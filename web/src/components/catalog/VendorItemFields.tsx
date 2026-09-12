@@ -356,9 +356,10 @@ export function VendorItemFields({
                 column="package_content"
                 value={vi.package_content}
                 kind="number"
-                  />
+              />
             </span>
-            <span>{unit})</span>
+            {/* `ml-1.5` (Mark, 2026-09-12): the unit was touching the box. */}
+            <span className="ml-1.5">{unit})</span>
           </span>
           <RecalcContent
             vendorItemId={vi.id}
