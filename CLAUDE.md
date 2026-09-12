@@ -2954,6 +2954,54 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **The report lands on the LIST, not the bar** — clearing the selection
    unmounts the bar, so a summary rendered there vanishes at the moment it is
    read.
+   **AND SO ARE THE INVOICE RECORD'S (Mark, 2026-09-12)** —
+   `InvoiceCommandMenu`, the fourth surface to take this shape, replacing two
+   boxes of buttons side by side: Void · Delete · Approve for payment, and
+   Send/Update/Link · Check QuickBooks · Forget the link. Up to six commands in
+   three colours across two rows become one trigger.
+   **THREE GROUPS, decide · send · destroy**: Approve for Payment / Withdraw
+   Approval / Reopen Invoice · **Send to QuickBooks** (or Update, or Link) ·
+   Check QuickBooks · Forget the Link · then a rule, then **Void Invoice** and
+   **Delete Invoice…**, both red.
+   **WHICH IS WHY `InvoiceActions` HANDS BACK TWO NAMED GROUPS** rather than
+   one array — QuickBooks sits BETWEEN its halves and the app's rule is that
+   the destructive rows come last (`OrderActions`' own `{ edit, destructive }`
+   shape). **FLAT, NOT A "QuickBooks ▸" SUBMENU**: at most three of its rows
+   are live at once, which is this file's own "two variants do not earn a
+   submenu" boundary, and a submenu would cost the ordinary case — one Send —
+   a second gesture.
+   **`InvoiceFooter` IS NOW `InvoiceActions`**, a name that had been wrong
+   since 2026-09-02 when these commands left the foot of the page for the title
+   row (015's "Receiving" relabel; 059's `resolution_note`).
+   **THE REFUSAL BECAME A DIALOG AND THE ROW STAYS ENABLED** —
+   `PushOrderToQuickBooks`' rule, and its reason bites harder here: the refusal
+   stood as PERMANENT PROSE under the button, which beneath a single Actions
+   trigger is a line on every bill not yet ready to go. It quotes
+   `shownRefusal` first, the list with "approve it first" filtered out, since
+   in a menu the Approve row is directly above the one you just pressed.
+   **PLACED IN THE 3fr CELL, right-aligned and `items-start`** (Mark: "under
+   the record nav buttons in the page title row, top aligned. The warning/hint
+   texts can appear below it"). Under the record nav comes free from the grid
+   rather than from a measurement — that cell ends on the content margin and
+   `RecordNav` rides at the right end of the breadcrumb row above. Measured at
+   1440 and 1280: the trigger's right edge and the record nav's are the same
+   pixel (1377, 1217), its top is the h1's box top (88, with the h1's ink at
+   89), and **Total's right edge is still the document pane's** (573.2, 509.2),
+   which is the alignment this header was rebuilt around on 2026-09-03.
+   **THE PROSE IS CAPPED AT `max-w-sm`.** Left full-width it spans the whole
+   3fr column — 788px at 1440 — and a yellow note that wide reads as a banner
+   across the header rather than as a line under the command it is about. 384px
+   is `PushOrderToQuickBooks`' own cap and is within ten pixels of the width
+   this block had as half of a two-box row.
+   **NOTHING RENDERS WHERE THERE IS NOTHING TO OFFER**, which here is a real
+   state and not a defensive one: the Page Permissions sheet has a purchaser at
+   Read Only on Invoices, so they get no approve, no void, no delete and no
+   push — and an empty menu is worse than none. The prose still renders, which
+   is what a reader came for.
+   Retired with the two boxes: the `grid-cols-2` that placed them, and the
+   placement hazard its comment recorded (a `grid-cols-2` whose first child
+   renders NO DOM NODE drops the survivor into track 1, which is why the
+   QuickBooks slot once needed a wrapper).
    **THE INVOICE LIST'S COMMANDS ARE ONE ACTIONS MENU TOO** (Mark, 2026-09-11,
    an hour after the PO list's and to the same shape): **New Invoice** ·
    **Documents** ▸ Preview Invoices · Download Invoices · **Sync QuickBooks** ·

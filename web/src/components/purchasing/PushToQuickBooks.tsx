@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { invokeQbo } from "@/lib/qboClient";
+import type { ReactNode } from "react";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
+import { alertDialog } from "@/lib/confirm";
 import { money } from "@/lib/purchaseOrders";
 import { normalizeInvoiceNumber, pushIsStale } from "@/lib/invoices";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
@@ -84,6 +87,7 @@ export function PushToQuickBooks({
   canPush,
   supabase,
   onDone,
+  children,
 }: {
   invoiceId: string;
   vendorId: string;
@@ -103,6 +107,9 @@ export function PushToQuickBooks({
   canPush: boolean;
   supabase: SupabaseClient;
   onDone: () => void;
+  /** Hand the rows to an `ActionMenu` instead of drawing buttons — the
+   *  arrangement `PushOrderToQuickBooks` uses on the special order record. */
+  children?: (items: ActionMenuItem[]) => ReactNode;
 }) {
   const [ctx, setCtx] = useState<Ctx | null>(null);
   const [busy, setBusy] = useState(false);
@@ -392,7 +399,11 @@ export function PushToQuickBooks({
   // after Send is clicked and finds a duplicate.)
   // `aria-hidden` because there is no content here for a screen reader to
   // announce, only a shape.
+  // IN A MENU THERE IS NOTHING TO STAND IN FOR — the trigger is already on
+  // screen and this simply contributes no rows until it knows what it can
+  // offer. The skeleton below exists to hold a BUTTON's place.
   if (!ctx) {
+    if (children) return <>{children([])}</>;
     return (
       <div className="flex flex-col items-end gap-1.5" aria-hidden="true">
         <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
@@ -407,7 +418,7 @@ export function PushToQuickBooks({
 
   // NOTHING AT ALL once we know: an invoice screen is not the place to
   // advertise a feature nobody has set up.
-  if (!ctx.connected) return null;
+  if (!ctx.connected) return children ? <>{children([])}</> : null;
 
   const account = expenseAccountFor(ctx.atShop, ctx.orgAccount);
   // The mapping is the SHOP's now, not the vendor's — 026's column, finally read.
@@ -683,6 +694,162 @@ export function PushToQuickBooks({
   // balance, sent, warnings, error — stays a stack of full-width lines below
   // both rows, since inlining a wrapped paragraph beside a button is what the
   // grid was already doing badly.
+  /* -- the prose, the same whether this draws buttons or hands over rows ---- */
+  // EVERYTHING ELSE — stacked lines, right-aligned, CAPPED AT `max-w-sm`
+  // (2026-09-12). Under a single Actions trigger this block otherwise spans
+  // the whole 3fr column — 788px at 1440 — and a yellow note that wide reads
+  // as a banner across the header rather than as a line under the command it
+  // is about. 384px is `PushOrderToQuickBooks`' own cap for prose under a
+  // menu, and it is within ten pixels of the width this block had when it was
+  // half of a two-box row.
+  const notes = (
+    <div className="w-full max-w-sm space-y-1 text-right text-[13px]">
+      {/* THE PASSIVE HALF of Mark's ask — the ACTIVE half is `offerResync`,
+          fired once from the effect above at the moment of re-approval.
+          This is what covers a reload afterwards, when that moment has
+          already passed: yellow, worth your eye, not an error — the same
+          "Update in QuickBooks" button above already does exactly this. */}
+      {already && stale && (
+        <p className="bg-mark-fill px-2 py-1 text-ink">
+          Edited since it was sent to QuickBooks — Update in QuickBooks to
+          keep them in sync.
+        </p>
+      )}
+      {/* Yellow, because this is not an error — it is the normal state
+          during the Bill.com parallel run, and the thing worth your eye is
+          that pressing Send would make a second copy. */}
+      {proposal?.ok && !already && (
+        <div className="space-y-1 bg-mark-fill px-2 py-1 text-right text-ink">
+          <p>
+            QuickBooks already has this as {proposal.candidate.entity}{" "}
+            {proposal.candidate.doc_number ?? proposal.candidate.id} —{" "}
+            {proposal.candidate.vendor_name ?? "unknown vendor"} ·{" "}
+            {proposal.candidate.txn_date ?? "no date"} · $
+            {proposal.candidate.total.toFixed(2)}.
+          </p>
+          {proposal.caveat && <p>{proposal.caveat}</p>}
+        </div>
+      )}
+      {/* Red rather than the mark colour: this is not "worth your eye", the
+          record here disagrees with QuickBooks and one of them is wrong. */}
+      {gone && (
+        <div className="space-y-1 border border-accent px-2 py-1 text-right text-ink">
+          <p>
+            QuickBooks no longer has{" "}
+            {already?.replace("In QuickBooks as ", "") ?? "that document"}.
+            It was deleted there, so this bill points at nothing and can be
+            neither updated nor sent until the link is forgotten.
+          </p>
+        </div>
+      )}
+      {/* Why the button is off, in words. A disabled control explains
+          itself only on hover, and the iPad has none. NOT THE APPROVAL
+          REFUSAL — "Approve it first" earned its place while this block sat
+          at the foot of the page; beside the Approve button itself it is a
+          sentence explaining a button by pointing at the button next to
+          it. */}
+      {canPush && shownRefusal && <p className="text-muted">{shownRefusal}</p>}
+      {!refusals.length && account && !already && (
+        <p className="text-faint">
+          Posts to {splitAccountName(account.name).leaf || account.ref}
+          {account.source === "org" ? " (the org default)" : ""}.
+        </p>
+      )}
+      {balance && (
+        <p className="text-muted">
+          {balance.text}{" "}
+          <span className="text-faint">· as of {balance.at}</span>
+        </p>
+      )}
+      {sent && <p className="text-muted">{sent}</p>}
+      {/* The bill IS in QuickBooks — this is not an error. It is the coding
+          QuickBooks accepted and then dropped, which it does with a 200 and
+          no fault when the matching preference is off. Yellow: worth your
+          eye, not something that went wrong. */}
+      {warnings.map((w) => (
+        <p key={w} className="bg-mark-fill px-2 py-1 text-ink">
+          {w}
+        </p>
+      ))}
+      {error && <p className="text-accent">{error}</p>}
+    </div>
+  );
+
+  if (children) {
+    // THE ROW STAYS ENABLED AND A REFUSAL IS A DIALOG — `PushOrderToQuickBooks`'
+    // rule on the special order record, and its reason applies here twice over:
+    // the refusal sentence stood permanently under the button, and under a
+    // single Actions trigger that is a line of prose on every bill that is not
+    // yet ready to go.
+    const items: ActionMenuItem[] = canPush
+      ? [
+          ...(proposal?.ok && !already
+            ? [
+                {
+                  label: busy ? "Linking…" : "Link to QuickBooks",
+                  disabled: busy,
+                  onSelect: () => void link(proposal.candidate),
+                },
+              ]
+            : [
+                {
+                  label: checkingDuplicate
+                    ? "Checking…"
+                    : busy
+                      ? "Sending…"
+                      : already
+                        ? "Update in QuickBooks"
+                        : "Send to QuickBooks",
+                  disabled: busy || checkingDuplicate,
+                  onSelect: () =>
+                    void (refusals.length > 0
+                      ? alertDialog({
+                          title: "This bill can't go to QuickBooks yet",
+                          // `shownRefusal` first, which is the list with
+                          // "approve it first" filtered out — in a menu the
+                          // Approve row is directly above this one, so saying
+                          // it points at the row you can already see. Falls
+                          // back to it when it is the ONLY reason, where it is
+                          // the honest answer however adjacent.
+                          body: shownRefusal ?? refusals[0],
+                        })
+                      : push()),
+                },
+              ]),
+          ...(already
+            ? [
+                {
+                  label: busy ? "Checking…" : "Check QuickBooks",
+                  disabled: busy,
+                  onSelect: () => void checkBalance(),
+                },
+              ]
+            : []),
+          // ONE ROW FOR BOTH CASES. As buttons these were two — a quiet
+          // underline while the link is merely unwanted, a full button once
+          // the document is GONE and the bill can neither update nor be sent
+          // until this is pressed. A flat menu has no second weight to say
+          // that in, so the red block below carries the urgency instead, and
+          // the row is the same row either way.
+          ...(already || gone
+            ? [
+                {
+                  label: busy ? "Forgetting…" : "Forget the Link",
+                  disabled: busy,
+                  onSelect: () => void unlink(),
+                },
+              ]
+            : []),
+        ]
+      : [];
+    return (
+      <>
+        {children(items)}
+        {notes}
+      </>
+    );
+  }
+
   return (
     <div className="flex flex-col items-end gap-1.5">
       {/* ROW 1 — every button that DOES something, packed together.
@@ -771,77 +938,7 @@ export function PushToQuickBooks({
         </div>
       )}
 
-      {/* EVERYTHING ELSE — full-width lines, stacked, right-aligned. */}
-      <div className="w-full space-y-1 text-right text-[13px]">
-        {/* THE PASSIVE HALF of Mark's ask — the ACTIVE half is `offerResync`,
-            fired once from the effect above at the moment of re-approval.
-            This is what covers a reload afterwards, when that moment has
-            already passed: yellow, worth your eye, not an error — the same
-            "Update in QuickBooks" button above already does exactly this. */}
-        {already && stale && (
-          <p className="bg-mark-fill px-2 py-1 text-ink">
-            Edited since it was sent to QuickBooks — Update in QuickBooks to
-            keep them in sync.
-          </p>
-        )}
-        {/* Yellow, because this is not an error — it is the normal state
-            during the Bill.com parallel run, and the thing worth your eye is
-            that pressing Send would make a second copy. */}
-        {proposal?.ok && !already && (
-          <div className="space-y-1 bg-mark-fill px-2 py-1 text-right text-ink">
-            <p>
-              QuickBooks already has this as {proposal.candidate.entity}{" "}
-              {proposal.candidate.doc_number ?? proposal.candidate.id} —{" "}
-              {proposal.candidate.vendor_name ?? "unknown vendor"} ·{" "}
-              {proposal.candidate.txn_date ?? "no date"} · $
-              {proposal.candidate.total.toFixed(2)}.
-            </p>
-            {proposal.caveat && <p>{proposal.caveat}</p>}
-          </div>
-        )}
-        {/* Red rather than the mark colour: this is not "worth your eye", the
-            record here disagrees with QuickBooks and one of them is wrong. */}
-        {gone && (
-          <div className="space-y-1 border border-accent px-2 py-1 text-right text-ink">
-            <p>
-              QuickBooks no longer has{" "}
-              {already?.replace("In QuickBooks as ", "") ?? "that document"}.
-              It was deleted there, so this bill points at nothing and can be
-              neither updated nor sent until the link is forgotten.
-            </p>
-          </div>
-        )}
-        {/* Why the button is off, in words. A disabled control explains
-            itself only on hover, and the iPad has none. NOT THE APPROVAL
-            REFUSAL — "Approve it first" earned its place while this block sat
-            at the foot of the page; beside the Approve button itself it is a
-            sentence explaining a button by pointing at the button next to
-            it. */}
-        {canPush && shownRefusal && <p className="text-muted">{shownRefusal}</p>}
-        {!refusals.length && account && !already && (
-          <p className="text-faint">
-            Posts to {splitAccountName(account.name).leaf || account.ref}
-            {account.source === "org" ? " (the org default)" : ""}.
-          </p>
-        )}
-        {balance && (
-          <p className="text-muted">
-            {balance.text}{" "}
-            <span className="text-faint">· as of {balance.at}</span>
-          </p>
-        )}
-        {sent && <p className="text-muted">{sent}</p>}
-        {/* The bill IS in QuickBooks — this is not an error. It is the coding
-            QuickBooks accepted and then dropped, which it does with a 200 and
-            no fault when the matching preference is off. Yellow: worth your
-            eye, not something that went wrong. */}
-        {warnings.map((w) => (
-          <p key={w} className="bg-mark-fill px-2 py-1 text-ink">
-            {w}
-          </p>
-        ))}
-        {error && <p className="text-accent">{error}</p>}
-      </div>
+      {notes}
     </div>
   );
 }

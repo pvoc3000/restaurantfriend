@@ -5,32 +5,42 @@ import { useRouter } from "next/navigation";
 import { ATTACHMENT_BUCKET } from "@/lib/attachments";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { InvoiceStatus } from "@/lib/invoices";
+import type { ReactNode } from "react";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
- * The invoice's own footer — Close · Void · Approve, right-aligned, in the
- * page's own flow.
+ * The invoice's own commands — approve, void, delete — and, since 2026-09-12,
+ * ROWS OF AN `ActionMenu` RATHER THAN BUTTONS (Mark: "move all the action
+ * buttons into our new ActionMenu"). Pass `children` and this hands its rows
+ * back in two named groups, keeping the writes, the row-count checks and every
+ * confirm; without `children` it still draws the old button row, which is the
+ * arrangement `OrderActions` uses and for the same reason.
  *
- * WHY IT IS NOT AN ACTIONBAR: Mark had the black band removed from the
+ * IT WAS `InvoiceFooter` AND THE NAME HAD BEEN WRONG SINCE 2026-09-02, when
+ * these commands left the foot of the page for the title row. Renamed here
+ * rather than left to mislead a third reader (015's "Receiving" relabel, and
+ * 059's `resolution_note`).
+ *
+ * WHY IT WAS NEVER AN ACTIONBAR: Mark had the black band removed from the
  * receiving screen on 2026-08-04 ("get rid of the black band at the bottom…
  * just two buttons"). Reintroducing one on a brand-new detail screen would be
  * reintroducing the thing he just took out.
  *
- * WHY APPROVE IS NOT BLACK: `DIALOG_COMMIT_CLASS` is "a commit inside a panel",
- * extended to the receiving screen because that screen produces ONE outcome and
- * its footer is a text-weight escape beside a commit. This screen isn't that —
- * what you came to do is edit the inline cells, and Void, Approve and Close are
- * a row of peers. CLAUDE.md names exactly this case as NOT the exception:
- * "every discrete button on it is peripheral by construction".
+ * WHY APPROVE WAS NEVER BLACK, in the arrangement this replaces:
+ * `DIALOG_COMMIT_CLASS` is "a commit inside a panel", extended to the receiving
+ * screen because that screen produces ONE outcome and its footer is a
+ * text-weight escape beside a commit. This screen isn't that — what you came to
+ * do is edit the inline cells. Moot in a menu, where every row is a peer.
  *
  * WHY IT DOESN'T NAVIGATE ON SUCCESS: receiving's Finalize leaves because
  * finalizing ENDS the task and everything left on screen is for a delivery you
  * have declared done. Approving leaves you looking at a record you may still
- * want to read, so the state is the feedback — the button is replaced by who
+ * want to read, so the state is the feedback — the command is replaced by who
  * approved it and when.
  */
-export function InvoiceFooter({
+export function InvoiceActions({
   invoiceId,
   status,
   approvedAt,
@@ -40,6 +50,7 @@ export function InvoiceFooter({
   closeHref,
   supabase,
   onDone,
+  children,
 }: {
   invoiceId: string;
   status: InvoiceStatus;
@@ -51,6 +62,14 @@ export function InvoiceFooter({
   closeHref: string;
   supabase: SupabaseClient;
   onDone: () => void;
+  /** Hand the rows to an `ActionMenu` instead of drawing buttons. TWO GROUPS,
+   *  because the menu puts QuickBooks BETWEEN them and the app's rule is that
+   *  the destructive rows come last — `OrderActions`' own `{ edit, destructive }`
+   *  shape. */
+  children?: (groups: {
+    decide: ActionMenuItem[];
+    destructive: ActionMenuItem[];
+  }) => ReactNode;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -187,6 +206,88 @@ export function InvoiceFooter({
   const button =
     "h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
 
+  /* -- the prose, which is the same either way ----------------------------- */
+  const notes = (
+    <>
+      {error && <p className="max-w-sm text-right text-sm text-accent">{error}</p>}
+      {/* THE LOCK EXPLAINS ITSELF (Mark, 2026-09-03, on seeing it live: "the
+          text 'Its figures are locked — withdraw approval to edit them.' is
+          unnecessary") — the fields are already sitting there read-only, which
+          is the whole message. Back to exactly what this said before 089. */}
+      {status === "approved" && (
+        <p className="max-w-sm text-right text-sm text-muted">
+          Approved for payment
+          {approvedAt ? ` on ${approvedAt.slice(0, 10)}` : ""}.
+        </p>
+      )}
+    </>
+  );
+
+  if (children) {
+    // TITLE CASE, the app's rule for a menu row, and the labels say what they
+    // act on where a button beside a heading did not have to.
+    const decide: ActionMenuItem[] = [
+      ...(canApprove && status === "open"
+        ? [
+            {
+              label: busy === "approve" ? "Approving…" : "Approve for Payment",
+              disabled: busy !== null,
+              onSelect: () => void setApproval(true),
+            },
+          ]
+        : []),
+      ...(canApprove && status === "approved"
+        ? [
+            {
+              label: busy === "unapprove" ? "Withdrawing…" : "Withdraw Approval",
+              disabled: busy !== null,
+              onSelect: () => void setApproval(false),
+            },
+          ]
+        : []),
+      ...(canEdit && status === "void"
+        ? [
+            {
+              // NOT destructive and NOT red — it is the UNDO of Void, and the
+              // only thing a voided invoice can do. It sits with the approval
+              // decisions because it is one: what state this record is in.
+              label: busy === "open" ? "Reopening…" : "Reopen Invoice",
+              disabled: busy !== null,
+              onSelect: () => void setStatus("open"),
+            },
+          ]
+        : []),
+    ];
+    const destructive: ActionMenuItem[] = [
+      ...(canEdit && status !== "void"
+        ? [
+            {
+              label: busy === "void" ? "Voiding…" : "Void Invoice",
+              danger: true,
+              disabled: busy !== null,
+              onSelect: () => void setStatus("void"),
+            },
+          ]
+        : []),
+      ...(canEdit
+        ? [
+            {
+              label: busy === "delete" ? "Deleting…" : "Delete Invoice…",
+              danger: true,
+              disabled: busy !== null,
+              onSelect: () => void destroy(),
+            },
+          ]
+        : []),
+    ];
+    return (
+      <>
+        {children({ decide, destructive })}
+        {notes}
+      </>
+    );
+  }
+
   // ITS OWN BOX NOW, matching `PushToQuickBooks`'s shape (Mark, 2026-09-03) —
   // a button row, then its own prose stacked beneath, in the fourth grid
   // column `InvoiceDetail` gives it. Sharing one row with QuickBooks' buttons
@@ -257,21 +358,8 @@ export function InvoiceFooter({
         )}
       </div>
 
-      <div className="w-full space-y-1 text-right">
-        {error && <p className="text-sm text-accent">{error}</p>}
-        {/* THE LOCK EXPLAINS ITSELF (Mark, 2026-09-03, on seeing it live:
-            "the text 'Its figures are locked — withdraw approval to edit
-            them.' is unnecessary") — the fields are already sitting there
-            read-only, which is the whole message; restating it in prose was
-            the confirm nobody needs to read twice. Back to exactly what this
-            said before 089. */}
-        {status === "approved" && (
-          <span className="block text-sm text-muted">
-            Approved for payment
-            {approvedAt ? ` on ${approvedAt.slice(0, 10)}` : ""}.
-          </span>
-        )}
-      </div>
+      {/* The same prose the menu path renders, so the two cannot drift. */}
+      <div className="w-full space-y-1">{notes}</div>
     </div>
   );
 }

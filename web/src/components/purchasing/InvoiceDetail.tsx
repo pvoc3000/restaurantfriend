@@ -45,8 +45,7 @@ import type { LinkedPurchaseOrder } from "@/lib/invoiceQueries";
 import type { SignedAttachment } from "@/lib/attachments";
 import { DocumentPane } from "./DocumentPane";
 import { useAttachmentActions } from "./useAttachmentActions";
-import { InvoiceFooter } from "./InvoiceFooter";
-import { PushToQuickBooks } from "./PushToQuickBooks";
+import { InvoiceCommandMenu } from "./InvoiceCommandMenu";
 import { attachmentRejection, type AttachmentKind } from "@/lib/attachments";
 import {
   handAmendment,
@@ -1160,55 +1159,63 @@ export function InvoiceDetail({
           </div>
         </div>
 
-        {/* RIGHT — actions | QuickBooks, matching the Bill/Amounts column's
-            width. Each renders its OWN box (buttons, then its own prose) —
-            see `InvoiceFooter` and `PushToQuickBooks` — so this grid only has
-            to place the two boxes side by side.
+        {/* RIGHT — ONE "ACTIONS" MENU, at the page's right edge and top
+            aligned (Mark, 2026-09-12: "move all the action buttons into our
+            new ActionMenu … place the actionmenu under the record nav buttons
+            in the page title row, top aligned. The warning/hint texts can
+            appear below it").
 
-            THE ORDER IS MARK'S (2026-09-08, asking for the two columns to be
-            swapped): Void · Delete · Approve for payment sit under the total,
-            and QuickBooks takes the page's right edge.
+            UNDER THE RECORD NAV comes free from the grid rather than from a
+            measurement: this is the 3fr cell, which ends on the content
+            margin, and `RecordNav` rides at the right end of the breadcrumb
+            row directly above — so right-aligning here puts the trigger under
+            it. `items-start` on the outer grid is what holds its top on the
+            h1's.
 
-            IT ALSO RETIRES A PLACEMENT HAZARD, which is why the wrapper `div`
-            the QuickBooks slot used to carry is gone (Mark, 2026-09-03:
-            "Void, Delete and Withdraw appear where the quickbook buttons
-            should be, then move into place"). A `grid-cols-2` whose FIRST
-            child has NO DOM NODE does not leave an empty slot — auto-placement
-            drops the one remaining child into the FIRST track — and
-            `PushToQuickBooks` returns `null` outright once it learns the org
-            has no QuickBooks connection, so it used to need a wrapper to hold
-            its track open. First in the row is now `InvoiceFooter`, which
-            ALWAYS renders a node, so track 1 is held whatever QuickBooks
-            decides and an absent last child leaves nothing to shift. If these
-            are ever swapped back, the wrapper goes back with them. */}
-        <div className="grid grid-cols-2 items-start gap-x-4">
-          <InvoiceFooter
-            invoiceId={invoice.id}
-            status={invoice.status}
-            approvedAt={invoice.approved_at}
-            caveats={caveats}
-            canApprove={canApprove}
-            canEdit={canEdit}
-            closeHref={closeHref}
-            supabase={supabase}
-            onDone={() => router.refresh()}
-          />
-          <PushToQuickBooks
-            invoiceId={invoice.id}
-            vendorId={invoice.vendor_id}
-            locationId={invoice.location_id}
-            orgId={orgId}
-            status={invoice.status}
-            total={invoice.total}
-            isCredit={invoice.is_credit}
-            invoiceNumber={invoice.invoice_number}
-            invoiceDate={invoice.invoice_date}
-            dueDate={invoice.due_date}
-            financialsTouchedAt={invoice.financials_touched_at}
-            syncedAt={invoice.synced_at}
-            canPush={canEdit}
-            supabase={supabase}
-            onDone={() => router.refresh()}
+            WHAT IT REPLACES is two boxes of buttons side by side — Void ·
+            Delete · Approve for payment, and Send/Update/Link · Check
+            QuickBooks · Forget the link — which between them were up to six
+            commands in three colours across two rows. The grid that placed
+            those two boxes is gone with them, and so is the placement hazard
+            its comment recorded: a `grid-cols-2` whose first child renders no
+            DOM node drops the survivor into track 1, which is why the
+            QuickBooks slot once needed a wrapper to hold its track open.
+            Nothing here has two tracks to confuse.
+
+            THE PROSE STACKS BENEATH, right-aligned, and it is not a leftover:
+            both components still render their own result lines, refusals and
+            yellow notes, in that order — QuickBooks' first because it is the
+            inner wrapper. See `InvoiceCommandMenu`. */}
+        <div className="flex flex-col items-end gap-2">
+          <InvoiceCommandMenu
+            actions={{
+              invoiceId: invoice.id,
+              status: invoice.status,
+              approvedAt: invoice.approved_at,
+              caveats,
+              canApprove,
+              canEdit,
+              closeHref,
+              supabase,
+              onDone: () => router.refresh(),
+            }}
+            quickbooks={{
+              invoiceId: invoice.id,
+              vendorId: invoice.vendor_id,
+              locationId: invoice.location_id,
+              orgId,
+              status: invoice.status,
+              total: invoice.total,
+              isCredit: invoice.is_credit,
+              invoiceNumber: invoice.invoice_number,
+              invoiceDate: invoice.invoice_date,
+              dueDate: invoice.due_date,
+              financialsTouchedAt: invoice.financials_touched_at,
+              syncedAt: invoice.synced_at,
+              canPush: canEdit,
+              supabase,
+              onDone: () => router.refresh(),
+            }}
           />
         </div>
       </div>
