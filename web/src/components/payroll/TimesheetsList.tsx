@@ -8,7 +8,8 @@ import {
   serverShiftFocus,
   subscribeShiftFocus,
 } from "@/lib/shiftFocus";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
@@ -769,40 +770,39 @@ export function TimesheetsList({
           icon={<SearchGlyph />}
         />
 
-        <div className="space-y-1.5">
-          <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
-            Overtime
-          </span>
-          <TabPicker
+        {/* PICKLISTS, NOT TABPICKERS (Mark, 2026-09-12) — a filter row's
+            one-of-N is a captioned `PickList` with its counts as hints, the
+            default since 2026-09-10. "Needs review 0" still shows: the hint is
+            the answer you came for. */}
+        <ControlField label="Overtime">
+          <PickList
             ariaLabel="Overtime review"
+            variant="field"
             value={review}
-            onChange={setReview}
+            onPick={(next) => setReview(next as typeof review)}
             options={[
-              { key: "all", label: "All", count: rows.length },
-              // Always shown, count and all — "Needs review 0" is the answer you
-              // came for, where an absent tab only says the screen forgot to
-              // offer it. The PO list's roll-up convention.
-              { key: "needs_review", label: "Needs review", count: needsReview.size },
+              { value: "all", label: "All", hint: String(rows.length) },
+              { value: "needs_review", label: "Needs review", hint: String(needsReview.size) },
             ]}
+            fit
           />
-        </div>
+        </ControlField>
 
-        <div className="space-y-1.5">
-          <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
-            Group by
-          </span>
-          <TabPicker
+        <ControlField label="Group by">
+          <PickList
             ariaLabel="Group by"
+            variant="field"
             value={grouping}
-            onChange={setGrouping}
+            onPick={(next) => setGrouping(next as Grouping)}
             options={[
-              { key: "employee", label: "Employee" },
-              { key: "workday", label: "Day" },
-              { key: "location", label: "Shop" },
-              { key: "none", label: "None" },
+              { value: "employee", label: "Employee" },
+              { value: "workday", label: "Day" },
+              { value: "location", label: "Shop" },
+              { value: "none", label: "None" },
             ]}
+            fit
           />
-        </div>
+        </ControlField>
 
         {/* THE TWO COMMANDS THAT WERE HERE — New timesheet and Import
             timesheets — are rows of the title row's Actions menu since
