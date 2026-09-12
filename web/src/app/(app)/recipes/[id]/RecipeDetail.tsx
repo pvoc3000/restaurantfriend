@@ -10,6 +10,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { RecipeVersions } from "@/components/production/RecipeVersions";
+import { PrintRecipe } from "@/components/production/PrintRecipe";
 import { RecipeVersionSheet } from "@/components/production/RecipeVersionSheet";
 import { RecipeInfo } from "@/components/production/RecipeInfo";
 import { SectionNav } from "@/components/ui/SectionNav";
@@ -300,7 +301,11 @@ export async function RecipeDetail({
           and it keeps the wider `w-40`: it has five sections with longer words
           ("Employment"), where this has two. */}
       <div className="space-y-3 lg:ml-36">
-        <div className="space-y-2">
+        {/* PRINT SHEET RIDES IN THE TITLE ROW, top-right (Mark, 2026-09-12),
+            where it sat at the right end of the version picker's line. It
+            prints the version the URL names, which is the one shown below. */}
+        <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
+        <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
               {recipe.name as string}
@@ -327,12 +332,20 @@ export async function RecipeDetail({
             {recipe.recipe_type ? ` · ${recipe.recipe_type as string}` : ""}
           </p>
         </div>
+        {current ? (
+          <div className="ml-auto">
+            <PrintRecipe
+              recipeName={recipe.name as string}
+              orgName={session.orgName}
+              version={current}
+            />
+          </div>
+        ) : null}
+        </div>
 
         {current ? (
           <RecipeVersions
             recipeId={id}
-            recipeName={recipe.name as string}
-            orgName={session.orgName}
             versions={versions}
             current={current}
             tab={tab}

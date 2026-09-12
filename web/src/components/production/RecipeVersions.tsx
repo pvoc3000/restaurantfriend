@@ -4,11 +4,11 @@ import { useRouter } from "next/navigation";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { PickList } from "@/components/ui/PickList";
 import { recipeHref, type RecipeTab } from "@/lib/recipes";
-import { PrintRecipe } from "./PrintRecipe";
 import type { SheetVersion } from "./RecipeVersionSheet";
 
 /**
- * The version picker and Print sheet, above the record's sections.
+ * The version picker, above the record's sections. Print sheet moved up to
+ * the title row (Mark, 2026-09-12).
  *
  * It sits ABOVE the split rather than inside a tab, because the version is what
  * both tabs are about: Info describes this version and Recipe is how to make it,
@@ -22,16 +22,12 @@ import type { SheetVersion } from "./RecipeVersionSheet";
  */
 export function RecipeVersions({
   recipeId,
-  recipeName,
-  orgName,
   versions,
   current,
   tab,
   params,
 }: {
   recipeId: string;
-  recipeName: string;
-  orgName: string;
   versions: SheetVersion[];
   current: SheetVersion;
   tab: RecipeTab;
@@ -42,7 +38,7 @@ export function RecipeVersions({
     recipeHref(recipeId, { tab, version: v.version_label }, params);
 
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="flex flex-wrap items-end gap-3">
       {/* A SEGMENTED BAR UNTIL THERE ARE TOO MANY VERSIONS, THEN A LIST.
           Chocolate Glaze has 38 and Chocolate Chip Cookie 23: a TabPicker of
           those is 2,381px wide in a 1,425px window, so the whole PAGE scrolled
@@ -80,7 +76,6 @@ export function RecipeVersions({
           }))}
         />
       )}
-      <PrintRecipe recipeName={recipeName} orgName={orgName} version={current} />
     </div>
   );
 }
