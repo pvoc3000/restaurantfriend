@@ -133,8 +133,14 @@ export function TextInput({
     // at the ✕ itself doesn't count as leaving the field and unmount the thing
     // you are reaching for.
     <span
+      // `fullWidth` WINS THE WIDTH; `search` decides the DRESS (2026-09-12).
+      // The two were entangled — `search` also forced `SEARCH_PEN` — so a
+      // captioned search, where the CAPTION BLOCK wears the pen and the field
+      // fills it, could not ask for the sunken look without nesting one pen
+      // inside another. That is why three of them wear the typed border
+      // instead, which is not a decision anybody made.
       className={`relative ${
-        search ? `flex ${SEARCH_PEN}` : fullWidth ? "flex w-full" : "inline-flex"
+        fullWidth ? "flex w-full" : search ? `flex ${SEARCH_PEN}` : "inline-flex"
       }`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}

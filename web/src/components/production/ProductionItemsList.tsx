@@ -290,11 +290,33 @@ export function ProductionItemsList({
     {
       key: "active",
       label: "Active",
-      width: 80,
+      // 90, up from 80, and Item pays the 10 — the total stays 1340 so every
+      // other column keeps its exact pixels (the PO list's rule). At 1280,
+      // where all eleven columns are still shown, 80 gave this cell 45.8px
+      // against a 50.7px "ACTIVE" and it printed "ACTI…" — the single-word
+      // fault CLAUDE.md names, which predates the switch but which the switch
+      // makes worse by wanting 40px of that cell where the checkbox wanted 24.
+      // Item gives it up because Item WRAPS, so what it loses is a wrap point
+      // rather than any text — the same argument that paid for the ⋯ column.
+      width: 90,
+      // The switch is 40px and the cell's padding 24, so a drag can never make
+      // this column too narrow to hold its own control. No widths-key bump:
+      // this is a nudge to a default, and a bump would throw away everybody's
+      // dragged widths, order and hidden columns to deliver it.
+      minWidth: 64,
       sortValue: (r) => (r.is_active ? 0 : 1),
       render: (r) =>
         editable ? (
-          <ActiveToggle table="production_items" id={r.id} active={r.is_active} />
+          // A SWITCH since 2026-09-12 (Mark) — this list carries a selection
+          // column too, which is the exact ambiguity `ui/Switch` exists to
+          // end: a checkbox would mean "this row is ticked" in one column and
+          // "this record is live" in the next.
+          <ActiveToggle
+            table="production_items"
+            id={r.id}
+            active={r.is_active}
+            control="switch"
+          />
         ) : (
           <span className="text-muted">{r.is_active ? "Yes" : "No"}</span>
         ),
@@ -302,11 +324,12 @@ export function ProductionItemsList({
     {
       key: "name",
       label: "Item",
-      // 294: the six it gave up are what let the ⋯ column be 74 rather than
-      // 68, which at 1280 is the difference between 40px of room for a 36px
-      // button and 35px. This column WRAPS, so what it loses is a wrap point
-      // rather than any text.
-      width: 294,
+      // 284, and it has paid twice: six for the ⋯ column (74 rather than 68,
+      // which at 1280 is the difference between 40px of room for a 36px
+      // button and 35px) and ten for Active in 2026-09-12. This column WRAPS,
+      // so what it loses each time is a wrap point rather than any text —
+      // measured at 1280 it still holds 224px against a 92px item name.
+      width: 284,
       pinned: true,
       wrap: true,
       sortValue: (r) => r.name,
@@ -508,11 +531,19 @@ export function ProductionItemsList({
 
   return (
     <div className="space-y-4">
+      {/* NEW ITEM RIDES WITH THE TITLE, top- and right-aligned (Mark,
+          2026-09-12) — `PageHeading` is already `items-start justify-between`,
+          so the placement is the prop rather than a class. This screen was a
+          straggler from the 2026-09-10 sweep that moved every other list's
+          create command out of its filter row; the prop's own doc has said
+          "beside the title" since it was written, while the wiring said
+          `rowAction`. */}
       <PageHeading
         title="Items"
         visible={visible.length}
         total={rows.length}
         noun="items"
+        action={action}
       />
       <div className="space-y-3">
         <FilterMenus
@@ -524,16 +555,22 @@ export function ProductionItemsList({
           onChange={changeFilters}
           // `PageHeading` states the count now — see `showCount`.
           showCount={false}
-          rowAction={action}
           leading={
             <div className={`${SEARCH_PEN} space-y-1.5`}>
               <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                 Search
               </span>
+              {/* THE SUNKEN DRESS, like every other search box in the app
+                  (Mark, 2026-09-12: "replace the search bar with our inset
+                  search bar"). `search` is what asks for `mac-field`; this
+                  block kept `fullWidth` because the CAPTION BLOCK around it
+                  wears `SEARCH_PEN`, and until today those two props fought
+                  over the width. See `ui/TextInput`. */}
               <TextInput
                 value={search}
                 onValueChange={changeSearch}
                 fullWidth
+                search
                 aria-label="Search items"
                 clearLabel="Clear the search"
                 icon={<SearchGlyph />}
