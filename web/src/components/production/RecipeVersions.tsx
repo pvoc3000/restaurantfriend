@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { ControlField } from "@/components/ui/ControlField";
 import { PickList } from "@/components/ui/PickList";
 import { recipeHref, type RecipeTab } from "@/lib/recipes";
 import type { SheetVersion } from "./RecipeVersionSheet";
@@ -39,14 +39,13 @@ export function RecipeVersions({
 
   return (
     <div className="flex flex-wrap items-end gap-3">
-      {/* A SEGMENTED BAR UNTIL THERE ARE TOO MANY VERSIONS, THEN A LIST.
-          Chocolate Glaze has 38 and Chocolate Chip Cookie 23: a TabPicker of
-          those is 2,381px wide in a 1,425px window, so the whole PAGE scrolled
-          sideways — which the app's layout rules forbid outright. Eight is
-          PickList's own threshold for growing a find box, and a reader hunting
-          for v43 among 38 wants to type it anyway. Below that a bar is still
-          right: three versions read at a glance and cost one tap. */}
-      {versions.length > 8 ? (
+      {/* ALWAYS A PICKLIST (Mark, 2026-09-12). It was a TabPicker up to eight
+          versions and a list past that — Chocolate Glaze has 38, and as tabs
+          that ran 2,381px wide and scrolled the page sideways — which meant the
+          same field was a different control from one recipe to the next. A
+          list at every count is one control, and past eight it grows its find
+          box. Captioned, because a collapsed picker has to say what it is. */}
+      <ControlField label="Version">
         <PickList
           variant="field"
           ariaLabel="Version"
@@ -62,20 +61,7 @@ export function RecipeVersions({
           }))}
           className="w-48"
         />
-      ) : (
-        <TabPicker
-          ariaLabel="Version"
-          value={current.version_label}
-          options={versions.map((v) => ({
-            key: v.version_label,
-            // The master is marked in the label rather than by colour: this is a
-            // TabPicker, whose black cell already means "selected", and a second
-            // colour in the same control would be two things to read.
-            label: v.is_master ? `v${v.version_label} ★` : `v${v.version_label}`,
-            href: href(v),
-          }))}
-        />
-      )}
+      </ControlField>
     </div>
   );
 }
