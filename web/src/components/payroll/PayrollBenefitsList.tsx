@@ -50,8 +50,18 @@ export function PayrollBenefitsList({
       sortValue: (b) => (b.is_active ? 0 : 1),
       // The house rule: the Active toggle leads every catalog table, and it is
       // why 033 names the column `is_active` rather than `active`.
+      // A SWITCH since 2026-09-12 (Mark), like every other Active column being
+      // converted. No rebalance: this table's total is 1320, so 90 buys 90.6px
+      // at 1440 and 79.7 at 1280 — 66.6 and 55.7 of content, clear of both the
+      // 40px switch and the 50.7px "ACTIVE".
       render: (b) => (
-        <ActiveToggle table="payroll_benefits" id={b.id} active={b.is_active} readOnly={!editable} />
+        <ActiveToggle
+          table="payroll_benefits"
+          id={b.id}
+          active={b.is_active}
+          control="switch"
+          readOnly={!editable}
+        />
       ),
     },
     {
