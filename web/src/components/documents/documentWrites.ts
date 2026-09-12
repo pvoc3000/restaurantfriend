@@ -116,3 +116,54 @@ export async function duplicateDocument(
     error: null,
   };
 }
+
+/**
+ * PUTTING A FILE ON A RECORD — Storage first, then the row.
+ *
+ * THE THIRD DOOR IS WHY THIS IS HERE (2026-09-12): the card's own button, a
+ * file DROPPED on the card, and — since the documents record took its commands
+ * into an Actions menu — a menu row three components away. Storage-then-row is
+ * 018's rule (a row pointing at nothing renders broken, where an orphaned
+ * object is invisible), and the insert's row count is the one that would
+ * otherwise be forgotten in a copy: a refused insert removes no rows and
+ * returns NO error, leaving the file in the bucket and on no record at all.
+ *
+ * The target is passed STRUCTURALLY rather than imported, so this module keeps
+ * no dependency on the client component that owns the registry.
+ */
+export async function attachFile(
+  supabase: SupabaseClient,
+  target: {
+    table: string;
+    ownerColumn: string;
+    bucket: string;
+    rejection: (file: { name: string; type: string }) => string | null;
+  },
+  orgId: string,
+  ownerId: string,
+  file: File
+): Promise<{ error: string | null }> {
+  const refusal = target.rejection(file);
+  if (refusal) return { error: refusal };
+
+  const path = photoPath(orgId, ownerId, file.name);
+  const up = await supabase.storage.from(target.bucket).upload(path, file);
+  if (up.error) return { error: up.error.message };
+
+  const { data, error } = await supabase
+    .from(target.table)
+    .insert({
+      org_id: orgId,
+      [target.ownerColumn]: ownerId,
+      storage_path: path,
+      file_name: file.name,
+      content_type: file.type,
+      byte_size: file.size,
+    })
+    .select("id");
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) {
+    return { error: "The file uploaded but was not filed — you may not have permission." };
+  }
+  return { error: null };
+}

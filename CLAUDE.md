@@ -8841,6 +8841,37 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Read was tried and reverted within the hour**, because Documents sits before
    Production in the menu and would have become every staffer's landing screen
    (`homeHref`); the table policy is membership-wide regardless.
+   **THE RECORD'S COMMANDS ARE ONE ACTIONS MENU (Mark, 2026-09-12)** — "combine
+   the action buttons on the documents detail page into an actionmenu, place it
+   where the delete button currently sits. Rename the attach button to 'Attach
+   File...'". **Attach File… · Delete Document… (red)**, in the title row where
+   Delete stood; measured at 1440 the trigger's right edge is the content margin
+   (1377) and its top is the h1's (98, ink at 99).
+   **THE SCREEN'S "ACTION BUTTONS" WERE EXACTLY TWO, one at each end of the
+   page** — Attach on the card, Delete beside the title. The per-FILE controls
+   stay: Open · Print · Download · Remove are underlined text on each row of the
+   list, they act on THAT file, and there can be several, so a screen-level menu
+   has no way to say which one it means.
+   **`AttachFile` CAME OUT OF `FiledDocuments` TO MAKE THAT POSSIBLE**, and it
+   is a component rather than a function because THE HIDDEN INPUT HAS TO COME
+   WITH IT: opening a file picker is `input.click()` and the browser honours it
+   only INSIDE a user gesture, so the input must be mounted wherever the command
+   is. `showAttach={false}` is how this record takes the command while the
+   INSPECTION record keeps the button; the drop zone stays on both, a dragged
+   file having nowhere else to land. **The upload moved to `documentWrites`**
+   beside `deleteDocuments`, which is what keeps the drop and the two buttons
+   one implementation — the insert's row count being exactly the thing a copy
+   forgets, and a refused insert leaving the file in the bucket and on no record
+   at all.
+   **`react-hooks/refs` REFUSES A REF CLOSURE HANDED INTO A RENDER PROP**, which
+   is `PushToQuickBooks`' wall a second time: the rule reads `children(...)` as a
+   CALL DURING RENDER, so a row whose `onSelect` closes over `someRef.current` is
+   an error even inside a `useCallback`. Restructured rather than silenced —
+   `useId` plus a `getElementById` in the handler, which is where the element is
+   wanted anyway. **Reach for that before a disable comment** if a command
+   component ever needs a DOM node from a menu row.
+   Known and Mark's to reverse: the label is ONE label, so the inspection
+   record's button reads "Attach File…" too, where its card is called Report.
    **`components/documents/FiledDocuments` IS THE INSPECTION RECORD'S REPORT
    CARD, GENERALISED** — the table, owner column, bucket, accept list and
    wording are a `FiledDocumentsTarget` (`INSPECTION_DOCUMENTS` in

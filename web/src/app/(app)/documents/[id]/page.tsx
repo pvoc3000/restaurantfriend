@@ -13,7 +13,7 @@ import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { PHOTO_URL_TTL_SECONDS } from "@/lib/facilityPhotos";
 import { DOCUMENT_BUCKET, DOCUMENT_SELECT, type OrgDocument } from "@/lib/orgDocuments";
 import { FiledDocuments, type FiledDocument } from "@/components/documents/FiledDocuments";
-import { DocumentActions } from "@/components/documents/DocumentActions";
+import { DocumentCommandMenu } from "@/components/documents/DocumentCommandMenu";
 
 const CRUMB = { href: "/documents", label: "Documents" };
 
@@ -112,11 +112,19 @@ export default async function DocumentPage({
             {[row.category, row.version ? `v${row.version}` : null].filter(Boolean).join(" · ")}
           </p>
         </div>
-        {canDeleteInspection(session.membership.role) && (
-          <div className="ml-auto">
-            <DocumentActions documentId={id} title={row.title} fileCount={paths.length} />
-          </div>
-        )}
+        {/* ONE ACTIONS MENU, where Delete stood (Mark, 2026-09-12) — Attach
+            File… came up from the card to join it. `items-start` on the row
+            already had the buttons level with the h1's top. */}
+        <div className="ml-auto">
+          <DocumentCommandMenu
+            documentId={id}
+            title={row.title}
+            fileCount={paths.length}
+            orgId={orgId}
+            editable={editable}
+            canDelete={canDeleteInspection(session.membership.role)}
+          />
+        </div>
       </div>
 
       <div className="grid gap-12 xl:grid-cols-2 xl:items-start">
@@ -145,7 +153,17 @@ export default async function DocumentPage({
             {cell("notes", row.notes, "Notes", { multiline: true, rows: 8 })}
           </section>
         </div>
-        <FiledDocuments kind="document" ownerId={id} orgId={orgId} documents={documents} editable={editable} />
+        {/* `showAttach={false}`: the command is in the title row's menu now.
+            The DROP ZONE stays — a file dragged onto the card is the same act
+            and has nowhere else to land. */}
+        <FiledDocuments
+          kind="document"
+          ownerId={id}
+          orgId={orgId}
+          documents={documents}
+          editable={editable}
+          showAttach={false}
+        />
       </div>
     </div>
   );

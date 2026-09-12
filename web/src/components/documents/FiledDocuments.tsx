@@ -9,10 +9,11 @@ import { FileDropZone } from "@/components/ui/FileDropZone";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Pane } from "@/components/ui/Pane";
 import { DocumentViewer } from "@/components/ui/DocumentViewer";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog } from "@/lib/confirm";
-import { PHOTO_BUCKET, photoPath } from "@/lib/facilityPhotos";
+import { PHOTO_BUCKET } from "@/lib/facilityPhotos";
 import { printDocument } from "@/lib/printDocument";
+import { attachFile } from "./documentWrites";
+import { AttachFile } from "./AttachFile";
 import { INSPECTION_DOC_ACCEPT, inspectionDocRejection } from "@/lib/inspections";
 import { DOCUMENT_ACCEPT, DOCUMENT_BUCKET, documentRejection } from "@/lib/orgDocuments";
 
@@ -54,7 +55,7 @@ export type FiledDocument = {
  */
 export type FiledDocumentsKind = "inspection" | "document";
 
-type FiledDocumentsTarget = {
+export type FiledDocumentsTarget = {
   /** The files table and the column naming the owning record. */
   table: string;
   ownerColumn: string;
@@ -69,7 +70,7 @@ type FiledDocumentsTarget = {
   noun: string;
 };
 
-const TARGETS: Record<FiledDocumentsKind, FiledDocumentsTarget> = {
+export const TARGETS: Record<FiledDocumentsKind, FiledDocumentsTarget> = {
   inspection: {
     table: "facility_photos",
     ownerColumn: "inspection_id",
@@ -96,17 +97,21 @@ export function FiledDocuments({
   orgId,
   documents,
   editable,
+  showAttach = true,
 }: {
   kind: FiledDocumentsKind;
   ownerId: string;
   orgId: string;
   documents: FiledDocument[];
   editable: boolean;
+  /** False where the screen has taken Attach into an Actions menu of its own
+   *  — the documents record. The DROP ZONE stays either way: a file dragged
+   *  onto the card is the same act, and it has nowhere else to land. */
+  showAttach?: boolean;
 }) {
   const target = TARGETS[kind];
   const router = useRouter();
   const supabase = createClient();
-  const fileInput = useRef<HTMLInputElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
   const beside = useViewportAtLeast(1280);
   useFillToBottom(viewerRef, beside, 480);
@@ -135,34 +140,15 @@ export function FiledDocuments({
   }
   const shown = documents.find((d) => d.id === picked) ?? documents[0] ?? null;
 
+  /** The DROP path. The button's is `AttachFile`; both go through the same
+   *  write, which is the point of it living in `documentWrites`. */
   async function add(file: File) {
-    const refusal = target.rejection(file);
-    if (refusal) return setFailed(refusal);
     setFailed(null);
     setBusy(true);
-    try {
-      const path = photoPath(orgId, ownerId, file.name);
-      const up = await supabase.storage.from(target.bucket).upload(path, file);
-      if (up.error) return setFailed(up.error.message);
-      const { data, error } = await supabase
-        .from(target.table)
-        .insert({
-          org_id: orgId,
-          [target.ownerColumn]: ownerId,
-          storage_path: path,
-          file_name: file.name,
-          content_type: file.type,
-          byte_size: file.size,
-        })
-        .select("id");
-      if (error) return setFailed(error.message);
-      if (!data || data.length === 0) {
-        return setFailed("The file uploaded but was not filed — you may not have permission.");
-      }
-      router.refresh();
-    } finally {
-      setBusy(false);
-    }
+    const { error } = await attachFile(supabase, target, orgId, ownerId, file);
+    setBusy(false);
+    if (error) return setFailed(error);
+    router.refresh();
   }
 
   async function remove(doc: FiledDocument) {
@@ -191,28 +177,12 @@ export function FiledDocuments({
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <SectionHeading count={documents.length}>{target.heading}</SectionHeading>
-        {editable && (
-          <>
-            <input
-              ref={fileInput}
-              type="file"
-              accept={target.accept.join(",")}
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = "";
-                if (f) void add(f);
-              }}
-            />
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => fileInput.current?.click()}
-              className={`${BUTTON_CLASS} ml-auto`}
-            >
-              {busy ? "Uploading…" : "Attach"}
-            </button>
-          </>
+        {/* THE COMMAND IS `AttachFile` NOW (2026-09-12) — one upload, two
+            dresses. `showAttach={false}` is how the documents record takes it
+            into the title row's Actions menu while the inspection record keeps
+            the button here. */}
+        {editable && showAttach && (
+          <AttachFile kind={kind} ownerId={ownerId} orgId={orgId} />
         )}
       </div>
 
