@@ -124,13 +124,15 @@ export function PoAttachments({
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           Paperwork
         </h2>
-        <span className="text-sm text-muted">
-          {attachments.length > 0
-            ? `${attachments.length} ${attachments.length === 1 ? "file" : "files"}`
-            : canEdit
-              ? "Nothing attached — drop one here"
-              : "Nothing attached"}
-        </span>
+        {/* The COUNT, and nothing when there is none (Mark, 2026-09-11). An
+            empty card said "Nothing attached — drop one here", which is the
+            hint rule twice over: the card is visibly empty, and the Attach
+            button beside it says what to do about that. */}
+        {attachments.length > 0 && (
+          <span className="text-sm text-muted">
+            {attachments.length} {attachments.length === 1 ? "file" : "files"}
+          </span>
+        )}
 
         {canEdit && (
           <span className="ml-auto flex items-center gap-3">
