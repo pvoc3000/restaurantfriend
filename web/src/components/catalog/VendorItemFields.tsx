@@ -152,34 +152,33 @@ export function VendorItemFields({
             format (see vendorItemTitle). The vendor's own description has its
             own field below — a title you could type into would be a second box
             writing that same column. */}
-        {/* w-full so the toggle always sits on its own row. A composed title
-            runs 39 chars at the median against a description's handful, so
-            left inline the toggle would sit beside short titles and wrap under
-            long ones — placement that moves record to record. */}
         <h1 className="w-full text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           {title ?? <span className="text-faint">Untitled vendor item</span>}
         </h1>
-        {/* A SWITCH since 2026-09-12 (Mark, sweeping the vendor screens). This
-            writes `vendor_items.is_active` — THE SAME COLUMN the vendor
-            record's Items tab and the inventory item's Vendor Items tab show
-            as a switch, one click away in both directions — so a checkbox here
-            was the one place in the family where that flag took a different
-            shape.
-
-            THE WORD BESIDE IT WENT WITH THE CHECKBOX, as on the inventory item
-            record: a switch states its own state, and `readOnly` renders the
-            word for a reader who gets no control. */}
-        <ActiveToggle
-          readOnly={!editable}
-          table="vendor_items"
-          id={vi.id}
-          active={vi.is_active}
-          control="switch"
-          label="Vendor item active"
-        />
       </div>
 
       <dl className="grid max-w-[min(42rem,max(24rem,50%))] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+        {/* THE ACTIVE SWITCH IS THE FIRST ROW, LABELLED (Mark, 2026-09-12:
+            "the active switch … needs a label"). It sat alone under the title
+            with nothing saying what it switched; this is where the vendor and
+            inventory item records put theirs.
+
+            A SWITCH since 2026-09-12 (Mark, sweeping the vendor screens). This
+            writes `vendor_items.is_active` — THE SAME COLUMN the vendor
+            record's Items tab and the inventory item's Vendor Items tab show
+            as a switch, one click away in both directions. `readOnly` renders
+            the word for a reader who gets no control. */}
+        <dt className="text-subtle">Active</dt>
+        <dd>
+          <ActiveToggle
+            readOnly={!editable}
+            table="vendor_items"
+            id={vi.id}
+            active={vi.is_active}
+            control="switch"
+            label="Vendor item active"
+          />
+        </dd>
         <dt className="text-subtle">Vendor</dt>
         <dd>
           {vi.vendors ? (
