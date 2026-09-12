@@ -169,7 +169,10 @@ export function VendorItemFields({
             as a switch, one click away in both directions. `readOnly` renders
             the word for a reader who gets no control. */}
         <dt className="text-subtle">Active</dt>
-        <dd>
+        {/* `min-h-9` on the three unboxed rows (Mark, 2026-09-12): a boxed
+            field is 36px, so text and a switch in a bare `dd` made these rows
+            visibly tighter than the fields below them. */}
+        <dd className="flex min-h-9 items-center">
           <ActiveToggle
             readOnly={!editable}
             table="vendor_items"
@@ -180,7 +183,7 @@ export function VendorItemFields({
           />
         </dd>
         <dt className="text-subtle">Vendor</dt>
-        <dd>
+        <dd className="flex min-h-9 items-center">
           {vi.vendors ? (
             <Link
               href={withFrom(`/vendors/${vi.vendors.id}`, here)}
@@ -199,7 +202,7 @@ export function VendorItemFields({
         </dd>
 
         <dt className="text-subtle">Inventory item</dt>
-        <dd className="flex flex-wrap items-center gap-2">
+        <dd className="flex min-h-9 flex-wrap items-center gap-2">
           {vi.inventory_items ? (
             <Link
               href={withFrom(`/items/${vi.inventory_items.id}`, here)}
