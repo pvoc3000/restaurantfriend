@@ -5280,8 +5280,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    as a `heading` prop, since the menu and the picker need its state. **The
    sticky controls band is GONE**: it existed to keep those buttons in view,
    so the weekday labels now stick under the masthead alone
-   (`STICKY_HEAD_ROW`), and the tray count and the "175 pars differ" sentence
-   are a plain line above the table. The paragraph below is history.
+   (`STICKY_HEAD_ROW`), and the "175 pars differ" sentence is a plain line
+   above the table. The same day (Mark) Group by's caption moved to the LEFT
+   of the picker — it stands alone under the menu, with no row of captioned
+   fields to line up with — and "24 trays on this plan" sits under it. The
+   paragraph below is history.
    **Add tray is PINNED — at the TOP since 2026-09-07** (Mark: move the
    footer's buttons "to the filter row, aligned to the right… then remove the
    footer, and make the header sticky so the filter row is always visible").

@@ -11,7 +11,6 @@ import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/u
 import { RowMenu } from "@/components/ui/RowMenu";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
-import { ControlField } from "@/components/ui/ControlField";
 import {
   STICKY_HEAD_ROW,
   useOverflowOnlyWhenNeeded,
@@ -994,54 +993,55 @@ export function PlanMatrix({
           h1's. */}
       <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
         <div className="min-w-0 flex-1">{heading}</div>
-        {commands.length > 0 || trays.length > 1 ? (
-          <div className="ml-auto flex flex-col items-end gap-3">
-            {commands.length > 0 ? (
-              <ActionMenu ariaLabel="Actions for this plan" minWidth={240} items={commands} />
-            ) : null}
-            {trays.length > 1 ? (
-              <ControlField label="Group by">
-                <PickList
-                  ariaLabel="Group trays by"
-                  variant="field"
-                  value={grouping}
-                  onPick={(next) => setGrouping(next as MatrixGrouping)}
-                  options={[
-                    { value: "tray", label: "Tray" },
-                    { value: "category", label: "Category" },
-                    { value: "type", label: "Item type" },
-                  ]}
-                  fit
-                />
-              </ControlField>
-            ) : null}
-          </div>
-        ) : null}
+        <div className="ml-auto flex flex-col items-end gap-3">
+          {commands.length > 0 ? (
+            <ActionMenu ariaLabel="Actions for this plan" minWidth={240} items={commands} />
+          ) : null}
+          {trays.length > 1 ? (
+            // The caption to the LEFT of the control here (Mark, 2026-09-12),
+            // where a filter row's `ControlField` stacks it above: this picker
+            // stands alone under the menu, so there is no row to line up with.
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase tracking-[0.12em] text-subtle">Group by</span>
+              <PickList
+                ariaLabel="Group trays by"
+                variant="field"
+                value={grouping}
+                onPick={(next) => setGrouping(next as MatrixGrouping)}
+                options={[
+                  { value: "tray", label: "Tray" },
+                  { value: "category", label: "Category" },
+                  { value: "type", label: "Item type" },
+                ]}
+                fit
+              />
+            </div>
+          ) : null}
+          {/* The grand total, under the picker (Mark, 2026-09-12). */}
+          <span className="text-[13px] text-muted">
+            {trays.length} tray{trays.length === 1 ? "" : "s"} on this plan
+          </span>
+        </div>
       </div>
 
       <div className="space-y-3">
-      {/* What the band said besides its buttons: the grand total, and how many
-          pars disagree with this shop's defaults — the count you need to decide
-          whether to Check Pars, stated BEFORE you turn it on. */}
-      <p className="text-[13px] text-muted">
-        {trays.length} tray{trays.length === 1 ? "" : "s"} on this plan
-        {editable && (differing.length > 0 || review) ? (
-          <>
-            {" · "}
-            {differing.length === 0 ? (
-              <>Every par matches {locationCode}&rsquo;s defaults.</>
-            ) : (
-              <>
-                <span className="font-medium text-ink">
-                  {differing.length} par{differing.length === 1 ? "" : "s"}
-                </span>{" "}
-                differ{differing.length === 1 ? "s" : ""} from {locationCode}&rsquo;s defaults
-                {review ? " — checking" : ""}.
-              </>
-            )}
-          </>
-        ) : null}
-      </p>
+      {/* How many pars disagree with this shop's defaults — the count you need
+          to decide whether to Check Pars, stated BEFORE you turn it on. */}
+      {editable && (differing.length > 0 || review) ? (
+        <p className="text-[13px] text-muted">
+          {differing.length === 0 ? (
+            <>Every par matches {locationCode}&rsquo;s defaults.</>
+          ) : (
+            <>
+              <span className="font-medium text-ink">
+                {differing.length} par{differing.length === 1 ? "" : "s"}
+              </span>{" "}
+              differ{differing.length === 1 ? "s" : ""} from {locationCode}&rsquo;s defaults
+              {review ? " — checking" : ""}.
+            </>
+          )}
+        </p>
+      ) : null}
 
       <div ref={scrollerRef} className="overflow-x-auto">
         {/* `table-fixed` is what makes the widths below actual widths. Without
