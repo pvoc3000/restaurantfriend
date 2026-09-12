@@ -119,10 +119,17 @@ export function LocationsList({
             width: 95,
             sortValue: (r: LocationRow) => sortValue(r, "active"),
             render: (r: LocationRow) => (
+              // A SWITCH since 2026-09-12 (Mark), matching the record it
+              // opens — the shop's own durable state, in the shape
+              // `ui/Switch` took back for exactly that. This list's other
+              // control is the WORKING HERE chip two columns over, which is a
+              // filled box you press; a checkbox beside it read as a third
+              // kind of thing.
               <ActiveToggle
                 table="locations"
                 id={r.id}
                 active={r.is_active}
+                control="switch"
                 label={`${r.code} active`}
               />
             ),

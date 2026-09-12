@@ -1,7 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
-import { LOCATIONS_CRUMB } from "@/lib/locations";
+import {
+  LOCATIONS_CRUMB,
+  LOCATION_TABS,
+  LOCATION_TAB_LABEL,
+  locationTabHref,
+  parseLocationTab,
+} from "@/lib/locations";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
@@ -13,6 +19,7 @@ import { OperationsFields } from "@/components/location/OperationsFields";
 import { OperatingHours } from "@/components/location/OperatingHours";
 import { WorkingHere } from "@/components/location/WorkingHere";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { SectionNav } from "@/components/ui/SectionNav";
 import { canEditPage } from "@/lib/pageAccess";
 
 /** The columns migration 017 added, plus what 001 always had. */
@@ -112,6 +119,13 @@ export async function LocationDetail({
   const location = row as unknown as LocationRecord;
   const trail = parseTrail(rawParams, LOCATIONS_CRUMB);
 
+  const tab = parseLocationTab(rawParams.tab);
+  const tabOptions = LOCATION_TABS.map((t) => ({
+    key: t,
+    label: LOCATION_TAB_LABEL[t],
+    href: locationTabHref(id, t, rawParams),
+  }));
+
   // Three tiers, the same order `send-po-email` resolves them in: this
   // location's own override, then the org's, then the app's default sender.
   const locationProvider = (location.settings?.email_provider ?? null) as EmailProvider | null;
@@ -135,8 +149,14 @@ export async function LocationDetail({
         trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
       />
 
-      {/* ---- who this is ---------------------------------------------- */}
-      <div className="space-y-3">
+      {/* THE IDENTITY, ABOVE THE SPLIT and indented to the content column —
+          the inventory and production item records' shape, copied rather than
+          re-derived. `lg:ml-48` = the sidebar's `lg:w-40` + the row's
+          `lg:gap-8`; THE THREE VALUES ARE COUPLED. `WorkingHere` comes with it
+          because adopting the shop you are reading about is not a fact ABOUT
+          the shop — it is what you do having read one, and it should not go
+          missing because you happen to be on Addresses. */}
+      <div className="space-y-3 lg:ml-48">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
             {editable ? (
@@ -163,185 +183,224 @@ export async function LocationDetail({
             mayWork={session.workableLocations.some((l) => l.id === location.id)}
           />
         </div>
-
-        <dl className="grid max-w-md grid-cols-[6rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
-          {/* ACTIVE IS THE RECORD'S FIRST FIELD, a large Mac checkbox a button
-              tall (Mark, 2026-09-10) — it sat beside the title as a switch. Its
-              label sits in the label column with the others; the checkbox keeps
-              the word as its accessible name only. */}
-          <dt className="text-subtle">Active</dt>
-          <dd>
-            <ActiveToggle
-              table="locations"
-              id={location.id}
-              active={location.is_active}
-              label="Active"
-              yesNo
-              readOnly={!editable}
-            />
-          </dd>
-          <dt className="text-subtle">Code</dt>
-          <dd>
-            {/* The PO number's location segment is the trailing digits of this
-                (migration 006), and every FMP-era join was on it. Editable, but
-                it is the one field here with consequences elsewhere. */}
-            {editable ? (
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="locations"
-                id={location.id}
-                column="code"
-                value={location.code}
-                nullable={false}
-              />
-            ) : (
-              location.code
-            )}
-          </dd>
-          <dt className="text-subtle">Public name</dt>
-          <dd>
-            {/* WHAT A CUSTOMER SEES — the inquiry form's shop list, and
-                whatever else ever faces outward. `name` is internal and says
-                so: the real ones read "DONUT FRIEND 01 HIGHLAND PARK", a
-                numbering scheme that means nothing to somebody choosing where
-                to collect a box of donuts.
-
-                Empty is a real state, not a gap to fill: it FALLS BACK to
-                `name`, which is why the placeholder shows the name rather than
-                an em dash — the cell tells you what the public would see right
-                now, whether or not anybody has set it. */}
-            {editable ? (
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="locations"
-                id={location.id}
-                column="public_name"
-                value={location.public_name}
-                placeholder={location.name}
-                ariaLabel="Public name"
-              />
-            ) : (
-              location.public_name ?? location.name
-            )}
-          </dd>
-          <dt className="text-subtle">Kind</dt>
-          <dd>
-            {editable ? (
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="locations"
-                id={location.id}
-                column="kind"
-                value={location.kind}
-                kind="pick"
-                nullable={false}
-                options={[
-                  { value: "physical", label: "physical", hint: "a shop with shelves" },
-                  { value: "virtual", label: "virtual", hint: "offsite events, no address" },
-                ]}
-              />
-            ) : (
-              location.kind
-            )}
-          </dd>
-        </dl>
       </div>
 
-      {/* ---- what hangs off this location ------------------------------ */}
-      {/* First after the identity (Mark, 2026-08-02). It's the fastest read on
-          the screen — four numbers that say how much of the business is at this
-          shop — and it answers "is this location real yet?" before you start
-          into the fields. Everything below it is detail you go looking for. */}
-      <section className="space-y-2">
-        <Heading>In the system</Heading>
-        {/* Figures, not links (Mark, 2026-08-01: "drop the links, but keep the
-            info. It's handy."). Every one of those screens is scoped to the
-            WORKING location, so a link from this record was only ever right by
-            coincidence — and wrong on the five records that aren't it. */}
-        <div className="flex flex-wrap gap-x-10 gap-y-4">
-          <Count label="Shop sections" value={sectionCount} />
-          <Count label="Vendors here" value={vendorCount} />
-          <Count label="Items stocked" value={itemCount} />
-          <Count label="Purchase orders" value={poCount} />
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+        {/* Two renderings of one control, WRAPPED rather than switched with a
+            responsive `display` utility — Tailwind resolves competing
+            utilities by stylesheet order, so a `hidden` passed in `className`
+            cannot be relied on to beat the component's own `flex`. */}
+        <div
+          className="hidden lg:sticky lg:block lg:w-40 lg:shrink-0"
+          style={{ top: "calc(var(--rf-header-h) + 1.5rem)" }}
+        >
+          <SectionNav ariaLabel="Which part of this record" value={tab} items={tabOptions} />
         </div>
-      </section>
-
-      {/* ---- addresses ------------------------------------------------ */}
-      <div className="grid gap-8 lg:grid-cols-2">
-        <section className="space-y-2">
-          <Heading>Shipping address</Heading>
-          <AddressFields
-            locationId={location.id}
-            address={location.address}
-            group="shipping"
-            editable={editable}
+        <div className="lg:hidden">
+          <SectionNav
+            orientation="horizontal"
+            ariaLabel="Which part of this record"
+            value={tab}
+            items={tabOptions}
           />
-          <p className="max-w-md text-xs text-subtle">
-            This is the <strong>Ship to</strong>{" "}block printed on every vendor
-            purchase order — it&rsquo;s where the delivery goes.
-          </p>
-        </section>
+        </div>
 
-        <section className="space-y-2">
-          <Heading>Billing address</Heading>
-          <AddressFields
-            locationId={location.id}
-            address={location.address}
-            group="billing"
-            editable={editable}
-          />
-          <p className="max-w-md text-xs text-subtle">
-            Kept per location, but a PO&rsquo;s <strong>bill to</strong>{" "}comes from
-            the organisation&rsquo;s billing entity, not from here.
-          </p>
-        </section>
+        <div className="min-w-0 flex-1 space-y-8">
+          {tab === "info" && (
+            <>
+              <dl className="grid max-w-md grid-cols-[6rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+                {/* ACTIVE IS THE RECORD'S FIRST FIELD (Mark, 2026-09-10, moving it
+                    out of the title row), AND A SWITCH AGAIN SINCE 2026-09-12 — it
+                    was one until the sweep that briefly made every on/off control a
+                    checkbox, then a large Mac checkbox a button tall, and now the
+                    shape `ui/Switch` took back for a record's own durable state. Its
+                    label sits in the label column with the others, so the control
+                    keeps the word as its accessible name only; `yesNo` is what a
+                    reader below purchaser+ gets in its place. */}
+                <dt className="text-subtle">Active</dt>
+                <dd>
+                  <ActiveToggle
+                    table="locations"
+                    id={location.id}
+                    active={location.is_active}
+                    control="switch"
+                    label="Active"
+                    yesNo
+                    readOnly={!editable}
+                  />
+                </dd>
+                <dt className="text-subtle">Code</dt>
+                <dd>
+                  {/* The PO number's location segment is the trailing digits of this
+                      (migration 006), and every FMP-era join was on it. Editable, but
+                      it is the one field here with consequences elsewhere. */}
+                  {editable ? (
+                    <InlineValue
+                      boxed={BOXED_FIELDS}
+                      table="locations"
+                      id={location.id}
+                      column="code"
+                      value={location.code}
+                      nullable={false}
+                    />
+                  ) : (
+                    location.code
+                  )}
+                </dd>
+                <dt className="text-subtle">Public name</dt>
+                <dd>
+                  {/* WHAT A CUSTOMER SEES — the inquiry form's shop list, and
+                      whatever else ever faces outward. `name` is internal and says
+                      so: the real ones read "DONUT FRIEND 01 HIGHLAND PARK", a
+                      numbering scheme that means nothing to somebody choosing where
+                      to collect a box of donuts.
+
+                      Empty is a real state, not a gap to fill: it FALLS BACK to
+                      `name`, which is why the placeholder shows the name rather than
+                      an em dash — the cell tells you what the public would see right
+                      now, whether or not anybody has set it. */}
+                  {editable ? (
+                    <InlineValue
+                      boxed={BOXED_FIELDS}
+                      table="locations"
+                      id={location.id}
+                      column="public_name"
+                      value={location.public_name}
+                      placeholder={location.name}
+                      ariaLabel="Public name"
+                    />
+                  ) : (
+                    location.public_name ?? location.name
+                  )}
+                </dd>
+                <dt className="text-subtle">Kind</dt>
+                <dd>
+                  {editable ? (
+                    <InlineValue
+                      boxed={BOXED_FIELDS}
+                      table="locations"
+                      id={location.id}
+                      column="kind"
+                      value={location.kind}
+                      kind="pick"
+                      nullable={false}
+                      options={[
+                        { value: "physical", label: "physical", hint: "a shop with shelves" },
+                        { value: "virtual", label: "virtual", hint: "offsite events, no address" },
+                      ]}
+                    />
+                  ) : (
+                    location.kind
+                  )}
+                </dd>
+              </dl>
+
+            {/* ---- what hangs off this location ------------------------------ */}
+            {/* First after the identity (Mark, 2026-08-02). It's the fastest read on
+                the screen — four numbers that say how much of the business is at this
+                shop — and it answers "is this location real yet?" before you start
+                into the fields. Everything below it is detail you go looking for. */}
+            <section className="space-y-2">
+              <Heading>In the system</Heading>
+              {/* Figures, not links (Mark, 2026-08-01: "drop the links, but keep the
+                  info. It's handy."). Every one of those screens is scoped to the
+                  WORKING location, so a link from this record was only ever right by
+                  coincidence — and wrong on the five records that aren't it. */}
+              <div className="flex flex-wrap gap-x-10 gap-y-4">
+                <Count label="Shop sections" value={sectionCount} />
+                <Count label="Vendors here" value={vendorCount} />
+                <Count label="Items stocked" value={itemCount} />
+                <Count label="Purchase orders" value={poCount} />
+              </div>
+            </section>
+            </>
+          )}
+
+          {/* ---- addresses ---------------------------------------------- */}
+          {tab === "addresses" && (
+            <div className="grid gap-8 lg:grid-cols-2">
+              <section className="space-y-2">
+                <Heading>Shipping address</Heading>
+                <AddressFields
+                  locationId={location.id}
+                  address={location.address}
+                  group="shipping"
+                  editable={editable}
+                />
+                <p className="max-w-md text-xs text-subtle">
+                  This is the <strong>Ship to</strong>{" "}block printed on every vendor
+                  purchase order — it&rsquo;s where the delivery goes.
+                </p>
+              </section>
+
+              <section className="space-y-2">
+                <Heading>Billing address</Heading>
+                <AddressFields
+                  locationId={location.id}
+                  address={location.address}
+                  group="billing"
+                  editable={editable}
+                />
+                <p className="max-w-md text-xs text-subtle">
+                  Kept per location, but a PO&rsquo;s <strong>bill to</strong>{" "}comes from
+                  the organisation&rsquo;s billing entity, not from here.
+                </p>
+              </section>
+            </div>
+          )}
+
+          {/* ---- everything below the addresses: how the shop RUNS ------- */}
+          {tab === "operations" && (
+            <>
+            {/* ---- hours ---------------------------------------------------- */}
+            <section className="space-y-2">
+              <Heading>Operating hours</Heading>
+              <OperatingHours
+                locationId={location.id}
+                openDays={location.open_days}
+                openTimes={location.open_time_by_weekday}
+                closeTimes={location.close_time_by_weekday}
+                editable={editable}
+              />
+            </section>
+
+            {/* ---- the numbers ---------------------------------------------- */}
+            <section className="space-y-2">
+              <Heading>Operations</Heading>
+              <OperationsFields
+                locationId={location.id}
+                taxRate={location.tax_rate}
+                laborRate={location.labor_rate}
+                registerCount={location.register_count}
+                editable={editable}
+              />
+            </section>
+
+            {/* ---- who POs come from ----------------------------------------- */}
+            <section className="space-y-2">
+              <Heading>Email sending</Heading>
+              <dl className="grid max-w-xl grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+                <dt className="text-subtle">Configured by</dt>
+                <dd>{providerTier}</dd>
+                <dt className="text-subtle">Sends as</dt>
+                <dd>
+                  {provider?.from ?? <span className="text-faint">the app&rsquo;s default sender</span>}
+                </dd>
+                <dt className="text-subtle">Transport</dt>
+                <dd>{provider?.kind ?? "resend"}</dd>
+              </dl>
+              <p className="max-w-[72ch] text-xs text-subtle">
+                Purchase orders emailed from this location go out through whichever of
+                the three tiers answers first — this location, then the organisation,
+                then the app&rsquo;s own sender. Credentials live in edge-function
+                secrets and are never stored in the database, so there is nothing here
+                to edit; changing the transport is a settings change.
+              </p>
+            </section>
+            </>
+          )}
+        </div>
       </div>
-
-      {/* ---- hours ---------------------------------------------------- */}
-      <section className="space-y-2">
-        <Heading>Operating hours</Heading>
-        <OperatingHours
-          locationId={location.id}
-          openDays={location.open_days}
-          openTimes={location.open_time_by_weekday}
-          closeTimes={location.close_time_by_weekday}
-          editable={editable}
-        />
-      </section>
-
-      {/* ---- the numbers ---------------------------------------------- */}
-      <section className="space-y-2">
-        <Heading>Operations</Heading>
-        <OperationsFields
-          locationId={location.id}
-          taxRate={location.tax_rate}
-          laborRate={location.labor_rate}
-          registerCount={location.register_count}
-          editable={editable}
-        />
-      </section>
-
-      {/* ---- who POs come from ----------------------------------------- */}
-      <section className="space-y-2">
-        <Heading>Email sending</Heading>
-        <dl className="grid max-w-xl grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
-          <dt className="text-subtle">Configured by</dt>
-          <dd>{providerTier}</dd>
-          <dt className="text-subtle">Sends as</dt>
-          <dd>
-            {provider?.from ?? <span className="text-faint">the app&rsquo;s default sender</span>}
-          </dd>
-          <dt className="text-subtle">Transport</dt>
-          <dd>{provider?.kind ?? "resend"}</dd>
-        </dl>
-        <p className="max-w-[72ch] text-xs text-subtle">
-          Purchase orders emailed from this location go out through whichever of
-          the three tiers answers first — this location, then the organisation,
-          then the app&rsquo;s own sender. Credentials live in edge-function
-          secrets and are never stored in the database, so there is nothing here
-          to edit; changing the transport is a settings change.
-        </p>
-      </section>
     </div>
   );
 }
