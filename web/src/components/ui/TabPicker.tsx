@@ -95,7 +95,13 @@ export function TabPicker<K extends string>({
     <span
       role="group"
       aria-label={ariaLabel}
-      className={`flex ${tall} ${stretch ? "w-full" : "w-fit"} items-end ${className}`}
+      // `flex-1`, not `w-fit`, since the rule below (Mark, 2026-09-12: "a 1px
+      // line under the whole row that stops under the selected tab"): the
+      // control now claims the rest of its row so the rule can run to the edge.
+      // In a flex row `flex-1` takes only the leftover space, so nothing beside
+      // it is pushed onto another line; in a block parent a `flex` box already
+      // fills the width. An `ml-auto` sibling still wins the space first.
+      className={`flex ${tall} ${stretch ? "w-full" : "min-w-0 flex-1"} items-end ${className}`}
     >
       {options.map((o, i) => {
         const on = o.key === value;
@@ -146,6 +152,10 @@ export function TabPicker<K extends string>({
           </button>
         );
       })}
+      {/* THE RULE: the grey tabs' own bottom borders carry it under the tabs,
+          the selected tab leaves the gap, and this runs it on to the edge. A
+          stretched bar has no leftover width, so it needs none. */}
+      {stretch ? null : <span aria-hidden className="min-w-0 flex-1 border-b border-ink" />}
     </span>
   );
 }
