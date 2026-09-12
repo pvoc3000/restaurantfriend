@@ -24,12 +24,17 @@ import { Switch } from "@/components/ui/Switch";
  * and durably "this record is live" — with no way to tell them apart but the
  * column heading.
  *
- * `control="switch"` is therefore OPT-IN and `/vendors` is the only caller
- * (Mark: "Vendors now, then decide"). It is a real fork in the app's look while
- * it stands, so either finish it across the other eleven ActiveToggle screens
- * or take it out; do not leave it here indefinitely. The write, the optimistic
- * revert and the read-only words are identical either way — only the dress
- * differs, which is the whole point.
+ * `control="switch"` is therefore OPT-IN, and it is being rolled out RECORD BY
+ * RECORD (Mark: "Vendors now, then decide", then on 2026-09-12 "apply some of
+ * the changes we made to the vendor detail page to other detail pages, starting
+ * with the inventory detail page"). So far: every `/vendors` surface, and the
+ * inventory item's record — its Info tab and its per-location table, the two
+ * that were still checkboxes there. Its LIST is not converted, which is the
+ * fork still standing: `/items` has selection boxes down one column and an
+ * Active checkbox down another, which is exactly the confusion this exists to
+ * end. Finish it or take it out; do not leave it here indefinitely. The write,
+ * the optimistic revert and the read-only words are identical either way — only
+ * the dress differs, which is the whole point.
  */
 export function ActiveToggle({
   table,

@@ -103,17 +103,40 @@ export function ItemLocationRows({
       // weights Order days resolved to 197px against the 300 its All/None
       // command needs (CLAUDE.md's WEEKDAY_PICKER_WIDTH warning, met). The
       // two weekday strips are the columns that cannot give; Section and Note
-      // are the compact set instead. Measured: 350px each at 1280 compact,
-      // 320 each at 1440 with all seven columns.
-      width: 90,
+      // are the compact set instead.
+      //
+      // AND AGAIN 2026-09-12, when the chevron moved to Shop and this cell
+      // became a switch. THE TOTAL IS STILL 1230, which is what keeps Weekday
+      // par at exactly the 342px it had — the PO list's rule, and here it is
+      // the column with no slack at all (seven 42px pens holding a four-digit
+      // par, measured 0px of clipping either side of the change).
+      //
+      // What the rebalance BUYS, measured at 1440 with all seven columns and
+      // again at 1280 compact, is three clips that were there before anybody
+      // asked for a switch: "Stock here" was cut by 42px, "DF01 HERE" by 23,
+      // and this column's own neighbour printed "DEFAU…" for Default. All
+      // three are whole now. What it COSTS is Section and Note, which are the
+      // two `hideWhenCompact` columns — already the pair judged least
+      // essential — and both of them TRUNCATE A VALUE rather than clipping a
+      // control: a shelf name goes from 7px of overflow to 46, a note from 73
+      // to 111. Both are pickers you open to read in full.
+      //
+      // 112 is what the widest thing in this cell needs: "Stock here" measures
+      // 78.8px, against the switch's 40.
+      width: 112,
       sortValue: (r) => (r.il ? (r.il.is_active ? 0 : 1) : 2),
       render: (r) =>
         r.il ? (
+          // A SWITCH since 2026-09-12 (Mark), following the vendor record's
+          // per-location table — which this one is the twin of, a shop and a
+          // row of that shop's config. See ui/Switch: a record's own durable
+          // state takes a different shape from a selection box.
           <ActiveToggle
             readOnly={!editable}
             table="inventory_item_locations"
             id={r.il.id}
             active={r.il.is_active}
+            control="switch"
             label={`Item active at ${r.location.code}`}
           />
         ) : !editable ? (
@@ -137,7 +160,10 @@ export function ItemLocationRows({
       // narrow for its name (CLAUDE.md). It is also what the vendor and item
       // records' new tabs call the same column.
       label: "Shop",
-      width: 90,
+      // The chevron, the code and the "here" badge — 34px of disclosure plus
+      // 81.9px of shop. It was 90, which held the code alone and cut the badge
+      // off the working shop's own row.
+      width: 152,
       sortValue: (r) => r.location.code,
       render: (r) => (
         <>
@@ -153,7 +179,10 @@ export function ItemLocationRows({
     {
       key: "section",
       label: "Section",
-      width: 150,
+      // Pays for the Shop column, with Note. A long shelf name truncates in
+      // the trigger and reads whole in the panel — see the Active column's
+      // note for the whole trade.
+      width: 108,
       hideWhenCompact: true,
       // Still sorts on the shelf's WALK position, not its name — "what order do
       // I meet these shops' copies of this item in" is the question.
@@ -189,7 +218,7 @@ export function ItemLocationRows({
       label: "Order days",
       // Above WEEKDAY_PICKER_WIDTH on purpose: widths are weights, and this
       // is what keeps the RESOLVED width at or over 300 beside the par strip.
-      width: Math.max(WEEKDAY_PICKER_WIDTH, 330),
+      width: Math.max(WEEKDAY_PICKER_WIDTH, 325),
       minWidth: WEEKDAY_PICKER_WIDTH,
       // Sorts on how MANY days it's ordered — "which items do we buy most
       // often here" is the question worth asking of this column.
@@ -211,7 +240,11 @@ export function ItemLocationRows({
     {
       key: "par",
       label: `Default par (${baseUnit})`,
-      width: 90,
+      // 94 is the HEADER's floor, not the value's: the label wraps to three
+      // lines and "Default" is 62.5px of them, which 90 could not hold — it
+      // printed "DEFAU…", the single-word-too-wide fault CLAUDE.md names.
+      // Four digits need 42.2.
+      width: 94,
       align: "right",
       sortValue: (r) =>
         r.il?.default_par === null || r.il?.default_par === undefined
@@ -282,7 +315,9 @@ export function ItemLocationRows({
     {
       key: "note",
       label: "Note",
-      width: 110,
+      // The other payer, and 69 is its floor for the same reason as Par's:
+      // below it the one-word header itself starts to ellipsise.
+      width: 69,
       hideWhenCompact: true,
       sortValue: (r) => r.il?.note ?? null,
       render: (r) =>
@@ -309,8 +344,11 @@ export function ItemLocationRows({
         columns={columns}
         rowKey={(r) => r.location.id}
         leading={leading}
-        // v2 (2026-09-05): the weekday par strip joined the columns.
-        storageKey="rf.itemLocations.columnWidths.v2"
+        // v3 (2026-09-12): the chevron moved to Shop and every weight but
+        // Weekday par's moved with it. A stored width outranks the declared
+        // one, so without the bump anyone who had ever dragged this table
+        // would keep a 90px Shop column with a 34px chevron in it.
+        storageKey="rf.itemLocations.columnWidths.v3"
         columnChooser
         // 1440: beside the record's sidebar this table has ~190px less than a
         // list, and both weekday strips must hold 300px — see the Active
@@ -319,8 +357,27 @@ export function ItemLocationRows({
         defaultSort={{ key: "location" }}
         rowClassName={(r) => (r.il && !r.il.is_active ? "text-faint" : "")}
         expand={{
+          // ON THE SHOP, NOT ON ACTIVE (Mark, 2026-09-12: "move the expand
+          // button in the per location table into the shop column … move the
+          // vendor item details to the right so they are aligned with the
+          // shop column"). The vendor record's per-location table the day
+          // before, and the same rule rather than an exception to it:
+          // `DataTable` puts the chevron in column one so the disclosure
+          // reads as part of the row's IDENTITY, which holds where column one
+          // is a name and breaks where it is a CONTROL — here a switch, with
+          // the "Active" header no longer over the thing it labels.
+          //
+          // Naming the column moves BOTH halves in one word: the chevron, and
+          // the open panel, which `DataTable` now starts at the disclosure's
+          // own column boundary. So the favorites grid lines up with the shop
+          // it is about — Mark's third sentence, and it needed no code here.
+          columnKey: "location",
           // Only stocked locations have plan rows to favorite.
           canExpand: (r) => r.il !== null,
+          // KEPT, unlike the vendor table's, which said the same thing its own
+          // expansion did. This one says why a row has NO chevron, and it says
+          // it beside the shop rather than beside the "Stock here" button it
+          // used to sit next to — where the two read as one fact stated twice.
           summary: (r) => (r.il ? null : "not stocked here"),
           render: (r) =>
             r.il ? (

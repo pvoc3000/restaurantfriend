@@ -63,20 +63,30 @@ export function ItemFields({
   return (
     <div className="space-y-3">
       <dl className="grid max-w-[min(42rem,max(24rem,50%))] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
-        {/* First, where every catalog table puts Active. The switch says the
-            state by its position; the word beside it says it in text, which
-            is also what a reader below purchaser+ gets instead of a switch. */}
+        {/* First, where every catalog table puts Active — and A SWITCH since
+            2026-09-12, following the vendor record (Mark: apply what we did
+            there "to other detail pages, starting with the inventory detail
+            page"). The item's own flag, the per-shop one on the table below
+            and the per-vendor-item one on the next tab are three scopes of one
+            idea, so they must not be three shapes; the third has been a switch
+            since the day the control came back, because that table is shared
+            with the vendor record.
+
+            THE WORD BESIDE IT WENT WITH THE CHECKBOX. A switch states its own
+            state — the thumb's position and the track's ground, which is what
+            `ui/Switch` exists to say — so "Active" beside an on switch was one
+            fact twice. Nothing is lost below purchaser+ either: the word is
+            exactly what `readOnly` renders in place of a control. */}
         <dt className="text-subtle">Active</dt>
-        <dd className="flex items-center gap-2 text-muted">
-          {editable && (
-            <ActiveToggle
-              table="inventory_items"
-              id={item.id}
-              active={item.is_active}
-              label="Item active in the catalog"
-            />
-          )}
-          {item.is_active ? "Active" : "Inactive"}
+        <dd>
+          <ActiveToggle
+            readOnly={!editable}
+            table="inventory_items"
+            id={item.id}
+            active={item.is_active}
+            control="switch"
+            label="Item active in the catalog"
+          />
         </dd>
 
         <dt className="text-subtle">Category</dt>
