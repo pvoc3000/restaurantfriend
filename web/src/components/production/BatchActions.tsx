@@ -104,14 +104,100 @@ export function BatchActions({
   // were its arguments and its gate, and a prop nobody reads is the kind of
   // thing that survives three refactors before somebody wires it to the wrong
   // value. Deleting is purchaser+ and is now the only command here.
+  /**
+   * DUPLICATE BATCH (Mark, 2026-09-12) — a second making of the same thing on
+   * the same log: same element, label, recipe version, scale and planned
+   * amounts, with a NEW batch number from 044's definer.
+   *
+   * WHAT IS NOT COPIED is everything that happened TO the original: its status
+   * (the copy is To Do), who made it, the on-hand count and the yield someone
+   * measured, the photo, the notes and the cost stamp. Copying a yield would
+   * record a measurement nobody took.
+   *
+   * `is_generated` goes FALSE, and must: 045's unique index allows one
+   * GENERATED batch per element per log, so a copy claiming to be generated
+   * would be refused — and it wasn't generated, somebody asked for it.
+   *
+   * `select("*")` rather than a column list, so a column a later migration adds
+   * comes along (`ProductionItemActions`' lesson); the resets apply only to
+   * keys the row actually has.
+   */
+  async function duplicate() {
+    setBusy("duplicate");
+    setError(null);
+    const { data: row, error: readErr } = await supabase
+      .from("production_batches")
+      .select("*")
+      .eq("id", batchId)
+      .maybeSingle();
+    if (readErr || !row) {
+      setBusy(null);
+      setError(readErr?.message ?? "The batch could not be read.");
+      return;
+    }
+    const { data: number, error: numberErr } = await supabase.rpc("next_batch_number", {
+      p_location_id: row.location_id as string,
+    });
+    if (numberErr) {
+      setBusy(null);
+      setError(numberErr.message);
+      return;
+    }
+    const copy: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(row)) {
+      if (["id", "created_at", "updated_at", "created_by", "updated_by", "legacy_id"].includes(k)) continue;
+      copy[k] = v;
+    }
+    const resets: Record<string, unknown> = {
+      batch_number: number as string,
+      is_generated: false,
+      status: "to_do",
+      operator_employee_id: null,
+      on_hand_count: null,
+      on_hand_size: null,
+      on_hand_unit: null,
+      yield_count: null,
+      yield_size: null,
+      yield_unit: null,
+      photo_path: null,
+      photo_name: null,
+      notes: null,
+      unit_cost: null,
+      cost_unresolved: null,
+      costed_at: null,
+    };
+    for (const [k, v] of Object.entries(resets)) {
+      if (k in copy || k === "batch_number") copy[k] = v;
+    }
+    const { data, error: insertErr } = await supabase
+      .from("production_batches")
+      .insert(copy)
+      .select("id");
+    setBusy(null);
+    if (insertErr) {
+      setError(insertErr.message);
+      return;
+    }
+    if (!data?.length) {
+      setError("Nothing was added — you may not have permission.");
+      return;
+    }
+    router.refresh();
+  }
+
   if (children) {
     return (
       <>
-        {children(
-          removable
+        {children([
+          {
+            label: busy === "duplicate" ? "Duplicating…" : "Duplicate Batch",
+            onSelect: () => void duplicate(),
+            disabled: busy !== null,
+          },
+          ...(removable
             ? [{ label: busy === "delete" ? "Deleting…" : "Delete Batch…", onSelect: () => void remove(), danger: true, disabled: busy !== null }]
-            : []
-        )}
+            : []),
+        ])}
         {error ? <p className="text-right text-sm text-accent">{error}</p> : null}
       </>
     );

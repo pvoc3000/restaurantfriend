@@ -9641,7 +9641,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `BatchActions` gained a `children` render prop. **And the same day the two
    shells got ONE menu** (Mark: "make them match, one menu on both"): Add
    Batch… · Delete Batch… · Mark Complete (or Reopen Log) · Delete Log…, in the
-   title row on the desk and the crumb row on the tablet. The desk pane's
+   title row on the desk and the crumb row on the tablet. **Duplicate Batch**
+   joined it the same day (`BatchActions`): same element, label, recipe
+   version, scale and planned amounts, a new number from `next_batch_number`,
+   status To Do and `is_generated` false (045 allows one generated batch per
+   element per log), with no operator, on-hand, yield, photo, notes or cost
+   copied. The desk pane's
    Delete batch button and the 2026-09-09 desk-only rule for the log commands
    are gone. What follows about the footer is history.
    **THE BATCH LOG RECORD WAS THE FIRST SCREEN REWORKED FOR IT** (Mark,

@@ -11,7 +11,8 @@ import { NewBatch } from "./NewBatch";
  * THE BATCH LOG'S COMMANDS, AS ONE "ACTIONS" MENU, THE SAME ON BOTH SHELLS
  * (Mark, 2026-09-12: "make them match, one menu on both"):
  *
- *   Add Batch… · Delete Batch… · — · Mark Complete (or Reopen Log) · Delete Log…
+ *   Add Batch… · Duplicate Batch · Delete Batch… · — · Mark Complete (or Reopen
+ *   Log) · Delete Log…
  *
  * The desk puts it in the title row; the tablet, which has no title row, in the
  * crumb row. That placement is the only difference left — the tablet's footer,
@@ -71,11 +72,14 @@ export function BatchLogCommandMenu({
           minWidth={200}
           items={[
             addRow,
+            // With nothing selected the batch commands stay in the menu, dead,
+            // so it keeps its shape as you click around the list.
             ...(deleteBatchRows.length
               ? deleteBatchRows
-              : removable
-                ? [{ label: "Delete Batch…", disabled: true, danger: true }]
-                : []),
+              : [
+                  { label: "Duplicate Batch", disabled: true },
+                  ...(removable ? [{ label: "Delete Batch…", disabled: true, danger: true }] : []),
+                ]),
             ...logRows.map((row, i) => (i === 0 ? { ...row, separatorBefore: true } : row)),
           ]}
         />
