@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { RowMenu } from "@/components/ui/RowMenu";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import {
   Dialog,
   DIALOG_CANCEL_CLASS,
@@ -37,13 +38,13 @@ type Usage = {
 
 async function countUsage(
   supabase: ReturnType<typeof createClient>,
-  itemId: string
+  itemIds: string[]
 ): Promise<Usage> {
   const count = async (table: string) => {
     const { count } = await supabase
       .from(table)
       .select("*", { count: "exact", head: true })
-      .eq("inventory_item_id", itemId);
+      .in("inventory_item_id", itemIds);
     return count ?? 0;
   };
   const [vendorItems, locations, reminders, elements, requests] = await Promise.all([
@@ -81,20 +82,33 @@ async function countUsage(
  * Every write `.select()`s its own result: a delete refused by RLS removes zero
  * rows and returns NO error.
  */
+export type ItemTarget = { id: string; name: string; isActive: boolean };
+
 export function InventoryItemActions({
-  itemId,
-  name,
-  isActive,
+  items,
   existingNames,
   afterDelete = "refresh",
+  scope = "row",
+  children,
 }: {
-  itemId: string;
-  name: string;
-  isActive: boolean;
-  /** Every item name in the org, so the copy's name doesn't collide. */
+  /** One item from its row, or the whole ticked selection. */
+  items: ItemTarget[];
+  /** Every item name in the org, so a copy's name doesn't collide. */
   existingNames: string[];
   afterDelete?: "refresh" | { href: string };
+  /** Wording only: a row's menu says "Duplicate", a selection's says
+   *  "Duplicate Selected". */
+  scope?: "row" | "selection";
+  /**
+   * HAND THE ROWS OUT instead of drawing a `RowMenu` — the list's one Actions
+   * menu owns WHERE they sit while this keeps owning what they DO. Without it
+   * the row menu is drawn as before.
+   */
+  children?: (rows: ActionMenuItem[]) => ReactNode;
 }) {
+  const ids = items.map((i) => i.id);
+  const many = items.length !== 1;
+  const subject = many ? `${items.length} inventory items` : items[0]?.name ?? "";
   const router = useRouter();
   const supabase = createClient();
   const [confirming, setConfirming] = useState(false);
@@ -102,21 +116,53 @@ export function InventoryItemActions({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * ONE AT A TIME, AND THE TAKEN NAMES GROW AS IT GOES — `duplicateTitle` reads
+   * a list of names to avoid, so a batch that passed the same list every time
+   * would make three items all called "… copy". Sequential rather than
+   * parallel for the same reason: each copy has to see the one before it.
+   *
+   * IT LANDS ON THE COPY ONLY WHEN THERE IS ONE. Duplicating a single item is
+   * "make me one to edit", and its record is where you go next; duplicating
+   * nine is a bulk act with no single destination, so it refreshes the list and
+   * says how many it made.
+   *
+   * A FAILURE PART WAY THROUGH KEEPS WHAT IT MADE and says so. Every copy is
+   * its own tree of writes, so there is no transaction spanning them and
+   * pretending otherwise would be worse than reporting the truth.
+   */
   async function duplicate() {
     setBusy("duplicate");
     setError(null);
+    const taken = [...existingNames];
+    let made = 0;
+    let lastId: string | null = null;
     try {
-      const newId = await duplicateItem();
+      for (const target of items) {
+        const { id, name } = await duplicateItem(target.id, taken);
+        taken.push(name);
+        lastId = id;
+        made += 1;
+      }
       router.refresh();
-      router.push(`/items/${newId}`);
+      if (items.length === 1 && lastId) router.push(`/items/${lastId}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const why = e instanceof Error ? e.message : String(e);
+      setError(
+        made > 0 && items.length > 1
+          ? `Copied ${made} of ${items.length}, then stopped: ${why}`
+          : why
+      );
+      if (made > 0) router.refresh();
     } finally {
       setBusy(null);
     }
   }
 
-  async function duplicateItem(): Promise<string> {
+  async function duplicateItem(
+    itemId: string,
+    takenNames: string[]
+  ): Promise<{ id: string; name: string }> {
     // 1. The master row.
     const { data: item, error: itemErr } = await supabase
       .from("inventory_items")
@@ -125,9 +171,10 @@ export function InventoryItemActions({
       .maybeSingle();
     if (itemErr || !item) throw new Error(itemErr?.message ?? "That item is no longer there.");
     const source = item as unknown as Row;
+    const copyName = duplicateTitle(takenNames, String(source.name));
     const { data: created, error: createErr } = await supabase
       .from("inventory_items")
-      .insert({ ...source, name: duplicateTitle(existingNames, String(source.name)) })
+      .insert({ ...source, name: copyName })
       .select("id")
       .single();
     if (createErr || !created) throw new Error(createErr?.message ?? "The copy could not be created.");
@@ -213,14 +260,14 @@ export function InventoryItemActions({
       }
     }
 
-    return newId;
+    return { id: newId, name: copyName };
   }
 
   async function openConfirm() {
     setConfirming(true);
     setUsage(null);
     setError(null);
-    setUsage(await countUsage(supabase, itemId));
+    setUsage(await countUsage(supabase, ids));
   }
 
   async function deactivate() {
@@ -229,7 +276,7 @@ export function InventoryItemActions({
     const { data, error } = await supabase
       .from("inventory_items")
       .update({ is_active: false })
-      .eq("id", itemId)
+      .in("id", ids)
       .select("id");
     setBusy(null);
     if (error || !data?.length) {
@@ -246,7 +293,7 @@ export function InventoryItemActions({
     const { data, error } = await supabase
       .from("inventory_items")
       .delete()
-      .eq("id", itemId)
+      .in("id", ids)
       .select("id");
     setBusy(null);
     if (error || !data?.length) {
@@ -259,33 +306,51 @@ export function InventoryItemActions({
   }
 
   const stocked = (usage?.locations ?? 0) > 0;
+  const anyActive = items.some((i) => i.isActive);
+  const suffix = scope === "selection" ? " Selected" : "";
+
+  /**
+   * The two commands, whichever door draws them. `hint` is the ROW MENU's —
+   * `ActionMenuItem` deliberately has none ("MenuButton stays for a short flat
+   * list with hints"), so the menu gets the same rows with the hints dropped
+   * rather than a second declaration that could drift from this one.
+   */
+  const rows = [
+    {
+      label: busy === "duplicate" ? "Duplicating…" : `Duplicate${suffix}`,
+      hint: "A copy with its locations, vendor items and favorites",
+      disabled: busy !== null || items.length === 0,
+      onSelect: () => void duplicate(),
+    },
+    {
+      label: `Delete${suffix}…`,
+      hint: "Shows what would go with it",
+      danger: true,
+      disabled: busy !== null || items.length === 0,
+      onSelect: () => void openConfirm(),
+    },
+  ];
 
   return (
     <>
-      <RowMenu
-        label={`Actions for ${name}`}
-        items={[
-          {
-            label: busy === "duplicate" ? "Duplicating…" : "Duplicate",
-            hint: "A copy with its locations, vendor items and favorites",
-            disabled: busy !== null,
-            onSelect: () => void duplicate(),
-          },
-          {
-            label: "Delete…",
-            hint: "Shows what would go with it",
-            danger: true,
-            disabled: busy !== null,
-            onSelect: () => void openConfirm(),
-          },
-        ]}
-      />
+      {children ? (
+        children(
+          rows.map(
+            ({ hint: _hint, ...row }): ActionMenuItem => {
+              void _hint;
+              return row;
+            }
+          )
+        )
+      ) : (
+        <RowMenu label={`Actions for ${subject}`} items={rows} />
+      )}
 
       {error && !confirming && <p className="mt-1 text-xs text-accent">{error}</p>}
 
       {confirming && (
         <Dialog
-          title="Delete inventory item"
+          title={many ? "Delete inventory items" : "Delete inventory item"}
           onClose={() => setConfirming(false)}
           busy={busy !== null}
           footer={
@@ -306,7 +371,7 @@ export function InventoryItemActions({
               >
                 {busy === "delete" ? "Deleting…" : "Delete anyway"}
               </button>
-              {isActive && (
+              {anyActive && (
                 <button
                   type="button"
                   onClick={() => void deactivate()}
@@ -319,7 +384,16 @@ export function InventoryItemActions({
             </>
           }
         >
-          <p className="text-sm text-ink">{name}</p>
+          {/* The ONE item by name; a batch by count, with the first few named
+              so you can tell at a glance whether the selection is what you
+              meant. */}
+          <p className="text-sm text-ink">{subject}</p>
+          {many && (
+            <p className="mt-1 text-sm text-muted">
+              {items.slice(0, 4).map((i) => i.name).join(", ")}
+              {items.length > 4 ? `, and ${items.length - 4} more` : ""}
+            </p>
+          )}
 
           {usage === null ? (
             <p className="mt-3 text-sm text-subtle">Checking what uses it…</p>
@@ -327,13 +401,16 @@ export function InventoryItemActions({
             <div className="mt-3 space-y-3 text-sm">
               {stocked ? (
                 <p className="border border-ink bg-[var(--rf-yellow-200)] px-3 py-2 text-ink">
-                  This item is stocked at {usage.locations}{" "}
-                  {usage.locations === 1 ? "location" : "locations"}. Deactivating
-                  takes it off the guide everywhere while leaving its history
+                  {many ? "These items are" : "This item is"} stocked at{" "}
+                  {usage.locations} {usage.locations === 1 ? "location" : "locations"}
+                  . Deactivating takes {many ? "them" : "it"} off the guide
+                  everywhere while leaving {many ? "their histories" : "its history"}{" "}
                   whole — which is almost always what you want.
                 </p>
               ) : (
-                <p className="text-muted">This item is not stocked anywhere.</p>
+                <p className="text-muted">
+                  {many ? "None of these items is" : "This item is not"} stocked anywhere.
+                </p>
               )}
 
               <div>

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { ATTACHMENT_BUCKET } from "@/lib/attachments";
 import { money } from "@/lib/purchaseOrders";
@@ -27,6 +27,7 @@ export function InvoiceBatchActions({
   canEdit,
   canApprove,
   onReport,
+  children,
 }: {
   selected: InvoiceListRow[];
   /** purchaser+, matching what 025's delete policy allows. */
@@ -44,6 +45,15 @@ export function InvoiceBatchActions({
    * has to outlive the thing that produced it.
    */
   onReport: (message: string, tone: "done" | "error") => void;
+  /**
+   * HANDS ITS ROWS OUT rather than drawing buttons (2026-09-11), so the list's
+   * one Actions menu owns WHERE these sit while this keeps owning what they
+   * DO — the confirms that name what will be skipped, the approval RPC's row
+   * count, the document order on the delete. `OrderCommandMenu`'s shape, and
+   * the reason is the same: those are each a lesson paid for once and not
+   * worth a second copy.
+   */
+  children: (items: ActionMenuItem[]) => ReactNode;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -187,28 +197,35 @@ export function InvoiceBatchActions({
     router.refresh();
   }
 
-  return (
-    <>
-      {canApprove && approvable.length > 0 && (
-        <button
-          type="button"
-          className={BUTTON_CLASS}
-          disabled={busy !== null}
-          onClick={() => void approve()}
-        >
-          {busy === "approve" ? "Approving…" : `Approve ${approvable.length}`}
-        </button>
-      )}
-      {canEdit && (
-        <button
-          type="button"
-          className={DANGER_BUTTON_CLASS}
-          disabled={busy !== null}
-          onClick={() => void destroy()}
-        >
-          {busy === "delete" ? "Deleting…" : "Delete"}
-        </button>
-      )}
-    </>
-  );
+  /**
+   * APPROVE IS RENDERED WHENEVER THE ROLE HAS IT AND GREYED WHEN THE SELECTION
+   * HOLDS NOTHING OPEN, where the button used to disappear. The count in the
+   * label is the reason on the row it is about — "Approve (0)" says the
+   * selection is already approved or voided — which a vanished control cannot
+   * say and a greyed one cannot say on an iPad, having no hover.
+   */
+  const items: ActionMenuItem[] = [
+    ...(canApprove
+      ? [
+          {
+            label: busy === "approve" ? "Approving…" : `Approve (${approvable.length})`,
+            disabled: busy !== null || approvable.length === 0,
+            onSelect: () => void approve(),
+          },
+        ]
+      : []),
+    ...(canEdit
+      ? [
+          {
+            label: busy === "delete" ? "Deleting…" : "Delete Selected…",
+            danger: true,
+            separatorBefore: true,
+            disabled: busy !== null || selected.length === 0,
+            onSelect: () => void destroy(),
+          },
+        ]
+      : []),
+  ];
+
+  return <>{children(items)}</>;
 }

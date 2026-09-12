@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
@@ -30,11 +30,19 @@ export function NewInventoryItem({
   orgId,
   categories,
   existingNames,
+  children,
 }: {
   orgId: string;
   /** The `category` vocabulary already in use. */
   categories: string[];
   existingNames: string[];
+  /**
+   * HAND THE COMMAND OUT INSTEAD OF DRAWING A BUTTON — `NewInvoice`'s render
+   * prop and `OrderCommandMenu`'s shape, so this keeps owning its dialog, its
+   * duplicate warning and its write while the list's Actions menu owns where
+   * the command SITS (2026-09-11). Without it the button is drawn as before.
+   */
+  children?: (open: () => void) => ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -88,9 +96,13 @@ export function NewInventoryItem({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={BUTTON_CLASS}>
-        New inventory item
-      </button>
+      {children ? (
+        children(() => setOpen(true))
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} className={BUTTON_CLASS}>
+          New inventory item
+        </button>
+      )}
 
       {open && (
         <Dialog

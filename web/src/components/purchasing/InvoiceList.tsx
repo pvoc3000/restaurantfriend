@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TextInput } from "@/components/ui/TextInput";
@@ -47,7 +47,9 @@ import { usePublishRecordSet } from "@/lib/recordSet";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { createClient } from "@/lib/supabase/client";
 import { invokeQbo } from "@/lib/qboClient";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
+import { ATTACHMENT_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/attachments";
+import { openWindowNow, showBlob, downloadBlob } from "@/lib/poProcessing";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { InvoiceBatchActions } from "./InvoiceBatchActions";
 import { NewInvoice } from "./NewInvoice";
@@ -302,7 +304,17 @@ export function InvoiceList({
   const allVisibleChecked =
     sorted.length > 0 && sorted.every((i) => checked.has(i.id));
 
+  /**
+   * TOUCHING THE SELECTION RETIRES THE LAST REPORT, which is what the report's
+   * own note always asked for ("cleared as soon as a new selection begins") and
+   * used to be implemented as a render guard instead — shown only while NOTHING
+   * was ticked. That worked while every command cleared the selection on its
+   * way out, and stopped working the moment Documents reported without
+   * clearing: its message could never appear. Clearing at the source states the
+   * rule once and lets the message render whenever it exists.
+   */
   function toggleAllVisible() {
+    setBatchReport(null);
     setChecked((prev) => {
       const next = new Set(prev);
       if (allVisibleChecked) sorted.forEach((i) => next.delete(i.id));
@@ -312,6 +324,7 @@ export function InvoiceList({
   }
 
   function toggleOne(id: string) {
+    setBatchReport(null);
     setChecked((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -320,20 +333,121 @@ export function InvoiceList({
     });
   }
 
-  const selectedTotal = useMemo(
-    () => sumSignedTotals(visible.filter((i) => checked.has(i.id))),
-    [visible, checked]
-  );
-
-  /** What the last bulk command did. Held HERE rather than in the bar, because
-   *  clearing the selection unmounts the bar — see `InvoiceBatchActions`. */
+  /** What the last bulk command did. Held HERE and not in the component that
+   *  ran it: `InvoiceBatchActions` clears the selection on its way out, and a
+   *  message owned by something the clearing unmounts is destroyed the instant
+   *  it is set — which is exactly what the first real bulk approve did. */
   const [batchReport, setBatchReport] = useState<{
     message: string;
     tone: "done" | "error";
   } | null>(null);
   const [qboBusy, setQboBusy] = useState(false);
   const [qboError, setQboError] = useState<string | null>(null);
+  const [scansBusy, startScans] = useTransition();
   const qboSupabase = createClient();
+
+  /** Every command in the menu but New invoice and Sync acts on the ticked
+   *  rows, so with none ticked those rows are dead — and say why. */
+  const nothingTicked = checked.size === 0;
+
+  /**
+   * THE SELECTION'S FILED PAPERWORK, AS ONE PDF (Mark, 2026-09-11, asking for
+   * Documents ▸ Preview / Download Invoices).
+   *
+   * A VENDOR INVOICE IS A DOCUMENT WE RECEIVE, so there is no invoice PDF for
+   * this app to render and there must not be one: the real document is the
+   * scan the vendor sent, and a generated sheet beside it would be a second
+   * answer to "what were we billed" with no original behind it. So Documents
+   * means the SCANS — `DocumentsList`'s merge, one screen over, over the
+   * attachments this module already files.
+   *
+   * An invoice with nothing filed is SKIPPED AND COUNTED rather than silently
+   * absent: "3 of 5 had nothing filed" is the useful half of the answer, and a
+   * merge quietly two invoices short is worse than one that refused.
+   *
+   * THE TAB IS OPENED BEFORE ANYTHING IS AWAITED (`openWindowNow`'s rule) —
+   * a window opened after an await is silently blocked, and `ActionMenu` runs
+   * this inside the click that closes it, so the gesture is still live here.
+   */
+  function openScans(mode: "open" | "download") {
+    const targets = sorted.filter((i) => checked.has(i.id) && i.document_count > 0);
+    const empty = checked.size - targets.length;
+    if (targets.length === 0) {
+      setBatchReport({
+        message: "None of those invoices has any paperwork filed, so there was nothing to open.",
+        tone: "error",
+      });
+      return;
+    }
+    const win = mode === "open" ? openWindowNow() : null;
+    setBatchReport(null);
+    startScans(async () => {
+      if (mode === "open" && !win) {
+        setBatchReport({
+          message: "The browser blocked the new tab. Allow pop-ups for this site, then try again.",
+          tone: "error",
+        });
+        return;
+      }
+      try {
+        const { data, error } = await qboSupabase
+          .from("purchase_order_attachments")
+          .select("invoice_id, storage_path, file_name, content_type")
+          .in("invoice_id", targets.map((i) => i.id))
+          .order("created_at");
+        if (error) throw new Error(error.message);
+
+        // In the order the LIST is showing them, each invoice's files oldest
+        // first — so the merged file reads down the screen rather than in
+        // whatever order Postgres answered.
+        const byInvoice = new Map<string, { path: string; name: string | null; type: string | null }[]>();
+        for (const a of data ?? []) {
+          const list = byInvoice.get(a.invoice_id as string) ?? [];
+          list.push({
+            path: a.storage_path as string,
+            name: (a.file_name as string | null) ?? null,
+            type: (a.content_type as string | null) ?? null,
+          });
+          byInvoice.set(a.invoice_id as string, list);
+        }
+        const files = targets.flatMap((i) => byInvoice.get(i.id) ?? []);
+        const { data: urls } = await qboSupabase.storage
+          .from(ATTACHMENT_BUCKET)
+          .createSignedUrls(files.map((f) => f.path), SIGNED_URL_TTL_SECONDS);
+        const signed = new Map<string, string>();
+        for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+        const sources = files
+          .map((f) => ({ url: signed.get(f.path), fileName: f.name, contentType: f.type }))
+          .filter((x): x is { url: string; fileName: string | null; contentType: string | null } => !!x.url);
+
+        if (sources.length === 0) throw new Error("Those files could not be opened. Reload and try again.");
+
+        const { mergeToSinglePdf, mergedFileName } = await import("@/lib/mergeDocuments");
+        const result = await mergeToSinglePdf(sources);
+        if (result.merged === 0) throw new Error("None of those files could be read.");
+        const name = mergedFileName(today, result.merged, "invoices");
+        if (mode === "open") showBlob(win, result.blob, name);
+        else downloadBlob(result.blob, name);
+
+        const caveats = [
+          empty ? `${empty} of the ${checked.size} had nothing filed` : null,
+          result.skipped.length ? `left out: ${result.skipped.join(", ")}` : null,
+        ].filter(Boolean);
+        if (caveats.length > 0) {
+          setBatchReport({
+            message: `${result.merged} document${result.merged === 1 ? "" : "s"} in the file — ${caveats.join("; ")}.`,
+            tone: "error",
+          });
+        }
+      } catch (e) {
+        win?.close();
+        setBatchReport({
+          message: e instanceof Error ? e.message : "The documents could not be merged.",
+          tone: "error",
+        });
+      }
+    });
+  }
 
   /**
    * Ask QuickBooks what these bills' balances are, write them (088), and
@@ -376,11 +490,17 @@ export function InvoiceList({
   }
 
   const columns: DataColumn<InvoiceListRow>[] = [
-    // The selection exists for the batch bar, whose two commands are approve
-    // (manager+) and delete (`canEdit`). A role with neither — a purchaser,
-    // Read Only here per the Page Permissions sheet — got boxes to tick and a
-    // bar reading "3 selected" with nothing to press.
-    ...(canEdit || canApprove ? [{
+    // THE SELECTION IS FOR EVERY ROLE SINCE 2026-09-11, where it used to need
+    // approve (manager+) or delete (`canEdit`) — the two commands the old batch
+    // bar held — so that a purchaser, Read Only here per the Page Permissions
+    // sheet, was not given boxes to tick with nothing to press.
+    //
+    // Documents ▸ Preview / Download is what changed it: opening the selection's
+    // filed scans is a READ, and this screen is already role-gated, so a reader
+    // who may open each invoice's paperwork one at a time on its record may
+    // certainly open several at once. Withholding the ticks would leave that
+    // row permanently dead for the one role most likely to want it.
+    {
       key: "select",
       label: "",
       width: 48,
@@ -398,7 +518,7 @@ export function InvoiceList({
           label={`select ${i.invoice_number ?? "invoice"}`}
         />
       ),
-    } satisfies DataColumn<InvoiceListRow>] : []),
+    },
     {
       key: "invoice_number",
       label: "Invoice",
@@ -595,6 +715,36 @@ export function InvoiceList({
   ];
 
   /** Same rule — this one has been a `PickList` since 2026-09-08. */
+  /**
+   * `NewInvoice` owns its own dialog, so the menu's row has to come FROM it —
+   * and a role that cannot create one renders no component at all, hence the
+   * empty-row fallback (`OrderCommandMenu`'s `withX` shape).
+   */
+  const withNewInvoice = (render: (items: ActionMenuItem[]) => ReactNode) =>
+    canEdit ? (
+      <NewInvoice
+        orgId={orgId}
+        locationId={locationId}
+        vendors={vendors}
+        today={today}
+        // The vendor's id lives on the embed, not as its own column on the row
+        // — the duplicate check only ever compares within one vendor, so that
+        // is the shape it wants.
+        existing={invoices.map((i) => ({
+          id: i.id,
+          vendor_id: i.vendors?.id ?? "",
+          invoice_number: i.invoice_number,
+          invoice_date: i.invoice_date,
+          total: i.total,
+          status: i.status,
+        }))}
+      >
+        {(open) => render([{ label: "New Invoice", onSelect: open }])}
+      </NewInvoice>
+    ) : (
+      render([])
+    );
+
   const agingTabs: AgingFilter[] = [
     "all",
     ...AGING_ORDER.filter((b) => (agingCounts[b] ?? 0) > 0 || b === filters.aging),
@@ -616,7 +766,13 @@ export function InvoiceList({
             {activeLocationCode} · {visible.length} of {invoices.length} invoices
           </p>
         </div>
-        <div className="ml-auto flex items-end gap-8 text-right">
+        {/* THE TOTALS RIDE 5px UP so their small-caps labels' INK meets the
+            Actions button's border, which is a hard line. `items-start` levels
+            BOXES, not ink: measured on the PO list the same day at 4.9px for
+            this exact pair of type sizes (12px label, 18px line-height, over a
+            36px bordered button). A RELATIVE offset, never a margin — a margin
+            is layout and would move the row. */}
+        <div className="relative bottom-[5px] ml-auto flex items-end gap-8 text-right">
           <div>
             <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
               Window total
@@ -646,46 +802,65 @@ export function InvoiceList({
             </div>
           </div>
         </div>
-        {/* The commands, last in the row. An INNER content-sized group, because
-            `NewInvoice`'s trigger carries an `ml-auto` baked in: inside a box
-            sized to its own content there is no free space for that margin to
-            take. */}
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            className={BUTTON_CLASS}
-            disabled={qboBusy}
-            onClick={() => void checkQuickBooks()}
-          >
-            {qboBusy ? "Checking QuickBooks…" : "Check QuickBooks"}
-          </button>
+        {/* ONE "ACTIONS" MENU FOR THE SCREEN (Mark, 2026-09-11), the day after
+            the PO list's and to the same shape: New Invoice · Documents ▸ ·
+            Sync QuickBooks · Approve, then a rule, then Delete Selected… and
+            Clear Selection. It replaces a Check QuickBooks button, a New
+            invoice button and a selection bar carrying two more.
 
-          {canEdit && (
-            <NewInvoice
-              orgId={orgId}
-              locationId={locationId}
-              vendors={vendors}
-              today={today}
-              // The vendor's id lives on the embed, not as its own column on
-              // the row — the duplicate check only ever compares within one
-              // vendor, so that's the shape it wants.
-              existing={invoices.map((i) => ({
-                id: i.id,
-                vendor_id: i.vendors?.id ?? "",
-                invoice_number: i.invoice_number,
-                invoice_date: i.invoice_date,
-                total: i.total,
-                status: i.status,
-              }))}
-            />
-          )}
-        </div>
-        {/* A failed check says why beside the control that caused it — on a
-            line of its own under the row, right-aligned, so it never pushes the
-            buttons or the totals around. */}
-        {qboError && (
-          <p className="basis-full text-right text-[13px] text-accent">{qboError}</p>
-        )}
+            THE TWO COMPONENTS THAT OWN THEIR COMMANDS KEEP OWNING THEM —
+            `NewInvoice` its dialog and duplicate warning, `InvoiceBatchActions`
+            its confirms, the approval RPC's row count and the document order on
+            the delete — and hand their rows out through a render prop, which is
+            `OrderCommandMenu`'s arrangement and its reason: those are each a
+            lesson paid for once.
+
+            ALWAYS RENDERED AND ALWAYS LIVE, greying only while something runs;
+            the ROWS carry the refusals, with their counts in the labels
+            ("Approve (0)"), so the menu explains itself where a dead trigger
+            could not — the PO list's rule, argued there at length. */}
+        {withNewInvoice((newInvoice) => (
+          <InvoiceBatchActions
+            selected={sorted.filter((i) => checked.has(i.id))}
+            canEdit={canEdit}
+            canApprove={canApprove}
+            onReport={(message, tone) => {
+              setBatchReport({ message, tone });
+              setChecked(new Set());
+            }}
+          >
+            {(batchRows) => (
+              <ActionMenu
+                label={scansBusy ? "Merging…" : qboBusy ? "Checking…" : "Actions"}
+                ariaLabel={
+                  nothingTicked
+                    ? "Actions — select invoices first"
+                    : `Actions for ${checked.size} selected invoices`
+                }
+                disabled={scansBusy || qboBusy}
+                minWidth={230}
+                items={[
+                  ...newInvoice,
+                  {
+                    label: "Documents",
+                    disabled: nothingTicked,
+                    items: [
+                      { label: "Preview Invoices", onSelect: () => openScans("open") },
+                      { label: "Download Invoices", onSelect: () => openScans("download") },
+                    ],
+                  },
+                  { label: "Sync QuickBooks", onSelect: () => void checkQuickBooks() },
+                  ...batchRows,
+                  {
+                    label: "Clear Selection",
+                    disabled: nothingTicked,
+                    onSelect: () => setChecked(new Set()),
+                  },
+                ]}
+              />
+            )}
+          </InvoiceBatchActions>
+        ))}
       </div>
 
       {/* THE FILTER ROW, in Mark's order (2026-09-08): search · window ·
@@ -787,41 +962,27 @@ export function InvoiceList({
         </p>
       )}
 
-      {/* The outcome of the last bulk command, OUTSIDE the bar it came from.
-          Cleared as soon as a new selection begins, so it can never be read as
-          being about the rows now ticked. */}
-      {batchReport && checked.size === 0 && (
+      {/* WHAT THE LAST COMMAND DID, and a failed QuickBooks check, both in the
+          BAND SLOT beside the capped notice — the PO list's placement, reached
+          the same way: the selection bar they used to sit in or beside is gone
+          (Mark, 2026-09-11). Same frame and fill as that notice; RED type where
+          something went wrong, ink where it merely reports.
+
+          THE REPORT IS CLEARED BY TOUCHING THE SELECTION (see `toggleOne`), so
+          it can never be read as being about rows ticked since — which is why
+          it renders whenever it exists, including while the rows it describes
+          are still ticked, as Documents leaves them. */}
+      {qboError && (
+        <p className="border border-ink bg-mark-fill px-4 py-3 text-sm text-accent">{qboError}</p>
+      )}
+      {batchReport && (
         <p
-          className={`border px-4 py-3 text-sm ${
-            batchReport.tone === "error"
-              ? "border-accent text-accent"
-              : "border-ink text-ink"
+          className={`border border-ink bg-mark-fill px-4 py-3 text-sm ${
+            batchReport.tone === "error" ? "text-accent" : "text-ink"
           }`}
         >
           {batchReport.message}
         </p>
-      )}
-
-      {(canEdit || canApprove) && checked.size > 0 && (
-        <div className="flex flex-wrap items-center gap-4 border border-ink px-4 py-3 text-sm">
-          <span>{checked.size} selected</span>
-          <span className="tabular-nums text-muted">{money(selectedTotal)}</span>
-          <InvoiceBatchActions
-            selected={sorted.filter((i) => checked.has(i.id))}
-            canEdit={canEdit}
-            canApprove={canApprove}
-            onReport={(message, tone) => {
-              setBatchReport({ message, tone });
-              setChecked(new Set());
-            }}
-          />
-          <button
-            onClick={() => setChecked(new Set())}
-            className="ml-auto text-muted underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-          >
-            Clear
-          </button>
-        </div>
       )}
 
       <DataTable

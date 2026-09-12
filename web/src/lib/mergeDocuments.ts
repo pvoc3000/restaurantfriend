@@ -117,6 +117,6 @@ export async function mergeToSinglePdf(sources: readonly MergeSource[]): Promise
 }
 
 /** What the merged file is called when it lands in somebody's downloads. */
-export function mergedFileName(today: string, count: number): string {
-  return `documents-${today}-${count}-files.pdf`;
+export function mergedFileName(today: string, count: number, prefix = "documents"): string {
+  return `${prefix}-${today}-${count}-files.pdf`;
 }

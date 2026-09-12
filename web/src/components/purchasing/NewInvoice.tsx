@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -62,6 +62,7 @@ export function NewInvoice({
    *  screen already has, so this costs no query. */
   existing,
   triggerClassName = "",
+  children,
 }: {
   orgId: string;
   locationId: string;
@@ -74,6 +75,13 @@ export function NewInvoice({
    * button's own dress is unchanged without it.
    */
   triggerClassName?: string;
+  /**
+   * HAND THE COMMAND OUT INSTEAD OF DRAWING A BUTTON — `OrderCommandMenu`'s
+   * render prop, so this keeps owning its dialog, its duplicate warning and
+   * its write while the list's Actions menu owns where the command SITS
+   * (2026-09-11). Without it the button is drawn as before.
+   */
+  children?: (open: () => void) => ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -196,13 +204,17 @@ export function NewInvoice({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={`ml-auto inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35 ${triggerClassName}`}
-      >
-        New invoice
-      </button>
+      {children ? (
+        children(() => setOpen(true))
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className={`ml-auto inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35 ${triggerClassName}`}
+        >
+          New invoice
+        </button>
+      )}
 
       {open && (
         <Dialog

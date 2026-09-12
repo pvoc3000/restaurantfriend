@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -29,7 +29,7 @@ import { NewInventoryItem } from "./NewInventoryItem";
 import { InventoryItemActions } from "./InventoryItemActions";
 import { PickList } from "@/components/ui/PickList";
 import type { ItemRow } from "@/app/(app)/items/page";
-import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 
 const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
   { key: "active", label: "Active" },
@@ -255,6 +255,45 @@ export function ItemsList({
 
   const itemNames = useMemo(() => items.map((i) => i.name), [items]);
 
+  /** Every command but New acts on the ticked rows, so with none ticked those
+   *  rows are dead — and the menu, opened, says why. */
+  const nothingTicked = checked.size === 0;
+
+  /**
+   * `NewInventoryItem` owns its own dialog, so the menu's row has to come FROM
+   * it — `NewInvoice`'s shape one screen over. No fallback branch: this is only
+   * ever called inside the `editable` test that used to gate the button.
+   */
+  const withNewItem = (render: (items: ActionMenuItem[]) => ReactNode) => (
+    <NewInventoryItem orgId={orgId} categories={categories} existingNames={itemNames}>
+      {(open) => render([{ label: "New Inventory Item", onSelect: open }])}
+    </NewInventoryItem>
+  );
+
+  /**
+   * DUPLICATE SELECTED AND DELETE SELECTED ARE THE ROW MENU'S OWN COMMANDS
+   * (Mark, 2026-09-11), over the ticked rows instead of one — ONE
+   * implementation behind both doors, taking the items as a parameter, which
+   * is the PO list's rule and its reason: what gets remembered in one copy and
+   * forgotten in the other is the confirm and the row-count check, and here
+   * that confirm is a whole dialog that counts what a delete would cascade.
+   *
+   * So `InventoryItemActions` keeps owning both verbs, its usage count, its
+   * "Deactivate instead" offer and its dialog, and hands the menu its two rows.
+   * Nothing about either command is re-implemented here.
+   */
+  const withItemActions = (render: (items: ActionMenuItem[]) => ReactNode) => (
+    <InventoryItemActions
+      items={items
+        .filter((i) => checked.has(i.id))
+        .map((i) => ({ id: i.id, name: i.name, isActive: i.is_active }))}
+      existingNames={itemNames}
+      scope="selection"
+    >
+      {render}
+    </InventoryItemActions>
+  );
+
   const columns: DataColumn<ItemRow>[] = [
     // The selection column exists for the bulk Deactivate bar, so it goes with
     // it: a Read Only role (a supervisor, per the Page Permissions sheet) gets
@@ -373,9 +412,7 @@ export function ItemsList({
             render: (item: ItemRow) => (
               <span className="flex justify-end">
                 <InventoryItemActions
-                  itemId={item.id}
-                  name={item.name}
-                  isActive={item.is_active}
+                  items={[{ id: item.id, name: item.name, isActive: item.is_active }]}
                   existingNames={itemNames}
                 />
               </span>
@@ -387,8 +424,27 @@ export function ItemsList({
 
   return (
     <div className="space-y-4">
-      {/* The create command rides in the TITLE row (Mark, 2026-09-10: "move
-          the action button into the identity row top right aligned"). */}
+      {/* ONE "ACTIONS" MENU FOR THE SCREEN (Mark, 2026-09-11), the third in a
+          day after the purchase order and invoice lists, in the TITLE row the
+          create command already rode in (Mark, 2026-09-10: "move the action
+          button into the identity row top right aligned"): New Inventory Item ·
+          Deactivate Here · Deactivate Everywhere, then a rule, then Clear
+          Selection.
+
+          `NewInventoryItem` KEEPS OWNING ITS COMMAND and hands the row out
+          through a render prop — `OrderCommandMenu`'s arrangement, so the
+          dialog, the duplicate warning and the write stay where they are and
+          only the command's PLACE moves.
+
+          FLAT, NOT A "Deactivate ▸" SUBMENU, which is where this departs from
+          the PO list's "Mark ▸". Two variants do not earn a submenu — that one
+          groups three and Documents four — and the destructive half of this
+          pair deserves to be VISIBLE rather than a hover away, which is the
+          opposite of what hiding it would achieve.
+
+          NOTHING IS RENDERED BELOW purchaser+, unlike the invoice list's,
+          because every row here writes: there is no read command to keep the
+          menu meaningful, so an empty one would be worse than none. */}
       <PageHeading
         title="Inventory"
         code={activeLocationCode}
@@ -396,13 +452,44 @@ export function ItemsList({
         total={items.length}
         noun="inventory items"
         action={
-          editable ? (
-            <NewInventoryItem
-              orgId={orgId}
-              categories={categories}
-              existingNames={itemNames}
-            />
-          ) : null
+          editable
+            ? withNewItem((newItem) =>
+                withItemActions((itemRows) => (
+                  <ActionMenu
+                    label={busy ? "Working…" : "Actions"}
+                    ariaLabel={
+                      nothingTicked
+                        ? "Actions — select items first"
+                        : `Actions for ${checked.size} selected items`
+                    }
+                    disabled={busy}
+                    minWidth={250}
+                    items={[
+                      ...newItem,
+                      {
+                        label: `Deactivate Here${activeLocationCode ? ` (${activeLocationCode})` : ""}`,
+                        disabled: nothingTicked,
+                        onSelect: () => void deactivate("here"),
+                      },
+                      {
+                        label: "Deactivate Everywhere",
+                        danger: true,
+                        disabled: nothingTicked,
+                        onSelect: () => void deactivate("everywhere"),
+                      },
+                      ...itemRows.map((row, i) =>
+                        i === 0 ? { ...row, separatorBefore: true } : row
+                      ),
+                      {
+                        label: "Clear Selection",
+                        disabled: nothingTicked,
+                        onSelect: () => setChecked(new Set()),
+                      },
+                    ]}
+                  />
+                ))
+              )
+            : null
         }
       />
 
@@ -464,31 +551,13 @@ export function ItemsList({
         </ControlField>
       </div>
 
-      {editable && checked.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 border border-ink px-4 py-3 text-sm">
-          <span>{checked.size} selected</span>
-          <button
-            disabled={busy}
-            onClick={() => deactivate("here")}
-            className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-          >
-            Deactivate here{activeLocationCode ? ` (${activeLocationCode})` : ""}
-          </button>
-          <button
-            disabled={busy}
-            onClick={() => deactivate("everywhere")}
-            className={DANGER_BUTTON_CLASS}
-          >
-            Deactivate everywhere
-          </button>
-          <button
-            onClick={() => setChecked(new Set())}
-            className="text-muted hover:underline"
-          >
-            Clear
-          </button>
-          {error && <span className="text-accent">{error}</span>}
-        </div>
+      {/* WHAT THE LAST COMMAND SAID, in the band slot — the purchasing lists'
+          placement (2026-09-11), reached the same way: the selection bar it
+          used to sit in is gone, its "N selected" having only restated the
+          ticks. Red type on the mark fill, because a refused write is
+          something WRONG. */}
+      {error && (
+        <p className="border border-ink bg-mark-fill px-4 py-3 text-sm text-accent">{error}</p>
       )}
 
       <DataTable

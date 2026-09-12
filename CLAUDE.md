@@ -45,6 +45,50 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 1. ✅ Schema + RLS applied
 2. ✅ Web skeleton: auth (email/password), org/location context, vendor list
 3. ✅ FMP → Postgres migration (`migration/`) loaded; web catalog admin shipped.
+   **THE INVENTORY LIST'S COMMANDS ARE ONE ACTIONS MENU** (Mark, 2026-09-11,
+   the third list in a day): **New Inventory Item** · **Deactivate Here (DF01)**
+   · **Deactivate Everywhere** (red), then a rule, then **Clear Selection**, in
+   the title row where the create command already rode. The selection bar is
+   gone — its "N selected" only restated the ticks — and its error moved to the
+   band slot, red on the mark fill, the purchasing lists' placement.
+   `NewInventoryItem` hands its row out through a render prop and keeps owning
+   its dialog, duplicate warning and write (`OrderCommandMenu`'s arrangement).
+   **FLAT, NOT A "Deactivate ▸" SUBMENU**, which is where it departs from the
+   PO list's "Mark ▸": two variants do not earn a submenu — that one groups
+   three and Documents four — and the destructive half of this pair deserves to
+   be VISIBLE rather than a hover away, which is the opposite of what hiding it
+   would achieve.
+   **NOTHING IS RENDERED BELOW purchaser+**, unlike the invoice list's, because
+   every row here WRITES: there is no read command to keep the menu meaningful,
+   so an empty one would be worse than none — and the selection column stays
+   gated for the same reason, where the invoice list's had to widen.
+   **DUPLICATE SELECTED AND DELETE SELECTED JOINED IT THE SAME DAY** (Mark),
+   under a rule above Clear Selection — and they are **the ROW MENU'S OWN
+   COMMANDS over the ticked rows**, not a second implementation.
+   `InventoryItemActions` took `itemId` and now takes `items: ItemTarget[]`,
+   keeping its usage count, its "Deactivate instead" offer and its whole
+   confirm dialog, and handing the list its two rows through the same render
+   prop `NewInventoryItem` uses. That is the PO list's rule and its reason: what
+   gets remembered in one copy and forgotten in the other is the confirm and the
+   row-count check, and here the confirm is a dialog that counts what a delete
+   would cascade.
+   **A BATCH DUPLICATE GROWS ITS OWN TAKEN-NAMES LIST**, which is the one thing
+   a naive loop gets wrong: `duplicateTitle` avoids the names it is given, so
+   passing the same list three times makes three items called "… copy". It runs
+   sequentially for that reason, LANDS ON THE COPY ONLY WHEN THERE IS ONE (nine
+   copies have no single destination), and a failure part way through keeps what
+   it made and says "Copied 3 of 9, then stopped" — each copy is its own tree of
+   writes with no transaction spanning them, and pretending otherwise would be
+   worse than the truth.
+   The dialog counts the whole selection and speaks in the plural ("These items
+   are stocked at 6 locations"), naming the first four so you can tell the
+   selection is the one you meant. `scope="selection"` is wording only.
+   Verified live at 1440: 403 rows and 403 checkboxes, every row dead with
+   nothing ticked and live with three, the batch confirm reading "3 inventory
+   items · Activated Charcoal, Advil, Agar, Powdered" over 6 per-location rows,
+   15 vendor items and 2 production elements — cancelled, nothing written — the
+   row menu still reading "Duplicate"/"Delete…" with its hints, and New
+   Inventory Item opening its dialog through the render prop.
    `/cleanup` queue (live from DB, per-location + all-locations, 3 problem
    checks, burn-down) with inline fix editors (package content w/ unit
    conversion, price, par — one per offending FAVORITE); multi-favorite plan-row grid
@@ -2876,6 +2920,44 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **The report lands on the LIST, not the bar** — clearing the selection
    unmounts the bar, so a summary rendered there vanishes at the moment it is
    read.
+   **THE INVOICE LIST'S COMMANDS ARE ONE ACTIONS MENU TOO** (Mark, 2026-09-11,
+   an hour after the PO list's and to the same shape): **New Invoice** ·
+   **Documents** ▸ Preview Invoices · Download Invoices · **Sync QuickBooks** ·
+   **Approve (n)**, then a rule, then **Delete Selected…** (red) and **Clear
+   Selection**. It replaces a Check QuickBooks button, a New invoice button and
+   a selection bar carrying two more — and the bar is GONE, its count and total
+   having only restated the ticks.
+   **`NewInvoice` AND `InvoiceBatchActions` KEEP OWNING THEIR COMMANDS** and
+   hand their rows out through a render prop — `OrderCommandMenu`'s arrangement
+   and its reason: the duplicate warning, the confirms that name what will be
+   skipped, the approval RPC's row count and the document order on the delete
+   are each a lesson paid for once and not worth a second copy.
+   **DOCUMENTS MEANS THE SCANS, and it cannot mean anything else** (Mark chose
+   it from three readings). A vendor invoice is a document we RECEIVE, so there
+   is no invoice PDF in this app and there must not be one: the real document is
+   what the vendor sent, and a generated sheet beside it would be a second
+   answer to "what were we billed" with no original behind it. So it is
+   `DocumentsList`'s own `mergeToSinglePdf` over the attachments this module
+   already files — `mergedFileName` gained an optional prefix so the file lands
+   as `invoices-…` rather than `documents-…`. An invoice with nothing filed is
+   SKIPPED AND COUNTED ("3 of the 5 had nothing filed"), never silently absent.
+   **THE SELECTION COLUMN IS NOW EVERY ROLE'S**, where it needed approve or
+   delete before — precisely so a Read Only purchaser was not given boxes with
+   nothing to press. Documents is what changed that: opening the selection's
+   scans is a READ, the screen is already role-gated, and a reader who may open
+   each invoice's paperwork one at a time on its record may certainly open
+   several at once.
+   **APPROVE IS RENDERED WHENEVER THE ROLE HAS IT AND GREYED AT ZERO**, where
+   the button used to vanish — "Approve (0)" says the selection is already
+   approved or voided, which is the reason on the row it is about, and a
+   vanished control cannot say it.
+   **BOTH REPORTS MOVED TO THE BAND SLOT** beside the capped notice, the PO
+   list's placement: same frame and fill, red where something went wrong.
+   And **the report is now cleared BY TOUCHING THE SELECTION** rather than by a
+   render guard that showed it only while nothing was ticked. That guard worked
+   while every command cleared the selection on its way out and broke the moment
+   Documents reported without clearing — its message could never have appeared.
+   Clearing at the source is what that note always asked for in words.
    **BOTH AMOUNT CAVEATS ASK ABOUT THE PAGE, NEVER ABOUT OUR OWN COLUMNS**
    (Mark, 2026-09-02, the same day: "there's a warning that isn't appropriate …
    after I changed it back the warning didn't go away"). `amountReconciliation`
@@ -9973,7 +10055,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons; `onSubmit` makes Enter commit (opt-in — see the Enter bullet below) |
   | `confirmDialog()` from `lib/confirm` | `window.confirm` | EVERY confirm (Mark, 2026-08-10: the browser's dialog "takes me out of the app experience"). A promise — `if (!(await confirmDialog({ title, body, tone: "danger" }))) return;` — so the handler becomes async; `splitConfirmMessage(msg)` spreads a one-string message into title + body. `ui/ConfirmDialog` is the panel and only the (app) layout touches it. Enter does NOT commit a `danger` confirm (it focuses Cancel), which is `ui/Dialog`'s rule applied |
   | `ui/MenuButton` | a button you wire to your own popup | a button that opens a short list of COMMANDS — the anchored menu with the trigger left to the caller. A menu, not a `PickList`: every row is a verb that happens once and leaves nothing selected, so the trigger's label never changes. `ui/RowMenu` is the `⋯` dress over it; a command bar passes words and `BUTTON_CLASS` |
-  | `ui/ActionMenu` | a row of command buttons in different sizes and colours | a SCREEN's commands behind one raised "Actions" button (Mark, 2026-09-11, first on the special order record). A vertical Mac menu (2px black edge, hard shadow, grey row under the pointer); a row with `items` shows ▶ and opens a submenu to the side on hover, click or →, flipping left when the right edge has no room; `separatorBefore` groups. **Row labels are Title Case** (Mark, same day) — Cancel Order, Schedule Production…, Kitchen Order — set by the callers. Choosing closes the menu and runs `onSelect` in the same click, so a Preview's window stays inside the gesture. The submenu lives inside the panel's own element so the click-outside test counts it as inside. **The components that own the commands keep owning them** — `SendDocument`, `PushOrderToQuickBooks` (its own group after Email…; a refusal is a dialog on choosing the row rather than a sentence under the button), `ScheduleProduction` and `OrderActions` take a `children` render prop and hand back rows, still drawing their own dialogs, confirms and error lines; `specialOrders/OrderCommandMenu` (a client component, because render props are functions) assembles them. `ui/MenuButton` stays for a short flat list with hints |
+  | `ui/ActionMenu` | a row of command buttons in different sizes and colours | a SCREEN's commands behind one raised "Actions" button (Mark, 2026-09-11, first on the special order record, then the purchase order, invoice and inventory LISTS the same day — on a list it also swallows the selection bar, so read those three entries before adding a fourth). A vertical Mac menu (2px black edge, hard shadow, grey row under the pointer); a row with `items` shows ▶ and opens a submenu to the side on hover, click or →, flipping left when the right edge has no room; `separatorBefore` groups. **Row labels are Title Case** (Mark, same day) — Cancel Order, Schedule Production…, Kitchen Order — set by the callers. Choosing closes the menu and runs `onSelect` in the same click, so a Preview's window stays inside the gesture. The submenu lives inside the panel's own element so the click-outside test counts it as inside. **The components that own the commands keep owning them** — `SendDocument`, `PushOrderToQuickBooks` (its own group after Email…; a refusal is a dialog on choosing the row rather than a sentence under the button), `ScheduleProduction` and `OrderActions` take a `children` render prop and hand back rows, still drawing their own dialogs, confirms and error lines; `specialOrders/OrderCommandMenu` (a client component, because render props are functions) assembles them. `ui/MenuButton` stays for a short flat list with hints |
   | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands — `ui/MenuButton` wearing `⋯`, so it escapes scroll panes and flips near the window's foot exactly like `PickList` |
   | `catalog/InlineValue` | a hand-wired edit-in-place, or a bare `<input type="date">` / `<input type="time">` | any editable cell — `kind` text / number / date / **time** / **pick** (`time` delegates to `ui/TimePicker` and, like `date`, does NOT click-to-edit — the box opens the picker directly); `multiline` for prose (textarea, ⌘↵ saves); `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column; `arrayColumn` + `arrayIndex` + `arrayStrip` + `arrayWidth` to edit ONE SLOT of a Postgres array (the `par_by_weekday` idiom, which had no editor until the recipe sheet). An array column CONSTRAINED against a sibling array must write both in one statement — that is what `alsoUpdate` is for. `emptyClassName` styles the cell when it holds NOTHING (faint by default; the plan matrix wants a yellow "—", and a caller CAN'T do this through `className`, because Tailwind resolves competing utilities by stylesheet order); `ariaLabel` names the cell where no `<dt>` does — a grid of identical cells otherwise all announce as "—, click to edit". **`onWrite` replaces the UPDATE and nothing else** — for a column whose rule is COLUMN-scoped and so lives behind a definer function (044's `made`/`leftover`); without it the cell issues a plain update that matches zero rows, returns NO error, and silently loses what was typed |
   | `useCalcField()` spread on the input (`ui/CalcPad` is already mounted) | `inputMode="decimal"` plus your own operator affordance | letting a numeric field take a `lib/calc` expression ON A TOUCH DEVICE. iOS renders `inputMode="decimal"` as the number pad, which has no operators, and on iPadOS `*`/`+`/`×`/`÷` are two keyboard layers deep — so on touch the field asks for NO system keyboard (`inputMode="none"`) and CalcPad supplies one that has them, with a live readout of what the expression comes to. The spread is the whole wiring; it writes through the native value setter, so a controlled React input needs no code. **Half a keyboard bolted to Apple's was tried first and Mark's verdict on hardware was "clumsy and awkward"** — don't reach back for it. Spread it ONLY on fields `evaluateNumeric` reads: several others carry `inputMode="decimal"` and parse with a plain `Number()`, where an inserted `×` is a value that can't save |
