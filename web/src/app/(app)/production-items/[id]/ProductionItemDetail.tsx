@@ -15,6 +15,13 @@ import { ProductionItemHistory } from "@/components/production/ProductionItemHis
 import { historyWindow, type HistoryLine } from "@/lib/productionHistory";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { canEditPage } from "@/lib/pageAccess";
+import { SectionNav } from "@/components/ui/SectionNav";
+import {
+  PRODUCTION_ITEM_TABS,
+  PRODUCTION_ITEM_TAB_LABEL,
+  parseProductionItemTab,
+  productionItemTabHref,
+} from "@/lib/productionItems";
 
 /**
  * One item: what it is, what it is made of, what that costs, and what each shop
@@ -42,6 +49,22 @@ export async function ProductionItemDetail({
   // until this shop's rate turns it into money.
   const costs = costContext(session.activeLocation);
 
+  // WHICH TAB, and therefore WHAT TO FETCH — the inventory item record's
+  // split. Info stops paying for the Add picker's vocabulary and the
+  // fortnight; Costs stops paying for the pars; History stops paying for both
+  // of the others.
+  //
+  // The two GRAPH loads stay unconditional and that is deliberate rather than
+  // unfinished: `loadItemGraph` is what resolves the taxonomy line under the
+  // title, which sits ABOVE the tabs and so is on every one of them, and
+  // `loadProductionGraph` answers both Info's cost figure and the whole of
+  // Costs. Gating it would buy one tab of three a saving in exchange for
+  // making `cost` nullable everywhere it is read.
+  const tab = parseProductionItemTab(rawParams.tab);
+  const wantsInfo = tab === "info";
+  const wantsCosts = tab === "costs";
+  const wantsHistory = tab === "history";
+
   const { graph, error } = await loadProductionGraph(supabase);
   if (error) return <LoadError message={error} />;
 
@@ -68,15 +91,17 @@ export async function ProductionItemDetail({
     // 040 built `production_schedule_items_item_idx` for exactly this query and
     // said so: "phase 5's two-week history on the Item screen, joined to the
     // parent's date".
-    supabase
-      .from("v_production_schedule_lines")
-      .select("schedule_date, location_id, par, made, leftover, sold")
-      .eq("item_id", id)
-      .gte("schedule_date", fortnight.from)
-      .lte("schedule_date", fortnight.to),
+    wantsHistory
+      ? supabase
+          .from("v_production_schedule_lines")
+          .select("schedule_date, location_id, par, made, leftover, sold")
+          .eq("item_id", id)
+          .gte("schedule_date", fortnight.from)
+          .lte("schedule_date", fortnight.to)
+      : { data: null, error: null },
     // The Add picker's vocabulary. Active elements only — see the helper for
     // why the costing graph beside it can't answer this.
-    loadElementOptions(supabase),
+    wantsCosts ? loadElementOptions(supabase) : { options: [] },
   ]);
   if (itemError || rowError) return <LoadError message={itemError ?? rowError!.message} />;
   if (!row) notFound();
@@ -135,8 +160,14 @@ export async function ProductionItemDetail({
 
   const trail = parseTrail(rawParams, { href: "/production-items", label: "Items" });
 
+  const tabOptions = PRODUCTION_ITEM_TABS.map((t) => ({
+    key: t,
+    label: PRODUCTION_ITEM_TAB_LABEL[t],
+    href: productionItemTabHref(id, t, rawParams),
+  }));
+
   return (
-    <div className="space-y-16">
+    <div className="space-y-8">
       <div className="space-y-6">
         <Breadcrumbs
           trail={trail}
@@ -144,7 +175,11 @@ export async function ProductionItemDetail({
           trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
         />
 
-        <div className="space-y-1">
+        {/* The identity block, ABOVE the split and indented to the content
+            column — the inventory item record's shape, copied rather than
+            re-derived. `lg:ml-48` = the sidebar's `lg:w-40` + the row's
+            `lg:gap-8`; THE THREE VALUES ARE COUPLED. */}
+        <div className="space-y-1 lg:ml-48">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
               {row.name as string}
@@ -159,76 +194,105 @@ export async function ProductionItemDetail({
             {[item.size, item.item_type, item.subtype, item.finish].filter(Boolean).join(" · ") || "—"}
           </p>
         </div>
-
-        <ProductionItemFields
-          item={{
-            id,
-            name: row.name as string,
-            item_type: item.item_type,
-            subtype: item.subtype,
-            finish: item.finish,
-            size: item.size,
-            price_class: item.price_class,
-            price_tier: item.price_tier,
-            tally_box_size: Number(row.tally_box_size ?? 6),
-            notes: (row.notes ?? null) as string | null,
-          }}
-          cost={cost}
-          price={price}
-          vocab={vocab}
-          editable={editable}
-        />
       </div>
 
-      {/* TWO COLUMNS (Mark, 2026-09-08: "move the 'default pars' section into a
-          second column next to the 'what it costs' section, and make the 'last
-          two weeks' section fit into a single column"). What it costs and
-          Default pars are both narrow tables that were each running the width
-          of the screen, so the record was three short blocks stacked down a
-          1,300px page.
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+        {/* Two renderings of one control, WRAPPED rather than switched with a
+            responsive `display` utility — Tailwind resolves competing
+            utilities by stylesheet order, so a `hidden` passed in `className`
+            cannot be relied on to beat the component's own `flex`. */}
+        <div
+          className="hidden lg:sticky lg:block lg:w-40 lg:shrink-0"
+          style={{ top: "calc(var(--rf-header-h) + 1.5rem)" }}
+        >
+          <SectionNav ariaLabel="Which part of this record" value={tab} items={tabOptions} />
+        </div>
+        <div className="lg:hidden">
+          <SectionNav
+            orientation="horizontal"
+            ariaLabel="Which part of this record"
+            value={tab}
+            items={tabOptions}
+          />
+        </div>
 
-          `minmax(0,1fr)` twice rather than a bare `1fr`: a grid item's
-          min-width is min-content, so the pars table (three columns of
-          controls) and the history's `min-w-[520px]` would otherwise push
-          their own tracks wider than half and the page sideways.
-          `items-start`, so a tall left column does not stretch the right one
-          into a box of white space.
+        {/* space-y-16, matching the other records: with only 8px inside each
+            block, the gap BETWEEN them is what says where one ends. */}
+        <div className="min-w-0 flex-1 space-y-16">
+          {wantsInfo && (
+            <>
+              <ProductionItemFields
+                item={{
+                  id,
+                  name: row.name as string,
+                  item_type: item.item_type,
+                  subtype: item.subtype,
+                  finish: item.finish,
+                  size: item.size,
+                  price_class: item.price_class,
+                  price_tier: item.price_tier,
+                  tally_box_size: Number(row.tally_box_size ?? 6),
+                  notes: (row.notes ?? null) as string | null,
+                }}
+                cost={cost}
+                price={price}
+                vocab={vocab}
+                editable={editable}
+              />
 
-          The history takes column ONE of the second row by ordinary auto
-          placement — it is a single column now rather than a spanning block,
-          which is the third half of the ask. */}
-      <div className="grid items-start gap-x-12 gap-y-16 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <ItemComponents
-          itemId={id}
-          orgId={session.membership.org_id}
-          rows={componentRows.map(({ line, name, cost: c }) => ({
-            id: line.id,
-            elementId: line.element_id,
-            name,
-            qty: line.qty,
-            unit: line.unit,
-            cost: c.cost,
-            sort: line.sort ?? null,
-          }))}
-          total={cost}
-          options={elementOptions}
-          editable={editable}
-        />
+              {/* DEFAULT PARS SITS WITH THE FIELDS (Mark, 2026-09-12: "Info —
+                  upper two columns and default pars area"). Both are what the
+                  item IS rather than what it costs or what it did, and the
+                  fields above are themselves two label/value columns, which
+                  is the "upper two columns" his wording names.
 
-        <ProductionItemLocations
-          itemId={id}
-          orgId={session.membership.org_id}
-          pars={await loadPars(supabase, id)}
-          locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
-          gridPrice={price.cell?.price ?? null}
-          editable={editable}
-        />
+                  THE 2026-09-08 TWO-COLUMN GRID IS GONE with it. That
+                  arrangement existed because What it costs, Default pars and
+                  Last two weeks were three short blocks stacked down a 1,300px
+                  page; with one block per tab there is nothing left to stack,
+                  and each now has the content column to itself. */}
+              <ProductionItemLocations
+                itemId={id}
+                orgId={session.membership.org_id}
+                pars={await loadPars(supabase, id)}
+                locations={session.activeLocations.map((l) => ({
+                  id: l.id,
+                  code: l.code,
+                  name: l.name,
+                }))}
+                gridPrice={price.cell?.price ?? null}
+                editable={editable}
+              />
+            </>
+          )}
 
-        <ProductionItemHistory
-          lines={history.lines}
-          dates={fortnight.dates}
-          unavailable={history.error}
-        />
+          {wantsCosts && (
+            <ItemComponents
+              itemId={id}
+              orgId={session.membership.org_id}
+              rows={componentRows.map(({ line, name, cost: c }) => ({
+                id: line.id,
+                elementId: line.element_id,
+                name,
+                qty: line.qty,
+                unit: line.unit,
+                cost: c.cost,
+                sort: line.sort ?? null,
+              }))}
+              total={cost}
+              options={elementOptions}
+              editable={editable}
+            />
+          )}
+
+          {wantsHistory && (
+            <ProductionItemHistory
+              lines={history.lines}
+              dates={fortnight.dates}
+              unavailable={history.error}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

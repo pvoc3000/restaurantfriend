@@ -3952,10 +3952,37 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    a row, the dough included, rendered as **"1/340 of a batch"** because that is
    how a baker says it, and anything unpriced says so on its own line rather
    than being dropped from the total.
-   **THE RECORD IS TWO COLUMNS SINCE 2026-09-08** (Mark: "move the 'default
+   **THE RECORD IS THREE TABS SINCE 2026-09-12** (Mark: "let's make three tabs
+   on the items detail page. Info — upper two columns and default pars area.
+   Costs — includes the costs area. History — includes the 'last two weeks'
+   area"), `ui/SectionNav` and `lib/productionItems`, the inventory item
+   record's pattern a fourth time — title and taxonomy above the split and
+   indented `lg:ml-48`, the tab in the URL under `tab`, `info` writing no
+   parameter so every stored link stays canonical, and `RecordNav` carrying
+   the tab when you page.
+   **"THE UPPER TWO COLUMNS" IS THE FIELDS BLOCK** — its `dl` is four tracks at
+   `sm` (label · value · label · value), which is two columns of pairs — and
+   Default pars joins it because both say what the item IS, where the other two
+   tabs say what it COSTS and what it DID.
+   **WHICH RETIRES THE TWO-COLUMN GRID BELOW**, described next and kept for its
+   reasoning: that arrangement existed because three short blocks were stacked
+   down a 1,300px page, and with one block per tab there is nothing left to
+   stack — each now has the whole content column, which roughly doubles the
+   pars strip's room (at 1280 it had 561px of a split row and now has 977 less
+   the 192px sidebar). Nothing else was at risk: History wraps its
+   `min-w-[520px]` table in `overflow-x-auto` and What it costs caps itself at
+   `70ch`.
+   **THE GRAPH LOADS STAY UNCONDITIONAL, deliberately.** Info drops the Add
+   picker's vocabulary and the fortnight, Costs drops the pars, History drops
+   both — but `loadItemGraph` resolves the taxonomy line under the title, which
+   sits ABOVE the tabs and so is on every one, and `loadProductionGraph`
+   answers both Info's cost figure and the whole of Costs. Gating it would buy
+   one tab of three a saving in exchange for making `cost` nullable everywhere
+   it is read.
+   (The arrangement it replaced, 2026-09-08 — Mark: "move the 'default
    pars' section into a second column next to the 'what it costs' section, and
    make the 'last two weeks' section fit into a single column instead of
-   spanning the entire screen"). What it costs and Default pars are both narrow
+   spanning the entire screen".) What it costs and Default pars are both narrow
    tables that were each running the full width of the screen, so the record was
    three short blocks stacked down 1,300px. `xl:grid-cols-[minmax(0,1fr)_minmax
    (0,1fr)]` — `minmax(0,…)` and not a bare `1fr`, because a grid item's
@@ -3969,6 +3996,34 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    641px box with no horizontal scroll) and 1024, where it stacks.
    Known cost, accepted: in half a column the pars table's Location cell
    truncates the shop's NAME. The CODE is what identifies it and stays whole.
+   **THE LIST TOOK THE SWITCH, THE SUNKEN SEARCH AND THE TITLE-ROW COMMAND
+   (2026-09-12)** — Mark, naming it by its own heading, which is "Items". All
+   three were stragglers: a checkbox where `/vendors` took the switch, the
+   TYPED border where every other search box is sunken, and its create command
+   still in the filter row after the 2026-09-10 sweep moved every other list's
+   into the title row — `action`'s own doc had said "beside the title" since it
+   was written while the wiring said `rowAction`.
+   **THE SWITCH MATTERS MOST HERE BECAUSE THIS LIST HAS A SELECTION COLUMN
+   TOO**, which is the exact ambiguity `ui/Switch` exists to end.
+   **`TextInput` HAD `search` AND `fullWidth` FIGHTING OVER THE WIDTH.**
+   `search` asks for the sunken `mac-field` dress AND forced `SEARCH_PEN`, so a
+   CAPTIONED search — where the caption block wears the pen and the field fills
+   it — could not have the dress without nesting one pen inside another.
+   `fullWidth` wins the width now and `search` decides the dress; no caller
+   passed both, so nothing else moved. **Three captioned searches still wear
+   the typed border for that reason and are one prop each from correct**:
+   `/special-orders`, `/customers` and the special order's Add-line panel.
+   **Active went 80 → 90 and Item pays the 10, total still 1340** so every
+   other column keeps its exact pixels. At 1280, where all eleven columns still
+   show, 80 gave that cell 45.8px against a 50.7px "ACTIVE" and it printed
+   "ACTI…" — a fault that predates the switch and that the switch makes worse,
+   wanting 40px of the cell where a checkbox wanted 24. Item pays because Item
+   WRAPS, so it loses a wrap point rather than any text (the argument that
+   already paid for the ⋯ column); measured it still holds 224px against a 92px
+   name. **`minWidth: 64` instead of a widths-key bump** — a bump would throw
+   away everybody's dragged widths, order and hidden columns to deliver a nudge
+   to a default, where the floor stops a drag making the column too narrow for
+   its own control.
    **THE LIST HAS A ⋯ — Duplicate and Delete** (`ProductionItemActions`, Mark,
    2026-09-08), `InventoryItemActions`' template, purchaser+ per the Page
    Permissions sheet.

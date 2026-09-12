@@ -63,6 +63,7 @@ import "./orgDocuments.fixtures";
 import "./displayTags.fixtures";
 import "./inventorySearch.fixtures";
 import "./inventoryItems.fixtures";
+import "./productionItemTabs.fixtures";
 import "./productionItems.fixtures";
 import "./productionPlans.fixtures";
 import "./scheduleWrites.fixtures";
