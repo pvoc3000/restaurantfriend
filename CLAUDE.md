@@ -4777,11 +4777,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    NAME, and "… copy" sorts after. **Delete** counts versions, lines, steps and
    the batch-log entries that lose their version link (044's `set null`), then
    deletes row first, pictures second. **The pinned add rows under the two
-   lists are gone** ("free up some space"): the menu posts a request through
-   `lib/recipeAddRequest` (the `lib/shiftFocus` shape — a nonce'd module value
-   that survives the soft navigation to the right tab) and `AddRecipeRow`
-   appears only then, the picker open or the step box focused, and hides again
-   once a row is added or the reader backs out.
+   lists are gone** ("free up some space"), and **both adds are DIALOGS**
+   (Mark, the same day): Add Ingredient… asks for the element (a typed name
+   the catalog lacks still writes `label`, via `ingredientChoice`) with an
+   optional amount and unit, Add Procedure… for the step's text (⌘↵ adds).
+   Both write against the version on screen, sort last-plus-ten, and take you
+   to their tab once the row is in. `AddRecipeRow` is deleted.
    **The Batch cost fact at the top is GONE** (Mark, 2026-08-12: "batch cost in
    this screenshot isn't useful information (it's also wrong as it doesn't
    include labor …). You can get rid of it"). It quoted the matrix's INGREDIENTS

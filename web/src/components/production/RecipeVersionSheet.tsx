@@ -21,7 +21,6 @@ import type { Cost } from "@/lib/productionCost";
 import { RecipeScaleCell } from "./RecipeScaleCell";
 import { ScaleAutoBox, HideOnPrint, DeleteRecipeRow } from "./RecipeRowControls";
 import { RecipeStepImage } from "./RecipeStepImage";
-import { AddRecipeRow } from "./AddRecipeRow";
 
 export type SheetLine = {
   id: string;
@@ -196,14 +195,6 @@ export function RecipeVersionSheet({
     W_HIDE +
     W_TRASH;
 
-  const lastLineSort = version.lines.reduce<number | null>(
-    (a, l) => (l.sort === null ? a : Math.max(a ?? 0, l.sort)),
-    null
-  );
-  const lastStepSort = version.steps.reduce<number | null>(
-    (a, s) => (s.sort === null ? a : Math.max(a ?? 0, s.sort)),
-    null
-  );
 
   // ONE LIST FILLS THE WINDOW. They shared it from 2026-08-08 until
   // 2026-08-11, when the crowding that arrangement was meant to cure came back
@@ -463,18 +454,8 @@ export function RecipeVersionSheet({
           <p className="shrink-0 text-[13px] text-muted">No ingredients on this version.</p>
         ) : null}
 
-        {editable ? (
-          <AddRecipeRow
-            table="production_recipe_lines"
-            versionId={version.id}
-            orgId={version.org_id}
-            lastSort={lastLineSort}
-            what="ingredient"
-            placeholder="Choose an element…"
-            options={elementOptions}
-            activateTable="production_elements"
-          />
-        ) : null}
+        {/* No add row here: Add Ingredient… in the record's Actions menu opens
+            a dialog (Mark, 2026-09-12). */}
       </section>
       ) : null}
 
@@ -568,16 +549,8 @@ export function RecipeVersionSheet({
           <p className="shrink-0 text-[13px] text-muted">No procedure on this version.</p>
         ) : null}
 
-        {editable ? (
-          <AddRecipeRow
-            table="production_recipe_steps"
-            versionId={version.id}
-            orgId={version.org_id}
-            lastSort={lastStepSort}
-            what="step"
-            placeholder="What happens next"
-          />
-        ) : null}
+        {/* No add row here: Add Procedure… in the record's Actions menu opens a
+            dialog (Mark, 2026-09-12). */}
       </section>
       ) : null}
 

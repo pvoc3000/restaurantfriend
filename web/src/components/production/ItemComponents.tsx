@@ -154,7 +154,7 @@ export function ItemComponents({
   });
 
   /**
-   * THE NEW ROW GETS NO `sort`, which is the opposite of `AddRecipeRow`'s
+   * THE NEW ROW GETS NO `sort`, which is the opposite of `RecipeCommandMenu`'s add dialogs'
    * last-plus-ten and deliberate. Measured: all 324 migrated edges have `sort`
    * null — the transform never filled it and no screen has ever reordered one —
    * so this table is sorted by name in practice. Writing 10 onto one row of

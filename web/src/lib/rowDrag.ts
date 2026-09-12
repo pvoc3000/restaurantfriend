@@ -84,7 +84,7 @@ import { type ColumnDropTarget as DropTarget } from "./columnOrder";
  * back where it started writes nothing at all.
  *
  * Numbering runs from 1 rather than in tens. Gaps exist to be typed into by
- * hand, which is what `AddRecipeRow`'s last-plus-ten is for; a list that is
+ * hand, which is what the recipe add dialogs' last-plus-ten is for; a list that is
  * reordered by dragging is renumbered wholesale every time, so a gap would never
  * be used and would only make the stored numbers harder to read.
  */
