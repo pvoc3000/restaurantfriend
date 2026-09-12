@@ -295,7 +295,6 @@ export async function BatchLogRecord({
               outstanding={rows.length - done}
               editable={editable}
               removable={removable}
-              touch
             />
           </div>
         ) : (
@@ -334,6 +333,7 @@ export async function BatchLogRecord({
             batches={rows.length}
             outstanding={rows.length - done}
             editable={editable}
+            removable={removable}
           />
         </div>
       </header>
@@ -384,7 +384,6 @@ export async function BatchLogRecord({
           scaleLabelsByVersion={scaleLabelsByVersion}
           locationId={log.location_id as string}
           editable={editable}
-          removable={removable}
           touch={touch}
           // THE LOG'S NOTE, beside Group by (Mark, 2026-09-12). Desk only, as
           // the strip it came from was — the tablet shell has neither.

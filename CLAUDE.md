@@ -9638,8 +9638,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Delete Batch… are an Actions menu in the crumb row (the tablet has no title
    row). Delete Batch acts on the batch the pane shows, which `BatchLogItems`
    publishes through `lib/selectedBatch` (the `lib/shiftFocus` shape);
-   `BatchActions` gained a `children` render prop. Complete/Reopen and Delete
-   Log remain desk-only. What follows about the footer is history.
+   `BatchActions` gained a `children` render prop. **And the same day the two
+   shells got ONE menu** (Mark: "make them match, one menu on both"): Add
+   Batch… · Delete Batch… · Mark Complete (or Reopen Log) · Delete Log…, in the
+   title row on the desk and the crumb row on the tablet. The desk pane's
+   Delete batch button and the 2026-09-09 desk-only rule for the log commands
+   are gone. What follows about the footer is history.
    **THE BATCH LOG RECORD WAS THE FIRST SCREEN REWORKED FOR IT** (Mark,
    2026-09-09, with FileMaker's own tablet layout as the reference: "a total
    mess on a tablet"). Measured at 1024×768 before: the pinned frame had ~500px,

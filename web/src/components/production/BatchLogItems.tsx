@@ -9,7 +9,6 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { clampSplit, setSplit, useSplit } from "@/lib/paneSplit";
 import { BatchItemsTable, type BatchRow } from "@/components/production/BatchItemsTable";
 import { BatchFields, type BatchFieldsRow } from "@/components/production/BatchFields";
-import { BatchActions } from "@/components/production/BatchActions";
 import { BatchHistory } from "@/components/production/BatchHistory";
 import { BatchRecipe } from "@/components/production/BatchRecipe";
 
@@ -102,7 +101,6 @@ export function BatchLogItems({
   scaleLabelsByVersion = {},
   locationId,
   editable,
-  removable,
   touch = false,
   filterExtra,
 }: {
@@ -116,8 +114,6 @@ export function BatchLogItems({
   scaleLabelsByVersion?: Record<string, string[]>;
   locationId: string;
   editable: boolean;
-  /** Purchaser+ — 044's delete policy, narrower than the edit one. */
-  removable: boolean;
   /** The tablet shell — see `BatchItemsTable`'s prop of the same name. */
   touch?: boolean;
   /** Handed to the table's filter row, after Group by. */
@@ -342,19 +338,8 @@ export function BatchLogItems({
                     ] ?? []
                   }
                 />
-                {/* On the tablet this command is a row of the Actions menu instead. */}
-                {touch ? null : (
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <BatchActions
-                      batchId={selected.id}
-                      elementName={selected.element_name}
-                      batchNumber={selected.batch_number}
-                      hasYield={selected.yield_count !== null || selected.yield_size !== null}
-                      photoPath={selected.photo_path}
-                      removable={removable}
-                    />
-                  </div>
-                )}
+                {/* Delete Batch… is a row of the Actions menu on both shells
+                    (Mark, 2026-09-12: "one menu on both"). */}
               </div>
             ) : pane === "history" ? (
               <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
