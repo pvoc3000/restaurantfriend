@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TabPicker } from "@/components/ui/TabPicker";
 
 /**
  * A record's own sections, as plain text links (Mark, 2026-08-06: "make the
@@ -83,6 +84,32 @@ export function SectionNav<K extends string>({
   className?: string;
 }) {
   const vertical = orientation === "vertical";
+
+  // THE HORIZONTAL FORM IS A `TabPicker` (Mark, 2026-09-12: the narrow-screen
+  // tabs "weren't affected by the changes to the tabpicker … and it should
+  // be"). Laid out in a row above the content, these ARE tabs over a panel —
+  // the classic Mac tab control's own shape, open under the selected tab with
+  // the rule running on to the edge — so they take TabPicker's dress rather
+  // than keeping a second one. The vertical sidebar stays plain text links, for
+  // the reasons above. `overflow-x-auto` so five tabs on a phone scroll inside
+  // their own strip rather than pushing the page sideways.
+  if (!vertical) {
+    return (
+      <nav aria-label={ariaLabel} className={`overflow-x-auto ${className}`}>
+        <TabPicker<K>
+          ariaLabel={ariaLabel}
+          value={value}
+          onChange={onSelect}
+          options={items.map((item) => ({
+            key: item.key,
+            label: item.label,
+            count: item.count,
+            href: onSelect ? undefined : item.href ?? "#",
+          }))}
+        />
+      </nav>
+    );
+  }
 
   return (
     <nav
