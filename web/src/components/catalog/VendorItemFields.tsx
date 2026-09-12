@@ -329,7 +329,9 @@ export function VendorItemFields({
               alsoUpdate={(next) => recomputeContent({ pack_size: next })}
             />
           </span>
-          <span className="w-14 shrink-0">
+          {/* `ml-2` (Mark, 2026-09-12): the size and unit boxes stood 2px apart
+              and read as one field; the × gives count and size their gap. */}
+          <span className="ml-2 w-14 shrink-0">
             <InlineValue
               readOnly={!editable}
               boxed={BOXED_FIELDS}
