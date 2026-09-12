@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { Checkbox } from "@/components/ui/Checkbox";
+import { Switch } from "@/components/ui/Switch";
 import { spaceBelow, useViewportAtLeast } from "@/lib/tableHead";
 import { recipeHref } from "@/lib/recipes";
 import { scaleColumns } from "@/lib/production";
@@ -384,7 +384,10 @@ function RecipeVersionList({
               giving it to. */}
           <colgroup>
             <col style={{ width: 72 }} />
-            <col style={{ width: 58 }} />
+            {/* 64, not 58: 42px of content held a 24px checkbox, and the 40px
+                switch wants its shadow's room too. Note is the flexible column
+                and pays. */}
+            <col style={{ width: 64 }} />
             <col style={{ width: 88 }} />
             <col />
             <col style={{ width: 116 }} />
@@ -478,8 +481,9 @@ function ActiveVersion({ id, active }: { id: string; active: boolean }) {
   const [pending, start] = useTransition();
 
   return (
-    <Checkbox
-      size="lg"
+    // A SWITCH since 2026-09-12 (Mark), the Active-column sweep reaching the
+    // versions table. Same write, same revert.
+    <Switch
       checked={on}
       disabled={pending}
       label={on ? "Active — click to retire this version" : "Retired — click to activate"}
