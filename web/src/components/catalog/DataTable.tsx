@@ -299,6 +299,23 @@ export function DataTable<T>({
     render: (row: T) => ReactNode;
     summary?: (row: T) => ReactNode;
     canExpand?: (row: T) => boolean;
+    /**
+     * WHICH COLUMN THE CHEVRON RIDES IN. The default is the first, and the
+     * reason is stated where it renders: a disclosure reads as part of the
+     * row's IDENTITY rather than as another column. That holds while the first
+     * column is the row's name — which it is on three of the six tables that
+     * expand — and breaks where the first column is a CONTROL, as it is on the
+     * two whose Active toggle leads: there the chevron lands beside a switch,
+     * two controls jammed together read as a pair of controls, and the Active
+     * header no longer sits over the thing it labels (Mark, 2026-09-11: "the
+     * fact the expansion button and switch are right next to each other looks
+     * strange").
+     *
+     * So name the identity column instead. It is not an escape from the rule,
+     * it is the rule reaching a table whose identity is not in column one.
+     * A key that is hidden or unknown falls back to the first visible column.
+     */
+    columnKey?: string;
   };
   /**
    * Band rows before each run of like-labelled rows. See DataGroup.
@@ -502,6 +519,19 @@ export function DataTable<T>({
   );
   const visibleColumns = orderedColumns.filter((col) =>
     isColumnVisible(col, compact, hidden, shown)
+  );
+
+  /** Which cell carries the chevron — see `expand.columnKey`. A named column
+   *  that is hidden (or misspelt) falls back to the first visible one, so the
+   *  disclosure can never go missing. */
+  const expandColumnKey =
+    expand?.columnKey && visibleColumns.some((c) => c.key === expand.columnKey)
+      ? expand.columnKey
+      : visibleColumns[0]?.key;
+  /** How many columns sit before it — what the open panel is indented past. */
+  const expandColumnIndex = Math.max(
+    0,
+    visibleColumns.findIndex((c) => c.key === expandColumnKey)
   );
 
   // The drag writes through the FULL movable order (hidden columns keep their
@@ -892,13 +922,15 @@ export function DataTable<T>({
                       rowClassName?.(row) ?? ""
                     }`}
                   >
-                    {visibleColumns.map((col, index) => {
+                    {visibleColumns.map((col) => {
                       const cell = col.render(row);
-                      // The chevron and summary ride in the first cell so the
-                      // disclosure reads as part of the row's identity rather
-                      // than as another column.
+                      // The chevron and summary ride in the row's IDENTITY cell
+                      // so the disclosure reads as part of it rather than as
+                      // another column — the first by default, or whichever
+                      // `expand.columnKey` names. See that prop for why a table
+                      // whose first column is a control has to say so.
                       const content =
-                        index === 0 && expand ? (
+                        col.key === expandColumnKey && expand ? (
                           <span className="flex min-w-0 items-center gap-3">
                             {expandable ? (
                               // A bordered box rather than a bare glyph: it
@@ -947,9 +979,28 @@ export function DataTable<T>({
                     })}
                   </tr>
 
+                  {/* THE PANEL BEGINS WHERE ITS OWN DISCLOSURE DOES (Mark,
+                      2026-09-11: the expansion's fields "should align with the
+                      location column not the active column"). Empty cells hold
+                      the columns BEFORE the chevron's, so the panel starts on a
+                      real column boundary rather than at a guessed indent — the
+                      widths are the table's own, so it stays aligned through a
+                      drag, a hidden column or the compact tier.
+
+                      `px-3` is the cell padding, so the panel's content shares
+                      a left edge with that column's. It was `px-4`, which on
+                      the three tables whose chevron is in column one put the
+                      panel 4px off the cell above it — this lines those up
+                      too. */}
                   {isOpen && expand && (
                     <tr className="border-b border-hairline bg-neutral-50">
-                      <td colSpan={visibleColumns.length} className="px-4 py-5">
+                      {expandColumnIndex > 0 && (
+                        <td aria-hidden colSpan={expandColumnIndex} />
+                      )}
+                      <td
+                        colSpan={visibleColumns.length - expandColumnIndex}
+                        className="px-3 py-5"
+                      >
                         {expand.render(row)}
                       </td>
                     </tr>

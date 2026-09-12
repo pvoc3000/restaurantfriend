@@ -504,11 +504,16 @@ span:has(> input.mac-field) {
    alone is a 16px difference; the grey ground makes an ON switch read as filled
    at a glance. Neither is colour, so it survives the app's rule that colour
    means record state. */
+/* 23px, THE TRACK'S OWN HEIGHT, not the checkbox's 24. The row is `align-items:
+   center`, so a 24px floor around a 23px track centred the track at a HALF
+   PIXEL — which blurs a 1px border and leaves the control sitting a hair off
+   whatever it stands beside. Matching the two means the box IS the track and
+   every offset in here is a whole number. */
 .mac-switch {
   position: relative;
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
+  min-height: 23px;
 }
 
 /* Transparent OVER the track, never `display: none`, which would take it out of

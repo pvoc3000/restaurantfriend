@@ -39,19 +39,6 @@ export type VendorLocationRow = {
   rep_email: string | null;
 };
 
-/**
- * Rep fields live behind the disclosure; this is what you see without opening.
- * Nothing is shown when there's no rep — a "none" on every row would cost the
- * width that makes the summary useful on the rows that do have one.
- */
-function repSummary(row: VendorLocationRow) {
-  // Falls back to the email: plenty of migrated rows have only that, and a row
-  // with contact details must never look empty from the outside.
-  const parts = [row.sales_rep, row.rep_phone].filter(Boolean);
-  if (parts.length === 0 && row.rep_email) return row.rep_email;
-  return parts.length > 0 ? parts.join(" · ") : null;
-}
-
 /** A shop, and this vendor's config there — null until somebody sets one up. */
 type Row = { location: Shop; vl: VendorLocationRow | null };
 
@@ -305,7 +292,8 @@ export function VendorLocationsTable({
       // The row IS the location — never hideable.
       pinned: true,
       label: "Location",
-      // Wide enough for the code, the "here" badge and the rep summary.
+      // The chevron, the code and the "here" badge. It was sized for a rep
+      // summary too; that is gone — see `expand` below.
       width: 300,
       sortValue: (r) => r.location.code,
       render: (r) => (
@@ -414,7 +402,22 @@ export function VendorLocationsTable({
       leading={leading}
       defaultSort={{ key: "location" }}
       expand={{
-        summary: (r) => (r.vl ? repSummary(r.vl) : null),
+        // ON THE LOCATION, NOT ON ACTIVE (Mark, 2026-09-11). The row IS the
+        // location, so that is where a disclosure belongs — and this column's
+        // own width note has said it was sized "for the code, the here badge
+        // and the rep summary" since it was written, which is where all three
+        // now are. What it buys on the Active column is what he asked for: the
+        // switch alone in the cell, so the "Active" header sits over the thing
+        // it labels and the column's border falls beside it.
+        //
+        // AND NO SUMMARY — the collapsed row is the shop and the chevron,
+        // nothing else (Mark, 2026-09-11: "we don't need to see the email
+        // address in the location column when it's not expanded"). It had
+        // shown the rep's name falling back to their email, which is how an
+        // address came to sit beside a location code; and the rep is what the
+        // row OPENS to show, so previewing it bought a second copy of one fact
+        // at the cost of the width the code and its badge read in.
+        columnKey: "location",
         render: (r) =>
           !r.vl ? (
             // The expansion is where the rep and every QuickBooks mapping live,

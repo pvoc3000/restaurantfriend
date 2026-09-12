@@ -2,6 +2,7 @@
 
 import { ORDER_TYPE_OPTIONS } from "@/lib/catalog";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
+import { ActiveToggle } from "./ActiveToggle";
 import { InlineValue } from "./InlineValue";
 
 export type VendorRecord = {
@@ -12,6 +13,7 @@ export type VendorRecord = {
   order_type: string;
   url: string | null;
   notes: string | null;
+  is_active: boolean;
 };
 
 /**
@@ -81,6 +83,32 @@ export function VendorFields({
 }) {
   return (
     <dl className="grid max-w-2xl grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+      {/* ACTIVE, FIRST (Mark, 2026-09-11: "we need to add a control to
+          activate/deactivate the vendor on the vendor detail page. Put it above
+          the Type field").
+
+          UNTIL NOW THE LIST WAS THE ONLY PLACE IN THE APP THAT COULD WRITE
+          `vendors.is_active` — this record only PRINTED "Inactive" beside the
+          title — so retiring the list's column, which was on the table when the
+          Active switch was designed, would have taken the capability with it.
+          A record's own state belongs on the record.
+
+          THE SWITCH, matching the two tables on this same screen (the
+          per-location config and the Items tab). It is the org-wide flag, where
+          those are per shop and per vendor item — three different scopes of one
+          idea, which is exactly why they must not be three different shapes. */}
+      <dt className="text-subtle">Active</dt>
+      <dd>
+        <ActiveToggle
+          readOnly={!editable}
+          table="vendors"
+          id={vendor.id}
+          active={vendor.is_active}
+          control="switch"
+          label="Vendor active"
+        />
+      </dd>
+
       <dt className="text-subtle">Type</dt>
       <dd>
         <InlineValue
