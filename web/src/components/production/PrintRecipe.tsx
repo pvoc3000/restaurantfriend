@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { openWindowNow, showBlob } from "@/lib/poProcessing";
 import type { SheetVersion } from "./RecipeVersionSheet";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 
 /**
  * Print the recipe sheet — the kitchen binder page.
@@ -18,11 +19,16 @@ export function PrintRecipe({
   recipeName,
   orgName,
   version,
+  children,
 }: {
   recipeName: string;
   /** Printed at the foot of every page, where FileMaker sets the wordmark. */
   orgName: string;
   version: SheetVersion;
+  /** Hand the command out as an Actions menu row instead of a button. The
+   *  window still opens inside the click — `ActionMenu` runs `onSelect` in the
+   *  same gesture. */
+  children?: (row: ActionMenuItem) => React.ReactNode;
 }) {
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
@@ -81,6 +87,15 @@ export function PrintRecipe({
         setFailed((e as Error).message ?? "The sheet could not be rendered.");
       }
     });
+  }
+
+  if (children) {
+    return (
+      <>
+        {children({ label: pending ? "Rendering…" : "Print Sheet", onSelect: print, disabled: pending })}
+        {failed ? <p className="text-right text-[13px] text-accent">{failed}</p> : null}
+      </>
+    );
   }
 
   return (

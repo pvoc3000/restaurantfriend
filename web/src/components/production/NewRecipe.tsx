@@ -8,6 +8,7 @@ import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/u
 import { TextInput } from "@/components/ui/TextInput";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 
 /**
  * Add a recipe — `NewElement`'s template, with one thing that template does not
@@ -32,12 +33,15 @@ export function NewRecipe({
   orgId,
   elements,
   types,
+  children,
 }: {
   orgId: string;
   /** Every element, retired ones sunk under their own heading. */
   elements: PickOption[];
   /** The `recipe_type` vocabulary already in use — FMP's Glaze/Cake/Mix. */
   types: string[];
+  /** Hand the command out as an Actions menu row; the dialog stays here. */
+  children?: (row: ActionMenuItem) => React.ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -113,9 +117,13 @@ export function NewRecipe({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={BUTTON_CLASS}>
-        New recipe
-      </button>
+      {children ? (
+        children({ label: "New Recipe…", onSelect: () => setOpen(true) })
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} className={BUTTON_CLASS}>
+          New recipe
+        </button>
+      )}
 
       {open && (
         <Dialog

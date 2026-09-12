@@ -4766,6 +4766,22 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    is sized to the matrix (`xl:w-[32rem]`) rather than to a share of the row:
    given a fraction it came out 394px for a 508px matrix, so the one block whose
    point is the comparison across it had to be scrolled to be read.
+   **THE RECORD'S COMMANDS ARE ONE ACTIONS MENU IN THE TITLE ROW** (Mark,
+   2026-09-12): New Recipe… · Duplicate Recipe · Add Ingredient… · Add
+   Procedure… · Print Sheet · Delete Recipe… (red), `RecipeCommandMenu`.
+   `NewRecipe` and `PrintRecipe` hand out rows through a `children` render
+   prop. **Duplicate** (`recipeWrites`) copies the family whole — every
+   version, line and step, each step picture as its OWN storage object — by
+   `select("*")` minus id, timestamps, `legacy_id` and `source_payload`, and
+   KEEPS the original's Active flag: costing takes an element's first family BY
+   NAME, and "… copy" sorts after. **Delete** counts versions, lines, steps and
+   the batch-log entries that lose their version link (044's `set null`), then
+   deletes row first, pictures second. **The pinned add rows under the two
+   lists are gone** ("free up some space"): the menu posts a request through
+   `lib/recipeAddRequest` (the `lib/shiftFocus` shape — a nonce'd module value
+   that survives the soft navigation to the right tab) and `AddRecipeRow`
+   appears only then, the picker open or the step box focused, and hides again
+   once a row is added or the reader backs out.
    **The Batch cost fact at the top is GONE** (Mark, 2026-08-12: "batch cost in
    this screenshot isn't useful information (it's also wrong as it doesn't
    include labor …). You can get rid of it"). It quoted the matrix's INGREDIENTS

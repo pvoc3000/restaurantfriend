@@ -1,12 +1,25 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { ingredientChoice } from "@/lib/recipes";
+import {
+  clearRecipeAdd,
+  readRecipeAdd,
+  serverRecipeAdd,
+  subscribeRecipeAdd,
+} from "@/lib/recipeAddRequest";
 
 /**
+ * HIDDEN UNTIL ASKED FOR, since 2026-09-12 (Mark: move Add Ingredient and Add
+ * Procedure into the record's Actions menu, "then you can get rid of the sticky
+ * footer … and free up some space"). The button that stood pinned under each
+ * list is gone; the menu posts a request (`lib/recipeAddRequest`) and this row
+ * appears — the picker already open, or the step box focused — and goes away
+ * again once the row is added or the reader backs out.
+ *
  * The blank row at the foot of FileMaker's two lists — say what it is and it
  * becomes a row.
  *
@@ -73,6 +86,26 @@ export function AddRecipeRow({
   const supabase = createClient();
   const [draft, setDraft] = useState("");
   const [picking, setPicking] = useState(false);
+  const kind = table === "production_recipe_lines" ? "ingredient" : "step";
+
+  // Honour a request from the Actions menu. Adjusted DURING RENDER (React's
+  // documented pattern for reacting to a changed value) so the row is open on
+  // the frame that paints; the store is cleared afterwards in an effect, which
+  // is a write to a module value rather than to state.
+  const req = useSyncExternalStore(subscribeRecipeAdd, readRecipeAdd, serverRecipeAdd);
+  const [handled, setHandled] = useState(0);
+  if (req && req.what === kind && req.nonce !== handled) {
+    setHandled(req.nonce);
+    setPicking(true);
+  }
+  useEffect(() => {
+    if (handled) clearRecipeAdd(handled);
+  }, [handled]);
+
+  const rowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (picking) rowRef.current?.scrollIntoView({ block: "nearest" });
+  }, [picking]);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -97,6 +130,7 @@ export function AddRecipeRow({
         return;
       }
       setDraft("");
+      setPicking(false);
       router.refresh();
     });
   }
@@ -116,57 +150,52 @@ export function AddRecipeRow({
     insert(table === "production_recipe_lines" ? { label: value } : { body: value });
   }
 
+  if (!picking) {
+    return error ? <p className="text-[13px] text-accent">{error}</p> : null;
+  }
+
   if (options) {
     return (
-      <div className="flex flex-wrap items-center gap-2">
-        {picking ? (
-          // `defaultOpen`: pressing the button already said "I want to choose
-          // something", so a second tap to open the list is a tap spent on
-          // nothing. `onClose` fires only on the DISMISS path, so abandoning
-          // puts the command back rather than leaving an empty field behind.
-          <PickList
-            variant="field"
-            value={null}
-            options={options}
-            allowNew
-            defaultOpen
-            onClose={() => setPicking(false)}
-            onPick={addChosen}
-            activateTable={activateTable}
-            ariaLabel={`Element to add as an ${what}`}
-            placeholder={placeholder}
-            className="w-full max-w-[26rem]"
-          />
-        ) : (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => {
-              setError(null);
-              setPicking(true);
-            }}
-            className="inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-          >
-            {pending ? "Adding…" : `Add ${what}`}
-          </button>
-        )}
+      <div ref={rowRef} className="flex shrink-0 flex-wrap items-center gap-2">
+        {/* `defaultOpen`: the menu already said "I want to choose something",
+            so the list is up. `onClose` fires only on the DISMISS path, so
+            backing out hides the row again. */}
+        <PickList
+          variant="field"
+          value={null}
+          options={options}
+          allowNew
+          defaultOpen
+          onClose={() => setPicking(false)}
+          onPick={addChosen}
+          activateTable={activateTable}
+          ariaLabel={`Element to add as an ${what}`}
+          placeholder={placeholder}
+          className="w-full max-w-[26rem]"
+        />
+        {pending ? <span className="text-[13px] text-muted">Adding…</span> : null}
         {error && <span className="text-[13px] text-accent">{error}</span>}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div ref={rowRef} className="flex shrink-0 flex-wrap items-center gap-2">
       <input
         value={draft}
         disabled={pending}
         placeholder={placeholder}
         autoComplete="off"
+        autoFocus
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
             addTyped();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            setDraft("");
+            setPicking(false);
           }
         }}
         className="h-9 w-full max-w-[26rem] border border-hairline px-2 text-[14px] outline-none focus:border-ink"
@@ -178,6 +207,17 @@ export function AddRecipeRow({
         className="inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
       >
         {pending ? "Adding…" : `Add ${what}`}
+      </button>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => {
+          setDraft("");
+          setPicking(false);
+        }}
+        className="text-[13px] text-muted underline underline-offset-[3px] hover:text-ink"
+      >
+        Cancel
       </button>
       {error && <span className="text-[13px] text-accent">{error}</span>}
     </div>

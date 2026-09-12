@@ -10,7 +10,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { RecipeVersions } from "@/components/production/RecipeVersions";
-import { PrintRecipe } from "@/components/production/PrintRecipe";
+import { RecipeCommandMenu } from "@/components/production/RecipeCommandMenu";
 import { RecipeVersionSheet } from "@/components/production/RecipeVersionSheet";
 import { RecipeInfo } from "@/components/production/RecipeInfo";
 import { SectionNav } from "@/components/ui/SectionNav";
@@ -52,6 +52,7 @@ export async function RecipeDetail({
     { data: recipe, error },
     { graph, error: graphError },
     { options: elementOptions },
+    { data: typeRows },
   ] = await Promise.all([
     supabase
       .from("production_recipes")
@@ -77,6 +78,8 @@ export async function RecipeDetail({
       // costing graph beside it deliberately cannot answer (it loads retired
       // ones too, because a resolver has to price what is already on a recipe).
       loadElementOptions(supabase),
+      // The `recipe_type` vocabulary, for the menu's New Recipe dialog.
+      supabase.from("production_recipes").select("recipe_type"),
     ]);
 
   if (error || graphError) {
@@ -301,9 +304,10 @@ export async function RecipeDetail({
           and it keeps the wider `w-40`: it has five sections with longer words
           ("Employment"), where this has two. */}
       <div className="space-y-3 lg:ml-36">
-        {/* PRINT SHEET RIDES IN THE TITLE ROW, top-right (Mark, 2026-09-12),
-            where it sat at the right end of the version picker's line. It
-            prints the version the URL names, which is the one shown below. */}
+        {/* THE ACTIONS MENU RIDES IN THE TITLE ROW, top-right (Mark,
+            2026-09-12), where Print sheet stood: New Recipe… · Duplicate
+            Recipe · Add Ingredient… · Add Procedure… · Print Sheet · Delete
+            Recipe…. Print prints the version the URL names. */}
         <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -332,15 +336,26 @@ export async function RecipeDetail({
             {recipe.recipe_type ? ` · ${recipe.recipe_type as string}` : ""}
           </p>
         </div>
-        {current ? (
-          <div className="ml-auto">
-            <PrintRecipe
-              recipeName={recipe.name as string}
-              orgName={session.orgName}
-              version={current}
-            />
-          </div>
-        ) : null}
+        <div className="ml-auto">
+          <RecipeCommandMenu
+            recipeId={id}
+            recipeName={recipe.name as string}
+            orgId={session.membership.org_id}
+            orgName={session.orgName}
+            version={current}
+            tab={tab}
+            params={rawParams}
+            editable={editable}
+            elements={elementOptions}
+            types={[
+              ...new Set(
+                (typeRows ?? [])
+                  .map((r) => (r.recipe_type as string | null) ?? "")
+                  .filter((t) => t.trim() !== "")
+              ),
+            ].sort()}
+          />
+        </div>
         </div>
 
         {current ? (
