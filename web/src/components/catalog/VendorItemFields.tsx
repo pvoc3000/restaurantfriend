@@ -159,16 +159,24 @@ export function VendorItemFields({
         <h1 className="w-full text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           {title ?? <span className="text-faint">Untitled vendor item</span>}
         </h1>
-        <span className="flex items-center gap-2 text-sm text-muted">
-          <ActiveToggle
-            readOnly={!editable}
-            table="vendor_items"
-            id={vi.id}
-            active={vi.is_active}
-            label="Vendor item active"
-          />
-          {vi.is_active ? "Active" : "Inactive"}
-        </span>
+        {/* A SWITCH since 2026-09-12 (Mark, sweeping the vendor screens). This
+            writes `vendor_items.is_active` — THE SAME COLUMN the vendor
+            record's Items tab and the inventory item's Vendor Items tab show
+            as a switch, one click away in both directions — so a checkbox here
+            was the one place in the family where that flag took a different
+            shape.
+
+            THE WORD BESIDE IT WENT WITH THE CHECKBOX, as on the inventory item
+            record: a switch states its own state, and `readOnly` renders the
+            word for a reader who gets no control. */}
+        <ActiveToggle
+          readOnly={!editable}
+          table="vendor_items"
+          id={vi.id}
+          active={vi.is_active}
+          control="switch"
+          label="Vendor item active"
+        />
       </div>
 
       <dl className="grid max-w-[min(42rem,max(24rem,50%))] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
