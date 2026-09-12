@@ -271,6 +271,58 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    order history and feed "last ordered"); PO detail lines get a purchaser+
    selection column with the same confirm-gated delete (received quantities
    named).
+   **THE PO LIST'S COMMANDS ARE ONE ACTIONS MENU TOO** (Mark, 2026-09-11,
+   the day after PO detail's) — `ui/ActionMenu`, replacing a Documents
+   `MenuButton` and five buttons that between them made the selection bar six
+   commands wide and wrapping. It is the same argument that put Documents
+   behind a trigger there in the first place, which is why that menu is now a
+   SUBMENU rather than a sibling: **Mark** ▸ Sent · Received · Closed ·
+   **Documents** ▸ Preview POs · Download POs · Preview Shopping Lists ·
+   Download Shopping Lists, then a rule, then **Delete** (red) and **Clear
+   Selection**.
+   **IT SITS BESIDE THE WINDOW TOTAL, NOT IN A BAR** (Mark's placement) —
+   `ml-auto` on the total pushes the pair to the right margin, and the title
+   row went `items-end` → **`items-start`** so the h1, the total and the button
+   all start on one line, which is `PageHeading`'s own rule reaching the two
+   headers that keep their own markup because they carry a total.
+   **AND `items-start` LEVELS BOXES, NOT INK** — the top half of the
+   2026-08-31 lesson that gave the guide's last-purchase label its
+   `relative bottom-[2.75px]`. With every box top at 96 the 12px "Window total"
+   label's CAP started at **100.9** while the button's border — a hard line —
+   started at 96, and Mark read the total as "a few pixels low". He was right
+   to a tenth: measured at **4.9px** across four font fallbacks and confirmed
+   from the metrics (18px line-height over 12px = 3px half-leading, baseline
+   109.5, cap ~0.72em), so the block rides **5px** up as a RELATIVE offset —
+   a margin is layout and would move the row. Re-measure if the label's size or
+   line-height moves, or if the button stops being the thing beside it.
+   **THE SELECTION BAR IS GONE** (Mark: "delete the selected amount and the box
+   around them"). Its count and running total only restated the ticks; the one
+   thing in it that did not is `batchError`, which moved up into the BAND SLOT
+   beside the capped notice (Mark's placement) — same frame and fill, RED type,
+   because a failed write is something WRONG where that one is merely worth
+   your eye. Red on yellow-200 is 4.62:1, which passes AA.
+   **THE TRIGGER STAYS LIVE WITH NOTHING TICKED and every row goes dead**
+   (Mark asked whether an enabled menu over disabled options was alright — it
+   is, and it is the better half). `NewTimesheet`'s rule says disable rather
+   than hide, and its own escape clause is that a greyed control explains
+   itself only on hover, which an iPad has none of. A dead TRIGGER has no words
+   available; opened, the menu explains itself completely — **the counts ride
+   in the labels** ("Sent (3)"), which is where the buttons carried them, so
+   "Sent (0)" is the whole reason on the row it is about. `ActionMenuItem`
+   takes no hint, so those buttons' `title` tooltips are gone and the count is
+   the half worth keeping. The button greys only while a batch runs, reading
+   Saving… / Receiving… / Closing… / Deleting… / Rendering… — one trigger, so
+   one place left to say WHICH, and that is worth more than a generic
+   "Working…" when a 200ms status write and a thirty-order PDF render answer
+   "did my click land" differently.
+   Verified live at 1440 and 820: all three tops at exactly 96, the label's ink
+   at 95.9–96.3, the Actions button's right edge on the content margin, no page
+   overflow at either, the Documents submenu correctly flipping LEFT at the
+   right margin, every row dead with nothing ticked and live with two, Clear
+   Selection emptying the ticks without the header changing shape — and
+   `window.open` confirmed fired SYNCHRONOUSLY inside the click, which is the
+   one thing the move could have broken (a popup opened after an await is
+   silently blocked).
    **PO DETAIL'S COMMANDS ARE ONE ACTIONS MENU** (Mark, 2026-09-11) — level
    with the title at the top right, grouped add · send · receive: Add Item… ·
    Preview PDF · Download PDF · Email PO… / Open Vendor Site / Shopping List

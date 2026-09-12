@@ -22,7 +22,7 @@ import {
   showBlob,
   SENT_VIA_FOR_ORDER_TYPE,
 } from "@/lib/poProcessing";
-import { MenuButton } from "@/components/ui/MenuButton";
+import { ActionMenu } from "@/components/ui/ActionMenu";
 import {
   money,
   PO_STATUS_CLASS,
@@ -54,7 +54,7 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { RowMenu } from "@/components/ui/RowMenu";
 import type { PoListRow } from "@/app/(app)/purchase-orders/page";
-import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 // Widths and hidden columns share this key — one table, one identity.
@@ -247,13 +247,6 @@ export function PurchaseOrderList({
     () => visible.reduce((sum, po) => sum + po.ordered_total, 0),
     [visible]
   );
-  const selectedTotal = useMemo(
-    () =>
-      visible
-        .filter((po) => checked.has(po.id))
-        .reduce((sum, po) => sum + po.ordered_total, 0),
-    [visible, checked]
-  );
 
   function toggleOne(id: string) {
     setChecked((prev) => {
@@ -263,17 +256,6 @@ export function PurchaseOrderList({
       return next;
     });
   }
-
-  /** The selected orders' numbers, in the order the batch PDF will run them —
-   *  so the menu's hint is the name the file will actually get. */
-  const selectedNumbers = useMemo(
-    () =>
-      orders
-        .filter((po) => checked.has(po.id))
-        .map((po) => po.po_number)
-        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
-    [orders, checked]
-  );
 
   const selectedDrafts = useMemo(
     () => orders.filter((po) => checked.has(po.id) && po.status === "draft"),
@@ -371,9 +353,9 @@ export function PurchaseOrderList({
   ) {
     if (ids.length === 0) return;
     // Opened before any await, while the click gesture still counts — a popup
-    // opened after async work is silently blocked. `MenuButton` closes
-    // synchronously inside the click, so this is still inside the gesture, and
-    // that is as true of a RowMenu as of the command bar's own button.
+    // opened after async work is silently blocked. `ActionMenu` and `RowMenu`
+    // both run `onSelect` inside the click that closes them, so this is still
+    // inside the gesture from either door.
     const win = mode === "open" ? openWindowNow() : null;
     setBatchBusy(`${kind}:${mode}`);
     setBatchError(null);
@@ -881,9 +863,40 @@ export function PurchaseOrderList({
     ),
   ];
 
+  /**
+   * What the Actions button says while it is working. Each of the six commands
+   * used to be its own button carrying its own word ("Saving…", "Receiving…");
+   * with one trigger there is one place left to say it, and saying WHICH is
+   * worth more than a generic "Working…" when the answer to "did my click land"
+   * differs between a 200ms status write and a thirty-order PDF render.
+   *
+   * `batchPdf` keys its busy state `"<kind>:<mode>"`, which is why the document
+   * case is tested by the colon rather than by listing four spellings.
+   */
+  /** Every command here acts on the ticked rows, so with none ticked every row
+   *  is dead — and says why, which a greyed trigger could not. */
+  const nothingTicked = checked.size === 0;
+
+  const batchBusyLabel =
+    batchBusy === null
+      ? null
+      : batchBusy === "sent"
+        ? "Saving…"
+        : batchBusy === "received"
+          ? "Receiving…"
+          : batchBusy === "closed"
+            ? "Closing…"
+            : batchBusy === "delete"
+              ? "Deleting…"
+              : "Rendering…";
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+      {/* TOPS ALIGNED, not baselines (Mark, 2026-09-11): the title block, the
+          window total and the Actions button all start on one line, which is
+          `PageHeading`'s own `items-start` rule reaching the two headers that
+          keep their own markup because they carry a total. */}
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
         <div>
           <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
             Purchase Orders
@@ -892,8 +905,21 @@ export function PurchaseOrderList({
             {activeLocationCode} · {visible.length} of {orders.length} orders
           </p>
         </div>
-        {/* The window total as a Statistic: small-caps label over the figure. */}
-        <div className="ml-auto text-right">
+        {/* The window total as a Statistic: small-caps label over the figure.
+            `items-start` LEVELS BOXES, NOT INK — the top half of the 2026-08-31
+            lesson that gave the guide's last-purchase label its
+            `relative bottom-[2.75px]`. A line box carries half-leading above
+            the cap, so with every box top at 96 the 12px label's CAP started at
+            100.9 while the Actions button's border — a hard line — started at
+            96, and Mark read the total as "a few pixels low". Measured at
+            4.9px across four font fallbacks and confirmed from the metrics
+            (18px line-height over 12px = 3px half-leading, baseline 109.5, cap
+            ~0.72em), so it rides 5px up.
+
+            A RELATIVE OFFSET, not a margin: a margin is layout and would move
+            the row. RE-MEASURE if the label's size or line-height moves, or if
+            the button stops being the thing beside it. */}
+        <div className="relative bottom-[5px] ml-auto text-right">
           <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
             Window total
           </div>
@@ -901,6 +927,103 @@ export function PurchaseOrderList({
             {money(pageTotal)}
           </div>
         </div>
+
+        {/* ONE "ACTIONS" MENU FOR THE SELECTION (Mark, 2026-09-11), replacing a
+            Documents menu and five buttons that between them made the selection
+            bar six commands wide and wrapping. It is the special order record's
+            move a fortnight on, and the same argument that put Documents behind
+            a trigger in the first place — which is why that menu is a SUBMENU
+            here rather than a sibling.
+
+            BESIDE THE WINDOW TOTAL AND TOP-ALIGNED (Mark's placement), which
+            is where every record screen already keeps its commands: `ml-auto`
+            on the total pushes the pair to the right margin, and the row's
+            `items-start` puts both their tops on the title's own line.
+
+            ALWAYS RENDERED AND ALWAYS LIVE, never hidden and not greyed with
+            an empty selection (Mark asked, 2026-09-11, whether an enabled menu
+            over disabled options was alright — it is, and it is the better
+            half). `NewTimesheet`'s rule says disable rather than hide, and its
+            own escape clause is that a greyed control explains itself only on
+            hover, which an iPad has none of, so it needs words on screen. A
+            dead TRIGGER has none available; opened, the menu explains itself
+            completely — "Sent (0)" is the whole reason, on the row it is about.
+            So the button only greys while a batch is running, and the header
+            never changes shape on a tick.
+
+            `ui/ActionMenu` runs `onSelect` inside the click that closes it, so
+            `renderPoPdf`'s synchronous `openWindowNow` is still within the
+            gesture and a preview is not popup-blocked.
+
+            THE COUNTS RIDE IN THE LABELS ("Sent (3)"), which is where the
+            buttons carried them. `ActionMenuItem` takes no hint, so those
+            buttons' `title` tooltips are gone — and the count is the half worth
+            keeping, because it is what makes a greyed row explicable on an
+            iPad, which has no hover to explain it. */}
+        {editable && (
+          <ActionMenu
+            label={batchBusyLabel ?? "Actions"}
+            ariaLabel={
+              checked.size === 0
+                ? "Actions — select orders first"
+                : `Actions for ${checked.size} selected orders`
+            }
+            disabled={batchBusy !== null}
+            triggerClassName={BUTTON_CLASS}
+            minWidth={220}
+            items={[
+              {
+                label: "Mark",
+                disabled: nothingTicked,
+                items: [
+                  {
+                    label: `Sent (${selectedDrafts.length})`,
+                    disabled: selectedDrafts.length === 0,
+                    onSelect: batchMarkSent,
+                  },
+                  {
+                    label: `Received (${selectedReceivable.length})`,
+                    disabled: selectedReceivable.length === 0,
+                    onSelect: batchMarkReceived,
+                  },
+                  {
+                    label: `Closed (${selectedCloseable.length})`,
+                    disabled: selectedCloseable.length === 0,
+                    onSelect: batchClose,
+                  },
+                ],
+              },
+              {
+                label: "Documents",
+                disabled: nothingTicked,
+                items: [
+                  { label: "Preview POs", onSelect: () => void batchPdf("po", "open") },
+                  { label: "Download POs", onSelect: () => void batchPdf("po", "download") },
+                  {
+                    label: "Preview Shopping Lists",
+                    onSelect: () => void batchPdf("shopping", "open"),
+                  },
+                  {
+                    label: "Download Shopping Lists",
+                    onSelect: () => void batchPdf("shopping", "download"),
+                  },
+                ],
+              },
+              {
+                label: "Delete",
+                danger: true,
+                separatorBefore: true,
+                disabled: nothingTicked,
+                onSelect: batchDelete,
+              },
+              {
+                label: "Clear Selection",
+                disabled: nothingTicked,
+                onSelect: () => setChecked(new Set()),
+              },
+            ]}
+          />
+        )}
       </div>
 
       {/* ONE ROW, CAPTIONED (Mark, 2026-09-10: "caption the filter row
@@ -1020,6 +1143,21 @@ export function PurchaseOrderList({
         </ControlField>
       </div>
 
+      {/* A BATCH'S ERROR, IN THE BAND SLOT (Mark, 2026-09-11: "batcherror could
+          go in the yellow area"). It used to sit in the selection bar, which is
+          gone, and it was the one thing in there that was not a restatement of
+          the ticks. Same frame and fill as the capped notice below it — one
+          band dress per screen — with RED type, because a failed write is
+          something WRONG where that one is merely worth your eye. Red on
+          yellow-200 is 4.62:1, which passes AA; the shift report's blockers box
+          is the same pairing. Above the capped notice, being the more urgent of
+          the two, and both can stand at once. */}
+      {batchError && (
+        <p className="border border-ink bg-mark-fill px-4 py-3 text-sm text-accent">
+          {batchError}
+        </p>
+      )}
+
       {capped && (
         <p className="border border-ink bg-mark-fill px-4 py-3 text-sm text-ink">
           Showing the 500 most recent orders in this window — narrow the window
@@ -1027,119 +1165,6 @@ export function PurchaseOrderList({
         </p>
       )}
 
-      {editable && checked.size > 0 && (
-        <div className="space-y-1 border border-ink px-4 py-3 text-sm">
-          <div className="flex flex-wrap items-center gap-4">
-            <span>{checked.size} selected</span>
-            <span className="tabular-nums text-muted">{money(selectedTotal)}</span>
-
-            {/* Batch documents (spec §4.8): every selected PO as one PDF, a
-                page run per order.
-                A MENU rather than buttons, which is what lets Download exist
-                without a seventh and eighth cell in this bar: four commands
-                behind one trigger is one fewer control than the two it
-                replaces. That is the opposite of ProcessPo's call, and for the
-                opposite reason — that card has room for two plain buttons and
-                Preview is its everyday act, where this bar is already six
-                commands wide and wraps. */}
-            <MenuButton
-              label="Batch document"
-              trigger={
-                batchBusy?.includes(":") ? "Rendering…" : "Documents"
-              }
-              triggerClassName="flex h-9 items-center mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-              caret
-              disabled={batchBusy !== null}
-              minWidth={260}
-              items={[
-                {
-                  label: "Preview PO PDFs",
-                  hint: "Opens for reading or printing",
-                  onSelect: () => batchPdf("po", "open"),
-                },
-                {
-                  label: "Download PO PDFs",
-                  hint: poDocumentFileName("po", selectedNumbers),
-                  onSelect: () => batchPdf("po", "download"),
-                },
-                {
-                  label: "Preview shopping lists",
-                  hint: "Opens for reading or printing",
-                  onSelect: () => batchPdf("shopping", "open"),
-                },
-                {
-                  label: "Download shopping lists",
-                  hint: poDocumentFileName("shopping", selectedNumbers),
-                  onSelect: () => batchPdf("shopping", "download"),
-                },
-              ]}
-            />
-            <button
-              disabled={batchBusy !== null || selectedDrafts.length === 0}
-              onClick={batchMarkSent}
-              title={
-                selectedDrafts.length === 0
-                  ? "No drafts selected — only drafts can be marked sent"
-                  : `Marks ${selectedDrafts.length} draft${
-                      selectedDrafts.length === 1 ? "" : "s"
-                    } sent, sent_via from each vendor's order type`
-              }
-              className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-            >
-              {batchBusy === "sent"
-                ? "Saving…"
-                : `Mark sent (${selectedDrafts.length})`}
-            </button>
-            <button
-              disabled={batchBusy !== null || selectedReceivable.length === 0}
-              onClick={batchMarkReceived}
-              title={
-                selectedReceivable.length === 0
-                  ? "Nothing receivable selected — these are already received, closed or void"
-                  : `Receives ${selectedReceivable.length} order${
-                      selectedReceivable.length === 1 ? "" : "s"
-                    } at the ordered quantity. Lines already counted are left alone.`
-              }
-              className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-            >
-              {batchBusy === "received"
-                ? "Receiving…"
-                : `Mark received (${selectedReceivable.length})`}
-            </button>
-            <button
-              disabled={batchBusy !== null || selectedCloseable.length === 0}
-              onClick={batchClose}
-              title={
-                selectedCloseable.length === 0
-                  ? "Nothing closeable selected — only a received order can be closed"
-                  : `Closes ${selectedCloseable.length} received order${
-                      selectedCloseable.length === 1 ? "" : "s"
-                    }: reconciled and filed, done being worked on.`
-              }
-              className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-            >
-              {batchBusy === "closed" ? "Closing…" : `Close (${selectedCloseable.length})`}
-            </button>
-
-            {/* Danger inverts red on hover — same move, different meaning. */}
-            <button
-              disabled={batchBusy !== null}
-              onClick={batchDelete}
-              className={DANGER_BUTTON_CLASS}
-            >
-              {batchBusy === "delete" ? "Deleting…" : "Delete"}
-            </button>
-
-            <button
-              onClick={() => setChecked(new Set())}
-              className="ml-auto text-muted underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-            >
-              Clear
-            </button>
-          </div>
-          {batchError && <p className="text-accent">{batchError}</p>}
-        </div>
-      )}
 
       <DataTable
         rows={sorted}
