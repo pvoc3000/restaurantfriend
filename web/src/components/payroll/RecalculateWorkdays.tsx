@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -71,6 +73,7 @@ export function RecalculateWorkdays({
   editable,
   canWrite,
   periodLabel,
+  children,
 }: {
   rows: RecalcRow[];
   timeZone: string;
@@ -78,6 +81,10 @@ export function RecalculateWorkdays({
   editable: boolean;
   canWrite: boolean;
   periodLabel: string;
+  /** Hand this component's row to an `ActionMenu` instead of drawing a
+   *  button — `OrderCommandMenu`'s arrangement, so the dialog, its writes and
+   *  its confirms stay here and only the command's PLACE moves. */
+  children?: (items: ActionMenuItem[]) => ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -171,9 +178,21 @@ export function RecalculateWorkdays({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={BUTTON}>
-        Recalculate…
-      </button>
+      {/* IN THE MENU (2026-09-12) — pass `children` and this hands back
+          its row instead of drawing a button; the dialog below is
+          unchanged and still belongs to this component. */}
+      {children ? (
+        children([
+          {
+            label: "Recalculate Workdays…",
+            onSelect: () => setOpen(true),
+          },
+        ])
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} className={BUTTON}>
+          Recalculate…
+        </button>
+      )}
 
       {open && (
         <Dialog

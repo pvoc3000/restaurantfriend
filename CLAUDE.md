@@ -2134,6 +2134,38 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    button on the timesheets list AND the pay-period list, and ended as a single
    control in that dialog's footer, on the argument that "I need a timesheet
    that isn't here" is the question the form and the import both answer.
+   **EVERY COMMAND ON THE SCREEN IS ONE ACTIONS MENU SINCE 2026-09-12** (Mark:
+   "move all action buttons on the timesheets page into an actionmenu. place it
+   in the title row top-right aligned") — `TimesheetCommandMenu`, replacing
+   FIVE controls in two different rows: New pay period, Recalculate… and Close
+   pay period… on the period bar, New timesheet and Import timesheets in the
+   filter row.
+   **TWO GROUPS, AND THE SPLIT IS THE SCREEN'S OWN** — Import Timesheets · New
+   Timesheet, then a rule, then New Pay Period · Recalculate Workdays… · Close
+   Pay Period…. `PeriodBar` has said since it was hoisted out of the filter row
+   that "the controls below act on the SHIFTS … while these act on the PERIOD",
+   so that split survives as the menu's two groups rather than as two rows of
+   buttons. **Recalculate is in the PERIOD group** because the page already
+   classified it there in as many words, though what it rewrites is a column on
+   the shifts. **Import LEADS**, which is the 2026-08-22 reversal below still
+   holding: importing IS the routine and typing a shift by hand is the
+   exception.
+   **KNOWN LOSS, and the one to weigh before repeating this**: Import and Close
+   each filled BLACK conditionally, so the screen said which of the two was the
+   obvious next act — Import on an empty pay period, Close on a full one. A
+   menu row has no weight, so that is gone. The app has met this before (the PO
+   list's per-row hints, the invoice list's Approve fill) and accepted it; if it
+   is missed, the honest fix is a sentence, not a coloured row.
+   **What did NOT move**: the no-pay-periods branch still draws `NewPayPeriod`
+   as a button, because that state has no title row and no menu and its one way
+   out is that button. And New Timesheet is still a DISABLED ROW rather than an
+   absent one on a closed period — `NewTimesheet`'s own 2026-08-05 rule — with
+   the sentence that explains it still directly under the filters.
+   `PeriodBar` lost its `children` slot with the three commands; the row is the
+   picker and the chip.
+   Measured at 1440: the trigger's right edge is the content margin (1377), its
+   top is the h1's (32, ink at 33), and the widest row is 143px of text in the
+   216 that `minWidth={240}` leaves.
    **REVERSED 2026-08-22** (Mark: "move the 'import timesheets' button out from
    the new timesheet dialogue and directly onto the timesheet screen"). It is a
    `Link` beside New timesheet in the filter row's right-hand cluster now. The

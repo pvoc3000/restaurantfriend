@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -47,6 +49,7 @@ export function NewPayPeriod({
   today,
   settings: rawSettings,
   orgId,
+  children,
 }: {
   /** Every period, for the cadence and the overlap check. Only the two dates are
    *  read, so this asks for the narrowest thing that satisfies it — it used to
@@ -56,6 +59,10 @@ export function NewPayPeriod({
   settings?: unknown;
   /** Required by 027's insert policy — see the note on the insert itself. */
   orgId: string;
+  /** Hand this component's row to an `ActionMenu` instead of drawing a
+   *  button — `OrderCommandMenu`'s arrangement, so the dialog, its writes and
+   *  its confirms stay here and only the command's PLACE moves. */
+  children?: (items: ActionMenuItem[]) => ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -173,13 +180,25 @@ export function NewPayPeriod({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
-      >
-        New pay period
-      </button>
+      {/* IN THE MENU (2026-09-12) — pass `children` and this hands back
+          its row instead of drawing a button; the dialog below is
+          unchanged and still belongs to this component. */}
+      {children ? (
+        children([
+          {
+            label: "New Pay Period",
+            onSelect: () => setOpen(true),
+          },
+        ])
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
+        >
+          New pay period
+        </button>
+      )}
 
       {open && (
         <Dialog

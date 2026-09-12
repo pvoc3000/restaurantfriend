@@ -9,12 +9,11 @@ import {
   type TimesheetRow,
 } from "@/components/payroll/TimesheetsList";
 import { PeriodBar } from "@/components/payroll/PeriodBar";
+import { TimesheetCommandMenu } from "@/components/payroll/TimesheetCommandMenu";
+import type { PayPeriodRecord } from "@/components/payroll/ExportTimesheets";
+// STILL IMPORTED AS A COMPONENT, for the no-pay-periods branch below: that
+// state has no title row and no menu, and its one way out is this button.
 import { NewPayPeriod } from "@/components/payroll/NewPayPeriod";
-import { RecalculateWorkdays } from "@/components/payroll/RecalculateWorkdays";
-import {
-  ExportTimesheets,
-  type PayPeriodRecord,
-} from "@/components/payroll/ExportTimesheets";
 import type { ShiftBenefitLine } from "@/components/payroll/ShiftDecisions";
 import {
   addDays,
@@ -568,60 +567,88 @@ export default async function TimesheetsPage({
       {/* Org-wide and PAY-PERIOD scoped rather than shop scoped, so the code
           would name the wrong thing. The filtered count lives in the list
           below, with the period's own total here. */}
-      <PageHeading title="Timesheets" total={rows.length} noun="shifts" />
-
-      {/* Which fortnight and what state it's in, then the two commands that act
-          on the PERIOD. The filters below act on the shifts. */}
-      <PeriodBar periods={periods} periodId={periodId} status={chosen.status}>
-        <NewPayPeriod
-          rows={periods}
-          today={today}
-          settings={session.orgSettings.payroll}
-          orgId={session.membership.org_id}
-        />
-        {/* Re-derive the workday from the punches, without the file. It acts
-            on the PERIOD, so it belongs in this row rather than with the shift
-            filters below. */}
-        <RecalculateWorkdays
-          rows={rows.map((r) => ({
-            id: r.id,
-            employee_name: r.employee_name,
-            clock_in: r.clock_in,
-            workday: r.workday,
-            workday_starts_at: employeeById.get(r.employee_id)?.workday_starts_at ?? null,
-          }))}
-          timeZone={timeZone}
-          editable={canWrite && isPayPeriodEditable(chosen.status)}
-          canWrite={canWrite}
-          periodLabel={formatPeriodRange(chosen)}
-        />
-        {record && (
-          <ExportTimesheets
-            period={record}
-            canWrite={canWrite}
-            timeZone={timeZone}
-            weeks={weeks}
-            orgName={session.orgName}
-            worksheetError={worksheetError}
-            rollup={rollup}
-            findings={findings}
-            pools={worksheetPools}
-            shifts={exportShifts}
-            employees={exportEmployees}
-            premiumHours={[...owedHours.entries()]}
-            benefits={benefits}
-            accruals={accruals}
-            earnings={[...earnings.entries()]}
-            caveatInputs={{
-              shiftsWithoutClockOut: shifts.filter((s) => !s.clock_out).length,
-              undecidedBreakFindings: findings.filter((f) => !f.decided).length,
-              poolsWithoutFigure: worksheetPools.filter((p) => p.effectiveCents === null).length,
-              overtimeNeedingReview,
-              unknownEarningColumns,
+      <PageHeading
+        title="Timesheets"
+        total={rows.length}
+        noun="shifts"
+        action={
+          <TimesheetCommandMenu
+            newPeriod={{
+              rows: periods,
+              today,
+              settings: session.orgSettings.payroll,
+              orgId: session.membership.org_id,
+            }}
+            recalculate={{
+              rows: rows.map((r) => ({
+                id: r.id,
+                employee_name: r.employee_name,
+                clock_in: r.clock_in,
+                workday: r.workday,
+                workday_starts_at:
+                  employeeById.get(r.employee_id)?.workday_starts_at ?? null,
+              })),
+              timeZone,
+              editable: canWrite && isPayPeriodEditable(chosen.status),
+              canWrite,
+              periodLabel: formatPeriodRange(chosen),
+            }}
+            close={
+              record
+                ? {
+                    period: record,
+                    canWrite,
+                    timeZone,
+                    weeks,
+                    orgName: session.orgName,
+                    worksheetError,
+                    rollup,
+                    findings,
+                    pools: worksheetPools,
+                    shifts: exportShifts,
+                    employees: exportEmployees,
+                    premiumHours: [...owedHours.entries()],
+                    benefits,
+                    accruals,
+                    earnings: [...earnings.entries()],
+                    caveatInputs: {
+                      shiftsWithoutClockOut: shifts.filter((s) => !s.clock_out).length,
+                      undecidedBreakFindings: findings.filter((f) => !f.decided).length,
+                      poolsWithoutFigure: worksheetPools.filter(
+                        (pl) => pl.effectiveCents === null
+                      ).length,
+                      overtimeNeedingReview,
+                      unknownEarningColumns,
+                    },
+                  }
+                : null
+            }
+            newTimesheet={{
+              employees: [...employeeById.entries()]
+                .map(([id, e]) => ({
+                  id,
+                  name: e.name,
+                  workday_starts_at: e.workday_starts_at,
+                }))
+                .sort((a, b) => (a.name < b.name ? -1 : 1)),
+              // ACTIVE locations only: this enumerates somewhere to put a new
+              // shift, and a closed shop is not one (design rule 3).
+              locations: session.activeLocations.map((l) => ({ id: l.id, code: l.code })),
+              orgId: session.membership.org_id,
+              timeZone,
+              period: chosen,
+              disabled: !(canWrite && isPayPeriodEditable(chosen.status)),
             }}
           />
-        )}
-      </PeriodBar>
+        }
+      />
+
+      {/* WHICH FORTNIGHT AND WHAT STATE IT IS IN, and nothing else since
+          2026-09-12 — its three commands went into the title row's Actions menu
+          with the list's two. The row is the picker and the chip; the split it
+          was hoisted out of the filter row to make survives as the MENU's two
+          groups rather than as two rows of buttons. */}
+      <PeriodBar periods={periods} periodId={periodId} status={chosen.status} />
 
       <TimesheetsList
         rows={rows}
@@ -631,12 +658,6 @@ export default async function TimesheetsPage({
         // one back on a UTC host would show every shift seven hours out.
         timeZone={timeZone}
         waiverEmployeeIds={(waiverRows ?? []).map((w) => w.employee_id as string)}
-        employees={[...employeeById.entries()]
-          .map(([id, e]) => ({ id, name: e.name, workday_starts_at: e.workday_starts_at }))
-          .sort((a, b) => (a.name < b.name ? -1 : 1))}
-        // ACTIVE locations only: this enumerates somewhere to put a new shift,
-        // and a closed shop is not one (design rule 3).
-        locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
         orgId={session.membership.org_id}
         premiums={premiums}
         pools={pools}

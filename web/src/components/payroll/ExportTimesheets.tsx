@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -120,6 +122,7 @@ export function ExportTimesheets({
   accruals,
   earnings,
   caveatInputs,
+  children,
 }: {
   period: PayPeriodRecord;
   canWrite: boolean;
@@ -150,6 +153,10 @@ export function ExportTimesheets({
     overtimeNeedingReview: number;
     unknownEarningColumns: { name: string; column: string; dollars: number }[];
   };
+  /** Hand this component's row to an `ActionMenu` instead of drawing a
+   *  button — `OrderCommandMenu`'s arrangement, so the dialog, its writes and
+   *  its confirms stay here and only the command's PLACE moves. */
+  children?: (items: ActionMenuItem[]) => ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -282,13 +289,25 @@ export function ExportTimesheets({
           is exactly what `PRIMARY_BUTTON_CLASS` is for — "only ever right
           CONDITIONALLY" — rather than a standing primary, which this app does
           not have. The two never both fill, so the row still says one thing. */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={shifts.length > 0 ? PRIMARY_BUTTON_CLASS : BUTTON}
-      >
-        Close pay period…
-      </button>
+      {/* IN THE MENU (2026-09-12) — pass `children` and this hands back
+          its row instead of drawing a button; the dialog below is
+          unchanged and still belongs to this component. */}
+      {children ? (
+        children([
+          {
+            label: "Close Pay Period…",
+            onSelect: () => setOpen(true),
+          },
+        ])
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className={shifts.length > 0 ? PRIMARY_BUTTON_CLASS : BUTTON}
+        >
+          Close pay period…
+        </button>
+      )}
 
       {open && (
         <Dialog

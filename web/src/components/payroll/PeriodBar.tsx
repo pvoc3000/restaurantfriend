@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { PickList } from "@/components/ui/PickList";
@@ -13,13 +12,19 @@ import { StatusChip } from "./PayPeriodStatusChip";
 import type { PeriodOption } from "./TimesheetsList";
 
 /**
- * Which fortnight, what state it's in, and the commands that act on it.
+ * Which fortnight, and what state it's in.
  *
- * Hoisted out of `TimesheetsList`'s filter row (Mark, 2026-08-06), and that is
- * the point of the row rather than tidiness: the controls below act on the
- * SHIFTS — search them, group them, add one — while these act on the PERIOD.
- * Reading top to bottom the screen now goes "which fortnight → the shifts in it
- * → the file", which is the order the work happens in.
+ * IT CARRIED THREE COMMANDS UNTIL 2026-09-12 — New pay period, Recalculate…
+ * and Close pay period… — which are rows of the title row's Actions menu now,
+ * with the list's two. The row itself stays, because the PICKER is the screen's
+ * scope and belongs above the shifts it chooses.
+ *
+ * Hoisted out of `TimesheetsList`'s filter row (Mark, 2026-08-06) to make a
+ * split that was never about tidiness: the controls below act on the SHIFTS —
+ * search them, group them, add one — while these acted on the PERIOD. THAT
+ * SPLIT SURVIVES AS THE MENU'S TWO GROUPS rather than as two rows of buttons;
+ * see `TimesheetCommandMenu`, which cites this note for where its rule comes
+ * from.
  *
  * The picker is also what the deleted pay-period LIST was for. 178 periods is
  * more than a menu wants, which is why `PickList` grows a find box past eight
@@ -29,15 +34,11 @@ export function PeriodBar({
   periods,
   periodId,
   status,
-  children,
 }: {
   periods: PeriodOption[];
   periodId: string | null;
   /** The chosen period's status, for the chip beside the picker. */
   status: PayPeriodStatus | null;
-  /** The commands, right-aligned. New pay period then Close pay period — the
-   *  ActionBar's rule that the primary cell is the one against the edge. */
-  children?: ReactNode;
 }) {
   const router = useRouter();
 
@@ -69,9 +70,6 @@ export function PeriodBar({
         </span>
       )}
 
-      {children && (
-        <div className="ml-auto flex flex-wrap items-center gap-3">{children}</div>
-      )}
     </div>
   );
 }

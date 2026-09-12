@@ -31,9 +31,6 @@ import {
   type ShiftBenefitLine,
 } from "./ShiftDecisions";
 import { AdjudicateOvertime } from "./AdjudicateOvertime";
-import Link from "next/link";
-import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
-import { NewTimesheet } from "./NewTimesheet";
 import { formatCents } from "@/lib/tipPool";
 import {
   OT_DECISION_LABEL,
@@ -157,8 +154,6 @@ export function TimesheetsList({
   canWrite,
   timeZone,
   waiverEmployeeIds,
-  employees,
-  locations,
   orgId,
   premiums,
   pools,
@@ -175,8 +170,6 @@ export function TimesheetsList({
    *  presentation: a waived meal on a six-hour day owes nothing at all. */
   waiverEmployeeIds: string[];
   /** The roster, for adding a shift by hand. */
-  employees: { id: string; name: string; workday_starts_at: string | null }[];
-  locations: { id: string; code: string }[];
   orgId: string;
   /** Premium decisions already on file, keyed `employee|workday|kind`. */
   premiums: Record<string, PremiumRow>;
@@ -811,47 +804,13 @@ export function TimesheetsList({
           />
         </div>
 
-        {/* Right-aligned in the filter row — the NewEmployee template, which is
-            how every create in this app is reached. ALWAYS RENDERED, disabled
-            when the period is closed rather than hidden (Mark, 2026-08-05): a
-            control that vanishes can't be told from a feature that doesn't
-            exist, and the filter row shouldn't change width as you page between
-            periods. The reason is already in words directly below. */}
-        {/* `flex-1 justify-end`, not `ml-auto` — `SEARCH_PEN`'s reason. */}
-        <div className="flex flex-1 items-center justify-end gap-3">
-          <NewTimesheet
-            employees={employees}
-            locations={locations}
-            orgId={orgId}
-            timeZone={timeZone}
-            period={period}
-            disabled={!editable}
-          />
-          {/* IMPORTING IS ITS OWN DOOR AGAIN (Mark, 2026-08-22), reversing the
-              2026-08-05 call that put it inside the New timesheet dialog as the
-              single door. That reasoning — "I need a timesheet that isn't here"
-              is the question both answer — reads well and turned out to cost a
-              click on the thing you do every pay period, to save one on the
-              thing you do rarely. Importing IS the routine; typing a shift by
-              hand is the exception.
-
-              NOT disabled on a closed period, unlike New timesheet beside it:
-              this navigates to a screen rather than writing anything, the
-              import screen states the period problem in its own words, and it
-              is also how you reach a DIFFERENT pay period's file. */}
-          {/* BLACK WHILE THE PERIOD IS EMPTY (Mark, 2026-08-22). An empty
-              pay period has exactly one thing worth doing, and it is this; once
-              there are shifts the weight moves to Close pay period on the bar
-              above. `PRIMARY_BUTTON_CLASS` is for precisely this — a commit
-              standing beside no peers, decided by state rather than a standing
-              primary the app does not have. */}
-          <Link
-            href="/timesheets/import"
-            className={`${rows.length === 0 ? PRIMARY_BUTTON_CLASS : BUTTON_CLASS} shrink-0 no-underline`}
-          >
-            Import timesheets
-          </Link>
-        </div>
+        {/* THE TWO COMMANDS THAT WERE HERE — New timesheet and Import
+            timesheets — are rows of the title row's Actions menu since
+            2026-09-12. The filter row is filters again, which is what the rest
+            of the app's lists settled on; the reason New timesheet was always
+            RENDERED and merely disabled on a closed period survives as the
+            menu's disabled row, and the sentence that explains it is still
+            directly below. */}
       </div>
 
       {/* The pay period in one line. Overtime is stated separately from regular

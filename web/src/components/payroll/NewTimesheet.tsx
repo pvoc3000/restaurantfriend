@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -45,6 +47,7 @@ export function NewTimesheet({
   timeZone,
   period,
   disabled = false,
+  children,
 }: {
   employees: { id: string; name: string; workday_starts_at: string | null }[];
   locations: { id: string; code: string }[];
@@ -69,6 +72,10 @@ export function NewTimesheet({
    * is hovered. The `title` is belt and braces for the desk.
    */
   disabled?: boolean;
+  /** Hand this component's row to an `ActionMenu` instead of drawing a
+   *  button — `OrderCommandMenu`'s arrangement, so the dialog, its writes and
+   *  its confirms stay here and only the command's PLACE moves. */
+  children?: (items: ActionMenuItem[]) => ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -281,19 +288,32 @@ export function NewTimesheet({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        disabled={disabled}
-        title={
-          disabled
-            ? "This pay period is no longer open, so nothing can be added to it."
-            : undefined
-        }
-        className="inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:cursor-not-allowed disabled:border-hairline disabled:bg-white disabled:text-faint disabled:hover:bg-white disabled:hover:text-faint"
-      >
-        New timesheet
-      </button>
+      {/* IN THE MENU (2026-09-12) — pass `children` and this hands back
+          its row instead of drawing a button; the dialog below is
+          unchanged and still belongs to this component. */}
+      {children ? (
+        children([
+          {
+            label: "New Timesheet",
+            disabled,
+            onSelect: () => setOpen(true),
+          },
+        ])
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          disabled={disabled}
+          title={
+            disabled
+              ? "This pay period is no longer open, so nothing can be added to it."
+              : undefined
+          }
+          className="inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:cursor-not-allowed disabled:border-hairline disabled:bg-white disabled:text-faint disabled:hover:bg-white disabled:hover:text-faint"
+        >
+          New timesheet
+        </button>
+      )}
 
       {open && (
         <Dialog
