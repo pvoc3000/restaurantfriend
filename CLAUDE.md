@@ -3859,6 +3859,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **AT LEAST** in words now; the screen keeps the symbol, where browser fonts
    have it); and scaled amounts printed "30.625 g", which no kitchen scale can
    show. Precision now falls as the quantity grows.
+   **`/elements` TOOK THE SAME THREE (2026-09-12)** — the switch in its Active
+   column, the sunken search, and New Element beside the title — an hour after
+   `/production-items`, and it was the last list still wiring its create
+   command to `FilterMenus`' `rowAction`, which now has no caller outside
+   `/interface`. **No rebalance was needed here and the reason is the TOTAL**:
+   1220 against that table's 1340, so the same weight of 80 buys 87.1px at
+   1440 and 76.6 at 1280 — 63.1 and 52.6 of content, room for the 40px switch
+   and a 50.7px "ACTIVE" either way, where over there 80 gave 45.8 and clipped.
+   Measured in the same pass and NOT fixed, since nothing in the ask touches
+   it: this table's ⋯ column is 60, which at 1280 is 33.5px of content for a
+   36px button and clips by 2 — the hazard `/production-items` records when it
+   took its own ⋯ to 74. Five weight off Costs from, which has 249px for a 48px
+   label, would settle it.
    Nav's Production section drops FMP's vocabulary for this module's own —
    **Recipe Items is gone entirely** (decision 2 merged it away, so a menu item
    would name a table that no longer exists) and "Item Schedules" becomes Plans.

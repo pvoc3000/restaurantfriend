@@ -316,7 +316,29 @@ export function ElementsList({
       sortValue: (r) => (r.is_active ? 0 : 1),
       render: (r) =>
         editable ? (
-          <ActiveToggle table="production_elements" id={r.id} active={r.is_active} />
+          // A SWITCH since 2026-09-12 (Mark), the production items list's
+          // conversion an hour later. This list carries a selection column
+          // too, which is the ambiguity `ui/Switch` exists to end: a checkbox
+          // would mean "this row is ticked" in one column and "this record is
+          // live" in the next.
+          //
+          // No rebalance was needed, unlike `/production-items`, and the
+          // reason is the TOTAL: 1220 here against that table's 1340, so the
+          // same weight of 80 buys 87.1px at 1440 and 76.6 at 1280 — 63.1 and
+          // 52.6 of content, room for the 40px switch and for a 50.7px
+          // "ACTIVE" either way, where over there 80 gave 45.8 and clipped.
+          //
+          // Measured in the same pass and NOT fixed, because nothing here
+          // touches it: the ⋯ column is 60, which at 1280 is 33.5px of content
+          // for a 36px button and clips by 2 — the hazard the inventory items
+          // list records when it took its own ⋯ to 74. Five weight off Costs
+          // from, which has 249px for a 48px label, would settle it.
+          <ActiveToggle
+            table="production_elements"
+            id={r.id}
+            active={r.is_active}
+            control="switch"
+          />
         ) : (
           <span className="text-muted">{r.is_active ? "Yes" : "No"}</span>
         ),
@@ -434,11 +456,18 @@ export function ElementsList({
 
   return (
     <div className="space-y-4">
+      {/* NEW ELEMENT RIDES WITH THE TITLE, top- and right-aligned (Mark,
+          2026-09-12) — `PageHeading` is already `items-start justify-between`,
+          so the placement is the prop rather than a class. The last straggler
+          from the 2026-09-10 sweep, `/production-items` having gone an hour
+          before; `action`'s own doc here has said "beside the title" all
+          along while the wiring said `rowAction`. */}
       <PageHeading
         title="Elements"
         visible={visible.length}
         total={rows.length}
         noun="elements"
+        action={action}
       />
       <div className="space-y-3">
         <FilterMenus
@@ -450,16 +479,21 @@ export function ElementsList({
           onChange={changeFilters}
           // `PageHeading` states the count now — see `showCount`.
           showCount={false}
-          rowAction={action}
           leading={
             <div className={`${SEARCH_PEN} space-y-1.5`}>
               <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                 Search
               </span>
+              {/* THE SUNKEN DRESS, like every other search box in the app
+                  (Mark, 2026-09-12). `search` is what asks for `mac-field`;
+                  `fullWidth` stays because the CAPTION BLOCK around it wears
+                  `SEARCH_PEN`. See `ui/TextInput` for why those two props had
+                  to stop fighting over the width before this was expressible. */}
               <TextInput
                 value={search}
                 onValueChange={changeSearch}
                 fullWidth
+                search
                 aria-label="Search elements"
                 clearLabel="Clear the search"
                 icon={<SearchGlyph />}
