@@ -11,8 +11,8 @@ import type { ReactNode } from "react";
  * which is the reason the guide drew it this way.
  *
  * **SINCE 2026-09-12 THEY ARE CLASSIC MAC TABS** (Mark): the selected tab is
- * WHITE and full height, the rest GREY (#c0c0c0) and 4px shorter, bottom-
- * aligned, all with black type. What follows about a black selected cell is
+ * WHITE, full height and open at the bottom (no bottom border), the rest GREY
+ * (#c0c0c0) and 8px shorter, bottom-aligned, all with black type. What follows about a black selected cell is
  * history; the rule that there is no per-caller colour still holds.
  *
  * This RETIRES the underline-marker tab dialect (border-b-2 on the active
@@ -86,7 +86,10 @@ export function TabPicker<K extends string>({
   // full height and the others are 4px SHORTER, bottom-aligned — so the
   // footprint is unchanged and no filter row anywhere moves.
   const tall = size === "sm" ? "h-8" : "h-9";
-  const short = size === "sm" ? "h-7" : "h-8";
+  // 8px shorter since the same day (Mark: "make it 8px taller than the
+  // inactive tabs"), and the selected tab has NO BOTTOM BORDER — it opens onto
+  // whatever sits below it, the way a Mac tab joins its panel.
+  const short = size === "sm" ? "h-6" : "h-7";
 
   return (
     <span
@@ -107,7 +110,7 @@ export function TabPicker<K extends string>({
         // sits above its neighbours (`z-10`) so its full-height border is the
         // one you see. Hover is the Mac look's 2px edge, drawn inset so
         // nothing grows — never a fill, since grey already means unselected.
-        const cls = `relative inline-flex ${on ? `${tall} z-10 bg-white` : `${short} bg-[#c0c0c0] hover:shadow-[inset_0_0_0_1px_#000]`} items-center gap-2 whitespace-nowrap border border-ink ${cell} font-semibold uppercase tracking-[0.06em] text-ink no-underline ${
+        const cls = `relative inline-flex ${on ? `${tall} z-10 border-b-0 bg-white` : `${short} bg-[#c0c0c0] hover:shadow-[inset_0_0_0_1px_#000]`} items-center gap-2 whitespace-nowrap border border-ink ${cell} font-semibold uppercase tracking-[0.06em] text-ink no-underline ${
           // Equal shares, centred — a stretched bar whose cells were sized by
           // their labels would put "Never ordered" three times the width of
           // "2+ years" and read as a mistake.
