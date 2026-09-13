@@ -131,8 +131,13 @@ export function SyncFromSquare({ today }: { today: string }) {
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
+    // RIGHT-ALIGNED AS A BLOCK (Mark, 2026-09-13: the button "should be
+    // aligned top right even when there's text below it"). The block was as
+    // wide as its longest line, with the button at that block's LEFT edge, so a
+    // result sentence underneath pulled it inward. `items-end` pins every child
+    // to the right margin, and the sentences read right-aligned beneath it.
+    <div className="flex flex-col items-end gap-2 text-right">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
           className={BUTTON_CLASS}
