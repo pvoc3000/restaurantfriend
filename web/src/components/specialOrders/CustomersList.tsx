@@ -250,6 +250,8 @@ export function CustomersList({
               value={search}
               onValueChange={changeSearch}
               fullWidth
+              // `search` for the sunken dress (Mark, 2026-09-13).
+              search
               aria-label="Search customers"
               clearLabel="Clear the search"
               icon={<SearchGlyph />}
