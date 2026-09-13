@@ -760,6 +760,9 @@ export function SpecialOrdersList({
                 value={search}
                 onValueChange={changeSearch}
                 fullWidth
+                // `search` for the sunken dress (Mark, 2026-09-13); `fullWidth`
+                // still decides the width, the caption block wearing the pen.
+                search
                 aria-label="Search special orders"
                 clearLabel="Clear the search"
                 icon={<SearchGlyph />}
