@@ -5,10 +5,9 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
-import { DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
+import { Dialog, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
-import { SEARCH_PEN } from "@/components/ui/fieldMetrics";
 import { money } from "@/lib/specialOrders";
 import type { OrderLineRow } from "./OrderLines";
 
@@ -161,8 +160,8 @@ export function AddOrderLine({
     });
   }
 
-  if (!open) {
-    return (
+  return (
+    <>
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className={BUTTON_CLASS} onClick={() => setOpen(true)}>
           Add item
@@ -178,115 +177,108 @@ export function AddOrderLine({
         <span className="text-[12px] text-muted">
           A hand-typed line carries no production item, so it cannot be scheduled.
         </span>
-        {error ? <p className="w-full text-[13px] text-accent">{error}</p> : null}
+        {error && !open ? <p className="w-full text-[13px] text-accent">{error}</p> : null}
       </div>
-    );
-  }
 
-  return (
-    <div className="space-y-3 border border-hairline p-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <div className={`${SEARCH_PEN} space-y-1.5`}>
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-            Find an item
-          </span>
-          <TextInput
-            value={search}
-            onValueChange={setSearch}
-            aria-label="Find a production item"
-            clearLabel="Clear the search"
-            fullWidth
-            autoFocus
-            icon={<SearchGlyph />}
-          />
-        </div>
-        {/* BLACK, which is the panel-commit exception rather than a breach of
-            "every button is white" (Mark, 2026-08-19: "the 'done' button
-            should be a real black button").
-
-            This chooser is a panel in everything but its frame: it produces
-            ONE outcome — lines added — and Done is the only way out of it, so
-            the row is a commit standing beside no peers, which is exactly the
-            distinction `DIALOG_COMMIT_CLASS` turns on. The receiving screen's
-            Complete makes the same argument on a whole screen. It was an
-            underlined phrase, which read as one more quiet link in a panel of
-            them and gave the one control that closes the thing less weight
-            than the Add button on every row. */}
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className={`ml-auto ${DIALOG_COMMIT_CLASS}`}
+      {/* A PANEL OVERLAY (Mark, 2026-09-13), where it opened inline under the
+          lines and pushed the page down. `ui/Dialog` pins the search in its
+          toolbar and Done in its footer, and scrolls only the list — the
+          `AddScheduleItems` shape. It still STAYS OPEN after each add. */}
+      {open ? (
+        <Dialog
+          title="Add items to this order"
+          onClose={() => setOpen(false)}
+          width="max-w-2xl"
+          height="h-[80vh]"
+          toolbar={
+            // The inset search dress (Mark, 2026-09-13), filling the toolbar.
+            <TextInput
+              value={search}
+              onValueChange={setSearch}
+              aria-label="Find a production item"
+              clearLabel="Clear the search"
+              fullWidth
+              search
+              autoFocus
+              icon={<SearchGlyph />}
+            />
+          }
+          footer={
+            // BLACK — the panel-commit exception (Mark, 2026-08-19): the one
+            // way out of a panel whose outcome is lines added.
+            <button type="button" onClick={() => setOpen(false)} className={DIALOG_COMMIT_CLASS}>
+              Done
+            </button>
+          }
         >
-          Done
-        </button>
-      </div>
-
-      {items.length === 0 ? (
-        <p className="text-[13px] text-muted">
-          No active production items — the menu is where these come from.
-        </p>
-      ) : (
-        <div className="max-h-96 overflow-y-auto">
-          <table className="w-full border-collapse text-[14px]">
-            <tbody>
-              {shown.map((item) => {
-                const already = onOrder.get(item.id);
-                return (
-                  <tr key={item.id} className="border-b border-hairline last:border-0 hover:bg-neutral-50">
-                    <td className="py-2 pr-3">
-                      <span className="block">{item.name}</span>
-                      <span className="block text-[12px] text-subtle">
-                        {[item.size, item.item_type, item.subtype, item.finish]
-                          .filter(Boolean)
-                          .join(" · ") || "—"}
-                        {already ? (
-                          <span className="bg-mark-fill px-1">{already} already on this order</span>
-                        ) : null}
-                      </span>
-                    </td>
-                    <td className="w-24 py-2 pr-3 text-right tabular-nums text-muted">
-                      {item.price === null ? "—" : money(item.price)}
-                    </td>
-                    <td className="w-20 py-2 pr-2">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={qty[item.id] ?? ""}
-                        onChange={(e) => setQty((p) => ({ ...p, [item.id]: e.target.value }))}
-                        placeholder="1"
-                        aria-label={`How many ${item.name}`}
-                        className="h-8 w-full border border-hairline px-2 text-right text-[14px] tabular-nums focus:border-ink focus:outline-none"
-                      />
-                    </td>
-                    <td className="w-24 py-2">
-                      <button
-                        type="button"
-                        onClick={() => add(item)}
-                        disabled={pending}
-                        className="h-8 w-full border border-ink bg-white px-2 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
-                      >
-                        Add
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {shown.length === 0 ? (
-                <tr>
-                  <td className="py-4 text-sm text-muted">Nothing matches “{search}”.</td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-          {!search && items.length > 60 ? (
-            <p className="pt-2 text-[12px] text-muted">
-              Showing the first 60 of {items.length} — search to narrow it.
+          {items.length === 0 ? (
+            <p className="text-[13px] text-muted">
+              No active production items — the menu is where these come from.
             </p>
-          ) : null}
-        </div>
-      )}
+          ) : (
+            <div>
+              <table className="w-full border-collapse text-[14px]">
+                <tbody>
+                  {shown.map((item) => {
+                    const already = onOrder.get(item.id);
+                    return (
+                      <tr key={item.id} className="border-b border-hairline last:border-0 hover:bg-neutral-50">
+                        <td className="py-2 pr-3">
+                          <span className="block">{item.name}</span>
+                          <span className="block text-[12px] text-subtle">
+                            {[item.size, item.item_type, item.subtype, item.finish]
+                              .filter(Boolean)
+                              .join(" · ") || "—"}
+                            {already ? (
+                              <span className="bg-mark-fill px-1">{already} already on this order</span>
+                            ) : null}
+                          </span>
+                        </td>
+                        <td className="w-24 py-2 pr-3 text-right tabular-nums text-muted">
+                          {item.price === null ? "—" : money(item.price)}
+                        </td>
+                        <td className="w-20 py-2 pr-2">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={qty[item.id] ?? ""}
+                            onChange={(e) => setQty((p) => ({ ...p, [item.id]: e.target.value }))}
+                            placeholder="1"
+                            aria-label={`How many ${item.name}`}
+                            className="h-8 w-full border border-hairline px-2 text-right text-[14px] tabular-nums focus:border-ink focus:outline-none"
+                          />
+                        </td>
+                        <td className="w-24 py-2">
+                          <button
+                            type="button"
+                            onClick={() => add(item)}
+                            disabled={pending}
+                            className="h-8 w-full border border-ink bg-white px-2 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
+                          >
+                            Add
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {shown.length === 0 ? (
+                    <tr>
+                      <td className="py-4 text-sm text-muted">Nothing matches “{search}”.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+              {!search && items.length > 60 ? (
+                <p className="pt-2 text-[12px] text-muted">
+                  Showing the first 60 of {items.length} — search to narrow it.
+                </p>
+              ) : null}
+            </div>
+          )}
 
-      {error ? <p className="text-[13px] text-accent">{error}</p> : null}
-    </div>
+          {error ? <p className="pt-3 text-[13px] text-accent">{error}</p> : null}
+        </Dialog>
+      ) : null}
+    </>
   );
 }
