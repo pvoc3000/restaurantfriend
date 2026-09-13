@@ -99,7 +99,11 @@ export function AddOrderLine({
   const nextSort = existing.reduce((a, l) => Math.max(a, l.sort ?? 0), 0) + 1;
 
   function add(item: MenuItem) {
-    const amount = Number(qty[item.id] ?? "1");
+    // A blank box still means ONE — its "1" hint is gone (Mark, 2026-09-13:
+    // "empty should be blank"), and a box cleared after an add ("") used to
+    // read as 0 and do nothing at all.
+    const typed = (qty[item.id] ?? "").trim();
+    const amount = typed === "" ? 1 : Number(typed);
     if (!Number.isFinite(amount) || amount <= 0) return;
     setError(null);
     start(async () => {
@@ -246,7 +250,6 @@ export function AddOrderLine({
                             inputMode="decimal"
                             value={qty[item.id] ?? ""}
                             onChange={(e) => setQty((p) => ({ ...p, [item.id]: e.target.value }))}
-                            placeholder="1"
                             aria-label={`How many ${item.name}`}
                             className="rf-typed h-9 w-full border border-ink bg-white px-2 text-right text-[14px] tabular-nums focus:outline-none"
                           />
