@@ -238,6 +238,9 @@ export function AddOrderLine({
                           {item.price === null ? "—" : money(item.price)}
                         </td>
                         <td className="w-20 py-2 pr-2">
+                          {/* A solid black border (Mark, 2026-09-13) — `rf-typed`,
+                              the app's typed-field dress, h-9 to match the
+                              action button beside it. */}
                           <input
                             type="text"
                             inputMode="decimal"
@@ -245,7 +248,7 @@ export function AddOrderLine({
                             onChange={(e) => setQty((p) => ({ ...p, [item.id]: e.target.value }))}
                             placeholder="1"
                             aria-label={`How many ${item.name}`}
-                            className="h-8 w-full border border-hairline px-2 text-right text-[14px] tabular-nums focus:border-ink focus:outline-none"
+                            className="rf-typed h-9 w-full border border-ink bg-white px-2 text-right text-[14px] tabular-nums focus:outline-none"
                           />
                         </td>
                         <td className="w-24 py-2">
@@ -253,7 +256,7 @@ export function AddOrderLine({
                             type="button"
                             onClick={() => add(item)}
                             disabled={pending}
-                            className="h-8 w-full border border-ink bg-white px-2 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
+                            className={`${BUTTON_CLASS} w-full px-2`}
                           >
                             Add
                           </button>
