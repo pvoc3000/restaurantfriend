@@ -140,12 +140,15 @@ export function AccountingSettings({
     if (!connected) return;
     let cancelled = false;
     void (async () => {
-      const [meta, accts, its, codes] = await Promise.all([
-        invokeQbo(supabase, { mode: "meta" }),
-        invokeQbo(supabase, { mode: "accounts" }),
-        invokeQbo(supabase, { mode: "items" }),
-        invokeQbo(supabase, { mode: "tax_codes" }),
-      ]);
+      // ONE AFTER ANOTHER, not `Promise.all` (2026-09-12). Four calls at once
+      // after an idle hour were four token refreshes at once, and the losers
+      // marked a working connection disconnected — this screen was one of the
+      // two that did it. `_shared/qbo.ts` now survives the race; this stops it
+      // happening on the screen you open to check QuickBooks.
+      const meta = await invokeQbo(supabase, { mode: "meta" });
+      const accts = await invokeQbo(supabase, { mode: "accounts" });
+      const its = await invokeQbo(supabase, { mode: "items" });
+      const codes = await invokeQbo(supabase, { mode: "tax_codes" });
       if (cancelled) return;
       if (its.data?.items) setItems(its.data.items as Choice[]);
       if (codes.data?.tax_codes) setTaxCodes(codes.data.tax_codes as Choice[]);

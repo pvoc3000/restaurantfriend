@@ -34,10 +34,26 @@
 // old value briefly, so a write that lands after a crash still has something to
 // fall back on.
 //
-// One user pressing buttons, so two simultaneous refreshes are possible and not
-// defended against beyond the expiry skew. Accepted deliberately: the cost is a
-// reconnect, the cure is on screen, and a lock here would be machinery for a
-// race that needs two people pressing the same button in the same second.
+// TWO REFRESHES AT ONCE ARE DEFENDED AGAINST, since 2026-09-12. This header
+// used to accept the race as needing "two people pressing the same button in
+// the same second". It needed nothing of the kind: Settings → Accounting and the
+// vendor record's QuickBooks block each fire FOUR calls on open, and after an
+// idle hour all four refreshed with the same token — one won, the others were
+// refused, and each refusal marked the connection disconnected, overwriting the
+// good token the winner had just saved. And a single push making several calls
+// re-refreshed with the token its own first call had just spent, because the
+// connection object was never updated. The connection went "disconnected" twice
+// in its first ten days on the real books.
+//
+// Three rules now keep a working connection working:
+//   1. A refresh updates the caller's `conn` IN PLACE, so the next call in the
+//      same request uses the new tokens.
+//   2. The save is COMPARE-AND-SWAP on the refresh token it spent. If another
+//      request got there first, adopt what it saved.
+//   3. A refusal RE-READS the row before declaring anything. If the stored
+//      refresh token has moved on, somebody else rotated it: adopt that. And a
+//      disconnect is only recorded against the token that actually failed, so a
+//      loser can never overwrite a winner.
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 
@@ -360,67 +376,122 @@ const EXPIRY_SKEW_MS = 5 * 60 * 1000;
  */
 export async function accessTokenFor(
   admin: SupabaseClient,
-  conn: Connection
+  conn: Connection,
+  attempt = 0
 ): Promise<string> {
-  const expiresAt = conn.access_token_expires_at
-    ? Date.parse(conn.access_token_expires_at)
-    : 0;
-  if (conn.access_token && expiresAt - EXPIRY_SKEW_MS > Date.now()) {
-    return conn.access_token;
-  }
+  if (tokenStillGood(conn)) return conn.access_token!;
 
+  const spent = conn.refresh_token!;
   let token: TokenResponse;
   try {
     token = await postToken(
       new URLSearchParams({
         grant_type: "refresh_token",
-        refresh_token: conn.refresh_token!,
+        refresh_token: spent,
       })
     );
   } catch (e) {
     if (e instanceof QboError && e.status === 400) {
-      await markDisconnected(admin, conn.org_id, e.message);
+      // Refused. Before calling the connection dead, ask whether another
+      // request rotated the token under us — the ordinary cause.
+      const fresher = await rowAfterRotation(admin, conn, spent);
+      if (fresher) {
+        Object.assign(conn, fresher);
+        if (tokenStillGood(conn)) return conn.access_token!;
+        if (attempt === 0) return accessTokenFor(admin, conn, 1);
+      }
+      await markDisconnected(admin, conn.org_id, e.message, { refresh_token: spent });
     }
     throw e;
   }
 
   const now = Date.now();
+  const next = {
+    refresh_token: token.refresh_token,
+    previous_refresh_token: spent,
+    refresh_token_expires_at: token.x_refresh_token_expires_in
+      ? new Date(now + token.x_refresh_token_expires_in * 1000).toISOString()
+      : null,
+    access_token: token.access_token,
+    access_token_expires_at: new Date(now + token.expires_in * 1000).toISOString(),
+    status: "connected",
+    last_error: null,
+  };
   const { data, error } = await admin
     .from("accounting_connections")
-    .update({
-      refresh_token: token.refresh_token,
-      previous_refresh_token: conn.refresh_token,
-      refresh_token_expires_at: token.x_refresh_token_expires_in
-        ? new Date(now + token.x_refresh_token_expires_in * 1000).toISOString()
-        : null,
-      access_token: token.access_token,
-      access_token_expires_at: new Date(now + token.expires_in * 1000).toISOString(),
-      status: "connected",
-      last_error: null,
-    })
+    .update(next)
     .eq("id", conn.id)
+    // COMPARE-AND-SWAP: only over the token we spent.
+    .eq("refresh_token", spent)
     .select("id");
 
-  if (error || !data || data.length === 0) {
+  if (error) {
     // The old refresh token is ALREADY dead at this point, so continuing would
     // spend a credential we can never renew. Stop here and say so.
     throw new QboError(
       "QuickBooks issued a new sign-in token and it could not be saved, so the " +
-        "connection has to be made again in Settings → Accounting." +
-        (error ? ` (${error.message})` : ""),
+        `connection has to be made again in Settings → Accounting. (${error.message})`,
       500
     );
   }
 
+  if (!data || data.length === 0) {
+    // Another request saved first. Adopt what it stored; our own access token
+    // is valid for its hour regardless, so fall back to it.
+    const fresher = await rowAfterRotation(admin, conn, spent);
+    if (fresher) Object.assign(conn, fresher);
+    if (tokenStillGood(conn)) return conn.access_token!;
+    conn.access_token = token.access_token;
+    conn.access_token_expires_at = next.access_token_expires_at;
+    return token.access_token;
+  }
+
+  Object.assign(conn, next);
   return token.access_token;
 }
 
+/** A stored access token with more than the skew left on it. */
+function tokenStillGood(conn: Connection): boolean {
+  const expiresAt = conn.access_token_expires_at ? Date.parse(conn.access_token_expires_at) : 0;
+  return !!conn.access_token && expiresAt - EXPIRY_SKEW_MS > Date.now();
+}
+
+/**
+ * The connection row, if another request has rotated the refresh token since
+ * we spent `spent` — or null. Asks a few times over a second and a half: the
+ * winner may still be waiting on Intuit or on its own save.
+ */
+async function rowAfterRotation(
+  admin: SupabaseClient,
+  conn: Connection,
+  spent: string
+): Promise<Partial<Connection> | null> {
+  for (let i = 0; i < 4; i++) {
+    const { data } = await admin
+      .from("accounting_connections")
+      .select("status, refresh_token, access_token, access_token_expires_at")
+      .eq("id", conn.id)
+      .maybeSingle();
+    if (data?.status === "connected" && data.refresh_token && data.refresh_token !== spent) {
+      return data as Partial<Connection>;
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return null;
+}
+
+/**
+ * Record a connection as ended. `onlyIf` scopes it to the token that actually
+ * failed, so a request that lost a race cannot overwrite the good token the
+ * winner saved. Omitted, it is unconditional.
+ */
 export async function markDisconnected(
   admin: SupabaseClient,
   orgId: string,
-  why: string
+  why: string,
+  onlyIf?: { refresh_token?: string; access_token?: string }
 ): Promise<void> {
-  await admin
+  let q = admin
     .from("accounting_connections")
     .update({
       status: "disconnected",
@@ -430,6 +501,9 @@ export async function markDisconnected(
     })
     .eq("org_id", orgId)
     .eq("provider", "qbo");
+  if (onlyIf?.refresh_token) q = q.eq("refresh_token", onlyIf.refresh_token);
+  if (onlyIf?.access_token) q = q.eq("access_token", onlyIf.access_token);
+  await q;
 }
 
 /** Best effort: a revoke that fails must not stop us forgetting the token on
@@ -505,10 +579,13 @@ export async function qboFetch(
   });
 
   if (res.status === 401) {
+    // Only against the token this request used: a refresh elsewhere may have
+    // replaced it, and a stale rejection must not end a working connection.
     await markDisconnected(
       admin,
       conn.org_id,
-      `QuickBooks rejected the access token.${tidSuffix(tid)}`
+      `QuickBooks rejected the access token.${tidSuffix(tid)}`,
+      { access_token: token }
     );
     throw new QboError(
       "QuickBooks rejected the connection. Reconnect it in Settings → Accounting.",

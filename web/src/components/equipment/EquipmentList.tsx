@@ -77,7 +77,10 @@ export function EquipmentList({
       width: 80,
       render: (r) =>
         editable ? (
-          <ActiveToggle table="equipment" id={r.id} active={r.is_active} />
+          // A SWITCH since 2026-09-12 (Mark), the Active-column sweep. No
+          // rebalance: total 1210, so 80 is ~77px at 1280 — room for the 40px
+          // switch and "ACTIVE".
+          <ActiveToggle table="equipment" id={r.id} active={r.is_active} control="switch" />
         ) : (
           <span className="text-muted">{r.is_active ? "Active" : "Inactive"}</span>
         ),

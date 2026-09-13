@@ -180,12 +180,13 @@ export function VendorLocationsTable({
     if (!qboConnected) return;
     let cancelled = false;
     void (async () => {
-      const [a, c, d, v] = await Promise.all([
-        invokeQbo(supabase, { mode: "accounts" }),
-        invokeQbo(supabase, { mode: "classes" }),
-        invokeQbo(supabase, { mode: "departments" }),
-        invokeQbo(supabase, { mode: "vendors" }),
-      ]);
+      // ONE AFTER ANOTHER (2026-09-12) — see AccountingSettings: four calls at
+      // once were four token refreshes at once, and this was the other screen
+      // that disconnected QuickBooks by doing it.
+      const a = await invokeQbo(supabase, { mode: "accounts" });
+      const c = await invokeQbo(supabase, { mode: "classes" });
+      const d = await invokeQbo(supabase, { mode: "departments" });
+      const v = await invokeQbo(supabase, { mode: "vendors" });
       if (cancelled) return;
       setQbo({
         vendors: (v.data?.vendors ?? []) as { id: string; name: string }[],
