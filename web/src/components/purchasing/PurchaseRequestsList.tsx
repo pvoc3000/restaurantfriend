@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
@@ -71,7 +72,8 @@ const SORT_KEYS = [
 /**
  * The queue: what the shop has asked for, and what happened to it.
  *
- * ONE FILTER DIMENSION, so it stays a `TabPicker` — `ui/FilterMenus` is for
+ * ONE FILTER DIMENSION, so it stays a single control (a `PickList` since
+ * 2026-09-13, a `TabPicker` before) — `ui/FilterMenus` is for
  * three or more. What it borrows from `lib/filterMenus` is the URL CONTRACT,
  * not the control: the view rides in the query like every other list's, without
  * a bespoke filter module of its own. `/recipes` is the same arrangement for
@@ -412,16 +414,22 @@ export function PurchaseRequestsList({
             clearLabel="Clear the search"
             icon={<SearchGlyph />}
           />
-          <TabPicker
-            ariaLabel="Which requests"
-            value={filters.status ?? "open"}
-            onChange={changeStatus}
-            options={dimensions[0].options.map((o) => ({
-              key: o.value,
-              label: o.label,
-              count: counts[o.value],
-            }))}
-          />
+          {/* A CAPTIONED PICKLIST (Mark, 2026-09-13), the filter row's default
+              since 2026-09-10 — the counts ride as hints. */}
+          <ControlField label="Status">
+            <PickList
+              ariaLabel="Which requests"
+              variant="field"
+              value={filters.status ?? "open"}
+              onPick={changeStatus}
+              options={dimensions[0].options.map((o) => ({
+                value: o.value,
+                label: o.label,
+                hint: String(counts[o.value] ?? 0),
+              }))}
+              fit
+            />
+          </ControlField>
           {capped ? (
             <span className="text-[12px] text-subtle">
               Showing the most recent 500.
