@@ -1090,7 +1090,7 @@ export function OrderGuide({
             The captions are VISUAL. Each control keeps its own `ariaLabel`,
             which is longer and better ("Which vendors to walk"), so nothing is
             announced twice. */}
-        <ControlField label="Filter">
+        <ControlField label="Show">
           {/* A LIST RATHER THAN FOUR TABS (Mark, 2026-09-10), which is the
               conversion `/invoices` already made for its Due tabs and is made
               here for that one's reason: this band is the one thing on the
