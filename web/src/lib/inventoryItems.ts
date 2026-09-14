@@ -34,7 +34,7 @@ export const ITEM_TAB_LABEL: Record<ItemTab, string> = {
   info: "Info",
   "vendor-items": "Vendor Items",
   "purchase-history": "Purchase History",
-  recipes: "Recipes",
+  recipes: "Used In",
 };
 
 /** Anything unrecognised shows the record rather than an error. */
