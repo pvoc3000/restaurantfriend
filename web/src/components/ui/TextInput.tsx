@@ -113,7 +113,14 @@ export function TextInput({
   // ✕ to appear, then click the ✕ — for a control whose whole reason to exist
   // is that it saves a gesture. At rest a field with nothing in it still shows
   // nothing, so a screen of empty filters is still a screen of plain boxes.
-  const showClear = (focused || hovered) && value !== "";
+  //
+  // A SEARCH BOX shows it WHENEVER IT HOLDS TEXT (Mark, 2026-09-14), taking
+  // the magnifier's slot: a search term left in a box is narrowing the list
+  // behind it, and the ✕ is how the box says so at rest — and the only way to
+  // clear it on an iPad, which has no hover. Other fields (the compose header,
+  // prefilled from templates) keep the focus-or-hover rule, or every prefilled
+  // field would wear a standing ✕.
+  const showClear = (search || icon ? true : focused || hovered) && value !== "";
 
   return (
     // The button is positioned against this, not against the input: an input
