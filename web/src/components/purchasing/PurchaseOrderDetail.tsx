@@ -768,7 +768,7 @@ export function PurchaseOrderDetail({
           ...(canEditLines
             ? group([
                 {
-                  label: "Delete Purchase Order…",
+                  label: "Delete PO…",
                   onSelect: () => void deletePurchaseOrder(),
                   danger: true,
                   disabled: busy,
