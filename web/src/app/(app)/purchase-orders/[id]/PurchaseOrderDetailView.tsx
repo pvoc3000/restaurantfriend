@@ -84,6 +84,7 @@ export async function PurchaseOrderDetailView({
         <p className="text-sm text-accent">Could not load order lines: {lineError}</p>
       ) : (
         <PurchaseOrderDetail
+          autoAddItem={rawParams.add === "1"}
           canFileBills={canEditPage(session.membership.role, "/invoices")}
           order={order}
           lines={lines}

@@ -23,6 +23,7 @@ import {
   SENT_VIA_FOR_ORDER_TYPE,
 } from "@/lib/poProcessing";
 import { ActionMenu } from "@/components/ui/ActionMenu";
+import { NewPurchaseOrder } from "./NewPurchaseOrder";
 import {
   money,
   PO_STATUS_CLASS,
@@ -105,7 +106,12 @@ export function PurchaseOrderList({
   activeLocationCode,
   capped,
   editable,
+  orgId,
+  locationId,
 }: {
+  /** For creating a purchase order — org_id is not null and RLS checks it. */
+  orgId: string;
+  locationId: string;
   orders: PoListRow[];
   initialFilters: PoFilters;
   /** The org's calendar day — what the presets and the window resolve on. */
@@ -961,6 +967,8 @@ export function PurchaseOrderList({
             keeping, because it is what makes a greyed row explicable on an
             iPad, which has no hover to explain it. */}
         {editable && (
+          <NewPurchaseOrder orgId={orgId} locationId={locationId} today={today}>
+          {(openNewPo) => (
           <ActionMenu
             label={batchBusyLabel ?? "Actions"}
             ariaLabel={
@@ -972,8 +980,11 @@ export function PurchaseOrderList({
             triggerClassName={BUTTON_CLASS}
             minWidth={220}
             items={[
+              // The one row that does not read the selection (Mark, 2026-09-14).
+              { label: "New Purchase Order…", onSelect: openNewPo },
               {
                 label: "Mark",
+                separatorBefore: true,
                 disabled: nothingTicked,
                 items: [
                   {
@@ -1023,6 +1034,8 @@ export function PurchaseOrderList({
               },
             ]}
           />
+          )}
+          </NewPurchaseOrder>
         )}
       </div>
 

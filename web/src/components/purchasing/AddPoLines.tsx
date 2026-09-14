@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -138,7 +138,11 @@ export function AddPoLines({
   orgId,
   lines,
   children,
+  autoOpen = false,
 }: {
+  /** Open the panel on arrival — a PO just created from the list's New
+   *  Purchase Order…, which has no lines yet (Mark, 2026-09-14). */
+  autoOpen?: boolean;
   order: PurchaseOrder;
   orgId: string;
   /** The PO's current lines — what's already on order, per vendor item. */
@@ -288,6 +292,22 @@ export function AddPoLines({
     }
     setRows((data ?? []) as unknown as PickerRow[]);
   }
+
+  // Once per mount, and never again on a refresh.
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (!autoOpen || autoOpened.current) return;
+    autoOpened.current = true;
+    // Drop `add=1` from the address so a reload or a return trip doesn't open
+    // the panel again.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("add")) {
+      url.searchParams.delete("add");
+      window.history.replaceState(window.history.state, "", url.toString());
+    }
+    void openPanel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpen]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

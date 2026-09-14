@@ -142,6 +142,8 @@ export default async function PurchaseOrdersPage({
       activeLocationCode={session.activeLocation.code}
       capped={rows.length === 500}
       editable={canEditPage(session.membership.role, "/purchase-orders")}
+      orgId={session.membership.org_id}
+      locationId={session.activeLocation.id}
     />
   );
 }

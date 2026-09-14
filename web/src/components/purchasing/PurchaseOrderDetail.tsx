@@ -73,7 +73,10 @@ export function PurchaseOrderDetail({
   attachmentError,
   receiveHref,
   canFileBills,
+  autoAddItem = false,
 }: {
+  /** `?add=1` — a PO the list just created; opens Add Item… on arrival. */
+  autoAddItem?: boolean;
   order: PurchaseOrder;
   lines: PoLine[];
   locationCode: string;
@@ -693,7 +696,7 @@ export function PurchaseOrderDetail({
       />
     );
     return canEditLines ? (
-      <AddPoLines order={order} orgId={orgId} lines={lines}>
+      <AddPoLines order={order} orgId={orgId} lines={lines} autoOpen={autoAddItem}>
         {(open) => render([{ label: "Add Item…", onSelect: open }])}
       </AddPoLines>
     ) : (
