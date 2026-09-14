@@ -35,6 +35,7 @@ import { AddPoLines } from "./AddPoLines";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { RowMenu } from "@/components/ui/RowMenu";
+import { confirmAndDeletePurchaseOrders } from "./deletePurchaseOrders";
 import { nextDeliveryDate } from "@/lib/poProcessing";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog, confirmDialogWithOption, splitConfirmMessage } from "@/lib/confirm";
@@ -175,6 +176,21 @@ export function PurchaseOrderDetail({
       return next;
     });
     router.refresh();
+  }
+
+  /** Delete the whole order — the list's own confirm and delete, then back to
+   *  the list, since the record under your feet no longer exists. */
+  async function deletePurchaseOrder() {
+    setError(null);
+    setBusy(true);
+    const result = await confirmAndDeletePurchaseOrders(supabase, [order]);
+    if (result === "deleted") {
+      router.push("/purchase-orders");
+      router.refresh();
+      return;
+    }
+    setBusy(false);
+    if (result !== "cancelled") setError(result.error);
   }
 
   const ordered = orderedTotal(lines);
@@ -743,6 +759,17 @@ export function PurchaseOrderDetail({
                 {
                   label: "Delete Selected…",
                   onSelect: () => void deleteLines([...checkedLines]),
+                  danger: true,
+                  disabled: busy,
+                },
+              ])
+            : []),
+          // Last and red, with a rule above it (Mark, 2026-09-14).
+          ...(canEditLines
+            ? group([
+                {
+                  label: "Delete Purchase Order…",
+                  onSelect: () => void deletePurchaseOrder(),
                   danger: true,
                   disabled: busy,
                 },

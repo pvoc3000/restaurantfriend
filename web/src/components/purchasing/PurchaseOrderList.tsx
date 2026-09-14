@@ -24,6 +24,7 @@ import {
 } from "@/lib/poProcessing";
 import { ActionMenu } from "@/components/ui/ActionMenu";
 import { NewPurchaseOrder } from "./NewPurchaseOrder";
+import { confirmAndDeletePurchaseOrders } from "./deletePurchaseOrders";
 import {
   money,
   PO_STATUS_CLASS,
@@ -397,97 +398,20 @@ export function PurchaseOrderList({
    * since from a row menu "1 purchase order" is a worse answer to "which one?"
    * than the number on the row you just pressed.
    */
+  // The confirm and the row-count-checked delete are `confirmAndDeletePurchaseOrders`,
+  // shared with PO detail's Delete Purchase Order… (2026-09-14).
   async function deleteOrders(selected: PoListRow[]): Promise<boolean> {
-    if (selected.length === 0) return false;
-    const nonDraft = selected.filter((po) => po.status !== "draft");
-
-    /**
-     * WHICH BILLS POINT AT THESE ORDERS.
-     *
-     * Both links are `on delete set null` (025), so deleting an order does not
-     * take its invoices with it — the money is still owed and the bill stays
-     * payable, which is right. What goes is the ATTRIBUTION: those invoices
-     * silently stop knowing what was ordered, and nothing said so (Mark asked
-     * what happens, 2026-09-02).
-     *
-     * Asked here rather than carried on every row: the list is 500 orders and
-     * this matters at the moment of deleting one.
-     */
-    let attributed: string[] = [];
-    const { data: linked } = await supabase
-      .from("vendor_invoice_lines")
-      .select("invoice_id, vendor_invoices ( invoice_number )")
-      .in("purchase_order_id", selected.map((po) => po.id));
-    if (linked && linked.length > 0) {
-      attributed = [
-        ...new Set(
-          linked
-            .map(
-              (l) =>
-                (l.vendor_invoices as unknown as { invoice_number: string | null } | null)
-                  ?.invoice_number ?? "no number"
-            )
-            .filter(Boolean)
-        ),
-      ];
-    }
-
-    const message =
-      (selected.length === 1
-        ? `Delete purchase order ${selected[0].po_number} and its lines?`
-        : `Delete ${selected.length} purchase orders and their lines?`) +
-      (nonDraft.length > 0
-        ? (selected.length === 1
-            ? `\n\nWARNING: it is ${nonDraft[0].status}, not a draft.`
-            : `\n\nWARNING: ${nonDraft.length} of them ${
-                nonDraft.length === 1 ? "is" : "are"
-              } not a draft (${[...new Set(nonDraft.map((po) => po.status))].join(", ")}).`) +
-          " Deleting sent or received orders erases order history permanently."
-        : "") +
-      (attributed.length > 0
-        ? `\n\n${attributed.length} invoice${attributed.length === 1 ? "" : "s"} ` +
-          `(${attributed.slice(0, 4).join(", ")}${attributed.length > 4 ? ", …" : ""}) ` +
-          `${attributed.length === 1 ? "is" : "are"} attributed to ` +
-          `${selected.length === 1 ? "this order" : "these orders"}. ` +
-          `The bill${attributed.length === 1 ? "" : "s"} stay${attributed.length === 1 ? "s" : ""} ` +
-          `and remain${attributed.length === 1 ? "s" : ""} payable — but ` +
-          `${attributed.length === 1 ? "it" : "they"} will no longer know what was ordered.`
-        : "") +
-      (nonDraft.length === 0 && attributed.length === 0
-        ? "\n\nThis cannot be undone."
-        : "");
-    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Delete", tone: "danger" })))
-      return false;
-
-    setBatchBusy("delete");
     setBatchError(null);
+    setBatchBusy("delete");
     try {
-      // `.select()` ON A DELETE. With no matching RLS policy Postgres removes
-      // ZERO ROWS and PostgREST returns NO ERROR, so a bare delete reports a
-      // cheerful success and the order is still there after the refresh — the
-      // employee-delete lesson, and the reason below purchaser+ this has to
-      // fail out loud rather than quietly.
-      const { data, error } = await supabase
-        .from("purchase_orders")
-        .delete()
-        .in(
-          "id",
-          selected.map((po) => po.id)
-        )
-        .select("id");
-      if (error) throw new Error(error.message);
-      if ((data?.length ?? 0) < selected.length) {
-        throw new Error(
-          data?.length
-            ? `Only ${data.length} of ${selected.length} were deleted — the rest are not yours to delete.`
-            : "Nothing was deleted. Purchase orders are a purchaser's to remove."
-        );
+      const result = await confirmAndDeletePurchaseOrders(supabase, selected);
+      if (result === "cancelled") return false;
+      if (result !== "deleted") {
+        setBatchError(result.error);
+        return false;
       }
       setChecked(new Set());
       return true;
-    } catch (e) {
-      setBatchError(e instanceof Error ? e.message : String(e));
-      return false;
     } finally {
       setBatchBusy(null);
     }
