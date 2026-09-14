@@ -47,7 +47,7 @@ import { GuideLine } from "./GuideLine";
 import { GeneratePos } from "./GeneratePos";
 import { Reminders } from "./Reminders";
 import { GuideRequests, type GuideRequest } from "./GuideRequests";
-import { ActionBar, ActionBarButton } from "@/components/ui/ActionBar";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { publishBarActions } from "@/lib/tabletBarActions";
 import { ICON_DOUBLE_CHEVRON_RIGHT, ICON_REFRESH } from "@/components/tablet/BarLabel";
 import { BackToTop } from "@/components/ui/BackToTop";
@@ -716,6 +716,46 @@ export function OrderGuide({
   const bands = reminders.length > 0 || requests.length > 0 || canGeneratePos;
 
   /**
+   * The Actions menu's rows. Generate POs leads (the walk's end point, spec §2
+   * step 3); Next Favorite / Next Section follow on the DESK only — on a tablet
+   * they are in the top bar — and Clear Guide… is last and red, being the one
+   * that throws work away. A row with nothing to act on is dead, never absent.
+   */
+  function guideMenuItems(openGenerate: (() => void) | null): ActionMenuItem[] {
+    const items: ActionMenuItem[] = [];
+    if (openGenerate) {
+      items.push({
+        label: "Generate POs…",
+        onSelect: openGenerate,
+        disabled: totals.length === 0,
+      });
+    }
+    if (!tablet) {
+      items.push(
+        {
+          label: `Next Favorite (${untouchedCount})`,
+          onSelect: () => scrollToNext("tr[data-untouched]"),
+          disabled: untouchedCount === 0,
+          separatorBefore: items.length > 0,
+        },
+        {
+          label: grouping === "vendor" ? "Next Vendor" : "Next Section",
+          onSelect: () => scrollToNext("tr[data-guide-section]"),
+          disabled: sectionCount === 0,
+        }
+      );
+    }
+    items.push({
+      label: "Clear Guide…",
+      onSelect: () => void clearGuide(),
+      disabled: clearing || dayTally.total === 0,
+      danger: true,
+      separatorBefore: items.length > 0,
+    });
+    return items;
+  }
+
+  /**
    * ON A TABLET, NEXT FAVORITE AND NEXT SECTION LIVE IN THE TOP BAR (Mark,
    * 2026-09-10: "should move to the upper nav bar on tablets, with an '>>'
    * glyph for each and with text 'favorite' and 'section'"), seated through
@@ -793,11 +833,10 @@ export function OrderGuide({
     // other page keeps its title and filters when the chrome collapses, so
     // their top padding isn't leftover.
     //
-    // pb-22 clears the fixed ActionBar: 52px of bar plus 36px so the last row
-    // can scroll out from under it. Paired with the bar's own height — see
-    // components/ui/ActionBar.
+    // NO FOOTER (Mark, 2026-09-14): the ActionBar's commands moved to the
+    // Actions menu in the title row, so the page no longer pads for a bar.
     <>
-    <div className="space-y-4 pb-22">
+    <div className="space-y-4">
       {/* The shelf — everything above the list: the title, the day picker,
           the vendor totals and the filters. It used to hide with the
           masthead's collapse toggle, on the argument that these are all
@@ -861,6 +900,34 @@ export function OrderGuide({
                 onChange={(next) => router.push(guideHref(next ?? today, today))}
               />
             </span>
+
+            {/* THE SCREEN'S COMMANDS ARE ONE ACTIONS MENU, right of the day
+                picker (Mark, 2026-09-14), replacing the bottom ActionBar.
+                `GeneratePos` keeps its dialog and hands its row out through
+                its `trigger` render prop, so the menu is drawn INSIDE it. */}
+            {canGeneratePos ? (
+              <GeneratePos
+                totals={totals}
+                locationId={locationId}
+                guideDate={guideDate}
+                weekday={weekday}
+                trigger={(open) => (
+                  <ActionMenu
+                    items={guideMenuItems(open)}
+                    label={clearing ? "Clearing…" : "Actions"}
+                    disabled={clearing}
+                    ariaLabel="Order guide actions"
+                  />
+                )}
+              />
+            ) : (
+              <ActionMenu
+                items={guideMenuItems(null)}
+                label={clearing ? "Clearing…" : "Actions"}
+                disabled={clearing}
+                ariaLabel="Order guide actions"
+              />
+            )}
           </div>
         </div>
 
@@ -1619,89 +1686,6 @@ export function OrderGuide({
         </table>
       )}
       </div>
-
-      {/* The screen's decision, pinned to the bottom the way the original's
-          command bar was. */}
-      <ActionBar
-        trailing={
-          // ON A TABLET THESE TWO ARE IN THE TOP BAR (Mark, 2026-09-10), seated
-          // there by the effect above `return` — so the bottom bar holds only
-          // the two commands that touch anything.
-          tablet ? undefined : (
-          <>
-            {/* Movement only — neither of these touches anything, which is why
-                they sit at the far edge from the two that do (Mark,
-                2026-07-29). Going BACK to the top isn't here: it's the floating
-                disc (components/ui/BackToTop), where the convention puts it. */}
-            <ActionBarButton
-              onClick={() => scrollToNext("tr[data-untouched]")}
-              disabled={untouchedCount === 0}
-              title={
-                untouchedCount === 0
-                  ? "Every line in this view has an order quantity or an explicit zero"
-                  : `Scroll to the next line with an empty order box — ${untouchedCount} left`
-              }
-            >
-              Next favorite
-            </ActionBarButton>
-
-            <ActionBarButton
-              onClick={() => scrollToNext("tr[data-guide-section]")}
-              disabled={sectionCount === 0}
-              title={
-                sectionCount === 0
-                  ? "Nothing to jump to in this view"
-                  : `Scroll to the next ${
-                      grouping === "vendor" ? "vendor" : "shop section"
-                    } — ${sectionCount} in this view`
-              }
-            >
-              Next section
-            </ActionBarButton>
-          </>
-          )
-        }
-      >
-        {/* Start the day over. Left of Generate POs — the escape hatch comes
-            before the destination. Every cell is plain black: Mark preferred
-            the black cell to the white fill (2026-07-26), so this bar has no
-            primary. The bar's own black is emphasis enough; a white cell inside
-            it read as a different kind of object. */}
-        <ActionBarButton
-          onClick={() => void clearGuide()}
-          disabled={clearing || dayTally.total === 0}
-          title={
-            dayTally.total === 0
-              ? "Nothing entered yet — there's nothing to clear"
-              : "Reset every line of this day's guide to untouched"
-          }
-        >
-          {clearing ? "Clearing…" : "Clear guide…"}
-        </ActionBarButton>
-
-        {/* The walk's end point (spec §2 step 3): who gets a PO. */}
-        {canGeneratePos && (
-          <GeneratePos
-            totals={totals}
-            locationId={locationId}
-            guideDate={guideDate}
-            weekday={weekday}
-            trigger={(open) => (
-              <ActionBarButton
-                onClick={open}
-                disabled={totals.length === 0}
-                title={
-                  totals.length === 0
-                    ? "Enter order quantities first — there's nothing to generate"
-                    : undefined
-                }
-              >
-                Generate POs…
-              </ActionBarButton>
-            )}
-          />
-        )}
-      </ActionBar>
 
       {/* Floating, not a bar cell: scrolling back to the top is a scrolling
           affordance, so it lives over the list rather than among the commands. */}
