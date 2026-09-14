@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { NewVendorItem } from "./NewVendorItem";
+import { AddVendorReminder } from "@/components/purchasing/Reminders";
+import { createEmptyPurchaseOrder } from "@/components/purchasing/createPurchaseOrder";
 import { openWindowNow, showBlob } from "@/lib/poProcessing";
 import { packLabel, packageDivisor } from "@/lib/catalog";
-import type { Crumb } from "@/lib/breadcrumbs";
+import { withFrom, type Crumb } from "@/lib/breadcrumbs";
 import type { VendorListData, VendorListGroup, VendorListRow } from "./pdf/VendorItemListPdf";
 
 type ReportRow = {
@@ -26,42 +29,78 @@ type ReportRow = {
 const num = (v: number | string | null) => (v === null ? null : Number(v));
 
 /**
- * The vendor record's Items tab commands (Mark, 2026-09-14): New Vendor Item…
- * (write roles only; `NewVendorItem` keeps its dialog and hands out the row)
- * and Vendor List Report, a PDF price list of the vendor's active items to show
- * another vendor. The report is a read, so every role that can open the tab
- * gets it.
+ * The vendor record's commands, ONE Actions menu in the title row where Add
+ * reminder… stood (Mark, 2026-09-14):
  *
- * THE WINDOW OPENS SYNCHRONOUSLY inside the click — `ActionMenu` runs
+ *   New Purchase Order… · New Vendor Item… · Add Reminder… | Vendor List Report
+ *
+ * New Purchase Order… creates an EMPTY draft for this vendor at the working
+ * shop — `createEmptyPurchaseOrder`, the PO list's own implementation — and
+ * lands on it with Add Item… already open (`?add=1`). The two dialogs keep
+ * owning their writes and hand out rows through render props. The report is a
+ * read, so every role that can open the record gets it.
+ *
+ * THE REPORT'S WINDOW OPENS SYNCHRONOUSLY inside the click — `ActionMenu` runs
  * `onSelect` in the gesture — because a `window.open` after an await is
  * silently blocked.
  */
-export function VendorItemsCommandMenu({
+export function VendorCommandMenu({
   orgId,
   orgName,
   vendor,
   existingProductIds,
   from,
-  canCreate,
+  canEditVendor,
+  canCreatePo,
   locationId,
   locationCode,
+  today,
 }: {
   orgId: string;
   orgName: string;
   vendor: { id: string; name: string };
   existingProductIds: string[];
   from: Crumb;
-  canCreate: boolean;
-  /** The working shop, whose price override (design rule 6) the report uses. */
+  /** The Page Permissions cell for /vendors — vendor items and reminders. */
+  canEditVendor: boolean;
+  /** The cell for /purchase-orders. */
+  canCreatePo: boolean;
+  /** The working shop: whose price the report shows, where a PO and a
+   *  reminder land. Null leaves those two commands out. */
   locationId: string | null;
   locationCode: string | null;
+  /** The org's calendar day — a new PO's order date. */
+  today: string;
 }) {
+  const router = useRouter();
   const supabase = createClient();
   const [pending, start] = useTransition();
+  const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+
+  function newPurchaseOrder() {
+    if (!locationId) return;
+    setFailed(null);
+    setBusyLabel("Creating…");
+    start(async () => {
+      const result = await createEmptyPurchaseOrder(supabase, {
+        orgId,
+        locationId,
+        vendorId: vendor.id,
+        today,
+      });
+      if ("error" in result) {
+        setBusyLabel(null);
+        setFailed(result.error);
+        return;
+      }
+      router.push(withFrom(`/purchase-orders/${result.id}?add=1`, from));
+    });
+  }
 
   function report() {
     setFailed(null);
+    setBusyLabel("Building…");
     const win = openWindowNow();
     start(async () => {
       try {
@@ -118,9 +157,7 @@ export function VendorItemsCommandMenu({
         const compare = (a: string, b: string) =>
           a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
         const groups: VendorListGroup[] = [...byType.entries()]
-          .sort(([a], [b]) =>
-            a === "No type" ? 1 : b === "No type" ? -1 : compare(a, b)
-          )
+          .sort(([a], [b]) => (a === "No type" ? 1 : b === "No type" ? -1 : compare(a, b)))
           .map(([type, list]) => ({
             type,
             rows: list.sort((a, b) => compare(a.item, b.item)),
@@ -145,42 +182,66 @@ export function VendorItemsCommandMenu({
       } catch (e) {
         win?.close();
         setFailed(e instanceof Error ? e.message : "The report could not be built.");
+      } finally {
+        setBusyLabel(null);
       }
     });
   }
 
-  const reportItem: ActionMenuItem = {
-    label: "Vendor List Report",
-    onSelect: report,
-    disabled: pending,
+  const menu = (openItem: (() => void) | null, openReminder: (() => void) | null) => {
+    const create: ActionMenuItem[] = [];
+    if (canCreatePo && locationId) {
+      create.push({ label: "New Purchase Order…", onSelect: newPurchaseOrder, disabled: pending });
+    }
+    if (openItem) create.push({ label: "New Vendor Item…", onSelect: openItem });
+    if (openReminder) create.push({ label: "Add Reminder…", onSelect: openReminder });
+    return (
+      <ActionMenu
+        label={pending && busyLabel ? busyLabel : "Actions"}
+        ariaLabel={`Actions for ${vendor.name}`}
+        disabled={pending}
+        minWidth={220}
+        items={[
+          ...create,
+          {
+            label: "Vendor List Report",
+            onSelect: report,
+            disabled: pending,
+            separatorBefore: create.length > 0,
+          },
+        ]}
+      />
+    );
   };
 
-  const menu = (createItems: ActionMenuItem[]) => (
-    <ActionMenu
-      label={pending ? "Building…" : "Actions"}
-      ariaLabel={`Actions for ${vendor.name}'s items`}
-      disabled={pending}
-      minWidth={220}
-      items={[
-        ...createItems,
-        { ...reportItem, separatorBefore: createItems.length > 0 },
-      ]}
-    />
-  );
+  const withReminder = (openItem: (() => void) | null) =>
+    canEditVendor && locationId ? (
+      <AddVendorReminder
+        vendorId={vendor.id}
+        vendorName={vendor.name}
+        locationId={locationId}
+        orgId={orgId}
+        today={today}
+      >
+        {(openReminder) => menu(openItem, openReminder)}
+      </AddVendorReminder>
+    ) : (
+      menu(openItem, null)
+    );
 
   return (
     <div className="flex flex-col items-end gap-2">
-      {canCreate ? (
+      {canEditVendor ? (
         <NewVendorItem
           orgId={orgId}
           vendor={vendor}
           existingProductIds={existingProductIds}
           from={from}
         >
-          {(open) => menu([{ label: "New Vendor Item…", onSelect: open }])}
+          {(openItem) => withReminder(openItem)}
         </NewVendorItem>
       ) : (
-        menu([])
+        withReminder(null)
       )}
       {failed ? <p className="text-sm text-accent">{failed}</p> : null}
     </div>

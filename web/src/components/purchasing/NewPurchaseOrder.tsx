@@ -10,7 +10,7 @@ import {
   DIALOG_COMMIT_CLASS,
 } from "@/components/ui/Dialog";
 import { PickList } from "@/components/ui/PickList";
-import { nextDeliveryDate } from "@/lib/poProcessing";
+import { createEmptyPurchaseOrder } from "./createPurchaseOrder";
 import { withFrom } from "@/lib/breadcrumbs";
 
 type VendorOption = {
@@ -92,42 +92,20 @@ export function NewPurchaseOrder({
     if (!vendorId) return;
     setFailed(null);
     startTransition(async () => {
-      const vendor = vendors.find((v) => v.id === vendorId);
-      const { data: poNumber, error: numberError } = await supabase.rpc("next_po_number", {
-        p_vendor_id: vendorId,
-        p_location_id: locationId,
+      const result = await createEmptyPurchaseOrder(supabase, {
+        orgId,
+        locationId,
+        vendorId,
+        today,
       });
-      if (numberError || !poNumber) {
-        setFailed(numberError?.message ?? "The order could not be numbered.");
-        return;
-      }
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      const { data, error } = await supabase
-        .from("purchase_orders")
-        .insert({
-          org_id: orgId,
-          location_id: locationId,
-          vendor_id: vendorId,
-          po_number: poNumber as string,
-          status: "draft",
-          order_date: today,
-          delivery_date: vendor
-            ? nextDeliveryDate(today, hereFor(vendor)?.delivery_days)
-            : null,
-          created_by: user?.id ?? null,
-        })
-        .select("id")
-        .single();
-      if (error || !data) {
-        setFailed(error?.message ?? "The purchase order could not be created.");
+      if ("error" in result) {
+        setFailed(result.error);
         return;
       }
       setOpen(false);
       router.refresh();
       router.push(
-        withFrom(`/purchase-orders/${data.id}?add=1`, {
+        withFrom(`/purchase-orders/${result.id}?add=1`, {
           href: "/purchase-orders",
           label: "Purchase Orders",
         })

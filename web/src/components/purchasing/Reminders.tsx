@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { daysOverdue, type Reminder } from "@/lib/reminders";
@@ -284,7 +284,11 @@ export function AddVendorReminder({
   locationId,
   orgId,
   today,
+  children,
 }: {
+  /** Hand out the command instead of drawing a button — the vendor record's
+   *  Actions menu (2026-09-14). */
+  children?: (open: () => void) => ReactNode;
   vendorId: string;
   vendorName: string;
   locationId: string;
@@ -323,13 +327,17 @@ export function AddVendorReminder({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setComposing(true)}
-        className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white"
-      >
-        Add reminder…
-      </button>
+      {children ? (
+        children(() => setComposing(true))
+      ) : (
+        <button
+          type="button"
+          onClick={() => setComposing(true)}
+          className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white"
+        >
+          Add reminder…
+        </button>
+      )}
       {composing && (
         <ReminderDialog
           busy={busy}

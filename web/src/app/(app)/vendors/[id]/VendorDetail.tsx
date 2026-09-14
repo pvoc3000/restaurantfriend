@@ -12,8 +12,7 @@ import {
   VendorItemsTable,
   type VendorItemWithItem,
 } from "@/components/catalog/VendorItemsTable";
-import { VendorItemsCommandMenu } from "@/components/catalog/VendorItemsCommandMenu";
-import { AddVendorReminder } from "@/components/purchasing/Reminders";
+import { VendorCommandMenu } from "@/components/catalog/VendorCommandMenu";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { SectionNav } from "@/components/ui/SectionNav";
@@ -109,6 +108,7 @@ export async function VendorDetail({
     { data: locationQbo },
     { data: poRows, error: poError },
     { data: invoiceRows, error: invoiceError },
+    { data: productIdRows },
   ] =
     await Promise.all([
       supabase
@@ -170,6 +170,12 @@ export async function VendorDetail({
             .order("invoice_date", { ascending: false })
             .limit(VENDOR_INVOICE_CAP)
         : SKIP,
+      // The Actions menu's New Vendor Item… warns on a SKU already on this
+      // list, and the menu is on EVERY tab — so off the Items tab (which
+      // already holds them) fetch the SKUs alone.
+      wantsItems
+        ? SKIP
+        : supabase.from("vendor_items").select("product_id").eq("vendor_id", id),
     ]);
 
   if (error) {
@@ -380,18 +386,28 @@ export async function VendorDetail({
             on the ACTIVE location's guide, which is the one you'd be
             walking. Above the split with the name, because it is about the
             vendor rather than about either section. */}
-        {session.activeLocation &&
-          editable && (
-            <span className="ml-auto">
-              <AddVendorReminder
-                vendorId={v.id}
-                vendorName={v.name}
-                locationId={session.activeLocation.id}
-                orgId={session.membership.org_id}
-                today={guideToday(session.orgSettings.timezone ?? serverTimeZone()).date}
-              />
-            </span>
-          )}
+        {/* THE RECORD'S COMMANDS ARE ONE ACTIONS MENU where Add reminder…
+            stood (Mark, 2026-09-14): New Purchase Order…, New Vendor Item…,
+            Add Reminder… and Vendor List Report. Above the split, so it is on
+            every tab. */}
+        <span className="ml-auto">
+          <VendorCommandMenu
+            orgId={session.membership.org_id}
+            orgName={session.orgName}
+            vendor={{ id: v.id, name: v.name }}
+            existingProductIds={(
+              (wantsItems ? vendorItems : productIdRows) as { product_id: string | null }[] | null ?? []
+            )
+              .map((vi) => vi.product_id ?? "")
+              .filter(Boolean)}
+            from={here}
+            canEditVendor={editable}
+            canCreatePo={canEditPage(session.membership.role, "/purchase-orders")}
+            locationId={workingShop?.id ?? null}
+            locationCode={workingShop?.code ?? null}
+            today={guideToday(session.orgSettings.timezone ?? serverTimeZone()).date}
+          />
+        </span>
       </div>
 
       {/* ---- the record's two sections --------------------------------- */}
@@ -478,20 +494,6 @@ export async function VendorDetail({
                   it. */}
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <SectionHeading count={vendorItems?.length ?? 0}>Vendor items</SectionHeading>
-                {/* The Items tab's commands are one Actions menu where the New
-                    vendor item button stood (Mark, 2026-09-14). */}
-                <VendorItemsCommandMenu
-                  orgId={session.membership.org_id}
-                  orgName={session.orgName}
-                  vendor={{ id: v.id, name: v.name }}
-                  existingProductIds={(vendorItems ?? [])
-                    .map((vi) => (vi.product_id ?? "") as string)
-                    .filter(Boolean)}
-                  from={here}
-                  canCreate={editable}
-                  locationId={workingShop?.id ?? null}
-                  locationCode={workingShop?.code ?? null}
-                />
               </div>
               {viError ? (
                 <p className="text-sm text-accent">
