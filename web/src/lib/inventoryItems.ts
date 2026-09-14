@@ -14,7 +14,7 @@
  * default), and `info` writes no parameter so the plain record address stays
  * canonical for every link already stored.
  */
-export type ItemTab = "info" | "vendor-items" | "purchase-history";
+export type ItemTab = "info" | "vendor-items" | "purchase-history" | "recipes";
 
 /**
  * Cap on the Purchase History fetch — `/purchase-orders`' own 500.
@@ -28,12 +28,13 @@ export type ItemTab = "info" | "vendor-items" | "purchase-history";
  */
 export const ITEM_PURCHASE_CAP = 500;
 
-export const ITEM_TABS: ItemTab[] = ["info", "vendor-items", "purchase-history"];
+export const ITEM_TABS: ItemTab[] = ["info", "vendor-items", "purchase-history", "recipes"];
 
 export const ITEM_TAB_LABEL: Record<ItemTab, string> = {
   info: "Info",
   "vendor-items": "Vendor Items",
   "purchase-history": "Purchase History",
+  recipes: "Recipes",
 };
 
 /** Anything unrecognised shows the record rather than an error. */

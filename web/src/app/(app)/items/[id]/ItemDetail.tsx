@@ -29,6 +29,12 @@ import {
   type ItemPurchaseRow,
 } from "@/components/catalog/ItemPurchaseHistory";
 import type { PoStatus } from "@/lib/purchaseOrders";
+import {
+  ItemUses,
+  type ItemElement,
+  type ProductUseRow,
+  type RecipeUseRow,
+} from "@/components/catalog/ItemUses";
 
 // Item detail is per-ITEM, not per-location: every location's row is listed so
 // the differences between shops are visible in one place (spec §4.8 — the
@@ -73,6 +79,7 @@ export async function ItemDetail({
   const wantsInfo = tab === "info";
   const wantsVendorItems = tab === "vendor-items";
   const wantsHistory = tab === "purchase-history";
+  const wantsUses = tab === "recipes";
 
   const [
     { data: item, error },
@@ -81,6 +88,7 @@ export async function ItemDetail({
     { data: sectionRows },
     { data: sourceRows, error: sourceError },
     { data: vendorRows },
+    { data: elementRows, error: elementError },
   ] = await Promise.all([
       supabase.from("inventory_items").select(SELECT).eq("id", id).maybeSingle(),
       // Deactivated vendors are gone from this screen entirely — you can't
@@ -128,6 +136,15 @@ export async function ItemDetail({
       // this tab hides. 80 rows, well under PostgREST's silent 1,000 cap.
       wantsVendorItems
         ? supabase.from("vendors").select("id, name, is_active").order("name")
+        : SKIP,
+      // The Recipes tab starts from the production elements that point at this
+      // item; every use below is reached through one of them.
+      wantsUses
+        ? supabase
+            .from("production_elements")
+            .select("id, name, is_active")
+            .eq("inventory_item_id", id)
+            .order("name")
         : SKIP,
     ]);
 
@@ -242,6 +259,128 @@ export async function ItemDetail({
       .sort((a, b) => (a.order_date < b.order_date ? 1 : a.order_date > b.order_date ? -1 : 0));
     historyCapped = all.length > ITEM_PURCHASE_CAP;
     history = all.slice(0, ITEM_PURCHASE_CAP);
+  }
+
+  // ---- the Recipes tab's rows ---------------------------------------------
+  // DIRECT uses of the item's elements: ingredient lines on a MASTER version,
+  // and production items taking the element as a component. Paginated on a
+  // unique order — a staple like flour is on a lot of recipes, and PostgREST
+  // truncates at 1,000 rows without a word.
+  const elements = ((elementRows ?? []) as ItemElement[]);
+  let recipeUses: RecipeUseRow[] = [];
+  let productUses: ProductUseRow[] = [];
+  let usesError: string | null = elementError?.message ?? null;
+  if (wantsUses && !usesError && elements.length > 0) {
+    const elementIds = elements.map((e) => e.id);
+    const nameOf = new Map(elements.map((e) => [e.id, e.name]));
+
+    type LineRow = {
+      id: string;
+      element_id: string;
+      qty: number | string | null;
+      unit: string | null;
+      note: string | null;
+      production_recipe_versions: {
+        version_label: string;
+        production_recipes: {
+          id: string;
+          name: string;
+          recipe_type: string | null;
+          is_active: boolean;
+        } | null;
+      } | null;
+    };
+    const lines: LineRow[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error: lineError } = await supabase
+        .from("production_recipe_lines")
+        .select(
+          `id, element_id, qty, unit, note,
+           production_recipe_versions!inner ( version_label, is_master,
+             production_recipes!inner ( id, name, recipe_type, is_active ) )`
+        )
+        .in("element_id", elementIds)
+        .eq("production_recipe_versions.is_master", true)
+        .order("id")
+        .range(from, from + 999);
+      if (lineError) {
+        usesError = lineError.message;
+        break;
+      }
+      lines.push(...((data ?? []) as unknown as LineRow[]));
+      if (!data || data.length < 1000) break;
+    }
+    recipeUses = lines
+      .filter((l) => l.production_recipe_versions?.production_recipes)
+      .map((l) => {
+        const version = l.production_recipe_versions!;
+        const recipe = version.production_recipes!;
+        return {
+          id: l.id,
+          recipe_id: recipe.id,
+          recipe_name: recipe.name,
+          recipe_type: recipe.recipe_type,
+          recipe_active: recipe.is_active,
+          version_label: version.version_label,
+          element_id: l.element_id,
+          element_name: nameOf.get(l.element_id) ?? "—",
+          qty: l.qty === null ? null : Number(l.qty),
+          unit: l.unit,
+          note: l.note,
+        };
+      });
+
+    if (!usesError) {
+      type EdgeRow = {
+        id: string;
+        element_id: string;
+        qty: number | string | null;
+        unit: string | null;
+        production_items: {
+          id: string;
+          name: string;
+          item_type: string | null;
+          subtype: string | null;
+          finish: string | null;
+          size: string | null;
+          is_active: boolean;
+        } | null;
+      };
+      const edges: EdgeRow[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error: edgeError } = await supabase
+          .from("production_item_elements")
+          .select(
+            `id, element_id, qty, unit,
+             production_items ( id, name, item_type, subtype, finish, size, is_active )`
+          )
+          .in("element_id", elementIds)
+          .order("id")
+          .range(from, from + 999);
+        if (edgeError) {
+          usesError = edgeError.message;
+          break;
+        }
+        edges.push(...((data ?? []) as unknown as EdgeRow[]));
+        if (!data || data.length < 1000) break;
+      }
+      productUses = edges
+        .filter((e) => e.production_items)
+        .map((e) => {
+          const p = e.production_items!;
+          return {
+            id: e.id,
+            item_id: p.id,
+            item_name: p.name,
+            detail: [p.size, p.item_type, p.subtype, p.finish].filter(Boolean).join(" · "),
+            item_active: p.is_active,
+            element_id: e.element_id,
+            element_name: nameOf.get(e.element_id) ?? "—",
+            qty: e.qty === null ? null : Number(e.qty),
+            unit: e.unit,
+          };
+        });
+    }
   }
 
   // Links out of this page come back here, with the trail so far intact.
@@ -389,6 +528,18 @@ export async function ItemDetail({
                 from={here}
                 capped={historyCapped}
                 locationCode={historyLocation?.code ?? null}
+              />
+            ))}
+
+          {tab === "recipes" &&
+            (usesError ? (
+              <p className="text-sm text-accent">Could not load recipes: {usesError}</p>
+            ) : (
+              <ItemUses
+                elements={elements}
+                recipes={recipeUses}
+                products={productUses}
+                from={here}
               />
             ))}
         </div>
