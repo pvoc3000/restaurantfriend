@@ -717,9 +717,10 @@ export function OrderGuide({
 
   /**
    * The Actions menu's rows. Generate POs leads (the walk's end point, spec §2
-   * step 3); Next Favorite / Next Section follow on the DESK only — on a tablet
-   * they are in the top bar — and Clear Guide… is last and red, being the one
-   * that throws work away. A row with nothing to act on is dead, never absent.
+   * step 3) and Clear Guide… is last and red, being the one that throws work
+   * away. Next Favorite / Next Section are NOT here (Mark, 2026-09-14): the
+   * tablet has them in its top bar and the desk does not need them. A row with
+   * nothing to act on is dead, never absent.
    */
   function guideMenuItems(openGenerate: (() => void) | null): ActionMenuItem[] {
     const items: ActionMenuItem[] = [];
@@ -729,21 +730,6 @@ export function OrderGuide({
         onSelect: openGenerate,
         disabled: totals.length === 0,
       });
-    }
-    if (!tablet) {
-      items.push(
-        {
-          label: `Next Favorite (${untouchedCount})`,
-          onSelect: () => scrollToNext("tr[data-untouched]"),
-          disabled: untouchedCount === 0,
-          separatorBefore: items.length > 0,
-        },
-        {
-          label: grouping === "vendor" ? "Next Vendor" : "Next Section",
-          onSelect: () => scrollToNext("tr[data-guide-section]"),
-          disabled: sectionCount === 0,
-        }
-      );
     }
     items.push({
       label: "Clear Guide…",
