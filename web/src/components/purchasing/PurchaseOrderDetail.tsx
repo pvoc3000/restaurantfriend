@@ -743,8 +743,10 @@ export function PurchaseOrderDetail({
   const figures = (
     <div className="border border-ink bg-white px-4 py-3">
       <div className="ml-auto grid w-fit grid-cols-[repeat(3,auto)] gap-x-8 gap-y-3">
-        {stats.map((s) => (
-          <div key={s.label} className="text-right">
+        {/* Keyed by POSITION: the labels repeat since the ordered and received
+            rows dropped their prefixes (2026-09-12), and this is a fixed six. */}
+        {stats.map((s, i) => (
+          <div key={i} className="text-right">
             <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">{s.label}</div>
             <div
               className={`text-[16px] font-bold tabular-nums ${
