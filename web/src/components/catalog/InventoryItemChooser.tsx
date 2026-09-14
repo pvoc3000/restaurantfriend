@@ -123,6 +123,8 @@ export function InventoryItemChooser({
         onValueChange={setTerm}
         clearLabel="Clear the search"
         search
+        // Fills the dialog's track; `search` alone caps a box at 18rem.
+        fullWidth
         aria-label="Search inventory items"
         icon={<SearchGlyph />}
       />

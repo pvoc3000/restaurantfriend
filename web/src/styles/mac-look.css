@@ -474,6 +474,11 @@
    centre on the full 39px. `:has` is inside the app's Safari 16.4 floor. */
 span:has(> input.mac-field) {
   height: 39px;
+  /* MIN-HEIGHT TOO (2026-09-14). `SEARCH_PEN` is `flex-[999_1_0%]`, written for
+     a ROW; in a flex COLUMN — a dialog's chooser — that 0% basis lands on the
+     HEIGHT and overrides `height`, and the input's `height: 100%` then
+     collapsed to its text. A flex basis cannot beat a min-height. */
+  min-height: 39px;
   margin-bottom: -3px;
 }
 

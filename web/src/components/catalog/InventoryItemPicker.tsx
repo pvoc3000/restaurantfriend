@@ -223,6 +223,8 @@ export function InventoryItemPicker({
         aria-label="Search inventory items by name"
         clearLabel="Clear the search"
         search
+        // In a dialog, fill it; on a detail screen, the search box's own width.
+        fullWidth={wide}
         icon={<SearchGlyph />}
       />
       {canSearch && results.length === 0 && (
