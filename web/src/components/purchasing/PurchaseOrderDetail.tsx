@@ -34,6 +34,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { AddPoLines } from "./AddPoLines";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
+import { RowMenu } from "@/components/ui/RowMenu";
 import { nextDeliveryDate } from "@/lib/poProcessing";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog, confirmDialogWithOption, splitConfirmMessage } from "@/lib/confirm";
@@ -122,30 +123,57 @@ export function PurchaseOrderDetail({
 
   /** Delete the selected lines. Received quantities are order history, so
    *  the confirm names them before anything irreversible happens. */
-  async function deleteLines() {
-    const selected = lines.filter((l) => checkedLines.has(l.id));
+  /**
+   * ONE implementation behind both doors — the Actions menu's Delete
+   * Selected… and a row's own ⋯ Delete Item (Mark, 2026-09-14) — so the
+   * confirm and the row-count check cannot drift between them. From a row menu
+   * the confirm NAMES the item: "1 line" is a worse answer to "which one?"
+   * than the name on the row you just pressed.
+   */
+  async function deleteLines(ids: string[]) {
+    const selected = lines.filter((l) => ids.includes(l.id));
+    if (selected.length === 0) return;
     const received = selected.filter((l) => l.qty_received !== null);
+    const one = selected.length === 1 ? selected[0] : null;
+    const oneName = one
+      ? one.vendor_items?.inventory_items?.name ?? one.description ?? "this item"
+      : null;
     const message =
-      `Delete ${selected.length} line${selected.length === 1 ? "" : "s"} from ${order.po_number}?` +
+      (oneName
+        ? `Delete ${oneName} from ${order.po_number}?`
+        : `Delete ${selected.length} lines from ${order.po_number}?`) +
       (received.length > 0
-        ? `\n\nWARNING: ${received.length} of them ${
-            received.length === 1 ? "has" : "have"
-          } a received quantity — deleting erases that history permanently.`
+        ? one
+          ? "\n\nWARNING: it has a received quantity — deleting erases that history permanently."
+          : `\n\nWARNING: ${received.length} of them ${
+              received.length === 1 ? "has" : "have"
+            } a received quantity — deleting erases that history permanently.`
         : "\n\nThis cannot be undone.");
     if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Delete", tone: "danger" }))) return;
 
     setBusy(true);
     setError(null);
-    const { error } = await supabase
+    // `.select()` its own result: a delete matching no policy removes zero rows
+    // and returns NO error, which would otherwise read as success.
+    const { data, error } = await supabase
       .from("purchase_order_items")
       .delete()
-      .in("id", [...checkedLines]);
+      .in("id", selected.map((l) => l.id))
+      .select("id");
     setBusy(false);
     if (error) {
       setError(error.message);
       return;
     }
-    setCheckedLines(new Set());
+    if ((data ?? []).length === 0) {
+      setError("Nothing was deleted — you may not have permission to change this order.");
+      return;
+    }
+    setCheckedLines((prev) => {
+      const next = new Set(prev);
+      for (const l of selected) next.delete(l.id);
+      return next;
+    });
     router.refresh();
   }
 
@@ -629,6 +657,34 @@ export function PurchaseOrderDetail({
           <span className="text-muted">{l.discrepancy_note ?? "—"}</span>
         ),
     },
+
+    // A row's own ⋯ (Mark, 2026-09-14) — Delete Item, the same `deleteLines`
+    // the Actions menu's Delete Selected… runs. Unlabelled, so the Columns menu
+    // never offers to hide it; write roles only, since its one entry writes.
+    ...(canEditLines
+      ? [
+          {
+            key: "menu",
+            label: "",
+            width: 60,
+            render: (l: PoLine) => (
+              <RowMenu
+                label={`Commands for ${
+                  l.vendor_items?.inventory_items?.name ?? l.description ?? "this line"
+                }`}
+                items={[
+                  {
+                    label: "Delete Item",
+                    danger: true,
+                    disabled: busy,
+                    onSelect: () => void deleteLines([l.id]),
+                  },
+                ]}
+              />
+            ),
+          },
+        ]
+      : []),
   ];
 
   // The expectation, stated beside the Delivery field while that field is
@@ -686,7 +742,7 @@ export function PurchaseOrderDetail({
             ? group([
                 {
                   label: "Delete Selected…",
-                  onSelect: () => void deleteLines(),
+                  onSelect: () => void deleteLines([...checkedLines]),
                   danger: true,
                   disabled: busy,
                 },
@@ -975,7 +1031,9 @@ export function PurchaseOrderDetail({
         // new column and keeps the old ones fat, so a new key drops them.
         // (v2 was the same story for v1: Type replaced the item name, and the
         // name moved into the wrapping Item cell.)
-        storageKey="rf.purchaseOrderLines.columnWidths.v4"
+        // v5 (2026-09-14): the row ⋯ column arrived; a stored v4 order has no
+        // slot for it.
+        storageKey="rf.purchaseOrderLines.columnWidths.v5"
         columnChooser
         // NOT `scroll` (Mark, 2026-08-24: "make the header able to be scrolled
         // away leaving just the column titles"), which reverses the 2026-08-02
