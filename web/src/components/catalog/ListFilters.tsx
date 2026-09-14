@@ -3,8 +3,8 @@
 import { STALE_ORDER, STALE_LABEL, type StaleBucket } from "@/lib/lastOrdered";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
-import { TabPicker } from "@/components/ui/TabPicker";
 import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 
 export type ActiveFilter = "active" | "inactive" | "all";
 export type StaleFilter = StaleBucket | "any";
@@ -18,8 +18,14 @@ export const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
 /**
  * The catalog filter bar — search, category, active state, last-ordered age.
  * Rendered identically wherever it appears so the controls mean the same thing
- * on Inventory and on a vendor's item list. Each filter is optional; pass only
- * the ones a screen actually has data for.
+ * everywhere it is used. Each filter is optional; pass only the ones a screen
+ * actually has data for.
+ *
+ * ONE CAPTIONED ROW OF PICKLISTS (Mark, 2026-09-14), replacing a row of typing
+ * controls over a row of two TabPickers: Show and Last ordered sit to the right
+ * of Category. A collapsed picker needs its caption — its face shows a value,
+ * not what it filters — and `items-end` levels the uncaptioned search box with
+ * the fields.
  */
 export function ListFilters({
   term,
@@ -49,25 +55,18 @@ export function ListFilters({
   totalCount?: number;
 }) {
   return (
-    // TWO ROWS, and which control sits on which is deliberate (Mark,
-    // 2026-08-01: put the age bar "on the same line as the active/inactive tab
-    // picker"). The two TabPickers are one row because they're the same kind of
-    // control answering the same question — which rows count — and the typing
-    // controls are the other. Left to `flex-wrap` on a single row the four
-    // wanted 1441px against 1329 available at 1440, so the age bar broke away
-    // from Active on its own; pairing them explicitly holds at any width.
-    <div className="space-y-2">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <TextInput
-          value={term}
-          onValueChange={onTerm}
-          aria-label={placeholder}
-          clearLabel="Clear the search"
-          search
-          icon={<SearchGlyph />}
-        />
+    <div className="flex min-w-0 flex-wrap items-end gap-3">
+      <TextInput
+        value={term}
+        onValueChange={onTerm}
+        aria-label={placeholder}
+        clearLabel="Clear the search"
+        search
+        icon={<SearchGlyph />}
+      />
 
-        {categories && onCategory && (
+      {categories && onCategory && (
+        <ControlField label="Category">
           <PickList
             variant="field"
             ariaLabel="Category"
@@ -79,36 +78,38 @@ export function ListFilters({
             ]}
             className="w-56"
           />
-        )}
-      </div>
+        </ControlField>
+      )}
 
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {active && onActive && (
-          <TabPicker
+      {active && onActive && (
+        <ControlField label="Show">
+          <PickList
+            variant="field"
+            fit
             ariaLabel="Active state"
             value={active}
-            onChange={onActive}
-            options={ACTIVE_TABS}
+            onPick={(v) => onActive(v as ActiveFilter)}
+            options={ACTIVE_TABS.map((t) => ({ value: t.key, label: t.label }))}
           />
-        )}
+        </ControlField>
+      )}
 
-        {/* No "Last ordered" caption (Mark, 2026-08-01): every cell already
-            says an age — "Never ordered", "2+ years", "Within a year" — so the
-            label was repeating what the bar spells out. It survives as the
-            group's `ariaLabel`, the reader who genuinely can't see the cells. */}
-        {stale && onStale && (
-          <TabPicker
+      {stale && onStale && (
+        <ControlField label="Last ordered">
+          <PickList
+            variant="field"
+            fit
             ariaLabel="Last ordered"
             value={stale}
-            onChange={onStale}
+            onPick={(v) => onStale(v as StaleFilter)}
             options={(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => ({
-              key: t,
+              value: t,
               label: t === "any" ? "Any age" : STALE_LABEL[t],
-              count: t === "any" ? totalCount ?? 0 : staleCounts?.[t] ?? 0,
+              hint: String(t === "any" ? totalCount ?? 0 : staleCounts?.[t] ?? 0),
             }))}
           />
-        )}
-      </div>
+        </ControlField>
+      )}
     </div>
   );
 }

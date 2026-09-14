@@ -12,7 +12,7 @@ import {
   VendorItemsTable,
   type VendorItemWithItem,
 } from "@/components/catalog/VendorItemsTable";
-import { NewVendorItem } from "@/components/catalog/NewVendorItem";
+import { VendorItemsCommandMenu } from "@/components/catalog/VendorItemsCommandMenu";
 import { AddVendorReminder } from "@/components/purchasing/Reminders";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -478,16 +478,20 @@ export async function VendorDetail({
                   it. */}
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <SectionHeading count={vendorItems?.length ?? 0}>Vendor items</SectionHeading>
-                {editable ? (
-                  <NewVendorItem
-                    orgId={session.membership.org_id}
-                    vendor={{ id: v.id, name: v.name }}
-                    existingProductIds={(vendorItems ?? [])
-                      .map((vi) => (vi.product_id ?? "") as string)
-                      .filter(Boolean)}
-                    from={here}
-                  />
-                ) : null}
+                {/* The Items tab's commands are one Actions menu where the New
+                    vendor item button stood (Mark, 2026-09-14). */}
+                <VendorItemsCommandMenu
+                  orgId={session.membership.org_id}
+                  orgName={session.orgName}
+                  vendor={{ id: v.id, name: v.name }}
+                  existingProductIds={(vendorItems ?? [])
+                    .map((vi) => (vi.product_id ?? "") as string)
+                    .filter(Boolean)}
+                  from={here}
+                  canCreate={editable}
+                  locationId={workingShop?.id ?? null}
+                  locationCode={workingShop?.code ?? null}
+                />
               </div>
               {viError ? (
                 <p className="text-sm text-accent">

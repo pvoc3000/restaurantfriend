@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
@@ -63,7 +63,11 @@ export function NewVendorItem({
   existingProductIds = [],
   existingVendorIds = [],
   from,
+  children,
 }: {
+  /** Hand out the command instead of drawing a button — the vendor record's
+   *  Actions menu (2026-09-14), `NewInventoryItem`'s render prop. */
+  children?: (open: () => void) => ReactNode;
   orgId: string;
   /**
    * The vendor's own screen: this vendor is fixed and the dialog asks which
@@ -202,9 +206,13 @@ export function NewVendorItem({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={BUTTON_CLASS}>
-        New vendor item
-      </button>
+      {children ? (
+        children(() => setOpen(true))
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} className={BUTTON_CLASS}>
+          New vendor item
+        </button>
+      )}
 
       {open && (
         <Dialog
