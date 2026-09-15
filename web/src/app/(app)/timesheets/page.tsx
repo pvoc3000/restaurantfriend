@@ -252,6 +252,8 @@ export default async function TimesheetsPage({
         name: `${e.last_name}, ${e.first_name}`,
         excludes_tips: (e.excludes_tips ?? false) as boolean,
         workday_starts_at: (e.workday_starts_at ?? null) as string | null,
+        primary_wage_type: (e.primary_wage_type ?? null) as string | null,
+        gusto_id: (e.gusto_id ?? null) as string | null,
       },
     ])
   );
@@ -266,6 +268,9 @@ export default async function TimesheetsPage({
       employee_id: t.employee_id as string,
       employee_name: emp?.name ?? "(unknown)",
       employee_excludes_tips: emp?.excludes_tips ?? false,
+      employee_gusto_id: emp?.gusto_id ?? null,
+      // What the Gusto file will call this shift — the export's own fallback.
+      title: ((t.wage_type as string | null) ?? emp?.primary_wage_type ?? null),
       location_code: t.location_id ? (codeById.get(t.location_id as string) ?? null) : null,
       location_id: (t.location_id ?? null) as string | null,
       workday: t.workday as string,

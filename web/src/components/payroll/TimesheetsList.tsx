@@ -25,6 +25,12 @@ import { MEAL_CODE_LABEL, assessWorkday, type BreakFinding } from "@/lib/breakRu
 import { toBreakShift } from "@/lib/payrollWorksheet";
 import { allocateTips, type PoolResult } from "@/lib/tipPool";
 import {
+  TIMESHEET_ISSUES,
+  TIMESHEET_ISSUE_LABEL,
+  timesheetIssues,
+  type TimesheetIssue,
+} from "@/lib/timesheetIssues";
+import {
   ShiftBenefits,
   ShiftPremium,
   ShiftTips,
@@ -53,6 +59,9 @@ export type TimesheetRow = {
   employee_id: string;
   employee_name: string;
   employee_excludes_tips: boolean;
+  employee_gusto_id: string | null;
+  /** The shift's job title, else the person's primary one — as exported. */
+  title: string | null;
   location_code: string | null;
   /** Needed as well as the code: the tip pool and the premium are keyed by id. */
   location_id: string | null;
@@ -117,6 +126,7 @@ function differsFromDecided(
 type SortKey = "employee" | "workday" | "in" | "worked" | "regular" | "ot" | "location";
 type Grouping = "none" | "employee" | "workday" | "location";
 type Review = "all" | "needs_review";
+type IssueFilter = "all" | "any" | TimesheetIssue;
 
 /**
  * The label a grouping puts on its band, and the value it orders runs by.
@@ -182,6 +192,7 @@ export function TimesheetsList({
   const [search, setSearch] = useState("");
   const [grouping, setGrouping] = useState<Grouping>("employee");
   const [review, setReview] = useState<Review>("all");
+  const [issue, setIssue] = useState<IssueFilter>("all");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
     key: "employee",
     dir: "asc",
@@ -245,16 +256,136 @@ export function TimesheetsList({
     return out;
   }, [rows, proposals]);
 
+  /**
+   * The meal-break findings, derived here exactly as the worksheet derives them.
+   *
+   * Surfaced on THIS screen because it is where you are looking when you ask
+   * whether a break was missed (Mark, 2026-08-05: "missed break not flagged by
+   * app"). It was only ever on the pay-period worksheet's Breaks tab, which is
+   * where the DECISION still gets recorded — this is a flag, not a second place
+   * to decide, the same split receiving and PO detail already keep.
+   *
+   * Assessed per (employee, workday) because that is the grain the California
+   * one-per-day cap works at, then marked on every shift of that day.
+   */
+  const breakFindings = useMemo(() => {
+    const days = new Map<string, TimesheetRow[]>();
+    for (const r of rows) {
+      const key = `${r.employee_id}|${r.workday}`;
+      const list = days.get(key);
+      if (list) list.push(r);
+      else days.set(key, [r]);
+    }
+    const out = new Map<string, BreakFinding>();
+    for (const [key, dayRows] of days) {
+      const [employee_id] = key.split("|");
+      const found = assessWorkday(dayRows.map(toBreakShift), {
+        hasMealWaiver: waiverEmployeeIds.includes(employee_id),
+      });
+      if (found.length === 0) continue;
+      for (const r of dayRows) out.set(r.id, found[0]);
+    }
+    return out;
+  }, [rows, waiverEmployeeIds]);
+
+  /**
+   * Each shop-day's pool, divided.
+   *
+   * Computed over the WHOLE period rather than the filtered set, for the same
+   * reason the overtime recompute is: the rate is pooled dollars ÷ everyone's
+   * tip hours, so hiding half a shop-day behind a search box would change the
+   * share shown for the half still on screen.
+   */
+  const dayPools = useMemo(() => {
+    const days = new Map<string, TimesheetRow[]>();
+    for (const r of rows) {
+      if (!r.location_id) continue;
+      const k = `${r.location_id}|${r.business_date}`;
+      const list = days.get(k);
+      if (list) list.push(r);
+      else days.set(k, [r]);
+    }
+    const out = new Map<string, { result: PoolResult | null; reported: number | null; corrected: number | null }>();
+    for (const [k, dayRows] of days) {
+      const pool = pools[k];
+      const effective = pool ? (pool.corrected_cents ?? pool.reported_cents) : null;
+      out.set(k, {
+        reported: pool?.reported_cents ?? null,
+        corrected: pool?.corrected_cents ?? null,
+        result:
+          effective === null
+            ? null
+            : allocateTips(
+                effective,
+                dayRows.map((r) => ({
+                  id: r.id,
+                  // Tip hours are hours WORKED. Sick hours are a separate
+                  // column and never enter this sum.
+                  hours: workedHours(r) ?? 0,
+                  excludeShift: r.exclude_tips,
+                  excludePerson: r.employee_excludes_tips,
+                }))
+              ),
+      });
+    }
+    return out;
+  }, [rows, pools]);
+
+  /**
+   * What is wrong with each shift, for the Issues filter (Mark, 2026-09-15).
+   * Over the whole pay period, like the two derivations it reads.
+   */
+  const issuesById = useMemo(() => {
+    const out = new Map<string, Set<TimesheetIssue>>();
+    for (const r of rows) {
+      const pool = r.location_id ? dayPools.get(`${r.location_id}|${r.business_date}`) : undefined;
+      out.set(
+        r.id,
+        timesheetIssues({
+          mealCode: breakFindings.get(r.id)?.code ?? null,
+          title: r.title,
+          kind: r.kind,
+          clockIn: r.clock_in,
+          clockOut: r.clock_out,
+          gustoId: r.employee_gusto_id,
+          locationId: r.location_id,
+          workedHours: workedHours(r),
+          excludedFromTips: excludedFromTips(r, r.employee_excludes_tips),
+          poolHasFigure: pool?.result != null,
+          poolUnallocatedCents: pool?.result?.unallocatedCents ?? 0,
+          ambiguousTime: Boolean(r.source_payload?.local_time_ambiguity),
+        })
+      );
+    }
+    return out;
+  }, [rows, breakFindings, dayPools]);
+
+  const issueCounts = useMemo(() => {
+    const n = new Map<IssueFilter, number>();
+    for (const set of issuesById.values()) {
+      if (set.size) n.set("any", (n.get("any") ?? 0) + 1);
+      for (const i of set) n.set(i, (n.get(i) ?? 0) + 1);
+    }
+    return n;
+  }, [issuesById]);
+
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const base = review === "needs_review" ? rows.filter((r) => needsReview.has(r.id)) : rows;
+    let base = review === "needs_review" ? rows.filter((r) => needsReview.has(r.id)) : rows;
+    if (issue !== "all") {
+      base = base.filter((r) => {
+        const set = issuesById.get(r.id);
+        if (!set) return false;
+        return issue === "any" ? set.size > 0 : set.has(issue);
+      });
+    }
     if (!q) return base;
     return base.filter((r) =>
       `${r.employee_name} ${r.workday} ${r.location_code ?? ""} ${r.position ?? ""}`
         .toLowerCase()
         .includes(q)
     );
-  }, [rows, search, review, needsReview]);
+  }, [rows, search, review, needsReview, issue, issuesById]);
 
   const sorted = useMemo(() => {
     const value = (r: TimesheetRow): string | number => {
@@ -300,38 +431,6 @@ export function TimesheetsList({
     });
   }, [shown, sort, grouping]);
 
-  /**
-   * The meal-break findings, derived here exactly as the worksheet derives them.
-   *
-   * Surfaced on THIS screen because it is where you are looking when you ask
-   * whether a break was missed (Mark, 2026-08-05: "missed break not flagged by
-   * app"). It was only ever on the pay-period worksheet's Breaks tab, which is
-   * where the DECISION still gets recorded — this is a flag, not a second place
-   * to decide, the same split receiving and PO detail already keep.
-   *
-   * Assessed per (employee, workday) because that is the grain the California
-   * one-per-day cap works at, then marked on every shift of that day.
-   */
-  const breakFindings = useMemo(() => {
-    const days = new Map<string, TimesheetRow[]>();
-    for (const r of rows) {
-      const key = `${r.employee_id}|${r.workday}`;
-      const list = days.get(key);
-      if (list) list.push(r);
-      else days.set(key, [r]);
-    }
-    const out = new Map<string, BreakFinding>();
-    for (const [key, dayRows] of days) {
-      const [employee_id] = key.split("|");
-      const found = assessWorkday(dayRows.map(toBreakShift), {
-        hasMealWaiver: waiverEmployeeIds.includes(employee_id),
-      });
-      if (found.length === 0) continue;
-      for (const r of dayRows) out.set(r.id, found[0]);
-    }
-    return out;
-  }, [rows, waiverEmployeeIds]);
-
   /* -- "take me to that shift" ------------------------------------------- */
 
   /**
@@ -364,6 +463,7 @@ export function TimesheetsList({
       if (!sorted.some((r) => r.id === target.id)) {
         setSearch("");
         setReview("all");
+        setIssue("all");
       }
     } else {
       // Nothing to jump to — record the nonce anyway, or this retries forever.
@@ -417,49 +517,6 @@ export function TimesheetsList({
     }
     return n;
   }, [rows]);
-
-  /**
-   * Each shop-day's pool, divided.
-   *
-   * Computed over the WHOLE period rather than the filtered set, for the same
-   * reason the overtime recompute is: the rate is pooled dollars ÷ everyone's
-   * tip hours, so hiding half a shop-day behind a search box would change the
-   * share shown for the half still on screen.
-   */
-  const dayPools = useMemo(() => {
-    const days = new Map<string, TimesheetRow[]>();
-    for (const r of rows) {
-      if (!r.location_id) continue;
-      const k = `${r.location_id}|${r.business_date}`;
-      const list = days.get(k);
-      if (list) list.push(r);
-      else days.set(k, [r]);
-    }
-    const out = new Map<string, { result: PoolResult | null; reported: number | null; corrected: number | null }>();
-    for (const [k, dayRows] of days) {
-      const pool = pools[k];
-      const effective = pool ? (pool.corrected_cents ?? pool.reported_cents) : null;
-      out.set(k, {
-        reported: pool?.reported_cents ?? null,
-        corrected: pool?.corrected_cents ?? null,
-        result:
-          effective === null
-            ? null
-            : allocateTips(
-                effective,
-                dayRows.map((r) => ({
-                  id: r.id,
-                  // Tip hours are hours WORKED. Sick hours are a separate
-                  // column and never enter this sum.
-                  hours: workedHours(r) ?? 0,
-                  excludeShift: r.exclude_tips,
-                  excludePerson: r.employee_excludes_tips,
-                }))
-              ),
-      });
-    }
-    return out;
-  }, [rows, pools]);
 
   /** Distinct (employee, workday) pairs owing a meal finding, among what's shown. */
   const mealDays = useMemo(() => {
@@ -788,6 +845,27 @@ export function TimesheetsList({
           />
         </ControlField>
 
+        {/* ISSUES, between Overtime and Group by (Mark, 2026-09-15). Counts
+            are over the whole pay period, like Overtime's beside it. */}
+        <ControlField label="Issues">
+          <PickList
+            ariaLabel="Issues"
+            variant="field"
+            value={issue}
+            onPick={(next) => setIssue(next as IssueFilter)}
+            options={[
+              { value: "all", label: "All", hint: String(rows.length) },
+              { value: "any", label: "Any issue", hint: String(issueCounts.get("any") ?? 0) },
+              ...TIMESHEET_ISSUES.map((i) => ({
+                value: i,
+                label: TIMESHEET_ISSUE_LABEL[i],
+                hint: String(issueCounts.get(i) ?? 0),
+              })),
+            ]}
+            fit
+          />
+        </ControlField>
+
         <ControlField label="Group by">
           <PickList
             ariaLabel="Group by"
@@ -957,7 +1035,7 @@ export function TimesheetsList({
           <p className="text-sm text-muted">
             {rows.length === 0
               ? "No shifts in this pay period."
-              : "No shifts match that search."}
+              : "No shifts match these filters."}
           </p>
         }
       />
