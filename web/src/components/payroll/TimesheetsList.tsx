@@ -9,6 +9,7 @@ import {
   subscribeShiftFocus,
 } from "@/lib/shiftFocus";
 import { PickList } from "@/components/ui/PickList";
+import { PickSet } from "@/components/ui/PickSet";
 import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
@@ -127,6 +128,8 @@ type SortKey = "employee" | "workday" | "in" | "worked" | "regular" | "ot" | "lo
 type Grouping = "none" | "employee" | "workday" | "location";
 type Review = "all" | "needs_review";
 type IssueFilter = "all" | "any" | TimesheetIssue;
+/** The Shops picker's value for a shift with no location. No code can be it. */
+const NO_SHOP = "__no_shop__";
 
 /**
  * The label a grouping puts on its band, and the value it orders runs by.
@@ -193,6 +196,8 @@ export function TimesheetsList({
   const [grouping, setGrouping] = useState<Grouping>("employee");
   const [review, setReview] = useState<Review>("all");
   const [issue, setIssue] = useState<IssueFilter>("all");
+  /** Shop codes to show. Empty means every shop — `PickSet`'s rule. */
+  const [shops, setShops] = useState<string[]>([]);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
     key: "employee",
     dir: "asc",
@@ -369,9 +374,35 @@ export function TimesheetsList({
     return n;
   }, [issuesById]);
 
+  /**
+   * The shops this pay period's shifts were worked at, with counts over the
+   * whole period. A shift with no shop gets its own option rather than being
+   * unreachable once a shop is ticked. A chosen code stays offered even at 0,
+   * or the control could not show what it is filtering by.
+   */
+  const shopOptions = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const r of rows) {
+      const k = r.location_code ?? NO_SHOP;
+      n.set(k, (n.get(k) ?? 0) + 1);
+    }
+    for (const s of shops) if (!n.has(s)) n.set(s, 0);
+    return [...n.entries()]
+      .sort(([a], [b]) => (a === NO_SHOP ? 1 : b === NO_SHOP ? -1 : a < b ? -1 : 1))
+      .map(([code, count]) => ({
+        value: code,
+        label: code === NO_SHOP ? "No shop" : code,
+        hint: String(count),
+      }));
+  }, [rows, shops]);
+
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
     let base = review === "needs_review" ? rows.filter((r) => needsReview.has(r.id)) : rows;
+    if (shops.length) {
+      const chosen = new Set(shops);
+      base = base.filter((r) => chosen.has(r.location_code ?? NO_SHOP));
+    }
     if (issue !== "all") {
       base = base.filter((r) => {
         const set = issuesById.get(r.id);
@@ -385,7 +416,7 @@ export function TimesheetsList({
         .toLowerCase()
         .includes(q)
     );
-  }, [rows, search, review, needsReview, issue, issuesById]);
+  }, [rows, search, review, needsReview, issue, issuesById, shops]);
 
   const sorted = useMemo(() => {
     const value = (r: TimesheetRow): string | number => {
@@ -464,6 +495,7 @@ export function TimesheetsList({
         setSearch("");
         setReview("all");
         setIssue("all");
+        setShops([]);
       }
     } else {
       // Nothing to jump to — record the nonce anyway, or this retries forever.
@@ -831,6 +863,21 @@ export function TimesheetsList({
             one-of-N is a captioned `PickList` with its counts as hints, the
             default since 2026-09-10. "Needs review 0" still shows: the hint is
             the answer you came for. */}
+        {/* SHOPS, several at once (Mark, 2026-09-15) — `PickSet`, where empty
+            means every shop. Payroll is org-wide, so this is a filter rather
+            than the working location. */}
+        <ControlField label="Shops">
+          <PickSet
+            options={shopOptions}
+            value={shops}
+            onChange={setShops}
+            allLabel="All shops"
+            noun="shops"
+            label="Which shops to show"
+            minWidth={200}
+          />
+        </ControlField>
+
         <ControlField label="Overtime">
           <PickList
             ariaLabel="Overtime review"
