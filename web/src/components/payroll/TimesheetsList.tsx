@@ -1246,7 +1246,9 @@ function BreakCell({
             finding.waivable ? " A signed meal-break waiver would cover this day." : ""
           } Record the decision on the pay period's worksheet.`}
         >
-          meal
+          {/* The Issues filter's own split: late against everything else
+              (Mark, 2026-09-15 — "meal" alone could not tell them apart). */}
+          {finding.code === "late_meal" ? "late meal" : "no meal"}
         </span>
       )}
     </span>

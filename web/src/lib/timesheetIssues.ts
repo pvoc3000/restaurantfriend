@@ -32,7 +32,7 @@ export const TIMESHEET_ISSUES: TimesheetIssue[] = [
 export const TIMESHEET_ISSUE_LABEL: Record<TimesheetIssue, string> = {
   late_meal: "Late meal",
   no_meal: "No meal",
-  no_title: "No title",
+  no_title: "No Payroll Title",
   tips: "Tips",
   no_clock_out: "No clock-out",
   no_payroll_id: "No payroll ID",
