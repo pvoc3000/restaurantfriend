@@ -43,6 +43,8 @@ export const TIMESHEET_ISSUE_LABEL: Record<TimesheetIssue, string> = {
 export type IssueFacts = {
   /** The workday's meal finding, already net of any waiver on file. */
   mealCode: MealCode | null;
+  /** A premium decision is already on file for that workday's meal. */
+  mealDecided: boolean;
   /** The shift's own title, else the person's primary one — what the export uses. */
   title: string | null;
   kind: "shift" | "adjustment";
@@ -75,8 +77,12 @@ export type IssueFacts = {
 export function timesheetIssues(f: IssueFacts): Set<TimesheetIssue> {
   const out = new Set<TimesheetIssue>();
 
-  if (f.mealCode === "late_meal") out.add("late_meal");
-  else if (f.mealCode !== null) out.add("no_meal");
+  // A finding somebody has already decided (owed, waived, not owed) is not an
+  // issue any more — only the undecided ones are work (Mark, 2026-09-15).
+  if (!f.mealDecided) {
+    if (f.mealCode === "late_meal") out.add("late_meal");
+    else if (f.mealCode !== null) out.add("no_meal");
+  }
 
   if ((f.title ?? "").trim() === "") out.add("no_title");
 

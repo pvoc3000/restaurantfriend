@@ -5,6 +5,7 @@ import { eq, test } from "./harness";
 
 const clean: IssueFacts = {
   mealCode: null,
+  mealDecided: false,
   title: "Donut Fryer",
   kind: "shift",
   clockIn: "2026-09-01T08:00:00Z",
@@ -32,6 +33,11 @@ test("issues: short and second meals file under No meal", () => {
   eq(issues({ mealCode: "no_meal" }), ["no_meal"]);
   eq(issues({ mealCode: "short_meal" }), ["no_meal"]);
   eq(issues({ mealCode: "no_second_meal" }), ["no_meal"]);
+});
+
+test("issues: a decided meal finding is no longer an issue", () => {
+  eq(issues({ mealCode: "late_meal", mealDecided: true }), []);
+  eq(issues({ mealCode: "no_meal", mealDecided: true }), []);
 });
 
 test("issues: a blank title is No title", () => {

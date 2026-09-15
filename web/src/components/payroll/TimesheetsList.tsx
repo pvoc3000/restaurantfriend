@@ -348,6 +348,9 @@ export function TimesheetsList({
         r.id,
         timesheetIssues({
           mealCode: breakFindings.get(r.id)?.code ?? null,
+          // Keyed as the row's own premium control reads it: one decision per
+          // employee-workday, whichever shift it was recorded from.
+          mealDecided: Boolean(premiums[`${r.employee_id}|${r.workday}|meal`]),
           title: r.title,
           kind: r.kind,
           clockIn: r.clock_in,
@@ -363,7 +366,7 @@ export function TimesheetsList({
       );
     }
     return out;
-  }, [rows, breakFindings, dayPools]);
+  }, [rows, breakFindings, dayPools, premiums]);
 
   const issueCounts = useMemo(() => {
     const n = new Map<IssueFilter, number>();
