@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { Pane, PaneHeader } from "@/components/ui/Pane";
 import { BackToTop } from "@/components/ui/BackToTop";
@@ -776,16 +776,18 @@ export function Receiving({
             <span className="text-[11px] uppercase tracking-[0.12em] text-subtle">
               Layout
             </span>
-            {/* size="sm": this sits beside a fixed-height pane band. */}
-            <TabPicker
+            {/* A picklist, not a TabPicker (Mark, 2026-09-14) — a setting you
+                make once and leave, which needs no row of cells. */}
+            <PickList
+              variant="field"
+              fit
               ariaLabel="Layout"
-              size="sm"
               value={layout}
-              onChange={setReceivingLayout}
+              onPick={(v) => setReceivingLayout(v as typeof layout)}
               options={[
-                { key: "auto", label: "Auto" },
-                { key: "split", label: "Side by side" },
-                { key: "stacked", label: "Stacked" },
+                { value: "auto", label: "Auto" },
+                { value: "split", label: "Side by side" },
+                { value: "stacked", label: "Stacked" },
               ]}
             />
           </div>
