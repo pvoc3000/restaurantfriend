@@ -88,7 +88,22 @@ export type BillInvoice = {
   is_credit: boolean;
   status: "open" | "approved" | "void";
   external_ref: AccountingRef | null;
+  /**
+   * The purchase orders this bill is for (Mark, 2026-09-14: the PO number
+   * "should be" sent). A QuickBooks Bill has NO purchase-order field, so they
+   * ride in the two places a bookkeeper reads — the line description and the
+   * memo. Optional: absent or empty sends exactly what it always did.
+   */
+  po_numbers?: string[];
 };
+
+/** The bill's PO numbers, trimmed and de-duplicated, as one phrase — "PO 132-181227-01",
+ *  "POs 132-181227-01, 142-181187-01" — or null when there are none. */
+export function poNumbersPhrase(poNumbers: readonly string[] | undefined): string | null {
+  const unique = [...new Set((poNumbers ?? []).map((p) => p.trim()).filter(Boolean))];
+  if (unique.length === 0) return null;
+  return `${unique.length === 1 ? "PO" : "POs"} ${unique.join(", ")}`;
+}
 
 export type BillPushInputs = {
   invoice: BillInvoice;
@@ -209,13 +224,15 @@ export function docNumberFor(invoiceNumber: string | null | undefined): string |
 
 /** What QBO's own register shows on the line. */
 export function billLineDescription(
-  invoice: Pick<BillInvoice, "invoice_number">,
+  invoice: Pick<BillInvoice, "invoice_number" | "po_numbers">,
   override?: string | null
 ): string {
   const o = override?.trim();
   if (o) return o;
   const n = invoice.invoice_number?.trim();
-  return n ? `Invoice ${n}` : "Vendor bill";
+  const base = n ? `Invoice ${n}` : "Vendor bill";
+  const pos = poNumbersPhrase(invoice.po_numbers);
+  return pos ? `${base} · ${pos}` : base;
 }
 
 /**
@@ -255,7 +272,12 @@ export function buildBillPayload(
     ],
     // Ours, so a bill in QuickBooks can be traced back to the scan it was read
     // from. Never shown to a vendor — a Bill is not a document we send.
-    PrivateNote: `restaurantfriend ${invoice.id}`,
+    // The PO numbers LEAD where there are any, because the memo is what a
+    // QuickBooks bill list shows at a glance.
+    PrivateNote: (() => {
+      const pos = poNumbersPhrase(invoice.po_numbers);
+      return pos ? `${pos} · restaurantfriend ${invoice.id}` : `restaurantfriend ${invoice.id}`;
+    })(),
   };
 
   // On the HEADER, which is where a Bill takes its location.

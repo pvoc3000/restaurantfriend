@@ -88,7 +88,10 @@ export function PushToQuickBooks({
   supabase,
   onDone,
   children,
+  poNumbers = [],
 }: {
+  /** The purchase orders the bill is for — sent in its description and memo. */
+  poNumbers?: string[];
   invoiceId: string;
   vendorId: string;
   /** The invoice's own shop — `vendor_invoices.location_id`, NOT NULL. */
@@ -196,6 +199,7 @@ export function PushToQuickBooks({
     const tracking = qboTrackingFor(ctx.atShop);
     const billInvoice: BillInvoice = {
       id: invoiceId,
+      po_numbers: poNumbers,
       invoice_number: invoiceNumber,
       invoice_date: invoiceDate,
       due_date: dueDate,
@@ -426,6 +430,7 @@ export function PushToQuickBooks({
   const tracking = qboTrackingFor(ctx.atShop);
   const billInvoice: BillInvoice = {
     id: invoiceId,
+    po_numbers: poNumbers,
     invoice_number: invoiceNumber,
     invoice_date: invoiceDate,
     due_date: dueDate,

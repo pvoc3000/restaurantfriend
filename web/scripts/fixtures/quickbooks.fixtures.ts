@@ -853,3 +853,30 @@ test("balanceLabel — a link arrives with the balance already asked for", () =>
   eq(balanceLabel("VendorCredit", 0, dollars), "fully applied in QuickBooks", "a credit reads differently");
   eq(balanceLabel("Bill", 472.13, dollars), "$472.13 still owed", "and a real balance names it");
 });
+
+/* -- the PO numbers ride in the description and the memo (2026-09-14) ----- */
+
+import { poNumbersPhrase } from "../../src/lib/quickbooks";
+
+test("poNumbersPhrase: one, several, duplicates and blanks, none", () => {
+  eq(poNumbersPhrase(["132-181227-01"]), "PO 132-181227-01");
+  eq(poNumbersPhrase(["132-181227-01", " 142-181187-01 ", "132-181227-01", ""]), "POs 132-181227-01, 142-181187-01");
+  eq(poNumbersPhrase([]), null);
+  eq(poNumbersPhrase(undefined), null);
+});
+
+test("a bill linked to an order names the PO in its line description and memo", () => {
+  const { body } = buildBillPayload(
+    inputs({ invoice: invoice({ po_numbers: ["132-181227-01"] }) })
+  );
+  const line = (body.Line as Record<string, unknown>[])[0];
+  eq(line.Description, "Invoice 73535581 · PO 132-181227-01", "description");
+  eq(body.PrivateNote, "PO 132-181227-01 · restaurantfriend inv-1", "memo leads with the PO");
+});
+
+test("a bill with no linked order sends exactly what it always did", () => {
+  const { body } = buildBillPayload(inputs({ invoice: invoice({ po_numbers: [] }) }));
+  const line = (body.Line as Record<string, unknown>[])[0];
+  eq(line.Description, billLineDescription({ invoice_number: "73535581" }), "description unchanged");
+  eq(body.PrivateNote, "restaurantfriend inv-1", "memo unchanged");
+});

@@ -1208,6 +1208,9 @@ export function InvoiceDetail({
               total: invoice.total,
               isCredit: invoice.is_credit,
               invoiceNumber: invoice.invoice_number,
+              // The orders this bill is linked to, sent in its description
+              // and memo (Mark, 2026-09-14).
+              poNumbers: linkedOrders.map((o) => o.po_number),
               invoiceDate: invoice.invoice_date,
               dueDate: invoice.due_date,
               financialsTouchedAt: invoice.financials_touched_at,
