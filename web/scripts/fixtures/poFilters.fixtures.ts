@@ -3,9 +3,11 @@
 // These exist for one failure mode: every parser here FALLS BACK silently on a
 // value it doesn't recognise. So a status the URL layer hasn't been taught
 // about doesn't error, it quietly becomes "all" — the filter appears to do
-// nothing, and the chip you just pressed unpresses itself. `open` is a roll-up
-// rather than a column value, which is exactly the kind of thing a validator
-// written against the status list forgets.
+// nothing, and the choice you just made unmakes itself.
+//
+// Since 2026-09-14 the status filter is a SET (empty = every status). The old
+// roll-ups `open` and `all` still READ, so links and remembered views from
+// before mean what they meant.
 
 import { isPoOpen } from "../../src/lib/purchaseOrders";
 import {
@@ -28,33 +30,58 @@ test("isPoOpen: closed and void are inert, not open", () => {
   no(isPoOpen("void"), "void");
 });
 
-test("parsePoFilters: ?status=open survives", () => {
-  eq(parsePoFilters({ status: "open" }).status, "open");
+test("the default is every status: an empty set", () => {
+  eq(DEFAULT_PO_FILTERS.status, []);
 });
 
-test("parsePoFilters: a raw status still survives", () => {
-  eq(parsePoFilters({ status: "received" }).status, "received");
+test("parsePoFilters: the old ?status=open reads as draft, sent and received", () => {
+  eq(parsePoFilters({ status: "open" }).status, ["draft", "sent", "received"]);
 });
 
-test("parsePoFilters: nonsense falls back rather than sticking", () => {
+test("parsePoFilters: the old ?status=all reads as every status", () => {
+  eq(parsePoFilters({ status: "all" }, { status: ["draft"] }).status, []);
+});
+
+test("parsePoFilters: one raw status survives as a set of one", () => {
+  eq(parsePoFilters({ status: "received" }).status, ["received"]);
+});
+
+test("parsePoFilters: several statuses survive, in the ladder's order", () => {
+  eq(parsePoFilters({ status: ["closed", "draft"] }).status, ["draft", "closed"]);
+});
+
+test("parsePoFilters: unknown values beside real ones are dropped", () => {
+  eq(parsePoFilters({ status: ["banana", "sent"] }).status, ["sent"]);
+});
+
+test("parsePoFilters: nonsense falls back rather than meaning every status", () => {
   eq(parsePoFilters({ status: "banana" }).status, DEFAULT_PO_FILTERS.status);
 });
 
-test("parsePoFilters: nonsense falls back to the REMEMBERED status, not the default", () => {
-  eq(parsePoFilters({ status: "banana" }, { status: "open" }).status, "open");
+test("parsePoFilters: nonsense falls back to the REMEMBERED statuses, not the default", () => {
+  eq(parsePoFilters({ status: "banana" }, { status: ["draft", "sent"] }).status, ["draft", "sent"]);
 });
 
 test("parsePoFilters: no status at all keeps what you were last looking at", () => {
-  eq(parsePoFilters({}, { status: "open" }).status, "open");
+  eq(parsePoFilters({}, { status: ["received"] }).status, ["received"]);
 });
 
-test("the session cookie round-trips open", () => {
-  const filters = { ...DEFAULT_PO_FILTERS, status: "open" as const };
-  eq(parsePoView(serializePoView(filters)).status, "open");
+test("the session cookie round-trips a set", () => {
+  const filters = { ...DEFAULT_PO_FILTERS, status: ["draft", "received"] as ("draft" | "received")[] };
+  eq(parsePoView(serializePoView(filters)).status, ["draft", "received"]);
+});
+
+test("a pre-set cookie holding open still reads as the three open statuses", () => {
+  eq(parsePoView("status=open&range=90").status, ["draft", "sent", "received"]);
 });
 
 test("a stale cookie holding a retired value is ignored", () => {
   eq(parsePoView("status=banana&range=90").status, undefined);
+});
+
+test("the URL repeats status per choice, and every status writes nothing", () => {
+  eq(poFiltersToQuery({ ...DEFAULT_PO_FILTERS, status: ["draft", "sent"] }), "status=draft&status=sent");
+  eq(poFiltersToQuery({ ...DEFAULT_PO_FILTERS, status: [] }), "");
 });
 
 /* -- the window as a RangePicker (2026-09-08) ---------------------------- */

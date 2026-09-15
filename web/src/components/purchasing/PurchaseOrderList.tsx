@@ -11,7 +11,6 @@ import {
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { ControlField } from "@/components/ui/ControlField";
-import { PickList } from "@/components/ui/PickList";
 import { PickSet } from "@/components/ui/PickSet";
 import { RangePicker } from "@/components/ui/RangePicker";
 import type { DateRange } from "@/lib/dateRange";
@@ -30,7 +29,6 @@ import {
   PO_STATUS_CLASS,
   PO_STATUS_LABEL,
   PO_STATUS_ORDER,
-  isPoOpen,
   poDocumentFileName,
   type PoStatus,
 } from "@/lib/purchaseOrders";
@@ -46,7 +44,6 @@ import {
   poRangeFromPicker,
   type PoFilters,
   type PoSortKey,
-  type StatusFilter,
 } from "@/lib/poFilters";
 import { urlFilterParams } from "@/lib/filterMenus";
 import { makeComparator, type SortValue } from "@/lib/tableSort";
@@ -184,12 +181,6 @@ export function PurchaseOrderList({
     return counts;
   }, [orders]);
 
-  /** The roll-up behind the Open chip — see isPoOpen. */
-  const openCount = useMemo(
-    () => orders.filter((po) => isPoOpen(po.status)).length,
-    [orders]
-  );
-
   /**
    * Everything but the vendor filter — what the vendor picker's options and
    * counts are drawn from, so they are conditioned on the other controls and
@@ -198,11 +189,8 @@ export function PurchaseOrderList({
   const beforeVendor = useMemo(() => {
     const words = filters.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return orders.filter((po) => {
-      if (filters.status === "open") {
-        if (!isPoOpen(po.status)) return false;
-      } else if (filters.status !== "all" && po.status !== filters.status) {
-        return false;
-      }
+      // A set; empty means every status.
+      if (filters.status.length > 0 && !filters.status.includes(po.status)) return false;
       if (words.length === 0) return true;
       const haystack = `${po.po_number} ${po.vendors?.name ?? ""} ${po.status}`.toLowerCase();
       return words.every((w) => haystack.includes(w));
@@ -785,13 +773,17 @@ export function PurchaseOrderList({
    * "Received 0", which is the true and useful sentence — you filtered to
    * Received and this window holds none.
    */
-  const statusTabs: StatusFilter[] = [
-    "all",
-    "open",
-    ...PO_STATUS_ORDER.filter(
-      (s) => (statusCounts[s] ?? 0) > 0 || s === filters.status
-    ),
-  ];
+  // A SET since 2026-09-14 (Mark): one option per status that has orders in
+  // this window, plus any already chosen, so a ticked status can always be
+  // unticked. The two roll-ups are gone — "Open" is draft, sent and received
+  // ticked together, and nothing ticked is All.
+  const statusOptions = PO_STATUS_ORDER.filter(
+    (s) => (statusCounts[s] ?? 0) > 0 || filters.status.includes(s)
+  ).map((s) => ({
+    value: s,
+    label: PO_STATUS_LABEL[s],
+    hint: String(statusCounts[s] ?? 0),
+  }));
 
   /**
    * What the Actions button says while it is working. Each of the six commands
@@ -1054,28 +1046,14 @@ export function PurchaseOrderList({
             where keeping it is what makes the trigger read "Received" rather
             than the raw column value on a window that holds none. */}
         <ControlField label="Status">
-          <PickList
-            ariaLabel="Status"
-            variant="field"
+          <PickSet
+            options={statusOptions}
             value={filters.status}
-            onPick={(status) => update({ status: status as StatusFilter })}
-            options={statusTabs.map((s) => ({
-              value: s,
-              label:
-                s === "all"
-                  ? "All"
-                  : s === "open"
-                    ? "Open"
-                    : PO_STATUS_LABEL[s as PoStatus],
-              hint: String(
-                s === "all"
-                  ? orders.length
-                  : s === "open"
-                    ? openCount
-                    : statusCounts[s] ?? 0
-              ),
-            }))}
-            fit
+            onChange={(next) => update({ status: next as PoStatus[] })}
+            allLabel="All"
+            noun="statuses"
+            label="Which statuses to show"
+            minWidth={200}
           />
         </ControlField>
       </div>

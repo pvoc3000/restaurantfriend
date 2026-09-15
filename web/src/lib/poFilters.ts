@@ -4,7 +4,7 @@
 import type { RawSearchParams } from "./itemFilters";
 import type { SortDir } from "./tableSort";
 import { withFrom } from "./breadcrumbs";
-import { PO_STATUS_ORDER, type PoStatus } from "./purchaseOrders";
+import { PO_STATUS_ORDER, isPoOpen, type PoStatus } from "./purchaseOrders";
 import { daysBefore } from "./today";
 import {
   matchingPreset,
@@ -19,19 +19,33 @@ import {
 } from "./vendorFilter";
 
 /**
- * The chip row is the five statuses plus two roll-ups: `all`, and `open` —
- * everything not yet closed (see isPoOpen), which is the list you work from.
+ * THE STATUS FILTER IS A SET (Mark, 2026-09-14), where it was one of the five
+ * statuses or a roll-up. EMPTY MEANS ALL, `ui/PickSet`'s rule. It rides in the
+ * URL and the cookie as a repeated `status=` param.
+ *
+ * The two old roll-ups still READ, so a link or a remembered view from before
+ * means what it meant: `open` becomes draft · sent · received (see isPoOpen)
+ * and `all` becomes empty. Anything else unknown is dropped.
+ *
+ * NULL WHEN NOTHING WAS RECOGNISED, so the caller falls back — to the
+ * remembered view, then the default — rather than a nonsense value silently
+ * meaning "every status". The fixtures pin this.
  */
-export type StatusFilter = PoStatus | "all" | "open";
-
-/** The roll-ups, told apart from the raw statuses wherever both are parsed. */
-const STATUS_ROLLUPS = ["all", "open"] as const;
-
-function isStatusFilter(value: string): value is StatusFilter {
-  return (
-    (STATUS_ROLLUPS as readonly string[]).includes(value) ||
-    (PO_STATUS_ORDER as string[]).includes(value)
-  );
+function parseStatuses(raw: readonly string[]): PoStatus[] | null {
+  const chosen = new Set<PoStatus>();
+  let recognised = false;
+  for (const value of raw) {
+    if (value === "all") {
+      recognised = true;
+    } else if (value === "open") {
+      recognised = true;
+      PO_STATUS_ORDER.filter(isPoOpen).forEach((s) => chosen.add(s));
+    } else if ((PO_STATUS_ORDER as string[]).includes(value)) {
+      recognised = true;
+      chosen.add(value as PoStatus);
+    }
+  }
+  return recognised ? PO_STATUS_ORDER.filter((s) => chosen.has(s)) : null;
 }
 
 /**
@@ -106,7 +120,8 @@ export type PoSortKey = (typeof PO_SORT_KEYS)[number];
 
 export type PoFilters = {
   q: string;
-  status: StatusFilter;
+  /** The statuses to show; empty means every status. */
+  status: PoStatus[];
   /** Vendor NAMES; empty means every vendor. See lib/vendorFilter. */
   vendors: string[];
   range: PoRange;
@@ -116,7 +131,7 @@ export type PoFilters = {
 
 export const DEFAULT_PO_FILTERS: PoFilters = {
   q: "",
-  status: "all",
+  status: [],
   vendors: [],
   range: "90",
   sort: "order_date",
@@ -137,7 +152,12 @@ export function parsePoFilters(
   params: RawSearchParams,
   remembered: Partial<PoFilters> = {}
 ): PoFilters {
-  const status = one(params.status);
+  const statusRaw =
+    params.status === undefined
+      ? null
+      : Array.isArray(params.status)
+        ? params.status
+        : [params.status];
   const range = one(params.range);
   const custom = parseRangeParams(params.from, params.to);
   const sort = one(params.sort);
@@ -148,7 +168,7 @@ export function parsePoFilters(
     // coming back to a list silently narrowed by a term you've forgotten
     // typing is its own trap.
     q: one(params.q),
-    status: isStatusFilter(status) ? status : fallback.status,
+    status: (statusRaw && parseStatuses(statusRaw)) ?? fallback.status,
     // REMEMBERED, unlike the search box: a vendor is a standing way of working
     // ("I only order from BakeMark on Tuesdays"), where a typed term is
     // usually one lookup you have already finished with. The picker also says
@@ -178,10 +198,10 @@ export const PO_VIEW_COOKIE = "rf.po.view";
 
 export function serializePoView(filters: PoFilters): string {
   const params = new URLSearchParams({
-    status: filters.status,
     sort: filters.sort,
     dir: filters.dir,
   });
+  for (const s of filters.status) params.append("status", s);
   appendRange(params, filters.range);
   appendVendorFilter(params, filters.vendors);
   return params.toString();
@@ -190,14 +210,15 @@ export function serializePoView(filters: PoFilters): string {
 export function parsePoView(raw: string | undefined | null): Partial<PoFilters> {
   if (!raw) return {};
   const q = new URLSearchParams(raw);
-  const status = q.get("status") ?? "";
+  const statuses = q.getAll("status");
   const range = q.get("range") ?? "";
   const custom = parseRangeParams(q.get("from") ?? undefined, q.get("to") ?? undefined);
   const sort = q.get("sort") ?? "";
   const dir = q.get("dir");
 
   const view: Partial<PoFilters> = {};
-  if (isStatusFilter(status)) view.status = status;
+  const parsedStatuses = statuses.length > 0 ? parseStatuses(statuses) : null;
+  if (parsedStatuses) view.status = parsedStatuses;
   const vendors = parseVendorFilter(q.getAll(VENDOR_FILTER_PARAM));
   if (vendors.length > 0) view.vendors = vendors;
   if (isRangeKey(range)) view.range = range;
@@ -210,7 +231,7 @@ export function parsePoView(raw: string | undefined | null): Partial<PoFilters> 
 export function poFiltersToQuery(filters: PoFilters): string {
   const params = new URLSearchParams();
   if (filters.q.trim()) params.set("q", filters.q.trim());
-  if (filters.status !== DEFAULT_PO_FILTERS.status) params.set("status", filters.status);
+  for (const s of filters.status) params.append("status", s);
   appendVendorFilter(params, filters.vendors);
   if (filters.range !== DEFAULT_PO_FILTERS.range) appendRange(params, filters.range);
   if (filters.sort !== DEFAULT_PO_FILTERS.sort) params.set("sort", filters.sort);
