@@ -25,6 +25,18 @@ test("an explicit cookie beats the device either way", () => {
   eq(resolveShell("tablet", false), "tablet", "a manager's own iPad");
 });
 
+test("supervisors and below are a tablet whatever the cookie or device says", () => {
+  eq(resolveShell("desk", false, "supervisor"), "tablet");
+  eq(resolveShell("desk", false, "staff"), "tablet");
+  eq(resolveShell(undefined, false, "staff"), "tablet");
+});
+
+test("purchaser and up keep the cookie-and-device rule", () => {
+  eq(resolveShell(undefined, false, "purchaser"), "desk");
+  eq(resolveShell("tablet", false, "admin"), "tablet");
+  eq(resolveShell("desk", true, "owner"), "desk");
+});
+
 test("a hand-edited cookie is not a third shell", () => {
   eq(parseShell("phone"), null);
   eq(parseShell(""), null);

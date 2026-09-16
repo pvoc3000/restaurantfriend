@@ -219,6 +219,6 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
     orgName: membership.orgs?.name ?? "",
     registeredDevice: jar.has(DEVICE_COOKIE),
     pinSession: jar.get(PIN_SESSION_COOKIE)?.value === "1",
-    shell: resolveShell(jar.get(SHELL_COOKIE)?.value, jar.has(DEVICE_COOKIE)),
+    shell: resolveShell(jar.get(SHELL_COOKIE)?.value, jar.has(DEVICE_COOKIE), membership.role),
   };
 });

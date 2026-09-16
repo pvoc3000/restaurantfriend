@@ -6,6 +6,7 @@ import type { PickOption } from "@/components/ui/PickList";
 import { BATCH_STATUS_LABEL, BATCH_STATUS_OPTIONS, describeAmount } from "@/lib/productionBatches";
 import { BatchPhoto } from "@/components/production/BatchPhoto";
 import { BatchVersionCell } from "@/components/production/BatchVersionCell";
+import { UNIT_PICK_OPTIONS } from "@/lib/units";
 
 /** Everything the editable pane needs about one batch. */
 export type BatchFieldsRow = {
@@ -295,10 +296,15 @@ function Triple({
           value={size} ariaLabel={`${what} size`}
         />
       </span>
-      <span className="block w-16 shrink-0">
+      {/* A PICKLIST (Mark, 2026-09-16) over the app's own unit vocabulary.
+          `allowNew`, because the FileMaker history carries units the list
+          does not ("tray", "batch"), and a closed list would make those
+          unenterable while they still rendered. */}
+      <span className="block w-24 shrink-0">
         <InlineValue
           boxed={BOXED_FIELDS}
           table="production_batches" id={row.id} column={`${prefix}_unit`}
+          kind="pick" options={UNIT_PICK_OPTIONS} allowNew
           value={unit} ariaLabel={`${what} unit`}
         />
       </span>

@@ -154,6 +154,7 @@ export default async function BatchLogsPage({
         action={
           editable ? (
             <GenerateBatches
+              orgId={session.membership.org_id}
               locationId={active.id}
               locationCode={active.code}
               today={today}

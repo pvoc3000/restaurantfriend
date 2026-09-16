@@ -9,6 +9,7 @@ import { BAR_CELL } from "@/components/tablet/barCell";
 import { BarLabel, ICON_TRASH } from "@/components/tablet/BarLabel";
 import { BATCH_PHOTO_BUCKET } from "@/lib/batchPhotos";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { currentOperatorId } from "@/components/production/currentOperator";
 
 /**
  * The command on one batch: delete it.
@@ -110,9 +111,10 @@ export function BatchActions({
    * amounts, with a NEW batch number from 044's definer.
    *
    * WHAT IS NOT COPIED is everything that happened TO the original: its status
-   * (the copy is To Do), who made it, the on-hand count and the yield someone
+   * (the copy is To Do), the on-hand count and the yield someone
    * measured, the photo, the notes and the cost stamp. Copying a yield would
-   * record a measurement nobody took.
+   * record a measurement nobody took. The operator is whoever is duplicating
+   * it (Mark, 2026-09-16), like every other new batch.
    *
    * `is_generated` goes FALSE, and must: 045's unique index allows one
    * GENERATED batch per element per log, so a copy claiming to be generated
@@ -152,7 +154,8 @@ export function BatchActions({
       batch_number: number as string,
       is_generated: false,
       status: "to_do",
-      operator_employee_id: null,
+      // Whoever is duplicating it, not whoever made the original.
+      operator_employee_id: await currentOperatorId(supabase, row.org_id as string),
       on_hand_count: null,
       on_hand_size: null,
       on_hand_unit: null,

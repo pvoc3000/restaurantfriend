@@ -8,6 +8,7 @@ import { DateField } from "@/components/ui/DateField";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { currentOperatorId } from "@/components/production/currentOperator";
 
 /**
  * "Generate a batch log" — migration 045.
@@ -59,10 +60,12 @@ const WARNING_TITLE: Record<string, string> = {
 };
 
 export function GenerateBatches({
+  orgId,
   locationId,
   locationCode,
   today,
 }: {
+  orgId: string;
   /** The WORKING kitchen. Not a choice — see the note above. */
   locationId: string;
   locationCode: string;
@@ -159,6 +162,23 @@ export function GenerateBatches({
       p_element_types:
         chosen && types && chosen.size < types.length ? [...chosen] : null,
     });
+    if (!error) {
+      // PREPARED BY IS WHOEVER GENERATED IT (Mark, 2026-09-16). The SQL
+      // leaves the operator null, so the batches this run CREATED are stamped
+      // here — by number, never the whole log, because a top-up must not
+      // rename the people who made the batches already on it. Soft: a login
+      // with no HR record, or a refused write, leaves the field for the record.
+      const numbers = ((data as Receipt | null)?.created ?? []).map((c) => c.batch_number);
+      const operatorId = numbers.length > 0 ? await currentOperatorId(supabase, orgId) : null;
+      if (operatorId) {
+        await supabase
+          .from("production_batches")
+          .update({ operator_employee_id: operatorId })
+          .eq("log_id", (data as Receipt).log_id)
+          .in("batch_number", numbers)
+          .is("operator_employee_id", null);
+      }
+    }
     setRunning(false);
     if (error) {
       setError(

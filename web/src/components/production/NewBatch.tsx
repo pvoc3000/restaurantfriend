@@ -10,6 +10,7 @@ import { PickList } from "@/components/ui/PickList";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { BAR_CELL } from "@/components/tablet/barCell";
 import { BarLabel, ICON_ADD } from "@/components/tablet/BarLabel";
+import { currentOperatorId } from "@/components/production/currentOperator";
 
 /**
  * Log a batch that isn't on the weekly round.
@@ -22,7 +23,7 @@ import { BarLabel, ICON_ADD } from "@/components/tablet/BarLabel";
  * at roles), then land on the new record.
  *
  * It asks for the four things a batch cannot be without and stops. The yield,
- * the on-hand, the operator, the recipe version and the photo are all set on
+ * the on-hand, the recipe version and the photo are all set on
  * the record, where `InlineValue` already edits them — a create form that also
  * took them would be a second editor to keep in step with the first.
  *
@@ -106,9 +107,10 @@ export function NewBatch({
     startTransition(async () => {
       // The number comes from 044's definer — a plain `nextval` is not reachable
       // by `authenticated`, which is the same arrangement 006 made for POs.
-      const { data: number, error: numberError } = await supabase.rpc("next_batch_number", {
-        p_location_id: locationId,
-      });
+      const [{ data: number, error: numberError }, operatorId] = await Promise.all([
+        supabase.rpc("next_batch_number", { p_location_id: locationId }),
+        currentOperatorId(supabase, orgId),
+      ]);
       if (numberError) {
         setFailed(numberError.message);
         return;
@@ -125,6 +127,7 @@ export function NewBatch({
           batch_label: label?.trim() ? label.trim() : null,
           is_generated: false,
           status: "complete",
+          operator_employee_id: operatorId,
         })
         .select("id")
         .single();

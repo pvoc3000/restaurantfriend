@@ -18,14 +18,14 @@ import {
 } from "@/lib/shiftReports";
 import { salesSnapshot, serverSalesSnapshot, subscribeSales } from "@/lib/shiftReportSales";
 import { usePublishedHeight } from "@/lib/tableHead";
+import { BarLabel, ICON_ARROW_BACK, ICON_CHECK } from "@/components/tablet/BarLabel";
 
 /**
  * The report itself: a full-screen, tablet-first walk through the pages this
  * shift is asked for.
  *
- * FileMaker's furniture, deliberately — a black band naming the page and its
- * number, and a black footer of three commands. Supervisors have walked this
- * shape for nine years and the muscle memory is worth more than a redesign.
+ * One black bar at the top naming the page and its number, with the four
+ * commands either side of the title.
  *
  * It owns the page index and nothing else. Every page writes as it goes,
  * straight to the report's own draft rows, so Back and Next are navigation
@@ -33,108 +33,33 @@ import { usePublishedHeight } from "@/lib/tableHead";
  * facts — that is `submit_shift_report`, once, at the end.
  */
 /**
- * One dress for every footer cell, so a four-across row cannot drift.
+ * THE COMMANDS RIDE IN THE TOP BAR, AND THERE IS NO FOOTER (Mark, 2026-09-16:
+ * "the shift report workflow should use the top nav bar and lose the bottom nav
+ * bar"). One black bar, the tablet shell's own dress — 64px cells, an icon over
+ * its word (`BarLabel`) — with the page title between the two pairs:
+ * Cancel · Pause & close · [page n of m — title] · Back · Next/Send.
  *
- * `inline-flex items-center justify-center` rather than leaning on a button's
- * own centring, which is a UA behaviour and not a stated one.
+ * A cell of its OWN rather than `BAR_CELL`, whose fixed 112px will not hold
+ * "Pause & close" on one line; the geometry is otherwise the same. LAYOUT ONLY,
+ * the runners' lesson: each caller states its colour, or Send's green could not
+ * beat a `text-white` baked in here.
  *
- * `py-[7px]`, not `py-3`, and that is arithmetic rather than taste: a cell now
- * holds a 28px icon over a 12px word with 2px between them, so 7 + 42 + 7 is
- * EXACTLY the `min-h-14` (56px) the bar has always been. At `py-3` it would be
- * 66 and every page would lose ten pixels of content. Change either size and
- * this has to be recomputed: 28/10 lands on the same 56 with a plain `py-2`.
+ * WHY THE WORD STAYS: a bare `✕` cannot say whether the first cell is Cancel
+ * (your own draft, discarded) or Close (a sent report, or somebody else's).
  */
-const FOOTER_CELL =
-  "inline-flex min-h-14 items-center justify-center px-4 py-[7px] text-white disabled:opacity-35";
+const RUNNER_CELL =
+  "inline-flex h-16 min-w-28 shrink-0 items-center justify-center px-3 transition-colors hover:bg-white/15 disabled:opacity-35 disabled:hover:bg-transparent";
 
-/**
- * THE FOOTER IS ICONS WITH THE WORD KEPT UNDER THEM (Mark, 2026-09-09, choosing
- * it out of eight mockups: "material symbols with a small word under it (H) but
- * with a check mark instead of an arrow for send. And send is green").
- *
- * MATERIAL SYMBOLS AS REAL ARTWORK, WHICH IS WHAT THIS APP ALREADY DOES —
- * `RecordNav`'s four record-book buttons and the Columns eye, Apache 2.0,
- * inlined as one `currentColor` path each rather than taking an icon
- * dependency. And it settles the same complaint RecordNav's own note records
- * from 2026-07-31, when those four had shipped as TYPED CHARACTERS while the
- * eye was artwork: "two families of arrow in one app is the sort of thing you
- * can't unsee". The Dingbat U+279C that stood here for an afternoon was the
- * typed half of exactly that split.
- *
- * SF Symbols were asked about and cannot be used here, for two independent
- * reasons: Apple's licence covers app UIs on Apple platforms rather than a
- * website, and there is no delivery route anyway — the glyphs live in a private
- * system font that no `font-family` exposes, so the only access is undocumented
- * Private Use Area codepoints that are tofu everywhere else. They are the right
- * answer for phase 5's SwiftUI app, where they are native and free.
- *
- * WHY THE WORD STAYS. A bare `✕` cannot say which of two things this button is:
- * the first cell is Cancel on your own draft and Close on a sent report or
- * somebody else's, which is a distinction that file already argues for at
- * length. Same for "Pause & close", where the "& close" is the half that tells
- * you it LEAVES. The words are the ones that were already there, unshortened —
- * an icon was added, nothing was taken away — and they are what gives each
- * button its accessible name, so no `aria-label` is needed and the artwork is
- * `aria-hidden`.
- *
- * wght 700 rather than RecordNav's 300: these sit over 12px bold uppercase type
- * on a black bar at arm's length, where 300 reads as hairline. Same family,
- * different weight, which is what a weight axis is for.
- */
 const ICON_CLOSE =
   "m256-168-88-88 224-224-224-224 88-88 224 224 224-224 88 88-224 224 224 224-88 88-224-224-224 224Z";
 const ICON_PAUSE = "M544-139v-682h252v682H544Zm-380 0v-682h252v682H164Z";
-const ICON_BACK = "m368-417 202 202-90 89-354-354 354-354 90 89-202 202h466v126H368Z";
 const ICON_NEXT = "M592-417H126v-126h466L390-745l90-89 354 354-354 354-90-89 202-202Z";
-const ICON_SEND = "M382-208 122-468l90-90 170 170 366-366 90 90-456 456Z";
 
 /**
- * SEND IS GREEN, AND IT IS `--rf-green-300` (Mark, 2026-09-09: "send is green,
- * not yellow/orange").
- *
- * MEASURED, because the obvious token is the wrong one. `--color-go-ink`
- * (green-600) is built to be INK ON WHITE, where it passes at 5.34:1; on this
- * bar it is **3.54:1**, under AA. `--color-go` (green-200) is the other way —
- * 14.44:1, and so pale that against the white cells beside it the tick reads as
- * off-white rather than as green. green-300 is 11.24:1 and unmistakably green,
- * which is the pair of things this needs.
- *
- * A FILL-RANGE VALUE USED AS INK ON A DARK GROUND is the same move `text-mark`
- * makes on the masthead, and that file's rule says so in as many words: yellow
- * is a fill and never an ink, "the one place `text-mark` is right is on BLACK".
- * Green behaves identically. For reference the yellow this replaces measures
- * 9.85:1, so the bar got brighter rather than dimmer.
- *
- * `var(--rf-green-300)` directly, since no semantic token names it — the same
- * way the bill-stage ladder reaches for `--rf-green-300` for Paid.
+ * SEND IS GREEN, `--rf-green-300`: measured 11.24:1 on black, where the ink
+ * token green-600 is 3.54:1 there and green-200 reads as off-white.
  */
-const FOOTER_SEND = "text-[var(--rf-green-300)]";
-
-/**
- * 28px of artwork over a 12px word — Mark's, off eight pairs rendered side by
- * side (26/9, 26/10, 26/12, 24/12, then 28/11, 28/10 and 28/12).
- *
- * AND IT LANDS BACK ON THIS SURFACE'S OWN TYPE SCALE, whose floor is the 12px
- * of its small-caps labels and column heads — which is worth saying because the
- * two runners-up did not: 28/11 and 28/10 were both shipped for a few minutes
- * and both would have introduced a size below that floor, on the argument that
- * a caption under an icon is its own element rather than a label in the scale.
- * That argument was never needed. The icon is what carries the size difference
- * and the word stays the size every other label on this screen is.
- */
-function FooterLabel({ icon, word }: { icon: string; word: string }) {
-  return (
-    <span className="flex flex-col items-center gap-0.5">
-      <svg width="28" height="28" viewBox="0 -960 960 960" aria-hidden="true">
-        <path fill="currentColor" d={icon} />
-      </svg>
-      <span className="text-[12px] font-bold uppercase leading-none tracking-[0.08em]">
-        {word}
-      </span>
-    </span>
-  );
-}
-const FOOTER_GLYPH = "text-[32px] leading-none tracking-normal";
+const SEND_INK = "text-[var(--rf-green-300)]";
 
 export function ShiftReportRunner({
   reportId,
@@ -443,27 +368,73 @@ export function ShiftReportRunner({
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* THE TITLE STAYS ON SCREEN (Mark, 2026-09-09: "make all titles and
-          headers in the shift report sticky"). It is the only thing that says
-          which of eight pages you are on and what it is for, and it was the
-          first thing to leave as soon as anybody scrolled.
-
-          It PUBLISHES ITS OWN MEASURED HEIGHT, because everything that sticks
-          beneath it has to stack under it and this bar WRAPS — one line at a
-          desk, two on a portrait iPad — so any constant is right at one width
-          and wrong at another, and being wrong here means a page's column
-          labels sitting on top of the rows they label. Measured, never written
-          down: the masthead's own lesson.
-
-          `WalkRunner` has had a sticky banner since it shipped; this shell was
-          the odd one out. */}
-      <header
-        ref={bannerRef}
-        className="sticky top-0 z-30 bg-ink px-6 py-5 text-center"
-      >
-        <h1 className="text-lg font-bold uppercase tracking-[0.08em] text-white">
-          Shift report — page {index + 1} of {order.length} — {pageTitle(page)}
-        </h1>
+      {/* THE BAR STAYS ON SCREEN (Mark, 2026-09-09: sticky titles; 2026-09-16:
+          the commands live here too). It PUBLISHES ITS OWN MEASURED HEIGHT as
+          `--rf-runner-h`, because everything that sticks beneath it stacks
+          under it and the title WRAPS on a portrait iPad. */}
+      <header ref={bannerRef} className="sticky top-0 z-30 bg-ink text-white">
+        <div className="flex items-center gap-1 px-2">
+          {/* ONE CELL, TWO HONEST WORDS: Cancel discards your own draft; on a
+              sent report, or somebody else's, it is a plain leave, so it says
+              Close rather than offering an act it will not perform. */}
+          <button
+            type="button"
+            className={`${RUNNER_CELL} text-white`}
+            onClick={() => void cancel()}
+            disabled={busy !== null}
+          >
+            <BarLabel icon={ICON_CLOSE} word={canDiscard ? "Cancel" : "Close"} />
+          </button>
+          <button
+            type="button"
+            className={`${RUNNER_CELL} text-white`}
+            onClick={pause}
+            disabled={busy !== null}
+          >
+            <BarLabel icon={ICON_PAUSE} word="Pause & close" />
+          </button>
+          <h1 className="min-w-0 flex-1 px-3 py-2 text-center text-[16px] font-bold uppercase tracking-[0.08em]">
+            Page {index + 1} of {order.length} — {pageTitle(page)}
+          </h1>
+          {/* Back is disabled on page 1 rather than absent, so nothing shifts
+              under a thumb. */}
+          <button
+            type="button"
+            className={`${RUNNER_CELL} text-white`}
+            onClick={() => setIndex(index - 1)}
+            disabled={busy !== null || first}
+          >
+            <BarLabel icon={ICON_ARROW_BACK} word="Back" />
+          </button>
+          {last ? (
+            <button
+              type="button"
+              className={`${RUNNER_CELL} ${SEND_INK}`}
+              onClick={send}
+              disabled={busy !== null || isSent || !canSend || blockers.length > 0}
+              title={
+                isSent
+                  ? "This report has already been sent."
+                  : !canSend
+                    ? "A report is sent by whoever started it."
+                    : blockers.length > 0
+                      ? blockers.join(" ")
+                      : undefined
+              }
+            >
+              <BarLabel icon={ICON_CHECK} word="Send" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`${RUNNER_CELL} text-white`}
+              onClick={() => setIndex(index + 1)}
+              disabled={busy !== null}
+            >
+              <BarLabel icon={ICON_NEXT} word="Next" />
+            </button>
+          )}
+        </div>
       </header>
 
       {/* 16px IS THIS SURFACE'S BODY SIZE. The app's own base is 15px (a desk
@@ -482,11 +453,9 @@ export function ShiftReportRunner({
           measured at −511px after a 600px scroll. That is `lib/tableHead`'s own
           documented trap, in the file it is documented in.
 
-          If this surface ever wants a genuinely fixed banner and footer the
-          answer is a DEFINITE height on the shell (`h-dvh`, not `h-screen` —
-          iOS Safari's `100vh` is the large viewport and would hide the footer
-          under the browser chrome), and the `overflow-y-auto` comes back at the
-          same time. One without the other is what was here. */}
+          If this surface ever wants a genuinely fixed banner the answer is a
+          DEFINITE height on the shell (`h-dvh`, not `h-screen`), and the
+          `overflow-y-auto` comes back at the same time. */}
       <main className="flex-1 px-6 py-8 text-[16px]">
         {busy ? <ProgressBand label={busy} /> : null}
         {failed ? (
@@ -501,86 +470,6 @@ export function ShiftReportRunner({
         {pages[page] ?? <p className="text-sm text-muted">Nothing to do on this page.</p>}
       </main>
 
-      {/* FOUR CELLS, FIXED (Mark, 2026-08-28: "Pause & close only appears on the
-          first page ... seems like it should always be available"). It used to
-          share a cell with Back, which meant the one command you reach for when
-          the shop gets busy was available only on page 1 — the page you are
-          least likely to be on when that happens.
-          A fixed four means no cell ever changes what it DOES as you page
-          through: Back is disabled on page 1 rather than absent, so nothing
-          shifts under a thumb. 44px targets throughout — this is read at arm's
-          length by somebody who is tired. */}
-      {/* z-30, the banner's own rung. It had none, which was safe only while
-          nothing else on this surface was sticky — a sticky table head at z-20
-          would now paint OVER these four buttons on a viewport short enough for
-          the two to meet, and these four are the way out. */}
-      <footer className="sticky bottom-0 z-30 grid grid-cols-4 divide-x divide-white/20 border-t border-white/20 bg-ink">
-        {/* ONE CELL, TWO HONEST WORDS. On your own draft this really does
-            cancel the report, so it says Cancel; on a sent one, or somebody
-            else's, there is nothing to discard and it is the same plain leave
-            that Pause & close gives — so it says Close rather than offering an
-            act it will not perform. The word is fixed for the whole visit: a
-            report's status cannot change under you here, because Send
-            navigates away. */}
-        <button
-          type="button"
-          className={FOOTER_CELL}
-          onClick={() => void cancel()}
-          disabled={busy !== null}
-        >
-          <FooterLabel icon={ICON_CLOSE} word={canDiscard ? "Cancel" : "Close"} />
-        </button>
-        <button
-          type="button"
-          className={FOOTER_CELL}
-          onClick={pause}
-          disabled={busy !== null}
-        >
-          <FooterLabel icon={ICON_PAUSE} word={"Pause & close"} />
-        </button>
-        {/* THE WORD SURVIVES AS THE ACCESSIBLE NAME. `aria-label` wins over
-            the content, so a screen reader says "Back" rather than
-            "leftwards arrow", and `title` gives a desk browser the same word
-            on hover — which the iPad has no equivalent of, and does not need:
-            a full-width arrow in a wizard's footer is about as unambiguous as
-            this app gets. */}
-        <button
-          type="button"
-          className={`${FOOTER_CELL} ${FOOTER_GLYPH}`}
-          onClick={() => setIndex(index - 1)}
-          disabled={busy !== null || first}
-        >
-          <FooterLabel icon={ICON_BACK} word="Back" />
-        </button>
-        {last ? (
-          <button
-            type="button"
-            className={`${FOOTER_CELL} ${FOOTER_SEND}`}
-            onClick={send}
-            disabled={busy !== null || isSent || !canSend || blockers.length > 0}
-            title={
-              isSent
-                ? "This report has already been sent."
-                : !canSend
-                  ? "A report is sent by whoever started it."
-                  : blockers.length > 0
-                    ? blockers.join(" ")
-                    : undefined
-            }
-          >
-            <FooterLabel icon={ICON_SEND} word="Send" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className={`${FOOTER_CELL} ${FOOTER_GLYPH}`}
-            onClick={() => setIndex(index + 1)}
-            disabled={busy !== null}
-          >
-            <FooterLabel icon={ICON_NEXT} word="Next" />
-          </button>
-        )}
-      </footer>
     </div>
   );
 }

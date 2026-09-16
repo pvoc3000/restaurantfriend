@@ -44,6 +44,7 @@ export function AccountSettings({
   pinSession,
   registeredDevice,
   shell,
+  shellForced,
 }: {
   displayName: string | null;
   email: string;
@@ -58,6 +59,8 @@ export function AccountSettings({
   registeredDevice: boolean;
   /** The chrome this browser gets — `lib/shell`. */
   shell: Shell;
+  /** The role always gets the tablet shell (`roleForcesTablet`), so there is no switch to offer. */
+  shellForced: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -195,6 +198,8 @@ export function AccountSettings({
           <span className={READ_ONLY_VALUE}>{shops === null ? "All shops" : shops.join(" · ")}</span>
         </dd>
 
+        {!shellForced && (
+        <>
         <dt className="text-subtle">Tablet layout</dt>
         <dd className="flex items-center gap-3">
           <Checkbox
@@ -208,6 +213,8 @@ export function AccountSettings({
             {shell === "tablet" ? "One bar and a page of actions." : "The menu, on this device."}
           </span>
         </dd>
+        </>
+        )}
       </dl>
 
       <section className="space-y-4">
@@ -329,12 +336,13 @@ export function AccountSettings({
         )}
       </section>
 
-      {registeredDevice && (
+      {(registeredDevice || shell === "tablet") && (
         <section className="space-y-4">
           <h2 className="text-[16px] font-bold uppercase tracking-[0.08em]">Sign out</h2>
-          {/* The masthead reads Switch user on a shared iPad, which locks the
-              device rather than signing out. This is the real thing, for
-              anyone who means it — the device stays registered either way. */}
+          {/* The tablet shell has no masthead, so no Sign out (Mark,
+              2026-09-16), and on a shared iPad its bar reads Switch user, which
+              locks the device rather than signing out. This is the real thing,
+              for anyone who means it — the device stays registered either way. */}
           <form action={signOut}>
             <button type="submit" className={BUTTON_CLASS}>
               Sign out

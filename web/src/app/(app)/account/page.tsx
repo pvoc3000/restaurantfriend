@@ -1,5 +1,6 @@
 import { AccountSettings } from "@/components/account/AccountSettings";
 import { ROLE_LABEL } from "@/lib/roles";
+import { roleForcesTablet } from "@/lib/shell";
 import { getAppSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 
@@ -36,6 +37,7 @@ export default async function AccountPage() {
         pinSession={session.pinSession}
         registeredDevice={session.registeredDevice}
         shell={session.shell}
+        shellForced={roleForcesTablet(session.membership.role)}
       />
     </div>
   );

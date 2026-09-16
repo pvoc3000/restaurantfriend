@@ -15,6 +15,8 @@
 // is registered; the explicit cookie is for testing from a desk and for a
 // manager who wants the bar on their own iPad.
 
+import type { Role } from "@/lib/roles";
+
 export const SHELL_COOKIE = "rf.shell";
 
 export type Shell = "desk" | "tablet";
@@ -26,11 +28,27 @@ export function parseShell(raw: string | undefined | null): Shell | null {
 }
 
 /**
- * The explicit cookie wins; absent, a registered device is a tablet and
+ * SUPERVISORS AND BELOW ALWAYS GET THE TABLET SHELL (Mark, 2026-09-16:
+ * "regardless"). The desk shell is the power tool for the people who run the
+ * catalog, the money and HR; a supervisor's and a staffer's work is the
+ * landing page's list of actions, on whatever device they happen to be using.
+ * It outranks the cookie and the device alike, so /account offers no switch.
+ */
+export function roleForcesTablet(role: Role): boolean {
+  return role === "supervisor" || role === "staff";
+}
+
+/**
+ * A forced role is a tablet. Otherwise the explicit cookie wins; absent, a registered device is a tablet and
  * anything else is a desk. Order matters: a manager can put the desk shell on
  * a registered iPad to fix something, and the device must not override them.
  */
-export function resolveShell(cookieValue: string | undefined | null, registeredDevice: boolean): Shell {
+export function resolveShell(
+  cookieValue: string | undefined | null,
+  registeredDevice: boolean,
+  role?: Role
+): Shell {
+  if (role && roleForcesTablet(role)) return "tablet";
   return parseShell(cookieValue) ?? (registeredDevice ? "tablet" : "desk");
 }
 
