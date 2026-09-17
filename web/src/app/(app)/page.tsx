@@ -1,7 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { homeHref } from "@/lib/nav";
-import { getAppSession } from "@/lib/session";
 import { TABLET_HOME } from "@/lib/shell";
 
 /**
@@ -28,14 +26,19 @@ import { TABLET_HOME } from "@/lib/shell";
  *
  * PER ROLE since 2026-09-04: the Page Permissions sheet hides the Locations
  * list from staff, supervisors and purchasers, so for them `/` lands on the
- * first screen their menu offers instead of on a refusal. `homeHref` is the
+ * first screen their menu offers instead of on a refusal. `homeHref` was the
  * rule, beside the menu it reads.
  *
  * UNDER THE TABLET SHELL (2026-09-09) home is `/start`, the landing page of
  * actions — there is no menu to offer a first screen, so the first question
  * becomes "what do you need to do", and the working shop sits in the bar.
+ *
+ * AND SINCE 2026-09-17 THE DESK LANDS THERE TOO (Mark: "navigate to it when
+ * logging in instead of the locations page"). `/start` renders an org-wide
+ * overview under the desk shell, and its Page Permissions row is readable by
+ * every role, so the per-role `homeHref` this used to call is gone — nobody
+ * lands on a refusal.
  */
-export default async function HomePage() {
-  const session = await getAppSession();
-  redirect(session.shell === "tablet" ? TABLET_HOME : homeHref(session.membership.role));
+export default function HomePage() {
+  redirect(TABLET_HOME);
 }

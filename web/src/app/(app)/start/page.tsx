@@ -1,3 +1,4 @@
+import { DeskStart } from "@/components/start/DeskStart";
 import { Landing, type TileState } from "@/components/tablet/Landing";
 import { templatesForShift, type ScheduledTemplate } from "@/lib/checklists";
 import { isoWeekday, onPlanItemIds } from "@/lib/displayTags";
@@ -23,10 +24,12 @@ import {
 import { daysAfter, serverTimeZone, todayInTimeZone } from "@/lib/today";
 
 /**
- * THE TABLET SHELL'S HOME — a page of actions rather than a menu (Mark,
- * 2026-09-09). Reachable under either shell (a desk browser can look at it),
- * but only the tablet's `/` lands here and only the tablet bar has a Home
- * button pointing at it.
+ * HOME, UNDER BOTH SHELLS. The tablet gets a page of actions (Mark,
+ * 2026-09-09); the desk gets an org-wide overview (Mark, 2026-09-17 —
+ * `components/start/DeskStart`). `/` lands here either way, and each shell has
+ * a Home button pointing at it.
+ *
+ * What follows is the TABLET page.
  *
  * EACH TILE SAYS WHAT IS OUTSTANDING. Nine small, location-scoped probes in
  * one wave, every one reusing the helper its own screen reads — so a tile and
@@ -42,6 +45,8 @@ import { daysAfter, serverTimeZone, todayInTimeZone } from "@/lib/today";
  */
 export default async function StartPage() {
   const session = await getAppSession();
+  if (session.shell !== "tablet") return <DeskStart session={session} />;
+
   const groups = tilesForRole(session.membership.role);
   const shown = new Set(groups.flatMap((g) => g.tiles.map((t) => t.key)));
   const loc = session.activeLocation?.id ?? null;

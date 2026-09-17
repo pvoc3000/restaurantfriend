@@ -371,24 +371,6 @@ export function sectionsForRole(role: Role): NavSection[] {
   })).filter((section) => section.subs.length > 0);
 }
 
-/**
- * Where `/` lands for this role: the Locations list where the sheet lets them
- * open it (Mark, 2026-08-20 — the first question of the day is which shop),
- * otherwise the first built screen the menu offers them, in menu order. A
- * staffer is hidden from Facilities, HR and Operations entirely, so a fixed
- * `/locations` would greet them with a refusal.
- */
-export function homeHref(role: Role): string {
-  if (canReachPage(role, "/locations")) return "/locations";
-  for (const section of sectionsForRole(role)) {
-    const first = section.subs.find((sub) => sub.built);
-    if (first) return first.href;
-  }
-  // No menu at all — a role the sheet shows nothing. A member's own account
-  // screen is ungoverned, so it is always somewhere to land.
-  return "/account";
-}
-
 export function findSub(section: NavSection, slug: string): NavSub | undefined {
   return section.subs.find((s) => s.slug === slug);
 }

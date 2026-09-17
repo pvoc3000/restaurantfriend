@@ -23,7 +23,7 @@ import {
   rolesWhoMayReach,
   whoMayReachSentence,
 } from "../../src/lib/pageAccess";
-import { SECTIONS, homeHref, sectionsForRole } from "../../src/lib/nav";
+import { SECTIONS, sectionsForRole } from "../../src/lib/nav";
 import { ROLES, type Role } from "../../src/lib/roles";
 import { eq, no, ok, test } from "./harness";
 
@@ -142,17 +142,6 @@ test("the menu hides exactly what the table hides", () => {
   no(sectionsForRole("staff").some((s) => s.slug === "hr"), "no HR section for staff");
   ok(sectionsForRole("purchaser").some((s) => s.slug === "hr") === false, "nor for a purchaser");
   ok(hrefs("owner").length >= hrefs("admin").length, "the owner sees at least what a manager does");
-});
-
-test("home is the Locations list where the sheet allows it, else the first offered screen", () => {
-  eq(homeHref("owner"), "/locations");
-  // Everyone else is hidden from Locations since the afternoon revision; the
-  // first built screen their menu offers, in menu order, is the checklists.
-  eq(homeHref("admin"), "/checklists");
-  eq(homeHref("purchaser"), "/checklists");
-  eq(homeHref("supervisor"), "/checklists");
-  // Staff are hidden from all of Facilities, HR and Operations.
-  eq(homeHref("staff"), "/schedules");
 });
 
 // ------------------------------------------------------------ the sentence

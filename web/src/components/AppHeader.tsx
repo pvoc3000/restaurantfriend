@@ -4,7 +4,7 @@ import { signOut } from "@/app/actions";
 import { SwitchUser } from "@/components/SwitchUser";
 import { AppNav } from "@/components/AppNav";
 import { HeaderShell } from "@/components/HeaderShell";
-import { GearIcon, IconButton, OrgIcon } from "@/components/ui/IconButton";
+import { GearIcon, HomeIcon, IconButton, OrgIcon } from "@/components/ui/IconButton";
 import { canReachPage } from "@/lib/pageAccess";
 import { WorkingLocation } from "@/components/WorkingLocation";
 import { NAV_COOKIE, parseNavMemory } from "@/lib/navMemory";
@@ -62,6 +62,13 @@ export async function AppHeader({ session }: { session: AppSession }) {
               locations={session.workableLocations}
               working={session.activeLocation}
             />
+
+            {/* HOME, LAST (Mark, 2026-09-17: "to the right of the settings
+                icon and to the right of the location picklist"). The house
+                came back with a destination of its own — the desk Start page. */}
+            <IconButton href="/start" label="Home">
+              <HomeIcon />
+            </IconButton>
           </>
         }
         // Row 2: who you are, and leaving.

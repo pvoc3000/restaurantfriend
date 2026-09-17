@@ -118,7 +118,7 @@ export const PAGE_ACCESS: Record<string, Record<Role, PageAccess>> = {
   "/sales":                row("-", "R", "W", "W", "W"),
   // The sheet's own row for the stub. Staff Read was tried and reverted the
   // same hour: Documents sits before Production in the menu, so it would have
-  // become every staffer's landing screen (`homeHref`). The table read
+  // become every staffer's landing screen (the since-retired `homeHref`). The table read
   // policy is membership-wide regardless; the cell is what the menu shows.
   "/documents":            row("-", "W", "W", "W", "W"),
   "/soon/operations/policies":  row("-", "W", "W", "W", "W"),

@@ -9805,6 +9805,48 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    task or document lists, and the runners' footers carry no
    `env(safe-area-inset-bottom)` yet.
 
+4q. ✅ **THE DESK START PAGE (2026-09-17, no migration).** Mark: "Let's make
+   one for the desktop too, and navigate to it when logging in instead of the
+   locations page", then: whole org, sales across the top with a chart of this
+   year against last, "needs attention" cards beneath, starting with six, and a
+   Home glyph at the right end of the masthead's row 1.
+   **ONE ROUTE, TWO SHELLS.** `/start` renders `components/start/DeskStart`
+   under the desk shell and the tablet's action tiles under the tablet shell;
+   `/` redirects there for both, and its all-R Page Permissions row means no
+   role lands on a refusal. It is exempt from `InactiveLocationGate`.
+   **WHOLE ORG, WHERE THE TABLET PAGE IS THE WORKING SHOP'S.** Every card names
+   the shop beside each record. Its links go to the list that owns the fact,
+   and three of those lists (POs, invoices, shift reports) show the WORKING
+   shop only, so a count can include records the list behind it does not show
+   until you switch. Accepted for now; a per-shop link would need the list to
+   take a location parameter.
+   **EVERY RULE IS BORROWED** (`lib/startPage`, fixture-tested): invoices read
+   `billStage`/`agingBucket`/`balanceOwed`, special orders `needsAttention`,
+   shift reports `missingNights` (closing only, 7 days ending yesterday, the
+   list's own rule), paperwork `soonestExpiry` over non-inactive staff. A card
+   a role may not open is not fetched (`canReachPage`; paperwork also needs
+   `canReadHr`), and a failed probe costs its card a sentence, not the page.
+   **THE SALES BAND** is `SalesSummary` over the last 30 days (both
+   comparisons, the gap and part-day notes) plus `components/start/SalesTrend`:
+   every shop folded into one line per day against the same WEEKDAYS 364 days
+   back, never the calendar date. **No hue** — ink against a grey DASHED line,
+   the dash being the second encoding; the dataviz validator passes the pair on
+   separation and contrast and flags it only for being grey, which is the
+   design system's rule. A day nobody pulled is a gap in its line, never zero.
+   Drawn at its MEASURED width (a scaled viewBox made the 12px labels 17px at
+   1440). Hover or arrow keys give a crosshair and both values.
+   **A card names each record over its detail, never beside it** — at three
+   cards a row, "Event has passed — send the receipt" was being cut off.
+   **What the live data said on the first probe (2026-09-17)**, which is the
+   page doing its job rather than a bug: 21 sent POs past their delivery day,
+   40 special orders needing attention (most "Event has passed — send the
+   receipt"), 14 closing nights with no shift report across DF01/DF02 in a
+   week, 16 current staff with a lapsed document, 0 invoice problems.
+   **Verified** by running every query read-only against the hosted DB and by
+   rendering the real `StartCard`/`SalesTrend`/`SalesSummary` in a standalone
+   page with the dev stylesheet at 1440 — the pane is behind the shared-device
+   PIN lock, so the signed-in page itself has NOT been seen yet.
+
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -10955,6 +10997,9 @@ weekday column, and 003 then silently made it per-vendor-item.
   `web/src/lib/nav.ts`** — a screen ships by getting a real `href` there and
   nothing else moves. Home and Settings are utility ICONS, not tabs, so they
   light no tab and the second band hides entirely on those routes.
+  **SUPERSEDED 2026-09-17: `/` LANDS ON `/start` UNDER BOTH SHELLS** (build
+  step 4q), and the masthead has a Home icon again, last in row 1, pointing
+  there. `homeHref` is deleted. The paragraph below is history.
   **`/` LANDS ON `/locations`** (Mark, 2026-08-20). It had been a leftover from
   the skeleton — a heading, the signed-in email, a sentence pointing at
   Locations and a lone "Vendors →" link — and landing on the shop list makes the
