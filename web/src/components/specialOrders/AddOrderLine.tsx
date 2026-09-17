@@ -167,7 +167,18 @@ export function AddOrderLine({
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className={BUTTON_CLASS} onClick={() => setOpen(true)}>
+        <button
+          type="button"
+          className={BUTTON_CLASS}
+          onClick={() => {
+            setOpen(true);
+            // The menu is rendered with the page, so an item created or renamed
+            // since this order was opened is not in it (Mark, 2026-09-16: a
+            // just-duplicated donut would not come up). Refreshing on open
+            // re-reads it; the panel shows the list it has meanwhile.
+            router.refresh();
+          }}
+        >
           Add item
         </button>
         <button
