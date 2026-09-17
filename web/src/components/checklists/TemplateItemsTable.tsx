@@ -174,10 +174,20 @@ export function TemplateItemsTable({
     {
       key: "is_active",
       label: "Active",
-      width: 80,
+      // 110, not 80 (2026-09-16): at a 1440 window every column shows, and 80
+      // of 1920 left ~33px of content for a 40px switch and a 51px label.
+      // Guidance pays, because it wraps. `minWidth` rather than a widths-key
+      // bump, so nobody's dragged widths are thrown away.
+      width: 110,
+      minWidth: 64,
       render: (r) =>
         editable ? (
-          <ActiveToggle table="checklist_template_items" id={r.id} active={r.is_active} />
+          <ActiveToggle
+            table="checklist_template_items"
+            id={r.id}
+            active={r.is_active}
+            control="switch"
+          />
         ) : (
           <span className="text-muted">{r.is_active ? "Active" : "Inactive"}</span>
         ),
@@ -404,7 +414,7 @@ export function TemplateItemsTable({
     {
       key: "guidance",
       label: "Note",
-      width: 280,
+      width: 250,
       sortValue: (r) => r.guidance ?? "",
       render: (r) =>
         editable ? (

@@ -219,6 +219,7 @@ export default async function ChecklistTemplatePage({
                 id={id}
                 active={template.is_active as boolean}
                 label="Active"
+                control="switch"
               />
             ) : (
               <span className={READ_ONLY_VALUE}>
