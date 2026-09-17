@@ -912,6 +912,11 @@ export async function SpecialOrderDetail({
               from under the lines on Items, keeping their arrangement. */}
           {activeTab === "payments" && (
             <>
+              {/* MONEY FIRST, THEN PAYMENTS (Mark, 2026-09-16, on the new
+                  Payments tab) — what the order comes to, then what has been
+                  paid against it. Money stays sized to its content and
+                  Payments takes the rest of the row. The note below is how the
+                  pair was arranged under the lines on Items, right to left. */}
               {/* PAYMENTS LEFT, MONEY RIGHT (Mark, 2026-08-19: "move the
                   'money' section on the items tab so it's all the way to the
                   right of the page, and the payment is all the way to the
@@ -940,6 +945,16 @@ export async function SpecialOrderDetail({
                   flex item's min-width defaults to min-content, so a long note
                   would push the PAGE sideways instead of the cell wrapping. */}
               <div className="flex flex-col gap-12 xl:flex-row xl:items-start xl:gap-12">
+                <div className="shrink-0">
+                  <OrderTotals
+                    id={id}
+                    totals={totals}
+                    inputs={moneyInputs}
+                    rushSuggestion={rushSuggestion}
+                    canWrite={canWrite}
+                  />
+                </div>
+
                 <div className="min-w-0 flex-1">
                   <OrderPayments
                     orderId={id}
@@ -949,16 +964,6 @@ export async function SpecialOrderDetail({
                     canWrite={canWrite}
                     today={today}
                     workflow={row as never}
-                  />
-                </div>
-
-                <div className="shrink-0">
-                  <OrderTotals
-                    id={id}
-                    totals={totals}
-                    inputs={moneyInputs}
-                    rushSuggestion={rushSuggestion}
-                    canWrite={canWrite}
                   />
                 </div>
               </div>
