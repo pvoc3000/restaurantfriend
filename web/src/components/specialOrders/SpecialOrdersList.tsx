@@ -349,17 +349,20 @@ export function SpecialOrdersList({
         ),
         matches: (r, v) => r.status === v,
       },
+      // LOCATION — the order's pickup shop, `location_id` — BEFORE Kitchen
+      // (Mark, 2026-09-16: "between status and kitchen"). The key stays
+      // `pickup` so the URL and the remembered-view cookie keep working.
+      {
+        key: "pickup",
+        label: "Location",
+        options: codes((r) => r.location_code),
+        matches: (r, v) => (v === NONE ? !r.location_code : r.location_code === v),
+      },
       {
         key: "kitchen",
         label: "Kitchen",
         options: codes((r) => r.kitchen_code),
         matches: (r, v) => (v === NONE ? !r.kitchen_code : r.kitchen_code === v),
-      },
-      {
-        key: "pickup",
-        label: "Pickup",
-        options: codes((r) => r.location_code),
-        matches: (r, v) => (v === NONE ? !r.location_code : r.location_code === v),
       },
       {
         key: "todo",
