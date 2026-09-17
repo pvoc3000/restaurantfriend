@@ -9841,6 +9841,16 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    design system's rule. A day nobody pulled is a gap in its line, never zero.
    Drawn at its MEASURED width (a scaled viewBox made the 12px labels 17px at
    1440). Hover or arrow keys give a crosshair and both values.
+   **THE ORDER GUIDE'S TWO BANDS SIT UNDER THE TITLE** (Mark, the same day:
+   "add the order guide's reminders and purchase requests to it") — the guide's
+   own `Reminders` and `GuideRequests`, due reminders on the left and open
+   requests on the right, so dismissing, "Add reminder" and the request ⋯ menu
+   behave exactly as on the guide. Reminders are "due" against TODAY (the guide
+   uses the walked date); a request's item links to the item record, there
+   being no walk to jump down. Gated by the `/order-guide` and
+   `/purchase-requests` cells. **The queries live once, in `lib/guideBands`**
+   (`fetchDueReminders`, `fetchOpenRequests`), and the guide page calls them
+   too — they were inline there before.
    **A card names each record over its detail, never beside it** — at three
    cards a row, "Event has passed — send the receipt" was being cut off.
    **What the live data said on the first (whole-org) probe (2026-09-17)**,

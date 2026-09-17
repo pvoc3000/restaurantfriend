@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canResolveRequests, canWriteCatalog } from "@/lib/roles";
-import type { GuideRequest } from "@/components/purchasing/GuideRequests";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import {
   guideToday,
@@ -15,7 +14,7 @@ import {
   type GuideRow,
   type LastPurchase,
 } from "@/lib/orderGuide";
-import { REMINDER_SELECT, type Reminder } from "@/lib/reminders";
+import { fetchDueReminders, fetchOpenRequests } from "@/lib/guideBands";
 import { OrderGuide } from "@/components/purchasing/OrderGuide";
 
 // Every column here crosses the wire 877 times, so the list is exactly what the
@@ -96,62 +95,11 @@ export default async function OrderGuidePage({
     .eq("guide_date", guideDate)
     .then((r) => r);
 
-  // Due reminders (spec §2 step 1), on the wire alongside the entries for the
-  // same reason — both are free next to the guide's ~850ms.
-  //
-  // `lte` rather than `eq`: a reminder set for a day nobody walked must not
-  // expire unseen. It stays up until it's dismissed, which is what makes it a
-  // reminder rather than a notification. Migration 018 adds the partial index
-  // this rides on.
-  const remindersPromise = supabase
-    .from("purchase_reminders")
-    .select(REMINDER_SELECT)
-    .eq("location_id", locationId)
-    .lte("show_on_date", guideDate)
-    .is("dismissed_at", null)
-    .order("show_on_date")
-    .then((r) => r);
-
-  /**
-   * WHAT THIS SHOP HAS ASKED FOR — the header's right-hand column (2026-08-22).
-   * It replaced a `head` count, because a band that lists the asks is worth
-   * more than one that counts them. Migration 059's partial index is exactly
-   * this query's shape.
-   *
-   * The item name comes through an EMBED rather than a second query, unlike
-   * the Requests list, which pages hundreds of rows and serves the link on a
-   * few: here it is one round trip over a handful of rows, and the FK makes it
-   * a to-ONE embed, so `inventory_items` arrives as an object rather than an
-   * array.
-   *
-   * On the wire with the others, and for the same reason: this is the app's
-   * heaviest route, and awaiting a sixth query in sequence would add its whole
-   * latency to a walk that already takes 3.5s to paint.
-   */
-  /**
-   * WHO ASKED. `purchase_requests.requested_by` points at `auth.users`, so
-   * there is no FK to embed through and the names come from `org_members`,
-   * which any member may read (001's `members_read`).
-   *
-   * On the wire with the rest, and it is the cheapest of them — one org's
-   * membership is a handful of rows. Note it must NOT be `.maybeSingle()`d or
-   * filtered to the current user: `members_read` shows you every member of
-   * your org, and the whole point here is the OTHER people's names.
-   */
-  const membersPromise = supabase
-    .from("org_members")
-    .select("user_id, display_name")
-    .then((r) => r);
-
-  const requestsPromise = supabase
-    .from("purchase_requests")
-    .select(
-      "id, request_text, details, priority, requested_by, inventory_item_id, inventory_items ( name )"
-    )
-    .eq("location_id", locationId)
-    .eq("status", "open")
-    .order("created_at")
-    .then((r) => r);
+  // Due reminders (spec §2 step 1) and what the shop has asked for — the
+  // header's two bands (lib/guideBands, shared with the desk Start page). On
+  // the wire alongside the entries: both are free next to the guide's ~850ms.
+  const remindersPromise = fetchDueReminders(supabase, locationId, guideDate);
+  const requestsPromise = fetchOpenRequests(supabase, locationId);
 
   /**
    * WHEN THIS ITEM WAS LAST BOUGHT, AND AS WHAT (Mark, 2026-08-10) — migration
@@ -206,7 +154,7 @@ export default async function OrderGuidePage({
   }
 
   const { data: entryRows } = await entriesPromise;
-  const { data: reminderRows } = await remindersPromise;
+  const reminders = await remindersPromise;
   /**
    * A MISSING VIEW MUST NOT TAKE THE GUIDE DOWN. Until 048 is applied this
    * errors, and the guide is the screen the shop is walked on — so the rows,
@@ -221,44 +169,7 @@ export default async function OrderGuidePage({
   const { data: lastPurchaseRows, error: lastPurchaseError } =
     await lastPurchasePromise;
 
-  // The band is not worth taking the walk down for, so its error is swallowed
-  // rather than surfaced the way the last-purchase view's is: there, an absent
-  // line would assert something false about every ITEM, where an absent
-  // request band reads as nothing outstanding — which, if the query failed, is
-  // the same thing the screen would say anyway.
-  const { data: requestRows } = await requestsPromise;
-  const { data: memberRows } = await membersPromise;
-  const memberName = new Map(
-    (memberRows ?? []).map((m) => [
-      m.user_id as string,
-      (m.display_name as string | null) ?? null,
-    ])
-  );
-  const requests: GuideRequest[] = (requestRows ?? []).map((r) => {
-    // A to-one embed is an object; typed defensively because PostgREST hands
-    // back an array the moment somebody widens the relationship, and a silent
-    // `undefined` here would just drop the item name.
-    const item = r.inventory_items as { name?: string } | { name?: string }[] | null;
-    const named = Array.isArray(item) ? item[0] : item;
-    return {
-      id: r.id as string,
-      request_text: r.request_text as string,
-      details: (r.details as string | null) ?? null,
-      priority: (r.priority as GuideRequest["priority"]) ?? "normal",
-      requested_by: (r.requested_by as string | null) ?? null,
-      /**
-       * Null rather than a stand-in word, unlike the Requests list, which says
-       * "Someone" to keep a table column from reading as nobody having asked.
-       * A band row is a sentence: an unknown name is better left off than
-       * padded out, and the row still says what was asked.
-       */
-      requesterName: r.requested_by
-        ? (memberName.get(r.requested_by as string) ?? null)
-        : null,
-      inventory_item_id: (r.inventory_item_id as string | null) ?? null,
-      itemName: named?.name ?? null,
-    };
-  });
+  const requests = await requestsPromise;
 
   return (
     <OrderGuide
@@ -276,7 +187,7 @@ export default async function OrderGuidePage({
       lastPurchases={(lastPurchaseRows ?? []) as unknown as LastPurchase[]}
       lastPurchaseError={lastPurchaseError?.message ?? null}
       entries={(entryRows ?? []) as GuideEntry[]}
-      reminders={(reminderRows ?? []) as unknown as Reminder[]}
+      reminders={reminders}
       weekday={weekday}
       initialFilter={view.filter}
       initialGrouping={view.grouping}

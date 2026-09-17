@@ -1,8 +1,11 @@
+import { GuideRequests } from "@/components/purchasing/GuideRequests";
+import { Reminders } from "@/components/purchasing/Reminders";
 import { SalesSummary, type SalesSummaryData } from "@/components/sales/SalesSummary";
 import { DOCUMENT_KIND_LABEL, type DocumentKind } from "@/lib/employeeDocuments";
 import { employeeName } from "@/lib/employees";
 import { canReachPage } from "@/lib/pageAccess";
-import { canReadHr } from "@/lib/roles";
+import { fetchDueReminders, fetchOpenRequests } from "@/lib/guideBands";
+import { canReadHr, canResolveRequests, canWriteCatalog } from "@/lib/roles";
 import {
   compareTotals,
   daysIn,
@@ -76,6 +79,8 @@ export async function DeskStart({ session }: { session: AppSession }) {
     orders: canReachPage(role, "/special-orders"),
     reports: canReachPage(role, "/shift-reports"),
     paperwork: canReadHr(role) && canReachPage(role, "/employees"),
+    reminders: canReachPage(role, "/order-guide"),
+    requests: canReachPage(role, "/purchase-requests"),
   };
 
   const heading = (
@@ -102,13 +107,15 @@ export async function DeskStart({ session }: { session: AppSession }) {
   }
   const loc = shop.id;
 
-  const [sales, invoices, pos, orders, reports, paperwork] = await Promise.all([
+  const [sales, invoices, pos, orders, reports, paperwork, reminders, requests] = await Promise.all([
     may.sales ? loadSales(supabase, today, loc, shop.code) : null,
     may.invoices ? loadInvoices(supabase, loc) : null,
     may.pos ? loadPurchaseOrders(supabase, today, loc) : null,
     may.orders ? loadSpecialOrders(supabase, session.membership.org_id, today, loc) : null,
     may.reports ? loadShiftReports(supabase, today, loc, shop.code) : null,
     may.paperwork ? loadPaperwork(supabase, loc) : null,
+    may.reminders ? fetchDueReminders(supabase, loc, today) : null,
+    may.requests ? fetchOpenRequests(supabase, loc) : null,
   ]);
 
   const settings = may.orders ? readSettings(session.orgSettings) : DEFAULT_SETTINGS;
@@ -116,6 +123,32 @@ export async function DeskStart({ session }: { session: AppSession }) {
   return (
     <div className="space-y-10">
       {heading}
+
+      {/* THE ORDER GUIDE'S TWO BANDS (Mark, 2026-09-17: "add the order guide's
+          reminders and purchase requests to it") — the same components, so
+          dismissing, adding a reminder and the request menu behave exactly as
+          they do on the guide. Their item names link to the item record here,
+          there being no walk to jump down. */}
+      {(reminders || requests) && (
+        <div className="grid gap-4 md:grid-cols-2 md:items-start">
+          {reminders && (
+            <Reminders
+              reminders={reminders}
+              guideDate={today}
+              locationId={loc}
+              orgId={session.membership.org_id}
+              canWrite={canWriteCatalog(role)}
+            />
+          )}
+          {requests && (
+            <GuideRequests
+              requests={requests}
+              userId={session.userId}
+              canResolve={canResolveRequests(role)}
+            />
+          )}
+        </div>
+      )}
 
       {sales &&
         (sales.data === null ? (
