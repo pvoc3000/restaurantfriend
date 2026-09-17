@@ -56,16 +56,20 @@ export function CompletionDates({
   const supabase = createClient();
   const [offer, setOffer] = useState<Consequence[] | null>(null);
 
-  const rows: { label: string; column: string; aria: string }[] = [
-    { label: "Initiated", column: "date_initiated", aria: "Date initiated" },
-    { label: "Quote sent", column: "quote_sent_at", aria: "Quote sent" },
+  // MARK'S ARRANGEMENT (2026-09-16): Order initiated alone, then the pairs —
+  // quote sent · approved, invoice sent · paid, receipt sent · delivery
+  // scheduled, order printed · order scheduled. `newRow` starts the first pair
+  // on a fresh row, which leaves Initiated half width and alone above it.
+  const rows: { label: string; column: string; aria: string; newRow?: boolean }[] = [
+    { label: "Order initiated", column: "date_initiated", aria: "Order initiated" },
+    { label: "Quote sent", column: "quote_sent_at", aria: "Quote sent", newRow: true },
     { label: "Quote approved", column: "quote_returned_at", aria: "Quote approved" },
     { label: "Invoice sent", column: "invoice_sent_at", aria: "Invoice sent" },
     { label: "Invoice paid", column: "invoice_paid_at", aria: "Invoice paid" },
     { label: "Receipt sent", column: "receipt_sent_at", aria: "Receipt sent" },
     { label: "Delivery scheduled", column: "delivery_scheduled_at", aria: "Delivery scheduled" },
     { label: "Order printed", column: "order_printed_at", aria: "Order printed" },
-    { label: "Production scheduled", column: "order_scheduled_at", aria: "Production scheduled" },
+    { label: "Order scheduled", column: "order_scheduled_at", aria: "Order scheduled" },
   ];
 
   return (
@@ -73,7 +77,8 @@ export function CompletionDates({
       {/* STACKED, LIKE EVERY OTHER BLOCK ON THIS TAB (2026-08-28).
           It was a fixed 128px label track with the value beside it, and boxing
           the fields made that arrangement impossible rather than merely tight.
-          Measured: the longest label here wants 174px ("Production scheduled")
+          Measured: the longest label here wanted 174px ("Production scheduled",
+          now "Order scheduled")
           and a date needs ~96px, in a 205px column — so the label wrapped AND
           the date was left 65px, which clipped it to "06/1".
           Before the boxes the same block simply OVERFLOWED its quadrant by
@@ -86,7 +91,10 @@ export function CompletionDates({
         {rows.map((r) => {
           const value = (order[r.column] ?? null) as string | null;
           return (
-            <div key={r.column} className="min-w-0 space-y-1">
+            <div
+              key={r.column}
+              className={`min-w-0 space-y-1 ${r.newRow ? "sm:col-start-1" : ""}`}
+            >
               <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                 {r.label}
               </dt>
