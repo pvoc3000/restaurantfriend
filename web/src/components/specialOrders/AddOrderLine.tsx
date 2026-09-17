@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
@@ -301,7 +302,11 @@ export function AddOrderLine({
           lines and pushed the page down. `ui/Dialog` pins the search in its
           toolbar and Done in its footer, and scrolls only the list — the
           `AddScheduleItems` shape. It still STAYS OPEN after each add. */}
-      {open ? (
+      {/* PORTALLED (2026-09-16): the Add item button now lives in a pinned
+          footer (`fixed`, z-30), and a `ui/Dialog` rendered inside it would be
+          capped at that layer — under the masthead. On the body it is z-60 as
+          everywhere else. */}
+      {open ? createPortal(
         <Dialog
           title="Add items to this order"
           onClose={() => setOpen(false)}
@@ -458,13 +463,14 @@ export function AddOrderLine({
           )}
 
           {error ? <p className="pt-3 text-[13px] text-accent">{error}</p> : null}
-        </Dialog>
+        </Dialog>,
+        document.body
       ) : null}
 
       {/* WHICH LETTER — a sibling of the panel, not nested inside it, so it
           paints over it and takes Escape alone (`ui/Dialog`'s stack). One tap
           on a character adds the line; the box is for the rare ones ("OP"). */}
-      {asking ? (
+      {asking ? createPortal(
         <Dialog
           title="Which letter?"
           onClose={() => setAsking(null)}
@@ -512,7 +518,8 @@ export function AddOrderLine({
               className="rf-typed mt-1 block h-9 w-full border border-ink bg-white px-2 text-[16px] normal-case tracking-normal text-ink focus:outline-none"
             />
           </label>
-        </Dialog>
+        </Dialog>,
+        document.body
       ) : null}
     </>
   );

@@ -13,6 +13,8 @@ import { InlineValue } from "@/components/catalog/InlineValue";
 import { ColumnHeader } from "@/components/catalog/ColumnHeader";
 import { useResizableColumns } from "@/lib/columnWidths";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { StickyFooter } from "@/components/ui/StickyFooter";
+import { STICKY_HEAD_ROW, useOverflowOnlyWhenNeeded } from "@/lib/tableHead";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { AddOrderLine, type MenuItem } from "./AddOrderLine";
@@ -49,8 +51,8 @@ export type OrderLineRow = {
  * worth stating because the convention says every list is. Two things it does
  * that the component cannot: a line is DRAGGED TO REORDER (`useRowDrag`, the ⠿
  * grip — a special order's line order is meaningful, and FileMaker's slots are
- * where it comes from), and the last row is a SUBTOTAL spanning most of the
- * width. `DataTable` has neither, and teaching it row-drag would touch fifteen
+ * where it comes from), and its subtotal rides in a pinned footer that borrows
+ * the table's own column widths (2026-09-16). `DataTable` has neither, and teaching it row-drag would touch fifteen
  * screens to serve one — the same reasoning that leaves `/order-guide` and
  * `/cleanup` hand-rolled.
  *
@@ -345,11 +347,18 @@ export function OrderLines({
 
   const subtotal = ordered.reduce((a, l) => a + lineTotal(l), 0);
 
+  // THE LABELS STICK (Mark, 2026-09-16), which needs the wrapper to stop being
+  // a scroll container whenever the table fits: a sticky cell inside an
+  // `overflow-x-auto` box pins to THAT box and leaves with the page
+  // (`lib/tableHead`'s documented trap).
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  useOverflowOnlyWhenNeeded(scrollerRef);
+
   return (
     <section className="space-y-2">
       <SectionHeading count={ordered.length}>Items</SectionHeading>
 
-      <div className="overflow-x-auto">
+      <div ref={scrollerRef} className="overflow-x-auto">
         {/* `table-fixed`, which is what makes a `<col>` width mean anything at
             all — in auto layout the browser sizes columns from their content
             and a dragged width is a suggestion it ignores. */}
@@ -360,7 +369,7 @@ export function OrderLines({
             ))}
           </colgroup>
           <thead>
-            <tr className="border-b-2 border-ink text-left">
+            <tr className={`text-left ${STICKY_HEAD_ROW}`}>
               {canWrite ? <th className="p-0" /> : null}
               {/* NOTE IS THE SECOND COLUMN (Mark, 2026-08-19), where it used
                   to sit between Tax and Total. It belongs beside the thing it
@@ -629,16 +638,7 @@ export function OrderLines({
                   Nothing on this order yet.
                 </td>
               </tr>
-            ) : (
-              // No `data-row-id`, so it can never be a drop target.
-              <tr className="border-t-2 border-ink font-semibold">
-                <td colSpan={canWrite ? 6 : 5} className="px-3 py-2 text-right">
-                  Items
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums">{money(subtotal)}</td>
-                {canWrite ? <td /> : null}
-              </tr>
-            )}
+            ) : null}
           </tbody>
         </table>
       </div>
@@ -658,8 +658,41 @@ export function OrderLines({
         </div>
       ) : null}
 
-      {canWrite ? (
-        <AddOrderLine orderId={orderId} orgId={orgId} existing={ordered} menu={menu} />
+      {/* THE ITEMS TOTAL AND ADD ITEM, PINNED (Mark, 2026-09-16). A one-row
+          table with the lines' own `colgroup`, so the total sits under the
+          Total column to the pixel however the widths are dragged. `lg:ml-48`
+          is the record's sidebar plus its gap — the content column's left
+          edge, which the full-bleed footer does not know about. Wrapped,
+          because `StickyFooter`'s spacer would otherwise take this section's
+          `space-y` margin, which nothing counts. */}
+      {canWrite || ordered.length > 0 ? (
+        <div>
+          <StickyFooter>
+            <div className="overflow-hidden border-t-2 border-ink lg:ml-48">
+              <table className="w-full min-w-[54rem] table-fixed border-collapse text-[14px]">
+                <colgroup>
+                  {columnKeys.map((key) => (
+                    <col key={key} style={{ width: colWidth(key) }} />
+                  ))}
+                </colgroup>
+                <tbody>
+                  <tr>
+                    <td colSpan={canWrite ? 5 : 4} className="py-2 pr-3">
+                      {canWrite ? (
+                        <AddOrderLine orderId={orderId} orgId={orgId} existing={ordered} menu={menu} />
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-right align-top font-semibold">Items</td>
+                    <td className="px-3 py-2 text-right align-top font-semibold tabular-nums">
+                      {money(subtotal)}
+                    </td>
+                    {canWrite ? <td /> : null}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </StickyFooter>
+        </div>
       ) : null}
 
       {error ? <p className="text-[13px] text-accent">{error}</p> : null}
