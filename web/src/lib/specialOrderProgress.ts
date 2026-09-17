@@ -131,6 +131,17 @@ export type OrderProgress = {
    * VISIBLE bar yellow and the last green.
    */
   fraction: number;
+  /**
+   * THE BAR'S LENGTH, 0..1, which since 2026-09-16 is NOT `fraction` (Mark:
+   * "make the steps of the bar 5 but the color of the bar 6"). The length
+   * measures the SPECIAL ORDERS TEAM's work, which ends at Invoice paid —
+   * printing and scheduling are the kitchen's, usually done from the generate
+   * dialog — so four drawn steps (rungs 2–5) fill the row and rung 6 adds no
+   * length. The COLOUR still reads `fraction` over all six, so a paid order is
+   * full width but a shade short of green, and only printed-and-scheduled is
+   * fully green: the difference between paid/unprinted and done.
+   */
+  length: number;
   ticks: ProgressTick[];
   /**
    * What the row's wash says, and the three cases are Mark's:
@@ -222,7 +233,15 @@ export function orderProgress(
   const tone: OrderProgress["tone"] =
     order.status === "cancelled" ? "none" : order.flag_reason ? "flagged" : "progress";
 
-  return { done, total, fraction: (done - 1) / (total - 1), ticks, tone };
+  const drawn = total - 2;
+  return {
+    done,
+    total,
+    fraction: (done - 1) / (total - 1),
+    length: Math.min(done - 1, drawn) / drawn,
+    ticks,
+    tone,
+  };
 }
 
 /**
@@ -323,10 +342,9 @@ const rgba = ([r, g, b]: [number, number, number], a: number) => `rgba(${r}, ${g
  * The last step always takes the last boundary, which is the table's own right
  * edge, so a finished order fills the row exactly.
  *
- * NOTE `total` IS THE NUMBER OF DRAWN STEPS, not the ladder's length. Since the
- * lead rung draws nothing, the caller passes FIVE for a six-rung ladder — which
- * also means the "too few rules" fallback bites one column later than it used
- * to.
+ * NOTE `total` IS THE NUMBER OF DRAWN STEPS, not the ladder's length. The lead
+ * rung draws nothing and the last rung draws no further than paid (see
+ * `OrderProgress.length`), so the caller passes FOUR for a six-rung ladder.
  */
 export function snapStops(total: number, boundaries: number[]): number[] | null {
   const rules = boundaries.filter((b) => b > 0 && b <= 1);
@@ -388,12 +406,14 @@ export function progressRowStyle(
   if (!flagged && p.done <= 1) return null;
 
   const solid = flagged ? RED : progressColor(p.fraction);
-  // FIVE drawn steps over a six-rung ladder, and the index is `done - 2`
-  // because rung 2 is the first one that draws.
-  const snapped = snapStops(p.total - 1, boundaries);
-  // The COLOUR still runs off the true fraction — only the LENGTH snaps, so
-  // the ramp stays even across the drawn rungs however the columns are dragged.
-  const width = snapped ? snapped[p.done - 2] : p.fraction;
+  // FOUR drawn steps — rungs 2 to 5, the team's work (see `length`). Rung 2
+  // is the first that draws and rung 6 draws no further than rung 5, so the
+  // index is `min(done, 5) - 2`.
+  const drawn = p.total - 2;
+  const snapped = snapStops(drawn, boundaries);
+  // The COLOUR runs off the six-rung `fraction` and is never snapped — only
+  // the LENGTH is, so the ramp stays even however the columns are dragged.
+  const width = snapped ? snapped[Math.min(p.done - 1, drawn) - 1] : p.length;
   const stop = flagged ? "100%" : `${(width * 100).toFixed(3)}%`;
   const wash = rgba(solid, flagged ? 0.15 : WASH_ALPHA);
 

@@ -7159,6 +7159,14 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `snapped[done - 1]` passed all 1072 cases while drawing every bar one column
    too long and reading `undefined` — "NaN%" — on the last rung. There is a
    fixture for it now.
+   **THE BAR'S LENGTH IS FOUR STEPS AND ITS COLOUR IS SIX** (Mark,
+   2026-09-16: "make the steps of the bar 5 but the color of the bar 6"). The
+   team's work ends at Invoice paid — printing and scheduling are the
+   kitchen's, mostly done from the generate dialog — so rungs 2–5 fill the row
+   (`OrderProgress.length`) and rung 6 adds no length. The colour still ramps
+   over all six (`fraction`), so paid-and-unprinted is full width a shade short
+   of green and only printed-and-scheduled is the final green. The strip's
+   sixth tick is unchanged and still says whether the kitchen has it.
    **THE STATUS SETS A FLOOR AND THE DATES ONLY PUSH IT FURTHER** (Mark,
    2026-08-20: "once an order is set to 'order', then it should jump to stage
    5"). That is not a new rule — it is `STATUS_HINT` believed by the bar:

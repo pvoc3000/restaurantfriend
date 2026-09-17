@@ -68,7 +68,7 @@ test("QUOTE SENT is the first visible bar", () => {
   eq(p.done, 2);
   ok(p.fraction > 0, "something to draw");
   const style = progressRowStyle(p)!;
-  ok(style.backgroundImage.includes("20.000%"), "one of the five drawn steps");
+  ok(style.backgroundImage.includes("25.000%"), "one of the four drawn steps");
 });
 
 test("the five drawn steps are evenly spaced, 0 to 1", () => {
@@ -83,6 +83,36 @@ test("the five drawn steps are evenly spaced, 0 to 1", () => {
       order_printed_at: "a", order_scheduled_at: "a" },
   ];
   eq(stamps.map((st) => order(st).fraction), [0, 0.2, 0.4, 0.6, 0.8, 1]);
+});
+
+test("the LENGTH is four steps and PAID fills the row (Mark, 2026-09-16)", () => {
+  // The team's work ends at Invoice paid; printing and scheduling are the
+  // kitchen's. So paid is full width, and printed-and-scheduled adds none.
+  const base = { quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a" };
+  eq(order({}).length, 0);
+  eq(order({ quote_sent_at: "a" }).length, 0.25);
+  eq(order(base).length, 0.75);
+  eq(order({ ...base, invoice_paid_at: "a" }).length, 1);
+  eq(order({ ...base, invoice_paid_at: "a", order_printed_at: "a", order_scheduled_at: "a" }).length, 1);
+});
+
+test("paid and unprinted is FULL WIDTH but not yet fully green", () => {
+  const base = { quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a", invoice_paid_at: "a" };
+  const paid = order(base);
+  const done = order({ ...base, order_printed_at: "a", order_scheduled_at: "a" });
+  ok(progressRowStyle(paid)!.backgroundImage.includes("100.000%"), "paid fills the row");
+  ok(progressRowStyle(done)!.backgroundImage.includes("100.000%"), "so does done");
+  const hue = (css: string) => css.slice(css.indexOf("rgba("), css.indexOf(")") + 1);
+  no(
+    hue(progressRowStyle(paid)!.backgroundImage) === hue(progressRowStyle(done)!.backgroundImage),
+    "but the two are told apart by colour"
+  );
+  eq(progressColor(done.fraction), [74, 156, 63], "only done is the final green");
+});
+
+test("a status floor of Order fills the row too", () => {
+  // Wholesale and standing orders reach `order` without stamping a payment.
+  eq(order({ status: "order" }).length, 1);
 });
 
 test("each stamp advances it by one", () => {
@@ -234,8 +264,8 @@ test("the wash is 20% and the fill stops at the fraction", () => {
   const p = order({ quote_sent_at: "a", quote_returned_at: "a" }); // 3 of 6
   const style = progressRowStyle(p)!;
   ok(style.backgroundImage.includes("0.2"), "20% alpha");
-  // 3 of 6 is the SECOND of five drawn steps, not half — the lead draws none.
-  ok(style.backgroundImage.includes("40.000%"), "two of the five steps");
+  // 3 of 6 is the SECOND of four drawn steps — the lead draws none.
+  ok(style.backgroundImage.includes("50.000%"), "two of the four steps");
   // Two layers: the edge rule and the wash, both on the row.
   eq(style.backgroundSize, "100% 3px, 100% 100%");
   eq(style.backgroundPosition, "left bottom, left top");
@@ -341,13 +371,13 @@ test("too few rules to be increasing → null, and the raw fraction is used", ()
   // A reader who has hidden the table down to a handful of columns. Snapping
   // badly is worse than not snapping.
   //
-  // NOTE the threshold moved with the change: the bar asks for FIVE stops now,
-  // not six, so five rules is enough and it takes four to fall back.
-  eq(snapStops(5, [0.25, 0.5, 0.75, 1]), null, "four rules cannot hold five stops");
-  ok(snapStops(5, [0.2, 0.4, 0.6, 0.8, 1]) !== null, "five can");
+  // The bar asks for FOUR stops (2026-09-16), so four rules is enough and it
+  // takes three to fall back.
+  eq(snapStops(4, [0.3, 0.6, 1]), null, "three rules cannot hold four stops");
+  ok(snapStops(4, [0.25, 0.5, 0.75, 1]) !== null, "four can");
   const p = order({ quote_sent_at: "a", quote_returned_at: "a" }); // 3 of 6
-  const style = progressRowStyle(p, [0.25, 0.5, 0.75, 1])!;
-  ok(style.backgroundImage.includes("40.000%"), "falls back to the fraction");
+  const style = progressRowStyle(p, [0.3, 0.6, 1])!;
+  ok(style.backgroundImage.includes("50.000%"), "falls back to the length");
 });
 
 test("exactly as many rules as rungs is enough", () => {
@@ -360,16 +390,21 @@ test("each rung takes ITS OWN snapped stop — the index is done-2", () => {
   // column too long — and the last rung read `undefined`, which formats as
   // "NaN%" and paints nothing at all.
   //
-  // Five stops over NINE rules, worked out by hand from `snapStops`:
-  const stops = snapStops(5, NINE)!;
-  eq(stops, [0.186, 0.351, 0.629, 0.792, 1]);
+  // Four stops over NINE rules, worked out by hand from `snapStops`:
+  const stops = snapStops(4, NINE)!;
+  eq(stops, [0.265, 0.503, 0.723, 1]);
 
   const widthOf = (p: ReturnType<typeof order>) => {
     const css = progressRowStyle(p, NINE)!.backgroundImage;
     return css.slice(css.indexOf(") ") + 2, css.indexOf("%,") + 1);
   };
-  eq(widthOf(order({ quote_sent_at: "a" })), "18.600%", "rung 2 → the first stop");
-  eq(widthOf(order({ quote_sent_at: "a", quote_returned_at: "a" })), "35.100%", "rung 3 → the second");
+  eq(widthOf(order({ quote_sent_at: "a" })), "26.500%", "rung 2 → the first stop");
+  eq(widthOf(order({ quote_sent_at: "a", quote_returned_at: "a" })), "50.300%", "rung 3 → the second");
+  eq(
+    widthOf(order({ quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a", invoice_paid_at: "a" })),
+    "100.000%",
+    "rung 5, paid → the right edge"
+  );
   eq(
     widthOf(order({
       quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a", invoice_paid_at: "a",
