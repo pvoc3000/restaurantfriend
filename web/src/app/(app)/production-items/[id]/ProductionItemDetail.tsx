@@ -8,7 +8,10 @@ import { resolveItemPrice } from "@/lib/productionPrice";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
-import { ProductionItemFields } from "@/components/production/ProductionItemFields";
+import {
+  ProductionItemFields,
+  ProductionItemTitle,
+} from "@/components/production/ProductionItemFields";
 import { ItemComponents } from "@/components/production/ItemComponents";
 import { ProductionItemLocations } from "@/components/production/ProductionItemLocations";
 import { ProductionItemHistory } from "@/components/production/ProductionItemHistory";
@@ -181,9 +184,10 @@ export async function ProductionItemDetail({
             `lg:gap-8`; THE THREE VALUES ARE COUPLED. */}
         <div className="space-y-1 lg:ml-48">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-              {row.name as string}
-            </h1>
+            <ProductionItemTitle
+              item={{ id, name: row.name as string }}
+              editable={editable}
+            />
             {!row.is_active ? (
               <span className="text-[12px] uppercase tracking-[0.12em] text-muted">Inactive</span>
             ) : null}

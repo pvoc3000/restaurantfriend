@@ -5,6 +5,36 @@ import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { formatCost, type Cost } from "@/lib/productionCost";
 import { formatMargin, margin, type ResolvedPrice } from "@/lib/productionPrice";
 
+/**
+ * The record's name as its heading, editable in place (Mark, 2026-09-16) —
+ * `VendorTitle`'s shape, keeping the h1's dotted underline rather than a box.
+ * No duplicate check: 038 dropped the unique name on purpose ("Angry Samoa"
+ * is four donuts), and the taxonomy line beneath tells them apart.
+ */
+export function ProductionItemTitle({
+  item,
+  editable,
+}: {
+  item: { id: string; name: string };
+  editable: boolean;
+}) {
+  return (
+    <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+      <InlineValue
+        readOnly={!editable}
+        table="production_items"
+        id={item.id}
+        column="name"
+        value={item.name}
+        nullable={false}
+        ariaLabel="Item name"
+        placeholder="Untitled item"
+        className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]"
+      />
+    </h1>
+  );
+}
+
 export type ItemFieldsData = {
   id: string;
   name: string;
