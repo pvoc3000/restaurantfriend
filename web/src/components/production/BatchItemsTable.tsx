@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import type { SortDir } from "@/lib/tableSort";
 import { PickList } from "@/components/ui/PickList";
+import { PickSet } from "@/components/ui/PickSet";
 import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
@@ -69,6 +70,9 @@ export type BatchRow = {
  * values and a log is a checklist; Prepared by is a handful of people splitting
  * a round.
  */
+/** An untyped batch filters as "", which the Type picker labels "No type". */
+const typeOf = (r: BatchRow) => r.element_type ?? "";
+
 type Grouping = "type" | "status" | "operator" | "none";
 
 const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
@@ -163,6 +167,9 @@ export function BatchItemsTable({
   const [term, setTerm] = useRememberedView("batch-items.search", "");
   // "all" or one of BATCH_STATUSES. Remembered like the search, for the same walk.
   const [status, setStatus] = useRememberedView<string>("batch-items.status", "all");
+  // The element TYPES shown (Mark, 2026-09-16), several at once; EMPTY MEANS
+  // ALL, `ui/PickSet`'s rule. An untyped batch is the "" value, "No type".
+  const [types, setTypes] = useRememberedView<string[]>("batch-items.types", []);
   const [sort, setSort] = useRememberedView<{ key: string; dir: SortDir }>(
     "batch-items.sort",
     { key: "element", dir: "asc" }
@@ -179,18 +186,37 @@ export function BatchItemsTable({
     );
   }, [rows, term]);
 
-  // The picklist's counts are taken AFTER the search and BEFORE the status
-  // filter — conditioned on the other control, never on itself, or every
-  // status but the chosen one would read 0 (lib/filterMenus' rule).
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const r of searched) counts[r.status] = (counts[r.status] ?? 0) + 1;
-    return counts;
-  }, [searched]);
-
-  const shown = useMemo(
+  // Each picker's counts are taken AFTER the search and the OTHER picker, never
+  // after itself — or every value but the chosen one would read 0
+  // (lib/filterMenus' rule).
+  const byType = useMemo(
+    () => (types.length === 0 ? searched : searched.filter((r) => types.includes(typeOf(r)))),
+    [searched, types]
+  );
+  const byStatus = useMemo(
     () => (status === "all" ? searched : searched.filter((r) => r.status === status)),
     [searched, status]
+  );
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const r of byType) counts[r.status] = (counts[r.status] ?? 0) + 1;
+    return counts;
+  }, [byType]);
+  const typeOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of rows) counts.set(typeOf(r), 0);
+    for (const r of byStatus) counts.set(typeOf(r), (counts.get(typeOf(r)) ?? 0) + 1);
+    // A chosen type stays offered at 0, or it would narrow the list with
+    // nothing on screen to untick.
+    for (const t of types) if (!counts.has(t)) counts.set(t, 0);
+    return [...counts.entries()]
+      .sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)))
+      .map(([value, n]) => ({ value, label: value || "No type", hint: String(n) }));
+  }, [rows, byStatus, types]);
+
+  const shown = useMemo(
+    () => (types.length === 0 ? byStatus : byStatus.filter((r) => types.includes(typeOf(r)))),
+    [byStatus, types]
   );
 
   // SORTING BY STATUS GROUPS BY STATUS (Mark, 2026-09-09). Grouping is the
@@ -525,7 +551,7 @@ export function BatchItemsTable({
               value={status}
               onPick={setStatus}
               options={[
-                { value: "all", label: "All statuses", hint: String(searched.length) },
+                { value: "all", label: "All statuses", hint: String(byType.length) },
                 ...BATCH_STATUSES.map((s) => ({
                   value: s,
                   label: BATCH_STATUS_LABEL[s],
@@ -533,6 +559,18 @@ export function BatchItemsTable({
                 })),
               ]}
               fit
+            />
+          </ControlField>
+          <ControlField label="Type">
+            <PickSet
+              options={typeOptions}
+              value={types}
+              onChange={setTypes}
+              allLabel="All types"
+              noun="types"
+              label="Which element types to show"
+              className="max-w-[16rem]"
+              minWidth={220}
             />
           </ControlField>
             <ControlField label="Group by">
