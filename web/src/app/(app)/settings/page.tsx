@@ -4,6 +4,7 @@ import { canManageMembers } from "@/lib/roles";
 import { ShiftReportSettings } from "@/components/settings/ShiftReportSettings";
 import { SpecialOrderSettings } from "@/components/settings/SpecialOrderSettings";
 import { AccountingSettings, type AccountingStatus } from "@/components/settings/AccountingSettings";
+import type { SalesMappingRow } from "@/components/settings/SalesMappingsTable";
 import { SharedDevices, type RegisteredDevice } from "@/components/settings/SharedDevices";
 import { thisDeviceId } from "@/app/deviceActions";
 import { SectionNav } from "@/components/ui/SectionNav";
@@ -55,12 +56,22 @@ export default async function SettingsPage({
   // Only the Accounting tab reads it — each tab fetches only itself, the
   // employee record's rule.
   let accounting: AccountingStatus | null = null;
+  let salesMappings: SalesMappingRow[] = [];
+  let salesMappingsError: string | null = null;
   if (tab === "accounting") {
     const supabase = await createClient();
-    const { data: qbo } = await supabase.rpc("accounting_connection_status", {
-      p_org: session.membership.org_id,
-    });
+    const [{ data: qbo }, maps] = await Promise.all([
+      supabase.rpc("accounting_connection_status", { p_org: session.membership.org_id }),
+      // Migration 104's grid. A missing table is a sentence on the tab, never
+      // a broken settings screen.
+      supabase
+        .from("accounting_sales_mappings")
+        .select("id, kind, square_key, square_name, account_ref, account_name, last_seen_at")
+        .eq("org_id", session.membership.org_id),
+    ]);
     accounting = Array.isArray(qbo) ? ((qbo[0] as AccountingStatus | undefined) ?? null) : null;
+    salesMappings = (maps.data ?? []) as SalesMappingRow[];
+    salesMappingsError = maps.error?.message ?? null;
   }
 
   // 097: the org's shared iPads. Owner/admin-readable by policy; below that
@@ -141,7 +152,13 @@ export default async function SettingsPage({
             </>
           )}
           {tab === "accounting" && (
-            <AccountingSettings orgId={orgId} editable={editable} initialStatus={accounting} />
+            <AccountingSettings
+              orgId={orgId}
+              editable={editable}
+              initialStatus={accounting}
+              salesMappings={salesMappings}
+              salesMappingsError={salesMappingsError}
+            />
           )}
           {tab === "devices" && (
             <SharedDevices

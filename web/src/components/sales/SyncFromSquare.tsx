@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ProgressBand } from "@/components/ui/ProgressBand";
@@ -45,7 +45,19 @@ import { addDays } from "@/lib/payPeriods";
  * Owner/admin only. `record_daily_sales` re-checks that itself; this just keeps
  * the button off a screen where pressing it could only fail.
  */
-export function SyncFromSquare({ today }: { today: string }) {
+/** What `SalesActions` seats in its menu: the command, without the button. */
+export type SyncRow = { label: string; onSelect: () => void; disabled: boolean };
+
+export function SyncFromSquare({
+  today,
+  children,
+}: {
+  today: string;
+  /** Given, the command is handed out as a row (`OrderCommandMenu`'s render-prop
+   *  shape) and this draws only its progress and warnings beneath; otherwise
+   *  it draws its own button. */
+  children?: (row: SyncRow) => ReactNode;
+}) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -130,6 +142,15 @@ export function SyncFromSquare({ today }: { today: string }) {
     return out;
   }
 
+  // The ordinary case: this month and last, which covers every day anybody is
+  // likely to be looking at and re-pulls recent days in case a tip settled
+  // late — up to and including TODAY, whose figure the screen then marks as
+  // still being taken.
+  const sync = () => {
+    const from = addDays(`${today.slice(0, 7)}-01`, -1);
+    void run(monthsBetween(`${from.slice(0, 7)}-01`, today), "Syncing");
+  };
+
   return (
     // RIGHT-ALIGNED AS A BLOCK (Mark, 2026-09-13: the button "should be
     // aligned top right even when there's text below it"). The block was as
@@ -137,24 +158,15 @@ export function SyncFromSquare({ today }: { today: string }) {
     // result sentence underneath pulled it inward. `items-end` pins every child
     // to the right margin, and the sentences read right-aligned beneath it.
     <div className="flex flex-col items-end gap-2 text-right">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <button
-          type="button"
-          className={BUTTON_CLASS}
-          disabled={busy !== null}
-          onClick={() => {
-            // The ordinary case: this month and last, which covers every day
-            // anybody is likely to be looking at and re-pulls recent days in
-            // case a tip settled late — up to and including TODAY, whose figure
-            // the screen then marks as still being taken.
-            const from = addDays(`${today.slice(0, 7)}-01`, -1);
-            void run(monthsBetween(`${from.slice(0, 7)}-01`, today), "Syncing");
-          }}
-        >
-          Sync from Square
-        </button>
-
-      </div>
+      {children ? (
+        children({ label: "Sync from Square", onSelect: sync, disabled: busy !== null })
+      ) : (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button type="button" className={BUTTON_CLASS} disabled={busy !== null} onClick={sync}>
+            Sync from Square
+          </button>
+        </div>
+      )}
 
       {busy ? <ProgressBand label={busy} /> : null}
 

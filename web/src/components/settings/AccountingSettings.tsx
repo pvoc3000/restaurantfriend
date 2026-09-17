@@ -8,6 +8,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { PickList } from "@/components/ui/PickList";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { SalesMappingsTable, type SalesMappingRow } from "./SalesMappingsTable";
 
 /**
  * The QuickBooks Online connection.
@@ -76,6 +77,8 @@ export function AccountingSettings({
   orgId,
   editable,
   initialStatus,
+  salesMappings,
+  salesMappingsError,
 }: {
   orgId: string;
   editable: boolean;
@@ -84,6 +87,9 @@ export function AccountingSettings({
    *  prop, and an effect that fetches on mount is both a flash of "Checking…"
    *  and the `set-state-in-effect` lint. Handlers re-read it explicitly. */
   initialStatus: AccountingStatus | null;
+  /** Migration 104's grid, seeded by the page like everything else here. */
+  salesMappings: SalesMappingRow[];
+  salesMappingsError: string | null;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -381,6 +387,18 @@ export function AccountingSettings({
       )}
 
       {error && <p className="max-w-2xl text-[13px] text-accent">{error}</p>}
+
+      {connected && (
+        <div className="border-t border-hairline pt-6">
+          {salesMappingsError ? (
+            <p className="max-w-2xl text-[13px] text-accent">
+              The sales mapping grid is missing — migration 104 has not been applied yet. ({salesMappingsError})
+            </p>
+          ) : (
+            <SalesMappingsTable orgId={orgId} rows={salesMappings} editable={editable} connected={connected} />
+          )}
+        </div>
+      )}
 
       {editable && (
         <div className="flex flex-wrap items-center gap-3">

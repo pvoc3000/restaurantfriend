@@ -16,6 +16,7 @@ import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { AddressFields } from "@/components/location/AddressFields";
 import { OperationsFields } from "@/components/location/OperationsFields";
+import { LocationIntegrations } from "@/components/location/LocationIntegrations";
 import { OperatingHours } from "@/components/location/OperatingHours";
 import { WorkingHere } from "@/components/location/WorkingHere";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -79,6 +80,8 @@ export async function LocationDetail({
     { count: vendorCount },
     { count: itemCount },
     { count: poCount },
+    integrations,
+    qboStatus,
   ] = await Promise.all([
     supabase
       .from("locations")
@@ -107,6 +110,16 @@ export async function LocationDetail({
       .from("purchase_orders")
       .select("id", { count: "exact", head: true })
       .eq("location_id", id),
+    // SEPARATE, AND ALLOWED TO FAIL: the four QuickBooks columns arrive with
+    // migration 104, and folding them into the select the whole record
+    // depends on would take the record down until it is applied. The block
+    // says so instead.
+    supabase
+      .from("locations")
+      .select("square_location_id, qbo_class_ref, qbo_location_ref")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase.rpc("accounting_connection_status", { p_org: session.membership.org_id }),
   ]);
 
   if (error) {
@@ -373,6 +386,23 @@ export async function LocationDetail({
                 laborRate={location.labor_rate}
                 registerCount={location.register_count}
                 editable={editable}
+              />
+            </section>
+
+            {/* ---- QuickBooks and Square ----------------------------------- */}
+            <section className="space-y-2">
+              <Heading>QuickBooks and Square</Heading>
+              <LocationIntegrations
+                locationId={location.id}
+                squareLocationId={(integrations.data?.square_location_id as string | null) ?? null}
+                qboClassRef={(integrations.data?.qbo_class_ref as string | null) ?? null}
+                qboLocationRef={(integrations.data?.qbo_location_ref as string | null) ?? null}
+                qboConnected={
+                  Array.isArray(qboStatus.data) &&
+                  (qboStatus.data[0] as { status?: string } | undefined)?.status === "connected"
+                }
+                editable={editable}
+                schemaError={integrations.error?.message ?? null}
               />
             </section>
 

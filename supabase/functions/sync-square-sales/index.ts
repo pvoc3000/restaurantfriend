@@ -232,6 +232,322 @@ function readCells(
 }
 
 // ---------------------------------------------------------------------------
+// The day's BREAKDOWN — what the QuickBooks posting reads (migration 104)
+// ---------------------------------------------------------------------------
+//
+// Net sales and tips above are the two payroll figures and they stay exactly
+// as they were. This pulls the LINES beside them: every item category, the
+// discounts, the tax, the tips, gift card sales, service charges, every tender
+// and every fee — enough for one balanced journal entry per shop-day, and no
+// more (Mark, 2026-09-16: "as few mappings as possible").
+//
+// FOUR CUBES, AND WHICH ONE ANSWERS WHAT WAS MEASURED, NOT READ. The catalogue
+// (`meta`) names hundreds of measures; the identity below was proved over sixty
+// days of both shops and every tender type, to the cent, before any of this
+// was written (2026-09-17, `query` mode):
+//
+//   Σ ItemSales(gross − returns, GIFT_CARD lines excluded)
+//     + Σ ServiceChargesReport(net)
+//     + Sales.sales_tax_amount + Sales.tips_amount + Sales.gift_card_sales_amount
+//   = Σ PaymentMethods(payments − refunds) + |Sales.discounts_amount + comps_amount|
+//
+// Three things in that line cost a day to learn and are worth not relearning:
+//
+//   * SERVICE CHARGES ARE INSIDE NET SALES. A courier tip or delivery fee on
+//     a Square Online order is collected with the order, so it is part of
+//     what the tenders carry — leave it out and every delivery day is off by
+//     exactly that amount. A returned one is negative and the net is what
+//     balances (measured: DF01 on 2026-09-07 was −$7.00 net).
+//   * A REFUND BY AMOUNT IS ALREADY A RETURN ON A CATEGORY. Square reports it
+//     in `Sales.refunds_by_amount_amount` AND as a CUSTOM_AMOUNT return on the
+//     Uncategorized category in ItemSales, so it is NOT its own line here —
+//     counting it twice unbalances the day by exactly its amount.
+//   * GIFT CARD LINE ITEMS ARE NOT INCOME. They ride ItemSales under
+//     Uncategorized with `line_item_type = GIFT_CARD`; excluded there and
+//     carried once as `gift_card_sale` from the Sales cube, net of their own
+//     discounts (which `discounts_amount` deliberately excludes).
+//
+// THE TENDERS HAVE NO `reporting_day`. PaymentMethods carries only the raw
+// local timestamp, so they are pulled by the HOUR over the window and bucketed
+// here by the seller's own rollover — 1:00 AM, the boundary documented on
+// `daily_sales.business_date` and in `lib/sales`' REPORTING_DAY_ROLLOVER_HOUR.
+// That bucketing is what the identity above was measured against; a change to
+// Square's reporting-day setting moves this constant too.
+//
+// EVERY AMOUNT GOES THROUGH `moneyToCents` AND AN UNREADABLE ONE MARKS THE DAY
+// `incomplete`, which the builder refuses. A breakdown that is quietly short a
+// line would post a journal entry that quietly does not balance — or worse,
+// one that balances by accident.
+
+/** Square's reporting day rolls at 01:00 local. `lib/sales` says the same. */
+const REPORTING_DAY_ROLLOVER_HOUR = 1;
+
+type BreakdownKind =
+  | "category"
+  | "service_charge"
+  | "discount"
+  | "tax"
+  | "tip"
+  | "gift_card_sale"
+  | "tender"
+  | "fee";
+
+type BreakdownLine = { kind: BreakdownKind; key: string; name: string; cents: number };
+
+type Breakdown = {
+  v: 1;
+  pulled_at: string;
+  incomplete?: boolean;
+  lines: BreakdownLine[];
+  totals: {
+    net_sales_cents: number;
+    top_line_cents: number;
+    itemized_returns_cents: number;
+    refunds_by_amount_cents: number;
+    total_collected_cents: number;
+  };
+};
+
+/** The value under a key, tolerating the granularity suffix the cube adds. */
+function pickField(row: Record<string, unknown>, want: string): unknown {
+  if (want in row) return row[want];
+  const k = Object.keys(row).find((key) => key.startsWith(`${want}.`));
+  return k ? row[k] : undefined;
+}
+
+function addDaysISO(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** A tender's key: the method, or `OTHER:<source>` for a marketplace tender. */
+function tenderKey(method: unknown, external: unknown): { key: string; name: string } {
+  const m = String(method ?? "").trim() || "UNKNOWN";
+  const src = String(external ?? "").trim();
+  if (m === "OTHER" && src) return { key: `OTHER:${src}`, name: src };
+  return { key: m, name: m };
+}
+
+async function loadBreakdown(
+  token: string,
+  from: string,
+  to: string,
+  codeFor: (squareLocationId: string) => string
+): Promise<{
+  byKey: Map<string, Breakdown>;
+  warnings: string[];
+  calls: number;
+  waitedMs: number;
+}> {
+  const warnings: string[] = [];
+  let calls = 0;
+  let waitedMs = 0;
+  const dateRange = [from, to];
+  const pulledAt = new Date().toISOString();
+
+  // Per (square location | reporting day): the lines being assembled.
+  const days = new Map<string, { lines: BreakdownLine[]; totals: Breakdown["totals"]; incomplete: boolean }>();
+  const dayFor = (loc: string, date: string) => {
+    const key = `${loc}|${date}`;
+    let d = days.get(key);
+    if (!d) {
+      d = {
+        lines: [],
+        totals: {
+          net_sales_cents: 0,
+          top_line_cents: 0,
+          itemized_returns_cents: 0,
+          refunds_by_amount_cents: 0,
+          total_collected_cents: 0,
+        },
+        incomplete: false,
+      };
+      days.set(key, d);
+    }
+    return d;
+  };
+  // Read one money cell, or mark the day incomplete and say why.
+  const cents = (
+    d: { incomplete: boolean },
+    raw: unknown,
+    what: string,
+    loc: string,
+    date: string
+  ): number | null => {
+    if (raw === null || raw === undefined) return 0;
+    const c = moneyToCents(raw);
+    if (c === null) {
+      d.incomplete = true;
+      warnings.push(
+        `${what} for ${codeFor(loc)} on ${date} was not a readable amount (${JSON.stringify(raw)}) — the day's breakdown is incomplete`
+      );
+    }
+    return c;
+  };
+  const dayOf = (row: Record<string, unknown>, cube: string): { loc: string; date: string } | null => {
+    const loc = String(pickField(row, `${cube}.location_id`) ?? "");
+    const raw = pickField(row, `${cube}.reporting_day`);
+    const date = typeof raw === "string" ? raw.slice(0, 10) : "";
+    return loc && date ? { loc, date } : null;
+  };
+  const run = async (query: Record<string, unknown>) => {
+    const r = await loadCube(token, query);
+    calls += r.calls;
+    waitedMs += r.waitedMs;
+    return r.rows;
+  };
+
+  // --- 1. the day's totals ---------------------------------------------------
+  const SALES = [
+    "net_sales", "top_line_product_sales", "discounts_amount", "comps_amount",
+    "itemized_returns", "refunds_by_amount_amount", "tips_amount", "sales_tax_amount",
+    "gift_card_sales_amount", "total_collected_amount",
+  ];
+  const salesRows = await run({
+    measures: SALES.map((m) => `Sales.${m}`),
+    dimensions: ["Sales.location_id"],
+    timeDimensions: [{ dimension: "Sales.reporting_day", dateRange, granularity: "day" }],
+  });
+  for (const row of salesRows) {
+    const at = dayOf(row, "Sales");
+    if (!at) continue;
+    const d = dayFor(at.loc, at.date);
+    const get = (m: string) => cents(d, pickField(row, `Sales.${m}`), `Sales.${m}`, at.loc, at.date);
+    const net = get("net_sales");
+    const top = get("top_line_product_sales");
+    const discounts = get("discounts_amount");
+    const comps = get("comps_amount");
+    const returns = get("itemized_returns");
+    const refunds = get("refunds_by_amount_amount");
+    const tips = get("tips_amount");
+    const tax = get("sales_tax_amount");
+    const gift = get("gift_card_sales_amount");
+    const collected = get("total_collected_amount");
+    d.totals = {
+      net_sales_cents: net ?? 0,
+      top_line_cents: top ?? 0,
+      itemized_returns_cents: returns ?? 0,
+      refunds_by_amount_cents: refunds ?? 0,
+      total_collected_cents: collected ?? 0,
+    };
+    // Discounts and comps are SIGNED NEGATIVE in the Sales cube ("they reduce
+    // gross/net sales"); the line carries the magnitude, one line for both.
+    const deduction = -((discounts ?? 0) + (comps ?? 0));
+    if (deduction !== 0) d.lines.push({ kind: "discount", key: "discounts", name: "Discounts and comps", cents: deduction });
+    if (tax) d.lines.push({ kind: "tax", key: "sales_tax", name: "Sales tax", cents: tax });
+    if (tips) d.lines.push({ kind: "tip", key: "tips", name: "Tips", cents: tips });
+    if (gift) d.lines.push({ kind: "gift_card_sale", key: "gift_cards", name: "Gift cards sold", cents: gift });
+  }
+
+  // --- 2. categories, gross net of returns ----------------------------------
+  const itemRows = await run({
+    measures: ["ItemSales.sales_gross_amount", "ItemSales.returns_gross_amount"],
+    dimensions: ["ItemSales.location_id", "ItemSales.category_name", "ItemSales.line_item_type"],
+    timeDimensions: [{ dimension: "ItemSales.reporting_day", dateRange, granularity: "day" }],
+  });
+  for (const row of itemRows) {
+    const at = dayOf(row, "ItemSales");
+    if (!at) continue;
+    if (String(pickField(row, "ItemSales.line_item_type") ?? "") === "GIFT_CARD") continue;
+    const d = dayFor(at.loc, at.date);
+    const name = String(pickField(row, "ItemSales.category_name") ?? "Uncategorized").trim() || "Uncategorized";
+    const gross = cents(d, pickField(row, "ItemSales.sales_gross_amount"), `${name} gross`, at.loc, at.date);
+    const returns = cents(d, pickField(row, "ItemSales.returns_gross_amount"), `${name} returns`, at.loc, at.date);
+    const total = (gross ?? 0) + (returns ?? 0);
+    // One line per category per day: CUSTOM_AMOUNT and ITEM rows both land
+    // under the category Square names for them.
+    const existing = d.lines.find((l) => l.kind === "category" && l.key === name);
+    if (existing) existing.cents += total;
+    else if (total !== 0) d.lines.push({ kind: "category", key: name, name, cents: total });
+  }
+
+  // --- 3. service charges, net of returns ----------------------------------
+  const svcRows = await run({
+    measures: ["ServiceChargesReport.total_service_charge_amount"],
+    dimensions: ["ServiceChargesReport.location_id", "ServiceChargesReport.service_charge_name"],
+    timeDimensions: [{ dimension: "ServiceChargesReport.reporting_day", dateRange, granularity: "day" }],
+  });
+  for (const row of svcRows) {
+    const at = dayOf(row, "ServiceChargesReport");
+    if (!at) continue;
+    const d = dayFor(at.loc, at.date);
+    const name = String(pickField(row, "ServiceChargesReport.service_charge_name") ?? "Service charge").trim() || "Service charge";
+    const amt = cents(d, pickField(row, "ServiceChargesReport.total_service_charge_amount"), `${name} service charge`, at.loc, at.date);
+    if (amt) d.lines.push({ kind: "service_charge", key: name, name, cents: amt });
+  }
+
+  // --- 4. tenders and fees, by the hour, bucketed into the reporting day ----
+  const hh = String(REPORTING_DAY_ROLLOVER_HOUR).padStart(2, "0");
+  const payRows = await run({
+    measures: ["PaymentMethods.total_amount", "PaymentMethods.fee_amount"],
+    dimensions: [
+      "PaymentMethods.location_id", "PaymentMethods.payment_method",
+      "PaymentMethods.payment_external_source", "PaymentMethods.type", "PaymentMethods.status",
+    ],
+    timeDimensions: [{
+      dimension: "PaymentMethods.local_reporting_timestamp",
+      dateRange: [`${from}T${hh}:00:00.000`, `${addDaysISO(to, 1)}T${String(REPORTING_DAY_ROLLOVER_HOUR - 1).padStart(2, "0")}:59:59.999`],
+      granularity: "hour",
+    }],
+    limit: 50000,
+  });
+  const skippedStatus = new Map<string, number>();
+  for (const row of payRows) {
+    const loc = String(pickField(row, "PaymentMethods.location_id") ?? "");
+    const rawHour = pickField(row, "PaymentMethods.local_reporting_timestamp.hour") ??
+      pickField(row, "PaymentMethods.local_reporting_timestamp");
+    if (!loc || typeof rawHour !== "string") continue;
+    // The hour is LOCAL wall time written as if UTC (the cube's own contract),
+    // so subtracting the rollover in UTC gives the reporting date directly.
+    const t = new Date(rawHour.endsWith("Z") ? rawHour : `${rawHour}Z`);
+    if (Number.isNaN(t.getTime())) continue;
+    t.setUTCHours(t.getUTCHours() - REPORTING_DAY_ROLLOVER_HOUR);
+    const date = t.toISOString().slice(0, 10);
+    if (date < from || date > to) continue;
+    const status = String(pickField(row, "PaymentMethods.status") ?? "");
+    if (status !== "COMPLETED") {
+      skippedStatus.set(status, (skippedStatus.get(status) ?? 0) + 1);
+      continue;
+    }
+    const d = dayFor(loc, date);
+    const { key, name } = tenderKey(
+      pickField(row, "PaymentMethods.payment_method"),
+      pickField(row, "PaymentMethods.payment_external_source")
+    );
+    const amt = cents(d, pickField(row, "PaymentMethods.total_amount"), `${name} tender`, loc, date) ?? 0;
+    const fee = cents(d, pickField(row, "PaymentMethods.fee_amount"), `${name} fee`, loc, date) ?? 0;
+    const tender = d.lines.find((l) => l.kind === "tender" && l.key === key);
+    if (tender) tender.cents += amt;
+    else d.lines.push({ kind: "tender", key, name, cents: amt });
+    if (fee !== 0) {
+      // Fees are SIGNED NEGATIVE ("costs incurred by the seller"); the line
+      // carries the magnitude, keyed by the tender it was charged on.
+      const f = d.lines.find((l) => l.kind === "fee" && l.key === key);
+      if (f) f.cents += -fee;
+      else d.lines.push({ kind: "fee", key, name: `${name} fees`, cents: -fee });
+    }
+  }
+  for (const [status, n] of skippedStatus) {
+    warnings.push(`${n} payment row${n === 1 ? "" : "s"} with status ${status} were left out of the breakdown (only COMPLETED payments are money)`);
+  }
+
+  const byKey = new Map<string, Breakdown>();
+  for (const [key, d] of days) {
+    // Zero lines are dropped so the hash only moves when money does.
+    const lines = d.lines.filter((l) => l.cents !== 0);
+    byKey.set(key, {
+      v: 1,
+      pulled_at: pulledAt,
+      ...(d.incomplete ? { incomplete: true } : {}),
+      lines,
+      totals: d.totals,
+    });
+  }
+  return { byKey, warnings, calls, waitedMs };
+}
+
+// ---------------------------------------------------------------------------
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -241,7 +557,7 @@ Deno.serve(async (req) => {
     const { mode, from, to } = payload as { mode?: string; from?: string; to?: string };
 
     // The two catalogue modes need no window; the sync needs one.
-    const NO_WINDOW_MODES = ["locations", "meta"];  // a dry run still needs a window
+    const NO_WINDOW_MODES = ["locations", "meta", "query"];  // a dry run still needs a window
     if (!NO_WINDOW_MODES.includes(mode ?? "") && (!from || !to)) {
       return json(400, {
         error: `missing from and to (or mode: ${NO_WINDOW_MODES.map((m) => `'${m}'`).join(" / ")})`,
@@ -345,6 +661,30 @@ Deno.serve(async (req) => {
         return squareFailure(e, rawToken, token);
       }
       return json(200, body);
+    }
+
+    // --- mode: query --------------------------------------------------------
+    //
+    // ONE CUBE QUERY, PASSED THROUGH, ROWS BACK. The diagnostic door beside
+    // `meta`: the catalogue names a measure, and this is how you find out what
+    // it actually returns for a real day before writing a line of code against
+    // it. Read-only against Square, writes nothing here, and owner/admin only —
+    // it answers any question the token can, which is the whole of the shop's
+    // trading history.
+    if (mode === "query") {
+      if (!["owner", "admin"].includes(member.role as string)) {
+        return json(403, { error: "a manager or the owner is required to query Square directly" });
+      }
+      const query = (payload as { query?: unknown }).query;
+      if (!query || typeof query !== "object") {
+        return json(400, { error: "missing query (a Reporting API cube query object)" });
+      }
+      try {
+        const r = await loadCube(token, query as Record<string, unknown>);
+        return json(200, { rows: r.rows, square_calls: r.calls, waited_ms: r.waitedMs });
+      } catch (e) {
+        return squareFailure(e, rawToken, token);
+      }
     }
 
     if (mode === "locations") {
@@ -501,6 +841,27 @@ Deno.serve(async (req) => {
       warnings.push(`Square location ${id} is not mapped to any shop — its days were skipped`);
     }
 
+    // THE BREAKDOWN RIDES WITH A REAL SYNC AND NEVER WITH A PREVIEW OR A DRY
+    // RUN: those answer a figure, this feeds a posting. If a breakdown cube
+    // fails, net and tips still land and the response says which days the
+    // QuickBooks post will refuse — payroll's two figures are never held
+    // hostage by a beta cube.
+    let breakdowns = new Map<string, Breakdown>();
+    if (!previewing && !payload?.dry) {
+      try {
+        const b = await loadBreakdown(token, from!, to!, (id) => bySquareId.get(id)?.code ?? id);
+        breakdowns = b.byKey;
+        calls += b.calls;
+        waitedMs += b.waitedMs;
+        warnings.push(...b.warnings);
+      } catch (e) {
+        if (e instanceof SquareError && e.status === 401) return squareFailure(e, rawToken, token);
+        warnings.push(
+          `The breakdown was not pulled for ${from} – ${to} (${e instanceof Error ? e.message : String(e)}) — net sales and tips were saved, and the QuickBooks post will refuse these days until a sync brings the breakdown`
+        );
+      }
+    }
+
     const rows: Record<string, unknown>[] = [];
     const perLocation = new Map<string, number>();
 
@@ -525,6 +886,7 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      const breakdown = breakdowns.get(key);
       rows.push({
         location_id: loc.id,
         business_date: date,
@@ -532,6 +894,7 @@ Deno.serve(async (req) => {
         // A day with sales and no tip row genuinely took no tips; Square omits
         // the cell rather than sending a zero.
         tips_cents: v.tips ?? 0,
+        ...(breakdown ? { breakdown } : {}),
       });
       perLocation.set(loc.code, (perLocation.get(loc.code) ?? 0) + 1);
     }

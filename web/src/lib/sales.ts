@@ -11,6 +11,7 @@
  */
 
 import { addDays, daysBetween, isoWeekday } from "./payPeriods";
+import type { SalesPostingRef } from "./salesPosting";
 
 export type SalesDay = {
   location_id: string;
@@ -23,6 +24,17 @@ export type SalesDay = {
   /** `daily_sales.source` — 'square', or 'manual' once somebody corrected it.
    *  A manual row is skipped by the sync (migration 065). */
   source?: string;
+  /** The row's own id (migration 104 made the QuickBooks posting need it);
+   *  absent on a page loaded before 104 is applied. */
+  id?: string;
+  /** When the day's breakdown was last pulled — null on a day pulled before
+   *  104, or when the breakdown cube failed. Never the breakdown itself: the
+   *  list does not carry it, the posting reads it fresh. */
+  breakdownPulledAt?: string | null;
+  breakdownHash?: string | null;
+  externalRef?: SalesPostingRef | null;
+  postedAt?: string | null;
+  postError?: string | null;
 };
 
 export type DateRange = { from: string; to: string };

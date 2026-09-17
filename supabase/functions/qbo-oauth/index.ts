@@ -294,6 +294,26 @@ Deno.serve(async (req) => {
       .update({ external_ref: {}, synced_at: null })
       .eq("org_id", row.org_id)
       .not("external_ref->qbo", "is", null));
+
+    // THE SALES POSTING (104): the shop's own class and location, every
+    // account in the sales grid, and every day's journal-entry id. The ids are
+    // the half with money in it again — left in place, a repost would UPDATE
+    // whatever entry carries that id in the new company file.
+    await clear("shop classes and locations", admin
+      .from("locations")
+      .update({ qbo_class_ref: null, qbo_class_name: null, qbo_location_ref: null, qbo_location_name: null })
+      .eq("org_id", row.org_id)
+      .or("qbo_class_ref.not.is.null,qbo_location_ref.not.is.null"));
+    await clear("sales mappings", admin
+      .from("accounting_sales_mappings")
+      .update({ account_ref: null, account_name: null })
+      .eq("org_id", row.org_id)
+      .not("account_ref", "is", null));
+    await clear("posted sales days", admin
+      .from("daily_sales")
+      .update({ external_ref: {}, posted_at: null, post_error: null })
+      .eq("org_id", row.org_id)
+      .not("external_ref->qbo", "is", null));
   }
 
   return back({

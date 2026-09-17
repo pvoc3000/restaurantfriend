@@ -89,6 +89,7 @@ import "./specialOrderProgress.fixtures";
 import "./specialOrderSchedule.fixtures";
 import "./scheduleSource.fixtures";
 import "./sales.fixtures";
+import "./salesPosting.fixtures";
 import "./startPage.fixtures";
 import "./sharedDevice.fixtures";
 import "./shell.fixtures";

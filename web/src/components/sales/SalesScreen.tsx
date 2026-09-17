@@ -29,6 +29,8 @@ import { daysBetween } from "@/lib/payPeriods";
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { createClient } from "@/lib/supabase/client";
 import type { RawSearchParams } from "@/lib/filterMenus";
+import Link from "next/link";
+import { postingLabel, postingState } from "@/lib/salesPosting";
 
 type Row = SalesDay & { id: string };
 
@@ -43,6 +45,7 @@ type Row = SalesDay & { id: string };
  */
 export function SalesScreen({
   canEdit,
+  posting,
   days,
   range,
   rangeLabel,
@@ -63,6 +66,9 @@ export function SalesScreen({
 }: {
   /** Owner/admin — migration 065 re-checks it inside the function. */
   canEdit: boolean;
+  /** The QuickBooks posting's standing facts (migration 104). `ready` is
+   *  false until that migration is applied, and then the column stays off. */
+  posting: { ready: boolean; connected: boolean; unmappedNames: number };
   /** The whole window, EVERY shop — the filter is applied here. */
   days: SalesDay[];
   range: DateRange;
@@ -159,7 +165,9 @@ export function SalesScreen({
     () =>
       visible
         .filter((d) => d.business_date >= range.from && d.business_date <= range.to)
-        .map((d) => ({ ...d, id: `${d.location_id}|${d.business_date}` })),
+        // The row's own id once 104 is applied; the synthesised one keeps the
+        // table keyed before that.
+        .map((d) => ({ ...d, id: d.id ?? `${d.location_id}|${d.business_date}` })),
     [visible, range.from, range.to]
   );
 
@@ -331,9 +339,65 @@ export function SalesScreen({
     },
   ];
 
+  if (posting.ready) {
+    columns.push({
+      key: "quickbooks",
+      label: "QuickBooks",
+      width: 170,
+      hideWhenCompact: true,
+      sortValue: (r) => r.postedAt ?? "",
+      render: (r) => {
+        const state = postingState({
+          external_ref: r.externalRef ?? null,
+          breakdown_hash: r.breakdownHash ?? null,
+          post_error: r.postError ?? null,
+        });
+        const label = postingLabel(state, r.externalRef ?? null);
+        // A day never pulled with a breakdown cannot be posted, and that is a
+        // different sentence from "not posted yet".
+        if (state === "unposted" && !r.breakdownPulledAt) {
+          return (
+            <span className="text-faint" title="No breakdown pulled — sync from Square again">
+              no breakdown
+            </span>
+          );
+        }
+        if (state === "failed") {
+          return (
+            <span className="bg-mark-fill px-1 text-[11px] text-accent" title={r.postError ?? undefined}>
+              failed
+            </span>
+          );
+        }
+        if (state === "stale") {
+          return (
+            <span className="flex items-center gap-2">
+              <span className="tabular-nums">{r.externalRef?.qbo?.doc_number ?? "posted"}</span>
+              <span className="bg-mark-fill px-1 text-[11px]" title="Pulled again since it was posted — post again to update the entry">
+                {label}
+              </span>
+            </span>
+          );
+        }
+        return <span className={state === "posted" ? "tabular-nums" : "text-faint"}>{label}</span>;
+      },
+    });
+  }
+
   return (
     <div className="space-y-8">
       <SalesSummary summary={summary} />
+
+      {posting.ready && posting.unmappedNames > 0 ? (
+        <p className="text-sm">
+          <span className="bg-mark-fill px-1">
+            {posting.unmappedNames} Square name{posting.unmappedNames === 1 ? "" : "s"} unmapped
+          </span>{" "}
+          <Link href="/settings?tab=accounting" className="text-muted underline hover:text-ink">
+            Settings → Accounting
+          </Link>
+        </p>
+      ) : null}
 
       <section className="space-y-4">
         {revertError ? <p className="text-xs text-accent">{revertError}</p> : null}

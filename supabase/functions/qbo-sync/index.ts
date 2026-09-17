@@ -25,6 +25,9 @@
 //   customers      → QBO customers, for the mapping picker on a customer
 //   tax_codes      → QBO tax codes, for the settings picker (084)
 //   push_invoice   → send one special order to QuickBooks as an Invoice
+//   post_daily_sales     → one shop-day of Square sales as a JournalEntry (104)
+//   find_journal_entries → what is on the books for a date range, flattened —
+//                          the parallel run against Shogo
 //   disconnect     → revoke at Intuit and forget the token (owner/admin)
 //
 // Disconnect lives HERE and not on `qbo-oauth` deliberately: that function is
@@ -458,10 +461,22 @@ Deno.serve(async (req) => {
       // is how a bill posts to the wrong account (Mark, 2026-09-01).
       // `FullyQualifiedName` is "Cost of Goods Sold:Baker Items COGs", and
       // sorting on it also files every child directly under its parent.
+      // `classification` widens it (104): the sales grid maps income, liability
+      // and asset accounts too, so it asks for "all" ONCE and narrows per row
+      // in the browser rather than making four calls that each refresh the
+      // token. Default unchanged, so every existing caller still gets the
+      // expense set.
+      const wanted = String((body as { classification?: string }).classification ?? "Expense");
+      // QuickBooks' own words: income accounts are classified "Revenue".
+      if (!["Expense", "Revenue", "Liability", "Asset", "Equity", "all"].includes(wanted)) {
+        return json(400, { error: `unknown classification: ${wanted}` });
+      }
+      const where = wanted === "all"
+        ? `Active = true`
+        : `Classification = ${qboQuote(wanted)} and Active = true`;
       const q =
-        `select Id, Name, FullyQualifiedName, AccountType, AccountSubType from Account ` +
-        `where Classification = ${qboQuote("Expense")} and Active = true ` +
-        `maxresults 1000`;
+        `select Id, Name, FullyQualifiedName, AccountType, AccountSubType, Classification from Account ` +
+        `where ${where} maxresults 1000`;
       const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(q)}`)) as {
         QueryResponse?: { Account?: Row[] };
       };
@@ -474,6 +489,7 @@ Deno.serve(async (req) => {
           depth: full.split(":").length - 1,
           type: String(a.AccountType ?? ""),
           sub_type: String(a.AccountSubType ?? ""),
+          classification: String(a.Classification ?? ""),
         };
       });
       accounts.sort((a, b) => a.name.localeCompare(b.name));
@@ -954,6 +970,282 @@ Deno.serve(async (req) => {
       }));
       rows.sort((a, b) => a.name.localeCompare(b.name));
       return json(200, { [mode]: rows });
+    }
+
+    // -----------------------------------------------------------------------
+    // post_daily_sales — one shop-day of Square sales becomes a JournalEntry
+    // -----------------------------------------------------------------------
+    //
+    // THE BROWSER BUILDS THE ENTRY AND THIS VALIDATES IT — `push_bill`'s shape,
+    // and its reason: the rule lives once, in the pure, fixture-tested
+    // `web/src/lib/salesPosting.ts`, and a Deno twin of a builder that has to
+    // balance to the cent is 016's `nextDeliveryDate` trap on money going into
+    // the books every day. What a caller could craft is checked against the
+    // day it names, read through the CALLER's client: the DocNumber and date
+    // are the day's own, every account is one the mapping grid holds, every
+    // line carries the shop's own class and location, the sides balance, and
+    // an Id is present exactly when the day already has one.
+    //
+    // A DAY WHOSE ENTRY HAS NOT CHANGED IS SKIPPED AND SAYS SO — `journal_hash`
+    // against the one recorded, and the breakdown hash against the row's
+    // generated one — unless `force`. That is what lets "Post to QuickBooks"
+    // run over a fortnight every morning without rewriting thirteen entries
+    // that are already right.
+    if (mode === "post_daily_sales") {
+      if (!["owner", "admin", "purchaser"].includes(role)) {
+        return json(403, { error: "a purchaser or above is required to post sales to QuickBooks" });
+      }
+      const req = body as unknown as {
+        daily_sales_id?: string;
+        payload?: Record<string, unknown>;
+        journal_hash?: string;
+        force?: boolean;
+      };
+      if (!req.daily_sales_id || !req.payload || !req.journal_hash) {
+        return json(400, { error: "missing daily_sales_id, payload or journal_hash" });
+      }
+
+      const { data: day, error: dayErr } = await supabase
+        .from("daily_sales")
+        .select("id, org_id, location_id, business_date, breakdown_hash, external_ref, post_error")
+        .eq("id", req.daily_sales_id)
+        .maybeSingle();
+      if (dayErr) {
+        return json(500, {
+          error: /breakdown_hash|external_ref/.test(dayErr.message)
+            ? "daily_sales has no breakdown yet — migration 104 has not been applied"
+            : dayErr.message,
+        });
+      }
+      if (!day) return json(404, { error: "No such sales day" });
+
+      const [{ data: shop }, { data: maps, error: mapErr }] = await Promise.all([
+        supabase
+          .from("locations")
+          .select("code, qbo_class_ref, qbo_location_ref")
+          .eq("id", day.location_id)
+          .maybeSingle(),
+        supabase
+          .from("accounting_sales_mappings")
+          .select("account_ref")
+          .eq("org_id", day.org_id)
+          .not("account_ref", "is", null),
+      ]);
+      if (mapErr) return json(500, { error: mapErr.message });
+      if (!shop) return json(404, { error: "The day's shop no longer exists" });
+      const allowed = new Set((maps ?? []).map((m) => String((m as { account_ref: string }).account_ref)));
+
+      const p = req.payload;
+      const expectedDoc = `${shop.code}-${day.business_date}`;
+      if (p.DocNumber !== expectedDoc) {
+        return json(400, { error: `The payload's DocNumber (${String(p.DocNumber)}) is not this day's (${expectedDoc}).` });
+      }
+      if (p.TxnDate !== day.business_date) {
+        return json(400, { error: `The payload's date (${String(p.TxnDate)}) is not this day's (${day.business_date}).` });
+      }
+      const lines = p.Line as Record<string, unknown>[] | undefined;
+      if (!Array.isArray(lines) || lines.length === 0) {
+        return json(400, { error: "The payload has no lines." });
+      }
+      let debits = 0;
+      let credits = 0;
+      for (const line of lines) {
+        const detail = line.JournalEntryLineDetail as Record<string, unknown> | undefined;
+        const cents = Math.round(Number(line.Amount) * 100);
+        if (!Number.isFinite(cents) || cents <= 0) {
+          return json(400, { error: `A line carries an amount QuickBooks would refuse (${String(line.Amount)}).` });
+        }
+        const acct = (detail?.AccountRef as { value?: string } | undefined)?.value;
+        if (!acct || !allowed.has(String(acct))) {
+          return json(400, { error: `A line posts to account ${String(acct)}, which is not in the sales mapping grid.` });
+        }
+        const klass = (detail?.ClassRef as { value?: string } | undefined)?.value ?? null;
+        const dept = (detail?.DepartmentRef as { value?: string } | undefined)?.value ?? null;
+        if (String(klass) !== String(shop.qbo_class_ref)) {
+          return json(400, { error: `A line carries a class that is not ${shop.code}'s.` });
+        }
+        if (String(dept) !== String(shop.qbo_location_ref)) {
+          return json(400, { error: `A line carries a location that is not ${shop.code}'s.` });
+        }
+        if (detail?.PostingType === "Debit") debits += cents;
+        else if (detail?.PostingType === "Credit") credits += cents;
+        else return json(400, { error: "A line has no posting type." });
+      }
+      if (debits !== credits) {
+        return json(400, { error: `The payload does not balance (debits ${debits} against credits ${credits}, in cents).` });
+      }
+
+      // CREATE VERSUS UPDATE IS DECIDED BY THE STORED ID, never by the payload.
+      const stored = (day.external_ref as { qbo?: { id?: string; journal_hash?: string; breakdown_hash?: string; doc_number?: string | null } } | null)?.qbo;
+      const storedId = stored?.id ?? null;
+      const sentId = p.Id === undefined || p.Id === null ? null : String(p.Id);
+      if (storedId && sentId !== storedId) {
+        return json(400, {
+          error: `This day is already in QuickBooks as entry ${storedId}; the payload names ${sentId ?? "a new entry"}. Reload and try again.`,
+        });
+      }
+      if (!storedId && sentId) {
+        return json(400, { error: `The payload updates entry ${sentId}, but this day has never been posted. Reload and try again.` });
+      }
+
+      if (
+        storedId && !req.force &&
+        stored?.journal_hash === req.journal_hash &&
+        stored?.breakdown_hash === day.breakdown_hash
+      ) {
+        return json(200, {
+          skipped: true,
+          reason: "unchanged since it was last posted",
+          qbo_id: storedId,
+          doc_number: stored?.doc_number ?? expectedDoc,
+        });
+      }
+
+      const conn = await loadConnection(admin, orgId);
+      let saved: Record<string, Record<string, unknown>>;
+      let retried = false;
+      try {
+        ({ saved, retried } = await postDocument(admin, conn, "JournalEntry", p));
+      } catch (e) {
+        // RECORDED, so the Sales screen can say "failed" with the reason, and
+        // the entry that is already there (if any) stays the entry.
+        const message = e instanceof QboError ? e.message : (e instanceof Error ? e.message : String(e));
+        await supabase.rpc("record_sales_posting", { p_daily_sales: day.id, p_ref: null, p_error: message });
+        const status = e instanceof QboError ? e.status : 502;
+        return json(status, { error: message });
+      }
+
+      const doc = saved?.JournalEntry;
+      if (!doc?.Id || doc?.SyncToken === undefined || doc?.SyncToken === null) {
+        return json(502, { error: "QuickBooks saved the entry but did not return an id and sync token." });
+      }
+
+      // WHAT QUICKBOOKS KEPT, per line — `push_bill`'s exact sentences, since a
+      // 200 with the coding silently dropped is the failure this app refuses.
+      const warnings: string[] = [];
+      if (retried) warnings.push(STALE_RETRY_NOTE);
+      const savedLines = (doc.Line as Record<string, Record<string, unknown>>[] | undefined) ?? [];
+      const kept = (which: "ClassRef" | "DepartmentRef") =>
+        savedLines.some((l) => Boolean((l.JournalEntryLineDetail as Record<string, unknown> | undefined)?.[which]));
+      if (!kept("DepartmentRef")) {
+        warnings.push(
+          "QuickBooks did not keep the location. Turn on Track locations in " +
+            "Account and settings → Advanced → Categories, then post again."
+        );
+      }
+      if (!kept("ClassRef")) {
+        warnings.push(
+          "QuickBooks did not keep the class. Turn on Track classes in " +
+            "Account and settings → Advanced → Categories, then post again."
+        );
+      }
+
+      const ref = {
+        qbo: {
+          id: String(doc.Id),
+          sync_token: String(doc.SyncToken),
+          doc_number: doc.DocNumber === undefined || doc.DocNumber === null ? null : String(doc.DocNumber),
+          entity: "JournalEntry",
+          journal_hash: req.journal_hash,
+        },
+      };
+      const { data: recorded, error: recErr } = await supabase.rpc("record_sales_posting", {
+        p_daily_sales: day.id,
+        p_ref: ref,
+        p_error: null,
+      });
+      if (recErr) return json(500, { error: recErr.message, qbo_id: String(doc.Id) });
+      // Row count, not the absence of an error: the entry IS in QuickBooks now,
+      // and a silent failure here means the next post creates a second one.
+      if (!Array.isArray(recorded) || recorded.length === 0) {
+        return json(500, {
+          error: "It reached QuickBooks but could not be recorded here, so posting " +
+            `again would duplicate it. Its QuickBooks id is ${doc.Id}.`,
+          qbo_id: String(doc.Id),
+        });
+      }
+
+      await admin
+        .from("accounting_connections")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", conn.id);
+
+      return json(200, {
+        entity: "JournalEntry",
+        qbo_id: String(doc.Id),
+        doc_number: ref.qbo.doc_number,
+        sync_token: ref.qbo.sync_token,
+        updated: Boolean(sentId),
+        warnings,
+        ref,
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // find_journal_entries — what is on the books for a range, flattened
+    // -----------------------------------------------------------------------
+    //
+    // The parallel run: Shogo's entries for the same dates, read back so the
+    // screen can lay them beside what this app would post. Reads, never
+    // writes. Capped at a month, because a year of journal entries is a report
+    // and not a comparison.
+    if (mode === "find_journal_entries") {
+      if (!["owner", "admin", "purchaser"].includes(role)) {
+        return json(403, { error: "a purchaser or above is required to read journal entries" });
+      }
+      const { from, to } = body as unknown as { from?: string; to?: string };
+      const iso = /^\d{4}-\d{2}-\d{2}$/;
+      if (!from || !to || !iso.test(from) || !iso.test(to) || from > to) {
+        return json(400, { error: "from and to must be ISO dates with from <= to" });
+      }
+      const span = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000 + 1;
+      if (span > 31) return json(400, { error: "at most 31 days at a time" });
+
+      const conn = await loadConnection(admin, orgId);
+      const PAGE = 500;
+      const entries: Record<string, unknown>[] = [];
+      for (let start = 1; start <= 5000; start += PAGE) {
+        const sql =
+          `select * from JournalEntry where TxnDate >= ${qboQuote(from)} and TxnDate <= ${qboQuote(to)} ` +
+          `orderby TxnDate startposition ${start} maxresults ${PAGE}`;
+        const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(sql)}`)) as {
+          QueryResponse?: { JournalEntry?: Record<string, unknown>[] };
+        };
+        const batch = res.QueryResponse?.JournalEntry ?? [];
+        for (const e of batch) {
+          const lines = ((e.Line as Record<string, unknown>[] | undefined) ?? [])
+            .filter((l) => l.DetailType === "JournalEntryLineDetail")
+            .map((l) => {
+              const d = (l.JournalEntryLineDetail as Record<string, unknown> | undefined) ?? {};
+              const ref = (k: string) => (d[k] as { value?: string; name?: string } | undefined) ?? {};
+              return {
+                posting: String(d.PostingType ?? ""),
+                amount: Number(l.Amount ?? 0),
+                account_ref: ref("AccountRef").value ?? null,
+                account_name: ref("AccountRef").name ?? null,
+                class_name: ref("ClassRef").name ?? null,
+                department_name: ref("DepartmentRef").name ?? null,
+                description: l.Description === undefined || l.Description === null ? null : String(l.Description),
+              };
+            });
+          entries.push({
+            id: String(e.Id),
+            sync_token: String(e.SyncToken ?? ""),
+            doc_number: e.DocNumber === undefined || e.DocNumber === null ? null : String(e.DocNumber),
+            txn_date: String(e.TxnDate ?? ""),
+            private_note: e.PrivateNote === undefined || e.PrivateNote === null ? null : String(e.PrivateNote),
+            lines,
+          });
+        }
+        if (batch.length < PAGE) break;
+      }
+
+      await admin
+        .from("accounting_connections")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", conn.id);
+
+      return json(200, { entries, checked_at: new Date().toISOString() });
     }
 
     // -----------------------------------------------------------------------

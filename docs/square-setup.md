@@ -101,8 +101,9 @@ You get back each location's `id`, `name`, `status`, `timezone` and `currency`.
 > reporting day will not line up with the others and the daily figures will be
 > quietly wrong rather than obviously broken.
 
-Then set each id on the shop's record: **Location → Locations → DF01 → Square
-location id**. It is an ordinary editable field.
+Then set each id on the shop's record: **Facilities → Locations → DF01 →
+Operations → QuickBooks and Square → Square location**. It is an ordinary
+editable field (since 2026-09-17; before that it was set by SQL).
 
 Two shops cannot share an id — the database refuses it. That constraint is not
 paranoia: a duplicate would double-count net sales forever *and* still
@@ -191,7 +192,60 @@ new ones.
 | The API version | `SQUARE_VERSION` in that file, pinned to `2026-07-15`. Bump deliberately and re-verify — an unpinned version drifts under a beta endpoint |
 | The schema | `supabase/migrations/063_daily_sales.sql` |
 | The verifier | `web/scripts/verify-square.ts` — code committed, **CSVs never** (a year of private revenue; paths are given on the command line) |
-| Who may sync | Owner or manager. Any member may *read* `/sales` |
+| Who may sync | Purchaser and above (migration 092). Any member may *read* `/sales` |
+| The breakdown | Pulled beside net sales and tips since migration 104, for the QuickBooks posting — see below and `docs/quickbooks-sales-setup.md` |
+
+## The breakdown, and the cubes that answer it
+
+Since migration 104 every real sync also stores the day's **lines** on
+`daily_sales.breakdown` — what `docs/quickbooks-sales-setup.md` posts. The
+Reporting API is a beta cube engine and its catalogue names hundreds of
+measures, so which cube answers what was **measured, not read**: the identity
+below was proved over sixty days of both shops and every tender type, to the
+cent, before a line of the pull was written (2026-09-17).
+
+| Line | Cube and measure | Day dimension |
+| --- | --- | --- |
+| category (gross net of returns) | `ItemSales.sales_gross_amount + returns_gross_amount` by `category_name`, **`line_item_type = GIFT_CARD` excluded** | `ItemSales.reporting_day` |
+| service charge (net) | `ServiceChargesReport.total_service_charge_amount` by `service_charge_name` | `ServiceChargesReport.reporting_day` |
+| discounts | `−(Sales.discounts_amount + Sales.comps_amount)` — signed negative there | `Sales.reporting_day` |
+| tax | `Sales.sales_tax_amount` | " |
+| tips | `Sales.tips_amount` | " |
+| gift cards sold | `Sales.gift_card_sales_amount` | " |
+| tender (payments − refunds) | `PaymentMethods.total_amount` by `payment_method` + `payment_external_source`, `status = COMPLETED` | **`local_reporting_timestamp` by the hour**, bucketed at the 01:00 rollover — the payment cubes carry no `reporting_day` |
+| fee | `−PaymentMethods.fee_amount`, keyed by the tender | " |
+
+```
+Σ categories + Σ service charges + tax + tips + gift cards sold
+  = Σ tenders + discounts
+```
+
+Three things that cost a day to learn:
+
+- **Service charges are inside net sales.** A courier tip or delivery fee on
+  a Square Online order is collected with the order and is in the tenders.
+  A returned one is negative; the net is what balances.
+- **A refund by amount is already a return on a category.** Square reports
+  it in `Sales.refunds_by_amount_amount` *and* as a `CUSTOM_AMOUNT` return on
+  *Uncategorized* in ItemSales. It is not its own line.
+- **Gift card line items are not income.** They ride ItemSales under
+  *Uncategorized* with `line_item_type = GIFT_CARD`; excluded there and
+  carried once from the Sales cube, net of their own discounts, which
+  `discounts_amount` deliberately excludes.
+
+To ask Square a question the function does not already ask, `mode: "query"`
+(owner or manager) passes one cube query through and returns the rows:
+
+```bash
+curl -s -X POST \
+  'https://kltxioacvneshbyhxtaj.supabase.co/functions/v1/sync-square-sales' \
+  -H "Authorization: Bearer $YOUR_SUPABASE_JWT" \
+  -H 'Content-Type: application/json' \
+  -d '{"mode":"query","query":{"measures":["Sales.net_sales"],"dimensions":["Sales.location_id"],"timeDimensions":[{"dimension":"Sales.reporting_day","dateRange":["2026-09-10","2026-09-10"],"granularity":"day"}]}}' | jq
+```
+
+If a breakdown cube fails, net sales and tips still land and the response
+warns which days will refuse to post until a sync brings the breakdown.
 
 ### Not set up, deliberately
 

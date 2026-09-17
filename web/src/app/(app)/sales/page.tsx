@@ -16,8 +16,9 @@ import {
   type SalesDay,
 } from "@/lib/sales";
 import { daysBetween } from "@/lib/payPeriods";
-import { SyncFromSquare } from "@/components/sales/SyncFromSquare";
+import { SalesActions } from "@/components/sales/SalesActions";
 import { SalesScreen } from "@/components/sales/SalesScreen";
+import type { SalesPostingRef } from "@/lib/salesPosting";
 
 /**
  * DAILY NET SALES AND TIPS, per shop.
@@ -85,23 +86,36 @@ export default async function SalesPage({
   // missing — `(business_date, location_id)` is unique per row here, which the
   // table's own key guarantees.
   const PAGE = 1000;
-  const salesRows: Record<string, unknown>[] = [];
-  let error: { message: string } | null = null;
-  for (let from = 0; ; from += PAGE) {
-    const { data, error: pageError } = await supabase
-      .from("daily_sales")
-      .select("location_id, business_date, net_sales_cents, tips_cents, synced_at, source")
-      .gte("business_date", window.from)
-      .lte("business_date", window.to)
-      .order("business_date")
-      .order("location_id")
-      .range(from, from + PAGE - 1);
-    if (pageError) {
-      error = pageError;
-      break;
+  const BASE = "location_id, business_date, net_sales_cents, tips_cents, synced_at, source";
+  // Migration 104's columns — NEVER `breakdown` itself, which is a document
+  // per row and which the posting reads fresh. If they are missing the sweep
+  // falls back to the columns 063 has, the QuickBooks column and commands
+  // stay off, and the screen still shows the sales: a page that cannot
+  // render yesterday's takings because a posting migration is pending is the
+  // wrong failure.
+  const POSTING = `${BASE}, id, breakdown_pulled_at, breakdown_hash, external_ref, posted_at, post_error`;
+  const sweep = async (columns: string) => {
+    const rows: Record<string, unknown>[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error: pageError } = await supabase
+        .from("daily_sales")
+        .select(columns)
+        .gte("business_date", window.from)
+        .lte("business_date", window.to)
+        .order("business_date")
+        .order("location_id")
+        .range(from, from + PAGE - 1);
+      if (pageError) return { rows, error: pageError };
+      rows.push(...((data ?? []) as unknown as Record<string, unknown>[]));
+      if (!data || data.length < PAGE) break;
     }
-    salesRows.push(...(data ?? []));
-    if (!data || data.length < PAGE) break;
+    return { rows, error: null as { message: string } | null };
+  };
+  let { rows: salesRows, error } = await sweep(POSTING);
+  let postingSchema = true;
+  if (error && /breakdown|external_ref|posted_at|post_error/.test(error.message)) {
+    postingSchema = false;
+    ({ rows: salesRows, error } = await sweep(BASE));
   }
 
   if (error) {
@@ -131,6 +145,16 @@ export default async function SalesPage({
     tipsCents: Number(r.tips_cents),
     syncedAt: (r.synced_at as string | null) ?? null,
     source: (r.source as string) ?? "square",
+    ...(postingSchema
+      ? {
+          id: r.id as string,
+          breakdownPulledAt: (r.breakdown_pulled_at as string | null) ?? null,
+          breakdownHash: (r.breakdown_hash as string | null) ?? null,
+          externalRef: (r.external_ref as SalesPostingRef | null) ?? null,
+          postedAt: (r.posted_at as string | null) ?? null,
+          postError: (r.post_error as string | null) ?? null,
+        }
+      : {}),
   }));
 
   // Which shops this screen is ABOUT: the ones mapped to Square. A shop with no
@@ -184,6 +208,38 @@ export default async function SalesPage({
   const elapsed = elapsedRange(resolved.range, today);
   const elapsedDays = daysBetween(elapsed.from, elapsed.to);
 
+  // THE POSTING'S STANDING FACTS: whether QuickBooks is connected, and how
+  // many Square names the sync has seen that nobody has mapped — the count
+  // that stands on this screen so an unmapped category is never a surprise
+  // on a receipt. Both tolerate a pending migration.
+  const canPost = canSyncSales(session.membership.role);
+  let qboConnected = false;
+  let unmappedNames = 0;
+  if (postingSchema) {
+    const [conn, unmapped] = await Promise.all([
+      supabase.rpc("accounting_connection_status", { p_org: session.membership.org_id }),
+      supabase
+        .from("accounting_sales_mappings")
+        .select("id", { count: "exact", head: true })
+        .neq("kind", "role")
+        .is("account_ref", null),
+    ]);
+    qboConnected =
+      Array.isArray(conn.data) && (conn.data[0] as { status?: string } | undefined)?.status === "connected";
+    unmappedNames = unmapped.count ?? 0;
+  }
+  // The days the commands act on: this range, every shop. The shop filter is
+  // a VIEW; a journal entry is per shop-day regardless of what is on screen.
+  const rangeDays = days
+    .filter((d) => d.business_date >= resolved.range.from && d.business_date <= resolved.range.to && d.id)
+    .map((d) => ({
+      id: d.id as string,
+      location_id: d.location_id,
+      locationCode: d.locationCode,
+      business_date: d.business_date,
+      hasBreakdown: Boolean(d.breakdownPulledAt),
+    }));
+
   return (
     <div className="space-y-8">
       {/* COMMANDS LEVEL WITH THE TITLE (Mark, 2026-08-23) — the special-order
@@ -198,11 +254,24 @@ export default async function SalesPage({
         title="Sales"
         total={days.length}
         noun="shop-days"
-        action={canSyncSales(session.membership.role) ? <SyncFromSquare today={today} /> : null}
+        action={
+          canPost ? (
+            <SalesActions
+              today={today}
+              orgId={session.membership.org_id}
+              postingReady={postingSchema}
+              connected={qboConnected}
+              range={resolved.range}
+              days={rangeDays}
+              shopCodes={shops.map((s) => s.code)}
+            />
+          ) : null
+        }
       />
 
       <SalesScreen
-        canEdit={canSyncSales(session.membership.role)}
+        canEdit={canPost}
+        posting={{ ready: postingSchema, connected: qboConnected, unmappedNames }}
         days={days}
         range={resolved.range}
         rangeLabel={resolved.label}
