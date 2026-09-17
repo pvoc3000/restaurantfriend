@@ -199,7 +199,12 @@ export function NewSpecialOrder({
                 This replaced Contact / Phone / Email, and those wrote the
                 DAY-OF contact — a different person on a corporate order, and
                 genuinely a later detail. The record still has all three. */}
-            <Field label="Customer">
+            {/* A DIV, NOT A LABEL (Mark, 2026-09-16: clicking inside the new
+                customer box closed it). A click on a label's empty space is
+                forwarded to its FIRST control, which in that box is "Find an
+                existing one instead" — so any stray click discarded the draft.
+                Only pressing that button closes it now. */}
+            <Field label="Customer" as="div">
               <CustomerPicker value={customer} onChange={setCustomer} disabled={pending} />
             </Field>
 
@@ -307,19 +312,23 @@ export function NewSpecialOrder({
 function Field({
   label,
   required = false,
+  as = "label",
   children,
 }: {
   label: string;
   required?: boolean;
+  /** `div` for a field holding SEVERAL controls — see the Customer field. */
+  as?: "label" | "div";
   children: ReactNode;
 }) {
+  const Tag = as;
   return (
-    <label className="block space-y-1.5">
+    <Tag className="block space-y-1.5">
       <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
         {label}
         {required ? <span className="text-accent"> *</span> : null}
       </span>
       {children}
-    </label>
+    </Tag>
   );
 }
