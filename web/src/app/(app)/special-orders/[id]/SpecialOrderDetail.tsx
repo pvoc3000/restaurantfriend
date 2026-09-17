@@ -32,6 +32,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { resolveItemPrice } from "@/lib/productionPrice";
 import { OrderLines, type OrderLineRow } from "@/components/specialOrders/OrderLines";
+import { OrderNumberCell } from "@/components/specialOrders/OrderNumberCell";
 import type { MenuItem } from "@/components/specialOrders/AddOrderLine";
 import { OrderPayments, type PaymentRow } from "@/components/specialOrders/OrderPayments";
 import { CompletionDates } from "@/components/specialOrders/CompletionDates";
@@ -598,9 +599,15 @@ export async function SpecialOrderDetail({
                 <section className="space-y-3">
                   <SectionHeading>Details</SectionHeading>
                   <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-                    <Row label="Order name">
+                    {/* ORDER NAME SPANS THE ROW so the ORDER NUMBER (Mark,
+                        2026-09-16) can pair with Status without shifting every
+                        pair below it along by one. */}
+                    <Row label="Order name" wide>
                       <Cell table="special_orders" id={id} column="title" value={row.title as string | null}
                             canWrite={canWrite} ariaLabel="What the order is for" />
+                    </Row>
+                    <Row label="Order number">
+                      <OrderNumberCell id={id} value={row.number as string} canWrite={canWrite} />
                     </Row>
                     <Row label="Status">
                       {kind === "order" ? (
@@ -1027,7 +1034,7 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className={wide ? "space-y-1" : "space-y-1"}>
+    <div className={wide ? "space-y-1 sm:col-span-2" : "space-y-1"}>
       <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{label}</dt>
       <dd>{children}</dd>
     </div>
