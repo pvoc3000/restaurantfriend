@@ -45,9 +45,6 @@ const UNSCOPED_ROUTES = [
   "/account",
   // Every control on one page, with fake data — nothing on it is a shop's.
   "/interface",
-  // The desk Start page is the whole org's. (The tablet's is the working
-  // shop's, and each of its tiles leads to a gated screen anyway.)
-  "/start",
 ];
 
 function isUnscopedRoute(pathname: string): boolean {

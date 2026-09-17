@@ -9809,17 +9809,23 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    one for the desktop too, and navigate to it when logging in instead of the
    locations page", then: whole org, sales across the top with a chart of this
    year against last, "needs attention" cards beneath, starting with six, and a
-   Home glyph at the right end of the masthead's row 1.
+   Home glyph in the masthead's row 1 — FIRST, left of the org settings icon
+   (it shipped last, after the location picker, and moved within the hour).
+   **The title reads "Welcome to <org name>!"**, over the shop code and the
+   day; the route, the menu and the tablet page are still Start.
    **ONE ROUTE, TWO SHELLS.** `/start` renders `components/start/DeskStart`
    under the desk shell and the tablet's action tiles under the tablet shell;
    `/` redirects there for both, and its all-R Page Permissions row means no
-   role lands on a refusal. It is exempt from `InactiveLocationGate`.
-   **WHOLE ORG, WHERE THE TABLET PAGE IS THE WORKING SHOP'S.** Every card names
-   the shop beside each record. Its links go to the list that owns the fact,
-   and three of those lists (POs, invoices, shift reports) show the WORKING
-   shop only, so a count can include records the list behind it does not show
-   until you switch. Accepted for now; a per-shop link would need the list to
-   take a location parameter.
+   role lands on a refusal.
+   **SCOPED TO THE WORKING SHOP** (Mark, the same day — it shipped whole-org for
+   an hour, which made a card count records the list it links to does not show,
+   because the PO, invoice and shift report lists follow the working shop).
+   Sales, invoices, POs and shift reports filter on `location_id`; special
+   orders count the shop as EITHER the pickup shop or the kitchen (sold here or
+   made here); paperwork counts staff whose `main_location_id` it is, so the
+   one current employee with no main shop is on neither card. With no working
+   shop the page says so under the title. Because it is scoped, it is NOT exempt
+   from `InactiveLocationGate`.
    **EVERY RULE IS BORROWED** (`lib/startPage`, fixture-tested): invoices read
    `billStage`/`agingBucket`/`balanceOwed`, special orders `needsAttention`,
    shift reports `missingNights` (closing only, 7 days ending yesterday, the
@@ -9837,11 +9843,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    1440). Hover or arrow keys give a crosshair and both values.
    **A card names each record over its detail, never beside it** — at three
    cards a row, "Event has passed — send the receipt" was being cut off.
-   **What the live data said on the first probe (2026-09-17)**, which is the
-   page doing its job rather than a bug: 21 sent POs past their delivery day,
-   40 special orders needing attention (most "Event has passed — send the
-   receipt"), 14 closing nights with no shift report across DF01/DF02 in a
-   week, 16 current staff with a lapsed document, 0 invoice problems.
+   **What the live data said on the first (whole-org) probe (2026-09-17)**,
+   which is the page doing its job rather than a bug: 21 sent POs past their
+   delivery day, 40 special orders needing attention (most "Event has passed —
+   send the receipt"), 14 closing nights with no shift report across DF01/DF02
+   in a week, 16 current staff with a lapsed document, 0 invoice problems.
    **Verified** by running every query read-only against the hosted DB and by
    rendering the real `StartCard`/`SalesTrend`/`SalesSummary` in a standalone
    page with the dev stylesheet at 1440 — the pane is behind the shared-device

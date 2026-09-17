@@ -38,6 +38,13 @@ export async function AppHeader({ session }: { session: AppSession }) {
         // components/HeaderShell.
         controls={
           <>
+            {/* HOME, FIRST (Mark, 2026-09-17 — it went in last, after the
+                location picker, and moved here the same day). The house came
+                back with a destination of its own: the Start page. */}
+            <IconButton href="/start" label="Home">
+              <HomeIcon />
+            </IconButton>
+
             {/* TWO SETTINGS, TWO ICONS (Mark, 2026-09-04): the storefront is
                 the ORG's — what the business says and is connected to, manager
                 and owner only, so the icon is withheld from anyone the table
@@ -62,13 +69,6 @@ export async function AppHeader({ session }: { session: AppSession }) {
               locations={session.workableLocations}
               working={session.activeLocation}
             />
-
-            {/* HOME, LAST (Mark, 2026-09-17: "to the right of the settings
-                icon and to the right of the location picklist"). The house
-                came back with a destination of its own — the desk Start page. */}
-            <IconButton href="/start" label="Home">
-              <HomeIcon />
-            </IconButton>
           </>
         }
         // Row 2: who you are, and leaving.

@@ -52,10 +52,11 @@ const ITEMS = 3;
  * too, and navigate to it when logging in"; whole org; sales across the top
  * with a year-over-year chart, "needs attention" cards beneath).
  *
- * WHOLE-ORG, where the tablet's landing page is the working shop's. Every card
- * names the shop beside each record, and its links go to the list that owns
- * the fact — which, for purchase orders, invoices and shift reports, shows the
- * WORKING shop. The counts are the org's; the list is where you act.
+ * SCOPED TO THE WORKING SHOP (Mark, 2026-09-17, the same day — it shipped
+ * whole-org for an hour). That makes every count agree with the list it links
+ * to, since the purchase order, invoice and shift report lists follow the
+ * working shop too. Special orders count the shop as either the pickup shop or
+ * the kitchen; paperwork counts the staff whose MAIN location it is.
  *
  * READ-ONLY and fetched in one wave. A probe that fails costs its own card a
  * sentence rather than the page, and a card a role may not open is not
@@ -66,8 +67,7 @@ export async function DeskStart({ session }: { session: AppSession }) {
   const role = session.membership.role;
   const timeZone = session.orgSettings.timezone ?? serverTimeZone();
   const today = todayInTimeZone(timeZone);
-  const codeOf = new Map(session.locations.map((l) => [l.id, l.code]));
-  const code = (id: string | null | undefined) => (id ? (codeOf.get(id) ?? "—") : "—");
+  const shop = session.activeLocation;
 
   const may = {
     sales: canReachPage(role, "/sales"),
@@ -78,28 +78,44 @@ export async function DeskStart({ session }: { session: AppSession }) {
     paperwork: canReadHr(role) && canReachPage(role, "/employees"),
   };
 
+  const heading = (
+    // Only the TITLE changed (Mark, 2026-09-17: "Welcome to <org name>!");
+    // the route and the tablet page are still Start.
+    <div>
+      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+        {session.orgName ? `Welcome to ${session.orgName}!` : "Welcome!"}
+      </h1>
+      <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
+        {shop ? `${shop.code} · ` : ""}
+        {longDate(today)}
+      </p>
+    </div>
+  );
+
+  if (!shop) {
+    return (
+      <div className="space-y-10">
+        {heading}
+        <p className="text-sm text-muted">Pick a location to see how it is doing.</p>
+      </div>
+    );
+  }
+  const loc = shop.id;
+
   const [sales, invoices, pos, orders, reports, paperwork] = await Promise.all([
-    may.sales ? loadSales(supabase, today, codeOf) : null,
-    may.invoices ? loadInvoices(supabase) : null,
-    may.pos ? loadPurchaseOrders(supabase, today) : null,
-    may.orders ? loadSpecialOrders(supabase, session.membership.org_id, today) : null,
-    may.reports ? loadShiftReports(supabase, session, today) : null,
-    may.paperwork ? loadPaperwork(supabase) : null,
+    may.sales ? loadSales(supabase, today, loc, shop.code) : null,
+    may.invoices ? loadInvoices(supabase, loc) : null,
+    may.pos ? loadPurchaseOrders(supabase, today, loc) : null,
+    may.orders ? loadSpecialOrders(supabase, session.membership.org_id, today, loc) : null,
+    may.reports ? loadShiftReports(supabase, today, loc, shop.code) : null,
+    may.paperwork ? loadPaperwork(supabase, loc) : null,
   ]);
 
   const settings = may.orders ? readSettings(session.orgSettings) : DEFAULT_SETTINGS;
 
   return (
     <div className="space-y-10">
-      {/* Not `PageHeading`: that states a list's count, and this page has none.
-          Same type, with the day and the org in its place. */}
-      <div>
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">Start</h1>
-        <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
-          {longDate(today)}
-          {session.orgName ? ` · ${session.orgName}` : ""}
-        </p>
-      </div>
+      {heading}
 
       {sales &&
         (sales.data === null ? (
@@ -109,10 +125,10 @@ export async function DeskStart({ session }: { session: AppSession }) {
         ))}
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {invoices && <InvoicesCard result={invoices} today={today} code={code} />}
-        {pos && <PurchaseOrdersCard result={pos} today={today} code={code} />}
+        {invoices && <InvoicesCard result={invoices} today={today} />}
+        {pos && <PurchaseOrdersCard result={pos} today={today} />}
         {orders && (
-          <SpecialOrdersCard result={orders} today={today} code={code} thresholds={settings.attention} />
+          <SpecialOrdersCard result={orders} today={today} thresholds={settings.attention} />
         )}
         {reports && <ShiftReportsCard result={reports} />}
         {paperwork && <PaperworkCard result={paperwork} today={today} />}
@@ -130,7 +146,8 @@ type ShopRow = { id: string; code: string; openDays: number[] | null; isActive: 
 async function loadSales(
   supabase: Supabase,
   today: string,
-  codeOf: Map<string, string>
+  loc: string,
+  code: string
 ): Promise<Result<{ days: SalesDay[]; shops: ShopRow[] }>> {
   const range = { from: daysBefore(today, SALES_DAYS - 1), to: today };
   const window = fetchWindow(range);
@@ -140,6 +157,7 @@ async function loadSales(
     const { data, error } = await supabase
       .from("daily_sales")
       .select("location_id, business_date, net_sales_cents, tips_cents, synced_at, source")
+      .eq("location_id", loc)
       .gte("business_date", window.from)
       .lte("business_date", window.to)
       .order("business_date")
@@ -149,7 +167,7 @@ async function loadSales(
     for (const r of data ?? []) {
       days.push({
         location_id: r.location_id as string,
-        locationCode: codeOf.get(r.location_id as string) ?? "—",
+        locationCode: code,
         business_date: r.business_date as string,
         netSalesCents: Number(r.net_sales_cents),
         tipsCents: Number(r.tips_cents),
@@ -160,11 +178,12 @@ async function loadSales(
     if (!data || data.length < 1000) break;
   }
 
-  // The shops Square reports for — the Sales screen's own definition, so the
-  // gap line here and there agree.
+  // This shop, if Square reports for it — the Sales screen's own definition,
+  // so the gap line here and there agree.
   const { data: mapped, error } = await supabase
     .from("locations")
     .select("id, code, open_days, is_active")
+    .eq("id", loc)
     .not("square_location_id", "is", null);
   if (error) return { data: null, error: error.message };
 
@@ -234,7 +253,7 @@ type InvoiceRow = StartInvoice & {
   vendor: string | null;
 };
 
-async function loadInvoices(supabase: Supabase): Promise<Result<InvoiceRow[]>> {
+async function loadInvoices(supabase: Supabase, loc: string): Promise<Result<InvoiceRow[]>> {
   const rows: InvoiceRow[] = [];
   for (let from = 0; ; from += 1000) {
     // Everything not void and not known to be paid — the only bills any of
@@ -245,6 +264,7 @@ async function loadInvoices(supabase: Supabase): Promise<Result<InvoiceRow[]>> {
         `id, invoice_number, due_date, total, is_credit, status, external_ref,
          qbo_balance, qbo_checked_at, location_id, vendors ( name )`
       )
+      .eq("location_id", loc)
       .neq("status", "void")
       .or("qbo_balance.is.null,qbo_balance.gt.0.005")
       .order("id")
@@ -276,11 +296,9 @@ async function loadInvoices(supabase: Supabase): Promise<Result<InvoiceRow[]>> {
 function InvoicesCard({
   result,
   today,
-  code,
 }: {
   result: Result<InvoiceRow[]>;
   today: string;
-  code: (id: string | null) => string;
 }) {
   if (result.data === null) return <StartCard title="Invoices" href="/invoices" lines={[]} error={result.error} />;
   const rows = result.data;
@@ -296,7 +314,7 @@ function InvoicesCard({
     .sort((a, b) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999"));
   const items: CardItem[] = [...overdue, ...waiting].slice(0, ITEMS).map((r) => ({
     primary: `${r.vendor ?? "Unknown vendor"} ${r.invoice_number ?? ""}`.trim(),
-    secondary: `${code(r.location_id)} · ${overdue.includes(r) ? "overdue" : "due"} ${shortDate(r.due_date)}`,
+    secondary: `${overdue.includes(r) ? "Overdue" : "Due"} ${shortDate(r.due_date)}`,
     href: `/invoices/${r.id}`,
   }));
 
@@ -336,11 +354,16 @@ type PoRow = {
  *  that is FileMaker's history (5,751 orders received and never closed). */
 const UNCLOSED_DAYS = 30;
 
-async function loadPurchaseOrders(supabase: Supabase, today: string): Promise<Result<PoRow[]>> {
+async function loadPurchaseOrders(
+  supabase: Supabase,
+  today: string,
+  loc: string
+): Promise<Result<PoRow[]>> {
   const since = daysBefore(today, UNCLOSED_DAYS);
   const { data, error } = await supabase
     .from("purchase_orders")
     .select("id, po_number, status, order_date, delivery_date, location_id, vendors ( name )")
+    .eq("location_id", loc)
     .or(`status.in.(draft,sent),and(status.eq.received,order_date.gte.${since})`)
     .order("order_date")
     .limit(1000);
@@ -366,11 +389,9 @@ async function loadPurchaseOrders(supabase: Supabase, today: string): Promise<Re
 function PurchaseOrdersCard({
   result,
   today,
-  code,
 }: {
   result: Result<PoRow[]>;
   today: string;
-  code: (id: string | null) => string;
 }) {
   if (result.data === null) {
     return <StartCard title="Purchase orders" href="/purchase-orders" lines={[]} error={result.error} />;
@@ -386,8 +407,8 @@ function PurchaseOrdersCard({
     primary: `${r.vendor ?? "Unknown vendor"} ${r.po_number}`,
     secondary:
       r.status === "draft"
-        ? `${code(r.location_id)} · draft ${shortDate(r.order_date)}`
-        : `${code(r.location_id)} · due ${shortDate(r.delivery_date)}`,
+        ? `Draft ${shortDate(r.order_date)}`
+        : `Due ${shortDate(r.delivery_date)}`,
     href: `/purchase-orders/${r.id}`,
   }));
 
@@ -428,7 +449,8 @@ type OrderRow = AttentionOrder & {
 async function loadSpecialOrders(
   supabase: Supabase,
   orgId: string,
-  today: string
+  today: string,
+  loc: string
 ): Promise<Result<OrderRow[]>> {
   // The list's own window — a month back and everything ahead — and only
   // real orders, which are all `needsAttention` ever judges.
@@ -444,6 +466,8 @@ async function loadSpecialOrders(
        customers ( first_name, last_name, company )`
     )
     .eq("org_id", orgId)
+    // Sold here or made here — either way it is this shop's to deal with.
+    .or(`location_id.eq.${loc},kitchen_location_id.eq.${loc}`)
     .eq("kind", "order")
     .neq("status", "cancelled")
     .gte("event_date", since)
@@ -510,12 +534,10 @@ async function loadSpecialOrders(
 function SpecialOrdersCard({
   result,
   today,
-  code,
   thresholds,
 }: {
   result: Result<OrderRow[]>;
   today: string;
-  code: (id: string | null) => string;
   thresholds: ReturnType<typeof readSettings>["attention"];
 }) {
   if (result.data === null) {
@@ -533,7 +555,7 @@ function SpecialOrdersCard({
 
   const items: CardItem[] = [...flagged, ...rest].slice(0, ITEMS).map(({ o, reason }) => ({
     primary: `#${o.number} ${o.customer ? customerLabel(o.customer) : (o.title ?? "")}`.trim(),
-    secondary: `${code(o.kitchen_location_id ?? o.location_id)} · ${reason}`,
+    secondary: reason,
     href: `/special-orders/${o.id}`,
   }));
 
@@ -566,18 +588,19 @@ type ReportsData = {
 
 async function loadShiftReports(
   supabase: Supabase,
-  session: AppSession,
-  today: string
+  today: string,
+  loc: string,
+  code: string
 ): Promise<Result<ReportsData>> {
   const since = daysBefore(today, REPORT_LOOKBACK);
-  const shopIds = session.activeLocations.map((l) => l.id);
   const [{ data: reports, error }, { data: shops, error: shopError }] = await Promise.all([
     supabase
       .from("shift_reports")
       .select("id, location_id, report_date, shift, status, sent_at, emailed_at")
+      .eq("location_id", loc)
       .gte("report_date", since)
       .order("report_date"),
-    supabase.from("locations").select("id, code, open_days").in("id", shopIds),
+    supabase.from("locations").select("id, code, open_days").eq("id", loc),
   ]);
   if (error) return { data: null, error: error.message };
   if (shopError) return { data: null, error: shopError.message };
@@ -590,7 +613,6 @@ async function loadShiftReports(
     status: string;
     emailed_at: string | null;
   }[];
-  const codeOf = new Map(session.locations.map((l) => [l.id, l.code]));
   return {
     data: {
       missed: missedClosingNights(
@@ -607,7 +629,7 @@ async function loadShiftReports(
       // report that was sent but whose email never went out.
       staleDrafts: rows
         .filter((r) => r.status === "draft" && r.report_date < today)
-        .map((r) => ({ id: r.id, code: codeOf.get(r.location_id) ?? "—", date: r.report_date })),
+        .map((r) => ({ id: r.id, code, date: r.report_date })),
       notEmailed: rows.filter((r) => r.status === "sent" && r.emailed_at === null).length,
     },
     error: null,
@@ -620,10 +642,10 @@ function ShiftReportsCard({ result }: { result: Result<ReportsData> }) {
   }
   const { missed, staleDrafts, notEmailed } = result.data;
   const items: CardItem[] = [
-    ...missed.map((m) => ({ primary: `${m.code} · ${longDate(m.date)}`, secondary: "no closing report" })),
+    ...missed.map((m) => ({ primary: longDate(m.date), secondary: "No closing report" })),
     ...staleDrafts.map((d) => ({
-      primary: `${d.code} · ${longDate(d.date)}`,
-      secondary: "still a draft",
+      primary: longDate(d.date),
+      secondary: "Still a draft",
       href: `/shift-reports/${d.id}/run`,
     })),
   ].slice(0, ITEMS);
@@ -651,11 +673,12 @@ type PaperworkData = {
   docs: { employee_id: string; kind: DocumentKind; expires_on: string | null }[];
 };
 
-async function loadPaperwork(supabase: Supabase): Promise<Result<PaperworkData>> {
+async function loadPaperwork(supabase: Supabase, loc: string): Promise<Result<PaperworkData>> {
   const [{ data: employees, error }, { data: docs, error: docError }] = await Promise.all([
     supabase
       .from("employees")
       .select("id, first_name, last_name, food_handler_expires")
+      .eq("main_location_id", loc)
       .neq("status", "inactive"),
     supabase.from("employee_documents").select("employee_id, kind, expires_on").order("id").limit(1000),
   ]);
