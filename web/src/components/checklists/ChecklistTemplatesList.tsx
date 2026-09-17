@@ -89,7 +89,12 @@ export function ChecklistTemplatesList({
       // silently swallow (076 changes 0 rows and returns no error).
       render: (r) =>
         editable ? (
-          <ActiveToggle table="checklist_templates" id={r.id} active={r.is_active} />
+          <ActiveToggle
+            table="checklist_templates"
+            id={r.id}
+            active={r.is_active}
+            control="switch"
+          />
         ) : (
           <span className="text-muted">{r.is_active ? "Active" : "Inactive"}</span>
         ),
