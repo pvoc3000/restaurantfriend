@@ -79,14 +79,14 @@ export function OrderInfoLayout({
       // loses about 8px and the grouping becomes legible.
       className="flex min-h-0 flex-col gap-10 xl:flex-row xl:gap-24"
     >
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-10">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-10 xl:gap-16">
         <div className="shrink-0">{topLeft}</div>
         <GrowingPane>{bottomLeft}</GrowingPane>
       </div>
 
-      {/* 64px between Customer and Completion dates (Mark, 2026-09-16: "more
-          padding between customer and completion dates"), where the left
-          column keeps 40. */}
+      {/* 64px between the top and bottom blocks of both columns (Mark,
+          2026-09-16: first Customer and Completion dates, then Details and
+          Also that day to match). */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-10 xl:gap-16">
         <div className="shrink-0">{topRight}</div>
         <GrowingPane>{bottomRight}</GrowingPane>
