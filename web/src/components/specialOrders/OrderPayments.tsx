@@ -257,7 +257,12 @@ export function OrderPayments({
               />
             </Field>
             <Field label="Date">
-              <DateField value={paidOn} onChange={setPaidOn} ariaLabel="Payment date" className="w-40" />
+              {/* The bordered box (Mark, 2026-09-16). `boxed` fills its track,
+                  so the width is the wrapper's — `className` reaches only the
+                  input inside. */}
+              <div className="w-40">
+                <DateField value={paidOn} onChange={setPaidOn} ariaLabel="Payment date" boxed />
+              </div>
             </Field>
             <Field label="How">
               <PickList
