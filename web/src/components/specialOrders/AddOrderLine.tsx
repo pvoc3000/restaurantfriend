@@ -224,6 +224,10 @@ export function AddOrderLine({
           qty: amount,
           unit_price: item.price ?? 0,
           taxable: true,
+          // THE LETTER IN QUOTES ON THE NOTE (Mark, 2026-09-16) — `"A"`, which
+          // is how FileMaker's letter lines have always carried it, and the
+          // note is what travels onto the production schedule line (069).
+          ...(character ? { notes: `"${character}"` } : {}),
         })
         .select("id");
       if (e) {
