@@ -3056,7 +3056,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    QuickBooks slot once needed a wrapper).
    **THE INVOICE LIST'S COMMANDS ARE ONE ACTIONS MENU TOO** (Mark, 2026-09-11,
    an hour after the PO list's and to the same shape): **New Invoice** ·
-   **Documents** ▸ Preview Invoices · Download Invoices · **Sync QuickBooks** ·
+   **Documents** ▸ Preview Invoices · Download Invoices · **Check QuickBooks** ·
    **Approve (n)**, then a rule, then **Delete Selected…** (red) and **Clear
    Selection**. It replaces a Check QuickBooks button, a New invoice button and
    a selection bar carrying two more — and the bar is GONE, its count and total

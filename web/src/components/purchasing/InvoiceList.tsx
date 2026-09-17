@@ -804,7 +804,7 @@ export function InvoiceList({
         </div>
         {/* ONE "ACTIONS" MENU FOR THE SCREEN (Mark, 2026-09-11), the day after
             the PO list's and to the same shape: New Invoice · Documents ▸ ·
-            Sync QuickBooks · Approve, then a rule, then Delete Selected… and
+            Check QuickBooks · Approve, then a rule, then Delete Selected… and
             Clear Selection. It replaces a Check QuickBooks button, a New
             invoice button and a selection bar carrying two more.
 
@@ -849,7 +849,7 @@ export function InvoiceList({
                       { label: "Download Invoices", onSelect: () => openScans("download") },
                     ],
                   },
-                  { label: "Sync QuickBooks", onSelect: () => void checkQuickBooks() },
+                  { label: "Check QuickBooks", onSelect: () => void checkQuickBooks() },
                   ...batchRows,
                   {
                     label: "Clear Selection",
