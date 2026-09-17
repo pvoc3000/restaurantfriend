@@ -10,6 +10,7 @@ import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { PickList } from "@/components/ui/PickList";
 import { ControlField } from "@/components/ui/ControlField";
+import { STICKY_HEAD_ROW_IN_PANE } from "@/lib/tableHead";
 import { money } from "@/lib/specialOrders";
 import {
   LETTER_CHARACTERS,
@@ -36,6 +37,9 @@ function normalizeLetter(raw: string): string | null {
   const c = raw.trim();
   return c === "" ? null : c.toUpperCase();
 }
+
+/** A column label: the app's small caps, with room above the first row. */
+const HEAD = "pb-2 pt-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted";
 
 type FilterKey = "item_type" | "size" | "subtype";
 const FILTERS: { key: FilterKey; label: string; all: string }[] = [
@@ -298,6 +302,10 @@ export function AddOrderLine({
           title="Add items to this order"
           onClose={() => setOpen(false)}
           width="max-w-3xl"
+          // No top padding: the column labels pin to the top of this scroller,
+          // and a sticky cell stops at the padding edge — with it, rows would
+          // show above the labels as they scroll.
+          bodyClassName="px-6 pb-6"
           height="h-[80vh]"
           toolbar={
             // The search FLEXES and the three pickers sit beside it (Mark,
@@ -342,12 +350,25 @@ export function AddOrderLine({
           }
         >
           {items.length === 0 ? (
-            <p className="text-[13px] text-muted">
+            <p className="pt-6 text-[13px] text-muted">
               No active production items — the menu is where these come from.
             </p>
           ) : (
             <div>
               <table className="w-full border-collapse text-[14px]">
+                {/* COLUMN LABELS (Mark, 2026-09-16), pinned while the list
+                    scrolls — `lib/tableHead`'s in-pane dress. */}
+                <thead>
+                  <tr className={STICKY_HEAD_ROW_IN_PANE}>
+                    <th className={`${HEAD} pr-3 text-left`}>Item</th>
+                    <th className={`${HEAD} pr-3 text-right`}>Price</th>
+                    <th className={`${HEAD} pr-2 text-right`}>Qty</th>
+                    <th className={`${HEAD} pr-2 text-center`}>Letter</th>
+                    <th className={HEAD}>
+                      <span className="sr-only">Add</span>
+                    </th>
+                  </tr>
+                </thead>
                 <tbody>
                   {shown.map((item) => {
                     const already = onOrder.get(item.id);
@@ -396,12 +417,11 @@ export function AddOrderLine({
                                   add(item);
                                 }
                               }}
-                              placeholder="Letter"
                               maxLength={3}
                               autoCapitalize="characters"
                               autoComplete="off"
                               aria-label={`Letter for ${item.name}`}
-                              className="rf-typed h-9 w-full border border-ink bg-white px-2 text-center text-[16px] font-semibold uppercase placeholder:text-[11px] placeholder:font-normal placeholder:normal-case placeholder:text-faint focus:outline-none"
+                              className="rf-typed h-9 w-full border border-ink bg-white px-2 text-center text-[16px] font-semibold uppercase focus:outline-none"
                             />
                           ) : null}
                         </td>
@@ -420,7 +440,7 @@ export function AddOrderLine({
                   })}
                   {shown.length === 0 ? (
                     <tr>
-                      <td className="py-4 text-sm text-muted">Nothing matches.</td>
+                      <td colSpan={5} className="py-4 text-sm text-muted">Nothing matches.</td>
                     </tr>
                   ) : null}
                 </tbody>
