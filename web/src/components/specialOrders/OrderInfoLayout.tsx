@@ -84,7 +84,10 @@ export function OrderInfoLayout({
         <GrowingPane>{bottomLeft}</GrowingPane>
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-10">
+      {/* 64px between Customer and Completion dates (Mark, 2026-09-16: "more
+          padding between customer and completion dates"), where the left
+          column keeps 40. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-10 xl:gap-16">
         <div className="shrink-0">{topRight}</div>
         <GrowingPane>{bottomRight}</GrowingPane>
       </div>
