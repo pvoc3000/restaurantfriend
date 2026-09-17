@@ -9864,8 +9864,16 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    PIN lock, so the signed-in page itself has NOT been seen yet.
 
 4r. 🚧 **SQUARE SALES POSTED TO QUICKBOOKS — replacing Shogo (2026-09-17;
-   migration 104 NEEDS APPLYING; `sync-square-sales`, `qbo-sync` and
-   `qbo-oauth` DEPLOYED).** Mark: replace the third-party app that posts a
+   migration 104 APPLIED 2026-09-17; `sync-square-sales`, `qbo-sync` and
+   `qbo-oauth` DEPLOYED).** *Probe, don't read this line.* Probed the day it
+   was applied: `daily_sales.breakdown` selects, `accounting_sales_mappings`
+   holds all ten roles plus every category and tender seen, every one MAPPED,
+   DF01 and DF02 carry a class and a location, and **96 shop-days (2026-08-01
+   → 09-17) dry-build through the real builder with 0 refusals, 0 unmapped
+   and every day balanced**. Two days warn and both are the documented
+   refund-by-amount case (DF02 08-12 $250, DF01 09-11 $13.35): the stored net
+   figure excludes it where the breakdown's Uncategorized return carries it.
+   **0 posts yet** — the first is Mark's. Mark: replace the third-party app that posts a
    journal entry per location nightly with a simpler in-app equivalent —
    "all I care about are category sales… also refunds, discounts. Everything
    else can be misc"; "as few mappings as possible… as adaptable when new
