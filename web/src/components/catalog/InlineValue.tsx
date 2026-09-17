@@ -298,6 +298,7 @@ export function InlineValue({
   rows = 4,
   boxed = false,
   readOnly = false,
+  disabled = false,
 }: {
   table: string;
   /** The row's uuid — the identity of every table in the catalog. Omit it only
@@ -470,6 +471,14 @@ export function InlineValue({
    * not, and NO box: the box means "you can change this".
    */
   readOnly?: boolean;
+  /**
+   * Greyed and unwritable, but KEEPING its box — where `readOnly` drops it. For
+   * a field that is editable in general and does not apply to this record
+   * (a special order's Delivery scheduled on a pickup, 2026-09-16), so it sits
+   * in line with its neighbours instead of reading as a different kind of
+   * field. Honoured by `kind="date"` only, today.
+   */
+  disabled?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -696,7 +705,7 @@ export function InlineValue({
       <span className={boxed ? "flex w-full flex-col" : "inline-flex flex-col items-start"}>
         <DateField
           value={value === null ? null : String(value)}
-          disabled={saving}
+          disabled={saving || disabled}
           required={!nullable}
           // The same gap the `pick` branch had until 2026-08-08: `ariaLabel`
           // reached the text/number button and nothing else, so a date cell

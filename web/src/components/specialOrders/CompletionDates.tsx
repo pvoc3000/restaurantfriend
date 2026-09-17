@@ -57,20 +57,26 @@ export function CompletionDates({
   const [offer, setOffer] = useState<Consequence[] | null>(null);
 
   // MARK'S ARRANGEMENT (2026-09-16): Order initiated alone, then the pairs —
-  // quote sent · approved, invoice sent · paid, receipt sent · delivery
-  // scheduled, order printed · order scheduled. `newRow` starts the first pair
-  // on a fresh row, which leaves Initiated half width and alone above it.
+  // quote sent · approved, invoice sent · paid, delivery scheduled · receipt
+  // sent (swapped the same day), order printed · order scheduled. `newRow`
+  // starts the first pair on a fresh row, which leaves Initiated half width
+  // and alone above it.
   const rows: { label: string; column: string; aria: string; newRow?: boolean }[] = [
     { label: "Order initiated", column: "date_initiated", aria: "Order initiated" },
     { label: "Quote sent", column: "quote_sent_at", aria: "Quote sent", newRow: true },
     { label: "Quote approved", column: "quote_returned_at", aria: "Quote approved" },
     { label: "Invoice sent", column: "invoice_sent_at", aria: "Invoice sent" },
     { label: "Invoice paid", column: "invoice_paid_at", aria: "Invoice paid" },
-    { label: "Receipt sent", column: "receipt_sent_at", aria: "Receipt sent" },
     { label: "Delivery scheduled", column: "delivery_scheduled_at", aria: "Delivery scheduled" },
+    { label: "Receipt sent", column: "receipt_sent_at", aria: "Receipt sent" },
     { label: "Order printed", column: "order_printed_at", aria: "Order printed" },
     { label: "Order scheduled", column: "order_scheduled_at", aria: "Order scheduled" },
   ];
+
+  // A PICKUP HAS NO DELIVERY TO SCHEDULE (Mark, 2026-09-16), so that date is
+  // greyed there — kept in its slot, box and all, so the pairs stay put. A
+  // date already on a pickup (entered before it switched) still shows.
+  const isPickup = ((order.fulfillment as string | null) ?? "pickup") !== "delivery";
 
   return (
     <>
@@ -108,6 +114,7 @@ export function CompletionDates({
                     kind="date"
                     value={value}
                     ariaLabel={r.aria}
+                    disabled={isPickup && r.column === "delivery_scheduled_at"}
                     onWrite={async (next) => {
                       const { data, error } = await supabase
                         .from("special_orders")
