@@ -128,7 +128,7 @@ export function CustomerPicker({
             onValueChange={(v) => set({ name: v })}
             placeholder="Their name"
             aria-label="Customer name"
-            className="w-full"
+            fullWidth
             autoFocus
           />
           <TextInput
@@ -136,21 +136,21 @@ export function CustomerPicker({
             onValueChange={(v) => set({ company: v })}
             placeholder="Company"
             aria-label="Customer company"
-            className="w-full"
+            fullWidth
           />
           <TextInput
             value={d.phone}
             onValueChange={(v) => set({ phone: v })}
             placeholder="Phone"
             aria-label="Customer phone"
-            className="w-full"
+            fullWidth
           />
           <TextInput
             value={d.email}
             onValueChange={(v) => set({ email: v })}
             placeholder="Email"
             aria-label="Customer email"
-            className="w-full"
+            fullWidth
           />
         </div>
 
@@ -179,6 +179,10 @@ export function CustomerPicker({
           aria-label="Find a customer"
           clearLabel="Clear the search"
           disabled={disabled}
+          // The width of the dialog's other fields (Mark, 2026-09-16), where
+          // a search on its own flexes to at most 18rem. "New customer" wraps
+          // under it.
+          fullWidth
           search
           icon={<SearchGlyph />}
         />

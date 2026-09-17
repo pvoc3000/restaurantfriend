@@ -186,7 +186,7 @@ export function NewSpecialOrder({
                 placeholder="Ruiz wedding, 8/30"
                 aria-label="What the order is for"
                 autoFocus
-                className="w-full"
+                fullWidth
               />
             </Field>
 
@@ -234,7 +234,9 @@ export function NewSpecialOrder({
                   value={eventDate}
                   onChange={setEventDate}
                   ariaLabel="Event date"
-                  className="w-full"
+                  // The solid-bordered box that fills its track, so the pair is
+                  // as wide and as tall as the pickers below (Mark, 2026-09-16).
+                  boxed
                 />
               </Field>
               <Field label="Event time" required={needsWhen}>
@@ -242,7 +244,7 @@ export function NewSpecialOrder({
                   value={eventTime}
                   onChange={setEventTime}
                   ariaLabel="Event time"
-                  className="w-full"
+                  boxed
                 />
               </Field>
             </div>
