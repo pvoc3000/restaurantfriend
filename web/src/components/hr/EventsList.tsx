@@ -85,8 +85,8 @@ const TIERS = ["narrative", "shifts", "all"] as const;
 type Tier = (typeof TIERS)[number];
 
 const TIER_LABEL: Record<Tier, string> = {
-  narrative: "Notes & warnings",
-  shifts: "Shift ratings",
+  narrative: "Notes & Warnings",
+  shifts: "Shift Ratings",
   all: "All",
 };
 
@@ -164,7 +164,7 @@ export function EventsList({
         // The conditioned counts say that out loud rather than hiding it.
         key: "where",
         label: "Shop",
-        options: [...codes.map((c) => ({ value: c, label: c })), { value: NONE, label: "Not set" }],
+        options: [...codes.map((c) => ({ value: c, label: c })), { value: NONE, label: "Not Set" }],
         matches: (r, v) => (v === NONE ? !r.locationCode : r.locationCode === v),
       },
       {
@@ -172,7 +172,7 @@ export function EventsList({
         label: "By",
         options: [
           ...authors.map((a) => ({ value: a, label: a })),
-          { value: NONE, label: "Not recorded" },
+          { value: NONE, label: "Not Recorded" },
         ],
         matches: (r, v) => (v === NONE ? !r.author : r.author === v),
       },
@@ -184,8 +184,8 @@ export function EventsList({
         label: "Score",
         options: [
           { value: "low", label: "Under 4", hint: "and the zeros" },
-          { value: "high", label: "4 or better" },
-          { value: "unscored", label: "Not scored" },
+          { value: "high", label: "4 or Better" },
+          { value: "unscored", label: "Not Scored" },
         ],
         matches: (r, v) =>
           v === "unscored" ? r.score === null : r.score !== null && (v === "low" ? r.score < 4 : r.score >= 4),

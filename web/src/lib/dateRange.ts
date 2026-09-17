@@ -181,17 +181,17 @@ export const RANGE_PRESETS = {
   },
   last_week: {
     key: "last_week",
-    label: "Last week",
+    label: "Last Week",
     range: (t: string) => ({ from: daysBefore(t, 7), to: daysBefore(t, 1) }),
   },
   next_week: {
     key: "next_week",
-    label: "Next week",
+    label: "Next Week",
     range: (t: string) => ({ from: daysAfter(t, 1), to: daysAfter(t, 7) }),
   },
   this_week: {
     key: "this_week",
-    label: "This week",
+    label: "This Week",
     range: (t: string) => {
       const from = weekStart(t);
       return { from, to: daysAfter(from, 6) };
@@ -199,7 +199,7 @@ export const RANGE_PRESETS = {
   },
   previous_week: {
     key: "previous_week",
-    label: "Previous week",
+    label: "Previous Week",
     range: (t: string) => {
       const from = daysBefore(weekStart(t), 7);
       return { from, to: daysAfter(from, 6) };
@@ -207,22 +207,22 @@ export const RANGE_PRESETS = {
   },
   last_30_days: {
     key: "last_30_days",
-    label: "Last 30 days",
+    label: "Last 30 Days",
     range: (t: string) => ({ from: daysBefore(t, 30), to: daysBefore(t, 1) }),
   },
   last_90_days: {
     key: "last_90_days",
-    label: "Last 90 days",
+    label: "Last 90 Days",
     range: (t: string) => ({ from: daysBefore(t, 90), to: daysBefore(t, 1) }),
   },
   this_month: {
     key: "this_month",
-    label: "This month",
+    label: "This Month",
     range: (t: string) => ({ from: monthStart(t), to: monthEnd(t) }),
   },
   last_month: {
     key: "last_month",
-    label: "Last month",
+    label: "Last Month",
     range: (t: string) => {
       const from = addMonths(t, -1);
       return { from, to: monthEnd(from) };
@@ -230,7 +230,7 @@ export const RANGE_PRESETS = {
   },
   next_month: {
     key: "next_month",
-    label: "Next month",
+    label: "Next Month",
     range: (t: string) => {
       const from = addMonths(t, 1);
       return { from, to: monthEnd(from) };
@@ -238,12 +238,12 @@ export const RANGE_PRESETS = {
   },
   this_year: {
     key: "this_year",
-    label: "This year",
+    label: "This Year",
     range: (t: string) => ({ from: `${t.slice(0, 4)}-01-01`, to: `${t.slice(0, 4)}-12-31` }),
   },
   last_year: {
     key: "last_year",
-    label: "Last year",
+    label: "Last Year",
     range: (t: string) => {
       const y = Number(t.slice(0, 4)) - 1;
       return { from: `${y}-01-01`, to: `${y}-12-31` };
@@ -251,7 +251,7 @@ export const RANGE_PRESETS = {
   },
   year_to_date: {
     key: "year_to_date",
-    label: "Year to date",
+    label: "Year to Date",
     range: (t: string) => ({ from: `${t.slice(0, 4)}-01-01`, to: t }),
   },
 } as const satisfies Record<string, RangePreset>;

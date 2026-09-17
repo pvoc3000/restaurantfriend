@@ -52,7 +52,7 @@ export const DOCUMENT_LABEL: Record<DocumentKind, string> = {
   quote: "Quote",
   invoice: "Invoice",
   receipt: "Receipt",
-  order: "Kitchen order",
+  order: "Kitchen Order",
 };
 
 /** What the masthead prints in the top right — FileMaker's own wording. */

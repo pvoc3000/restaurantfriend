@@ -40,7 +40,7 @@ export const CHECKLIST_KIND_HINT: Record<ChecklistKind, string> = {
 export type CheckStatus = "pending" | "done" | "issue" | "na";
 
 export const CHECK_STATUS_LABEL: Record<CheckStatus, string> = {
-  pending: "Not yet",
+  pending: "Not Yet",
   done: "Done",
   issue: "Issue",
   na: "N/A",

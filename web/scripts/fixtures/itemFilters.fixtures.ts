@@ -20,7 +20,7 @@ test("the three age bands abut and All time is null", () => {
   // Every day is in exactly one band: the ends meet with no gap and no overlap.
   eq(by("1to2y").range(TUE)!.to < by("within1y").range(TUE)!.from, true);
   eq(by("over2y").range(TUE)!.to < by("1to2y").range(TUE)!.from, true);
-  eq(matchingPreset(null, LAST_ORDERED_PRESETS, TUE)?.label, "All time");
+  eq(matchingPreset(null, LAST_ORDERED_PRESETS, TUE)?.label, "All Time");
 });
 
 test("the range rides the URL as from/to and half a pair is nothing", () => {

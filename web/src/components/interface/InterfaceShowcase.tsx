@@ -852,14 +852,14 @@ function TablesBlock() {
     {
       key: "category",
       label: "Category",
-      allLabel: "All categories",
+      allLabel: "All Categories",
       options: CATEGORIES.map((c) => ({ value: c, label: c })),
       matches: (row, value) => row.category === value,
     },
     {
       key: "vendor",
       label: "Vendor",
-      allLabel: "All vendors",
+      allLabel: "All Vendors",
       options: VENDORS.map((v) => ({ value: v, label: v })),
       matches: (row, value) => row.vendor === value,
     },

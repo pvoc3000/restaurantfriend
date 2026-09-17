@@ -65,31 +65,31 @@ export type EventKind =
 
 export const EVENT_KIND_LABEL: Record<EventKind, string> = {
   shift: "Shift",
-  call_out: "Call out",
+  call_out: "Call Out",
   attendance: "Attendance",
-  verbal_warning: "Verbal warning",
-  written_warning: "Written warning",
+  verbal_warning: "Verbal Warning",
+  written_warning: "Written Warning",
   incident: "Incident",
   positive: "Positive",
   negative: "Negative",
   check_in: "Check-in",
   note: "Note",
-  document_note: "Document note",
+  document_note: "Document Note",
 };
 
 /** Exactly migration 035's check constraint — a value outside it fails insert. */
 export const EVENT_KIND_OPTIONS: PickOption[] = [
   { value: "shift", label: "Shift", hint: "a rating for one shift", group: "Shift" },
   { value: "attendance", label: "Attendance", hint: "late, left early", group: "Attendance" },
-  { value: "call_out", label: "Call out", hint: "did not work the shift", group: "Attendance" },
-  { value: "verbal_warning", label: "Verbal warning", group: "Discipline" },
-  { value: "written_warning", label: "Written warning", group: "Discipline" },
+  { value: "call_out", label: "Call Out", hint: "did not work the shift", group: "Attendance" },
+  { value: "verbal_warning", label: "Verbal Warning", group: "Discipline" },
+  { value: "written_warning", label: "Written Warning", group: "Discipline" },
   { value: "incident", label: "Incident", hint: "an incident report", group: "Discipline" },
   { value: "positive", label: "Positive", hint: "a shout-out", group: "Notes" },
   { value: "negative", label: "Negative", group: "Notes" },
   { value: "check_in", label: "Check-in", group: "Notes" },
   { value: "note", label: "Note", group: "Notes" },
-  { value: "document_note", label: "Document note", hint: "a filing recorded in FileMaker", group: "Notes" },
+  { value: "document_note", label: "Document Note", hint: "a filing recorded in FileMaker", group: "Notes" },
 ];
 
 /**

@@ -251,10 +251,10 @@ export const AGING_ORDER: AgingBucket[] = [
 
 export const AGING_LABEL: Record<AgingBucket, string> = {
   overdue: "Overdue",
-  due7: "Due in 7 days",
-  due30: "Due in 30 days",
+  due7: "Due in 7 Days",
+  due30: "Due in 30 Days",
   later: "Later",
-  nodate: "No due date",
+  nodate: "No Due Date",
 };
 
 /**

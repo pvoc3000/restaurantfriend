@@ -43,9 +43,9 @@ export type SoAttachmentKind =
   | "document";
 
 export const SO_ATTACHMENT_KIND_LABEL: Record<SoAttachmentKind, string> = {
-  signed_quote: "Signed quote",
-  quote_document: "Quote sent",
-  invoice_document: "Invoice sent",
+  signed_quote: "Signed Quote",
+  quote_document: "Quote Sent",
+  invoice_document: "Invoice Sent",
   picture: "Picture",
   document: "Document",
 };
@@ -58,7 +58,7 @@ export const SO_ATTACHMENT_KIND_LABEL: Record<SoAttachmentKind, string> = {
  * it never was, and the stage date beside it would then be a lie nobody wrote.
  */
 export const SO_ATTACHMENT_KIND_OPTIONS: PickOption[] = [
-  { value: "signed_quote", label: "Signed quote", hint: "returned by the customer" },
+  { value: "signed_quote", label: "Signed Quote", hint: "returned by the customer" },
   { value: "picture", label: "Picture", hint: "the cake, the reference photo" },
   { value: "document", label: "Document", hint: "anything else on file" },
 ];

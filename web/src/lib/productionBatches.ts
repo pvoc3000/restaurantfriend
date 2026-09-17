@@ -42,8 +42,8 @@ export const BATCH_STATUSES = [
 export type BatchStatus = (typeof BATCH_STATUSES)[number];
 
 export const BATCH_STATUS_LABEL: Record<BatchStatus, string> = {
-  to_do: "To do",
-  in_progress: "In progress",
+  to_do: "To Do",
+  in_progress: "In Progress",
   complete: "Complete",
   skipped: "Skipped",
   test: "Test",

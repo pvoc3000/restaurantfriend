@@ -632,5 +632,5 @@ test("salesRangePresets: five presets, no custom, agreeing with resolveSalesRang
   const presets = salesRangePresets("2026-08-23", PERIODS);
   eq(presets.map((p) => p.key), ["period", "last-period", "mtd", "last-30", "ytd"]);
   eq(presets[0].range("2026-08-23"), resolveSalesRange("period", "2026-08-23", PERIODS).range);
-  eq(presets[2].label, "Month to date");
+  eq(presets[2].label, "Month to Date");
 });

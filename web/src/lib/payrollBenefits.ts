@@ -44,9 +44,9 @@ import { compareByStart } from "./overtime";
 export type BenefitUnit = "per_shift" | "per_workday" | "per_period";
 
 export const BENEFIT_UNIT_LABEL: Record<BenefitUnit, string> = {
-  per_shift: "Per shift",
-  per_workday: "Per day",
-  per_period: "Per pay period",
+  per_shift: "Per Shift",
+  per_workday: "Per Day",
+  per_period: "Per Pay Period",
 };
 
 /** What each unit means, for the picker — the per_workday caveat especially. */

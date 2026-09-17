@@ -114,7 +114,7 @@ export default async function SpecialOrdersPage({
     .from("special_orders")
     .select(
       `id, number, kind, status, todo, flag_reason, title, event_date, event_time,
-       fulfillment, standing_days, ignore_balance,
+       fulfillment, standing_days, standing_order_id, ignore_balance,
        tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee,
        quote_sent_at, quote_returned_at, invoice_sent_at, invoice_paid_at,
        receipt_sent_at, delivery_scheduled_at, order_printed_at, order_scheduled_at,

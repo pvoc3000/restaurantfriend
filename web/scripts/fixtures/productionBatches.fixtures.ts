@@ -23,7 +23,7 @@ import {
 test("all five FileMaker statuses survive, with no sort prefixes", () => {
   eq([...BATCH_STATUSES], ["to_do", "in_progress", "complete", "skipped", "test"]);
   for (const s of BATCH_STATUSES) ok(BATCH_STATUS_LABEL[s], `label for ${s}`);
-  eq(BATCH_STATUS_LABEL.to_do, "To do");
+  eq(BATCH_STATUS_LABEL.to_do, "To Do");
 });
 
 test("outstanding is to-do AND in-progress — a half-made batch is not done", () => {

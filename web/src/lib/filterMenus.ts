@@ -36,6 +36,8 @@ export type FilterOption = {
   label: string;
   /** Said quietly after the label. The bar fills this with a count. */
   hint?: string;
+  /** A rule above this row, for a vocabulary in two halves — see `PickOption`. */
+  separatorBefore?: boolean;
 };
 
 export type FilterDimension<T> = {

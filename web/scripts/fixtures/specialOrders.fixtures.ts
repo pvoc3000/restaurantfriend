@@ -24,6 +24,8 @@ import {
   isProductionLine,
   isSettled,
   countsAsOwed,
+  matchesKindFilter,
+  ORDER_KIND_FILTERS,
   isoWeekday,
   lineTotal,
   meansNoAllergy,
@@ -780,4 +782,22 @@ test("countsAsOwed: only a BILLED order is money owed, never a lead or a quote",
   no(countsAsOwed(o("cancelled")));
   no(countsAsOwed(o(null, "standing_order")));
   no(countsAsOwed(o("order", "order", true)));
+});
+
+test("the kind filter tells a standing order from the days it makes", () => {
+  const day = { kind: "order", standing_order_id: "s1" };
+  const oneOff = { kind: "order", standing_order_id: null };
+  const recurrence = { kind: "standing_order", standing_order_id: null };
+
+  ok(matchesKindFilter(oneOff, "order"));
+  no(matchesKindFilter(day, "order"), "hiding the wholesale days is the point");
+  ok(matchesKindFilter(day, "standing_day"));
+  no(matchesKindFilter(oneOff, "standing_day"));
+  ok(matchesKindFilter(recurrence, "standing_order"));
+  no(matchesKindFilter(day, "standing_order"), "a day is not its own recurrence");
+  ok(matchesKindFilter({ kind: "template" }, "template"));
+  // Every order matches exactly one option, or the four cannot sum to the list.
+  for (const r of [day, oneOff, recurrence, { kind: "template" }]) {
+    eq(ORDER_KIND_FILTERS.filter((f) => matchesKindFilter(r, f.value)).length, 1);
+  }
 });

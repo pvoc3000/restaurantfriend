@@ -7,10 +7,10 @@ export type StaleBucket = "never" | "over2y" | "1to2y" | "within1y";
 export const STALE_ORDER: StaleBucket[] = ["never", "over2y", "1to2y", "within1y"];
 
 export const STALE_LABEL: Record<StaleBucket, string> = {
-  never: "Never ordered",
-  over2y: "2+ years",
-  "1to2y": "1–2 years",
-  within1y: "Within a year",
+  never: "Never Ordered",
+  over2y: "2+ Years",
+  "1to2y": "1–2 Years",
+  within1y: "Within a Year",
 };
 
 /**

@@ -42,7 +42,7 @@ const BUTTON =
 const DECISION_OPTIONS = [
   { value: "owed", label: "Owed", hint: "an hour of premium pay is due" },
   { value: "waived", label: "Waived", hint: "a signed waiver covers it" },
-  { value: "not_owed", label: "Not owed", hint: "looked at; the rule wasn't broken" },
+  { value: "not_owed", label: "Not Owed", hint: "looked at; the rule wasn't broken" },
 ];
 
 export type PremiumRow = {

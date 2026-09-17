@@ -30,14 +30,14 @@ export const TIMESHEET_ISSUES: TimesheetIssue[] = [
 ];
 
 export const TIMESHEET_ISSUE_LABEL: Record<TimesheetIssue, string> = {
-  late_meal: "Late meal",
-  no_meal: "No meal",
+  late_meal: "Late Meal",
+  no_meal: "No Meal",
   no_title: "No Payroll Title",
   tips: "Tips",
-  no_clock_out: "No clock-out",
-  no_payroll_id: "No payroll ID",
-  no_shop: "No shop",
-  ambiguous_time: "Ambiguous clock time",
+  no_clock_out: "No Clock-out",
+  no_payroll_id: "No Payroll ID",
+  no_shop: "No Shop",
+  ambiguous_time: "Ambiguous Clock Time",
 };
 
 export type IssueFacts = {

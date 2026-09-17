@@ -22,7 +22,7 @@ export const PAY_PERIOD_STATUS: PayPeriodStatus[] = ["open", "review", "exported
 
 export const PAY_PERIOD_STATUS_LABEL: Record<PayPeriodStatus, string> = {
   open: "Open",
-  review: "In review",
+  review: "In Review",
   exported: "Exported",
   closed: "Closed",
 };

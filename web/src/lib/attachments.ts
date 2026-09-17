@@ -64,14 +64,14 @@ export type AttachmentKind = "invoice" | "packing_slip" | "photo" | "other";
 /** Exactly 001's check constraint — a value outside it is a failed insert. */
 export const ATTACHMENT_KIND_OPTIONS: PickOption[] = [
   { value: "invoice", label: "Invoice", hint: "what you were billed" },
-  { value: "packing_slip", label: "Packing slip", hint: "what was in the boxes" },
+  { value: "packing_slip", label: "Packing Slip", hint: "what was in the boxes" },
   { value: "photo", label: "Photo", hint: "a short case, damage" },
   { value: "other", label: "Other" },
 ];
 
 export const ATTACHMENT_KIND_LABEL: Record<AttachmentKind, string> = {
   invoice: "Invoice",
-  packing_slip: "Packing slip",
+  packing_slip: "Packing Slip",
   photo: "Photo",
   other: "Other",
 };

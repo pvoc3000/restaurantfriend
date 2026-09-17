@@ -20,8 +20,8 @@ export type ElementBatchRow = {
 
 const STATUS: PickOption[] = [
   { value: "complete", label: "Complete" },
-  { value: "in_progress", label: "In progress" },
-  { value: "to_do", label: "To do" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "to_do", label: "To Do" },
   { value: "skipped", label: "Skipped" },
   { value: "test", label: "Test" },
 ];

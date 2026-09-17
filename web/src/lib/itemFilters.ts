@@ -23,22 +23,22 @@ export type ActiveFilter = "active" | "inactive" | "all";
 export const LAST_ORDERED_PRESETS: RangePreset[] = [
   {
     key: "within1y",
-    label: "Within a year",
+    label: "Within a Year",
     range: (today) => ({ from: daysBefore(today, 365), to: today }),
   },
   {
     key: "1to2y",
-    label: "1–2 years ago",
+    label: "1–2 Years Ago",
     range: (today) => ({ from: daysBefore(today, 730), to: daysBefore(today, 366) }),
   },
   {
     key: "over2y",
-    label: "Over 2 years ago",
+    label: "Over 2 Years Ago",
     // A floor rather than an open end: a range is two dates, and nothing in
     // this catalog predates the shop.
     range: (today) => ({ from: "2000-01-01", to: daysBefore(today, 731) }),
   },
-  { key: "all", label: "All time", range: () => null },
+  { key: "all", label: "All Time", range: () => null },
 ];
 
 /**

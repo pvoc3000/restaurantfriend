@@ -392,11 +392,11 @@ export const SALES_RANGES = [
 export type SalesRangeKey = (typeof SALES_RANGES)[number];
 
 export const SALES_RANGE_LABEL: Record<SalesRangeKey, string> = {
-  period: "This pay period",
-  "last-period": "Last pay period",
-  mtd: "Month to date",
-  "last-30": "Last 30 days",
-  ytd: "Year to date",
+  period: "This Pay Period",
+  "last-period": "Last Pay Period",
+  mtd: "Month to Date",
+  "last-30": "Last 30 Days",
+  ytd: "Year to Date",
   custom: "Custom",
 };
 

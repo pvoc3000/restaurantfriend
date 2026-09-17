@@ -30,7 +30,7 @@ export type TaskStatus = "open" | "in_progress" | "done" | "cancelled";
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   open: "Open",
-  in_progress: "In progress",
+  in_progress: "In Progress",
   done: "Done",
   cancelled: "Cancelled",
 };

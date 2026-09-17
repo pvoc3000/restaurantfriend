@@ -91,7 +91,7 @@ export const GUIDE_FILTER_LABEL: Record<GuideFilter, string> = {
   all: "All",
   favorites: "Favorites",
   skipped: "Skipped",
-  will_order: "Will order",
+  will_order: "Will Order",
 };
 
 /**
@@ -317,7 +317,7 @@ export type GuideSection = {
 export type GuideGrouping = "section" | "item" | "vendor";
 
 export const GROUPING_LABEL: Record<GuideGrouping, string> = {
-  section: "Shop section",
+  section: "Shop Section",
   item: "Item",
   vendor: "Vendor",
 };

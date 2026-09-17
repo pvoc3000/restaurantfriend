@@ -29,6 +29,12 @@ export type PickOption = {
   /** Options carrying the same group name are listed under it. */
   group?: string;
   /**
+   * A rule above this row, for a vocabulary that falls into two halves with no
+   * heading worth writing — `ActionMenu`'s word for the same mark. A `group`
+   * draws its own rule AND a heading; this is the quieter half of that.
+   */
+  separatorBefore?: boolean;
+  /**
    * Retired, but still worth knowing about (Mark, 2026-08-15: "sometimes I'd
    * like to be able to at least know an item exists").
    *
@@ -411,6 +417,9 @@ export function PickList({
     // vocabulary underneath it — the same treatment `Add "…"` gets at the
     // other end of the list.
     divider: o === clearOption,
+    // Never on the first row, where the search box or the panel edge is
+    // already the line above — the `headerRule` rule, for the same reason.
+    rule: Boolean(o.separatorBefore) && i > 0,
   }));
 
   return (
@@ -639,9 +648,12 @@ export function PickList({
             {shown.length === 0 && !offerNew && (
               <p className="px-3 py-2 text-sm text-muted">Nothing matches.</p>
             )}
-            {rows.map(({ option: o, header, headerRule, divider }, i) => {
+            {rows.map(({ option: o, header, headerRule, divider, rule }, i) => {
               return (
-                <div key={`${o.group ?? ""}:${o.value}`}>
+                <div
+                  key={`${o.group ?? ""}:${o.value}`}
+                  className={rule ? "border-t border-hairline" : ""}
+                >
                   {header && (
                     <p
                       className={`${MENU_HEADER_CLASS} ${

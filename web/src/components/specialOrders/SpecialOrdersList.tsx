@@ -40,9 +40,11 @@ import {
 import { sortRows } from "@/lib/tableSort";
 import {
   KIND_LABEL,
+  ORDER_KIND_FILTERS,
   STATUS_LABEL,
   countsAsOwed,
   customerLabel,
+  matchesKindFilter,
   money,
   needsAttention,
   suggestedTodo,
@@ -67,6 +69,9 @@ export type SpecialOrderRow = {
   kitchen_code: string | null;
   customer: { id: string; first_name: string | null; last_name: string | null; company: string | null } | null;
   standing_days: number[] | null;
+  /** Set when 099 materialized this day FROM a standing order; null on a
+   *  hand-typed one. The Kind filter's whole distinction. */
+  standing_order_id: string | null;
   /** Derived on the server from the lines and the payments — never a column. */
   totals: OrderTotals;
   /** Every stage date, so the grid and `needsAttention` read the same row. */
@@ -280,9 +285,9 @@ export function SpecialOrdersList({
         label: "Show",
         // The bar prepends its own FILTER_ALL option, and it is labelled the
         // same as the explicit `all` below ON PURPOSE — see that option.
-        allLabel: "All orders",
+        allLabel: "All Orders",
         options: [
-          { value: "attention", label: "Needs attention" },
+          { value: "attention", label: "Needs Attention" },
           { value: "upcoming", label: "Upcoming" },
           { value: "tomorrow", label: "Tomorrow" },
           { value: "unpaid", label: "Unpaid" },
@@ -304,7 +309,7 @@ export function SpecialOrdersList({
            * control six lists share, to remove an option that is correct
            * everywhere else.
            */
-          { value: "all", label: "All orders" },
+          { value: "all", label: "All Orders" },
         ],
         // Upcoming: the working view, and the list's resting state.
         defaultValue: "upcoming",
@@ -332,11 +337,8 @@ export function SpecialOrdersList({
       {
         key: "kind",
         label: "Kind",
-        options: (["order", "standing_order", "template"] as SpecialOrderKind[]).map((k) => ({
-          value: k,
-          label: KIND_LABEL[k],
-        })),
-        matches: (r, v) => r.kind === v,
+        options: ORDER_KIND_FILTERS,
+        matches: (r, v) => matchesKindFilter(r, v),
       },
       {
         key: "status",
@@ -366,7 +368,7 @@ export function SpecialOrdersList({
         label: "To-do",
         options: [
           ...todos.map((t) => ({ value: t, label: t })),
-          { value: NONE, label: "Nothing set" },
+          { value: NONE, label: "Nothing Set" },
         ],
         matches: (r, v) => (v === NONE ? !r.todo : r.todo === v),
       },
@@ -486,7 +488,15 @@ export function SpecialOrdersList({
       sortTiebreaks: [(r) => r.number],
       render: (r) =>
         r.kind === "order" ? (
-          <span className="text-muted">{r.status ? STATUS_LABEL[r.status] : "—"}</span>
+          <span className="text-muted">
+            {r.status ? STATUS_LABEL[r.status] : "—"}
+            {/* Which of the two kinds of order this is, under its status —
+                the same distinction the Kind menu now filters on, on the row
+                it is about. */}
+            {r.standing_order_id ? (
+              <span className="block text-[12px] text-subtle">Standing order</span>
+            ) : null}
+          </span>
         ) : (
           <span className="text-muted">{KIND_LABEL[r.kind]}</span>
         ),

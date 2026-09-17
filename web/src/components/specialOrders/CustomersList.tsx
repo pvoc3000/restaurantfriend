@@ -77,7 +77,7 @@ export function CustomersList({
         key: "owing",
         label: "Balance",
         options: [
-          { value: "owing", label: "Owes money" },
+          { value: "owing", label: "Owes Money" },
           { value: "clear", label: "Settled" },
         ],
         matches: (r, v) => (v === "owing" ? r.outstanding > 0 : r.outstanding <= 0),
@@ -95,8 +95,8 @@ export function CustomersList({
         key: "activity",
         label: "Orders",
         options: [
-          { value: "any", label: "Has ordered" },
-          { value: "none", label: "Never ordered" },
+          { value: "any", label: "Has Ordered" },
+          { value: "none", label: "Never Ordered" },
         ],
         matches: (r, v) => (v === "any" ? r.orderCount > 0 : r.orderCount === 0),
       },

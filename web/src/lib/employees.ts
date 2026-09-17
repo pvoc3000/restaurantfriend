@@ -94,13 +94,13 @@ export type EmployeeStatus = "active" | "new_hire" | "inactive";
 
 export const STATUS_LABEL: Record<EmployeeStatus, string> = {
   active: "Active",
-  new_hire: "New hire",
+  new_hire: "New Hire",
   inactive: "Inactive",
 };
 
 export const STATUS_OPTIONS: PickOption[] = [
   { value: "active", label: "Active" },
-  { value: "new_hire", label: "New hire", hint: "started, not yet settled" },
+  { value: "new_hire", label: "New Hire", hint: "started, not yet settled" },
   { value: "inactive", label: "Inactive", hint: "no longer works here" },
 ];
 
@@ -112,17 +112,17 @@ export type EmployeeSchedule =
   | "part_time_plus";
 
 export const SCHEDULE_LABEL: Record<EmployeeSchedule, string> = {
-  part_time: "Part time",
-  full_time: "Full time",
-  full_time_plus: "Full time +",
-  part_time_plus: "Part time +",
+  part_time: "Part Time",
+  full_time: "Full Time",
+  full_time_plus: "Full Time +",
+  part_time_plus: "Part Time +",
 };
 
 export const SCHEDULE_OPTIONS: PickOption[] = [
-  { value: "part_time", label: "Part time" },
-  { value: "part_time_plus", label: "Part time +" },
-  { value: "full_time", label: "Full time" },
-  { value: "full_time_plus", label: "Full time +" },
+  { value: "part_time", label: "Part Time" },
+  { value: "part_time_plus", label: "Part Time +" },
+  { value: "full_time", label: "Full Time" },
+  { value: "full_time_plus", label: "Full Time +" },
 ];
 
 export type Employee = {

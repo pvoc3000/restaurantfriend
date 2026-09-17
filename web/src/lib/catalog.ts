@@ -330,8 +330,8 @@ export function parPackageLabel(
 export const ORDER_TYPE_LABEL: Record<string, string> = {
   email_po: "Email PO",
   online: "Online",
-  in_person: "In person",
-  none: "None — directory only",
+  in_person: "In Person",
+  none: "None — Directory Only",
 };
 
 export const ORDER_TYPE_OPTIONS: { value: string; label: string }[] = [

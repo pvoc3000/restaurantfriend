@@ -47,9 +47,9 @@ export type Timesheet = {
 };
 
 export const OT_DECISION_LABEL: Record<OtDecision, string> = {
-  source: "As imported",
+  source: "As Imported",
   recomputed: "Recomputed",
-  manual: "Set by hand",
+  manual: "Set by Hand",
 };
 
 /**

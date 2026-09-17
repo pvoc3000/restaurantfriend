@@ -34,6 +34,48 @@ export const KIND_LABEL: Record<SpecialOrderKind, string> = {
 };
 
 /**
+ * THE KIND FILTER'S VOCABULARY, which is four answers over a column with three
+ * values (Mark, 2026-09-17: "is there a way to make a distinction between
+ * standing orders and orders that come from standing orders?").
+ *
+ * There is, and it needs no migration: a day a standing order materialized is
+ * an ordinary `kind = 'order'` carrying `standing_order_id` (099), where a
+ * hand-typed order carries none. So the filter splits `order` in two and
+ * leaves the column alone.
+ *
+ * `order` KEEPS ITS VALUE AND NARROWS ITS MEANING to a one-off — a remembered
+ * `?kind=order` still parses, and it is the half that makes hiding possible:
+ * with Order still matching both there would be no way to take the wholesale
+ * days off the screen, which is what was asked for.
+ */
+export type OrderKindFilter = "order" | "standing_day" | "standing_order" | "template";
+
+export const ORDER_KIND_FILTERS: {
+  value: OrderKindFilter;
+  label: string;
+  separatorBefore?: boolean;
+}[] = [
+  { value: "order", label: "Regular Orders" },
+  // Mark's words, 2026-09-17: the DAY is the order and the recurrence is the
+  // template that makes it. `KIND_LABEL` keeps the schema's own vocabulary for
+  // the record screens; this is the filter's.
+  { value: "standing_day", label: "Standing Orders" },
+  // The two templates below the two kinds of real order, ruled off from them
+  // and in the same order as the orders above (Mark, 2026-09-17).
+  { value: "template", label: "Regular Order Templates", separatorBefore: true },
+  { value: "standing_order", label: "Standing Order Templates" },
+];
+
+export function matchesKindFilter(
+  order: { kind: string; standing_order_id?: string | null },
+  value: string
+): boolean {
+  if (value === "order") return order.kind === "order" && !order.standing_order_id;
+  if (value === "standing_day") return order.kind === "order" && Boolean(order.standing_order_id);
+  return order.kind === value;
+}
+
+/**
  * The ladder, in order. `cancelled` is deliberately last and OFF it — it is
  * where an order stops rather than a rung, which is why `nextStatus` returns
  * null from it and why the list greys those rows rather than colouring them.

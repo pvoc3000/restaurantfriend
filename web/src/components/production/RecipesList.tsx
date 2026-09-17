@@ -102,7 +102,7 @@ export function RecipesList({
         options: [
           { value: "active", label: "Active" },
           { value: "all", label: "All" },
-          { value: "no-master", label: "No master" },
+          { value: "no-master", label: "No Master" },
         ],
         matches: (r, v) =>
           v === "active" ? r.is_active : v === "no-master" ? !r.masterLabel : true,

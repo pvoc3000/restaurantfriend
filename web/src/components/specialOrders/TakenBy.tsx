@@ -74,7 +74,7 @@ export function TakenBy({
   const options: PickOption[] = [
     ...(roster ?? []).map((r) => ({ value: r.id, label: r.name })),
     ...(employeeId && !linked
-      ? [{ value: employeeId, label: "Somebody who has left", group: "No longer here" }]
+      ? [{ value: employeeId, label: "Somebody Who Has Left", group: "No longer here" }]
       : []),
   ];
 
