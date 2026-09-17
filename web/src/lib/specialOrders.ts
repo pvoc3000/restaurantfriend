@@ -230,6 +230,32 @@ export function isSettled(order: MoneyOrder, totals: OrderTotals): boolean {
   return Boolean(order.ignore_balance) || totals.balance <= 0;
 }
 
+/**
+ * Does this order's balance count as money the customer OWES us?
+ *
+ * Only once we have BILLED them: status `invoice` (sent, awaiting payment) or
+ * `order` (committed). A lead or a quote derives a balance too — it has lines
+ * and no payments — but that figure is a price we OFFERED, not a debt, and
+ * counting it made the customer book claim $210k outstanding on 764 quotes
+ * (measured 2026-09-17) against ~$60k really billed.
+ *
+ * `kind === "order"` stays load-bearing: a standing order or a template is a
+ * shape, never a bill. `ignore_balance` is decision 13's weekly-statement
+ * escape hatch. The two customer screens both ask this, so they cannot
+ * disagree about one customer's money again.
+ */
+export function countsAsOwed(order: {
+  kind: string;
+  status: string | null;
+  ignore_balance?: boolean | null;
+}): boolean {
+  return (
+    order.kind === "order" &&
+    (order.status === "invoice" || order.status === "order") &&
+    !order.ignore_balance
+  );
+}
+
 export function money(value: number): string {
   return `${value < 0 ? "-" : ""}$${Math.abs(value).toFixed(2)}`;
 }

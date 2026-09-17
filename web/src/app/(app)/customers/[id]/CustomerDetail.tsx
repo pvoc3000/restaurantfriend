@@ -7,6 +7,7 @@ import type { RawSearchParams } from "@/lib/filterMenus";
 import {
   KIND_LABEL,
   STATUS_LABEL,
+  countsAsOwed,
   customerLabel,
   money,
   orderTotals,
@@ -126,14 +127,12 @@ export async function CustomerDetail({
    * A standing order is the SHAPE of a recurring order, never a bill. The days
    * it materializes are the orders, and those are in the list below.
    * `needsAttention` guards the same way for the same reason.
+   *
+   * Since 2026-09-17 the rule is `countsAsOwed`, shared with the list: a lead
+   * or a quote is a price offered, not a debt, so neither is "outstanding".
    */
   const unpaid = withMoney.filter(
-    (o) =>
-      o.kind === "order" &&
-      o.status !== "cancelled" &&
-      !o.ignore_balance &&
-      o.totals.balance > 0 &&
-      o.totals.total > 0
+    (o) => countsAsOwed(o) && o.totals.balance > 0 && o.totals.total > 0
   );
   const rest = withMoney.filter((o) => !unpaid.includes(o));
   const owed = unpaid.reduce((a, o) => a + o.totals.balance, 0);
@@ -262,7 +261,7 @@ function OrderTable({
   count: number;
   rows: {
     id: string; number: string; kind: string; status: SpecialOrderStatus | null;
-    title: string | null; event_date: string | null;
+    title: string | null; event_date: string | null; ignore_balance: boolean;
     totals: { total: number; balance: number };
   }[];
   trailHref: string;
@@ -303,7 +302,7 @@ function OrderTable({
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums">{money(o.totals.total)}</td>
                 <td className={`px-3 py-2 text-right tabular-nums ${accent ? "text-accent" : "text-faint"}`}>
-                  {o.totals.balance > 0 ? money(o.totals.balance) : "—"}
+                  {countsAsOwed(o) && o.totals.balance > 0 ? money(o.totals.balance) : "—"}
                 </td>
               </tr>
             ))}

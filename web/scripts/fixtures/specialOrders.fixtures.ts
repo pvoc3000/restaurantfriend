@@ -23,6 +23,7 @@ import {
   customerLabel,
   isProductionLine,
   isSettled,
+  countsAsOwed,
   isoWeekday,
   lineTotal,
   meansNoAllergy,
@@ -759,4 +760,15 @@ test("meansNoAllergy: anything unrecognised is SHOWN", () => {
   // way of writing an allergy costs a great deal more.
   no(meansNoAllergy("¯\\_(ツ)_/¯"), "unknown");
   no(meansNoAllergy("ask the customer"), "unknown phrase");
+});
+
+test("countsAsOwed: only a BILLED order is money owed, never a lead or a quote", () => {
+  const o = (status: string | null, kind = "order", ignore_balance = false) => ({ kind, status, ignore_balance });
+  ok(countsAsOwed(o("invoice")));
+  ok(countsAsOwed(o("order")));
+  no(countsAsOwed(o("quote")));
+  no(countsAsOwed(o("lead")));
+  no(countsAsOwed(o("cancelled")));
+  no(countsAsOwed(o(null, "standing_order")));
+  no(countsAsOwed(o("order", "order", true)));
 });
