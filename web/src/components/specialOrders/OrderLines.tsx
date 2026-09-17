@@ -81,6 +81,18 @@ const LINE_WIDTHS: Record<string, number> = {
   actions: 44,
 };
 
+/** The footer's total, with thousands separators (Mark, 2026-09-16). Local on
+ *  purpose: `money` also prints the quote, the invoice and the statement, and
+ *  the minus sign goes before the dollar, where `lib/purchaseOrders`' puts it
+ *  after. */
+function moneyWithCommas(value: number): string {
+  const abs = Math.abs(value).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `${value < 0 ? "-" : ""}$${abs}`;
+}
+
 /**
  * The lines — decision 5's editable COPIES of production items.
  *
@@ -684,7 +696,7 @@ export function OrderLines({
                     </td>
                     <td className="px-3 py-2 text-right align-top font-semibold">Items</td>
                     <td className="px-3 py-2 text-right align-top font-semibold tabular-nums">
-                      {money(subtotal)}
+                      {moneyWithCommas(subtotal)}
                     </td>
                     {canWrite ? <td /> : null}
                   </tr>

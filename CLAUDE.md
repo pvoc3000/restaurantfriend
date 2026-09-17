@@ -7336,6 +7336,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    It is **opt-in, and `RowMenu` does not take it**: `⋯` already means "there is
    more here", and a caret beside it is the same claim twice inside a 36px
    square.
+   **PAYMENTS AND MONEY HAVE THEIR OWN TAB SINCE 2026-09-16** (Mark) —
+   Info · Items · Payments · Notes · Delivery · Documents, every kind of record
+   included (a template's Money block is what a duplicate inherits). The Items
+   tab keeps the lines, sticky column labels, and a pinned footer holding Add
+   item and the Items total, which borrows the lines' own `colgroup` so the
+   figure sits under Total. The paragraph below still describes the pair's
+   arrangement, now on the Payments tab.
    **PAYMENTS LEFT, MONEY RIGHT ON THE ITEMS TAB.** Stacked, the payments table
    sat a screen below the balance it settles. They shipped Money-left first and
    were swapped the same day ("move the 'money' section… all the way to the

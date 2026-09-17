@@ -818,7 +818,7 @@ export function readSettings(orgSettings: Record<string, unknown>): SpecialOrder
  * The tab lives in the URL like every other piece of view state, and `info`
  * writes NO parameter so the record keeps one canonical address.
  */
-export type OrderTab = "info" | "items" | "notes" | "delivery" | "documents";
+export type OrderTab = "info" | "items" | "payments" | "notes" | "delivery" | "documents";
 
 /**
  * FileMaker's own tabs, minus the two this module retires: EVENT INFO · ITEMS ·
@@ -831,11 +831,17 @@ export type OrderTab = "info" | "items" | "notes" | "delivery" | "documents";
  * DOCUMENT a sentence prints on, and on the Info tab they pushed the log —
  * the thing you actually read — below the fold.
  */
-export const ORDER_TABS: OrderTab[] = ["info", "items", "notes", "delivery", "documents"];
+/*
+ * PAYMENTS IS ITS OWN TAB (Mark, 2026-09-16), holding the Payments table and
+ * the Money block, which sat under the lines on Items. It comes right after
+ * Items: what was ordered, then what it costs and what has been paid.
+ */
+export const ORDER_TABS: OrderTab[] = ["info", "items", "payments", "notes", "delivery", "documents"];
 
 export const ORDER_TAB_LABEL: Record<OrderTab, string> = {
   info: "Info",
   items: "Items",
+  payments: "Payments",
   notes: "Notes",
   delivery: "Delivery",
   documents: "Documents",
@@ -896,7 +902,9 @@ export function orderTabHref(
  * state you cannot reach.
  */
 export function tabsFor(kind: SpecialOrderKind, fulfillment: string | null): OrderTab[] {
-  if (kind !== "order") return ["info", "items", "notes"];
+  // A template and a standing order keep Payments: it is where their Money
+  // block lives — the delivery charge and discount a duplicate inherits.
+  if (kind !== "order") return ["info", "items", "payments", "notes"];
   return fulfillment === "delivery"
     ? ORDER_TABS
     : ORDER_TABS.filter((t) => t !== "delivery");

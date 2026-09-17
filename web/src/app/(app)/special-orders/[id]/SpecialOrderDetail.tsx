@@ -904,7 +904,14 @@ export async function SpecialOrderDetail({
                   />
                 </>
               )}
+            </>
+          )}
 
+          {/* ================= PAYMENTS ================= */}
+          {/* ITS OWN TAB (Mark, 2026-09-16) — Payments and Money moved here
+              from under the lines on Items, keeping their arrangement. */}
+          {activeTab === "payments" && (
+            <>
               {/* PAYMENTS LEFT, MONEY RIGHT (Mark, 2026-08-19: "move the
                   'money' section on the items tab so it's all the way to the
                   right of the page, and the payment is all the way to the
