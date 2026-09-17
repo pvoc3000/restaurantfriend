@@ -3066,6 +3066,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    and its reason: the duplicate warning, the confirms that name what will be
    skipped, the approval RPC's row count and the document order on the delete
    are each a lesson paid for once and not worth a second copy.
+   **PUSH TO QUICKBOOKS (n) JOINED IT 2026-09-16** (Mark) — the ticked
+   APPROVED bills, sent one after another through `components/purchasing/
+   qboBillPush`, which the record's `PushToQuickBooks` now uses too (one send,
+   two doors). Every per-bill guard is a NAMED skip in the report: a linked bill
+   not edited since it was sent is left alone; an unlinked bill QuickBooks
+   already has under its number is NEVER sent (link it on the record — the
+   record's "found means stop"); `billPushRefusals` refusals are listed. ONE
+   `find_bills` covers the selection, and unlike the record a FAILED lookup
+   sends nothing, or a bad connection would double every Bill.com-synced bill.
+   Gated like the record (the Invoices edit cell) and absent until
+   `accounting_connection_status` says connected.
    **DOCUMENTS MEANS THE SCANS, and it cannot mean anything else** (Mark chose
    it from three readings). A vendor invoice is a document we RECEIVE, so there
    is no invoice PDF in this app and there must not be one: the real document is

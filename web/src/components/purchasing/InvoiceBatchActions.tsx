@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { ActionMenuItem } from "@/components/ui/ActionMenu";
@@ -8,6 +8,19 @@ import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { ATTACHMENT_BUCKET } from "@/lib/attachments";
 import { money } from "@/lib/purchaseOrders";
 import type { InvoiceListRow } from "@/app/(app)/invoices/page";
+import { invokeQbo } from "@/lib/qboClient";
+import { normalizeInvoiceNumber, pushIsStale } from "@/lib/invoices";
+import {
+  billPushRefusals,
+  expenseAccountFor,
+  proposeBillLink,
+  pushedLabel,
+  qboTrackingFor,
+  qboVendorId,
+  type BillInvoice,
+  type QboCandidate,
+} from "@/lib/quickbooks";
+import { readBillPushContext, sendBillToQuickBooks } from "./qboBillPush";
 
 /**
  * What you can do to a handful of invoices at once.
@@ -24,12 +37,14 @@ import type { InvoiceListRow } from "@/app/(app)/invoices/page";
  */
 export function InvoiceBatchActions({
   selected,
+  orgId,
   canEdit,
   canApprove,
   onReport,
   children,
 }: {
   selected: InvoiceListRow[];
+  orgId: string;
   /** purchaser+, matching what 025's delete policy allows. */
   canEdit: boolean;
   /** Manager and Owner only — the module's own decision, and what
@@ -57,7 +72,29 @@ export function InvoiceBatchActions({
 }) {
   const supabase = createClient();
   const router = useRouter();
-  const [busy, setBusy] = useState<"approve" | "delete" | null>(null);
+  const [busy, setBusy] = useState<"approve" | "delete" | "push" | null>(null);
+  /** Whether QuickBooks is connected at all — the record's rule: a screen is
+   *  not the place to advertise a feature nobody has set up, so the row is
+   *  absent until this says yes. One cheap RPC per list load. */
+  const [qboConnected, setQboConnected] = useState(false);
+  useEffect(() => {
+    if (!canEdit) return;
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase.rpc("accounting_connection_status", { p_org: orgId });
+      const row = Array.isArray(data) ? (data[0] as { status?: string } | undefined) : undefined;
+      if (!cancelled) setQboConnected(row?.status === "connected");
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // `supabase` is a fresh client each render; the org and the role are what matter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId, canEdit]);
+
+  // Only an APPROVED bill goes to QuickBooks — `billPushRefusals` says so for
+  // one bill, and the count in the label says it for the selection.
+  const pushable = selected.filter((i) => i.status === "approved");
 
   // Only an OPEN invoice can be approved: an approved one is already there and
   // a voided one is refused by the function anyway. Naming the skipped ones in
@@ -197,6 +234,170 @@ export function InvoiceBatchActions({
     router.refresh();
   }
 
+
+  /**
+   * PUSH THE TICKED, APPROVED BILLS TO QUICKBOOKS (Mark, 2026-09-16).
+   *
+   * THE RECORD'S PUSH, BILL BY BILL — `qboBillPush` is the send, and every
+   * guard the record applies is applied here, each one a SKIP that is NAMED in
+   * the report rather than a quiet omission:
+   *   · already in QuickBooks and not edited since → left alone (nothing to send);
+   *   · not yet linked, but QuickBooks already HAS it under this number →
+   *     skipped, never sent: the record's "found means stop" rule, since a
+   *     second copy in the books is the one outcome this module exists to
+   *     avoid. Linking is a per-bill decision and stays on the record;
+   *   · anything `billPushRefusals` refuses (no vendor mapping, no account…).
+   * Sequential, because each push is its own request and its own recorded ref;
+   * a failure part way keeps what went and says so.
+   */
+  async function push() {
+    const skipped = selected.length - pushable.length;
+    const ok = await confirmDialog({
+      ...splitConfirmMessage(
+        `Push ${pushable.length} approved bill${pushable.length === 1 ? "" : "s"} to QuickBooks?\n\n` +
+          `Bills already in QuickBooks are updated only if they were edited since they were sent. ` +
+          `A bill QuickBooks already has under the same number is skipped — link it on its record.` +
+          (skipped ? `\n\n${skipped} not approved — those are left alone.` : "")
+      ),
+      confirmLabel: "Push",
+    });
+    if (!ok) return;
+
+    setBusy("push");
+    const ids = pushable.map((i) => i.id);
+    const { data: rows, error: rowsError } = await supabase
+      .from("vendor_invoices")
+      .select(
+        "id, vendor_id, location_id, invoice_number, invoice_date, due_date, total, is_credit, status, financials_touched_at, synced_at"
+      )
+      .in("id", ids);
+    if (rowsError || !rows) {
+      setBusy(null);
+      onReport(rowsError?.message ?? "The invoices could not be read.", "error");
+      return;
+    }
+
+    // ONE duplicate lookup for the whole selection — `find_bills` takes ids and
+    // returns a flat candidate list that `proposeBillLink` narrows per bill.
+    const unlinked = pushable.filter((i) => !i.qbo_linked).map((i) => i.id);
+    let candidates: QboCandidate[] = [];
+    if (unlinked.length > 0) {
+      const { data, message } = await invokeQbo(supabase, {
+        mode: "find_bills",
+        invoice_ids: unlinked,
+      });
+      if (message) {
+        // The record falls through on a failed lookup; a BATCH must not, or a
+        // bad connection would put every Bill.com-synced bill in twice.
+        setBusy(null);
+        onReport(`QuickBooks could not be checked for duplicates, so nothing was sent: ${message}`, "error");
+        return;
+      }
+      candidates = (data?.candidates as QboCandidate[]) ?? [];
+    }
+
+    let sent = 0;
+    let updated = 0;
+    const notes: string[] = [];
+    const failed: string[] = [];
+    for (const listRow of pushable) {
+      const inv = rows.find((r) => r.id === listRow.id);
+      const name = listRow.invoice_number ?? "no number";
+      if (!inv) {
+        failed.push(`${name}: could not be read`);
+        continue;
+      }
+      const ctx = await readBillPushContext(supabase, {
+        orgId,
+        vendorId: inv.vendor_id as string,
+        locationId: inv.location_id as string,
+        invoiceId: inv.id as string,
+      });
+      if (!ctx.connected) {
+        failed.push(`${name}: QuickBooks is not connected`);
+        break;
+      }
+      const already = pushedLabel(ctx.invoiceRef);
+      if (
+        already &&
+        !pushIsStale({
+          financials_touched_at: inv.financials_touched_at as string | null,
+          synced_at: inv.synced_at as string | null,
+        })
+      ) {
+        notes.push(`${name} already in QuickBooks, unchanged`);
+        continue;
+      }
+      const account = expenseAccountFor(ctx.atShop, ctx.orgAccount);
+      const vendorRef = qboVendorId(ctx.atShop?.external_ref ?? null);
+      const billInvoice: BillInvoice = {
+        id: inv.id as string,
+        po_numbers: listRow.purchase_orders.map((p) => p.po_number),
+        invoice_number: inv.invoice_number as string | null,
+        invoice_date: inv.invoice_date as string | null,
+        due_date: inv.due_date as string | null,
+        total: inv.total as number | null,
+        is_credit: inv.is_credit as boolean,
+        status: inv.status as BillInvoice["status"],
+        external_ref: ctx.invoiceRef,
+      };
+      if (!already) {
+        const found = proposeBillLink(
+          {
+            invoice_number: billInvoice.invoice_number,
+            total: billInvoice.total,
+            is_credit: billInvoice.is_credit,
+            external_ref: ctx.invoiceRef,
+          },
+          candidates,
+          vendorRef,
+          normalizeInvoiceNumber
+        );
+        if (found.ok) {
+          notes.push(`${name} is already in QuickBooks — link it on its record`);
+          continue;
+        }
+      }
+      const refusals = billPushRefusals({
+        invoice: billInvoice,
+        vendorRef,
+        vendorName: ctx.vendorName,
+        accountRef: account?.ref ?? null,
+      });
+      if (refusals.length > 0 || !account) {
+        notes.push(`${name}: ${refusals[0] ?? "no expense account"}`);
+        continue;
+      }
+      const result = await sendBillToQuickBooks(supabase, {
+        invoiceId: inv.id as string,
+        ctx,
+        billInvoice,
+        account,
+        vendorRef,
+        tracking: qboTrackingFor(ctx.atShop),
+      });
+      if (!result.ok) {
+        failed.push(`${name}: ${result.message}`);
+        continue;
+      }
+      if (result.updated) updated++;
+      else sent++;
+      for (const w of result.warnings) notes.push(`${name}: ${w}`);
+    }
+    setBusy(null);
+
+    const done = [sent ? `Sent ${sent}` : null, updated ? `updated ${updated}` : null]
+      .filter(Boolean)
+      .join(", ");
+    const parts = [
+      done ? `${done[0].toUpperCase()}${done.slice(1)} in QuickBooks.` : "Nothing was sent to QuickBooks.",
+      failed.length ? `Failed: ${failed.join("; ")}.` : null,
+      notes.length ? `Skipped or noted: ${notes.join("; ")}.` : null,
+    ].filter(Boolean);
+    onReport(parts.join(" "), failed.length ? "error" : "done");
+    if (sent + updated > 0) router.refresh();
+  }
+
   /**
    * APPROVE IS RENDERED WHENEVER THE ROLE HAS IT AND GREYED WHEN THE SELECTION
    * HOLDS NOTHING OPEN, where the button used to disappear. The count in the
@@ -211,6 +412,17 @@ export function InvoiceBatchActions({
             label: busy === "approve" ? "Approving…" : `Approve (${approvable.length})`,
             disabled: busy !== null || approvable.length === 0,
             onSelect: () => void approve(),
+          },
+        ]
+      : []),
+    // Same gate as the record's push (`canPush` is the Invoices edit cell),
+    // and absent until QuickBooks is known to be connected.
+    ...(canEdit && qboConnected
+      ? [
+          {
+            label: busy === "push" ? "Pushing…" : `Push to QuickBooks (${pushable.length})`,
+            disabled: busy !== null || pushable.length === 0,
+            onSelect: () => void push(),
           },
         ]
       : []),

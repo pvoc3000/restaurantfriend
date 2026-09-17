@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { invokeQbo } from "@/lib/qboClient";
+import {
+  readBillPushContext,
+  sendBillToQuickBooks,
+  type BillPushContext,
+} from "./qboBillPush";
 import type { ReactNode } from "react";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import type { ActionMenuItem } from "@/components/ui/ActionMenu";
@@ -12,7 +17,6 @@ import { normalizeInvoiceNumber, pushIsStale } from "@/lib/invoices";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import {
   billPushRefusals,
-  buildBillPayload,
   expenseAccountFor,
   type ResolvedAccount,
   type QboRefValue,
@@ -20,20 +24,13 @@ import {
   qboTrackingFor,
   qboVendorId,
   splitAccountName,
-  attachableMetadata,
-  attachableFromResponse,
-  attachmentRefusal,
-  attachmentsToSend,
-  withAttachments,
   proposeBillLink,
   linkedRef,
   balanceLabel,
   type BillLinkProposal,
   type QboCandidate,
   type QboEntity,
-  type AccountingRef,
   type BillInvoice,
-  type VendorLocationAccounting,
 } from "@/lib/quickbooks";
 
 /** The clock reading beside a balance — one implementation for `checkBalance`
@@ -57,19 +54,7 @@ function checkedAtLabel(iso: string): string {
  * or not QuickBooks is connected. `VendorAccounting` does the same.
  */
 
-type Ctx = {
-  connected: boolean;
-  orgAccount: { ref: string | null; name: string | null } | null;
-  vendorName: string;
-  /** 083's row for THIS invoice's shop. Null when nobody has configured the
-   *  vendor there — or when the migration is not applied yet. */
-  atShop: VendorLocationAccounting | null;
-  schemaError: string | null;
-  invoiceRef: AccountingRef | null;
-  /** What is filed on this bill. The `invoice` ones go up with it (Mark,
-   *  2026-09-02) — a two-page scan is two rows and QuickBooks should get both. */
-  documents: { id: string; kind: string | null; file_name: string | null; content_type: string | null; storage_path: string }[];
-};
+type Ctx = BillPushContext;
 
 export function PushToQuickBooks({
   invoiceId,
@@ -225,46 +210,10 @@ export function PushToQuickBooks({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, ctx, financialsTouchedAt, syncedAt, canPush]);
 
-  const readContext = useCallback(async (): Promise<Ctx> => {
-    const [conn, vendor, invoice, atShop, docs] = await Promise.all([
-      supabase.rpc("accounting_connection_status", { p_org: orgId }),
-      supabase.from("vendors").select("name").eq("id", vendorId).maybeSingle(),
-      supabase.from("vendor_invoices").select("external_ref").eq("id", invoiceId).maybeSingle(),
-      // Separate and allowed to fail: these columns arrive with 083, and
-      // folding them into a query the rest of the block depends on would take
-      // the whole thing down until it is applied.
-      supabase
-        .from("vendor_locations")
-        .select(
-          "external_ref, expense_account_ref, expense_account_name, qbo_location_ref, qbo_location_name, qbo_class_ref, qbo_class_name"
-        )
-        .eq("vendor_id", vendorId)
-        .eq("location_id", locationId)
-        .maybeSingle(),
-      supabase
-        .from("purchase_order_attachments")
-        .select("id, kind, file_name, content_type, storage_path")
-        .eq("invoice_id", invoiceId),
-    ]);
-
-    const row = Array.isArray(conn.data)
-      ? (conn.data[0] as
-          | { status?: string; bill_expense_account_ref?: string | null; bill_expense_account_name?: string | null }
-          | undefined)
-      : undefined;
-
-    return {
-      connected: row?.status === "connected",
-      orgAccount: row
-        ? { ref: row.bill_expense_account_ref ?? null, name: row.bill_expense_account_name ?? null }
-        : null,
-      vendorName: (vendor.data?.name as string) ?? "this vendor",
-      atShop: (atShop.data ?? null) as VendorLocationAccounting | null,
-      schemaError: atShop.error?.message ?? null,
-      invoiceRef: (invoice.data?.external_ref ?? null) as AccountingRef | null,
-      documents: (docs.data ?? []) as Ctx["documents"],
-    };
-  }, [supabase, orgId, vendorId, locationId, invoiceId]);
+  const readContext = useCallback(
+    (): Promise<Ctx> => readBillPushContext(supabase, { orgId, vendorId, locationId, invoiceId }),
+    [supabase, orgId, vendorId, locationId, invoiceId]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -301,92 +250,17 @@ export function PushToQuickBooks({
     vendorRef: string | null;
     tracking: { location: QboRefValue | null; klass: QboRefValue | null };
   }) {
-    const { ctx: liveCtx, billInvoice, account, vendorRef, tracking } = input;
-    const qboRefId = liveCtx.invoiceRef?.qbo?.id ?? null;
-    const { entity, body: payload } = buildBillPayload({
-      invoice: billInvoice,
-      vendorRef,
-      vendorName: liveCtx.vendorName,
-      accountRef: account.ref,
-      department: tracking.location,
-      klass: tracking.klass,
-    });
-
     setBusy(true);
     setError(null);
     setWarnings([]);
-
-    // THE SCAN GOES WITH THE BILL (Mark, 2026-09-02). Only what is filed as an
-    // `invoice`, and only what is not already up there: a second upload of the
-    // same file makes a SECOND attachment — QuickBooks has no upsert, measured.
-    const localWarnings: string[] = [];
-    const files = attachmentsToSend(liveCtx.documents, liveCtx.invoiceRef)
-      .filter((d) => {
-        const no = attachmentRefusal(d.content_type, d.file_name);
-        if (no) localWarnings.push(no);
-        return !no;
-      })
-      .map((d) => ({
-        key: d.id,
-        file_name: d.file_name ?? "invoice.pdf",
-        content_type: d.content_type ?? "application/pdf",
-        storage_path: d.storage_path,
-        // The server overwrites the entity ref with the bill it really wrote;
-        // this composes the shape and `IncludeOnSend: false`.
-        metadata: attachableMetadata({
-          entity,
-          entityId: qboRefId ?? "0",
-          fileName: d.file_name ?? "invoice.pdf",
-          contentType: d.content_type ?? "application/pdf",
-        }),
-      }));
-
-    const { data, message } = await invokeQbo(supabase, {
-      mode: "push_bill",
-      invoice_id: invoiceId,
-      entity,
-      payload,
-      ...(files.length ? { attachments: files } : {}),
-    });
+    const result = await sendBillToQuickBooks(supabase, { invoiceId, ...input });
     setBusy(false);
-    if (message) {
-      setError(message);
+    if (!result.ok) {
+      setError(result.message);
       return;
     }
-
-    // A refusal arrives as HTTP 200 with a Fault inside the item, so the status
-    // said nothing — the pure rule reads it.
-    const added: Record<string, string> = {};
-    for (const r of (data?.attachment_results as { key: string; response?: unknown; error?: string }[]) ?? []) {
-      if (r.error) { localWarnings.push(r.error); continue; }
-      const read = attachableFromResponse(r.response);
-      if (read.ok) added[r.key] = read.id;
-      else localWarnings.push(`The invoice scan was not attached: ${read.message}`);
-    }
-    if (Object.keys(added).length > 0) {
-      // Recorded through 081's definer, like the push itself — `external_ref`
-      // is writable straight through PostgREST otherwise, which is the whole
-      // reason that function exists. Its merge replaces the `qbo` branch whole,
-      // so the full branch goes back.
-      // THE REF THE SERVER RECORDED, added to — never rebuilt from parts. Its
-      // `sync_token` is the one AFTER the attachment, because attaching a file
-      // bumps the bill's own token and the push response predates that.
-      const ref = withAttachments(data!.ref as AccountingRef, added);
-      const { data: rec, error: refErr } = await supabase.rpc("record_accounting_push", {
-        p_invoice: invoiceId,
-        p_ref: ref,
-      });
-      if (refErr || !Array.isArray(rec) || rec.length === 0) {
-        localWarnings.push("The scan went up but was not recorded, so pushing again would attach a second copy.");
-      }
-    }
-
-    setWarnings([...((data?.warnings as string[]) ?? []), ...localWarnings]);
-    setSent(
-      `${data?.updated ? "Updated" : "Sent"} as ${entity} ${
-        (data?.doc_number as string) ?? (data?.qbo_id as string)
-      }`
-    );
+    setWarnings(result.warnings);
+    setSent(`${result.updated ? "Updated" : "Sent"} as ${result.entity} ${result.label}`);
     setCtx(await readContext());
     onDone();
   }

@@ -804,7 +804,7 @@ export function InvoiceList({
         </div>
         {/* ONE "ACTIONS" MENU FOR THE SCREEN (Mark, 2026-09-11), the day after
             the PO list's and to the same shape: New Invoice · Documents ▸ ·
-            Check QuickBooks · Approve, then a rule, then Delete Selected… and
+            Check QuickBooks · Approve · Push to QuickBooks, then a rule, then Delete Selected… and
             Clear Selection. It replaces a Check QuickBooks button, a New
             invoice button and a selection bar carrying two more.
 
@@ -822,6 +822,7 @@ export function InvoiceList({
         {withNewInvoice((newInvoice) => (
           <InvoiceBatchActions
             selected={sorted.filter((i) => checked.has(i.id))}
+            orgId={orgId}
             canEdit={canEdit}
             canApprove={canApprove}
             onReport={(message, tone) => {
