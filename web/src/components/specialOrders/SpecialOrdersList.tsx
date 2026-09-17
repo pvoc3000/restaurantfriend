@@ -41,6 +41,7 @@ import { sortRows } from "@/lib/tableSort";
 import {
   KIND_LABEL,
   STATUS_LABEL,
+  countsAsOwed,
   customerLabel,
   money,
   needsAttention,
@@ -320,14 +321,10 @@ export function SpecialOrdersList({
             d.setUTCDate(d.getUTCDate() + 1);
             return r.event_date === d.toISOString().slice(0, 10);
           }
+          // Only a BILLED order can be unpaid — a lead or a quote is a price
+          // offered (`countsAsOwed`, the customer screens' rule too).
           if (v === "unpaid")
-            return (
-              r.kind === "order" &&
-              r.status !== "cancelled" &&
-              !r.ignore_balance &&
-              r.totals.balance > 0 &&
-              r.totals.total > 0
-            );
+            return countsAsOwed(r) && r.totals.balance > 0 && r.totals.total > 0;
           if (v === "past") return !!r.event_date && r.event_date < today;
           return true;
         },
@@ -567,7 +564,7 @@ export function SpecialOrdersList({
       render: (r) => (
         <span className="block tabular-nums">
           {money(r.totals.total)}
-          {r.totals.balance > 0 && !r.ignore_balance ? (
+          {r.totals.balance > 0 && countsAsOwed(r) ? (
             <span className="block text-[12px] text-accent">{money(r.totals.balance)} due</span>
           ) : null}
         </span>

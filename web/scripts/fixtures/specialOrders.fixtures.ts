@@ -384,6 +384,15 @@ test("a past event that is still unpaid says THAT instead", () => {
   );
 });
 
+test("a past QUOTE is not 'unpaid' — it was never billed", () => {
+  eq(needsAttention(order({ status: "quote", event_date: "2026-08-16" }), "2026-08-17", unpaid), null);
+  eq(needsAttention(order({ status: "lead", event_date: "2026-08-16" }), "2026-08-17", unpaid), null);
+  eq(
+    needsAttention(order({ status: "invoice", event_date: "2026-08-16" }), "2026-08-17", unpaid),
+    "Event has passed and $100.00 is unpaid"
+  );
+});
+
 test("a past, settled, receipted order is finished", () => {
   eq(
     needsAttention(order({ event_date: "2026-08-16", receipt_sent_at: "2026-08-16" }), "2026-08-17", paid),

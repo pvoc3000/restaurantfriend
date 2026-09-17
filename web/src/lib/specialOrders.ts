@@ -458,7 +458,10 @@ export function needsAttention(
   // asked for a receipt, which is both wrong and the exact thing this queue
   // exists to catch. (A fixture pins it; swapping these two turns it red.)
   if (past) {
-    if (!isSettled(order, totals) && totals.total > 0) {
+    // Only a BILLED order can be unpaid (`countsAsOwed`). A lead or quote whose
+    // day has gone by was never ordered, not unpaid — 800-odd FileMaker quotes
+    // sat in this queue claiming $230k before 2026-09-17.
+    if (countsAsOwed(order) && !isSettled(order, totals) && totals.total > 0) {
       return `Event has passed and ${money(totals.balance)} is unpaid`;
     }
     if (order.status === "order" && !order.receipt_sent_at && totals.total > 0) {
