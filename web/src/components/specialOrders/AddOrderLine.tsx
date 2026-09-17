@@ -8,6 +8,8 @@ import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { money } from "@/lib/specialOrders";
 import {
   LETTER_CHARACTERS,
@@ -27,6 +29,14 @@ import type { OrderLineRow } from "./OrderLines";
  * `production_item_locations`, not on the item, so a client that selected the
  * item alone would find no price column and quietly offer every donut at zero.
  */
+type FilterKey = "item_type" | "size" | "subtype";
+const FILTERS: { key: FilterKey; label: string; all: string }[] = [
+  { key: "item_type", label: "Type", all: "All types" },
+  { key: "size", label: "Size", all: "All sizes" },
+  { key: "subtype", label: "Cut", all: "All cuts" },
+];
+const FILTER_KEYS = FILTERS.map((f) => f.key);
+
 export type MenuItem = {
   id: string;
   name: string;
@@ -72,6 +82,9 @@ export function AddOrderLine({
 
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  // TYPE · SIZE · CUT beside the search (Mark, 2026-09-16). "" is All. Kept
+  // for as long as the panel is open, like the search.
+  const [filters, setFilters] = useState<Record<FilterKey, string>>({ item_type: "", size: "", subtype: "" });
   const [qty, setQty] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -91,18 +104,48 @@ export function AddOrderLine({
     return m;
   }, [existing]);
 
-  const shown = useMemo(() => {
-    if (!items) return [];
+  const searched = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return items.slice(0, 60);
-    return items
-      .filter((i) =>
-        [i.name, i.item_type, i.subtype, i.finish, i.size].some((v) =>
-          (v ?? "").toLowerCase().includes(q)
-        )
+    if (!q) return items;
+    return items.filter((i) =>
+      [i.name, i.item_type, i.subtype, i.finish, i.size].some((v) =>
+        (v ?? "").toLowerCase().includes(q)
       )
-      .slice(0, 60);
+    );
   }, [items, search]);
+
+  /** Passes every picker EXCEPT `skip` — so each picker's counts are
+   *  conditioned on the others and never on itself (lib/filterMenus' rule). */
+  const passes = (i: MenuItem, skip: FilterKey | null) =>
+    FILTER_KEYS.every((k) => k === skip || filters[k] === "" || (i[k] ?? "") === filters[k]);
+
+  const filtered = useMemo(
+    () => searched.filter((i) => passes(i, null)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searched, filters]
+  );
+  const shown = filtered.slice(0, 60);
+
+  function optionsFor(key: FilterKey, all: string) {
+    const counts = new Map<string, number>();
+    for (const i of items) {
+      const v = i[key];
+      if (v) counts.set(v, 0);
+    }
+    for (const i of searched) {
+      const v = i[key];
+      if (v && passes(i, key)) counts.set(v, (counts.get(v) ?? 0) + 1);
+    }
+    // A chosen value stays offered at 0, or nothing on screen could clear it.
+    if (filters[key] && !counts.has(filters[key])) counts.set(filters[key], 0);
+    const total = searched.filter((i) => passes(i, key)).length;
+    return [
+      { value: "", label: all, hint: String(total) },
+      ...[...counts.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([value, n]) => ({ value, label: value, hint: String(n) })),
+    ];
+  }
 
   // The next sort number, so an added line lands LAST rather than jumping to
   // the top past every null (the `ItemComponents` arithmetic, read the other
@@ -239,20 +282,41 @@ export function AddOrderLine({
         <Dialog
           title="Add items to this order"
           onClose={() => setOpen(false)}
-          width="max-w-2xl"
+          width="max-w-3xl"
           height="h-[80vh]"
           toolbar={
-            // The inset search dress (Mark, 2026-09-13), filling the toolbar.
-            <TextInput
-              value={search}
-              onValueChange={setSearch}
-              aria-label="Find a production item"
-              clearLabel="Clear the search"
-              fullWidth
-              search
-              autoFocus
-              icon={<SearchGlyph />}
-            />
+            // The search FLEXES and the three pickers sit beside it (Mark,
+            // 2026-09-16), each captioned — a collapsed picker shows one value,
+            // so it has to name its own dimension (`ui/ControlField`).
+            // `items-end` puts the uncaptioned search on the pickers' line.
+            // `flex-1` on the row: the Dialog's toolbar is itself a flex row, so
+            // without it this one is content-sized and the search cannot grow.
+            <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3">
+              <div className="min-w-[12rem] flex-1">
+                <TextInput
+                  value={search}
+                  onValueChange={setSearch}
+                  aria-label="Find a production item"
+                  clearLabel="Clear the search"
+                  fullWidth
+                  search
+                  autoFocus
+                  icon={<SearchGlyph />}
+                />
+              </div>
+              {FILTERS.map((f) => (
+                <ControlField key={f.key} label={f.label}>
+                  <PickList
+                    value={filters[f.key]}
+                    onPick={(next) => setFilters((p) => ({ ...p, [f.key]: next }))}
+                    variant="field"
+                    ariaLabel={`Filter by ${f.label.toLowerCase()}`}
+                    options={optionsFor(f.key, f.all)}
+                    fit
+                  />
+                </ControlField>
+              ))}
+            </div>
           }
           footer={
             // BLACK — the panel-commit exception (Mark, 2026-08-19): the one
@@ -316,14 +380,14 @@ export function AddOrderLine({
                   })}
                   {shown.length === 0 ? (
                     <tr>
-                      <td className="py-4 text-sm text-muted">Nothing matches “{search}”.</td>
+                      <td className="py-4 text-sm text-muted">Nothing matches.</td>
                     </tr>
                   ) : null}
                 </tbody>
               </table>
-              {!search && items.length > 60 ? (
+              {filtered.length > 60 ? (
                 <p className="pt-2 text-[12px] text-muted">
-                  Showing the first 60 of {items.length} — search to narrow it.
+                  Showing the first 60 of {filtered.length} — search or filter to narrow it.
                 </p>
               ) : null}
             </div>
