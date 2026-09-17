@@ -29,6 +29,14 @@ import type { OrderLineRow } from "./OrderLines";
  * `production_item_locations`, not on the item, so a client that selected the
  * item alone would find no price column and quietly offer every donut at zero.
  */
+/** What a typed letter is stored as: trimmed and upper-cased — the box shows
+ *  capitals, and every real character is upper case ("A", "OP"); `<3` and the
+ *  punctuation are unchanged by it. */
+function normalizeLetter(raw: string): string | null {
+  const c = raw.trim();
+  return c === "" ? null : c.toUpperCase();
+}
+
 type FilterKey = "item_type" | "size" | "subtype";
 const FILTERS: { key: FilterKey; label: string; all: string }[] = [
   { key: "item_type", label: "Type", all: "All types" },
@@ -92,6 +100,9 @@ export function AddOrderLine({
    *  amount that was typed when Add was pressed. */
   const [asking, setAsking] = useState<{ item: MenuItem; amount: number } | null>(null);
   const [otherLetter, setOtherLetter] = useState("");
+  /** A letter typed on the row itself (Mark, 2026-09-16), which skips the
+   *  "Which letter?" box. Blank still asks. */
+  const [rowLetter, setRowLetter] = useState<Record<string, string>>({});
 
   const items = menu;
 
@@ -163,6 +174,11 @@ export function AddOrderLine({
     // `Letter` cut; nothing is written until the character is chosen, so
     // Cancel means nothing was added.
     if (needsLetterChoice(item.subtype)) {
+      const typedLetter = normalizeLetter(rowLetter[item.id] ?? "");
+      if (typedLetter) {
+        insert(item, amount, typedLetter);
+        return;
+      }
       setOtherLetter("");
       setAsking({ item, amount });
       return;
@@ -171,10 +187,8 @@ export function AddOrderLine({
   }
 
   function chooseLetter(character: string) {
-    const c = character.trim();
-    if (!asking || c === "") return;
-    // A single letter is upper-cased, `cutLetter`'s own rule.
-    const letter = /^[a-z]$/.test(c) ? c.toUpperCase() : c;
+    const letter = normalizeLetter(character);
+    if (!asking || !letter) return;
     const { item, amount } = asking;
     setAsking(null);
     insert(item, amount, letter);
@@ -217,6 +231,7 @@ export function AddOrderLine({
         return;
       }
       setQty((prev) => ({ ...prev, [item.id]: "" }));
+      setRowLetter((prev) => ({ ...prev, [item.id]: "" }));
       router.refresh();
       // Deliberately NOT closing: see the header.
     });
@@ -364,6 +379,31 @@ export function AddOrderLine({
                             aria-label={`How many ${item.name}`}
                             className="rf-typed h-9 w-full border border-ink bg-white px-2 text-right text-[14px] tabular-nums focus:outline-none"
                           />
+                        </td>
+                        <td className="w-16 py-2 pr-2">
+                          {/* THE LETTER, on letter-cut rows only; the cell is
+                              kept on every row so the columns line up. */}
+                          {needsLetterChoice(item.subtype) ? (
+                            <input
+                              type="text"
+                              value={rowLetter[item.id] ?? ""}
+                              onChange={(e) =>
+                                setRowLetter((p) => ({ ...p, [item.id]: e.target.value }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  add(item);
+                                }
+                              }}
+                              placeholder="Letter"
+                              maxLength={3}
+                              autoCapitalize="characters"
+                              autoComplete="off"
+                              aria-label={`Letter for ${item.name}`}
+                              className="rf-typed h-9 w-full border border-ink bg-white px-2 text-center text-[16px] font-semibold uppercase placeholder:text-[11px] placeholder:font-normal placeholder:normal-case placeholder:text-faint focus:outline-none"
+                            />
+                          ) : null}
                         </td>
                         <td className="w-24 py-2">
                           <button
