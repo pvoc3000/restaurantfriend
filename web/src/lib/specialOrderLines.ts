@@ -223,3 +223,33 @@ function distinct(values: readonly (string | null)[]): string[] {
   }
   return [...seen].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
+
+/* ==========================================================================
+ * ADDING A LINE FROM THE MENU (Mark, 2026-09-16)
+ * ========================================================================== */
+
+/**
+ * Does adding this item need a letter asked for first?
+ *
+ * Only a BARE `Letter` cut. A menu item whose cut already names its character
+ * (`Letter "<3"`, the Valentine's heart) has nothing to ask.
+ */
+export function needsLetterChoice(subtype: string | null | undefined): boolean {
+  return isLetterCut(subtype) && cutLetter(subtype) === null;
+}
+
+/**
+ * The line's name when it is added from the menu: the item's name, then the
+ * size when it is a Mini or a Giant (Regular is the unstated default), then
+ * the letter — "Rites of Sprinkles - Straw - Mini", "… - Letter A".
+ */
+export function addedLineName(
+  item: { name: string; size: string | null },
+  character: string | null
+): string {
+  const size = (item.size ?? "").trim();
+  const parts = [item.name.trim()];
+  if (/^(mini|giant)$/i.test(size)) parts.push(size);
+  if (character) parts.push(`Letter ${character}`);
+  return parts.join(" - ");
+}

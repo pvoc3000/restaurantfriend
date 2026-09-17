@@ -5,10 +5,17 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
-import { Dialog, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
+import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { money } from "@/lib/specialOrders";
+import {
+  LETTER_CHARACTERS,
+  LETTER_HINT,
+  addedLineName,
+  letterCut,
+  needsLetterChoice,
+} from "@/lib/specialOrderLines";
 import type { OrderLineRow } from "./OrderLines";
 
 /**
@@ -68,6 +75,10 @@ export function AddOrderLine({
   const [qty, setQty] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  /** A letter donut waiting for its character (Mark, 2026-09-16), with the
+   *  amount that was typed when Add was pressed. */
+  const [asking, setAsking] = useState<{ item: MenuItem; amount: number } | null>(null);
+  const [otherLetter, setOtherLetter] = useState("");
 
   const items = menu;
 
@@ -105,6 +116,28 @@ export function AddOrderLine({
     const typed = (qty[item.id] ?? "").trim();
     const amount = typed === "" ? 1 : Number(typed);
     if (!Number.isFinite(amount) || amount <= 0) return;
+    // A LETTER DONUT ASKS WHICH LETTER FIRST (Mark, 2026-09-16) — only a bare
+    // `Letter` cut; nothing is written until the character is chosen, so
+    // Cancel means nothing was added.
+    if (needsLetterChoice(item.subtype)) {
+      setOtherLetter("");
+      setAsking({ item, amount });
+      return;
+    }
+    insert(item, amount, null);
+  }
+
+  function chooseLetter(character: string) {
+    const c = character.trim();
+    if (!asking || c === "") return;
+    // A single letter is upper-cased, `cutLetter`'s own rule.
+    const letter = /^[a-z]$/.test(c) ? c.toUpperCase() : c;
+    const { item, amount } = asking;
+    setAsking(null);
+    insert(item, amount, letter);
+  }
+
+  function insert(item: MenuItem, amount: number, character: string | null) {
     setError(null);
     start(async () => {
       const { data, error: e } = await supabase
@@ -117,11 +150,14 @@ export function AddOrderLine({
           sort: nextSort,
           production_item_id: item.id,
           // The SNAPSHOT. Every one of these is editable on the row afterwards,
-          // which is the whole of decision 5.
-          name: item.name,
+          // which is the whole of decision 5. The NAME carries a Mini or Giant
+          // size and the letter (Mark, 2026-09-16); the CUT carries the letter
+          // in `letterCut`'s canonical spelling, which the row's letter picker
+          // and production scheduling both read.
+          name: addedLineName(item, character),
           item_donut: item.name,
           item_type: item.item_type,
-          item_cut: item.subtype,
+          item_cut: character ? letterCut(character) : item.subtype,
           item_finish: item.finish,
           item_size: item.size,
           qty: amount,
@@ -294,6 +330,60 @@ export function AddOrderLine({
           )}
 
           {error ? <p className="pt-3 text-[13px] text-accent">{error}</p> : null}
+        </Dialog>
+      ) : null}
+
+      {/* WHICH LETTER — a sibling of the panel, not nested inside it, so it
+          paints over it and takes Escape alone (`ui/Dialog`'s stack). One tap
+          on a character adds the line; the box is for the rare ones ("OP"). */}
+      {asking ? (
+        <Dialog
+          title="Which letter?"
+          onClose={() => setAsking(null)}
+          width="max-w-lg"
+          onSubmit={otherLetter.trim() ? () => chooseLetter(otherLetter) : undefined}
+          footer={
+            <div className="flex items-center justify-end gap-3">
+              <button type="button" onClick={() => setAsking(null)} className={DIALOG_CANCEL_CLASS}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => chooseLetter(otherLetter)}
+                disabled={otherLetter.trim() === ""}
+                className={DIALOG_COMMIT_CLASS}
+              >
+                Add
+              </button>
+            </div>
+          }
+        >
+          <p className="pb-3 text-[14px]">
+            {asking.amount} × {addedLineName(asking.item, null)}
+          </p>
+          <div className="grid grid-cols-6 gap-2">
+            {LETTER_CHARACTERS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => chooseLetter(c)}
+                title={LETTER_HINT[c]}
+                aria-label={LETTER_HINT[c] ?? `Letter ${c}`}
+                className={`${BUTTON_CLASS} w-full px-0 text-[16px] font-bold`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+          <label className="mt-4 block text-[12px] uppercase tracking-[0.12em] text-muted">
+            Something else
+            <input
+              type="text"
+              value={otherLetter}
+              onChange={(e) => setOtherLetter(e.target.value)}
+              className="rf-typed mt-1 block h-9 w-full border border-ink bg-white px-2 text-[16px] normal-case tracking-normal text-ink focus:outline-none"
+            />
+          </label>
         </Dialog>
       ) : null}
     </>

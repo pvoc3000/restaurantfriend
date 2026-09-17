@@ -9,6 +9,8 @@
 import { test, eq, ok, no } from "./harness";
 import {
   LETTER_CHARACTERS,
+  addedLineName,
+  needsLetterChoice,
   cutLetter,
   cutOptions,
   donutOptions,
@@ -187,4 +189,26 @@ test("donut options are the menu's names, de-duplicated", () => {
   const menu = [...MENU, { ...MENU[0] }];
   eq(donutOptions(menu).length, 5);
   eq(donutOptions(menu)[0].value, "Angry Samoa");
+});
+
+/* -- adding a line from the menu ------------------------------------------- */
+
+test("addedLineName: a Mini or a Giant carries its size, a Regular does not", () => {
+  eq(addedLineName({ name: "Rites of Sprinkles - Straw", size: "Mini" }, null), "Rites of Sprinkles - Straw - Mini");
+  eq(addedLineName({ name: "Old Fashioned", size: "Giant" }, null), "Old Fashioned - Giant");
+  eq(addedLineName({ name: "Angry Samoa", size: "Regular" }, null), "Angry Samoa");
+  eq(addedLineName({ name: "Angry Samoa", size: null }, null), "Angry Samoa");
+});
+
+test("addedLineName: the letter goes last, after any size", () => {
+  eq(addedLineName({ name: "Rites of Sprinkles - Straw", size: "Regular" }, "A"), "Rites of Sprinkles - Straw - Letter A");
+  eq(addedLineName({ name: "Angry Samoa", size: "Mini" }, "<3"), "Angry Samoa - Mini - Letter <3");
+});
+
+test("needsLetterChoice: only a bare Letter cut asks", () => {
+  ok(needsLetterChoice("Letter"));
+  ok(needsLetterChoice(" letter "));
+  no(needsLetterChoice('Letter "<3"'), "the heart names its character");
+  no(needsLetterChoice("Promise Ring"), "not a letter");
+  no(needsLetterChoice(null), "no cut");
 });
