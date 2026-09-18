@@ -197,6 +197,29 @@
   background-color: #c0c0c0;
 }
 
+/* THE ALL BUTTON IS AN EIGHTH DAY THAT ALWAYS READS "All", STRUCK THROUGH WHEN
+   PRESSING IT WOULD CLEAR THE WEEK (Mark, 2026-09-18: "a normal weekday button
+   whose text is always 'All' but with a slash across it when its action will
+   deselect all weekdays"). The slash is a 1px rule rotated 45°, corner to
+   corner, drawn over the word — the universal "not" — so the button says what
+   it will DO rather than changing its word. Set on the button's `::after`, so
+   it drops and edges with the button. */
+.mac-day-struck {
+  position: relative;
+}
+
+.mac-day-struck::after {
+  content: "";
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  top: 50%;
+  height: 1px;
+  background-color: currentColor;
+  transform: rotate(-45deg);
+  pointer-events: none;
+}
+
 /* A control you TYPE INTO does not drop when the press lands in its text — the
    order guide's date box, a field beside a calendar button. Pressing the
    button still drops it. */

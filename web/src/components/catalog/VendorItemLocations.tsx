@@ -8,11 +8,13 @@ import type { Location } from "@/lib/session";
 import { money, qty, HERE_BADGE_CLASS } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
 import {
+  WEEKDAY_ALL_SLOT_CLASS,
   WEEKDAY_DAY_CLASS,
   WEEKDAY_OFF_CLASS,
   WEEKDAY_ON_CLASS,
   WEEKDAY_PICKER_WIDTH,
   WEEKDAY_SLOT_CLASS,
+  weekdayAllClass,
 } from "./WeekdayPicker";
 
 // ISO weekdays, 1 = Monday … 7 = Sunday (CLAUDE.md).
@@ -194,18 +196,19 @@ function FavoriteDays({
           </span>
         );
       })}
-      {/* Bordered rather than filled so it reads as a command, not an 8th day. */}
-      <button
-        type="button"
-        aria-pressed={allOn}
-        aria-label={allOn ? "Clear every favorite day" : "Favorite every day"}
-        disabled={busy}
-        onClick={toggleAll}
-        title={allOn ? "Clear every day" : "Favorite on every day"}
-        className="ml-2 text-xs text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900 disabled:opacity-35"
-      >
-        {allOn ? "None" : "All"}
-      </button>
+      <span className={WEEKDAY_ALL_SLOT_CLASS}>
+        <button
+          type="button"
+          aria-pressed={allOn}
+          aria-label={allOn ? "Clear every favorite day" : "Favorite every day"}
+          disabled={busy}
+          onClick={toggleAll}
+          title={allOn ? "Clear every day" : "Favorite on every day"}
+          className={weekdayAllClass(allOn)}
+        >
+          All
+        </button>
+      </span>
       {failed && <span className="ml-1 text-xs text-accent">retry</span>}
     </span>
   );

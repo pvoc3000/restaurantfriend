@@ -7,7 +7,7 @@ import { useDayPaint } from "@/lib/dayPaint";
 
 /**
  * What a DataTable column holding a day picker has to be, in px: seven 32px
- * boxes (224) + the All/None command (~40) + the cell's own px-4 (32).
+ * slots (224) + the All button's slot and gap (36) + the cell's own px-4 (32).
  * DataTable is `table-fixed` with `truncate` cells, so a column narrower than
  * this silently CLIPS the right-hand end — which is how the All command went
  * missing from the item screen's Order days column (Mark, 2026-07-27: "should
@@ -66,6 +66,20 @@ export const WEEKDAY_DAY_CLASS =
   "inline-flex h-[26px] w-[26px] touch-pan-y select-none items-center justify-center border border-ink text-xs tabular-nums";
 /** An OFF day: white, faint type, ink on hover. */
 export const WEEKDAY_OFF_CLASS = "mac-day-off bg-white text-faint hover:text-ink";
+/**
+ * The All/None command as an EIGHTH DAY (Mark, 2026-09-18): the same raised
+ * square, always reading "All", in ink because it is a command and not a state,
+ * with `mac-day-struck`'s slash across the word while every day is on and
+ * pressing it would clear the week. `ml-1` keeps it a command beside the seven
+ * rather than a Monday-to-Sunday-to-All row. Eight slots and the gap are 260px,
+ * inside `WEEKDAY_PICKER_WIDTH`.
+ */
+export const WEEKDAY_ALL_SLOT_CLASS = `${WEEKDAY_SLOT_CLASS} ml-1`;
+export function weekdayAllClass(allOn: boolean) {
+  return `mac-day ${WEEKDAY_DAY_CLASS} bg-white text-ink disabled:opacity-35 ${
+    allOn ? "mac-day-struck" : ""
+  }`;
+}
 
 // ISO weekdays, 1 = Monday … 7 = Sunday (CLAUDE.md).
 const DAYS = [
@@ -198,18 +212,19 @@ export function WeekdayPicker({
           </span>
         );
       })}
-      {/* An underlined text link so it reads as a command, not an 8th day. */}
-      <button
-        type="button"
-        aria-pressed={allOn}
-        aria-label={`${label}: ${allOn ? "clear every day" : "select every day"}`}
-        disabled={pending}
-        onClick={toggleAll}
-        title={allOn ? "Clear every day" : "Select every day"}
-        className="ml-2 text-xs text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900 disabled:opacity-35"
-      >
-        {allOn ? "None" : "All"}
-      </button>
+      <span className={WEEKDAY_ALL_SLOT_CLASS}>
+        <button
+          type="button"
+          aria-pressed={allOn}
+          aria-label={`${label}: ${allOn ? "clear every day" : "select every day"}`}
+          disabled={pending}
+          onClick={toggleAll}
+          title={allOn ? "Clear every day" : "Select every day"}
+          className={weekdayAllClass(allOn)}
+        >
+          All
+        </button>
+      </span>
       {failed && (
         <span className="ml-2 text-[12px] uppercase tracking-[0.12em] text-accent">
           retry
