@@ -466,3 +466,17 @@
    it shipped, and the mirror image of the SWC whitespace trap this file already
    documents for entities in text.
 
+   **RATINGS PRIVACY RE-AUDITED 2026-09-18** (Mark: nobody but owners, managers
+   and the authoring supervisor may read ratings/events, anywhere). No change
+   needed. Every migration replayed in the Docker harness, one seeded report
+   and rating, rows visible per role — `shift_reports` / `shift_report_ratings`
+   / `employee_events`: owner 1/1/1 · manager 1/1/1 · authoring supervisor
+   1/1/**0** · another supervisor 1/**0**/0 · purchaser 1/0/0 · staff 0/0/0 ·
+   signed out 0/0/0. The author reads their own ratings through the draft
+   table, never through `employee_events`. Also checked: no view reads either
+   table; the only definer functions touching them are submit and reopen, and
+   `sent_receipt` holds counts only (087's `v_skipped` is never appended to);
+   the ratings email goes only to owner/admin addresses, chosen server-side;
+   `/employees` and `/events` are X/X/- for staff/supervisor/purchaser; the
+   record screen shows the ratings section from the ROWS, so another supervisor
+   sees no section at all.
