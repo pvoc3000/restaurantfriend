@@ -4,11 +4,11 @@ import { FileDropZone } from "@/components/ui/FileDropZone";
 import { PickList } from "@/components/ui/PickList";
 import { Pane, PaneHeader } from "@/components/ui/Pane";
 import { DocumentViewer } from "@/components/ui/DocumentViewer";
+import { AttachMenu } from "./AttachMenu";
 import {
   fileSize,
   isImage,
   ATTACHMENT_ACCEPT,
-  ATTACHMENT_ACCEPT_ATTR,
   ATTACHMENT_KIND_LABEL,
   ATTACHMENT_KIND_OPTIONS,
   type AttachmentKind,
@@ -125,14 +125,13 @@ export function DocumentPane({
                 ariaLabel="Kind of attachment"
               />
             </span>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-              className="h-9 mac-control border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-            >
-              Attach&hellip;
-            </button>
+            <AttachMenu
+              fileRef={fileRef}
+              busy={busy}
+              kindLabel={ATTACHMENT_KIND_LABEL[kind]}
+              onFiles={onFilesPicked}
+              triggerClassName="h-9 mac-control inline-flex items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+            />
             {/* Acts on the document SHOWN, which is why it sits with Remove
                 rather than with the kind picker and Attach — those two are
                 about adding a new file. The band can't wrap (see `ui/Pane`), so
@@ -161,21 +160,6 @@ export function DocumentPane({
             )}
           </span>
         )}
-        <input
-          ref={fileRef}
-          type="file"
-          multiple
-          // Named formats, not `image/*`: a photo picked from an iPhone's
-          // library arrives as HEIC under `image/*`, which the model API won't
-          // read. Naming these makes iOS transcode on the way out, so the
-          // failure happens at pick time rather than at extraction time with
-          // the invoice already filed.
-          accept={ATTACHMENT_ACCEPT_ATTR}
-          className="hidden"
-          onChange={(e) => {
-            if (e.target.files?.length) onFilesPicked(Array.from(e.target.files));
-          }}
-        />
       </PaneHeader>
 
       {/* An EMPTY pane doesn't get the tall box. Stacked on an iPad, a document

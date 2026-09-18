@@ -7,7 +7,6 @@ import {
   attachmentRejection,
   fileSize,
   ATTACHMENT_ACCEPT,
-  ATTACHMENT_ACCEPT_ATTR,
   ATTACHMENT_KIND_LABEL,
   ATTACHMENT_KIND_OPTIONS,
   type AttachmentKind,
@@ -17,9 +16,9 @@ import { FileDropZone } from "@/components/ui/FileDropZone";
 import { PickList } from "@/components/ui/PickList";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { DocumentChip } from "@/components/ui/DocumentChip";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { RevealPanel } from "@/components/ui/RevealPanel";
 import { useAttachmentActions } from "./useAttachmentActions";
+import { AttachMenu } from "./AttachMenu";
 import type { InvoiceCreationOrder } from "@/lib/invoiceFromExtraction";
 
 /**
@@ -136,16 +135,16 @@ export function PoAttachments({
 
         {canEdit && (
           <span className="ml-auto flex items-center gap-3">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-              // Its own width, no longer a fixed 144px (Mark, 2026-09-12: "a
-              // little less wide") — the card shares its row with the figures.
-              className={BUTTON_CLASS}
-            >
-              Attach&hellip;
-            </button>
+            {/* File… or Scan… (Mark, 2026-09-18) — `AttachMenu`, shared with
+                the receiving screen's document pane. Its own width, no longer
+                a fixed 144px (Mark, 2026-09-12: "a little less wide") — the
+                card shares its row with the figures. */}
+            <AttachMenu
+              fileRef={fileRef}
+              busy={busy}
+              kindLabel={ATTACHMENT_KIND_LABEL[kind]}
+              onFiles={(files) => void upload(files, kind)}
+            />
             <span className="flex items-center gap-2">
               <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
                 Add as
@@ -161,16 +160,6 @@ export function PoAttachments({
                 fit
               />
             </span>
-            <input
-              ref={fileRef}
-              type="file"
-              multiple
-              accept={ATTACHMENT_ACCEPT_ATTR}
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files?.length) void upload(Array.from(e.target.files), kind);
-              }}
-            />
           </span>
         )}
       </div>
