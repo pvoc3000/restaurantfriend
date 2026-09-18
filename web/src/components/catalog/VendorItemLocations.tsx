@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useDayPaint } from "@/lib/dayPaint";
 import type { Location } from "@/lib/session";
 import { money, qty, HERE_BADGE_CLASS } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
@@ -72,26 +73,40 @@ function FavoriteDays({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  async function toggle(weekday: number) {
-    const adding = !on.includes(weekday);
+  // Write the DIFFERENCE between what is on and what should be: insert the
+  // days that are missing, delete the ones that are going. A favorite is a plan
+  // ROW rather than an array slot, so a swipe across four days is two
+  // statements rather than one — inserting an existing favorite would trip the
+  // unique plan-row key, and a delete names only the days being removed. Both
+  // are attempted; the first refusal reverts the strip.
+  async function write(next: number[]) {
     const previous = on;
-    setOn(adding ? [...on, weekday].sort((a, b) => a - b) : on.filter((d) => d !== weekday));
+    const adding = next.filter((d) => !previous.includes(d));
+    const removing = previous.filter((d) => !next.includes(d));
+    if (adding.length === 0 && removing.length === 0) return;
+    setOn(next);
     setBusy(true);
     setFailed(false);
 
-    const { error } = adding
-      ? await supabase.from("order_guide_plan_days").insert({
+    let error = null;
+    if (adding.length > 0) {
+      ({ error } = await supabase.from("order_guide_plan_days").insert(
+        adding.map((weekday) => ({
           org_id: orgId,
           item_location_id: itemLocationId,
           weekday,
           vendor_item_id: vendorItemId,
-        })
-      : await supabase
-          .from("order_guide_plan_days")
-          .delete()
-          .eq("item_location_id", itemLocationId)
-          .eq("vendor_item_id", vendorItemId)
-          .eq("weekday", weekday);
+        }))
+      ));
+    }
+    if (!error && removing.length > 0) {
+      ({ error } = await supabase
+        .from("order_guide_plan_days")
+        .delete()
+        .eq("item_location_id", itemLocationId)
+        .eq("vendor_item_id", vendorItemId)
+        .in("weekday", removing));
+    }
 
     setBusy(false);
     if (error) {
@@ -101,6 +116,10 @@ function FavoriteDays({
     }
     router.refresh();
   }
+
+  // Press a day to flip it; hold and swipe across others to make them match
+  // it (`lib/dayPaint`).
+  const paint = useDayPaint({ days: on, disabled: busy, commit: write });
 
   // All-on / all-off in one click. Turning on inserts only the MISSING days —
   // re-inserting an existing favorite would trip the unique plan-row key.
@@ -157,7 +176,7 @@ function FavoriteDays({
   return (
     <span className="inline-flex items-center">
       {DAYS.map((d) => {
-        const active = on.includes(d.weekday);
+        const active = paint.shown.includes(d.weekday);
         return (
           <span key={d.weekday} className={WEEKDAY_SLOT_CLASS}>
             <button
@@ -165,7 +184,7 @@ function FavoriteDays({
               aria-pressed={active}
               aria-label={`Favorite on ${d.label}`}
               disabled={busy}
-              onClick={() => toggle(d.weekday)}
+              {...paint.dayProps(d.weekday)}
               className={`mac-day ${WEEKDAY_DAY_CLASS} disabled:opacity-35 ${
                 active ? WEEKDAY_ON_CLASS : WEEKDAY_OFF_CLASS
               }`}

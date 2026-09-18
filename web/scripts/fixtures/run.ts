@@ -16,6 +16,7 @@ import "./orgSettings.fixtures";
 import "./dateInput.fixtures";
 import "./timeInput.fixtures";
 import "./dateRange.fixtures";
+import "./dayPaint.fixtures";
 import "./columnVisibility.fixtures";
 import "./rowDrag.fixtures";
 import "./pickList.fixtures";

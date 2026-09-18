@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useDayPaint } from "@/lib/dayPaint";
 
 /**
  * What a DataTable column holding a day picker has to be, in px: seven 32px
@@ -62,7 +63,7 @@ export const WEEKDAY_ON_CLASS = "bg-[var(--rf-neutral-500)] text-white";
  */
 export const WEEKDAY_SLOT_CLASS = "inline-flex h-8 w-8 items-start justify-start";
 export const WEEKDAY_DAY_CLASS =
-  "inline-flex h-[26px] w-[26px] items-center justify-center border border-ink text-xs tabular-nums";
+  "inline-flex h-[26px] w-[26px] touch-pan-y select-none items-center justify-center border border-ink text-xs tabular-nums";
 /** An OFF day: white, faint type, ink on hover. */
 export const WEEKDAY_OFF_CLASS = "mac-day-off bg-white text-faint hover:text-ink";
 
@@ -141,13 +142,10 @@ export function WeekdayPicker({
     });
   }
 
-  function toggle(weekday: number) {
-    write(
-      days.includes(weekday)
-        ? days.filter((d) => d !== weekday)
-        : [...days, weekday].sort((a, b) => a - b)
-    );
-  }
+  // Press a day to flip it; hold and swipe across others to make them match
+  // it. One write on release, however many days the stroke crossed
+  // (`lib/dayPaint`).
+  const paint = useDayPaint({ days, disabled: pending, commit: write });
 
   // All-on / all-off in one click — seven clicks to say "every day" is the
   // kind of friction that stops config from being kept accurate.
@@ -182,7 +180,7 @@ export function WeekdayPicker({
           the original's 7-column day grid. They were seven butted boxes
           sharing one black rule until 2026-09-18. */}
       {DAYS.map((day) => {
-        const on = days.includes(day.weekday);
+        const on = paint.shown.includes(day.weekday);
         return (
           <span key={day.weekday} className={WEEKDAY_SLOT_CLASS}>
             <button
@@ -190,7 +188,7 @@ export function WeekdayPicker({
               aria-pressed={on}
               aria-label={`${label}: ${day.label}`}
               disabled={pending}
-              onClick={() => toggle(day.weekday)}
+              {...paint.dayProps(day.weekday)}
               className={`mac-day ${WEEKDAY_DAY_CLASS} disabled:opacity-35 ${
                 on ? WEEKDAY_ON_CLASS : WEEKDAY_OFF_CLASS
               }`}
