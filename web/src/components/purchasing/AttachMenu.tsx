@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import { MenuButton } from "@/components/ui/MenuButton";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { ATTACHMENT_ACCEPT_ATTR } from "@/lib/attachments";
-import { loadImage, type ScanTone } from "@/lib/scanPages";
+import { detectPage, loadImage, type ScanCrop, type ScanTone } from "@/lib/scanPages";
 import { ScanDialog, type ScanPage } from "./ScanDialog";
 
 /**
@@ -72,12 +72,19 @@ export function AttachMenu({
     setFailed(null);
     try {
       const loaded = await Promise.all(
-        files.map(async (file) => ({
-          id: crypto.randomUUID(),
-          img: await loadImage(file),
-          rotation: 0 as const,
-          crop: null,
-        }))
+        files.map(async (file) => {
+          const img = await loadImage(file);
+          // The page found and squared up on the way in (`detectPage`); left
+          // whole when nothing page-like is found. A detector that throws is a
+          // photo without a crop, never a photo lost.
+          let crop: ScanCrop | null = null;
+          try {
+            crop = detectPage({ img, rotation: 0 });
+          } catch {
+            crop = null;
+          }
+          return { id: crypto.randomUUID(), img, rotation: 0 as const, crop };
+        })
       );
       setPages((prev) => [...prev, ...loaded]);
     } catch {

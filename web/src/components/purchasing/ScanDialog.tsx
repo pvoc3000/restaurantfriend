@@ -6,14 +6,15 @@ import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/u
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { TabPicker } from "@/components/ui/TabPicker";
 import {
-  isNeutralTone,
+  isDefaultTone,
+  detectPage,
   renderPage,
   rotateBy,
   rotateCrop,
   saveScanTone,
   useScanTone,
   isWholePage,
-  NEUTRAL_TONE,
+  DEFAULT_TONE,
   WHOLE_PAGE,
   type ScanCrop,
   type ScanPoint,
@@ -38,7 +39,8 @@ export type ScanPage = ScanPageSettings & { id: string };
  * Preview is also where CROP lives, because a crop is dragged, and a handle
  * on a 250px tile is too small to aim at on an iPad. The crop is four free
  * corners, which is also how a page shot at an angle is straightened — see
- * `CropEditor`.
+ * `CropEditor`. A new page arrives ALREADY cropped to the paper when the
+ * detector finds it (`detectPage`), and Auto in the editor finds it again.
  *
  * THE TONE IS REMEMBERED (`useScanTone`) and every change to it saves; see
  * `lib/scanPages`. Rotation and crop are per page and die with the scan.
@@ -72,6 +74,8 @@ export function ScanDialog({
   /** The crop being dragged in preview — committed on Done, dropped on Cancel. */
   const [draftCrop, setDraftCrop] = useState<ScanCrop | null>(null);
   const cropping = draftCrop !== null;
+  /** Auto found nothing — said beside the button until the next crop edit. */
+  const [notFound, setNotFound] = useState(false);
 
   const count = pages.length;
   const index = pages.findIndex((p) => p.id === viewing);
@@ -101,6 +105,7 @@ export function ScanDialog({
 
   function show(id: string | null) {
     setDraftCrop(null);
+    setNotFound(false);
     setViewing(id);
   }
 
@@ -186,7 +191,21 @@ export function ScanDialog({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDraftCrop(WHOLE_PAGE)}
+                  onClick={() => {
+                    const found = detectPage(shown);
+                    setNotFound(found === null);
+                    if (found) setDraftCrop(found);
+                  }}
+                  className={BUTTON_CLASS}
+                >
+                  Auto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotFound(false);
+                    setDraftCrop(WHOLE_PAGE);
+                  }}
                   className={BUTTON_CLASS}
                 >
                   Whole Page
@@ -194,6 +213,9 @@ export function ScanDialog({
                 <button type="button" onClick={() => setDraftCrop(null)} className={DIALOG_CANCEL_CLASS}>
                   Cancel Crop
                 </button>
+                {notFound && (
+                  <span className="text-sm text-accent">No page edges found — drag the corners.</span>
+                )}
               </>
             ) : (
               <>
@@ -201,7 +223,10 @@ export function ScanDialog({
                 <button
                   type="button"
                   disabled={building}
-                  onClick={() => setDraftCrop(shown.crop ?? WHOLE_PAGE)}
+                  onClick={() => {
+                    setNotFound(false);
+                    setDraftCrop(shown.crop ?? WHOLE_PAGE);
+                  }}
                   className={BUTTON_CLASS}
                 >
                   Crop
@@ -591,8 +616,8 @@ function ToneControls({ tone, disabled }: { tone: ScanTone; disabled: boolean })
       />
       <button
         type="button"
-        disabled={disabled || isNeutralTone(tone)}
-        onClick={() => onChange(NEUTRAL_TONE)}
+        disabled={disabled || isDefaultTone(tone)}
+        onClick={() => onChange(DEFAULT_TONE)}
         className={BUTTON_CLASS}
       >
         Reset

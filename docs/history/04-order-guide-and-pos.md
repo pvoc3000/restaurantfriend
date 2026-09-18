@@ -1237,3 +1237,27 @@
    (018's storage policy, the PO policies), so the update cannot silently hit
    zero rows for someone who could attach. A failed status write is reported
    after the upload loop, because `read` clears the error line when it starts.
+   **THE SCANNER FINDS THE PAGE ITSELF, AND STARTS IN GREYSCALE** (Mark,
+   2026-09-18). `detectPage` runs on every photo as it arrives and sets its
+   crop to the paper's four corners, so a page lands already straightened;
+   **Auto** in the crop editor runs it again (after Whole Page, say), and says
+   "No page edges found" when it can't. Plain arithmetic on a ~400px copy, no
+   library — OpenCV.js would be sturdier and is ~8 MB of WebAssembly on the
+   iPad taking the photo: luma → two box blurs (takes the print off the sheet)
+   → Otsu threshold → an opening (erode ×2, dilate ×2, cuts thin bright bridges
+   to glints) → largest 4-connected region → its outermost point along each
+   diagonal is the corner. **REFUSED AS NOT-A-PAGE** — and the photo left whole
+   — under 15% of the frame, over 97% (page already fills it, or the background
+   is as bright as the paper), or not a convex quad. The known blind spot is a
+   white page on a white counter: no bright region to find, so it is refused
+   rather than guessed. Measured on synthetic true-perspective scenes at
+   1200×1600 in the pane: ~25–30 ms each; a keystoned page on a dark counter,
+   one rotated 15° with perspective and noise, and one on wood grain with
+   uneven light all found, worst corner 8–10px out (~0.6%, inside the paper —
+   the blur rounds the corners); white-on-white and a frame-filling page both
+   correctly null. A page turned more than ~40° in the frame would confuse the
+   diagonal corners; nobody photographs an invoice that way.
+   **GREYSCALE IS THE DEFAULT** (`DEFAULT_TONE`), separate from
+   `NEUTRAL_TONE`, which still means "untouched" and is what `applyTone` skips.
+   It is what a scan starts at with nothing stored and what Reset returns to;
+   a tone somebody has already dialled in is still theirs.
