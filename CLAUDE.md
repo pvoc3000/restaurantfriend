@@ -9931,11 +9931,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    an entry's id is refused by the index; the deployed modes answer their
    refusals by name and `find_journal_entries` returned Shogo's real entries.
    **NOT yet seen in the browser** (the pane is behind the PIN lock).
-   **THE DEPOSITS — migration 105, NEEDS APPLYING; `sync-square-sales`,
-   `qbo-sync` and `qbo-oauth` DEPLOYED 2026-09-17.** *Probe, don't read this
-   line*: `select count(*) from square_payouts` (a table, 0 until the first
-   sync), `select count(*) from pg_proc where proname in
-   ('record_square_payouts','record_payout_posting')` → 2. Mark: "shogo
+   **THE DEPOSITS — migration 105 APPLIED 2026-09-17; `sync-square-sales`,
+   `qbo-sync` and `qbo-oauth` DEPLOYED the same day.** *Probe, don't read
+   this line.* Probed the hour it was applied: `square_payouts` selects (0
+   rows until the first sync), `record_payout_posting(null-id, null, null)`
+   answers 0 rows, `record_square_payouts('[]')` answers
+   `{"payouts_upserted": 0}` and a bad location raises by name. Mark: "shogo
    creates a deposit that gets matched with an online transaction when I
    download them from my bank. Let's implement this as well."
    **THE DEPOSITS ON THE BOOKS ARE THE BANK FEED'S, NOT SHOGO'S** — read back
