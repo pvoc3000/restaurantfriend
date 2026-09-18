@@ -66,6 +66,9 @@ export default async function proxy(request: NextRequest) {
   // after an idle lock there is no session, and the page's own data comes
   // through a server action carrying the device cookie, never a user.
   const isLockPage = request.nextUrl.pathname.startsWith("/lock");
+  // Staff how-to guides: static text, readable before you have a login — the
+  // first one explains how to get one. `/legal`'s reasoning.
+  const isGuidePage = request.nextUrl.pathname.startsWith("/guides");
   const isRegisteredDevice = request.cookies.has(DEVICE_COOKIE);
 
   if (
@@ -75,7 +78,8 @@ export default async function proxy(request: NextRequest) {
     !isQuotePage &&
     !isInquiryPage &&
     !isLegalPage &&
-    !isLockPage
+    !isLockPage &&
+    !isGuidePage
   ) {
     const redirectUrl = request.nextUrl.clone();
     // A registered iPad wakes up on its picker, not the password screen —

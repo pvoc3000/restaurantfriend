@@ -32,8 +32,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   keeps only `ConfirmProvider` and `CalcPad` — for a surface that is a TASK
   rather than a screen: today just the shift report's runner. `proxy.ts` needs
   no entry for it, since anything not explicitly exempted there is auth-gated.
-  It is NOT the place for a public page: `/login`, `/welcome`, `/q/[token]` and
-  `/inquiry` sit outside both groups and are exempted by name.
+  It is NOT the place for a public page: `/login`, `/welcome`, `/q/[token]`,
+  `/inquiry`, `/legal` and `/guides` sit outside both groups and are exempted by
+  name. **`/guides` holds staff how-to guides, readable signed out** (Mark,
+  2026-09-18) — static text like `/legal`, because the first guide explains how
+  to get a login. Its labels are copied from the screens, so a relabelled button
+  is also an edit to `app/guides/shift-report/page.tsx`; add a row to
+  `app/guides/page.tsx` when a guide ships.
 - **Migration** (`migration/`): FMP data is LOADED to the hosted DB — 80 vendors,
   790 items, 2,888 vendor items, 1,237 item-locations, full PO history. Loader
   is `migration/load.mjs` (service_role, local only). Transformed JSON lives
