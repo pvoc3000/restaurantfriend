@@ -1261,3 +1261,15 @@
    `NEUTRAL_TONE`, which still means "untouched" and is what `applyTone` skips.
    It is what a scan starts at with nothing stored and what Reset returns to;
    a tone somebody has already dialled in is still theirs.
+   **A LOUPE WHILE A CROP HANDLE IS HELD** (Mark, 2026-09-18) — on an iPad the
+   finger placing a corner is what hides it. `Loupe` in `ScanDialog`: a 128px
+   square in the window dress (2px edge, hard shadow, no radius), 48px ABOVE
+   the handle and flipped below when that would leave the top of the page,
+   showing 3× what is on screen. It copies from the editor's own page canvas —
+   already toned, and drawn at `LARGE_EDGE`, so ~4× the screen's resolution and
+   3× is real detail — and draws the crop's edges (white under black) and a
+   crosshair over it, so what you line up is the crop LINE against the paper's
+   edge. Corners and edge handles get it; a whole-shape move does not. Verified
+   mid-drag in the pane with synthetic pointer events (`setPointerCapture`
+   stubbed, since a synthetic pointer can't be captured): shown on press, the
+   line tracking the paper edge, gone on release.

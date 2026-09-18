@@ -414,7 +414,8 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
  * with capture, so a finger that slides off a handle keeps dragging it;
  * `touch-action: none` stops iPad Safari scrolling the dialog under the drag.
  * Handles are 44px targets drawn small — the app's touch rule (see
- * `ui/CalendarGrid`).
+ * `ui/CalendarGrid`). While a corner or edge is held, a `Loupe` shows it
+ * magnified above the finger.
  */
 function CropEditor({
   page,
@@ -454,6 +455,9 @@ function CropEditor({
   }, [aspect]);
 
   const drag = useRef<{ handle: Handle; x: number; y: number; start: ScanCrop } | null>(null);
+  /** The handle being dragged, while it has a loupe — corners and edges; a
+   *  whole-shape move has nothing precise to place. */
+  const [loupeFor, setLoupeFor] = useState<Exclude<Handle, "move"> | null>(null);
 
   // One handler, the handle read off the element — a handler MADE per handle
   // during render is what `react-hooks/refs` refuses.
@@ -464,6 +468,7 @@ function CropEditor({
     el.setPointerCapture(e.pointerId);
     const handle = (el.dataset.handle ?? "move") as Handle;
     drag.current = { handle, x: e.clientX, y: e.clientY, start: crop };
+    setLoupeFor(handle === "move" ? null : handle);
   }
 
   function move(e: React.PointerEvent) {
@@ -496,10 +501,16 @@ function CropEditor({
 
   function end() {
     drag.current = null;
+    setLoupeFor(null);
   }
 
   const pct = (v: number) => `${v * 100}%`;
   const mid = (a: ScanPoint, b: ScanPoint): ScanPoint => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const handlePoint = (h: Exclude<Handle, "move">): ScanPoint => {
+    if (CORNERS.includes(h as Corner)) return crop[h as Corner];
+    const ends = EDGES.find((edge) => edge.handle === h)!.ends;
+    return mid(crop[ends[0]], crop[ends[1]]);
+  };
   const outline = CORNERS.map((k) => `${crop[k].x},${crop[k].y}`).join(" ");
   const pointer = {
     onPointerDown: begin,
@@ -572,9 +583,125 @@ function CropEditor({
               <span className="h-3.5 w-3.5 border-2 border-ink bg-white" />
             </div>
           ))}
+          {loupeFor && (
+            <Loupe box={boxRef} fit={fit} point={handlePoint(loupeFor)} crop={crop} />
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+/** The loupe's side, in CSS pixels, and how much it magnifies what is on
+ *  screen. 3× of a page drawn at `LARGE_EDGE` is still real detail, not
+ *  enlarged screen pixels — the canvas holds ~4× what the screen shows. */
+const LOUPE_SIZE = 128;
+const LOUPE_ZOOM = 3;
+/** Clear air between the handle and the loupe, so a fingertip covers neither. */
+const LOUPE_GAP = 48;
+
+/**
+ * THE LOUPE (Mark, 2026-09-18) — the page magnified around the handle being
+ * dragged, because on an iPad the finger placing a corner is exactly what hides
+ * it. Shown ABOVE the handle, flipped below it when that would leave the top
+ * of the page; a square in the app's window dress (2px edge, hard shadow, no
+ * radius) rather than a round glass.
+ *
+ * It copies from the editor's own page canvas — already toned, so the corner
+ * is judged on the picture being attached — and draws the crop's edges and a
+ * crosshair over it, so what you line up is the crop line against the paper's
+ * edge, not a handle against a guess.
+ */
+function Loupe({
+  box,
+  fit,
+  point,
+  crop,
+}: {
+  box: React.RefObject<HTMLDivElement | null>;
+  fit: { width: number; height: number };
+  point: ScanPoint;
+  crop: ScanCrop;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const loupe = canvasRef.current;
+    const page = box.current?.querySelector("canvas");
+    if (!loupe || !page || page.width === 0) return;
+    const ratio = window.devicePixelRatio || 1;
+    loupe.width = LOUPE_SIZE * ratio;
+    loupe.height = LOUPE_SIZE * ratio;
+    const context = loupe.getContext("2d");
+    if (!context) return;
+
+    // What the loupe shows, in PAGE fractions: a window LOUPE_ZOOM times
+    // smaller than the loupe, centred on the handle.
+    const spanX = LOUPE_SIZE / LOUPE_ZOOM / fit.width;
+    const spanY = LOUPE_SIZE / LOUPE_ZOOM / fit.height;
+    const left = point.x - spanX / 2;
+    const top = point.y - spanY / 2;
+    // Page fractions → loupe pixels.
+    const toLoupe = (p: ScanPoint) => ({
+      x: ((p.x - left) / spanX) * loupe.width,
+      y: ((p.y - top) / spanY) * loupe.height,
+    });
+
+    // Past the page's edge is the pane's grey, so a corner at the edge of the
+    // photo reads as an edge rather than as more page.
+    context.fillStyle = "#e5e5e5";
+    context.fillRect(0, 0, loupe.width, loupe.height);
+    context.imageSmoothingQuality = "high";
+    context.drawImage(
+      page,
+      left * page.width,
+      top * page.height,
+      spanX * page.width,
+      spanY * page.height,
+      0,
+      0,
+      loupe.width,
+      loupe.height
+    );
+
+    // The crop's outline, white under black as in the editor.
+    const corners = [crop.tl, crop.tr, crop.br, crop.bl].map(toLoupe);
+    for (const [colour, width] of [["white", 4], ["black", 2]] as const) {
+      context.strokeStyle = colour;
+      context.lineWidth = width * ratio;
+      context.beginPath();
+      corners.forEach((c, i) => (i === 0 ? context.moveTo(c.x, c.y) : context.lineTo(c.x, c.y)));
+      context.closePath();
+      context.stroke();
+    }
+    // Crosshair on the handle itself.
+    const c = loupe.width / 2;
+    const arm = 10 * ratio;
+    context.strokeStyle = "black";
+    context.lineWidth = 1 * ratio;
+    context.beginPath();
+    context.moveTo(c - arm, c);
+    context.lineTo(c + arm, c);
+    context.moveTo(c, c - arm);
+    context.lineTo(c, c + arm);
+    context.stroke();
+  }, [box, fit, point, crop]);
+
+  const x = point.x * fit.width;
+  const y = point.y * fit.height;
+  const above = y - LOUPE_GAP - LOUPE_SIZE >= 0;
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden
+      className="pointer-events-none absolute z-10 border-2 border-ink bg-white shadow-[4px_4px_0_0_#000]"
+      style={{
+        width: LOUPE_SIZE,
+        height: LOUPE_SIZE,
+        left: Math.min(fit.width - LOUPE_SIZE / 2, Math.max(-LOUPE_SIZE / 2, x - LOUPE_SIZE / 2)),
+        top: above ? y - LOUPE_GAP - LOUPE_SIZE : y + LOUPE_GAP,
+      }}
+    />
   );
 }
 
