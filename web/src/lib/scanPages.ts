@@ -32,6 +32,8 @@
  * statically; the PDF code arrives on the click that attaches.
  */
 
+import { useSyncExternalStore } from "react";
+
 /** Long edge, in pixels, of a page as stored. */
 const MAX_EDGE = 2000;
 const JPEG_QUALITY = 0.82;
@@ -40,6 +42,17 @@ const JPEG_QUALITY = 0.82;
 const LETTER = { width: 612, height: 792 };
 
 export type ScanRotation = 0 | 90 | 180 | 270;
+
+/**
+ * The part of the TURNED page to keep, as fractions of its width and height —
+ * so it means the same thing at preview size and at full size. Null keeps the
+ * whole page. A rectangle only: pulling four corners to square up a page shot
+ * at an angle is perspective correction, a different and much larger job.
+ */
+export type ScanCrop = { x: number; y: number; w: number; h: number };
+
+/** The smallest crop, as a fraction of a side — a sliver is a mis-drag. */
+export const MIN_CROP = 0.05;
 
 export type ScanMode = "color" | "grey" | "bw";
 
@@ -58,6 +71,82 @@ export function isNeutralTone(tone: ScanTone): boolean {
 
 export function rotateBy(rotation: ScanRotation, quarterTurns: 1 | -1): ScanRotation {
   return (((rotation + quarterTurns * 90) % 360) + 360) % 360 as ScanRotation;
+}
+
+/**
+ * A crop turned WITH its page, so rotating a cropped page keeps the same part
+ * of the paper rather than a rectangle in the same place on the screen.
+ */
+export function rotateCrop(crop: ScanCrop | null, quarterTurns: 1 | -1): ScanCrop | null {
+  if (!crop) return null;
+  return quarterTurns === 1
+    ? { x: 1 - (crop.y + crop.h), y: crop.x, w: crop.h, h: crop.w }
+    : { x: crop.y, y: 1 - (crop.x + crop.w), w: crop.h, h: crop.w };
+}
+
+// ---------------------------------------------------------------------------
+// THE TONE IS REMEMBERED (Mark, 2026-09-18: "once I dial it in, I'd like it to
+// be the default until I change the settings again"). A per-device display
+// preference, so localStorage — `lib/receivingLayout`'s rule, read through
+// `useSyncExternalStore` for the same reason given there. Every change saves,
+// Reset included; there is no separate "save as default" to forget.
+
+const TONE_KEY = "rf.scan.tone";
+const toneListeners = new Set<() => void>();
+let cachedRaw: string | null = null;
+let cachedTone: ScanTone = NEUTRAL_TONE;
+
+function subscribeTone(onChange: () => void) {
+  toneListeners.add(onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    toneListeners.delete(onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function clampSetting(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(-100, Math.min(100, Math.round(n))) : 0;
+}
+
+/** The stored tone. The same object while the stored text is unchanged —
+ *  `useSyncExternalStore` compares snapshots by identity. */
+function readTone(): ScanTone {
+  let raw: string | null = null;
+  try {
+    raw = window.localStorage.getItem(TONE_KEY);
+  } catch {
+    // Private browsing: every scan starts untouched.
+  }
+  if (raw === cachedRaw) return cachedTone;
+  cachedRaw = raw;
+  try {
+    const parsed = raw ? JSON.parse(raw) : null;
+    cachedTone = parsed
+      ? {
+          mode: parsed.mode === "grey" || parsed.mode === "bw" ? parsed.mode : "color",
+          brightness: clampSetting(parsed.brightness),
+          contrast: clampSetting(parsed.contrast),
+        }
+      : NEUTRAL_TONE;
+  } catch {
+    cachedTone = NEUTRAL_TONE;
+  }
+  return cachedTone;
+}
+
+export function useScanTone(): ScanTone {
+  return useSyncExternalStore(subscribeTone, readTone, () => NEUTRAL_TONE);
+}
+
+export function saveScanTone(tone: ScanTone) {
+  try {
+    window.localStorage.setItem(TONE_KEY, JSON.stringify(tone));
+  } catch {
+    // Not being able to persist shouldn't stop the control working this scan.
+  }
+  for (const listener of toneListeners) listener();
 }
 
 export async function loadImage(file: Blob): Promise<HTMLImageElement> {
@@ -108,26 +197,45 @@ function applyTone(pixels: Uint8ClampedArray, tone: ScanTone) {
   }
 }
 
-/** One page — turned, shrunk to `maxEdge`, toned — onto `canvas`. */
+export type ScanPageSettings = {
+  img: HTMLImageElement;
+  rotation: ScanRotation;
+  crop: ScanCrop | null;
+};
+
+/**
+ * One page — turned, cropped, shrunk to `maxEdge`, toned — onto `canvas`.
+ * `maxEdge` applies to what is KEPT, so a cropped page keeps its detail
+ * rather than being shrunk as a whole page and then cut down.
+ */
 export function renderPage(
   canvas: HTMLCanvasElement,
-  img: HTMLImageElement,
-  rotation: ScanRotation,
+  page: ScanPageSettings,
   tone: ScanTone,
   maxEdge: number
 ) {
-  const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
-  const w = Math.round(img.naturalWidth * scale);
-  const h = Math.round(img.naturalHeight * scale);
+  const { img, rotation } = page;
+  const natW = img.naturalWidth;
+  const natH = img.naturalHeight;
   const sideways = rotation === 90 || rotation === 270;
-  canvas.width = sideways ? h : w;
-  canvas.height = sideways ? w : h;
+  // The turned page's size, which the crop's fractions are fractions of.
+  const turnedW = sideways ? natH : natW;
+  const turnedH = sideways ? natW : natH;
+  const crop = page.crop ?? { x: 0, y: 0, w: 1, h: 1 };
+  const keptW = crop.w * turnedW;
+  const keptH = crop.h * turnedH;
+  const scale = Math.min(1, maxEdge / Math.max(keptW, keptH));
+  canvas.width = Math.max(1, Math.round(keptW * scale));
+  canvas.height = Math.max(1, Math.round(keptH * scale));
   const context = canvas.getContext("2d");
   if (!context) throw new Error("The browser could not read that photo.");
+  context.imageSmoothingQuality = "high";
   context.save();
-  context.translate(canvas.width / 2, canvas.height / 2);
+  context.scale(scale, scale);
+  context.translate(-crop.x * turnedW, -crop.y * turnedH);
+  context.translate(turnedW / 2, turnedH / 2);
   context.rotate((rotation * Math.PI) / 180);
-  context.drawImage(img, -w / 2, -h / 2, w, h);
+  context.drawImage(img, -natW / 2, -natH / 2, natW, natH);
   context.restore();
   if (!isNeutralTone(tone)) {
     const frame = context.getImageData(0, 0, canvas.width, canvas.height);
@@ -136,13 +244,9 @@ export function renderPage(
   }
 }
 
-async function pageJpeg(
-  img: HTMLImageElement,
-  rotation: ScanRotation,
-  tone: ScanTone
-): Promise<Uint8Array> {
+async function pageJpeg(page: ScanPageSettings, tone: ScanTone): Promise<Uint8Array> {
   const canvas = document.createElement("canvas");
-  renderPage(canvas, img, rotation, tone, MAX_EDGE);
+  renderPage(canvas, page, tone, MAX_EDGE);
   const jpeg = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY)
   );
@@ -156,7 +260,7 @@ async function pageJpeg(
  * photo is, with the photo scaled to fit and centred — `mergeDocuments`' rule.
  */
 export async function scanToPdf(
-  pages: readonly { img: HTMLImageElement; rotation: ScanRotation }[],
+  pages: readonly ScanPageSettings[],
   tone: ScanTone,
   fileName: string
 ): Promise<File> {
@@ -164,7 +268,7 @@ export async function scanToPdf(
   const out = await PDFDocument.create();
 
   for (const page of pages) {
-    const image = await out.embedJpg(await pageJpeg(page.img, page.rotation, tone));
+    const image = await out.embedJpg(await pageJpeg(page, tone));
     const landscape = image.width > image.height;
     const width = landscape ? LETTER.height : LETTER.width;
     const height = landscape ? LETTER.width : LETTER.height;
