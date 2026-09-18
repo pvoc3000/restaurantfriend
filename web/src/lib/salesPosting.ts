@@ -81,7 +81,8 @@ export type SalesRole =
   | "card"
   | "cash"
   | "other_tender"
-  | "fees";
+  | "fees"
+  | "bank";
 
 /** QuickBooks' own `Classification` words — income accounts are `Revenue`
  *  there, measured on the real chart (304 accounts, 2026-09-17). */
@@ -109,6 +110,7 @@ export const SALES_ROLES: {
   { key: "cash", label: "Cash takings", hint: "cash payments net of cash refunds (debit)", classification: "Asset" },
   { key: "other_tender", label: "Unmapped tenders", hint: "where a tender with no mapping posts — Uber Eats, DoorDash, Afterpay (debit)", classification: "Asset" },
   { key: "fees", label: "Square fees", hint: "processing fees, posted daily (debit)", classification: "Expense" },
+  { key: "bank", label: "Bank account for payouts", hint: "where a Square payout lands — the Deposit is made into this account (105)", classification: "Asset" },
 ];
 
 export const SALES_ROLE_LABEL: Record<SalesRole, string> = Object.fromEntries(
@@ -386,14 +388,24 @@ export function buildJournalEntry(input: BuildInput): JournalBuild {
     lines.push({ posting: side, cents: Math.abs(cents), account, description, source });
   };
 
-  const fees = new Map<string, number>();
-  for (const l of breakdown.lines) if (l.kind === "fee") fees.set(l.key, (fees.get(l.key) ?? 0) + l.cents);
+  // EVERY FEE NETS AGAINST THE CARD LINE, whatever tender the sync keyed it
+  // to. Square takes all of its fees out of the card PAYOUT — the gift-card
+  // load fee on a card bought with cash included — so the cash in the drawer
+  // is the full amount and the money Square sends is the card takings less
+  // every fee. Measured (2026-09-17, 18 shop-days): keyed this way the card
+  // line agrees with the payout for that day's charges to within cents, and
+  // keyed per tender it was short by the whole load fee on every such day —
+  // which is the residual that would have kept Undeposited Square Funds from
+  // ever clearing against the deposits (105).
+  let feesTotal = 0;
+  for (const l of breakdown.lines) if (l.kind === "fee") feesTotal += l.cents;
 
   let categoriesCents = 0;
   let serviceCents = 0;
   let discountCents = 0;
   let tipCents = 0;
   let feesCents = 0;
+  let sawCard = false;
 
   for (const l of breakdown.lines) {
     switch (l.kind) {
@@ -435,7 +447,8 @@ export function buildJournalEntry(input: BuildInput): JournalBuild {
         if (!fixed && !mapped && l.cents !== 0) {
           unmapped.push({ kind: "tender", key: l.key, name: l.name, cents: l.cents, role });
         }
-        const fee = fees.get(l.key) ?? 0;
+        const fee = l.key === "CARD" ? feesTotal : 0;
+        if (l.key === "CARD") sawCard = true;
         const net = l.cents - fee;
         const description =
           l.key === "CARD"
@@ -453,9 +466,12 @@ export function buildJournalEntry(input: BuildInput): JournalBuild {
         break;
     }
   }
-  // Every fee, one line. Fees keyed to a tender that took nothing that day
-  // (a refund fee credit on a quiet day) still land here; the balance check
-  // is what notices if the tender side did not carry them.
+  // Every fee, one line — and a day with fees and no card payment at all
+  // (a refund fee on a quiet day) still has them taken out of the payout,
+  // so the card line carries the negative and flips to a credit.
+  if (!sawCard && feesTotal !== 0) {
+    push("Debit", -feesTotal, need("card"), "Square fees taken from the payout", { kind: "tender", key: "CARD" });
+  }
   push("Debit", feesCents, feesCents ? need("fees") : null, "Square fees", { kind: "fee", key: "fees" });
 
   for (const role of missingRoles) {
@@ -634,4 +650,273 @@ export function shopForEntryLines(
     }
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// A Square payout as one QuickBooks Bank Deposit (migration 105)
+// ---------------------------------------------------------------------------
+//
+// The other half of the card line. 104's entry debits the card takings, net
+// of every fee, to Undeposited Square Funds; when Square pays them out this
+// moves that money to the bank, for the EXACT amount the bank will show, so
+// the bank feed offers a MATCH instead of adding a second deposit. One line,
+// never a breakdown of the payout: the fees were expensed on the day, and a
+// deposit that re-stated them would count them twice.
+//
+// What the books held before this (2026-09-17, read back): a Deposit per
+// payout into Chase ACH, one line to Undeposited Square Funds, dated the
+// bank's own date — which is Square's `arrival_date`. Same shape here, with
+// the shop's class on the line and its location on the header (a Deposit
+// takes a header DepartmentRef where a JournalEntry does not), and the
+// payout's end-to-end id as the DocNumber, because the bank's ACH memo
+// carries that same id and it is how a bank line is traced to a payout.
+
+/** One row of `square_payouts`, as the builder wants it. */
+export type SquarePayout = {
+  id: string;
+  location_id: string;
+  square_payout_id: string;
+  end_to_end_id: string | null;
+  /** Square's own word: SENT, PAID or FAILED. */
+  status: string;
+  payout_type: string | null;
+  sent_at: string;
+  arrival_date: string;
+  amount_cents: number;
+  external_ref: PayoutPostingRef | null;
+  post_error: string | null;
+};
+
+export type PayoutPostingRef = {
+  qbo?: {
+    id?: string;
+    sync_token?: string;
+    doc_number?: string | null;
+    entity?: "Deposit";
+    deposit_hash?: string;
+    /** Stamped by `record_payout_posting` from the row, so the screen can say
+     *  "changed since posted" without rebuilding. */
+    amount_cents?: number;
+    arrival_date?: string;
+  };
+};
+
+export type QboDeposit = {
+  Id?: string;
+  SyncToken?: string;
+  sparse?: boolean;
+  DocNumber: string;
+  TxnDate: string;
+  PrivateNote: string;
+  DepositToAccountRef: { value: string; name?: string };
+  DepartmentRef?: { value: string; name?: string };
+  Line: {
+    DetailType: "DepositLineDetail";
+    Amount: number;
+    Description: string;
+    DepositLineDetail: {
+      AccountRef: { value: string; name?: string };
+      ClassRef?: { value: string; name?: string };
+    };
+  }[];
+};
+
+export type DepositBuild =
+  | {
+      ok: true;
+      mode: "create" | "update";
+      docNumber: string;
+      cents: number;
+      bank: QboRefValue;
+      account: QboRefValue;
+      hash: string;
+      warnings: string[];
+      body: QboDeposit;
+    }
+  | { ok: false; refusals: string[] };
+
+/** The payout's end-to-end id — `T316V42B337KEBX`, the id the bank memo
+ *  carries — else a prefix of Square's own id. Refuses over the cap. */
+export function docNumberForPayout(payout: Pick<SquarePayout, "end_to_end_id" | "square_payout_id">): { ok: true; value: string } | { ok: false; reason: string } {
+  const e2e = payout.end_to_end_id?.trim();
+  const value = e2e ? e2e : `SQ-${payout.square_payout_id.replace(/^po_/, "").slice(-12)}`;
+  if (value.length > DOC_NUMBER_MAX) {
+    return { ok: false, reason: `The deposit's document number would be ${value.length} characters (${value}); QuickBooks allows ${DOC_NUMBER_MAX}.` };
+  }
+  return { ok: true, value };
+}
+
+export function depositHash(input: { docNumber: string; txnDate: string; cents: number; bankRef: string; accountRef: string; classRef: string; deptRef: string }): string {
+  return journalHash({
+    docNumber: input.docNumber,
+    txnDate: input.txnDate,
+    lines: [
+      { posting: "Debit", cents: input.cents, account: { ref: input.bankRef, name: null }, description: "", source: { kind: "tender", key: input.classRef } },
+      { posting: "Credit", cents: input.cents, account: { ref: input.accountRef, name: null }, description: "", source: { kind: "tender", key: input.deptRef } },
+    ],
+  });
+}
+
+/**
+ * One deposit for one payout, or the reasons there cannot be one.
+ *
+ *   · a payout Square reports as anything but SENT or PAID → refused (money
+ *     that did not move is not a deposit);
+ *   · a zero or negative payout → refused (Square taking money BACK is a
+ *     withdrawal, recorded by hand — rare, and worth a person's eye);
+ *   · the shop lacks a Class or a Location → refused, as for the entry;
+ *   · no bank role, or no card role → refused by name;
+ *   · the amount is the payout's, to the cent, and there is one line.
+ */
+export function buildDeposit(input: {
+  payout: SquarePayout;
+  mappings: readonly SalesMapping[];
+  shop: PostingShop;
+}): DepositBuild {
+  const { payout, mappings, shop } = input;
+  const refusals: string[] = [];
+  const warnings: string[] = [];
+
+  if (payout.status !== "SENT" && payout.status !== "PAID") {
+    refusals.push(`Square reports this payout as ${payout.status}, so no money reached the bank.`);
+  }
+  if (!Number.isInteger(payout.amount_cents) || payout.amount_cents <= 0) {
+    refusals.push(
+      payout.amount_cents < 0
+        ? `This payout is negative (${money(payout.amount_cents)}) — Square took money back, which is a withdrawal to record by hand.`
+        : "This payout is for nothing."
+    );
+  }
+
+  const klass = shop.qbo_class_ref?.trim() ? { value: shop.qbo_class_ref.trim(), ...(shop.qbo_class_name ? { name: shop.qbo_class_name } : {}) } : null;
+  const dept = shop.qbo_location_ref?.trim() ? { value: shop.qbo_location_ref.trim(), ...(shop.qbo_location_name ? { name: shop.qbo_location_name } : {}) } : null;
+  if (!klass) refusals.push(`${shop.code} has no QuickBooks class — set it on the location's record.`);
+  if (!dept) refusals.push(`${shop.code} has no QuickBooks location — set it on the location's record.`);
+
+  const bank = roleAccount(mappings, "bank");
+  const account = roleAccount(mappings, "card");
+  if (!bank) refusals.push(`No account is set for “${SALES_ROLE_LABEL.bank}” — Settings → Accounting → Sales from Square.`);
+  if (!account) refusals.push(`No account is set for “${SALES_ROLE_LABEL.card}” — Settings → Accounting → Sales from Square.`);
+
+  const doc = docNumberForPayout(payout);
+  if (!doc.ok) refusals.push(doc.reason);
+
+  if (refusals.length > 0) return { ok: false, refusals };
+
+  const docNumber = (doc as { ok: true; value: string }).value;
+  const cents = payout.amount_cents;
+  const hash = depositHash({
+    docNumber,
+    txnDate: payout.arrival_date,
+    cents,
+    bankRef: bank!.ref,
+    accountRef: account!.ref,
+    classRef: klass!.value,
+    deptRef: dept!.value,
+  });
+  const id = payout.external_ref?.qbo?.id?.trim();
+  const syncToken = payout.external_ref?.qbo?.sync_token?.trim();
+  const mode: "create" | "update" = id && syncToken ? "update" : "create";
+  const sent = payout.sent_at.slice(0, 10);
+
+  const body: QboDeposit = {
+    ...(mode === "update" ? { Id: id, SyncToken: syncToken, sparse: false } : {}),
+    DocNumber: docNumber,
+    TxnDate: payout.arrival_date,
+    PrivateNote: `Square payout · ${shop.code} · sent ${sent}, arriving ${payout.arrival_date} · ${docNumber} · restaurantfriend`,
+    DepositToAccountRef: { value: bank!.ref, ...(bank!.name ? { name: bank!.name } : {}) },
+    DepartmentRef: dept!,
+    Line: [
+      {
+        DetailType: "DepositLineDetail",
+        Amount: centsToAmount(cents),
+        Description: `Square payout ${docNumber} · ${shop.code}`,
+        DepositLineDetail: {
+          AccountRef: { value: account!.ref, ...(account!.name ? { name: account!.name } : {}) },
+          ClassRef: klass!,
+        },
+      },
+    ],
+  };
+
+  return { ok: true, mode, docNumber, cents, bank: bank!, account: account!, hash, warnings, body };
+}
+
+/**
+ * The state of a payout for the Sales screen — `postingState`'s shape.
+ * `stale` means the payout's amount or arrival date moved after it was
+ * posted (both are stamped into the ref by the database at post time).
+ */
+export function payoutPostingState(row: Pick<SquarePayout, "external_ref" | "post_error" | "amount_cents" | "arrival_date">): PostingState {
+  if (row.post_error) return "failed";
+  const qbo = row.external_ref?.qbo;
+  if (!qbo?.id) return "unposted";
+  if (
+    (qbo.amount_cents !== undefined && qbo.amount_cents !== row.amount_cents) ||
+    (qbo.arrival_date !== undefined && qbo.arrival_date !== row.arrival_date)
+  ) {
+    return "stale";
+  }
+  return "posted";
+}
+
+export function payoutPostingLabel(state: PostingState, ref: PayoutPostingRef | null): string {
+  switch (state) {
+    case "unposted":
+      return "—";
+    case "failed":
+      return "failed";
+    case "stale":
+      return "changed since posted";
+    case "posted":
+      return ref?.qbo?.doc_number ?? "posted";
+  }
+}
+
+/** A QuickBooks Deposit as `find_deposits` flattens it. */
+export type FlatDeposit = {
+  id: string;
+  doc_number: string | null;
+  txn_date: string;
+  total_cents: number;
+  deposit_to_name: string | null;
+  department_name: string | null;
+  private_note: string | null;
+  lines: { cents: number; account_name: string | null; class_name: string | null; entity_name: string | null; description: string | null }[];
+};
+
+export type DepositMatch = {
+  payoutId: string;
+  /** Deposits on the books for this payout's amount within a few days of its
+   *  arrival: OURS (the DocNumber is the payout's) or somebody else's. */
+  ours: FlatDeposit[];
+  theirs: FlatDeposit[];
+};
+
+/**
+ * Which deposits on the books answer to each payout — by AMOUNT within
+ * `windowDays` of the arrival date, since a deposit the bank feed added
+ * carries no id. The parallel run: while the bank feed is still adding them,
+ * a payout with a deposit of ours AND one of theirs is doubled on the books.
+ */
+export function matchDeposits(
+  payouts: readonly Pick<SquarePayout, "id" | "amount_cents" | "arrival_date" | "end_to_end_id" | "square_payout_id">[],
+  deposits: readonly FlatDeposit[],
+  windowDays = 4
+): DepositMatch[] {
+  const dayMs = 86400000;
+  return payouts.map((p) => {
+    const doc = docNumberForPayout(p);
+    const ours: FlatDeposit[] = [];
+    const theirs: FlatDeposit[] = [];
+    const at = Date.parse(`${p.arrival_date}T00:00:00Z`);
+    for (const d of deposits) {
+      if (d.total_cents !== p.amount_cents) continue;
+      const gap = Math.abs(Date.parse(`${d.txn_date}T00:00:00Z`) - at) / dayMs;
+      if (gap > windowDays) continue;
+      if (doc.ok && d.doc_number === doc.value) ours.push(d);
+      else theirs.push(d);
+    }
+    return { payoutId: p.id, ours, theirs };
+  });
 }

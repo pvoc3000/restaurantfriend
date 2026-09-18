@@ -314,6 +314,12 @@ Deno.serve(async (req) => {
       .update({ external_ref: {}, posted_at: null, post_error: null })
       .eq("org_id", row.org_id)
       .not("external_ref->qbo", "is", null));
+    // 105: every payout's deposit id, for the same reason as the days'.
+    await clear("posted payouts", admin
+      .from("square_payouts")
+      .update({ external_ref: {}, posted_at: null, post_error: null })
+      .eq("org_id", row.org_id)
+      .not("external_ref->qbo", "is", null));
   }
 
   return back({

@@ -16,9 +16,9 @@ import {
   type SalesDay,
 } from "@/lib/sales";
 import { daysBetween } from "@/lib/payPeriods";
-import { SalesActions } from "@/components/sales/SalesActions";
+import { SalesActions, type ActionPayout } from "@/components/sales/SalesActions";
 import { SalesScreen } from "@/components/sales/SalesScreen";
-import type { SalesPostingRef } from "@/lib/salesPosting";
+import type { PayoutPostingRef, SalesPostingRef } from "@/lib/salesPosting";
 
 /**
  * DAILY NET SALES AND TIPS, per shop.
@@ -228,6 +228,40 @@ export default async function SalesPage({
       Array.isArray(conn.data) && (conn.data[0] as { status?: string } | undefined)?.status === "connected";
     unmappedNames = unmapped.count ?? 0;
   }
+  // THE PAYOUTS IN RANGE (105), by the date they reach the bank — every shop,
+  // for the same reason as the days. A missing table means 105 is pending:
+  // the deposit half stays off and the screen says so, the sales unaffected.
+  let payouts: ActionPayout[] = [];
+  let depositsReady = false;
+  if (postingSchema) {
+    const { data: payoutRows, error: payoutError } = await supabase
+      .from("square_payouts")
+      .select("id, location_id, square_payout_id, end_to_end_id, status, payout_type, sent_at, arrival_date, amount_cents, external_ref, posted_at, post_error")
+      .gte("arrival_date", resolved.range.from)
+      .lte("arrival_date", resolved.range.to)
+      .order("arrival_date")
+      .order("location_id")
+      .limit(1000);
+    if (!payoutError) {
+      depositsReady = true;
+      payouts = ((payoutRows ?? []) as Record<string, unknown>[]).map((r) => ({
+        id: r.id as string,
+        location_id: r.location_id as string,
+        locationCode: codeFor.get(r.location_id as string) ?? "—",
+        square_payout_id: r.square_payout_id as string,
+        end_to_end_id: (r.end_to_end_id as string | null) ?? null,
+        status: r.status as string,
+        payout_type: (r.payout_type as string | null) ?? null,
+        sent_at: r.sent_at as string,
+        arrival_date: r.arrival_date as string,
+        amount_cents: Number(r.amount_cents),
+        external_ref: (r.external_ref as PayoutPostingRef | null) ?? null,
+        posted_at: (r.posted_at as string | null) ?? null,
+        post_error: (r.post_error as string | null) ?? null,
+      }));
+    }
+  }
+
   // The days the commands act on: this range, every shop. The shop filter is
   // a VIEW; a journal entry is per shop-day regardless of what is on screen.
   const rangeDays = days
@@ -263,6 +297,7 @@ export default async function SalesPage({
               connected={qboConnected}
               range={resolved.range}
               days={rangeDays}
+              payouts={payouts}
               shopCodes={shops.map((s) => s.code)}
             />
           ) : null
@@ -271,8 +306,9 @@ export default async function SalesPage({
 
       <SalesScreen
         canEdit={canPost}
-        posting={{ ready: postingSchema, connected: qboConnected, unmappedNames }}
+        posting={{ ready: postingSchema, connected: qboConnected, unmappedNames, depositsReady }}
         days={days}
+        payouts={payouts}
         range={resolved.range}
         rangeLabel={resolved.label}
         fellBack={resolved.fellBack}

@@ -19,6 +19,14 @@ import {
   tenderRole,
   centsToAmount,
   SALES_ROLES,
+  buildDeposit,
+  docNumberForPayout,
+  depositHash,
+  payoutPostingState,
+  payoutPostingLabel,
+  matchDeposits,
+  type SquarePayout,
+  type FlatDeposit,
   type SalesBreakdown,
   type SalesMapping,
   type PostingShop,
@@ -293,11 +301,33 @@ test("a service charge credits its role, and a net-returned one debits it", () =
   eq([svc.posting, svc.account.ref, svc.cents], ["Debit", "S", 700]);
 });
 
-test("a fee on a tender that took nothing still debits fees and then fails the balance", () => {
+test("a fee keyed to ANOTHER tender still nets against the CARD line — Square takes every fee out of the payout", () => {
+  // The real DF01 2026-09-14: fifteen gift cards loaded with cash, 63¢ each,
+  // keyed to CASH by the sync. The drawer holds the full cash; the payout is
+  // short by the 9.45. Measured: keyed per tender the card line missed the
+  // payout by 9.07 that day; netted here it is within 38 cents.
   const day = realDay();
-  day.lines.push({ kind: "fee", key: "AFTERPAY", name: "AFTERPAY fees", cents: 100 });
-  const r = refused({ breakdown: day });
-  ok(r[0].includes("does not balance"), r[0]);
+  day.lines.push({ kind: "fee", key: "CASH", name: "CASH fees", cents: 945 });
+  const b = built({ breakdown: day });
+  const card = b.lines.find((l) => l.source.kind === "tender" && l.source.key === "CARD")!;
+  const cash = b.lines.find((l) => l.source.kind === "tender" && l.source.key === "CASH")!;
+  const fees = b.lines.find((l) => l.source.kind === "fee")!;
+  eq(card.cents, 230573 - 7234 - 945, "card net of EVERY fee");
+  eq(cash.cents, 5093, "cash stays the full drawer");
+  eq(fees.cents, 7234 + 945, "one fee line for all of it");
+  eq(b.debits, b.credits, "still balances");
+});
+
+test("fees on a day with no card payment at all come off a card line that flips to a credit", () => {
+  const day = realDay();
+  day.lines = day.lines.filter((l) => !(l.kind === "tender" && l.key === "CARD"));
+  day.lines = day.lines.map((l) => (l.kind === "fee" ? { ...l, key: "AFTERPAY", cents: 100 } : l));
+  // Keep it balanced: the card takings went; the categories must shrink too.
+  day.lines = day.lines.map((l) => (l.kind === "category" && l.key === "Signatures" ? { ...l, cents: 176445 - 230573 } : l));
+  const b = built({ breakdown: day });
+  const card = b.lines.find((l) => l.source.kind === "tender" && l.source.key === "CARD")!;
+  eq([card.posting, card.cents, card.account.ref], ["Credit", 100, "C"]);
+  eq(b.debits, b.credits);
 });
 
 // --- create versus update -----------------------------------------------------
@@ -403,4 +433,138 @@ test("shopForEntryLines reads the shop off a class or a location name", () => {
   eq(shopForEntryLines([l("DF02", null)], shops), "DF02");
   eq(shopForEntryLines([l(null, "df01 hp")], shops), "DF01");
   eq(shopForEntryLines([l(null, null)], shops), null);
+});
+
+// --- the deposit (105) ---------------------------------------------------------
+
+const BANKED: SalesMapping[] = [...ROLES, role("bank", "B", "Chase ACH (*1509)")];
+
+/** The real DF01 payout that arrived 2026-09-16, as Square reported it. */
+function payout(over: Partial<SquarePayout> = {}): SquarePayout {
+  return {
+    id: "p1",
+    location_id: "L1",
+    square_payout_id: "po_5313fba0-9bc2-42ba-aa40-8fe46e216ad4",
+    end_to_end_id: "T316V42B337KEBX",
+    status: "SENT",
+    payout_type: "BATCH",
+    sent_at: "2026-09-16T02:18:03Z",
+    arrival_date: "2026-09-16",
+    amount_cents: 130104,
+    external_ref: null,
+    post_error: null,
+    ...over,
+  };
+}
+
+function deposit(over: Partial<SquarePayout> = {}, mappings: SalesMapping[] = BANKED) {
+  const b = buildDeposit({ payout: payout(over), mappings, shop: DF01 });
+  if (!b.ok) throw new Error("expected a deposit, got refusals: " + b.refusals.join(" | "));
+  return b;
+}
+
+function depositRefused(over: Partial<SquarePayout> = {}, mappings: SalesMapping[] = BANKED): string[] {
+  const b = buildDeposit({ payout: payout(over), mappings, shop: DF01 });
+  if (b.ok) throw new Error("expected refusals, got a deposit");
+  return b.refusals;
+}
+
+test("the real DF01 payout becomes one deposit for its exact amount, into the bank, from the card account", () => {
+  const b = deposit();
+  eq(b.mode, "create");
+  eq(b.docNumber, "T316V42B337KEBX", "the end-to-end id the bank memo carries");
+  eq(b.cents, 130104);
+  eq(
+    JSON.stringify(b.body),
+    JSON.stringify({
+      DocNumber: "T316V42B337KEBX",
+      TxnDate: "2026-09-16",
+      PrivateNote: "Square payout · DF01 · sent 2026-09-16, arriving 2026-09-16 · T316V42B337KEBX · restaurantfriend",
+      DepositToAccountRef: { value: "B", name: "Chase ACH (*1509)" },
+      DepartmentRef: { value: "1", name: "DF01 HP" },
+      Line: [
+        {
+          DetailType: "DepositLineDetail",
+          Amount: 1301.04,
+          Description: "Square payout T316V42B337KEBX · DF01",
+          DepositLineDetail: {
+            AccountRef: { value: "C", name: "Undeposited Square Funds" },
+            ClassRef: { value: "5000000000000012345", name: "DF01" },
+          },
+        },
+      ],
+    }),
+    "the emitted body"
+  );
+});
+
+test("a payout without an end-to-end id is numbered from Square's own id, under the cap", () => {
+  const d = docNumberForPayout({ end_to_end_id: null, square_payout_id: "po_5313fba0-9bc2-42ba-aa40-8fe46e216ad4" });
+  ok(d.ok && d.value === "SQ-8fe46e216ad4", JSON.stringify(d));
+  const long = docNumberForPayout({ end_to_end_id: "X".repeat(30), square_payout_id: "po_x" });
+  ok(!long.ok, "over the cap refuses rather than truncating");
+});
+
+test("a FAILED, zero or negative payout is refused by name", () => {
+  ok(depositRefused({ status: "FAILED" })[0].includes("FAILED"));
+  ok(depositRefused({ amount_cents: 0 })[0].includes("nothing"));
+  ok(depositRefused({ amount_cents: -1500 })[0].includes("took money back"));
+});
+
+test("no bank role, no card role, no class or no location each refuse by name", () => {
+  ok(depositRefused({}, ROLES).some((r) => r.includes("Bank account for payouts")), "bank");
+  ok(depositRefused({}, BANKED.filter((m) => m.square_key !== "card")).some((r) => r.includes("Card takings")), "card");
+  const noClass = buildDeposit({ payout: payout(), mappings: BANKED, shop: { ...DF01, qbo_class_ref: null } });
+  ok(!noClass.ok && noClass.refusals[0].includes("no QuickBooks class"));
+  const noDept = buildDeposit({ payout: payout(), mappings: BANKED, shop: { ...DF01, qbo_location_ref: null } });
+  ok(!noDept.ok && noDept.refusals[0].includes("no QuickBooks location"));
+});
+
+test("a posted payout builds an UPDATE, and the hash moves only when the deposit would", () => {
+  const b = deposit({ external_ref: { qbo: { id: "550524", sync_token: "0" } } });
+  eq(b.mode, "update");
+  eq(b.body.Id, "550524");
+  eq(b.body.SyncToken, "0");
+  eq(b.body.sparse, false);
+  eq(deposit().hash, deposit().hash, "stable");
+  ok(deposit().hash !== deposit({ amount_cents: 130105 }).hash, "moves with the amount");
+  ok(deposit().hash !== deposit({ arrival_date: "2026-09-17" }).hash, "moves with the date");
+  eq(
+    depositHash({ docNumber: "D", txnDate: "2026-09-16", cents: 1, bankRef: "B", accountRef: "C", classRef: "K", deptRef: "1" }),
+    depositHash({ docNumber: "D", txnDate: "2026-09-16", cents: 1, bankRef: "B", accountRef: "C", classRef: "K", deptRef: "1" })
+  );
+});
+
+test("a payout's state: unposted, posted, changed since posted, failed", () => {
+  eq(payoutPostingState(payout()), "unposted");
+  const posted = payout({ external_ref: { qbo: { id: "1", doc_number: "T316V42B337KEBX", amount_cents: 130104, arrival_date: "2026-09-16" } } });
+  eq(payoutPostingState(posted), "posted");
+  eq(payoutPostingLabel("posted", posted.external_ref), "T316V42B337KEBX");
+  eq(payoutPostingState({ ...posted, amount_cents: 130105 }), "stale");
+  eq(payoutPostingState({ ...posted, arrival_date: "2026-09-17" }), "stale");
+  eq(payoutPostingLabel("stale", posted.external_ref), "changed since posted");
+  eq(payoutPostingState({ ...posted, post_error: "refused" }), "failed");
+});
+
+test("matchDeposits pairs a payout with deposits of its amount near its date, ours by DocNumber and theirs by nothing", () => {
+  const flat = (over: Partial<FlatDeposit>): FlatDeposit => ({
+    id: "d", doc_number: null, txn_date: "2026-09-16", total_cents: 130104, deposit_to_name: "Chase ACH (*1509)",
+    department_name: null, private_note: null, lines: [], ...over,
+  });
+  const m = matchDeposits(
+    [payout()],
+    [
+      flat({ id: "ours", doc_number: "T316V42B337KEBX" }),
+      flat({ id: "bank", private_note: "ORIG CO NAME:Square Inc …" }),
+      flat({ id: "far", txn_date: "2026-09-30" }),
+      flat({ id: "other", total_cents: 130105 }),
+    ]
+  );
+  eq(m[0].ours.map((d) => d.id), ["ours"]);
+  eq(m[0].theirs.map((d) => d.id), ["bank"]);
+});
+
+test("the bank role is on the grid, and it is an asset", () => {
+  const bank = SALES_ROLES.find((r) => r.key === "bank")!;
+  eq(bank.classification, "Asset");
 });

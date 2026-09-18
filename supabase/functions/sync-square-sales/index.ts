@@ -548,6 +548,93 @@ async function loadBreakdown(
 }
 
 // ---------------------------------------------------------------------------
+// Payouts (migration 105)
+// ---------------------------------------------------------------------------
+
+type PayoutRow = {
+  location_id: string;
+  square_payout_id: string;
+  end_to_end_id: string | null;
+  status: string;
+  payout_type: string | null;
+  sent_at: string;
+  arrival_date: string;
+  amount_cents: number;
+  currency: string;
+  destination_id: string | null;
+  square_version: number | null;
+};
+
+/**
+ * Every payout Square reports for the mapped locations, from the Payouts API
+ * (REST, not the Reporting cubes — a payout is a ledger fact, not a report).
+ *
+ * THE WINDOW IS WIDENED, NOT FILTERED. `begin_time`/`end_time` filter on the
+ * payout's CREATION, and a payout is created about two days after the
+ * charges it carries and one day before it lands in the bank — so a pull for
+ * September asks from four days before it to two days after, and keeps
+ * everything it gets. The upsert makes the overlap harmless, and the Sales
+ * screen ranges on `arrival_date`, which is the date the bank shows. A payout
+ * arriving TOMORROW is deliberately kept: posting its deposit tonight is what
+ * lets the bank feed match it in the morning instead of adding a second one.
+ *
+ * Amounts are integer cents in a Money object, through `moneyToCents`, which
+ * refuses anything else — a payout is money about to be matched against a
+ * bank line, and a guessed unit there is a deposit for a hundred times the
+ * truth.
+ */
+async function loadPayouts(
+  token: string,
+  from: string,
+  to: string,
+  bySquareId: Map<string, { id: string; code: string }>
+): Promise<{ rows: PayoutRow[]; warnings: string[]; calls: number }> {
+  const rows: PayoutRow[] = [];
+  const warnings: string[] = [];
+  let calls = 0;
+  const begin = `${addDaysISO(from, -4)}T00:00:00Z`;
+  const end = `${addDaysISO(to, 2)}T23:59:59Z`;
+  for (const [squareId, loc] of bySquareId) {
+    let cursor: string | null = null;
+    do {
+      const q =
+        `location_id=${encodeURIComponent(squareId)}&begin_time=${encodeURIComponent(begin)}` +
+        `&end_time=${encodeURIComponent(end)}&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+      const body = await squareFetch(token, `/v2/payouts?${q}`);
+      calls++;
+      for (const p of (body.payouts ?? []) as Record<string, unknown>[]) {
+        const id = String(p.id ?? "");
+        const amount = moneyToCents(p.amount_money);
+        const arrival = typeof p.arrival_date === "string" ? p.arrival_date : null;
+        const created = typeof p.created_at === "string" ? p.created_at : null;
+        if (!id || amount === null || !arrival || !created) {
+          // Never a guess: a payout is money the bank will show, and one that
+          // cannot be read exactly is a sentence, not a zero.
+          warnings.push(`A payout for ${loc.code} could not be read (${JSON.stringify({ id, amount: p.amount_money, arrival, created })})`);
+          continue;
+        }
+        const dest = p.destination as { id?: unknown } | undefined;
+        rows.push({
+          location_id: loc.id,
+          square_payout_id: id,
+          end_to_end_id: typeof p.end_to_end_id === "string" ? p.end_to_end_id : null,
+          status: String(p.status ?? "UNKNOWN"),
+          payout_type: typeof p.type === "string" ? p.type : null,
+          sent_at: created,
+          arrival_date: arrival,
+          amount_cents: amount,
+          currency: String((p.amount_money as { currency_code?: unknown } | undefined)?.currency_code ?? "USD"),
+          destination_id: typeof dest?.id === "string" ? dest.id : null,
+          square_version: typeof p.version === "number" ? p.version : null,
+        });
+      }
+      cursor = typeof body.cursor === "string" && body.cursor ? body.cursor : null;
+    } while (cursor);
+  }
+  return { rows, warnings, calls };
+}
+
+// ---------------------------------------------------------------------------
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -557,7 +644,7 @@ Deno.serve(async (req) => {
     const { mode, from, to } = payload as { mode?: string; from?: string; to?: string };
 
     // The two catalogue modes need no window; the sync needs one.
-    const NO_WINDOW_MODES = ["locations", "meta", "query"];  // a dry run still needs a window
+    const NO_WINDOW_MODES = ["locations", "meta", "query", "get"];  // a dry run still needs a window
     if (!NO_WINDOW_MODES.includes(mode ?? "") && (!from || !to)) {
       return json(400, {
         error: `missing from and to (or mode: ${NO_WINDOW_MODES.map((m) => `'${m}'`).join(" / ")})`,
@@ -682,6 +769,28 @@ Deno.serve(async (req) => {
       try {
         const r = await loadCube(token, query as Record<string, unknown>);
         return json(200, { rows: r.rows, square_calls: r.calls, waited_ms: r.waitedMs });
+      } catch (e) {
+        return squareFailure(e, rawToken, token);
+      }
+    }
+
+    // --- mode: get ----------------------------------------------------------
+    //
+    // ONE REST GET, PASSED THROUGH. `query`'s sibling for the v2 REST API —
+    // the Payouts endpoints in particular, whose shape had to be seen on real
+    // data before the deposit sync was written against it. Read-only (GET
+    // only, and the path is checked to be a v2 path), owner/admin only.
+    if (mode === "get") {
+      if (!["owner", "admin"].includes(member.role as string)) {
+        return json(403, { error: "a manager or the owner is required to read Square directly" });
+      }
+      const path = (payload as { path?: unknown }).path;
+      if (typeof path !== "string" || !path.startsWith("/v2/")) {
+        return json(400, { error: "missing path (a /v2/… GET path with its query string)" });
+      }
+      try {
+        const body = await squareFetch(token, path);
+        return json(200, body);
       } catch (e) {
         return squareFailure(e, rawToken, token);
       }
@@ -983,10 +1092,39 @@ Deno.serve(async (req) => {
       });
     }
 
+    // THE PAYOUTS RIDE WITH A REAL SYNC (105), after the days have landed.
+    // A failure here is a warning: the sales are saved either way, and the
+    // deposit post says "no payouts pulled" in its own words until a sync
+    // brings them.
+    let payoutsUpserted = 0;
+    try {
+      const p = await loadPayouts(token, from!, to!, bySquareId);
+      calls += p.calls;
+      warnings.push(...p.warnings);
+      if (p.rows.length) {
+        const { data: pr, error: pErr } = await supabase.rpc("record_square_payouts", { p_rows: p.rows });
+        if (pErr) {
+          warnings.push(
+            /record_square_payouts/.test(pErr.message)
+              ? "Payouts were pulled but record_square_payouts does not exist — migration 105 has not been applied yet"
+              : `Payouts were pulled but not saved: ${pErr.message}`
+          );
+        } else {
+          payoutsUpserted = Number((pr as { payouts_upserted?: number } | null)?.payouts_upserted ?? 0);
+        }
+      }
+    } catch (e) {
+      if (e instanceof SquareError && e.status === 401) return squareFailure(e, rawToken, token);
+      warnings.push(
+        `Payouts were not pulled for ${from} – ${to} (${e instanceof Error ? e.message : String(e)}) — the sales were saved; the deposits will be missing until a sync brings them`
+      );
+    }
+
     return json(200, {
       from,
       to,
       ...(report as Record<string, unknown>),
+      payouts_upserted: payoutsUpserted,
       locations: [...perLocation].map(([code, days]) => ({ code, days })),
       unmapped_square_locations: [...unmapped],
       warnings,

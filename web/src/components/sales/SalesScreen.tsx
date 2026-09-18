@@ -30,7 +30,9 @@ import { InlineValue } from "@/components/catalog/InlineValue";
 import { createClient } from "@/lib/supabase/client";
 import type { RawSearchParams } from "@/lib/filterMenus";
 import Link from "next/link";
-import { postingLabel, postingState } from "@/lib/salesPosting";
+import { postingLabel, postingState, payoutPostingLabel, payoutPostingState } from "@/lib/salesPosting";
+import { SectionHeading } from "@/components/ui/SectionHeading";
+import type { ActionPayout } from "./SalesActions";
 
 type Row = SalesDay & { id: string };
 
@@ -47,6 +49,7 @@ export function SalesScreen({
   canEdit,
   posting,
   days,
+  payouts,
   range,
   rangeLabel,
   fellBack,
@@ -68,9 +71,11 @@ export function SalesScreen({
   canEdit: boolean;
   /** The QuickBooks posting's standing facts (migration 104). `ready` is
    *  false until that migration is applied, and then the column stays off. */
-  posting: { ready: boolean; connected: boolean; unmappedNames: number };
+  posting: { ready: boolean; connected: boolean; unmappedNames: number; depositsReady: boolean };
   /** The whole window, EVERY shop — the filter is applied here. */
   days: SalesDay[];
+  /** The range's payouts, every shop (105); the shop filter applies here too. */
+  payouts: ActionPayout[];
   range: DateRange;
   rangeLabel: string;
   fellBack: boolean;
@@ -174,6 +179,84 @@ export function SalesScreen({
   // Both shops folded into one figure per date, for the Combined view. A day
   // where one shop was shut is still that date's real takings.
   const combined = useMemo(() => rollUpByDate(rows), [rows]);
+
+  const depositRows = useMemo(
+    () => (picked.length ? payouts.filter((p) => picked.includes(p.locationCode)) : payouts),
+    [payouts, picked]
+  );
+
+  // THE DEPOSITS TABLE (105): one row per Square payout, by the day it
+  // reaches the bank, with the same QuickBooks column the days carry.
+  const depositColumns: DataColumn<ActionPayout>[] = [
+    {
+      key: "arrives",
+      label: "Arrives",
+      width: 160,
+      pinned: true,
+      sortValue: (r) => r.arrival_date,
+      sortTiebreaks: [(r) => r.locationCode],
+      render: (r) => <span className="tabular-nums">{r.arrival_date}</span>,
+    },
+    { key: "shop", label: "Shop", width: 110, sortValue: (r) => r.locationCode, render: (r) => r.locationCode },
+    {
+      key: "sent",
+      label: "Sent",
+      width: 150,
+      hideWhenCompact: true,
+      sortValue: (r) => r.sent_at,
+      render: (r) => <span className="text-muted tabular-nums">{r.sent_at.slice(0, 10)}</span>,
+    },
+    {
+      key: "amount",
+      label: "Amount",
+      width: 170,
+      align: "right",
+      sortValue: (r) => r.amount_cents,
+      render: (r) => <Money cents={r.amount_cents} />,
+    },
+    {
+      key: "square",
+      label: "Square",
+      width: 120,
+      hideWhenCompact: true,
+      sortValue: (r) => r.status,
+      // Square's own word. FAILED is the one to look at: money that did not move.
+      render: (r) =>
+        r.status === "SENT" || r.status === "PAID" ? (
+          <span className="text-muted">{r.status.toLowerCase()}</span>
+        ) : (
+          <span className="bg-mark-fill px-1 text-[11px] text-accent">{r.status.toLowerCase()}</span>
+        ),
+    },
+    {
+      key: "quickbooks",
+      label: "QuickBooks",
+      width: 190,
+      sortValue: (r) => r.posted_at ?? "",
+      render: (r) => {
+        const state = payoutPostingState(r);
+        const label = payoutPostingLabel(state, r.external_ref);
+        if (state === "failed") {
+          return (
+            <span className="bg-mark-fill px-1 text-[11px] text-accent" title={r.post_error ?? undefined}>
+              failed
+            </span>
+          );
+        }
+        if (state === "stale") {
+          return (
+            <span className="flex items-center gap-2">
+              <span className="tabular-nums">{r.external_ref?.qbo?.doc_number ?? "posted"}</span>
+              <span className="bg-mark-fill px-1 text-[11px]" title="The payout's amount or date moved after it was posted — post again to update the deposit">
+                {label}
+              </span>
+            </span>
+          );
+        }
+        return <span className={state === "posted" ? "tabular-nums" : "text-faint"}>{label}</span>;
+      },
+    },
+  ];
 
   function go(next: Record<string, string | null>) {
     const q = new URLSearchParams();
@@ -489,6 +572,30 @@ export function SalesScreen({
         }}
         />
       </section>
+
+      {posting.ready ? (
+        <section className="space-y-4">
+          <SectionHeading count={depositRows.length}>Square deposits</SectionHeading>
+          {!posting.depositsReady ? (
+            <p className="text-sm text-muted">Deposits need migration 105, which has not been applied yet.</p>
+          ) : (
+            <DataTable
+              rows={depositRows}
+              columns={depositColumns}
+              rowKey={(r) => r.id}
+              storageKey="sales.deposits.v1"
+              defaultSort={{ key: "arrives", dir: "desc" }}
+              columnChooser
+              compactBelow={1024}
+              empty={<span>No payouts reach the bank in this period. Sync from Square brings them.</span>}
+              totals={(shown) => ({
+                arrives: <span className="text-muted">{shown.length} payout{shown.length === 1 ? "" : "s"}</span>,
+                amount: <Money cents={shown.reduce((a, r) => a + r.amount_cents, 0)} />,
+              })}
+            />
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }

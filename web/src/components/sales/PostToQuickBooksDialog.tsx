@@ -7,9 +7,9 @@ import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/u
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { formatCents } from "@/lib/tipPool";
-import { buildJournalEntry, type JournalBuild } from "@/lib/salesPosting";
-import { readPostingContext, readBreakdowns, postDay, type DayForPosting } from "./salesPostClient";
-import type { ActionDay } from "./SalesActions";
+import { buildJournalEntry, buildDeposit, type DepositBuild, type JournalBuild, type SquarePayout } from "@/lib/salesPosting";
+import { readPostingContext, readBreakdowns, readPayouts, postDay, postPayout, type DayForPosting } from "./salesPostClient";
+import type { ActionDay, ActionPayout } from "./SalesActions";
 
 /**
  * THE RECEIPT FIRST, THEN THE POST. Every day in range is BUILT in the browser
@@ -31,18 +31,37 @@ type Planned = {
   result?: { ok: true; skipped: boolean; label: string; updated: boolean; warnings: string[] } | { ok: false; message: string };
 };
 
+/**
+ * THE DEPOSITS COME AFTER THE DAYS (105). One Bank Deposit per Square payout,
+ * for the payout's exact amount, so the bank feed matches it rather than
+ * adding its own. Built from the rows read fresh — a payout's sync token is
+ * the one thing a stale list row would get wrong — and sent one after
+ * another once every day has gone.
+ */
+type PlannedDeposit = {
+  payout: ActionPayout;
+  read: SquarePayout | null;
+  build: DepositBuild | null;
+  action: "create" | "update" | "skip" | "refused";
+  result?: Planned["result"];
+};
+
 export function PostToQuickBooksDialog({
   orgId,
   days,
+  payouts,
   onClose,
 }: {
   orgId: string;
   days: ActionDay[];
+  payouts: ActionPayout[];
   onClose: () => void;
 }) {
   const supabase = createClient();
   const router = useRouter();
   const [planned, setPlanned] = useState<Planned[] | null>(null);
+  const [plannedDeposits, setPlannedDeposits] = useState<PlannedDeposit[] | null>(null);
+  const [depositError, setDepositError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [force, setForce] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -88,14 +107,47 @@ export function PostToQuickBooksDialog({
           return { day, read: r, build, action: unchanged ? ("skip" as const) : build.mode };
         });
       setPlanned(out);
+
+      // The deposits, read fresh by id. A missing table (105 pending) is a
+      // sentence on this half, never a reason to hold the days back.
+      const dep = await readPayouts(supabase, payouts.map((p) => p.id));
+      if (cancelled) return;
+      if (dep.error) {
+        setDepositError(/square_payouts/.test(dep.error) ? "Deposits need migration 105, which has not been applied yet." : dep.error);
+        setPlannedDeposits([]);
+        return;
+      }
+      const depById = new Map(dep.payouts.map((p) => [p.id, p]));
+      setPlannedDeposits(
+        payouts
+          .slice()
+          .sort((a, b) => a.arrival_date.localeCompare(b.arrival_date) || a.locationCode.localeCompare(b.locationCode))
+          .map((payout) => {
+            const r = depById.get(payout.id) ?? null;
+            const shop = ctx.shops.get(payout.location_id);
+            if (!r || !shop) return { payout, read: r, build: null, action: "refused" as const };
+            const build = buildDeposit({ payout: r, mappings: ctx.mappings, shop });
+            if (!build.ok) return { payout, read: r, build, action: "refused" as const };
+            const stored = r.external_ref?.qbo;
+            const unchanged =
+              Boolean(stored?.id) &&
+              stored?.deposit_hash === build.hash &&
+              stored?.amount_cents === r.amount_cents &&
+              stored?.arrival_date === r.arrival_date;
+            return { payout, read: r, build, action: unchanged ? ("skip" as const) : build.mode };
+          })
+      );
     })();
     return () => {
       cancelled = true;
     };
-  }, [supabase, orgId, days]);
+  }, [supabase, orgId, days, payouts]);
 
   const toSend = (planned ?? []).filter((p) => p.build?.ok && (force ? p.action !== "refused" : p.action === "create" || p.action === "update"));
+  const depositsToSend = (plannedDeposits ?? []).filter((p) => p.build?.ok && (force ? p.action !== "refused" : p.action === "create" || p.action === "update"));
   const refusedCount = (planned ?? []).filter((p) => p.action === "refused").length;
+  const depositsRefused = (plannedDeposits ?? []).filter((p) => p.action === "refused").length;
+  const sendCount = toSend.length + depositsToSend.length;
   const unmappedAll = new Map<string, { name: string; kind: string; role: string }>();
   for (const p of planned ?? []) {
     if (p.build?.ok) for (const u of p.build.unmapped) unmappedAll.set(`${u.kind}|${u.key}`, { name: u.name, kind: u.kind, role: u.role });
@@ -113,6 +165,21 @@ export function PostToQuickBooksDialog({
       setPlanned([...next]);
       // A failure stops the run: the rest are unchanged and can be sent again,
       // and a refused connection would fail thirteen times in a row otherwise.
+      if (!result.ok) {
+        setBusy(null);
+        setDone(true);
+        router.refresh();
+        return;
+      }
+    }
+    // Then the deposits, in the same manner.
+    const nextDeposits = [...(plannedDeposits ?? [])];
+    for (const [i, p] of nextDeposits.entries()) {
+      if (!depositsToSend.includes(p) || !p.build?.ok || !p.read) continue;
+      setBusy(`Posting deposit ${p.payout.locationCode} ${p.payout.arrival_date} (${depositsToSend.indexOf(p) + 1} of ${depositsToSend.length})`);
+      const result = await postPayout(supabase, p.read, p.build, force);
+      nextDeposits[i] = { ...p, result };
+      setPlannedDeposits([...nextDeposits]);
       if (!result.ok) break;
     }
     setBusy(null);
@@ -121,7 +188,9 @@ export function PostToQuickBooksDialog({
   }
 
   const sent = (planned ?? []).filter((p) => p.result?.ok && !p.result.skipped).length;
+  const sentDeposits = (plannedDeposits ?? []).filter((p) => p.result?.ok && !p.result.skipped).length;
   const failed = (planned ?? []).find((p) => p.result && !p.result.ok);
+  const failedDeposit = (plannedDeposits ?? []).find((p) => p.result && !p.result.ok);
 
   return (
     <Dialog
@@ -133,7 +202,7 @@ export function PostToQuickBooksDialog({
         <div className="flex flex-wrap items-center justify-end gap-3">
           {!done ? (
             <Checkbox checked={force} onChange={setForce} className="mr-auto text-[13px]">
-              Post unchanged days again
+              Post unchanged days and deposits again
             </Checkbox>
           ) : null}
           <button type="button" className={DIALOG_CANCEL_CLASS} disabled={busy !== null} onClick={onClose}>
@@ -143,10 +212,10 @@ export function PostToQuickBooksDialog({
             <button
               type="button"
               className={DIALOG_COMMIT_CLASS}
-              disabled={busy !== null || !planned || toSend.length === 0}
+              disabled={busy !== null || !planned || !plannedDeposits || sendCount === 0}
               onClick={() => void commit()}
             >
-              {busy ? "Posting…" : `Post ${toSend.length} entr${toSend.length === 1 ? "y" : "ies"}`}
+              {busy ? "Posting…" : `Post ${sendCount} ${sendCount === 1 ? "entry" : "entries"}`}
             </button>
           ) : null}
         </div>
@@ -221,11 +290,58 @@ export function PostToQuickBooksDialog({
               </tbody>
             </table>
 
+            <div className="space-y-2 pt-2">
+              <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-muted">Deposits</p>
+              <p className="text-[13px] text-muted">
+                One bank deposit per Square payout, for the payout’s exact amount, dated the day it
+                reaches the bank — so the bank feed matches it instead of adding its own.
+                {depositsRefused ? ` ${depositsRefused} ${depositsRefused === 1 ? "is" : "are"} refused and say why.` : ""}
+              </p>
+              {depositError ? <p className="text-[13px] text-accent">{depositError}</p> : null}
+              {!plannedDeposits && !depositError ? <ProgressBand label="Building the deposits…" /> : null}
+              {plannedDeposits && plannedDeposits.length === 0 && !depositError ? (
+                <p className="text-[13px] text-faint">No payouts in this range. Sync from Square brings them.</p>
+              ) : null}
+              {plannedDeposits && plannedDeposits.length > 0 ? (
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="border-b-2 border-ink text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                      <th className="py-1 pr-3">Arrives</th>
+                      <th className="py-1 pr-3">Shop</th>
+                      <th className="py-1 pr-3 text-right">Amount</th>
+                      <th className="py-1 pr-3">Action</th>
+                      <th className="py-1">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {plannedDeposits.map((p) => (
+                      <tr key={p.payout.id} className="border-b border-hairline align-top">
+                        <td className="py-1.5 pr-3 tabular-nums">{p.payout.arrival_date}</td>
+                        <td className="py-1.5 pr-3">{p.payout.locationCode}</td>
+                        <td className="py-1.5 pr-3 text-right tabular-nums">{formatCents(p.payout.amount_cents)}</td>
+                        <td className="py-1.5 pr-3">{actionWord(p, force)}</td>
+                        <td className="py-1.5">
+                          <ul className="space-y-0.5">
+                            {p.build && !p.build.ok ? p.build.refusals.map((r, i) => <li key={i} className="text-accent">{r}</li>) : null}
+                            {!p.read ? <li className="text-accent">This payout could not be read.</li> : null}
+                            {p.build?.ok ? <li className="text-muted">{p.build.docNumber} · {p.build.bank.name ?? p.build.bank.ref} ← {p.build.account.name ?? p.build.account.ref}</li> : null}
+                            {p.result && !p.result.ok ? <li className="text-accent">{p.result.message}</li> : null}
+                            {p.result?.ok ? p.result.warnings.map((w, i) => <li key={`r${i}`}><span className="bg-mark-fill px-1">{w}</span></li>) : null}
+                          </ul>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : null}
+            </div>
+
             {busy ? <ProgressBand label={busy} /> : null}
             {done ? (
-              <p className={failed ? "text-accent" : "text-muted"}>
-                {sent} entr{sent === 1 ? "y" : "ies"} posted.
-                {failed ? ` Stopped at ${failed.day.locationCode} ${failed.day.business_date}; the days after it were not sent.` : ""}
+              <p className={failed || failedDeposit ? "text-accent" : "text-muted"}>
+                {sent} entr{sent === 1 ? "y" : "ies"} and {sentDeposits} deposit{sentDeposits === 1 ? "" : "s"} posted.
+                {failed ? ` Stopped at ${failed.day.locationCode} ${failed.day.business_date}; nothing after it was sent.` : ""}
+                {failedDeposit ? ` Stopped at the ${failedDeposit.payout.locationCode} deposit arriving ${failedDeposit.payout.arrival_date}; the deposits after it were not sent.` : ""}
               </p>
             ) : null}
           </>
@@ -235,7 +351,7 @@ export function PostToQuickBooksDialog({
   );
 }
 
-function actionWord(p: Planned, force: boolean): string {
+function actionWord(p: Pick<Planned, "result" | "action">, force: boolean): string {
   if (p.result) {
     if (!p.result.ok) return "failed";
     if (p.result.skipped) return "skipped";

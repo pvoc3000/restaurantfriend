@@ -254,3 +254,41 @@ this the first scheduled job in the project, and the cost is not the schedule �
 it is that an unattended run has nobody reading its response, so it also needs a
 run-record table and a way to notice a token revoked in March before June. Worth
 doing; not done.
+
+## Payouts (migration 105)
+
+Every **Sync from Square** also pulls the shop's **payouts** — the money Square
+sends to the bank — from the Payouts API (`GET /v2/payouts`, REST, not a
+Reporting cube) into `square_payouts`, one row per payout keyed by Square's own
+id. The token minted in step 1 needs **PAYOUTS_READ**; the current one has it.
+
+What a payout carries, measured on the real account (2026-09-17):
+
+| Field | What it is |
+| --- | --- |
+| `created_at` | when Square batched it — about 7:20pm PT, the day after the charges |
+| `arrival_date` | the day it reaches the bank; what the bank line is dated |
+| `amount_money` | the net amount, integer cents; equals the sum of its entries on all 26 payouts checked |
+| `end_to_end_id` | `T316V42B337KEBX` — the bank's ACH memo carries it as `IND ID`, so it is the deposit's document number |
+| `status` | `SENT` the day it goes, `PAID` once the bank confirms; a `FAILED` one moved no money |
+
+A payout's **entries** (`/v2/payouts/{id}/payout-entries`, paged by cursor at
+100) are per charge: `CHARGE` (gross, fee, net), `REFUND`, `THIRD_PARTY_FEE`
+(the DoorDash Drive courier charge — the breakdown's `APP_FEE`) and
+`GIFT_CARD_LOAD_FEE` (63¢ per gift card loaded, whatever tender bought it).
+The sync does not store them; the function's owner-only `get` mode reads them
+when a payout needs explaining.
+
+**How a payout relates to the day's entry.** Bucketing every entry by the
+charge's reporting day and comparing against the day's card line **net of
+every fee**: 18 complete shop-days agreed to within 0–123 cents each (Square's
+own fee rounding — the cube and the ledger disagree with each other by a few
+cents a day). That is why the daily entry nets *all* fees against the card
+line and the deposit is one line for the payout's exact amount; see
+`docs/quickbooks-sales-setup.md`.
+
+The pull asks for payouts **created** from four days before the window to two
+days after and keeps everything it gets — a payout is created two days after
+its charges and one day before it lands, and the upsert makes the overlap
+harmless. A payout arriving *tomorrow* is deliberately kept, so its deposit
+can be posted tonight and matched by the bank feed in the morning.

@@ -11,13 +11,15 @@ import {
   buildJournalEntry,
   diffAgainstShogo,
   isOurDocNumber,
+  matchDeposits,
   shopForEntryLines,
+  type DepositMatch,
   type FlatJournalLine,
   type JournalLine,
   type ShogoDiffRow,
 } from "@/lib/salesPosting";
-import { readPostingContext, readBreakdowns, findJournalEntries, type JournalEntrySummary } from "./salesPostClient";
-import type { ActionDay } from "./SalesActions";
+import { readPostingContext, readBreakdowns, findJournalEntries, findDeposits, type JournalEntrySummary } from "./salesPostClient";
+import type { ActionDay, ActionPayout } from "./SalesActions";
 
 /**
  * THE PARALLEL RUN. Shogo's entries for the same dates are read back out of
@@ -38,12 +40,14 @@ type DiffLine = ShogoDiffRow & { key: string; shop: string; date: string };
 export function CompareWithShogoDialog({
   orgId,
   days,
+  payouts,
   range,
   shopCodes,
   onClose,
 }: {
   orgId: string;
   days: ActionDay[];
+  payouts: ActionPayout[];
   range: DateRange;
   shopCodes: string[];
   onClose: () => void;
@@ -54,6 +58,11 @@ export function CompareWithShogoDialog({
   const [shogoDocs, setShogoDocs] = useState<string[]>([]);
   const [refused, setRefused] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // THE DEPOSITS (105): each payout in the window beside the deposits on the
+  // books for its amount near its date — ours by DocNumber, anybody else's
+  // by nothing. A payout with one of each is doubled on the books.
+  const [depositMatches, setDepositMatches] = useState<DepositMatch[] | null>(null);
+  const [depositError, setDepositError] = useState<string | null>(null);
 
   // A month at most, from the END of the range: the recent days are the ones
   // being compared while Shogo is still running.
@@ -146,13 +155,32 @@ export function CompareWithShogoDialog({
       setMissing({ oursOnly, theirsOnly });
       setShogoDocs([...docs].slice(0, 5));
       setRefused(refusals);
+
+      // SEQUENTIAL, after the journal entries: two `qbo-sync` calls at once
+      // is the token-refresh race.
+      const inWindowPayouts = payouts.filter((p) => p.arrival_date >= window.from && p.arrival_date <= window.to);
+      if (inWindowPayouts.length === 0) {
+        setDepositMatches([]);
+        return;
+      }
+      const dep = await findDeposits(supabase, { from: addDays(window.from, -4), to: addDays(window.to, 4) });
+      if (cancelled) return;
+      if (dep.error) {
+        setDepositError(dep.error);
+        setDepositMatches([]);
+        return;
+      }
+      setDepositMatches(matchDeposits(inWindowPayouts, dep.deposits));
     })();
     return () => {
       cancelled = true;
     };
-  }, [supabase, orgId, days, window, shopCodes]);
+  }, [supabase, orgId, days, payouts, window, shopCodes]);
 
   const offCount = (rows ?? []).filter((r) => r.delta !== 0).length;
+  const payoutById = new Map(payouts.map((p) => [p.id, p]));
+  const doubled = (depositMatches ?? []).filter((m) => m.ours.length && m.theirs.length).length;
+  const nowhere = (depositMatches ?? []).filter((m) => !m.ours.length && !m.theirs.length).length;
 
   return (
     <Dialog
@@ -228,6 +256,60 @@ export function CompareWithShogoDialog({
                 ))}
               </tbody>
             </table>
+
+            <div className="space-y-2 pt-2">
+              <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-muted">Deposits</p>
+              <p className="text-[13px] text-muted">
+                Each Square payout arriving in the window, beside the deposits on the books for that
+                amount within four days of it. A deposit is ours when its document number is the
+                payout’s; anything else came from the bank feed or another app.
+                {doubled ? <span className="ml-1 bg-mark-fill px-1">{doubled} doubled — a deposit of ours and one from elsewhere</span> : null}
+                {nowhere ? <span className="ml-1 text-faint">{nowhere} with nothing on the books yet</span> : null}
+              </p>
+              {depositError ? <p className="text-[13px] text-accent">{depositError}</p> : null}
+              {!depositMatches && !depositError ? <ProgressBand label="Reading deposits…" /> : null}
+              {depositMatches && depositMatches.length === 0 && !depositError ? (
+                <p className="text-[13px] text-faint">No payouts in this window.</p>
+              ) : null}
+              {depositMatches && depositMatches.length > 0 ? (
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="border-b-2 border-ink text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                      <th className="py-1 pr-3">Arrives</th>
+                      <th className="py-1 pr-3">Shop</th>
+                      <th className="py-1 pr-3 text-right">Amount</th>
+                      <th className="py-1 pr-3">Ours</th>
+                      <th className="py-1">From elsewhere</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {depositMatches.map((m) => {
+                      const p = payoutById.get(m.payoutId);
+                      if (!p) return null;
+                      return (
+                        <tr key={m.payoutId} className="border-b border-hairline align-top">
+                          <td className="py-1 pr-3 tabular-nums">{p.arrival_date}</td>
+                          <td className="py-1 pr-3">{p.locationCode}</td>
+                          <td className="py-1 pr-3 text-right tabular-nums">{formatCents(p.amount_cents)}</td>
+                          <td className="py-1 pr-3 tabular-nums">
+                            {m.ours.length ? m.ours.map((d) => `${d.doc_number} · ${d.txn_date}`).join(", ") : <span className="text-faint">—</span>}
+                          </td>
+                          <td className="py-1">
+                            {m.theirs.length ? (
+                              <span className={m.ours.length ? "bg-mark-fill px-1" : ""}>
+                                {m.theirs.map((d) => `${d.txn_date} → ${d.deposit_to_name ?? "?"}${d.lines[0]?.account_name ? ` from ${d.lines[0].account_name}` : ""}`).join("; ")}
+                              </span>
+                            ) : (
+                              <span className="text-faint">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : null}
+            </div>
           </>
         ) : null}
       </div>

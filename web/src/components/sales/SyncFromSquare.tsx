@@ -74,6 +74,7 @@ export function SyncFromSquare({
 
     let sales = 0;
     let tips = 0;
+    let payouts = 0;
     const collected: string[] = [];
 
     for (const [i, m] of months.entries()) {
@@ -111,10 +112,12 @@ export function SyncFromSquare({
       const r = (data ?? {}) as {
         sales_upserted?: number;
         tips_written?: number;
+        payouts_upserted?: number;
         warnings?: string[];
       };
       sales += r.sales_upserted ?? 0;
       tips += r.tips_written ?? 0;
+      payouts += r.payouts_upserted ?? 0;
       if (r.warnings?.length) collected.push(...r.warnings);
     }
 
@@ -122,6 +125,7 @@ export function SyncFromSquare({
     setResult(
       `${sales} shop-day${sales === 1 ? "" : "s"} pulled` +
         (tips ? `, ${tips} fed to the tip pool` : "") +
+        (payouts ? `, ${payouts} payout${payouts === 1 ? "" : "s"}` : "") +
         "."
     );
     setWarnings(collected);

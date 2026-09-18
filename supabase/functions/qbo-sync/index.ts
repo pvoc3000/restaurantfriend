@@ -28,6 +28,9 @@
 //   post_daily_sales     → one shop-day of Square sales as a JournalEntry (104)
 //   find_journal_entries → what is on the books for a date range, flattened —
 //                          the parallel run against Shogo
+//   post_square_payout   → one Square payout as a Bank Deposit (105)
+//   find_deposits        → the deposits on the books for a date range, flattened
+//   query                → one SELECT, passed through (owner/admin, read-only)
 //   disconnect     → revoke at Intuit and forget the token (owner/admin)
 //
 // Disconnect lives HERE and not on `qbo-oauth` deliberately: that function is
@@ -1179,6 +1182,295 @@ Deno.serve(async (req) => {
         warnings,
         ref,
       });
+    }
+
+    // -----------------------------------------------------------------------
+    // post_square_payout — one payout becomes a Bank Deposit (105)
+    // -----------------------------------------------------------------------
+    //
+    // `post_daily_sales`' shape: the browser BUILT it (`buildDeposit`, pure and
+    // fixture-tested) and this checks every claim in it against the payout it
+    // names — the amount to the cent, the date, the bank, the account, the
+    // shop's class and location, and that an Id is present iff the payout
+    // already has one. Create versus update is decided by the STORED id.
+    if (mode === "post_square_payout") {
+      if (!["owner", "admin", "purchaser"].includes(role)) {
+        return json(403, { error: "a purchaser or above is required to post deposits to QuickBooks" });
+      }
+      const req = body as unknown as {
+        payout_id?: string;
+        payload?: Record<string, unknown>;
+        deposit_hash?: string;
+        force?: boolean;
+      };
+      if (!req.payout_id || !req.payload || !req.deposit_hash) {
+        return json(400, { error: "missing payout_id, payload or deposit_hash" });
+      }
+
+      const { data: payout, error: payErr } = await supabase
+        .from("square_payouts")
+        .select("id, org_id, location_id, square_payout_id, end_to_end_id, status, arrival_date, amount_cents, external_ref")
+        .eq("id", req.payout_id)
+        .maybeSingle();
+      if (payErr) {
+        return json(500, {
+          error: /square_payouts/.test(payErr.message)
+            ? "square_payouts does not exist — migration 105 has not been applied"
+            : payErr.message,
+        });
+      }
+      if (!payout) return json(404, { error: "No such payout" });
+      if (payout.status !== "SENT" && payout.status !== "PAID") {
+        return json(400, { error: `Square reports this payout as ${payout.status}; only a SENT or PAID payout is a deposit.` });
+      }
+      if (Number(payout.amount_cents) <= 0) {
+        return json(400, { error: "A zero or negative payout is not a deposit." });
+      }
+
+      const [{ data: shop }, { data: maps, error: mapErr }] = await Promise.all([
+        supabase
+          .from("locations")
+          .select("code, qbo_class_ref, qbo_location_ref")
+          .eq("id", payout.location_id)
+          .maybeSingle(),
+        supabase
+          .from("accounting_sales_mappings")
+          .select("kind, square_key, account_ref")
+          .eq("org_id", payout.org_id)
+          .eq("kind", "role")
+          .in("square_key", ["bank", "card"]),
+      ]);
+      if (mapErr) return json(500, { error: mapErr.message });
+      if (!shop) return json(404, { error: "The payout's shop no longer exists" });
+      const roleRef = (k: string) => {
+        const m = (maps ?? []).find((x) => (x as { square_key: string }).square_key === k) as { account_ref: string | null } | undefined;
+        return m?.account_ref ? String(m.account_ref) : null;
+      };
+      const bankRef = roleRef("bank");
+      const cardRef = roleRef("card");
+      if (!bankRef) return json(400, { error: "No account is set for the bank the payouts land in — Settings → Accounting → Sales from Square." });
+      if (!cardRef) return json(400, { error: "No account is set for card takings — Settings → Accounting → Sales from Square." });
+
+      const p = req.payload;
+      // The DocNumber rule, restated: the end-to-end id, else a prefix of
+      // Square's id. `docNumberForPayout` in lib/salesPosting is the one the
+      // browser used; this is the check that it did.
+      const e2e = typeof payout.end_to_end_id === "string" ? payout.end_to_end_id.trim() : "";
+      const expectedDoc = e2e || `SQ-${String(payout.square_payout_id).replace(/^po_/, "").slice(-12)}`;
+      if (p.DocNumber !== expectedDoc) {
+        return json(400, { error: `The payload's DocNumber (${String(p.DocNumber)}) is not this payout's (${expectedDoc}).` });
+      }
+      if (p.TxnDate !== payout.arrival_date) {
+        return json(400, { error: `The payload's date (${String(p.TxnDate)}) is not this payout's arrival date (${payout.arrival_date}).` });
+      }
+      const bank = (p.DepositToAccountRef as { value?: string } | undefined)?.value;
+      if (String(bank) !== bankRef) {
+        return json(400, { error: `The payload deposits into account ${String(bank)}, which is not the bank in the sales grid.` });
+      }
+      const dept = (p.DepartmentRef as { value?: string } | undefined)?.value ?? null;
+      if (String(dept) !== String(shop.qbo_location_ref)) {
+        return json(400, { error: `The payload carries a location that is not ${shop.code}'s.` });
+      }
+      const lines = p.Line as Record<string, unknown>[] | undefined;
+      if (!Array.isArray(lines) || lines.length !== 1) {
+        return json(400, { error: "A payout's deposit is exactly one line." });
+      }
+      const line = lines[0];
+      const detail = line.DepositLineDetail as Record<string, unknown> | undefined;
+      const cents = Math.round(Number(line.Amount) * 100);
+      if (cents !== Number(payout.amount_cents)) {
+        return json(400, { error: `The payload's amount (${String(line.Amount)}) is not this payout's (${(Number(payout.amount_cents) / 100).toFixed(2)}).` });
+      }
+      const acct = (detail?.AccountRef as { value?: string } | undefined)?.value;
+      if (String(acct) !== cardRef) {
+        return json(400, { error: `The line posts to account ${String(acct)}, which is not the card takings account in the sales grid.` });
+      }
+      const klass = (detail?.ClassRef as { value?: string } | undefined)?.value ?? null;
+      if (String(klass) !== String(shop.qbo_class_ref)) {
+        return json(400, { error: `The line carries a class that is not ${shop.code}'s.` });
+      }
+
+      const stored = (payout.external_ref as { qbo?: { id?: string; deposit_hash?: string; doc_number?: string | null; amount_cents?: number; arrival_date?: string } } | null)?.qbo;
+      const storedId = stored?.id ?? null;
+      const sentId = p.Id === undefined || p.Id === null ? null : String(p.Id);
+      if (storedId && sentId !== storedId) {
+        return json(400, {
+          error: `This payout is already in QuickBooks as deposit ${storedId}; the payload names ${sentId ?? "a new deposit"}. Reload and try again.`,
+        });
+      }
+      if (!storedId && sentId) {
+        return json(400, { error: `The payload updates deposit ${sentId}, but this payout has never been posted. Reload and try again.` });
+      }
+
+      if (
+        storedId && !req.force &&
+        stored?.deposit_hash === req.deposit_hash &&
+        stored?.amount_cents === Number(payout.amount_cents) &&
+        stored?.arrival_date === payout.arrival_date
+      ) {
+        return json(200, {
+          skipped: true,
+          reason: "unchanged since it was last posted",
+          qbo_id: storedId,
+          doc_number: stored?.doc_number ?? expectedDoc,
+        });
+      }
+
+      const conn = await loadConnection(admin, orgId);
+      let saved: Record<string, Record<string, unknown>>;
+      let retried = false;
+      try {
+        ({ saved, retried } = await postDocument(admin, conn, "Deposit", p));
+      } catch (e) {
+        const message = e instanceof QboError ? e.message : (e instanceof Error ? e.message : String(e));
+        await supabase.rpc("record_payout_posting", { p_payout: payout.id, p_ref: null, p_error: message });
+        const status = e instanceof QboError ? e.status : 502;
+        return json(status, { error: message });
+      }
+
+      const doc = saved?.Deposit;
+      if (!doc?.Id || doc?.SyncToken === undefined || doc?.SyncToken === null) {
+        return json(502, { error: "QuickBooks saved the deposit but did not return an id and sync token." });
+      }
+
+      const warnings: string[] = [];
+      if (retried) warnings.push(STALE_RETRY_NOTE);
+      if (!doc.DepartmentRef) {
+        warnings.push(
+          "QuickBooks did not keep the location. Turn on Track locations in " +
+            "Account and settings → Advanced → Categories, then post again."
+        );
+      }
+      const savedLines = (doc.Line as Record<string, Record<string, unknown>>[] | undefined) ?? [];
+      if (!savedLines.some((l) => Boolean((l.DepositLineDetail as Record<string, unknown> | undefined)?.ClassRef))) {
+        warnings.push(
+          "QuickBooks did not keep the class. Turn on Track classes in " +
+            "Account and settings → Advanced → Categories, then post again."
+        );
+      }
+
+      const ref = {
+        qbo: {
+          id: String(doc.Id),
+          sync_token: String(doc.SyncToken),
+          doc_number: doc.DocNumber === undefined || doc.DocNumber === null ? null : String(doc.DocNumber),
+          entity: "Deposit",
+          deposit_hash: req.deposit_hash,
+        },
+      };
+      const { data: recorded, error: recErr } = await supabase.rpc("record_payout_posting", {
+        p_payout: payout.id,
+        p_ref: ref,
+        p_error: null,
+      });
+      if (recErr) return json(500, { error: recErr.message, qbo_id: String(doc.Id) });
+      if (!Array.isArray(recorded) || recorded.length === 0) {
+        return json(500, {
+          error: "It reached QuickBooks but could not be recorded here, so posting " +
+            `again would duplicate it. Its QuickBooks id is ${doc.Id}.`,
+          qbo_id: String(doc.Id),
+        });
+      }
+
+      await admin
+        .from("accounting_connections")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", conn.id);
+
+      return json(200, {
+        entity: "Deposit",
+        qbo_id: String(doc.Id),
+        doc_number: ref.qbo.doc_number,
+        sync_token: ref.qbo.sync_token,
+        updated: Boolean(sentId),
+        warnings,
+        ref,
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // find_deposits — the deposits on the books for a range, flattened
+    // -----------------------------------------------------------------------
+    //
+    // `find_journal_entries` for deposits: what the bank feed (or Shogo, or a
+    // person) has already put on the books, so a payout can be shown beside
+    // the deposit that answers to it — and a payout with one of ours AND one
+    // of theirs can be seen for the double it is. Reads, never writes.
+    if (mode === "find_deposits") {
+      if (!["owner", "admin", "purchaser"].includes(role)) {
+        return json(403, { error: "a purchaser or above is required to read deposits" });
+      }
+      const { from, to } = body as unknown as { from?: string; to?: string };
+      const iso = /^\d{4}-\d{2}-\d{2}$/;
+      if (!from || !to || !iso.test(from) || !iso.test(to) || from > to) {
+        return json(400, { error: "from and to must be ISO dates with from <= to" });
+      }
+      const span = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000 + 1;
+      if (span > 45) return json(400, { error: "at most 45 days at a time" });
+
+      const conn = await loadConnection(admin, orgId);
+      const PAGE = 500;
+      const deposits: Record<string, unknown>[] = [];
+      for (let start = 1; start <= 5000; start += PAGE) {
+        const sql =
+          `select * from Deposit where TxnDate >= ${qboQuote(from)} and TxnDate <= ${qboQuote(to)} ` +
+          `orderby TxnDate startposition ${start} maxresults ${PAGE}`;
+        const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(sql)}`)) as {
+          QueryResponse?: { Deposit?: Record<string, unknown>[] };
+        };
+        const batch = res.QueryResponse?.Deposit ?? [];
+        for (const d of batch) {
+          const ref = (o: unknown, k: string) => ((o as Record<string, unknown> | undefined)?.[k] as { value?: string; name?: string } | undefined) ?? {};
+          const lines = ((d.Line as Record<string, unknown>[] | undefined) ?? []).map((l) => {
+            const det = (l.DepositLineDetail as Record<string, unknown> | undefined) ?? {};
+            return {
+              cents: Math.round(Number(l.Amount ?? 0) * 100),
+              account_name: ref(det, "AccountRef").name ?? null,
+              class_name: ref(det, "ClassRef").name ?? null,
+              entity_name: ref(det, "Entity").name ?? null,
+              description: l.Description === undefined || l.Description === null ? null : String(l.Description),
+            };
+          });
+          deposits.push({
+            id: String(d.Id),
+            doc_number: d.DocNumber === undefined || d.DocNumber === null ? null : String(d.DocNumber),
+            txn_date: String(d.TxnDate ?? ""),
+            total_cents: Math.round(Number(d.TotalAmt ?? 0) * 100),
+            deposit_to_name: ref(d, "DepositToAccountRef").name ?? null,
+            department_name: ref(d, "DepartmentRef").name ?? null,
+            private_note: d.PrivateNote === undefined || d.PrivateNote === null ? null : String(d.PrivateNote),
+            lines,
+          });
+        }
+        if (batch.length < PAGE) break;
+      }
+
+      await admin
+        .from("accounting_connections")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", conn.id);
+
+      return json(200, { deposits, checked_at: new Date().toISOString() });
+    }
+
+    // -----------------------------------------------------------------------
+    // query — one QuickBooks query, passed through (owner/admin, read-only)
+    // -----------------------------------------------------------------------
+    //
+    // `sync-square-sales`' `query` for the other side: the diagnostic door
+    // for finding out what an entity actually looks like on the real books
+    // before writing a line of code against it (Shogo's deposits, 2026-09-17).
+    // QuickBooks' query endpoint is read-only by construction, and this
+    // refuses anything that is not a SELECT anyway.
+    if (mode === "query") {
+      if (!isManager) return json(403, { error: "a manager or the owner is required to query QuickBooks directly" });
+      const sql = (body as unknown as { sql?: unknown }).sql;
+      if (typeof sql !== "string" || !/^\s*select\b/i.test(sql)) {
+        return json(400, { error: "missing sql (a QuickBooks SELECT statement)" });
+      }
+      const conn = await loadConnection(admin, orgId);
+      const res = await qboFetch(admin, conn, `query?query=${encodeURIComponent(sql)}`);
+      return json(200, res);
     }
 
     // -----------------------------------------------------------------------

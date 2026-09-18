@@ -9873,7 +9873,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    and every day balanced**. Two days warn and both are the documented
    refund-by-amount case (DF02 08-12 $250, DF01 09-11 $13.35): the stored net
    figure excludes it where the breakdown's Uncategorized return carries it.
-   **0 posts yet** — the first is Mark's. Mark: replace the third-party app that posts a
+   Mark posted the first real entry himself the same day (`DF02-2026-09-16`,
+   read back with its sync token) and compared it against Shogo's for the same
+   day — see the deposits block below for what that comparison settled. Mark: replace the third-party app that posts a
    journal entry per location nightly with a simpler in-app equivalent —
    "all I care about are category sales… also refunds, discounts. Everything
    else can be misc"; "as few mappings as possible… as adaptable when new
@@ -9928,9 +9930,55 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    still takes the breakdown, a re-pull reads as stale, a second day claiming
    an entry's id is refused by the index; the deployed modes answer their
    refusals by name and `find_journal_entries` returned Shogo's real entries.
-   **NOT yet seen in the browser** (the pane is behind the PIN lock) and **no
-   real post has been made** — the first post is Mark's, against a day Shogo
-   has also posted, followed by Compare.
+   **NOT yet seen in the browser** (the pane is behind the PIN lock).
+   **THE DEPOSITS — migration 105, NEEDS APPLYING; `sync-square-sales`,
+   `qbo-sync` and `qbo-oauth` DEPLOYED 2026-09-17.** *Probe, don't read this
+   line*: `select count(*) from square_payouts` (a table, 0 until the first
+   sync), `select count(*) from pg_proc where proname in
+   ('record_square_payouts','record_payout_posting')` → 2. Mark: "shogo
+   creates a deposit that gets matched with an online transaction when I
+   download them from my bank. Let's implement this as well."
+   **THE DEPOSITS ON THE BOOKS ARE THE BANK FEED'S, NOT SHOGO'S** — read back
+   through the new owner-only `query` mode: a Bank Deposit per Square payout
+   into Chase ACH, one line to Undeposited Square Funds, every one carrying
+   the bank's own ACH memo, no DocNumber, and the DF02 location on DF01's
+   payouts too, which is a bank rule adding them. Mark's account of the
+   ROUTINE is still what this builds: a deposit on the books before the bank
+   line lands, so the feed MATCHES. Uber Eats and DoorDash pay out on their
+   own and stay the feed's; this posts nothing for them.
+   **ONE DEPOSIT PER PAYOUT, ONE LINE, THE EXACT AMOUNT.** `square_payouts`
+   is pulled by every sync from the Payouts API (`loadPayouts`; the token has
+   PAYOUTS_READ), keyed by Square's id, arriving-date ranged on the Sales
+   screen under a **Square deposits** table with the days' QuickBooks column.
+   `buildDeposit` (`lib/salesPosting`, fixture-pinned on the real DF01 payout
+   of 2026-09-16) makes a QBO `Deposit` into the new **`bank` role**'s account
+   from the `card` role's, class on the line, location on the HEADER (a
+   Deposit has one where a JournalEntry does not), DocNumber = the payout's
+   `end_to_end_id` — the id the bank memo carries as IND ID. FAILED, zero and
+   negative payouts refuse by name. `post_square_payout` validates the amount
+   to the cent, the date, the bank, the account, the shop's refs and the
+   stored-id rule; `record_payout_posting` stamps the row's amount and date
+   into the ref so `payoutPostingState` can say `changed since posted` with no
+   rebuild. The post dialog gains a Deposits half sent AFTER the days;
+   Compare with Shogo gains a deposits section (`find_deposits` +
+   `matchDeposits`: ours by DocNumber, theirs by amount within four days, a
+   payout with both marked DOUBLED).
+   **EVERY FEE NOW NETS AGAINST THE CARD LINE**, which is the one change to
+   104's entry and the measurement that decided the deposit's shape: with
+   every payout's entries paged and bucketed by the charge's reporting day,
+   18 complete shop-days agreed with the card line net of ALL fees to within
+   0–123 cents (Square's own fee rounding, cube against ledger), where the
+   gift-card load fee keyed to CASH left the payout short of the entry by the
+   whole fee. So the deposit carries no fee lines — they were expensed on the
+   day — and Undeposited Square Funds clears to within a few dollars a month.
+   Verified: 1873 fixtures; all 105 migrations replay and, as real roles, a
+   purchaser records and re-pulls (status moves, the posted ref survives),
+   a second payout cannot claim a deposit id, staff read and write nothing
+   (0 rows, no error), anon is refused; the deployed modes answer their
+   refusals by name; `find_deposits` returned the twelve real deposits of
+   09-14..17; and **all 26 real payouts dry-build through the compiled
+   builder with a bank role stood in, 0 refusals** — no deposit has been
+   posted, and none of this has been seen in the browser.
 
 5. SwiftUI floor app (only after 4 is proven in real use)
 

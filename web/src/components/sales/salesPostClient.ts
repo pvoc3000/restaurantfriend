@@ -1,12 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { invokeQbo } from "@/lib/qboClient";
 import type {
+  DepositBuild,
+  FlatDeposit,
   FlatJournalLine,
   JournalBuild,
+  PayoutPostingRef,
   PostingShop,
   SalesBreakdown,
   SalesMapping,
   SalesPostingRef,
+  SquarePayout,
 } from "@/lib/salesPosting";
 
 /**
@@ -147,4 +151,76 @@ export async function findJournalEntries(
   const { data, message } = await invokeQbo(supabase, { mode: "find_journal_entries", ...range });
   if (message) return { entries: [], error: message };
   return { entries: ((data?.entries as JournalEntrySummary[]) ?? []), error: null };
+}
+
+// ---------------------------------------------------------------------------
+// Payouts and deposits (migration 105)
+// ---------------------------------------------------------------------------
+
+/** The payouts, read FRESH by id — the list's rows may be an hour old, and a
+ *  deposit's sync token is what a stale row would get wrong. */
+export async function readPayouts(
+  supabase: SupabaseClient,
+  ids: readonly string[]
+): Promise<{ payouts: SquarePayout[]; error: string | null }> {
+  const payouts: SquarePayout[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await supabase
+      .from("square_payouts")
+      .select("id, location_id, square_payout_id, end_to_end_id, status, payout_type, sent_at, arrival_date, amount_cents, external_ref, post_error")
+      .in("id", ids.slice(i, i + 100));
+    if (error) return { payouts, error: error.message };
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      payouts.push({
+        id: r.id as string,
+        location_id: r.location_id as string,
+        square_payout_id: r.square_payout_id as string,
+        end_to_end_id: (r.end_to_end_id as string | null) ?? null,
+        status: r.status as string,
+        payout_type: (r.payout_type as string | null) ?? null,
+        sent_at: r.sent_at as string,
+        arrival_date: r.arrival_date as string,
+        amount_cents: Number(r.amount_cents),
+        external_ref: (r.external_ref as PayoutPostingRef | null) ?? null,
+        post_error: (r.post_error as string | null) ?? null,
+      });
+    }
+  }
+  return { payouts, error: null };
+}
+
+/** Send one built deposit. Same contract as `postDay`. */
+export async function postPayout(
+  supabase: SupabaseClient,
+  payout: Pick<SquarePayout, "id">,
+  build: Extract<DepositBuild, { ok: true }>,
+  force = false
+): Promise<DayPostResult> {
+  const { data, message } = await invokeQbo(supabase, {
+    mode: "post_square_payout",
+    payout_id: payout.id,
+    payload: build.body,
+    deposit_hash: build.hash,
+    ...(force ? { force: true } : {}),
+  });
+  if (message) return { ok: false, message };
+  if (data?.skipped) {
+    return { ok: true, skipped: true, label: String(data.doc_number ?? data.qbo_id ?? ""), updated: false, warnings: [] };
+  }
+  return {
+    ok: true,
+    skipped: false,
+    label: String((data?.doc_number as string) ?? (data?.qbo_id as string) ?? ""),
+    updated: Boolean(data?.updated),
+    warnings: (data?.warnings as string[]) ?? [],
+  };
+}
+
+export async function findDeposits(
+  supabase: SupabaseClient,
+  range: { from: string; to: string }
+): Promise<{ deposits: FlatDeposit[]; error: string | null }> {
+  const { data, message } = await invokeQbo(supabase, { mode: "find_deposits", ...range });
+  if (message) return { deposits: [], error: message };
+  return { deposits: ((data?.deposits as FlatDeposit[]) ?? []), error: null };
 }
