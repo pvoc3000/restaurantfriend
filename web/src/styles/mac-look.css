@@ -168,6 +168,35 @@
   box-shadow: inset 0 0 0 1px #000;
 }
 
+/* ---- .mac-day: a weekday picker's day ---------------------------------- */
+
+/* A DAY IS A SMALL RAISED BUTTON, and seven of them are a row of small action
+   buttons rather than one segmented bar (Mark, 2026-09-18: "reduce the size of
+   the individual day buttons by a bit and add a hard drop shadow behind
+   them"). 26px inside the 32px slot the strip has always had, so the strip is
+   still 224 x 32 and `WEEKDAY_PICKER_WIDTH` still holds; a 2px shadow rather
+   than `.mac-control`'s 3px, because 3px of shadow on a 26px square is a
+   ninth of the button. Same grammar otherwise: a 2px edge on hover, the drop
+   into the shadow while held. An ON day keeps its grey fill through hover and
+   press (its ground is what it MEANS), an OFF day fills #c0c0c0 while held. */
+.mac-day {
+  box-shadow: 2px 2px 0 0 #000;
+  transition: none;
+}
+
+.mac-day:not(:disabled):hover {
+  box-shadow: 2px 2px 0 0 #000, inset 0 0 0 1px #000;
+}
+
+.mac-day:not(:disabled):active {
+  transform: translate(2px, 2px);
+  box-shadow: inset 0 0 0 1px #000;
+}
+
+.mac-day.mac-day-off:not(:disabled):active {
+  background-color: #c0c0c0;
+}
+
 /* A control you TYPE INTO does not drop when the press lands in its text — the
    order guide's date box, a field beside a calendar button. Pressing the
    button still drops it. */

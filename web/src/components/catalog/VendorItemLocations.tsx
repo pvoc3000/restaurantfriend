@@ -6,7 +6,13 @@ import { createClient } from "@/lib/supabase/client";
 import type { Location } from "@/lib/session";
 import { money, qty, HERE_BADGE_CLASS } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
-import { WEEKDAY_ON_CLASS, WEEKDAY_PICKER_WIDTH } from "./WeekdayPicker";
+import {
+  WEEKDAY_DAY_CLASS,
+  WEEKDAY_OFF_CLASS,
+  WEEKDAY_ON_CLASS,
+  WEEKDAY_PICKER_WIDTH,
+  WEEKDAY_SLOT_CLASS,
+} from "./WeekdayPicker";
 
 // ISO weekdays, 1 = Monday … 7 = Sunday (CLAUDE.md).
 const DAYS = [
@@ -134,13 +140,14 @@ function FavoriteDays({
     return (
       <span className="inline-flex items-center" aria-label="Favorite days">
         {DAYS.map((d) => (
-          <span
-            key={d.weekday}
-            className={`inline-flex h-8 w-8 items-center justify-center border border-l-0 border-ink text-xs tabular-nums first:border-l ${
-              on.includes(d.weekday) ? WEEKDAY_ON_CLASS : "bg-white text-faint"
-            }`}
-          >
-            {d.label}
+          <span key={d.weekday} className={WEEKDAY_SLOT_CLASS}>
+            <span
+              className={`${WEEKDAY_DAY_CLASS} ${
+                on.includes(d.weekday) ? WEEKDAY_ON_CLASS : "bg-white text-faint"
+              }`}
+            >
+              {d.label}
+            </span>
           </span>
         ))}
       </span>
@@ -152,19 +159,20 @@ function FavoriteDays({
       {DAYS.map((d) => {
         const active = on.includes(d.weekday);
         return (
-          <button
-            key={d.weekday}
-            type="button"
-            aria-pressed={active}
-            aria-label={`Favorite on ${d.label}`}
-            disabled={busy}
-            onClick={() => toggle(d.weekday)}
-            className={`inline-flex h-8 w-8 items-center justify-center border border-l-0 border-ink text-xs tabular-nums transition-colors first:border-l disabled:opacity-35 ${
-              active ? WEEKDAY_ON_CLASS : "bg-white text-faint hover:text-ink"
-            }`}
-          >
-            {d.label}
-          </button>
+          <span key={d.weekday} className={WEEKDAY_SLOT_CLASS}>
+            <button
+              type="button"
+              aria-pressed={active}
+              aria-label={`Favorite on ${d.label}`}
+              disabled={busy}
+              onClick={() => toggle(d.weekday)}
+              className={`mac-day ${WEEKDAY_DAY_CLASS} disabled:opacity-35 ${
+                active ? WEEKDAY_ON_CLASS : WEEKDAY_OFF_CLASS
+              }`}
+            >
+              {d.label}
+            </button>
+          </span>
         );
       })}
       {/* Bordered rather than filled so it reads as a command, not an 8th day. */}

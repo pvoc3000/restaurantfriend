@@ -48,6 +48,24 @@ export const WEEKDAY_PICKER_WIDTH = 300;
  */
 export const WEEKDAY_ON_CLASS = "bg-[var(--rf-neutral-500)] text-white";
 
+/**
+ * ONE DAY IS A SMALL RAISED BUTTON IN A 32px SLOT (Mark, 2026-09-18: keep the
+ * strip's dimensions, shrink the day, add a hard drop shadow — "a linear group
+ * of small action buttons"). The SLOT is what `WEEKDAY_PICKER_WIDTH` counts,
+ * so it stays 32px and the strip stays 224 x 32; the button inside it is 26px
+ * with `.mac-day`'s 2px shadow, which leaves 4px of air between neighbours.
+ * `items-start justify-start` puts the button flush with the slot's top-left
+ * and the shadow inside it, so the strip's box is exactly the seven slots.
+ *
+ * Shared with `VendorItemLocations`' favorites strip for the reason
+ * `WEEKDAY_ON_CLASS` is: the two are drawn on neighbouring records.
+ */
+export const WEEKDAY_SLOT_CLASS = "inline-flex h-8 w-8 items-start justify-start";
+export const WEEKDAY_DAY_CLASS =
+  "inline-flex h-[26px] w-[26px] items-center justify-center border border-ink text-xs tabular-nums";
+/** An OFF day: white, faint type, ink on hover. */
+export const WEEKDAY_OFF_CLASS = "mac-day-off bg-white text-faint hover:text-ink";
+
 // ISO weekdays, 1 = Monday … 7 = Sunday (CLAUDE.md).
 const DAYS = [
   { weekday: 1, label: "Mo" },
@@ -142,13 +160,16 @@ export function WeekdayPicker({
     return (
       <span className="inline-flex items-center" aria-label={label}>
         {DAYS.map((day) => (
-          <span
-            key={day.weekday}
-            className={`inline-flex h-8 w-8 items-center justify-center border border-l-0 border-ink text-xs tabular-nums first:border-l ${
-              days.includes(day.weekday) ? WEEKDAY_ON_CLASS : "bg-white text-faint"
-            }`}
-          >
-            {day.label}
+          <span key={day.weekday} className={WEEKDAY_SLOT_CLASS}>
+            {/* Flat — the same small square without the shadow, so a
+                statement does not look pressable. */}
+            <span
+              className={`${WEEKDAY_DAY_CLASS} ${
+                days.includes(day.weekday) ? WEEKDAY_ON_CLASS : "bg-white text-faint"
+              }`}
+            >
+              {day.label}
+            </span>
           </span>
         ))}
       </span>
@@ -157,30 +178,26 @@ export function WeekdayPicker({
 
   return (
     <span className="inline-flex items-center">
-      {/* Seven butted boxes sharing one black rule — the modern form of the
-          original's 7-column day grid. */}
+      {/* Seven small raised buttons, one per 32px slot — the modern form of
+          the original's 7-column day grid. They were seven butted boxes
+          sharing one black rule until 2026-09-18. */}
       {DAYS.map((day) => {
         const on = days.includes(day.weekday);
         return (
-          <button
-            key={day.weekday}
-            type="button"
-            aria-pressed={on}
-            aria-label={`${label}: ${day.label}`}
-            disabled={pending}
-            onClick={() => toggle(day.weekday)}
-            className={`inline-flex h-8 w-8 items-center justify-center border border-l-0 border-ink text-xs tabular-nums transition-colors first:border-l disabled:opacity-35 ${
-              on
-                ? WEEKDAY_ON_CLASS
-                : // The grey wash, same as `TabPicker`'s off cells — this is the
-                  // app's other segmented control and it darkened the TEXT
-                  // alone, which on a 32px cell is a much fainter answer to the
-                  // pointer than the cell beside it gives.
-                  "bg-white text-faint hover:bg-neutral-100 hover:text-ink"
-            }`}
-          >
-            {day.label}
-          </button>
+          <span key={day.weekday} className={WEEKDAY_SLOT_CLASS}>
+            <button
+              type="button"
+              aria-pressed={on}
+              aria-label={`${label}: ${day.label}`}
+              disabled={pending}
+              onClick={() => toggle(day.weekday)}
+              className={`mac-day ${WEEKDAY_DAY_CLASS} disabled:opacity-35 ${
+                on ? WEEKDAY_ON_CLASS : WEEKDAY_OFF_CLASS
+              }`}
+            >
+              {day.label}
+            </button>
+          </span>
         );
       })}
       {/* An underlined text link so it reads as a command, not an 8th day. */}
