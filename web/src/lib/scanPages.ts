@@ -43,16 +43,44 @@ const LETTER = { width: 612, height: 792 };
 
 export type ScanRotation = 0 | 90 | 180 | 270;
 
-/**
- * The part of the TURNED page to keep, as fractions of its width and height —
- * so it means the same thing at preview size and at full size. Null keeps the
- * whole page. A rectangle only: pulling four corners to square up a page shot
- * at an angle is perspective correction, a different and much larger job.
- */
-export type ScanCrop = { x: number; y: number; w: number; h: number };
+export type ScanPoint = { x: number; y: number };
 
-/** The smallest crop, as a fraction of a side — a sliver is a mis-drag. */
-export const MIN_CROP = 0.05;
+/**
+ * The part of the TURNED page to keep: its four corners, as fractions of the
+ * page's width and height — so it means the same thing at preview size and at
+ * full size. Null keeps the whole page.
+ *
+ * FOUR CORNERS, NOT A RECTANGLE (Mark, 2026-09-18: "add the four-corner
+ * perspective correction"). A page photographed at an angle is a trapezoid in
+ * the photo; put a corner on each corner of the paper and the page comes out
+ * square, as if shot from straight above. A rectangle is just the case where
+ * the corners line up, and it takes a cheaper path (`isRectangle`).
+ */
+export type ScanCrop = { tl: ScanPoint; tr: ScanPoint; br: ScanPoint; bl: ScanPoint };
+
+export const WHOLE_PAGE: ScanCrop = {
+  tl: { x: 0, y: 0 },
+  tr: { x: 1, y: 0 },
+  br: { x: 1, y: 1 },
+  bl: { x: 0, y: 1 },
+};
+
+const EPSILON = 1e-6;
+
+export function isRectangle(c: ScanCrop): boolean {
+  return (
+    Math.abs(c.tl.y - c.tr.y) < EPSILON &&
+    Math.abs(c.bl.y - c.br.y) < EPSILON &&
+    Math.abs(c.tl.x - c.bl.x) < EPSILON &&
+    Math.abs(c.tr.x - c.br.x) < EPSILON
+  );
+}
+
+export function isWholePage(c: ScanCrop): boolean {
+  return (["tl", "tr", "br", "bl"] as const).every(
+    (k) => Math.abs(c[k].x - WHOLE_PAGE[k].x) < EPSILON && Math.abs(c[k].y - WHOLE_PAGE[k].y) < EPSILON
+  );
+}
 
 export type ScanMode = "color" | "grey" | "bw";
 
@@ -79,9 +107,13 @@ export function rotateBy(rotation: ScanRotation, quarterTurns: 1 | -1): ScanRota
  */
 export function rotateCrop(crop: ScanCrop | null, quarterTurns: 1 | -1): ScanCrop | null {
   if (!crop) return null;
+  // Each point turns with the page, and the corners are RENAMED so top-left is
+  // still the top-left: a right turn brings the old bottom-left to the top.
+  const turn = (p: ScanPoint): ScanPoint =>
+    quarterTurns === 1 ? { x: 1 - p.y, y: p.x } : { x: p.y, y: 1 - p.x };
   return quarterTurns === 1
-    ? { x: 1 - (crop.y + crop.h), y: crop.x, w: crop.h, h: crop.w }
-    : { x: crop.y, y: 1 - (crop.x + crop.w), w: crop.h, h: crop.w };
+    ? { tl: turn(crop.bl), tr: turn(crop.tl), br: turn(crop.tr), bl: turn(crop.br) }
+    : { tl: turn(crop.tr), tr: turn(crop.br), br: turn(crop.bl), bl: turn(crop.tl) };
 }
 
 // ---------------------------------------------------------------------------
@@ -204,9 +236,15 @@ export type ScanPageSettings = {
 };
 
 /**
- * One page — turned, cropped, shrunk to `maxEdge`, toned — onto `canvas`.
- * `maxEdge` applies to what is KEPT, so a cropped page keeps its detail
- * rather than being shrunk as a whole page and then cut down.
+ * One page — turned, cropped or straightened, shrunk to `maxEdge`, toned —
+ * onto `canvas`. `maxEdge` applies to what is KEPT, so a cropped page keeps its
+ * detail rather than being shrunk as a whole page and then cut down.
+ *
+ * The GEOMETRY is cached per photo (`shaped`), and only the tone is redone on
+ * each call. Straightening a page is a pass over every pixel with a projective
+ * transform — about a tenth of a second at preview size — and a brightness
+ * slider asks for a new picture every frame; without the cache the slider
+ * would re-straighten the page sixty times a second.
  */
 export function renderPage(
   canvas: HTMLCanvasElement,
@@ -214,34 +252,191 @@ export function renderPage(
   tone: ScanTone,
   maxEdge: number
 ) {
-  const { img, rotation } = page;
-  const natW = img.naturalWidth;
-  const natH = img.naturalHeight;
-  const sideways = rotation === 90 || rotation === 270;
-  // The turned page's size, which the crop's fractions are fractions of.
-  const turnedW = sideways ? natH : natW;
-  const turnedH = sideways ? natW : natH;
-  const crop = page.crop ?? { x: 0, y: 0, w: 1, h: 1 };
-  const keptW = crop.w * turnedW;
-  const keptH = crop.h * turnedH;
-  const scale = Math.min(1, maxEdge / Math.max(keptW, keptH));
-  canvas.width = Math.max(1, Math.round(keptW * scale));
-  canvas.height = Math.max(1, Math.round(keptH * scale));
+  const shape = shaped(page, maxEdge);
+  canvas.width = shape.width;
+  canvas.height = shape.height;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("The browser could not read that photo.");
-  context.imageSmoothingQuality = "high";
-  context.save();
-  context.scale(scale, scale);
-  context.translate(-crop.x * turnedW, -crop.y * turnedH);
-  context.translate(turnedW / 2, turnedH / 2);
-  context.rotate((rotation * Math.PI) / 180);
-  context.drawImage(img, -natW / 2, -natH / 2, natW, natH);
-  context.restore();
+  context.drawImage(shape, 0, 0);
   if (!isNeutralTone(tone)) {
     const frame = context.getImageData(0, 0, canvas.width, canvas.height);
     applyTone(frame.data, tone);
     context.putImageData(frame, 0, 0);
   }
+}
+
+/** A few shapes per photo — the tile, the preview, and the one being dragged
+ *  to — and dropped with the photo, being keyed weakly on it. */
+const shapeCache = new WeakMap<HTMLImageElement, Map<string, HTMLCanvasElement>>();
+const SHAPES_PER_PHOTO = 4;
+
+function shaped(page: ScanPageSettings, maxEdge: number): HTMLCanvasElement {
+  const key = `${page.rotation}|${maxEdge}|${page.crop ? JSON.stringify(page.crop) : "whole"}`;
+  let shapes = shapeCache.get(page.img);
+  if (!shapes) shapeCache.set(page.img, (shapes = new Map()));
+  const hit = shapes.get(key);
+  if (hit) return hit;
+
+  const crop = page.crop ?? WHOLE_PAGE;
+  const out = isRectangle(crop) ? cropRectangle(page, crop, maxEdge) : straighten(page, crop, maxEdge);
+  shapes.set(key, out);
+  // Oldest first — a Map iterates in insertion order.
+  while (shapes.size > SHAPES_PER_PHOTO) shapes.delete(shapes.keys().next().value!);
+  return out;
+}
+
+/** The turned photo's size — what a crop's fractions are fractions of. */
+function turnedSize(page: ScanPageSettings) {
+  const sideways = page.rotation === 90 || page.rotation === 270;
+  const w = page.img.naturalWidth;
+  const h = page.img.naturalHeight;
+  return sideways ? { width: h, height: w } : { width: w, height: h };
+}
+
+/**
+ * Draw the turned photo at `scale`, offset so that (`left`, `top`) in turned
+ * pixels lands at the canvas origin. Both paths are this with different
+ * windows.
+ */
+function drawTurned(
+  context: CanvasRenderingContext2D,
+  page: ScanPageSettings,
+  scale: number,
+  left: number,
+  top: number
+) {
+  const { img, rotation } = page;
+  const turned = turnedSize(page);
+  context.imageSmoothingQuality = "high";
+  context.save();
+  context.scale(scale, scale);
+  context.translate(-left, -top);
+  context.translate(turned.width / 2, turned.height / 2);
+  context.rotate((rotation * Math.PI) / 180);
+  context.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+  context.restore();
+}
+
+function cropRectangle(page: ScanPageSettings, crop: ScanCrop, maxEdge: number): HTMLCanvasElement {
+  const turned = turnedSize(page);
+  const left = crop.tl.x * turned.width;
+  const top = crop.tl.y * turned.height;
+  const keptW = (crop.tr.x - crop.tl.x) * turned.width;
+  const keptH = (crop.bl.y - crop.tl.y) * turned.height;
+  const scale = Math.min(1, maxEdge / Math.max(keptW, keptH));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(keptW * scale));
+  canvas.height = Math.max(1, Math.round(keptH * scale));
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("The browser could not read that photo.");
+  drawTurned(context, page, scale, left, top);
+  return canvas;
+}
+
+const distance = (a: ScanPoint, b: ScanPoint) => Math.hypot(a.x - b.x, a.y - b.y);
+
+/**
+ * The projective map from the unit square onto the four corners — Heckbert's
+ * square-to-quad. (u, v) in the straightened page → (x, y) in the photo.
+ * Forward only, which is all a resample needs: each OUTPUT pixel asks where in
+ * the photo it comes from.
+ */
+function squareToQuad(q: ScanCrop) {
+  const [p0, p1, p2, p3] = [q.tl, q.tr, q.br, q.bl];
+  const sx = p0.x - p1.x + p2.x - p3.x;
+  const sy = p0.y - p1.y + p2.y - p3.y;
+  let a, b, c, d, e, f, g, h;
+  if (Math.abs(sx) < EPSILON && Math.abs(sy) < EPSILON) {
+    // A parallelogram: the map is affine.
+    [a, b, c] = [p1.x - p0.x, p3.x - p0.x, p0.x];
+    [d, e, f] = [p1.y - p0.y, p3.y - p0.y, p0.y];
+    g = h = 0;
+  } else {
+    const dx1 = p1.x - p2.x;
+    const dx2 = p3.x - p2.x;
+    const dy1 = p1.y - p2.y;
+    const dy2 = p3.y - p2.y;
+    const den = dx1 * dy2 - dy1 * dx2;
+    g = (sx * dy2 - sy * dx2) / den;
+    h = (dx1 * sy - dy1 * sx) / den;
+    [a, b, c] = [p1.x - p0.x + g * p1.x, p3.x - p0.x + h * p3.x, p0.x];
+    [d, e, f] = [p1.y - p0.y + g * p1.y, p3.y - p0.y + h * p3.y, p0.y];
+  }
+  return (u: number, v: number): ScanPoint => {
+    const w = g * u + h * v + 1;
+    return { x: (a * u + b * v + c) / w, y: (d * u + e * v + f) / w };
+  };
+}
+
+/**
+ * The four corners pulled out to a rectangle. The page's size is its longer
+ * top-or-bottom edge by its longer left-or-right edge, so nothing is squeezed
+ * below the resolution it was photographed at; then `maxEdge` as usual.
+ *
+ * The photo is first drawn at that same scale, and only the part under the
+ * corners — a 12 MP camera page read in full would be 48 MB of pixels to pull
+ * a preview out of. Then every output pixel is sampled bilinearly from it.
+ */
+function straighten(page: ScanPageSettings, crop: ScanCrop, maxEdge: number): HTMLCanvasElement {
+  const turned = turnedSize(page);
+  const px = (p: ScanPoint): ScanPoint => ({ x: p.x * turned.width, y: p.y * turned.height });
+  const q = { tl: px(crop.tl), tr: px(crop.tr), br: px(crop.br), bl: px(crop.bl) };
+  const outW = Math.max(distance(q.tl, q.tr), distance(q.bl, q.br));
+  const outH = Math.max(distance(q.tl, q.bl), distance(q.tr, q.br));
+  const scale = Math.min(1, maxEdge / Math.max(outW, outH));
+
+  // The source: the corners' bounding box, drawn at `scale`.
+  const xs = [q.tl.x, q.tr.x, q.br.x, q.bl.x];
+  const ys = [q.tl.y, q.tr.y, q.br.y, q.bl.y];
+  const left = Math.floor(Math.min(...xs));
+  const top = Math.floor(Math.min(...ys));
+  const source = document.createElement("canvas");
+  source.width = Math.max(2, Math.ceil((Math.max(...xs) - left) * scale) + 1);
+  source.height = Math.max(2, Math.ceil((Math.max(...ys) - top) * scale) + 1);
+  const sourceContext = source.getContext("2d");
+  if (!sourceContext) throw new Error("The browser could not read that photo.");
+  drawTurned(sourceContext, page, scale, left, top);
+  const src = sourceContext.getImageData(0, 0, source.width, source.height).data;
+  const sw = source.width;
+  const sh = source.height;
+
+  const local = (p: ScanPoint): ScanPoint => ({ x: (p.x - left) * scale, y: (p.y - top) * scale });
+  const map = squareToQuad({ tl: local(q.tl), tr: local(q.tr), br: local(q.br), bl: local(q.bl) });
+
+  const canvas = document.createElement("canvas");
+  const W = (canvas.width = Math.max(1, Math.round(outW * scale)));
+  const H = (canvas.height = Math.max(1, Math.round(outH * scale)));
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("The browser could not read that photo.");
+  const frame = context.createImageData(W, H);
+  const out = frame.data;
+
+  for (let j = 0; j < H; j++) {
+    const v = (j + 0.5) / H;
+    for (let i = 0; i < W; i++) {
+      const at = map((i + 0.5) / W, v);
+      // Pixel centres sit at +0.5; clamp so the 2×2 neighbourhood is in range.
+      const x = Math.min(sw - 1.001, Math.max(0, at.x - 0.5));
+      const y = Math.min(sh - 1.001, Math.max(0, at.y - 0.5));
+      const x0 = x | 0;
+      const y0 = y | 0;
+      const fx = x - x0;
+      const fy = y - y0;
+      const i00 = (y0 * sw + x0) * 4;
+      const i10 = i00 + 4;
+      const i01 = i00 + sw * 4;
+      const i11 = i01 + 4;
+      const o = (j * W + i) * 4;
+      for (let ch = 0; ch < 3; ch++) {
+        const top = src[i00 + ch] + (src[i10 + ch] - src[i00 + ch]) * fx;
+        const bottom = src[i01 + ch] + (src[i11 + ch] - src[i01 + ch]) * fx;
+        out[o + ch] = top + (bottom - top) * fy;
+      }
+      out[o + 3] = 255;
+    }
+  }
+  context.putImageData(frame, 0, 0);
+  return canvas;
 }
 
 async function pageJpeg(page: ScanPageSettings, tone: ScanTone): Promise<Uint8Array> {

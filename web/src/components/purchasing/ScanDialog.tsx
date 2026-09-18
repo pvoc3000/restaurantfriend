@@ -12,9 +12,11 @@ import {
   rotateCrop,
   saveScanTone,
   useScanTone,
-  MIN_CROP,
+  isWholePage,
   NEUTRAL_TONE,
+  WHOLE_PAGE,
   type ScanCrop,
+  type ScanPoint,
   type ScanMode,
   type ScanPageSettings,
   type ScanTone,
@@ -34,7 +36,9 @@ export type ScanPage = ScanPageSettings & { id: string };
  * you dial the tone in — on a page big enough to read the print.
  *
  * Preview is also where CROP lives, because a crop is dragged, and a handle
- * on a 250px tile is too small to aim at on an iPad.
+ * on a 250px tile is too small to aim at on an iPad. The crop is four free
+ * corners, which is also how a page shot at an angle is straightened — see
+ * `CropEditor`.
  *
  * THE TONE IS REMEMBERED (`useScanTone`) and every change to it saves; see
  * `lib/scanPages`. Rotation and crop are per page and die with the scan.
@@ -172,8 +176,8 @@ export function ScanDialog({
                 <button
                   type="button"
                   onClick={() => {
-                    const full = draftCrop.x === 0 && draftCrop.y === 0 && draftCrop.w === 1 && draftCrop.h === 1;
-                    update(shown.id, (p) => ({ ...p, crop: full ? null : draftCrop }));
+                    const whole = isWholePage(draftCrop);
+                    update(shown.id, (p) => ({ ...p, crop: whole ? null : draftCrop }));
                     setDraftCrop(null);
                   }}
                   className={BUTTON_CLASS}
@@ -182,7 +186,7 @@ export function ScanDialog({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDraftCrop({ x: 0, y: 0, w: 1, h: 1 })}
+                  onClick={() => setDraftCrop(WHOLE_PAGE)}
                   className={BUTTON_CLASS}
                 >
                   Whole Page
@@ -197,7 +201,7 @@ export function ScanDialog({
                 <button
                   type="button"
                   disabled={building}
-                  onClick={() => setDraftCrop(shown.crop ?? { x: 0, y: 0, w: 1, h: 1 })}
+                  onClick={() => setDraftCrop(shown.crop ?? WHOLE_PAGE)}
                   className={BUTTON_CLASS}
                 >
                   Crop
@@ -359,18 +363,33 @@ function PageCanvas({
   );
 }
 
-type Handle = "move" | "nw" | "ne" | "sw" | "se";
+type Corner = "tl" | "tr" | "br" | "bl";
+type Handle = "move" | Corner | "top" | "right" | "bottom" | "left";
+
+const CORNERS: Corner[] = ["tl", "tr", "br", "bl"];
+/** Each edge handle drags the two corners at its ends. */
+const EDGES: { handle: Handle; ends: [Corner, Corner] }[] = [
+  { handle: "top", ends: ["tl", "tr"] },
+  { handle: "right", ends: ["tr", "br"] },
+  { handle: "bottom", ends: ["br", "bl"] },
+  { handle: "left", ends: ["bl", "tl"] },
+];
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 /**
- * The whole page with the kept rectangle over it: drag inside to move it,
- * drag a corner to size it. Everything is in FRACTIONS of the page, measured
- * against the canvas's own box on screen, so the crop means the same thing on
- * a phone and at full size.
+ * The whole page with the kept area over it, as FOUR FREE CORNERS (Mark,
+ * 2026-09-18). Put one on each corner of the paper and the page comes out
+ * square — the perspective correction; keep them in line and it is an ordinary
+ * crop. Drag a corner to move it alone, an edge's middle handle to move that
+ * edge (both its corners), or inside to move the lot.
  *
- * Pointer events with capture, so a finger that slides off the handle keeps
- * dragging it; `touch-action: none` stops iPad Safari scrolling the dialog
- * under the drag. The handles are 44px targets drawn as 14px squares — the
- * app's touch rule (see `ui/CalendarGrid`).
+ * Everything is in FRACTIONS of the page, measured against the box on screen,
+ * so the crop means the same thing on a phone and at full size. Pointer events
+ * with capture, so a finger that slides off a handle keeps dragging it;
+ * `touch-action: none` stops iPad Safari scrolling the dialog under the drag.
+ * Handles are 44px targets drawn small — the app's touch rule (see
+ * `ui/CalendarGrid`).
  */
 function CropEditor({
   page,
@@ -413,11 +432,12 @@ function CropEditor({
 
   // One handler, the handle read off the element — a handler MADE per handle
   // during render is what `react-hooks/refs` refuses.
-  function begin(e: React.PointerEvent<HTMLElement>) {
+  function begin(e: React.PointerEvent<Element>) {
     e.preventDefault();
     e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const handle = (e.currentTarget.dataset.handle ?? "move") as Handle;
+    const el = e.currentTarget as HTMLElement | SVGElement;
+    el.setPointerCapture(e.pointerId);
+    const handle = (el.dataset.handle ?? "move") as Handle;
     drag.current = { handle, x: e.clientX, y: e.clientY, start: crop };
   }
 
@@ -425,24 +445,28 @@ function CropEditor({
     const d = drag.current;
     const box = boxRef.current?.getBoundingClientRect();
     if (!d || !box) return;
-    const dx = (e.clientX - d.x) / box.width;
-    const dy = (e.clientY - d.y) / box.height;
+    let dx = (e.clientX - d.x) / box.width;
+    let dy = (e.clientY - d.y) / box.height;
     const s = d.start;
-    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+    const moved: Corner[] =
+      d.handle === "move"
+        ? CORNERS
+        : CORNERS.includes(d.handle as Corner)
+          ? [d.handle as Corner]
+          : EDGES.find((edge) => edge.handle === d.handle)!.ends;
 
-    if (d.handle === "move") {
-      onChange({ ...s, x: clamp(s.x + dx, 0, 1 - s.w), y: clamp(s.y + dy, 0, 1 - s.h) });
-      return;
+    // Moving more than one corner moves them TOGETHER, so the move is limited
+    // by whichever reaches the edge of the page first — otherwise one corner
+    // would stop at the edge while the other slid on and the shape changed.
+    if (moved.length > 1) {
+      const xs = moved.map((k) => s[k].x);
+      const ys = moved.map((k) => s[k].y);
+      dx = Math.min(1 - Math.max(...xs), Math.max(-Math.min(...xs), dx));
+      dy = Math.min(1 - Math.max(...ys), Math.max(-Math.min(...ys), dy));
     }
-    let left = s.x;
-    let top = s.y;
-    let right = s.x + s.w;
-    let bottom = s.y + s.h;
-    if (d.handle === "nw" || d.handle === "sw") left = clamp(left + dx, 0, right - MIN_CROP);
-    if (d.handle === "ne" || d.handle === "se") right = clamp(right + dx, left + MIN_CROP, 1);
-    if (d.handle === "nw" || d.handle === "ne") top = clamp(top + dy, 0, bottom - MIN_CROP);
-    if (d.handle === "sw" || d.handle === "se") bottom = clamp(bottom + dy, top + MIN_CROP, 1);
-    onChange({ x: left, y: top, w: right - left, h: bottom - top });
+    const next = { ...s };
+    for (const k of moved) next[k] = { x: clamp01(s[k].x + dx), y: clamp01(s[k].y + dy) };
+    onChange(next);
   }
 
   function end() {
@@ -450,12 +474,14 @@ function CropEditor({
   }
 
   const pct = (v: number) => `${v * 100}%`;
-  const corners: { handle: Handle; x: number; y: number; cursor: string }[] = [
-    { handle: "nw", x: crop.x, y: crop.y, cursor: "nwse-resize" },
-    { handle: "ne", x: crop.x + crop.w, y: crop.y, cursor: "nesw-resize" },
-    { handle: "sw", x: crop.x, y: crop.y + crop.h, cursor: "nesw-resize" },
-    { handle: "se", x: crop.x + crop.w, y: crop.y + crop.h, cursor: "nwse-resize" },
-  ];
+  const mid = (a: ScanPoint, b: ScanPoint): ScanPoint => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const outline = CORNERS.map((k) => `${crop[k].x},${crop[k].y}`).join(" ");
+  const pointer = {
+    onPointerDown: begin,
+    onPointerMove: move,
+    onPointerUp: end,
+    onPointerCancel: end,
+  };
 
   return (
     <div ref={paneRef} className="flex h-full w-full items-center justify-center">
@@ -468,39 +494,55 @@ function CropEditor({
           <div className="absolute inset-0 [&>canvas]:h-full [&>canvas]:w-full [&>canvas]:max-h-none [&>canvas]:max-w-none">
             <PageCanvas page={page} tone={tone} maxEdge={LARGE_EDGE} label="Page to crop" whole />
           </div>
-          {/* The part cut away, dimmed: one shadow spread from the kept box,
-              clipped by this wrapper. */}
-          <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div
-              className="absolute outline outline-2 outline-ink"
-              style={{
-                left: pct(crop.x),
-                top: pct(crop.y),
-                width: pct(crop.w),
-                height: pct(crop.h),
-                boxShadow: "0 0 0 9999px rgba(0,0,0,0.5)",
-              }}
+          {/* In page fractions: the viewBox IS the page, stretched to the box.
+              The part cut away is dimmed (the page minus the shape, even-odd),
+              the shape is outlined black over white so it reads on paper and
+              on a dark counter alike, and the shape's inside is the MOVE
+              target — the one part of this SVG that takes the pointer. */}
+          <svg
+            className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+            viewBox="0 0 1 1"
+            preserveAspectRatio="none"
+            aria-hidden
+          >
+            <path
+              d={`M0 0H1V1H0Z M${outline.replaceAll(" ", " L")}Z`}
+              fillRule="evenodd"
+              fill="rgba(0,0,0,0.5)"
             />
-          </div>
-          <div
-            className="absolute cursor-move"
-            style={{ left: pct(crop.x), top: pct(crop.y), width: pct(crop.w), height: pct(crop.h) }}
-            data-handle="move"
-            onPointerDown={begin}
-            onPointerMove={move}
-            onPointerUp={end}
-            onPointerCancel={end}
-          />
-          {corners.map((c) => (
+            <polygon points={outline} fill="none" stroke="white" strokeWidth={4} vectorEffect="non-scaling-stroke" />
+            <polygon points={outline} fill="none" stroke="black" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+            <polygon
+              points={outline}
+              fill="transparent"
+              className="pointer-events-auto cursor-move"
+              data-handle="move"
+              {...pointer}
+            />
+          </svg>
+          {EDGES.map(({ handle, ends }) => {
+            const at = mid(crop[ends[0]], crop[ends[1]]);
+            return (
+              <div
+                key={handle}
+                data-handle={handle}
+                aria-hidden
+                className="absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-move items-center justify-center"
+                style={{ left: pct(at.x), top: pct(at.y) }}
+                {...pointer}
+              >
+                <span className="h-2.5 w-2.5 border border-ink bg-white" />
+              </div>
+            );
+          })}
+          {CORNERS.map((k) => (
             <div
-              key={c.handle}
-              className="absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
-              style={{ left: pct(c.x), top: pct(c.y), cursor: c.cursor }}
-              data-handle={c.handle}
-              onPointerDown={begin}
-              onPointerMove={move}
-              onPointerUp={end}
-              onPointerCancel={end}
+              key={k}
+              data-handle={k}
+              aria-hidden
+              className="absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-crosshair items-center justify-center"
+              style={{ left: pct(crop[k].x), top: pct(crop[k].y) }}
+              {...pointer}
             >
               <span className="h-3.5 w-3.5 border-2 border-ink bg-white" />
             </div>

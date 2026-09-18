@@ -25,6 +25,9 @@ import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
  * a screen. If the two surfaces owned their own copies, the same gesture would
  * eventually behave differently depending on where you did it.
  *
+ * ATTACHING AN INVOICE OR PACKING SLIP TO AN ORDER MARKS IT RECEIVED (Mark,
+ * 2026-09-18) when it was still draft or sent — see `upload`.
+ *
  * READING AND FILING ARE TWO ACTS, AND ONLY THE FIRST HAPPENS HERE (Mark,
  * 2026-09-01: "I don't think an invoice document should be created
  * automatically … it should be created only once a purchase order is
@@ -127,6 +130,7 @@ export function useAttachmentActions({
   // array after the drop zone has vetted the types.
   async function upload(files: readonly File[], kind: AttachmentKind) {
     setError(null);
+    let statusProblem: string | null = null;
     for (const file of files) {
       setPhase({ kind: "uploading", label: `Uploading ${file.name}…` });
       // An order's own paperwork keeps 018's key; an invoice with no order
@@ -174,6 +178,29 @@ export function useAttachmentActions({
         return;
       }
 
+      // PAPERWORK MEANS IT ARRIVED (Mark, 2026-09-18: "change the status of
+      // a purchase order to received if we attached an invoice or packing slip
+      // to it"). Only from draft or sent — the filter is IN the update, so an
+      // order already received, closed or void is left exactly as it is, and
+      // a phone order that never went through "sent" still counts. Before the
+      // read, so the order says Received while the 30s read is still running.
+      //
+      // The STATUS ONLY, where Mark ▸ Received also fills quantities (see
+      // `lib/poStatus`): an invoice says the delivery came, not what was in
+      // it. The counts come from reconciling against its reading, and until
+      // then the Received figures stay short, which is the true state.
+      if (poId && (kind === "invoice" || kind === "packing_slip")) {
+        const { error: statusError } = await supabase
+          .from("purchase_orders")
+          .update({ status: "received" })
+          .eq("id", poId)
+          .in("status", ["draft", "sent"]);
+        // The file is stored; a status that didn't move is worth saying and
+        // not worth undoing the upload over. Said AFTER the loop — `read`
+        // clears the error line when it starts.
+        if (statusError) statusProblem = `Attached, but the order wasn't marked received: ${statusError.message}`;
+      }
+
       // Invoices only (Mark, 2026-07-31). Each read is an Opus call, so
       // attaching four pages as four files costs four; and a packing slip has
       // no prices to join on, so reading one buys nothing.
@@ -186,6 +213,7 @@ export function useAttachmentActions({
       }
     }
     setPhase(IDLE);
+    if (statusProblem) setError(statusProblem);
     if (fileRef.current) fileRef.current.value = "";
     router.refresh();
   }

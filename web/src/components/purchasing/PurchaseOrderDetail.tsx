@@ -37,6 +37,7 @@ import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { confirmAndDeletePurchaseOrders } from "./deletePurchaseOrders";
 import { nextDeliveryDate } from "@/lib/poProcessing";
+import { markPurchaseOrdersReceived } from "@/lib/poStatus";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog, confirmDialogWithOption, splitConfirmMessage } from "@/lib/confirm";
 
@@ -207,6 +208,26 @@ export function PurchaseOrderDetail({
       .eq("id", order.id);
     setBusy(false);
     if (error) setError(error.message);
+    else router.refresh();
+  }
+
+  async function markAs(status: PoStatus) {
+    if (status === "closed") return close();
+    if (status === "void") {
+      const ok = await confirmDialog({
+        title: `Void ${order.po_number}?`,
+        body: "It stays on the list as Void and stops counting as an open order. Mark it again to bring it back.",
+        confirmLabel: "Void",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+    if (status !== "received") return setStatus(status);
+    setBusy(true);
+    setError(null);
+    const { error } = await markPurchaseOrdersReceived(supabase, [order.id]);
+    setBusy(false);
+    if (error) setError(error);
     else router.refresh();
   }
 
@@ -735,6 +756,18 @@ export function PurchaseOrderDetail({
       : []),
   ];
 
+  /* MARK PO ▸ one row per status (Mark, 2026-09-18), the current one greyed.
+     The Status field above sets the same column and says nothing; these are
+     the verbs, and two of them carry what the status asserts. Received fills
+     the lines nobody has counted — `markPurchaseOrdersReceived`, the list's
+     own Mark ▸ Received. Closed… is Close Order…, confirm and all. Void…
+     confirms, because it takes the order out of everything that is open. */
+  const markItems: ActionMenuItem[] = PO_STATUS_ORDER.map((status) => ({
+    label: PO_STATUS_LABEL[status] + (status === "closed" || status === "void" ? "…" : ""),
+    disabled: busy || status === order.status,
+    onSelect: () => void markAs(status),
+  }));
+
   /* ONE ACTIONS MENU, level with the title at the right margin (Mark,
      2026-09-11), in the order a PO is worked: add to it · send it · receive it.
      The send rows are ProcessPo's and Add Item… is AddPoLines' — each keeps its
@@ -750,6 +783,9 @@ export function PurchaseOrderDetail({
         items={[
           ...addItems,
           ...group(processItems),
+          ...(canEditLines
+            ? group([{ label: "Mark PO", items: markItems, disabled: busy }])
+            : []),
           ...group(receivingItems),
           // The line selection's one command (Mark, 2026-09-11) — it replaced a
           // band that held nothing but Delete. Offered only while a line is

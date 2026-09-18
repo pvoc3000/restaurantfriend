@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { markPurchaseOrdersReceived } from "@/lib/poStatus";
 import {
   matchesVendorFilter,
   vendorFilterOptions,
@@ -451,62 +452,21 @@ export function PurchaseOrderList({
   }
 
   /**
-   * Mark the selection received — the Friday counterpart to Mark sent.
-   *
-   * It writes QUANTITIES, not just the status, because a status-only "received"
-   * is a lie this screen would then report: the Received column flags any
-   * received PO whose total falls short of what was ordered, so flipping the
-   * status alone paints every order red for a shortfall that never happened.
-   * "Received" means the delivery landed, so the lines say so.
-   *
-   * Only lines with NO received quantity are filled. Anything already counted —
-   * a short case someone recorded on the detail screen — is a measurement, and
-   * a batch button must not overwrite it. (PO detail's "Receive all as ordered"
-   * deliberately does overwrite; that one is aimed at a single order you're
-   * looking at.)
+   * Mark the selection received — the Friday counterpart to Mark sent. The
+   * write is `markPurchaseOrdersReceived`, shared with PO detail's Mark PO ▸
+   * Received; why it fills quantities, and only empty ones, is there.
    */
   async function batchMarkReceived() {
     setBatchBusy("received");
     setBatchError(null);
-    try {
-      const ids = selectedReceivable.map((po) => po.id);
-      const { data: lines, error: lineError } = await supabase
-        .from("purchase_order_items")
-        .select("id, qty_ordered")
-        .in("po_id", ids)
-        .is("qty_received", null);
-      if (lineError) throw new Error(lineError.message);
-
-      // PostgREST can't say "set qty_received = qty_ordered", and one request
-      // per line would be hundreds on a Friday. Ordered quantities are a tiny
-      // set of small numbers, so grouping by value costs a handful of requests
-      // — the same shape as batchMarkSent's grouping by sent_via.
-      const byQty = new Map<number, string[]>();
-      for (const l of lines ?? []) {
-        const q = Number(l.qty_ordered);
-        byQty.set(q, [...(byQty.get(q) ?? []), l.id]);
-      }
-      for (const [q, lineIds] of byQty) {
-        const { error } = await supabase
-          .from("purchase_order_items")
-          .update({ qty_received: q })
-          .in("id", lineIds);
-        if (error) throw new Error(error.message);
-      }
-
-      const { error } = await supabase
-        .from("purchase_orders")
-        .update({ status: "received" })
-        .in("id", ids);
-      if (error) throw new Error(error.message);
-
-      setChecked(new Set());
-      router.refresh();
-    } catch (e) {
-      setBatchError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBatchBusy(null);
-    }
+    const { error } = await markPurchaseOrdersReceived(
+      supabase,
+      selectedReceivable.map((po) => po.id)
+    );
+    setBatchBusy(null);
+    if (error) return setBatchError(error);
+    setChecked(new Set());
+    router.refresh();
   }
 
   const allVisibleChecked =
