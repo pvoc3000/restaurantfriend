@@ -655,6 +655,26 @@ export function ScheduleLines({
         compactBelow={1200}
         columnChooser
         group={group}
+        // THE NIGHT'S GRAND TOTALS (Mark, 2026-09-19), under the columns they
+        // sum. A count cell nobody has filled is left OUT of its sum rather
+        // than read as zero, and a column with no counts at all says nothing —
+        // a "0 made" before the night is counted would read as a result.
+        totals={(shown) => {
+          const sum = (pick: (r: ScheduleLineRow) => number | null) => {
+            const counted = shown.map(pick).filter((n): n is number => n !== null);
+            return counted.length === 0 ? null : counted.reduce((n, v) => n + v, 0).toLocaleString();
+          };
+          const cells: Record<string, string> = { item: "Total", par: sum((r) => r.par)! };
+          for (const [key, pick] of [
+            ["made", (r: ScheduleLineRow) => r.made],
+            ["leftover", (r: ScheduleLineRow) => r.leftover],
+            ["sold", (r: ScheduleLineRow) => r.sold],
+          ] as const) {
+            const total = sum(pick);
+            if (total !== null) cells[key] = total;
+          }
+          return cells;
+        }}
         empty={
           <p className="text-sm text-muted">
             Nothing on this schedule. Add an item, or regenerate the day if the
