@@ -5,7 +5,7 @@ import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { confirmDialog } from "@/lib/confirm";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { PickList } from "@/components/ui/PickList";
 import { ControlField } from "@/components/ui/ControlField";
@@ -152,12 +152,14 @@ export function ShiftReportsList({
 
   async function remove(row: ShiftReportRow) {
     const ok = await confirmDialog({
-      ...splitConfirmMessage(
-        `Delete the ${SHIFT_SLOT_LABEL[row.shift].toLowerCase()} report for ${row.reportDate}? ` +
-          (row.status === "sent"
-            ? "It has already been sent, so the ratings and counts it wrote stay where they are — only the report goes."
-            : "Nothing has been written to the schedule or to anybody's record yet, so this discards the whole draft.")
-      ),
+      // The question moves into the body and the title asks it plainly (Mark,
+      // 2026-09-18). A blank line makes them two paragraphs in the panel.
+      title: "Are You Sure?",
+      body:
+        `Delete the ${SHIFT_SLOT_LABEL[row.shift].toLowerCase()} report for ${row.reportDate}?\n\n` +
+        (row.status === "sent"
+          ? "It has already been sent, so the ratings and counts it wrote stay where they are — only the report goes."
+          : "Nothing has been written to the schedule or to anybody's record yet, so this discards the whole draft."),
       confirmLabel: "Delete",
       tone: "danger",
     });
