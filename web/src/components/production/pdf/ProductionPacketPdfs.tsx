@@ -17,6 +17,7 @@
 
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
+  countTotals,
   rollUp,
   tallyBoxes,
   trayRuler,
@@ -24,6 +25,8 @@ import {
   totalDonuts,
   TRAY_CELLS,
   type Grain,
+  type RollSize,
+  type RollSubtype,
   type RollType,
   type ScheduleLine,
 } from "@/lib/productionSchedule";
@@ -160,6 +163,17 @@ const styles = StyleSheet.create({
   subtotalBatch: { fontSize: 7, color: MUTED, marginLeft: 24 },
   grandTotal: { flexDirection: "row", marginTop: 5, marginLeft: 118 },
   grandTotalText: { fontSize: 9, fontFamily: "Helvetica-Bold" },
+  // A total row's counts, each under the write-in box it sums — the row's own
+  // `writeIn` geometry, so the figure sits under the column it adds up.
+  countCell: { width: 34, marginLeft: 4, textAlign: "center" },
+  nightTotal: {
+    flexDirection: "row",
+    marginTop: 10,
+    paddingTop: 4,
+    borderTopWidth: 1.5,
+    borderTopColor: INK,
+    marginLeft: 118,
+  },
   grandBatch: { fontSize: 9, fontFamily: "Helvetica-Bold", marginLeft: 24 },
 
   sheetHead: {
@@ -276,7 +290,18 @@ function PremadePage({ schedule, packet }: { schedule: PacketSchedule; packet: P
       {rolled.length === 0 ? (
         <Text style={styles.empty}>Nothing on this schedule.</Text>
       ) : (
-        rolled.map((type) => <PremadeType key={type.itemType} type={type} />)
+        <>
+          {rolled.map((type) => <PremadeType key={type.itemType} type={type} />)}
+          {/* THE NIGHT'S GRAND TOTAL (Mark, 2026-09-19), the schedule
+              record's closing row on paper. */}
+          <View style={styles.nightTotal} wrap={false}>
+            <CountTotalRow
+              label="NIGHT TOTAL"
+              lines={schedule.lines}
+              textStyle={styles.grandTotalText}
+            />
+          </View>
+        </>
       )}
 
       <View style={styles.footer} fixed>
@@ -316,28 +341,65 @@ function PremadeType({ type }: { type: RollType }) {
                 return <PremadeRow key={row.key} line={line} />;
               })}
               <View style={styles.subtotal}>
-                <Text style={styles.subtotalText}>
-                  {(sub.subtype || "(no cut)").toUpperCase()} TOTAL: {fmt(sub.total)}
-                </Text>
+                <CountTotalRow
+                  label={`${(sub.subtype || "(no cut)").toUpperCase()} TOTAL`}
+                  lines={subtypeLines(sub)}
+                  textStyle={styles.subtotalText}
+                />
               </View>
             </View>
           ))}
 
           <View style={styles.subtotal}>
-            <Text style={styles.subtotalText}>
-              {(size.size || "").toUpperCase()} {(type.itemType || "").toUpperCase()} TOTAL:{" "}
-              {fmt(size.total)}
-            </Text>
+            <CountTotalRow
+              label={`${(size.size || "").toUpperCase()} ${(type.itemType || "").toUpperCase()} TOTAL`}
+              lines={sizeLines(size)}
+              textStyle={styles.subtotalText}
+            />
           </View>
         </View>
       ))}
 
       <View style={styles.grandTotal}>
-        <Text style={styles.grandTotalText}>
-          {(type.itemType || "(no type)").toUpperCase()} TOTAL: {fmt(type.total)}
-        </Text>
+        <CountTotalRow
+          label={`${(type.itemType || "(no type)").toUpperCase()} TOTAL`}
+          lines={type.sizes.flatMap(sizeLines)}
+          textStyle={styles.grandTotalText}
+        />
       </View>
     </View>
+  );
+}
+
+const subtypeLines = (sub: RollSubtype) => sub.rows.flatMap((r) => r.lines);
+const sizeLines = (size: RollSize) => size.subtypes.flatMap(subtypeLines);
+
+/**
+ * A premade total line: the par in words as it always printed, and — once the
+ * night is counted — MADE and L/O under the two write-in boxes they sum, with
+ * SOLD after the par since the sheet has no column for it. The same sums as the
+ * schedule record's (`countTotals`); a count no line has prints nothing, so a
+ * packet printed before the night looks exactly as it did.
+ */
+function CountTotalRow({
+  label,
+  lines,
+  textStyle,
+}: {
+  label: string;
+  lines: ScheduleLine[];
+  textStyle: (typeof styles)[keyof typeof styles];
+}) {
+  const t = countTotals(lines);
+  return (
+    <>
+      <Text style={[textStyle, { flexGrow: 1 }]}>
+        {label}: {fmt(t.par)}
+        {t.sold !== null ? `    SOLD: ${fmt(t.sold)}` : ""}
+      </Text>
+      <Text style={[textStyle, styles.countCell]}>{t.made !== null ? fmt(t.made) : ""}</Text>
+      <Text style={[textStyle, styles.countCell]}>{t.leftover !== null ? fmt(t.leftover) : ""}</Text>
+    </>
   );
 }
 

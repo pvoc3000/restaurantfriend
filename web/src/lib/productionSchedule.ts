@@ -735,3 +735,36 @@ export function sortSchedules<T extends SortableSchedule>(
  * reaches to the same edge, so the two are one number.
  */
 export const SCHEDULE_WINDOW_DAYS = 28;
+
+/**
+ * A run of lines summed (Mark, 2026-09-19) — for the schedule record's group
+ * subtotals and grand total, and the premade sheet's, so screen and paper
+ * cannot add up differently.
+ *
+ * A count nobody has entered is left OUT of its sum rather than read as zero,
+ * and a count no line in the run has is NULL — a "0 made" before the night is
+ * counted would read as a result. SOLD is made − leftover per line, a missing
+ * leftover counting as none: `v_production_schedule_lines`' own definition,
+ * repeated because the packet's lines come from the table, not the view.
+ */
+export type CountTotals = {
+  par: number;
+  made: number | null;
+  leftover: number | null;
+  sold: number | null;
+};
+
+export function countTotals(
+  lines: { par: number; made: number | null; leftover: number | null }[]
+): CountTotals {
+  const add = (values: (number | null)[]) => {
+    const counted = values.filter((n): n is number => n !== null);
+    return counted.length === 0 ? null : counted.reduce((n, v) => n + v, 0);
+  };
+  return {
+    par: lines.reduce((n, l) => n + (Number(l.par) || 0), 0),
+    made: add(lines.map((l) => l.made)),
+    leftover: add(lines.map((l) => l.leftover)),
+    sold: add(lines.map((l) => (l.made === null ? null : l.made - (l.leftover ?? 0)))),
+  };
+}

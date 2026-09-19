@@ -10,7 +10,7 @@ import { PickList } from "@/components/ui/PickList";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { RowMenu } from "@/components/ui/RowMenu";
-import { planDeviation, type ScheduleLine } from "@/lib/productionSchedule";
+import { countTotals, planDeviation, type ScheduleLine } from "@/lib/productionSchedule";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 export type ScheduleLineRow = ScheduleLine & {
@@ -156,21 +156,13 @@ type Grouping = "type" | "tray" | "none";
 /**
  * The four counts summed, for a group's subtotal and the grand total alike
  * (Mark, 2026-09-19), keyed by column so each lands under its own heading.
- *
- * A count cell nobody has filled is left OUT of its sum rather than read as
- * zero, and a column with no counts at all says nothing — a "0 made" before the
- * night is counted would read as a result.
+ * The sums are `countTotals`, which the printed premade sheet uses too; a count
+ * no line has is left blank.
  */
 function lineTotals(rows: ScheduleLineRow[]): Record<string, string> {
   const cells: Record<string, string> = {};
-  for (const [key, pick] of [
-    ["par", (r: ScheduleLineRow) => r.par],
-    ["made", (r: ScheduleLineRow) => r.made],
-    ["leftover", (r: ScheduleLineRow) => r.leftover],
-    ["sold", (r: ScheduleLineRow) => r.sold],
-  ] as const) {
-    const counted = rows.map(pick).filter((n): n is number => n !== null);
-    if (counted.length > 0) cells[key] = counted.reduce((n, v) => n + v, 0).toLocaleString();
+  for (const [key, n] of Object.entries(countTotals(rows))) {
+    if (n !== null) cells[key] = n.toLocaleString();
   }
   return cells;
 }
