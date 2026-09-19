@@ -37,6 +37,23 @@ function isStatusFilter(value: string): value is InvoiceStatusFilter {
   return value === "all" || (BILL_STAGE_ORDER as string[]).includes(value);
 }
 
+/**
+ * Bill or credit memo (Mark, 2026-09-19: "add a 'type' picklist to the invoices
+ * filter row with 'Bill' and 'Credit Memo' options"). `is_credit` underneath;
+ * `all` is the default, so the list reads as it did before anyone touches it.
+ */
+export type InvoiceKindFilter = "all" | "bill" | "credit";
+
+export const INVOICE_KIND_LABEL: Record<InvoiceKindFilter, string> = {
+  all: "Any type",
+  bill: "Bill",
+  credit: "Credit Memo",
+};
+
+function isKindFilter(value: string): value is InvoiceKindFilter {
+  return value === "all" || value === "bill" || value === "credit";
+}
+
 /** The aging tiers, plus `all`. */
 export type AgingFilter = AgingBucket | "all";
 
@@ -63,6 +80,7 @@ export type InvoiceFilters = {
   /** Vendor NAMES; empty means every vendor. See lib/vendorFilter. */
   vendors: string[];
   aging: AgingFilter;
+  kind: InvoiceKindFilter;
   /**
    * The PO list's window, key or custom pair — `lib/poFilters` owns the
    * presets so the two lists cannot drift on what "90 days" means, and the
@@ -90,6 +108,7 @@ export const DEFAULT_INVOICE_FILTERS: InvoiceFilters = {
   status: "open",
   vendors: [],
   aging: "all",
+  kind: "all",
   range: "90",
   sort: "due_date",
   dir: "asc",
@@ -106,6 +125,7 @@ export function parseInvoiceFilters(
 ): InvoiceFilters {
   const status = one(params.status);
   const aging = one(params.aging);
+  const kind = one(params.kind);
   const range = one(params.range);
   const custom = parseRangeParams(params.from, params.to);
   const sort = one(params.sort);
@@ -121,6 +141,7 @@ export function parseInvoiceFilters(
       ? parseVendorFilter(params[VENDOR_FILTER_PARAM])
       : fallback.vendors ?? [],
     aging: isAgingFilter(aging) ? aging : fallback.aging,
+    kind: isKindFilter(kind) ? kind : fallback.kind,
     range: isRangeKey(range) ? range : (custom ?? fallback.range),
     sort: (INVOICE_SORT_KEYS as readonly string[]).includes(sort)
       ? (sort as InvoiceSortKey)
@@ -136,6 +157,7 @@ export function serializeInvoiceView(filters: InvoiceFilters): string {
   const params = new URLSearchParams({
     status: filters.status,
     aging: filters.aging,
+    kind: filters.kind,
     sort: filters.sort,
     dir: filters.dir,
   });
@@ -151,6 +173,7 @@ export function parseInvoiceView(
   const q = new URLSearchParams(raw);
   const status = q.get("status") ?? "";
   const aging = q.get("aging") ?? "";
+  const kind = q.get("kind") ?? "";
   const range = q.get("range") ?? "";
   const custom = parseRangeParams(q.get("from") ?? undefined, q.get("to") ?? undefined);
   const sort = q.get("sort") ?? "";
@@ -161,6 +184,7 @@ export function parseInvoiceView(
   const vendors = parseVendorFilter(q.getAll(VENDOR_FILTER_PARAM));
   if (vendors.length > 0) view.vendors = vendors;
   if (isAgingFilter(aging)) view.aging = aging;
+  if (isKindFilter(kind)) view.kind = kind;
   if (isRangeKey(range)) view.range = range;
   else if (custom) view.range = custom;
   if ((INVOICE_SORT_KEYS as readonly string[]).includes(sort)) {
@@ -177,6 +201,7 @@ export function invoiceFiltersToQuery(filters: InvoiceFilters): string {
   if (filters.status !== d.status) params.set("status", filters.status);
   appendVendorFilter(params, filters.vendors);
   if (filters.aging !== d.aging) params.set("aging", filters.aging);
+  if (filters.kind !== d.kind) params.set("kind", filters.kind);
   if (filters.range !== d.range) appendRange(params, filters.range);
   if (filters.sort !== d.sort) params.set("sort", filters.sort);
   if (filters.dir !== d.dir) params.set("dir", filters.dir);

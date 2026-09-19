@@ -35,7 +35,9 @@ import {
   parseInvoiceFilters,
   serializeInvoiceView,
   INVOICE_VIEW_COOKIE,
+  INVOICE_KIND_LABEL,
   type AgingFilter,
+  type InvoiceKindFilter,
   type InvoiceFilters,
   type InvoiceSortKey,
   type InvoiceStatusFilter,
@@ -217,6 +219,8 @@ export function InvoiceList({
     return counts;
   }, [invoices]);
 
+  const creditCount = useMemo(() => invoices.filter((i) => i.is_credit).length, [invoices]);
+
   const agingCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const i of invoices) {
@@ -234,6 +238,7 @@ export function InvoiceList({
       if (filters.aging !== "all" && agingBucket(i.due_date, today) !== filters.aging) {
         return false;
       }
+      if (filters.kind !== "all" && i.is_credit !== (filters.kind === "credit")) return false;
       if (words.length === 0) return true;
       const haystack = [
         i.invoice_number ?? "",
@@ -245,7 +250,7 @@ export function InvoiceList({
         .toLowerCase();
       return words.every((w) => haystack.includes(w));
     });
-  }, [invoices, filters.status, filters.aging, filters.q, today]);
+  }, [invoices, filters.status, filters.aging, filters.kind, filters.q, today]);
 
   const vendorOptions = useMemo(
     () => vendorFilterOptions(beforeVendor.map((i) => i.vendors?.name), filters.vendors),
@@ -958,6 +963,27 @@ export function InvoiceList({
               hint: String(s === "all" ? invoices.length : statusCounts[s] ?? 0),
             }))}
             fit          />
+        </ControlField>
+
+        <ControlField label="Type">
+          <PickList
+            ariaLabel="Type"
+            variant="field"
+            value={filters.kind}
+            onPick={(kind) => update({ kind: kind as InvoiceKindFilter })}
+            options={(["all", "bill", "credit"] as const).map((k) => ({
+              value: k,
+              label: INVOICE_KIND_LABEL[k],
+              hint: String(
+                k === "all"
+                  ? invoices.length
+                  : k === "credit"
+                    ? creditCount
+                    : invoices.length - creditCount
+              ),
+            }))}
+            fit
+          />
         </ControlField>
 
       </div>
