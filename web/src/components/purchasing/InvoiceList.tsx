@@ -739,7 +739,12 @@ export function InvoiceList({
           status: i.status,
         }))}
       >
-        {(open) => render([{ label: "New Invoice", onSelect: open }])}
+        {(open) =>
+          render([
+            { label: "New Bill", onSelect: () => open("bill") },
+            { label: "New Credit Memo", onSelect: () => open("credit") },
+          ])
+        }
       </NewInvoice>
     ) : (
       render([])
@@ -803,7 +808,8 @@ export function InvoiceList({
           </div>
         </div>
         {/* ONE "ACTIONS" MENU FOR THE SCREEN (Mark, 2026-09-11), the day after
-            the PO list's and to the same shape: New Invoice · Documents ▸ ·
+            the PO list's and to the same shape: New Bill · New Credit Memo ·
+            Documents ▸ ·
             Check QuickBooks · Approve · Push to QuickBooks, then a rule, then Delete Selected… and
             Clear Selection. It replaces a Check QuickBooks button, a New
             invoice button and a selection bar carrying two more.

@@ -32,6 +32,8 @@ type DuplicateCandidate = Pick<
   "id" | "vendor_id" | "invoice_number" | "invoice_date" | "total" | "status"
 >;
 
+export type InvoiceKind = "bill" | "credit";
+
 /**
  * File a bill that no purchase order produced.
  *
@@ -81,8 +83,13 @@ export function NewInvoice({
    * render prop, so this keeps owning its dialog, its duplicate warning and
    * its write while the list's Actions menu owns where the command SITS
    * (2026-09-11). Without it the button is drawn as before.
+   *
+   * `open` takes the KIND (2026-09-19, Mark: "relabel 'New Invoice' to 'New
+   * Bill' and add 'New Credit Memo' below it") — the menu offers two rows and
+   * this one dialog serves both, arriving preset; the Kind picker inside it
+   * still lets you change your mind.
    */
-  children?: (open: () => void) => ReactNode;
+  children?: (open: (kind: InvoiceKind) => void) => ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -136,6 +143,11 @@ export function NewInvoice({
     if (pending) return;
     setOpen(false);
     reset();
+  }
+
+  function openAs(kind: InvoiceKind) {
+    setIsCredit(kind === "credit");
+    setOpen(true);
   }
 
   function add() {
@@ -213,11 +225,11 @@ export function NewInvoice({
   return (
     <>
       {children ? (
-        children(() => setOpen(true))
+        children(openAs)
       ) : (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => openAs("bill")}
           className={`ml-auto inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35 ${triggerClassName}`}
         >
           New invoice
@@ -226,7 +238,7 @@ export function NewInvoice({
 
       {open && (
         <Dialog
-          title="New invoice"
+          title={isCredit ? "New credit memo" : "New bill"}
           onClose={close}
           busy={pending}
           width="max-w-2xl"
@@ -249,7 +261,7 @@ export function NewInvoice({
                 disabled={!ready || pending}
                 className={DIALOG_COMMIT_CLASS}
               >
-                {pending ? "Filing…" : isCredit ? "File credit memo" : "File invoice"}
+                {pending ? "Filing…" : isCredit ? "File credit memo" : "File bill"}
               </button>
             </>
           }
