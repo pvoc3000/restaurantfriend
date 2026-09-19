@@ -310,18 +310,19 @@ export default async function RunShiftReportPage({
     wants("premades")
       ? supabase
           .from("production_schedules")
-          // EVERY schedule for the shop's day except special orders, never
-          // `.maybeSingle()`. A day routinely has more than one: generating a
-          // night also writes a schedule per special order it pulls, and a
-          // shop fed by two kitchens gets one per kitchen. `.maybeSingle()`
-          // returned null with an error on two rows, and the page said "no
-          // schedule" on a day that had one (2026-09-18, DF02: a plan schedule
-          // beside Cafe Knotted's). Special orders are left out because they
-          // are made for a customer, not premades anybody counts back.
-          .select("id, title, created_at")
+          // EVERY schedule for the shop's day, never `.maybeSingle()`. A day
+          // routinely has more than one: generating a night also writes a
+          // schedule per special order it pulls, and a shop fed by two
+          // kitchens gets one per kitchen. `.maybeSingle()` returned null with
+          // an error on two rows, and the page said "no schedule" on a day that
+          // had one (2026-09-18, DF02: a plan schedule beside Cafe Knotted's).
+          //
+          // SPECIAL ORDERS INCLUDED since 2026-09-19 (Mark: supervisors
+          // "should fill out any schedules generated, including special
+          // orders"), each on a page of its own — see `premadePages`.
+          .select("id, title, source, kitchen_location_id, created_at")
           .eq("location_id", report.location_id)
           .eq("schedule_date", reportDate)
-          .neq("source", "special_order")
           .order("created_at")
       : SKIP,
     wants("elements")
@@ -419,18 +420,12 @@ export default async function RunShiftReportPage({
 
   // ---- premades: the day's lines, with any draft counts laid over them -----
   let premadeRows: PremadeRow[] = [];
-  let scheduleTitle: string | null = null;
   const todayScheduleRows = (todaySchedules as Record<string, unknown>[] | null) ?? [];
   if (wants("premades") && todayScheduleRows.length > 0) {
-    scheduleTitle =
-      todayScheduleRows
-        .map((t) => t.title as string | null)
-        .filter((t): t is string => !!t)
-        .join(" · ") || null;
     const [{ data: lines }, { data: drafts }] = await Promise.all([
       supabase
         .from("v_production_schedule_lines")
-        .select("id, item_name, item_type, subtype, par, note, sort")
+        .select("id, schedule_id, item_name, item_type, subtype, par, note, sort")
         .in(
           "schedule_id",
           todayScheduleRows.map((t) => t.id as string)
@@ -448,6 +443,7 @@ export default async function RunShiftReportPage({
       const d = draftById.get(l.id as string);
       return {
         scheduleItemId: l.id as string,
+        scheduleId: l.schedule_id as string,
         itemType: (l.item_type as string | null) ?? null,
         size: (l.size as string | null) ?? null,
         subtype: (l.subtype as string | null) ?? null,
@@ -715,19 +711,62 @@ export default async function RunShiftReportPage({
     );
   }
 
+  /**
+   * ONE PAGE PER SCHEDULE (Mark, 2026-09-19), the day's plan schedules first
+   * and its special orders after, each in the order it was generated. A day
+   * with NO plan schedule still leads with an empty Premades page, because that
+   * page's empty state is where "Generate today's schedule" lives — and a
+   * special order on the day must not hide the fact that nobody generated the
+   * premades. A special-order schedule with no lines has nothing to count and
+   * gets no page.
+   */
+  const premadePages: { title: string; body: React.ReactNode }[] = [];
   if (wants("premades")) {
-    bodies.premades = (
-      <PremadesPage
-        key="premades"
-        reportId={id}
-        orgId={report.org_id as string}
-        locationId={report.location_id as string}
-        reportDate={reportDate}
-        scheduleTitle={scheduleTitle}
-        rows={premadeRows}
-        editable={editable}
-      />
+    const special = (t: Record<string, unknown>) => t.source === "special_order";
+    const planSchedules = todayScheduleRows.filter((t) => !special(t));
+    const orderSchedules = todayScheduleRows.filter(
+      (t) => special(t) && premadeRows.some((r) => r.scheduleId === t.id)
     );
+    const pageFor = (title: string, key: string, scheduleTitle: string | null, rows: PremadeRow[]) =>
+      premadePages.push({
+        title,
+        body: (
+          <PremadesPage
+            key={key}
+            reportId={id}
+            orgId={report.org_id as string}
+            locationId={report.location_id as string}
+            reportDate={reportDate}
+            scheduleTitle={scheduleTitle}
+            rows={rows}
+            editable={editable}
+          />
+        ),
+      });
+    if (planSchedules.length === 0) pageFor("Premades", "premades", null, []);
+    for (const t of planSchedules) {
+      const title = (t.title as string | null) ?? null;
+      // Two plan schedules on one day are two KITCHENS feeding this shop, so
+      // an untitled one is told apart by where it is made.
+      const kitchenCode =
+        session.locations.find((l) => l.id === t.kitchen_location_id)?.code ?? null;
+      const label = title ?? (planSchedules.length > 1 && kitchenCode ? `made at ${kitchenCode}` : null);
+      pageFor(
+        label ? `Premades — ${label}` : "Premades",
+        `premades-${t.id as string}`,
+        title,
+        premadeRows.filter((r) => r.scheduleId === t.id)
+      );
+    }
+    for (const t of orderSchedules) {
+      const title = (t.title as string | null) ?? "Special order";
+      pageFor(
+        `Special order — ${title}`,
+        `premades-${t.id as string}`,
+        title,
+        premadeRows.filter((r) => r.scheduleId === t.id)
+      );
+    }
   }
 
   if (wants("elements")) {
@@ -861,6 +900,7 @@ export default async function RunShiftReportPage({
       canDiscard={canDiscard}
       emailReport={emailReport}
       pages={bodies}
+      premadePages={premadePages}
       openAtPage={Number.isFinite(openAt) ? openAt : null}
       blockers={blockers}
       // Sending FINISHES the checklist (Mark, 2026-09-01), so the runner needs

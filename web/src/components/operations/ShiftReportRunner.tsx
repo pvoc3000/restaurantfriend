@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore, useTransition } from "react";
+import { Fragment, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/lib/confirm";
@@ -69,6 +69,7 @@ export function ShiftReportRunner({
   canDiscard,
   emailReport,
   pages,
+  premadePages,
   openAtPage,
   blockers,
   checklistRun,
@@ -89,6 +90,12 @@ export function ShiftReportRunner({
   emailReport: EmailReport;
   /** One rendered body per page, built by the server component. */
   pages: Partial<Record<ShiftReportPage, React.ReactNode>>;
+  /**
+   * ONE PREMADES PAGE PER SCHEDULE (Mark, 2026-09-19: each schedule "should"
+   * be its own page), special orders included. When given, these stand in
+   * the premades slot in order and each is numbered as a page of its own.
+   */
+  premadePages?: { title: string; body: React.ReactNode }[];
   /**
    * Where to open, 1-based, or null for the first page.
    *
@@ -119,7 +126,14 @@ export function ShiftReportRunner({
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const order = pagesForShift(shift);
+  // The walk, with the premades slot expanded to one step per schedule. Each
+  // step carries its own key, so moving between two premades pages REMOUNTS
+  // the page rather than carrying one schedule's half-typed state to the next.
+  const order = pagesForShift(shift).flatMap((p) =>
+    p === "premades" && premadePages && premadePages.length > 0
+      ? premadePages.map((s, i) => ({ key: `premades-${i}`, title: s.title, body: s.body }))
+      : [{ key: p as string, title: pageTitle(p), body: pages[p] }]
+  );
   const [index, setIndex] = useState(() =>
     openAtPage === null ? 0 : Math.min(Math.max(openAtPage - 1, 0), order.length - 1)
   );
@@ -407,7 +421,7 @@ export function ShiftReportRunner({
             <BarLabel icon={ICON_PAUSE} word="Pause & close" />
           </button>
           <h1 className="min-w-0 flex-1 px-3 py-2 text-center text-[16px] font-bold uppercase tracking-[0.08em]">
-            Page {index + 1} of {order.length} — {pageTitle(page)}
+            Page {index + 1} of {order.length} — {page.title}
           </h1>
           {/* Back is disabled on page 1 rather than absent, so nothing shifts
               under a thumb. */}
@@ -480,7 +494,9 @@ export function ShiftReportRunner({
             <span className="text-muted">— it is a document now, and read-only.</span>
           </p>
         ) : null}
-        {pages[page] ?? <p className="text-sm text-muted">Nothing to do on this page.</p>}
+        <Fragment key={page.key}>
+          {page.body ?? <p className="text-sm text-muted">Nothing to do on this page.</p>}
+        </Fragment>
       </main>
 
     </div>

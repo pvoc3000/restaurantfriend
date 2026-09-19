@@ -586,3 +586,20 @@
    another act reads.** `canDiscard = canSend && …` looked like a tidy
    statement that the two had one owner; it was a promise nobody re-checked
    when one of them changed.
+
+   **ONE PAGE PER SCHEDULE, SPECIAL ORDERS INCLUDED** (Mark, 2026-09-19:
+   supervisors "should fill out any schedules generated, including special
+   orders", and each schedule "should" be its own page). The runner's premades
+   fetch lost its `.neq("source", "special_order")`, and the server now hands
+   `ShiftReportRunner` a `premadePages` list that stands in the premades slot:
+   the day's plan schedules first ("Premades", or "Premades — made at DF02"
+   when two kitchens feed the shop), then each special order ("Special order —
+   Cafe Knotted"), numbered as pages of their own. Each step is REMOUNTED by
+   key, so one schedule's half-typed count cannot carry to the next page. A day
+   with no plan schedule still leads with an empty Premades page, because the
+   Generate button lives in its empty state and a special order must not hide
+   that nobody generated the premades; a special order with no lines gets no
+   page. No schema change: counts were already keyed on `schedule_item_id`, and
+   Send's flush and 107's reopen never looked at a schedule's source. Uncounted
+   special-order lines now count towards the Send gate like any other line.
+   Not walked live — the pane was signed out.

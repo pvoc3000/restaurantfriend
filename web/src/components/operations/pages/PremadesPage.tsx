@@ -9,6 +9,8 @@ import { CountField, TextField } from "./fields";
 
 export type PremadeRow = {
   scheduleItemId: string;
+  /** Which of the day's schedules the line is on — one page each. */
+  scheduleId: string;
   itemType: string | null;
   size: string | null;
   subtype: string | null;

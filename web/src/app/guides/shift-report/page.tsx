@@ -199,7 +199,8 @@ export default function ShiftReportGuide() {
         </h2>
         <p className={s.lede}>
           The black bar at the top shows where you are, for example <em>page 3 of 8</em>. A
-          closing report has eight pages. Opening, mid and off-site reports have five.
+          closing report has eight pages, plus one more for each extra schedule the day has (see
+          Premades). Opening, mid and off-site reports have five.
         </p>
 
         <div className={s.pages}>
@@ -241,6 +242,10 @@ export default function ShiftReportGuide() {
               same order as the printed sheet.
             </p>
             <ul>
+              <li>
+                Every schedule for the day gets its own page, special orders included. A special
+                order’s page is titled with the order’s name.
+              </li>
               <li>
                 If you made exactly the par, tap the <strong>→</strong> arrow to copy it in.
               </li>
