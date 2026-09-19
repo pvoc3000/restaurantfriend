@@ -614,7 +614,7 @@ export function PlanMatrix({
   async function takeAllSuggested() {
     if (!differing.length) return;
     if (
-      !(await confirmDialog({ ...splitConfirmMessage(`Set ${differing.length} par${differing.length === 1 ? "" : "s"} to ${locationCode}'s defaults? The numbers currently on those slots are replaced.`), confirmLabel: "Use defaults" }))
+      !(await confirmDialog({ ...splitConfirmMessage(`Set ${differing.length} par${differing.length === 1 ? "" : "s"} to ${locationCode}'s defaults?\n\nThe numbers currently on those slots are replaced.`), confirmLabel: "Use defaults" }))
     ) {
       return;
     }
@@ -698,7 +698,7 @@ export function PlanMatrix({
     if (
       !(await confirmDialog({ ...splitConfirmMessage(`Set ${locationCode}'s DEFAULT pars from this plan — ${byItem.size} item${
           byItem.size === 1 ? "" : "s"
-        }? This changes the shop's catalog, not just this plan, and every future plan seeds from it.`), confirmLabel: "Update defaults" }))
+        }?\n\nThis changes the shop's catalog, not just this plan, and every future plan seeds from it.`), confirmLabel: "Update defaults" }))
     ) {
       return;
     }

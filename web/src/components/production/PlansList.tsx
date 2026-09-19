@@ -358,7 +358,7 @@ export function PlansList({
           row.slotCount ? ` carrying ${row.slotCount} item${row.slotCount === 1 ? "" : "s"}` : ""
         }`
       : "";
-    if (!(await confirmDialog({ ...splitConfirmMessage(`Delete "${row.title}"${held}? This cannot be undone.`), confirmLabel: "Delete plan", tone: "danger" }))) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(`Delete "${row.title}"${held}?\n\nThis cannot be undone.`), confirmLabel: "Delete plan", tone: "danger" }))) return;
     setFailed(null);
     start(async () => {
       const supabase = createClient();
