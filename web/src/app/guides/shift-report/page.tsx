@@ -388,8 +388,9 @@ export default function ShiftReportGuide() {
         </ol>
         <Note head="Made a mistake after sending?">
           A sent report can’t be edited, but you can reopen your own. On the Shift Reports list,
-          open the report and tap <Ui>Reopen</Ui>, then fix it and send it again. Sending again
-          emails the team again. A report somebody else sent needs a manager to reopen it.
+          open the report and tap <Ui>Reopen</Ui>. The report opens at its first page. Fix it and
+          send it again. The new email is marked <strong>Corrected</strong>. A report somebody
+          else sent needs a manager to reopen it.
         </Note>
       </section>
 

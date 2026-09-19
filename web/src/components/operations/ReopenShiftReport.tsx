@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { confirmDialog } from "@/lib/confirm";
+import { alertDialog, confirmDialog } from "@/lib/confirm";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 
 /**
@@ -35,10 +34,8 @@ export function ReopenShiftReport({
   countCount: number;
   emailed: boolean;
 }) {
-  const router = useRouter();
   const supabase = createClient();
   const [failed, setFailed] = useState<string | null>(null);
-  const [kept, setKept] = useState<string[] | null>(null);
   const [, startTransition] = useTransition();
 
   async function reopen() {
@@ -101,8 +98,20 @@ export function ReopenShiftReport({
       const notes = (receipt?.kept ?? []).map(
         (k) => `${k.item ?? k.employee ?? "One row"}: ${k.reason ?? "left alone"}`
       );
-      setKept(notes.length > 0 ? notes : null);
-      router.refresh();
+      // SAID BEFORE LEAVING, in a notice that waits to be read — the page is
+      // about to go, so anything shown on it would never be seen.
+      if (notes.length > 0) {
+        await alertDialog({
+          title: "Some of it was left in place",
+          body: notes.join("\n\n"),
+        });
+      }
+      // STRAIGHT INTO THE REPORT, at page 1 (Mark, 2026-09-18: the extra
+      // "Resume the report" step "seems unnecessary"). Reopening is only ever
+      // done in order to walk it again. A HARD navigation, not `router.push`:
+      // this crosses from (app) into (fullscreen), and on 2026-09-18 a push
+      // across that boundary left the screen where it was.
+      window.location.assign(`/shift-reports/${reportId}/run`);
     });
   }
 
@@ -112,15 +121,6 @@ export function ReopenShiftReport({
         Reopen
       </button>
       {failed ? <p className="text-sm text-accent">{failed}</p> : null}
-      {kept ? (
-        <ul className="space-y-1 text-sm">
-          {kept.map((k) => (
-            <li key={k}>
-              <span className="bg-mark-fill px-1">{k}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </div>
   );
 }
