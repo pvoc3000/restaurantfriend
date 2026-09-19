@@ -10,7 +10,7 @@ import {
   type InvoiceExtraction,
 } from "./invoiceExtraction";
 import type { LineMatch } from "./invoiceMatch";
-import { effectiveCatalogPrice, type PoLine } from "./purchaseOrders";
+import { effectiveCatalogPrice, isFreeLine, type PoLine } from "./purchaseOrders";
 
 /**
  * Should `target` become `next`?
@@ -91,8 +91,15 @@ export function priceAction(
     };
   }
 
+  // STAGE 2 DOES NOT FIRE ON FREE GOODS (2026-09-19). Since the add panel can
+  // put the same item on an order twice at two prices, a line at $0 — the bag
+  // BakeMark threw in with thirteen — is a normal thing to find here, and its
+  // disagreement with the $50 catalog is not news: taking the button would
+  // write 0 over a live price and break every order guide suggestion that
+  // reads it. Stage 1 is untouched, because an INVOICE reading $0 against a
+  // line that says $50 is exactly the correction this screen is for.
   const { price: catalog, hasOverride } = effectiveCatalogPrice(line, locationId);
-  if (needsUpdate(catalog, linePrice)) {
+  if (!isFreeLine(line) && needsUpdate(catalog, linePrice)) {
     return {
       stage: "vendor",
       price: linePrice!,

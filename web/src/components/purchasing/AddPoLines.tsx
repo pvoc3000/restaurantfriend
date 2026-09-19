@@ -6,8 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 import {
   addableQty,
   isPendingAdd,
-  money,
+  mergeTargetLine,
   PO_STATUS_LABEL,
+  samePrice,
   unaddedWarning,
   type PendingAdd,
   type PoLine,
@@ -44,6 +45,15 @@ import { useCalcField } from "@/components/ui/CalcPad";
  * one: two lines of the same SKU is a mistake the vendor pays for, and "add 3
  * to the purchase order" reads the same either way. The row shows what's
  * already on order so the arithmetic is never a surprise.
+ *
+ * **AT THE SAME PRICE, AND ONLY THEN** (Mark, 2026-09-19: "we ordered 13 bags
+ * of that mix, they gave us a free bag. I'd like to have the master mix appear
+ * twice, once at $50 ea. and once at 0 ea."). So the row carries a PRICE box
+ * beside its quantity, filled with what the catalog resolves to and yours to
+ * overwrite; an add at a price no line on the order has starts a new line, and
+ * an add at a price one already has joins it. `mergeTargetLine` is the whole
+ * rule and it is tested, because "which line does this land on" is the kind of
+ * question that is obvious until the day it silently averages two prices.
  *
  * ONE-OFF LINES ARE THE PANEL'S SECOND MODE (Mark, 2026-08-24: "add an item to a
  * purchase order that isn't linked to a vendor item… one-off items we need to
@@ -125,6 +135,17 @@ const BLANK_ONE_OFF = {
   notes: "",
 };
 
+/**
+ * The price box's resting content — plain digits, not `money`'s "$1,234.00".
+ * You do arithmetic in this field (lib/calc), and a comma is a thousands
+ * separator to a reader and noise to a parser. An empty box is not a zero: it
+ * is "no price known", which is what a catalog row with no price writes today
+ * and what the line stores as null.
+ */
+function priceText(price: number | null): string {
+  return price === null ? "" : price.toFixed(2);
+}
+
 function effectivePrice(vi: PickerRow, locationId: string): number | null {
   const override = vi.vendor_item_location_prices.find(
     (p) => p.location_id === locationId
@@ -162,6 +183,10 @@ export function AddPoLines({
   const [rows, setRows] = useState<PickerRow[]>([]);
   const [search, setSearch] = useState("");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  /** Per-row price overrides. A row with no key here is at its catalog price —
+   *  seeded lazily rather than filled on load, so "untouched" stays legible
+   *  and a catalog price that changes under an open panel is still followed. */
+  const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [addingId, setAddingId] = useState<string | null>(null);
   const [added, setAdded] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
@@ -170,16 +195,16 @@ export function AddPoLines({
   const [addingOneOff, setAddingOneOff] = useState(false);
   const [oneOffAdded, setOneOffAdded] = useState<string[]>([]);
 
-  // What's on the order right now, by vendor item. Recomputed from props, so
-  // it follows the router.refresh() after every add.
+  // What's on the order right now, by vendor item — EVERY line, because since
+  // prices are per line the same item can hold several. Recomputed from props,
+  // so it follows the router.refresh() after every add.
   const onOrder = useMemo(() => {
-    const map = new Map<string, { lineId: string; qty: number }>();
+    const map = new Map<string, PoLine[]>();
     for (const l of lines) {
       if (!l.vendor_item_id) continue;
-      map.set(l.vendor_item_id, {
-        lineId: l.id,
-        qty: Number(l.qty_ordered ?? 0),
-      });
+      const at = map.get(l.vendor_item_id);
+      if (at) at.push(l);
+      else map.set(l.vendor_item_id, [l]);
     }
     return map;
   }, [lines]);
@@ -193,6 +218,15 @@ export function AddPoLines({
    */
   const pending = useMemo<PendingAdd[]>(() => {
     const out: PendingAdd[] = [];
+    // THE AMOUNT IS WHAT MAKES A ROW PENDING, AND THE PRICE DELIBERATELY IS
+    // NOT (2026-09-19, the first thing the price box got wrong). A price alone
+    // cannot be added — `add` refuses without an amount — so it is not work
+    // waiting to be done; and `add` leaves the price box AS TYPED after a
+    // successful add, on purpose, so that adding thirteen at $50 and then one
+    // at $0 is two amounts rather than two amounts and two prices. Counting it
+    // meant the confirm fired on the way out of every add that had touched a
+    // price, naming a row that was already on the order — a warning about
+    // nothing, which is how people learn to dismiss warnings unread.
     for (const [id, qty] of Object.entries(drafts)) {
       if (qty.trim() === "") continue;
       const vi = rows.find((r) => r.id === id);
@@ -266,6 +300,7 @@ export function AddPoLines({
     setError(null);
     setAdded({});
     setDrafts({});
+    setPriceDrafts({});
     setOneOff(BLANK_ONE_OFF);
     setOneOffAdded([]);
     setTab("catalog");
@@ -325,6 +360,30 @@ export function AddPoLines({
     );
   }, [rows, search]);
 
+  /**
+   * What a row's price box comes to: the typed override where there is one,
+   * the catalog price where there isn't.
+   *
+   * Three outcomes and they are genuinely three. A number is a price. An EMPTY
+   * box is "no price known" and writes null — the state a catalog row with no
+   * price already produces, so the box has to be able to say it. Anything else
+   * is a typo, and quietly treating a typo as null would file a line at no
+   * price because somebody typed "5o".
+   */
+  function draftedPrice(
+    vi: PickerRow
+  ): { ok: true; price: number | null } | { ok: false } {
+    const draft = priceDrafts[vi.id];
+    if (draft === undefined) {
+      return { ok: true, price: effectivePrice(vi, order.location_id) };
+    }
+    const raw = draft.trim();
+    if (raw === "") return { ok: true, price: null };
+    const n = evaluateNumeric(raw);
+    if (n === null || !Number.isFinite(n)) return { ok: false };
+    return { ok: true, price: n };
+  }
+
   async function add(vi: PickerRow) {
     // Arithmetic allowed, same as every other numeric field (lib/calc.ts) —
     // and the same call that decides whether this button wears the fill.
@@ -334,17 +393,31 @@ export function AddPoLines({
       return;
     }
 
+    const resolved = draftedPrice(vi);
+    if (!resolved.ok) {
+      setError("That unit price is not a number.");
+      return;
+    }
+    const price = resolved.price;
+    if (price !== null && price < 0) {
+      setError("A unit price cannot be negative.");
+      return;
+    }
+
     setAddingId(vi.id);
     setError(null);
 
-    const existing = onOrder.get(vi.id);
+    // The line this lands on — the one already at THIS price, if there is one.
+    // A different price is a different line (`mergeTargetLine`), which is what
+    // puts a free bag beside the thirteen it came with.
+    const existing = mergeTargetLine(onOrder.get(vi.id) ?? [], vi.id, price);
     const { error } = existing
-      ? // Same SKU already on the order: raise its quantity. The line keeps its
-        // own price snapshot — that's what was agreed when it was ordered.
+      ? // Same SKU at the same price: raise its quantity, and leave its own
+        // price snapshot alone — it already says what this add says.
         await supabase
           .from("purchase_order_items")
-          .update({ qty_ordered: existing.qty + n })
-          .eq("id", existing.lineId)
+          .update({ qty_ordered: Number(existing.qty_ordered ?? 0) + n })
+          .eq("id", existing.id)
       : await supabase.from("purchase_order_items").insert({
           org_id: orgId,
           po_id: order.id,
@@ -355,7 +428,7 @@ export function AddPoLines({
           package_desc: snapshotPack(vi),
           notes: vi.notes,
           qty_ordered: n,
-          unit_price: effectivePrice(vi, order.location_id),
+          unit_price: price,
         });
 
     setAddingId(null);
@@ -365,6 +438,9 @@ export function AddPoLines({
     }
 
     setDrafts((prev) => ({ ...prev, [vi.id]: "" }));
+    // The PRICE is deliberately left as typed. Adding four bags at a negotiated
+    // rate is one gesture repeated, and re-typing the rate each time is the
+    // thing the panel staying open exists to avoid; `openPanel` clears it.
     setAdded((prev) => ({ ...prev, [vi.id]: (prev[vi.id] ?? 0) + n }));
     // The table behind the panel is server-rendered, so this is what makes the
     // new line appear there — and what keeps `onOrder` above honest.
@@ -561,8 +637,20 @@ export function AddPoLines({
               ) : (
                 <ul className="divide-y divide-hairline border border-ink">
                   {filtered.map((vi) => {
-                    const existing = onOrder.get(vi.id);
-                    const price = effectivePrice(vi, order.location_id);
+                    const existingLines = onOrder.get(vi.id) ?? [];
+                    const onOrderQty = existingLines.reduce(
+                      (t, l) => t + Number(l.qty_ordered ?? 0),
+                      0
+                    );
+                    const catalogPrice = effectivePrice(vi, order.location_id);
+                    const resolved = draftedPrice(vi);
+                    // Which line this add would land on, live — so the button
+                    // can say whether it is joining a line or starting one
+                    // BEFORE it is pressed, rather than leaving the person to
+                    // discover it in the table afterwards.
+                    const joins = resolved.ok
+                      ? mergeTargetLine(existingLines, vi.id, resolved.price)
+                      : null;
                     const pack = snapshotPack(vi);
                     const orderedAs = [vi.brand, vi.description]
                       .filter(Boolean)
@@ -586,16 +674,53 @@ export function AddPoLines({
                           </span>
                         </span>
 
-                        <span className="w-24 shrink-0 text-right tabular-nums text-body">
-                          {money(price)}
+                        {/* THE PRICE IS A FIELD, NOT A READOUT (Mark,
+                            2026-09-19). It rests at what the catalog resolves
+                            to — the location override, else the base price
+                            (design rule 6) — and typing over it is how the
+                            same item goes onto the order twice at two rates.
+                            No `$`: the box takes arithmetic like every other
+                            numeric field, and a currency sign inside one is
+                            something to delete before you can type. */}
+                        <span className="w-24 shrink-0">
+                          <input
+                            {...calcField}
+                            value={priceDrafts[vi.id] ?? priceText(catalogPrice)}
+                            onChange={(e) =>
+                              setPriceDrafts((prev) => ({
+                                ...prev,
+                                [vi.id]: e.target.value,
+                              }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void add(vi);
+                              }
+                            }}
+                            aria-label={`Unit price for ${
+                              vi.inventory_items?.name ?? orderedAs
+                            }`}
+                            placeholder="price"
+                            className={`h-9 w-full border px-1 text-right tabular-nums ${
+                              // The only cue the panel gives that this row is
+                              // not at the catalog price — colour means record
+                              // STATE, and "priced by hand" is one.
+                              resolved.ok && !samePrice(resolved.price, catalogPrice)
+                                ? "border-2 border-ink font-semibold"
+                                : "border-ink"
+                            }`}
+                          />
                         </span>
 
                         {/* What's already on the order, and what this panel has
                             put there this session. */}
                         <span className="w-32 shrink-0 text-right text-xs">
-                          {existing ? (
+                          {existingLines.length > 0 ? (
                             <span className="text-muted tabular-nums">
-                              {existing.qty} on order
+                              {onOrderQty} on order
+                              {existingLines.length > 1 &&
+                                ` · ${existingLines.length} lines`}
                             </span>
                           ) : (
                             <span className="text-faint">not on order</span>
@@ -635,7 +760,13 @@ export function AddPoLines({
                               : PRIMARY_BUTTON_CLASS
                           } shrink-0`}
                         >
-                          {addingId === vi.id ? "Adding…" : "Add to PO"}
+                          {addingId === vi.id
+                            ? "Adding…"
+                            : joins
+                              ? "Add to line"
+                              : existingLines.length > 0
+                                ? "New line"
+                                : "Add to PO"}
                         </button>
                       </li>
                     );

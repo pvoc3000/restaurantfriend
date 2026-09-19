@@ -188,6 +188,70 @@ export function effectiveCatalogPrice(
 }
 
 /**
+ * ARE THESE THE SAME LINE PRICE? At the precision the column actually stores.
+ *
+ * `unit_price` is `numeric(10,2)`, so a price only ever comes back as whole
+ * cents and two prices are the same one iff they round to the same cent. That
+ * is stricter than receiving's epsilon on purpose: this question is "is this
+ * the line I already have", and 50.00 against 49.996 is a typo worth keeping
+ * apart, where receiving's is "did the vendor change the price", and there the
+ * same gap is float noise.
+ *
+ * NULL IS A VALUE HERE, not a wildcard. A line ordered with no price known is
+ * a real, distinct state — it is what an add with an empty price box writes —
+ * so two priceless lines join and a priceless one never joins a priced one.
+ */
+export function samePrice(a: number | null, b: number | null): boolean {
+  if (a === null || b === null) return a === null && b === null;
+  return Math.round(a * 100) === Math.round(b * 100);
+}
+
+/**
+ * THE LINE AN ADD SHOULD JOIN, or null when it needs one of its own.
+ *
+ * The panel merges an add into a line it already has rather than writing a
+ * second one — two lines of the same SKU at the same price is a mistake the
+ * vendor pays for. **But only AT THE SAME PRICE** (Mark, 2026-09-19): "we
+ * ordered 13 bags of that mix, they gave us a free bag. I'd like to have the
+ * master mix appear twice, once at $50 ea. and once at 0 ea."
+ *
+ * Which is the general case, not a special one for free goods — a price break
+ * partway through a quantity, a corrected price on a split delivery, anything
+ * where the same item was billed at two rates. The quantity is the only thing
+ * a merge can carry; the price is per LINE, so two prices cannot be one line
+ * however much the description matches, and combining them would report an
+ * average nobody was charged.
+ *
+ * A ONE-OFF LINE (`vendor_item_id` null) IS NEVER A TARGET, and `addOneOff`
+ * never asks: there is no SKU to say two of them are the same thing.
+ */
+export function mergeTargetLine<
+  T extends { vendor_item_id: string | null; unit_price: number | null }
+>(lines: T[], vendorItemId: string, price: number | null): T | null {
+  return (
+    lines.find(
+      (l) =>
+        l.vendor_item_id === vendorItemId &&
+        samePrice(l.unit_price === null ? null : Number(l.unit_price), price)
+    ) ?? null
+  );
+}
+
+/**
+ * FREE GOODS — a line deliberately priced at nothing, which is a different
+ * fact from a line whose price nobody has filled in (null).
+ *
+ * It exists because `samePrice` above lets one onto an order, and a $0 line is
+ * a trap for the two places that compare a line's price with the catalog's:
+ * receiving would offer "Update vendor to $0.00" for ever, and the Finalize
+ * confirm would name a line whose only route to agreement is writing 0 over a
+ * real catalog price. A free bag says nothing about what the item costs.
+ */
+export function isFreeLine(line: { unit_price: number | null }): boolean {
+  return line.unit_price !== null && Number(line.unit_price) === 0;
+}
+
+/**
  * Lines whose invoice price differs from the catalog price — the `≠` marker on
  * PO detail's Unit price column.
  */
@@ -267,6 +331,14 @@ export function closeReadiness(
   // base catalog price — design rule 6). Getting only the first was the bug.
   const differing = lines.filter((l) => {
     if (l.unit_price === null || l.vendor_items === null) return false;
+    // FREE GOODS ARE NOT A DISAGREEMENT (2026-09-19, with the same-item-two-
+    // prices add). A bag thrown in with an order of thirteen is priced at 0
+    // against a catalog that says $50, and the only way to make those agree is
+    // to write 0 over the catalog — so naming it here would be a caveat whose
+    // only remedy is damage. `priceAction` declines to offer it for the same
+    // reason, and these two must ask the same question or the confirm names a
+    // line the screen has no button for.
+    if (isFreeLine(l)) return false;
     return numericPriceDiffers(
       effectiveCatalogPrice(l, locationId).price,
       l.unit_price

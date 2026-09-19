@@ -31,6 +31,7 @@ import "./homebaseImport.fixtures";
 import "./invoiceDate.fixtures";
 import "./invoiceMatch.fixtures";
 import "./lastPurchase.fixtures";
+import "./linePrices.fixtures";
 import "./invoices.fixtures";
 import "./invoiceFilters.fixtures";
 import "./itemFilters.fixtures";
