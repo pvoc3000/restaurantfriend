@@ -234,7 +234,7 @@ export default async function ShiftReportPage({
                     {(r.note as string) ?? ""}
                     {r.got_break === false ? (
                       <span className="ml-2 bg-mark-fill px-1 text-xs">
-                        missed break
+                        no break
                         {r.break_reason ? `: ${r.break_reason as string}` : ""}
                       </span>
                     ) : null}

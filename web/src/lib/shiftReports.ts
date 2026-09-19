@@ -773,9 +773,12 @@ export function supervisorBody(report: EmailReport): string {
 export function ratingsSection(report: EmailReport): string {
   if (report.ratings.length === 0) return "";
   const rows = report.ratings.map((r) => {
+    // "NO BREAK", not "missed break" (Mark, 2026-09-18: "it probably wasn't
+    // missed"). The box records that no break was taken; the reason beside it
+    // says why, and most reasons are a short shift rather than a failure.
     const brk =
       r.gotBreak === false
-        ? ` <span style="${S.mark}">missed break${r.breakReason ? `: ${esc(r.breakReason)}` : ""}</span>`
+        ? ` <span style="${S.mark}">no break${r.breakReason ? `: ${esc(r.breakReason)}` : ""}</span>`
         : "";
     return (
       `<tr><td style="${S.td}">${esc(r.employeeName)}</td>` +

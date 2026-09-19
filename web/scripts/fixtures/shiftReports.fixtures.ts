@@ -497,6 +497,9 @@ test("the management email DOES carry the names, or it is the wrong email", () =
   ok(body.includes("4.00"), "the score");
   ok(body.includes("Steady all night"), "the note");
   ok(body.includes("Too busy at close"), "the missed break");
+  // Worded as a fact, not a failure (Mark, 2026-09-18).
+  ok(body.includes("no break: Too busy at close"), "labelled \"no break\"");
+  no(body.includes("missed break"), "the old wording");
 });
 
 test("both emails carry the shift facts a supervisor needs", () => {
