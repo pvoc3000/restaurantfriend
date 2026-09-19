@@ -86,7 +86,9 @@ export function ReopenShiftReport({
         setFailed(
           /reopen_shift_report/.test(error.message)
             ? "reopen_shift_report does not exist — migration 072 has not been applied yet."
-            : error.message
+            : /only a manager or the owner/.test(error.message)
+              ? "Only a manager can reopen this until migration 106 is applied."
+              : error.message
         );
         return;
       }

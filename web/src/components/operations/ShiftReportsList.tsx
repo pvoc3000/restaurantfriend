@@ -297,6 +297,7 @@ export function ShiftReportsList({
             myEmployeeId={myEmployeeId}
             existing={rows.map((r) => ({
               id: r.id,
+              mine: r.mine,
               date: r.reportDate,
               shift: r.shift,
               status: r.status,

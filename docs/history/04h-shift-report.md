@@ -516,3 +516,17 @@
    beside it for the handover case — still no constraint, for 070's reason. A
    SENT match says to ask a manager to reopen it and links to it, since a second
    report is the wrong fix for a missing count.
+
+   **A SUPERVISOR REOPENS THEIR OWN SENT REPORT — migration 106, NOT YET
+   APPLIED as of 2026-09-18** (Mark: "my supervisor is unable to 'reopen' a
+   report they sent"). 072 kept reopening owner/admin because it un-writes rows
+   on other people's HR records — true of somebody else's report, not of your
+   own, where every row it takes back is one you wrote by pressing Send. The
+   scope is the AUTHOR (`created_by = auth.uid()`), the rule 070's update/delete
+   policies and `submit_shift_report` already use, and the only one that works:
+   a reopened report is a draft, and a supervisor may only edit a draft they
+   created. Tested on the Docker harness over all 106 migrations: author
+   reopens and can then edit; a colleague's report, and staff even on their own,
+   are refused; owner reopens anyone's; anon has no execute. The record screen
+   shows Reopen to the author; New shift report's sent-duplicate line says "open
+   it and tap Reopen" for your own and "ask a manager" otherwise.

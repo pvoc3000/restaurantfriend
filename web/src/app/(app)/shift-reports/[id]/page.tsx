@@ -139,10 +139,13 @@ export default async function ShiftReportPage({
             <Link href={`/shift-reports/${id}/run`} className="text-sm underline">
               Resume this report
             </Link>
-          ) : canReadHr(role) ? (
-            // Owner/admin only, which is 072's own rule and 070's for touching a
-            // sent report at all: a supervisor writes and sends their own, but
-            // taking one back un-writes rows on other people's HR records.
+          ) : canReadHr(role) || report.created_by === session.userId ? (
+            // A manager reopens any report; the supervisor who WROTE it
+            // reopens their own (migration 106, Mark 2026-09-18). 072 had this
+            // owner/admin only, but every row a reopen takes back is one the
+            // author wrote by pressing Send, so undoing it is theirs to do.
+            // The page is already gated to supervisor+ above, and 106 re-checks
+            // both halves in the function.
             <ReopenShiftReport
               reportId={id}
               ratingCount={ratingRows.length}

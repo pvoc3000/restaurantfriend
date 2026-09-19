@@ -61,7 +61,14 @@ export function NewShiftReport({
    * `my_employee_id`, or null when their login has no HR record.
    */
   myEmployeeId: string | null;
-  existing: { id: string; date: string; shift: ShiftSlot; status: "draft" | "sent" }[];
+  existing: {
+    id: string;
+    /** Started by the signed-in member — the one who may reopen it once sent (106). */
+    mine: boolean;
+    date: string;
+    shift: ShiftSlot;
+    status: "draft" | "sent";
+  }[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -252,12 +259,14 @@ export function NewShiftReport({
                     {SHIFT_SLOT_LABEL[shift].toLowerCase()} shift report on {date}.
                   </span>{" "}
                   {duplicate.status === "sent" ? (
-                    // A SENT report cannot be resumed; a manager reopens it
-                    // (072 — un-sending takes rows back off HR records). Say so,
-                    // because a second report is the wrong fix for a missing
-                    // count and is what happened on 2026-09-18.
+                    // A SENT report cannot be resumed; it is REOPENED — by its
+                    // author since 106, otherwise by a manager. Say so, because a
+                    // second report is the wrong fix for a missing count and is
+                    // what happened on 2026-09-18.
                     <span className="text-muted">
-                      To add to it, ask a manager to reopen it.{" "}
+                      {duplicate.mine
+                        ? "To add to it, open it and tap Reopen."
+                        : "To add to it, ask a manager to reopen it."}{" "}
                       <Link href={`/shift-reports/${duplicate.id}`} className="underline">
                         Open it
                       </Link>
