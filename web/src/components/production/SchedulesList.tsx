@@ -14,6 +14,7 @@ import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { PickSet, type PickSetOption } from "@/components/ui/PickSet";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import {
   packetDate,
@@ -104,7 +105,8 @@ export function SchedulesList({
   stampable,
   editable,
   today,
-  locationCode,
+  locations,
+  kitchenId,
   action,
 }: {
   rows: ScheduleRow[];
@@ -119,8 +121,10 @@ export function SchedulesList({
    */
   editable: boolean;
   today: string;
-  /** The working shop, for the heading's count line. */
-  locationCode?: string | null;
+  /** The active shops, in order — the Show filter's Location and Kitchen lists. */
+  locations: { id: string; code: string }[];
+  /** The working location, which the Show filter starts ticked on as KITCHEN. */
+  kitchenId: string | null;
   /** The screen's create command, beside the title. */
   action?: ReactNode;
 }) {
@@ -129,7 +133,14 @@ export function SchedulesList({
     from: today,
     to: daysAfter(today, SCHEDULE_WINDOW_DAYS),
   }));
-  const [unprintedOnly, setUnprintedOnly] = useState(false);
+  /**
+   * THE SHOW FILTER (Mark, 2026-09-19): one set holding three questions —
+   * `unprinted`, `loc:<id>` and `kitchen:<id>`. OR within a group, AND across
+   * them, and a group with nothing ticked asks nothing, so an empty set is
+   * every night loaded. It starts on the working kitchen, which is what this
+   * screen showed when that was a scope on the query.
+   */
+  const [show, setShow] = useState<string[]>(() => (kitchenId ? [`kitchen:${kitchenId}`] : []));
   const [grouping, setGrouping] = useState<Grouping>("date");
   const [term, setTerm] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -137,13 +148,46 @@ export function SchedulesList({
   const [failed, setFailed] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "date", dir: "desc" });
 
-  const unprintedCount = useMemo(() => rows.filter((r) => r.printedAt === null).length, [rows]);
+  const showOptions = useMemo((): PickSetOption[] => {
+    const count = (pred: (r: ScheduleRow) => boolean) => String(rows.filter(pred).length);
+    return [
+      { value: "unprinted", label: "Unprinted Only", hint: count((r) => r.printedAt === null) },
+      ...locations.map((l) => ({
+        value: `loc:${l.id}`,
+        label: l.code,
+        group: "Location",
+        summary: `Sold at ${l.code}`,
+        hint: count((r) => r.location_id === l.id),
+      })),
+      ...locations.map((l) => ({
+        value: `kitchen:${l.id}`,
+        label: l.code,
+        group: "Kitchen",
+        summary: `Made at ${l.code}`,
+        hint: count((r) => r.kitchen_location_id === l.id),
+      })),
+    ];
+  }, [rows, locations]);
+
+  const filter = useMemo(() => {
+    const ids = (prefix: string) =>
+      new Set(show.filter((v) => v.startsWith(prefix)).map((v) => v.slice(prefix.length)));
+    return { unprinted: show.includes("unprinted"), shops: ids("loc:"), kitchens: ids("kitchen:") };
+  }, [show]);
+
+  // The heading names a kitchen only when the list is exactly one kitchen's.
+  const headingCode =
+    filter.kitchens.size === 1
+      ? locations.find((l) => filter.kitchens.has(l.id))?.code ?? null
+      : null;
 
   const shown = useMemo(() => {
     const q = term.trim().toLowerCase();
     return rows.filter((r) => {
       if (range && !inRange(r.schedule_date, range)) return false;
-      if (unprintedOnly && r.printedAt !== null) return false;
+      if (filter.unprinted && r.printedAt !== null) return false;
+      if (filter.shops.size > 0 && !filter.shops.has(r.location_id)) return false;
+      if (filter.kitchens.size > 0 && !filter.kitchens.has(r.kitchen_location_id)) return false;
       if (!q) return true;
       // Both spellings of the date, because the column shows one and the row
       // stores the other: `packetDate` prints "Thu 8/7/2026" where the column
@@ -166,7 +210,7 @@ export function SchedulesList({
         .toLowerCase()
         .includes(q);
     });
-  }, [rows, plans, range, unprintedOnly, term]);
+  }, [rows, plans, range, filter, term]);
 
   // The order lives in `lib/productionSchedule` so it can be fixture-tested —
   // a comparator inside a `useMemo` is exactly where the group-leads bug hid.
@@ -396,7 +440,7 @@ export function SchedulesList({
     <div className="space-y-4">
       <PageHeading
         title="Schedules"
-        code={locationCode}
+        code={headingCode}
         visible={visible.length}
         total={rows.length}
         noun="schedules"
@@ -416,8 +460,8 @@ export function SchedulesList({
         />
         {/* A RANGE rather than a tier list (Mark, 2026-09-19), at the
             purchasing lists' measured `w-52`. Unprinted is not a date, so it
-            left the list and became its own box beside it — and now combines
-            with any window, where the tier could only mean "unprinted, ever". */}
+            left the range for the Show set beside it — and now combines with
+            any window, where the tier could only mean "unprinted, ever". */}
         <ControlField label="Window">
           <div className="w-52">
             <RangePicker
@@ -430,9 +474,16 @@ export function SchedulesList({
             />
           </div>
         </ControlField>
-        <Checkbox checked={unprintedOnly} onChange={setUnprintedOnly} className="pb-1.5">
-          Unprinted only ({unprintedCount})
-        </Checkbox>
+        <ControlField label="Show">
+          <PickSet
+            options={showOptions}
+            value={show}
+            onChange={setShow}
+            allLabel="All"
+            label="Which schedules to show"
+            noun="filters"
+          />
+        </ControlField>
         <ControlField label="Group by">
           <PickList
             ariaLabel="Group the schedules"

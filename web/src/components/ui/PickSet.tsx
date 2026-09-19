@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import {
   MENU_CARET,
+  MENU_HEADER_CLASS,
   MENU_ITEM_CLASS,
   MENU_PANEL_CLASS,
   MENU_SEARCH_CLASS,
@@ -19,6 +20,18 @@ export type PickSetOption = {
   label: string;
   /** Said quietly beside the label — a count, a shop's full name. */
   hint?: string;
+  /**
+   * Options carrying the same group name are listed under it, with a rule and
+   * a heading — `PickList`'s `group`, same name and same look. Adjacent
+   * options only, so the caller orders them.
+   */
+  group?: string;
+  /**
+   * What the TRIGGER says for this option when it is ticked, where the label
+   * alone would be ambiguous out of its group — "DF01" is a shop under
+   * Location and a kitchen under Kitchen. Defaults to the label.
+   */
+  summary?: string;
 };
 
 /**
@@ -111,7 +124,7 @@ export function PickSet({
     chosen.length === 0
       ? allLabel
       : chosen.length <= 2
-        ? chosen.map((o) => o.label).join(" + ")
+        ? chosen.map((o) => o.summary ?? o.label).join(" + ")
         : `${chosen.length} ${noun}`;
 
   function toggle(v: string) {
@@ -231,20 +244,29 @@ export function PickSet({
               <p className="px-3 py-2 text-sm text-muted">Nothing matches.</p>
             )}
 
-            {shown.map((o) => {
+            {shown.map((o, i) => {
               const on = value.includes(o.value);
+              // A heading where the group changes, ruled above except where
+              // the "All" row's own rule is already the line above it.
+              const header = o.group && o.group !== shown[i - 1]?.group ? o.group : null;
               return (
-                <Checkbox
-                  key={o.value}
-                  checked={on}
-                  onChange={() => toggle(o.value)}
-                  className={`${MENU_ITEM_CLASS} mac-checkbox-fill w-full ${menuItemState(on)}`}
-                >
-                  <span>{o.label}</span>
-                  {o.hint && (
-                    <span className={`ml-auto pl-3 text-xs ${menuHintClass(on)}`}>{o.hint}</span>
+                <div key={o.value}>
+                  {header && (
+                    <p className={`${MENU_HEADER_CLASS} ${i > 0 ? "border-t border-hairline" : ""}`}>
+                      {header}
+                    </p>
                   )}
-                </Checkbox>
+                  <Checkbox
+                    checked={on}
+                    onChange={() => toggle(o.value)}
+                    className={`${MENU_ITEM_CLASS} mac-checkbox-fill w-full ${menuItemState(on)}`}
+                  >
+                    <span>{o.label}</span>
+                    {o.hint && (
+                      <span className={`ml-auto pl-3 text-xs ${menuHintClass(on)}`}>{o.hint}</span>
+                    )}
+                  </Checkbox>
+                </div>
               );
             })}
           </div>,

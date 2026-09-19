@@ -17,8 +17,11 @@ import { readSettings } from "@/lib/specialOrders";
  * element sheets are renderings of these same lines re-cut, computed at print
  * time and never stored.
  *
- * SCOPED TO THE WORKING KITCHEN (Mark, 2026-08-28), and on the KITCHEN rather
- * than the selling shop — which is what keeps decision 9 intact. A kitchen's
+ * OPENS ON THE WORKING KITCHEN (Mark, 2026-08-28), and on the KITCHEN rather
+ * than the selling shop — which is what keeps decision 9 intact. Since
+ * 2026-09-19 that is the Show filter's starting tick rather than a scope on the
+ * query: every kitchen's nights load, and Show narrows by Location and Kitchen
+ * in the browser. A kitchen's
  * night is every schedule it makes FOR, so at DF01 this still carries the DF02
  * schedule DF01 actually bakes; what it stops carrying is a night DF01 has no
  * hand in. Scoping on the selling shop instead would have hidden exactly the
@@ -44,11 +47,10 @@ export default async function SchedulesPage() {
   const from = addDays(today, -SCHEDULE_WINDOW_DAYS);
   const to = addDays(today, SCHEDULE_WINDOW_DAYS);
 
-  // The kitchen this screen is about. Null only when the member has no active
-  // location at all, which `InactiveLocationGate` already handles upstream —
-  // the impossible-uuid keeps the query total rather than silently unscoped.
+  // The kitchen the list opens on and Generate writes for. Null only when the
+  // member has no active location at all, which `InactiveLocationGate` already
+  // handles upstream.
   const kitchen = session.activeLocation;
-  const kitchenId = kitchen?.id ?? "00000000-0000-0000-0000-000000000000";
 
   const [{ data: schedules, error }, { data: lines, error: lineErr }, { data: planRows }] =
     await Promise.all([
@@ -63,10 +65,6 @@ export default async function SchedulesPage() {
       )
       .gte("schedule_date", from)
       .lte("schedule_date", to)
-      // In the DATABASE, not in the browser: the window is four weeks either
-      // side of today and the rows carry no filter of their own, so narrowing
-      // here is one less page of lines to roll up as well.
-      .eq("kitchen_location_id", kitchenId)
       .order("schedule_date", { ascending: false }),
     supabase
       .from("production_schedule_items")
@@ -162,7 +160,8 @@ export default async function SchedulesPage() {
           stampable={countable}
           editable={editable}
           today={today}
-          locationCode={kitchen?.code ?? null}
+          locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
+          kitchenId={kitchen?.id ?? null}
           action={
             editable && kitchen ? (
               <GenerateSchedules
