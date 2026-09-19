@@ -399,6 +399,7 @@ const REPORT: EmailReport = {
   reportDate: "2026-08-27",
   shift: "closing",
   supervisorName: "Karina Morales",
+  correctsEmailSentAt: null,
   narrative: "Footwork today was pretty steady.",
   netSalesCents: 133307,
   tipsCents: 7801,
@@ -915,4 +916,24 @@ test("a report with NO checklist linked and none asked for says nothing", () => 
   // The common case for a shop that has not written a master list yet — the
   // page must not nag about a feature nobody is using.
   eq(submitBlockers({ ...READY, checklist: null, checklistNotStarted: false }), []);
+});
+
+// ---- the corrected email (migration 107) -------------------------------------
+
+test("a first send is not marked as a correction anywhere", () => {
+  no(emailSubject(REPORT).includes("Corrected"), "the subject");
+  no(supervisorBody(REPORT).includes("Corrected report"), "the supervisor body");
+  no(managementBody(REPORT).includes("Corrected report"), "the management body");
+});
+
+test("a re-send says CORRECTED in the subject and at the top of BOTH bodies", () => {
+  const again: EmailReport = { ...REPORT, correctsEmailSentAt: "2026-09-18 19:50" };
+  eq(emailSubject(again), `Corrected: ${emailSubject(REPORT)}`);
+  for (const body of [supervisorBody(again), managementBody(again)]) {
+    ok(body.includes("Corrected report."), "the notice");
+    ok(body.includes("replaces the copy emailed 2026-09-18 19:50"), "names the copy it replaces");
+    // ABOVE the heading — a manager has to learn it supersedes the earlier
+    // copy before reading anything else.
+    ok(body.indexOf("Corrected report.") < body.indexOf("<h2"), "the notice leads");
+  }
 });

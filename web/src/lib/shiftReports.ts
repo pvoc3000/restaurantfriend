@@ -413,6 +413,17 @@ export type EmailReport = {
   reportDate: string;
   shift: ShiftSlot;
   supervisorName: string | null;
+  /**
+   * When the email this one REPLACES went out, as the shop's wall time
+   * ("2026-09-18 19:50"), or null for a first send (migration 107).
+   *
+   * A report reopened and sent again emails the team again, which is right —
+   * managers read the email, not the app — but it arrived looking exactly like
+   * the first, so it read as a duplicate. Non-null marks the subject and puts a
+   * line at the top of BOTH bodies. Display text rather than an instant so this
+   * module stays free of time zones, like `reportDate`.
+   */
+  correctsEmailSentAt: string | null;
   narrative: string | null;
   /** Provisional at report time — see `salesLine`. */
   netSalesCents: number | null;
@@ -674,6 +685,15 @@ export function checklistSection(report: EmailReport): string {
 export function supervisorBody(report: EmailReport): string {
   const parts: string[] = [];
 
+  // FIRST, above the heading: a manager who read the earlier copy needs to know
+  // before anything else that this one supersedes it. In the supervisor body,
+  // so the management email inherits it by construction.
+  if (report.correctsEmailSentAt) {
+    parts.push(
+      `<p style="margin:0 0 12px"><span style="${S.mark}"><strong>Corrected report.</strong> ` +
+        `This replaces the copy emailed ${esc(report.correctsEmailSentAt)}.</span></p>`
+    );
+  }
   parts.push(
     `<h2 style="${S.h2}">${esc(report.locationCode)} — ${esc(SHIFT_SLOT_LABEL[report.shift])} — ${esc(report.reportDate)}</h2>`
   );
@@ -793,5 +813,5 @@ export function wrapEmail(body: string): string {
 }
 
 export function emailSubject(report: EmailReport): string {
-  return `${report.locationCode} ${SHIFT_SLOT_LABEL[report.shift].toLowerCase()} shift report — ${report.reportDate}`;
+  return `${report.correctsEmailSentAt ? "Corrected: " : ""}${report.locationCode} ${SHIFT_SLOT_LABEL[report.shift].toLowerCase()} shift report — ${report.reportDate}`;
 }

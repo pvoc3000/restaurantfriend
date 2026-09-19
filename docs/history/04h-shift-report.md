@@ -530,3 +530,20 @@
    are refused; owner reopens anyone's; anon has no execute. The record screen
    shows Reopen to the author; New shift report's sent-duplicate line says "open
    it and tap Reopen" for your own and "ask a manager" otherwise.
+
+   **A RE-SENT REPORT IS EMAILED AS A CORRECTION — migration 107, APPLIED
+   2026-09-18** (Mark: "build the corrected email version", after choosing it
+   over letting a supervisor skip the second email: managers read the email,
+   not the app, and it is the only copy carrying the ratings, so a silent fix
+   would leave their inbox copy wrong). 072's reopen clears `emailed_at` —
+   rightly — so the fact that people HAVE read a copy was lost; 107 adds
+   `previously_emailed_at`, which the reopen fills with
+   `coalesce(emailed_at, previously_emailed_at)` and nothing ever clears. When
+   it is set, `emailSubject` leads with "Corrected: " and `supervisorBody` (so
+   the management body too, by construction) opens with "Corrected report. This
+   replaces the copy emailed <shop wall time>". The runner reads the column in
+   its own query and ignores an error, so it never depended on the deploy order.
+   Harness: stashed on reopen, kept across a second reopen after a failed mail,
+   absent on a report never emailed. Two fixtures cover subject, both bodies and
+   that the notice leads. A report reopened BEFORE 107 (DF02's 2026-09-18
+   closing) has nothing stashed and re-sends unmarked.

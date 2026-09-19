@@ -5,6 +5,7 @@ import { getAppSession } from "@/lib/session";
 import { canEnterCounts } from "@/lib/roles";
 import { daysBefore, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { compareForPremadeSheet } from "@/lib/productionSchedule";
+import { localDateISO, localTime } from "@/lib/timeZone";
 import { isDayComplete } from "@/lib/sales";
 import { readSettings } from "@/lib/specialOrders";
 import { ordersForKitchen } from "@/lib/specialOrderSchedule";
@@ -279,6 +280,7 @@ export default async function RunShiftReportPage({
     { data: tomorrowOrders },
     { data: tomorrowSchedules },
     { data: plans },
+    { data: previousMail },
   ] = await Promise.all([
     supabase.rpc("special_order_takers", { p_org_id: report.org_id }),
     // Supervisors and managers only, for page 1's picker — migration 080. The
@@ -367,6 +369,11 @@ export default async function RunShiftReportPage({
           .from("production_plans")
           .select("id, title, location_id, kitchen_by_weekday, starts_on, ends_on, is_active")
       : SKIP,
+    // WHETHER THIS SEND CORRECTS AN EMAIL PEOPLE HAVE READ — migration 107.
+    // Its own query rather than a column in the report select above, so a
+    // database without 107 answers with an error that is simply ignored (no
+    // correction marking) instead of failing the whole report.
+    supabase.from("shift_reports").select("previously_emailed_at").eq("id", id).maybeSingle(),
   ]);
 
   const nameById = new Map<string, string>(
@@ -775,6 +782,14 @@ export default async function RunShiftReportPage({
     shift,
     supervisorName: report.supervisor_employee_id
       ? nameById.get(report.supervisor_employee_id as string) ?? null
+      : null,
+    // The SHOP's wall time, so "emailed 2026-09-18 19:50" is the time on the
+    // clock in the room, not UTC.
+    correctsEmailSentAt: previousMail?.previously_emailed_at
+      ? (() => {
+          const at = Date.parse(previousMail.previously_emailed_at as string);
+          return `${localDateISO(timeZone, at)} ${localTime(timeZone, at)}`;
+        })()
       : null,
     narrative: (report.narrative as string | null) ?? null,
     netSalesCents,
