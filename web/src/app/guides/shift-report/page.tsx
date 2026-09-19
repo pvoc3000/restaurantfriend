@@ -242,6 +242,10 @@ export default function ShiftReportGuide() {
               <li>
                 If you made exactly the par, tap the <strong>→</strong> arrow to copy it in.
               </li>
+              <li>
+                If nobody generated today’s schedule, the page is empty. Tap{" "}
+                <Ui>Generate today’s schedule</Ui> and the rows appear.
+              </li>
             </ul>
           </Page>
 

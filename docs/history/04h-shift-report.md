@@ -480,3 +480,16 @@
    `/employees` and `/events` are X/X/- for staff/supervisor/purchaser; the
    record screen shows the ratings section from the ROWS, so another supervisor
    sees no section at all.
+
+   **A MISSING DAY CAN BE GENERATED FROM THE PREMADES PAGE** (Mark,
+   2026-09-18: "we should be allowed to generate the schedule if it's missing,
+   just so we can enter counts"). Counts are keyed on `schedule_item_id`, so a
+   day nobody generated left the page empty with no way forward. The empty
+   state now carries **Generate today's schedule**, which calls
+   `generate_production_schedules` bare — the report's date, the report's shop,
+   one day, no replace — and NOT the `GenerateSchedules` dialog, which is for
+   the next night: it defaults to tomorrow, tops up standing orders and pulls
+   special orders, and pulling today's orders into a schedule after they have
+   been made would be wrong. Par comes from the plan as it stands now. An empty
+   receipt (no plan covers that shop's day) is said in words instead of the
+   button. Not walked live: exercising it means writing a real schedule.

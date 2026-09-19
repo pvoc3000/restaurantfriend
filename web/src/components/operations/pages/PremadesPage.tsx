@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { STICKY_HEAD_ROW_UNDER_RUNNER } from "@/lib/tableHead";
 import { CountField, TextField } from "./fields";
 
@@ -47,12 +47,18 @@ export type PremadeRow = {
 export function PremadesPage({
   reportId,
   orgId,
+  locationId,
+  reportDate,
   scheduleTitle,
   rows,
   editable,
 }: {
   reportId: string;
   orgId: string;
+  /** The report's shop — the one a missing schedule is generated for. */
+  locationId: string;
+  /** The report's day, which is the day being counted. */
+  reportDate: string;
   scheduleTitle: string | null;
   rows: PremadeRow[];
   editable: boolean;
@@ -61,6 +67,8 @@ export function PremadesPage({
   const supabase = createClient();
   const [failed, setFailed] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const [generating, setGenerating] = useState(false);
+  const [noPlan, setNoPlan] = useState(false);
 
   /** Rows with nothing in the Left column yet — what the button below fills. */
   const uncounted = rows.filter((r) => r.leftover === null);
@@ -138,11 +146,67 @@ export function PremadesPage({
     });
   }
 
+  /**
+   * GENERATE THE DAY AFTER THE FACT, so there is something to count (Mark,
+   * 2026-09-18: "we should be allowed to generate the schedule if it's
+   * missing, just so we can enter counts").
+   *
+   * Counts are keyed on `schedule_item_id`, so a night nobody generated left
+   * this page with no rows and no way forward. This makes the missing schedule
+   * from the plan as it stands NOW — for THIS shop and THIS day only.
+   *
+   * DELIBERATELY NOT `GenerateSchedules`. That dialog is for the NEXT night: it
+   * defaults to tomorrow, tops up standing orders and offers to pull special
+   * orders into the run. Pulling today's orders into a schedule after they
+   * have been made would be wrong, so this calls the generator bare — one day,
+   * one shop, no replace, no special orders pulled. An already-generated day is
+   * SKIPPED by the function itself, so a double press does nothing.
+   */
+  function generateToday() {
+    setGenerating(true);
+    startTransition(async () => {
+      const { data, error } = await supabase.rpc("generate_production_schedules", {
+        p_start: reportDate,
+        p_days: 1,
+        p_location_ids: [locationId],
+        p_ignore_special_orders: false,
+        p_replace: false,
+        p_allow_actuals: false,
+      });
+      setGenerating(false);
+      if (error) {
+        setFailed(error.message);
+        return;
+      }
+      setFailed(null);
+      const receipt = data as { created?: unknown[]; skipped?: unknown[] } | null;
+      // Nothing created and nothing already there: no plan puts anything on
+      // this shop's day, which the generator reports as an empty receipt.
+      setNoPlan(!receipt?.created?.length && !receipt?.skipped?.length);
+      router.refresh();
+    });
+  }
+
   if (rows.length === 0) {
     return (
-      <p className="text-center text-[16px]">
-        No production schedule was generated for this shop today, so there is nothing to count.
-      </p>
+      <div className="mx-auto max-w-xl space-y-4 text-center text-[16px]">
+        <p>No production schedule was generated for this shop today, so there is nothing to count.</p>
+        {failed ? <p className="text-sm text-accent">{failed}</p> : null}
+        {noPlan ? (
+          <p className="text-sm text-muted">
+            No production plan covers this shop on {reportDate}, so there is no schedule to make.
+          </p>
+        ) : editable ? (
+          <button
+            type="button"
+            className={PRIMARY_BUTTON_CLASS}
+            disabled={generating}
+            onClick={generateToday}
+          >
+            {generating ? "Generating…" : "Generate today’s schedule"}
+          </button>
+        ) : null}
+      </div>
     );
   }
 

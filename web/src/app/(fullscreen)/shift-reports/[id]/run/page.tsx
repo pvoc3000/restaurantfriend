@@ -692,6 +692,8 @@ export default async function RunShiftReportPage({
         key="premades"
         reportId={id}
         orgId={report.org_id as string}
+        locationId={report.location_id as string}
+        reportDate={reportDate}
         scheduleTitle={scheduleTitle}
         rows={premadeRows}
         editable={editable}
