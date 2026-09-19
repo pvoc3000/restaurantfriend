@@ -12,7 +12,7 @@ export const metadata = {
  *
  * EVERY LABEL HERE IS THE SCREEN'S OWN, read from the components rather than
  * remembered: "Set my password" (/welcome), "Start or Resume a Shift Report"
- * (the tablet landing tile), "Start the report" (NewShiftReport), "Received a
+ * (the tablet landing tile), "Start the report", "Resume the draft" and "Start another" (NewShiftReport), "Received a
  * 30 minute break" (RatingsPage), "Pin to checklists" (WalkItem), "Print All
  * Documents" (PrintPacket), "Pause & close" (ShiftReportRunner). When one of
  * those changes, this page is the other place it has to change — and the page
@@ -187,7 +187,9 @@ export default function ShiftReportGuide() {
         <Note head="Stopped halfway?">
           Your work is saved as you go. Tap the same home-screen button to pick up where you
           left off. On the Shift Reports list, open the <strong>⋯</strong> menu on your report
-          and choose <strong>Resume…</strong>.
+          and choose <strong>Resume…</strong>. If you tap <Ui>New shift report</Ui> for a
+          shift that already has a draft, it offers <Ui go>Resume the draft</Ui>. Use that, not{" "}
+          <Ui>Start another</Ui>.
         </Note>
       </section>
 

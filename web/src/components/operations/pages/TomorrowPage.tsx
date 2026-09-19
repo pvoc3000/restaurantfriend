@@ -162,7 +162,8 @@ export function TomorrowPage({
             orgId={orgId}
             horizonDays={horizonDays}
             locations={locations}
-            today={nextProductionDate}
+            today={today}
+            startDate={nextProductionDate}
             kitchenId={kitchenId}
             kitchenCode={kitchenCode}
             plans={plans}

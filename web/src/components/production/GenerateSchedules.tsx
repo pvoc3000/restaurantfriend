@@ -135,6 +135,7 @@ export function GenerateSchedules({
   kitchenId,
   kitchenCode,
   plans,
+  startDate,
   primary = false,
 }: {
   orgId: string;
@@ -152,6 +153,16 @@ export function GenerateSchedules({
   kitchenCode: string;
   /** Every plan in the org; which ones count is decided per date range. */
   plans: PlanSummary[];
+  /**
+   * The night the dialog opens on, when the caller KNOWS it — the shift
+   * report's next production day. Omitted, it is the day after `today`.
+   *
+   * A separate prop because the report used to pass that day AS `today`, and
+   * the day-after rule below then opened the dialog on the night after it
+   * (2026-09-18) — the report said "production schedules for the 19th" and the
+   * button offered the 20th.
+   */
+  startDate?: string | null;
   /**
    * Fill the trigger black.
    *
@@ -177,7 +188,7 @@ export function GenerateSchedules({
    * Derived from the ORG's calendar day, which is what `today` already is, so
    * the boundary is the shop's rather than the browser's or UTC's.
    */
-  const defaultStart = daysAfter(today, 1);
+  const defaultStart = startDate ?? daysAfter(today, 1);
 
   const [open, setOpen] = useState(false);
   const [start, setStart] = useState<string | null>(defaultStart);
@@ -240,10 +251,9 @@ export function GenerateSchedules({
    * one set; a run further out than the horizon (somebody generating a fortnight
    * ahead) extends `through` rather than being quietly short.
    *
-   * `today` here is whatever the caller based the dialog on — the org's own day
-   * on `/schedules`, the next production date on the shift report — and both
-   * are today or later, which is what keeps 099 from being asked to make a day
-   * that has already happened.
+   * `today` here is the org's own day on both callers (the shift report passed
+   * its next production date until 2026-09-18 — see `startDate`), which is
+   * what keeps 099 from being asked to make a day that has already happened.
    *
    * A FAILURE IS NOT REPORTED. Nothing about generating a plan schedule depends
    * on it, `loadCandidates` runs either way, and the special orders list says so

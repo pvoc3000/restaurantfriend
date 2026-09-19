@@ -493,3 +493,26 @@
    been made would be wrong. Par comes from the plan as it stands now. An empty
    receipt (no plan covers that shop's day) is said in words instead of the
    button. Not walked live: exercising it means writing a real schedule.
+
+   **PREMADES READ EVERY NON-SPECIAL-ORDER SCHEDULE FOR THE DAY** (2026-09-18).
+   The runner fetched the shop's day with `.maybeSingle()`, which errors on two
+   rows — and a day routinely has two, because generating a night also writes a
+   schedule per special order it pulls (and a shop fed by two kitchens gets one
+   per kitchen). DF02 on 2026-09-18 had a plan schedule beside Cafe Knotted's,
+   so the page said "no schedule" on a day with 35 lines. Now: every schedule
+   for location + date except `source = 'special_order'`, lines from all of them.
+
+   **PAGE 7'S GENERATE OPENED ON THE WRONG NIGHT** (fixed 2026-09-18). It passed
+   the next production date AS `today`, and `GenerateSchedules` has defaulted to
+   the day after `today` since 2026-09-07 — so the dialog offered the night
+   after the one the page was about. It now passes the org's day as `today` and
+   the next production date as the new `startDate` prop.
+
+   **NEW SHIFT REPORT RESUMES A DRAFT RATHER THAN WARNING ABOUT IT** (Mark,
+   2026-09-18: "help avoid supervisors starting a new report if they already
+   have a draft started"). The yellow sentence alone did not stop a second DF02
+   closing report that night. When a draft exists for the chosen date + shift,
+   the black button (and Enter) is **Resume the draft**, with **Start another**
+   beside it for the handover case — still no constraint, for 070's reason. A
+   SENT match says to ask a manager to reopen it and links to it, since a second
+   report is the wrong fix for a missing count.

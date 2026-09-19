@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
@@ -60,7 +61,7 @@ export function NewShiftReport({
    * `my_employee_id`, or null when their login has no HR record.
    */
   myEmployeeId: string | null;
-  existing: { date: string; shift: ShiftSlot; status: "draft" | "sent" }[];
+  existing: { id: string; date: string; shift: ShiftSlot; status: "draft" | "sent" }[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -79,7 +80,30 @@ export function NewShiftReport({
   // The STATUS rides along so the sentence can say which it is: "completed" of
   // a draft would be a claim the list two inches away contradicts.
   const duplicate =
-    date === null ? null : existing.find((e) => e.date === date && e.shift === shift) ?? null;
+    date === null
+      ? null
+      : // A DRAFT FIRST: when there is both a sent report and a draft for the
+        // night, the draft is the one somebody means to get back to.
+        existing.find((e) => e.date === date && e.shift === shift && e.status === "draft") ??
+        existing.find((e) => e.date === date && e.shift === shift) ??
+        null;
+
+  /**
+   * RESUME IS THE DEFAULT WHEN A DRAFT IS ALREADY THERE (Mark, 2026-09-18:
+   * "help avoid supervisors starting a new report if they already have a draft
+   * started"). The yellow sentence alone did not stop it — on 2026-09-18 DF02
+   * got a second closing report seven minutes after the first. So the dialog
+   * stops merely warning and changes its answer: the black button and Enter
+   * resume the draft, and starting another is still one press away for the
+   * handover case, which is why this is not a constraint either.
+   */
+  const resumable = duplicate?.status === "draft" ? duplicate : null;
+
+  function resume() {
+    if (!resumable) return;
+    setOpen(false);
+    router.push(`/shift-reports/${resumable.id}/run`);
+  }
 
   function create() {
     startTransition(async () => {
@@ -132,7 +156,8 @@ export function NewShiftReport({
           busy={pending}
           width="max-w-lg"
           onSubmit={() => {
-            if (ready) create();
+            if (resumable) resume();
+            else if (ready) create();
           }}
           // A FRAGMENT, not a wrapper — `ui/Dialog`'s own footer is already
           // `flex justify-end gap-4`, so a `justify-between` div inside it is
@@ -147,14 +172,30 @@ export function NewShiftReport({
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                className={DIALOG_COMMIT_CLASS}
-                disabled={!ready}
-                onClick={create}
-              >
-                Start the report
-              </button>
+              {resumable ? (
+                <>
+                  <button
+                    type="button"
+                    className={DIALOG_CANCEL_CLASS}
+                    disabled={!ready}
+                    onClick={create}
+                  >
+                    Start another
+                  </button>
+                  <button type="button" className={DIALOG_COMMIT_CLASS} onClick={resume}>
+                    Resume the draft
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className={DIALOG_COMMIT_CLASS}
+                  disabled={!ready}
+                  onClick={create}
+                >
+                  Start the report
+                </button>
+              )}
             </>
           }
         >
@@ -207,9 +248,23 @@ export function NewShiftReport({
               {duplicate ? (
                 <p className="text-sm">
                   <span className="bg-mark-fill px-1">
-                    There is already a {duplicate.status === "sent" ? "completed" : "draft"}{" "}
-                    {SHIFT_SLOT_LABEL[shift].toLowerCase()} shift report on {date}!
-                  </span>
+                    There is already a {duplicate.status === "sent" ? "sent" : "draft"}{" "}
+                    {SHIFT_SLOT_LABEL[shift].toLowerCase()} shift report on {date}.
+                  </span>{" "}
+                  {duplicate.status === "sent" ? (
+                    // A SENT report cannot be resumed; a manager reopens it
+                    // (072 — un-sending takes rows back off HR records). Say so,
+                    // because a second report is the wrong fix for a missing
+                    // count and is what happened on 2026-09-18.
+                    <span className="text-muted">
+                      To add to it, ask a manager to reopen it.{" "}
+                      <Link href={`/shift-reports/${duplicate.id}`} className="underline">
+                        Open it
+                      </Link>
+                    </span>
+                  ) : (
+                    <span className="text-muted">Resume it rather than starting another.</span>
+                  )}
                 </p>
               ) : null}
             </div>
