@@ -1336,3 +1336,31 @@ picklist not above it"). That rule is for a filter ROW, where several collapsed
 controls must begin on one margin; this row is one control and a search box, so
 there is no column to keep and a caption above was the only thing making the
 toolbar two lines tall (81px against 61px).
+
+**THE PRICE BREAKS A TIE THE SKU CANNOT** (Mark, 2026-09-19, the hour after the
+two-prices rule shipped: "for both master mix lines there's a 'match' button…
+when I try to match to the purchase order line, nothing changes. Is it getting
+matched?"). It was not. `matchInvoiceToOrder`'s four SKU passes skip any number
+printed twice on the ORDER (`poSkuCounts.get(sku) !== 1`), which was the honest
+answer while two lines of one SKU meant a split delivery; it stopped being the
+whole answer the moment the app started creating that state on purpose. And the
+Match dialog could never have rescued it — pairing IS copying the vendor's
+number onto the line (`matchTo`), both lines already had 08779, so the write set
+08779 to 08779 and the screen was right to look unchanged. **A fifth pass**:
+among the lines sharing one SKU, pair by PRICE, and only where the price decides
+it outright — exactly one line at that price on each side, checked in both
+directions. Two lines of one SKU at one price is still the split delivery and
+still refused. `sameSku` is exported for the dialog so "the same item number"
+has ONE definition; Match now refuses a no-op and says what would tell the lines
+apart, rather than writing and appearing to work.
+**AND A HOLE THAT WAS ALREADY THERE**, which the two-prices rule would have made
+routine rather than rare: a line the SKU passes refuse now stays out of the
+DESCRIPTION pass as well. Falling back to a weaker signal after refusing a
+stronger one ON AMBIGUITY GROUNDS is backwards, and two lines of one item have
+the same wording by construction — so the conservative pass scored both 1.0 and
+paired them by array order. Measured before the fix: 6 and 7 of one mix at one
+price, billed on two lines, came back fully "matched" by description, 6↔$300 and
+7↔$350 — right only by the accident of array order, and it would have proposed
+those quantities just as confidently had they been reversed. The manual route
+out of a real ambiguity is unchanged: copy the vendor's number onto ONE line,
+which makes it unique, and both sides join properly.
