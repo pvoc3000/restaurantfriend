@@ -18,7 +18,6 @@ import { packLabel } from "@/lib/catalog";
 import { evaluateNumeric } from "@/lib/calc";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
-import { TabPicker } from "@/components/ui/TabPicker";
 import { PickList } from "@/components/ui/PickList";
 import { PACKAGE_DESC_OPTIONS } from "@/lib/units";
 import { Dialog, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
@@ -46,7 +45,7 @@ import { useCalcField } from "@/components/ui/CalcPad";
  * to the purchase order" reads the same either way. The row shows what's
  * already on order so the arithmetic is never a surprise.
  *
- * ONE-OFF LINES ARE THE SECOND TAB (Mark, 2026-08-24: "add an item to a
+ * ONE-OFF LINES ARE THE PANEL'S SECOND MODE (Mark, 2026-08-24: "add an item to a
  * purchase order that isn't linked to a vendor item… one-off items we need to
  * purchase but don't necessarily want to be a regular vendor item"). They cost
  * NO migration: `purchase_order_items.vendor_item_id` has been nullable since
@@ -55,9 +54,10 @@ import { useCalcField } from "@/components/ui/CalcPad";
  * A line's own snapshot columns are the record either way; what a one-off gives
  * up is the catalog behind them, which is the point of it.
  *
- * ONE PANEL, TWO TABS, rather than a second button on the order bar: the bar
+ * ONE PANEL, TWO MODES, rather than a second button on the order bar: the bar
  * already carries five, and "put something on this order" is one question
- * whether or not the vendor sells it under a SKU we keep.
+ * whether or not the vendor sells it under a SKU we keep. They were TABS until
+ * 2026-09-19 and are now the toolbar's Show picker — see the `toolbar` below.
  */
 
 type PickerRow = {
@@ -445,18 +445,43 @@ export function AddPoLines({
           // use and it must not scroll away.
           toolbar={
             <>
-              <TabPicker
-                ariaLabel="What to add"
-                value={tab}
-                onChange={(k) => {
-                  setTab(k);
-                  setError(null);
-                }}
-                options={[
-                  { key: "catalog" as const, label: "This vendor's items" },
-                  { key: "oneOff" as const, label: "One-off item" },
-                ]}
-              />
+              {/* A PICKER, NOT TABS (Mark, 2026-09-19). Both halves of this
+                  panel are ways of putting a line on the order, and a segmented
+                  bar spending 313px to say so was what crowded this row; the
+                  picker says the same thing in 166px.
+
+                  ITS LABEL IS INLINE, WHICH IS THE EXCEPTION AND NOT A LAPSE
+                  (Mark, same day: "make the label inline with the picklist not
+                  above it"). `ControlField` — caption ABOVE, never beside — is
+                  the rule for a FILTER ROW, where several collapsed controls
+                  have to begin on one margin and line up with what sits above
+                  them. This row is one control and a search box: there is no
+                  column to keep, and a caption above is the only thing that
+                  would make the toolbar two lines tall. `shrink-0` so the pair
+                  is never squashed — the search takes the leftover. */}
+              <span className="flex shrink-0 items-center gap-2">
+                {/* VISUAL ONLY, the same as `ControlField`'s caption: the
+                    picker keeps its own `ariaLabel`, which is the longer
+                    sentence, so a screen reader hears it once and hears the
+                    better one. */}
+                <span className="text-xs uppercase tracking-[0.12em] text-subtle">
+                  Show:
+                </span>
+                <PickList
+                  ariaLabel="What to add"
+                  variant="field"
+                  fit
+                  value={tab}
+                  onPick={(k) => {
+                    setTab(k as "catalog" | "oneOff");
+                    setError(null);
+                  }}
+                  options={[
+                    { value: "catalog", label: "This vendor's items" },
+                    { value: "oneOff", label: "One-off item" },
+                  ]}
+                />
+              </span>
               {tab === "catalog" && (
                 <TextInput
                   autoFocus
