@@ -729,3 +729,9 @@ export function sortSchedules<T extends SortableSchedule>(
     return a.kitchenCode < b.kitchenCode ? -1 : 1;
   });
 }
+
+/**
+ * How far either side of today `/schedules` loads. The list's Upcoming preset
+ * reaches to the same edge, so the two are one number.
+ */
+export const SCHEDULE_WINDOW_DAYS = 28;

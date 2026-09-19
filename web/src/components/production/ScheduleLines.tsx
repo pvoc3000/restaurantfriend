@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { Checkbox } from "@/components/ui/Checkbox";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { RowMenu } from "@/components/ui/RowMenu";
@@ -671,15 +671,18 @@ export function ScheduleLines({
             <SectionHeading count={rows.length}>Items</SectionHeading>
             <div className="flex items-center gap-2">
               <span className="text-xs uppercase tracking-[0.12em] text-subtle">Group by</span>
-              <TabPicker
+              {/* A PICKLIST since 2026-09-19 (Mark), the list screens' Group by. */}
+              <PickList
                 ariaLabel="Group the items"
+                variant="field"
                 value={grouping}
-                onChange={setGrouping}
+                onPick={(v) => setGrouping(v as Grouping)}
                 options={[
-                  { key: "type" as Grouping, label: "Type" },
-                  { key: "tray" as Grouping, label: "Tray" },
-                  { key: "none" as Grouping, label: "None" },
+                  { value: "type", label: "Type" },
+                  { value: "tray", label: "Tray" },
+                  { value: "none", label: "None" },
                 ]}
+                fit
               />
             </div>
           </div>

@@ -3,7 +3,7 @@ import { getAppSession } from "@/lib/session";
 import { canEnterCounts } from "@/lib/roles";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SchedulesList, type ScheduleRow } from "@/components/production/SchedulesList";
-import type { SchedulePlan } from "@/lib/productionSchedule";
+import { SCHEDULE_WINDOW_DAYS, type SchedulePlan } from "@/lib/productionSchedule";
 import { GenerateSchedules } from "@/components/production/GenerateSchedules";
 import { canEditPage } from "@/lib/pageAccess";
 import { readSettings } from "@/lib/specialOrders";
@@ -41,8 +41,8 @@ export default async function SchedulesPage() {
   // A window rather than the whole history: a fortnight either side is the
   // question this screen answers ("what is tonight, what did we do last week"),
   // and the table grows by ~4 rows a day forever.
-  const from = addDays(today, -28);
-  const to = addDays(today, 28);
+  const from = addDays(today, -SCHEDULE_WINDOW_DAYS);
+  const to = addDays(today, SCHEDULE_WINDOW_DAYS);
 
   // The kitchen this screen is about. Null only when the member has no active
   // location at all, which `InactiveLocationGate` already handles upstream —

@@ -7,6 +7,9 @@ import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import type { SortDir } from "@/lib/tableSort";
 import { PickList } from "@/components/ui/PickList";
+import { RangePicker } from "@/components/ui/RangePicker";
+import { inRange, type DateRange, type RangePresetSpec } from "@/lib/dateRange";
+import { daysAfter } from "@/lib/today";
 import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
@@ -15,6 +18,7 @@ import { usePublishRecordSet } from "@/lib/recordSet";
 import {
   packetDate,
   plansInForce,
+  SCHEDULE_WINDOW_DAYS,
   sortSchedules,
   type ScheduleGrouping,
   scheduleSourceLabel,
@@ -44,7 +48,25 @@ export type ScheduleRow = {
   countedLines: number;
 };
 
-type Tier = "upcoming" | "today" | "unprinted" | "all";
+/**
+ * The Window's buttons (Mark, 2026-09-19: the Show picklist became a
+ * RangePicker). UPCOMING is today to the far edge of what the page loads, so it
+ * is exactly the old tier; "All" is no range, which here means the whole loaded
+ * window rather than all history — the page never fetches more than that.
+ */
+const SCHEDULE_PRESETS: readonly RangePresetSpec[] = [
+  {
+    key: "upcoming",
+    label: "Upcoming",
+    range: (t: string) => ({ from: t, to: daysAfter(t, SCHEDULE_WINDOW_DAYS) }),
+  },
+  "today",
+  "tomorrow",
+  "yesterday",
+  "this_week",
+  "previous_week",
+  { key: "all", label: "All", range: () => null },
+];
 
 /** Re-exported name for the local reads below; `lib/productionSchedule` owns it. */
 type Grouping = ScheduleGrouping;
@@ -103,7 +125,11 @@ export function SchedulesList({
   action?: ReactNode;
 }) {
   const router = useRouter();
-  const [tier, setTier] = useState<Tier>("upcoming");
+  const [range, setRange] = useState<DateRange | null>(() => ({
+    from: today,
+    to: daysAfter(today, SCHEDULE_WINDOW_DAYS),
+  }));
+  const [unprintedOnly, setUnprintedOnly] = useState(false);
   const [grouping, setGrouping] = useState<Grouping>("date");
   const [term, setTerm] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -111,22 +137,13 @@ export function SchedulesList({
   const [failed, setFailed] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "date", dir: "desc" });
 
-  const counts = useMemo(
-    () => ({
-      upcoming: rows.filter((r) => r.schedule_date >= today).length,
-      today: rows.filter((r) => r.schedule_date === today).length,
-      unprinted: rows.filter((r) => r.printedAt === null).length,
-      all: rows.length,
-    }),
-    [rows, today]
-  );
+  const unprintedCount = useMemo(() => rows.filter((r) => r.printedAt === null).length, [rows]);
 
   const shown = useMemo(() => {
     const q = term.trim().toLowerCase();
     return rows.filter((r) => {
-      if (tier === "upcoming" && r.schedule_date < today) return false;
-      if (tier === "today" && r.schedule_date !== today) return false;
-      if (tier === "unprinted" && r.printedAt !== null) return false;
+      if (range && !inRange(r.schedule_date, range)) return false;
+      if (unprintedOnly && r.printedAt !== null) return false;
       if (!q) return true;
       // Both spellings of the date, because the column shows one and the row
       // stores the other: `packetDate` prints "Thu 8/7/2026" where the column
@@ -149,7 +166,7 @@ export function SchedulesList({
         .toLowerCase()
         .includes(q);
     });
-  }, [rows, plans, tier, term, today]);
+  }, [rows, plans, range, unprintedOnly, term]);
 
   // The order lives in `lib/productionSchedule` so it can be fixture-tested —
   // a comparator inside a `useMemo` is exactly where the group-leads bug hid.
@@ -397,24 +414,25 @@ export function SchedulesList({
           search
           icon={<SearchGlyph />}
         />
-        {/* Captioned PICKLISTS rather than tabs (Mark, 2026-09-10), the
-            purchasing lists' conversion: counts ride as hints, `fit` sizes
-            each trigger to its widest option. */}
-        <ControlField label="Show">
-          <PickList
-            ariaLabel="Which schedules"
-            variant="field"
-            value={tier}
-            onPick={(v) => setTier(v as Tier)}
-            options={[
-              { value: "upcoming", label: "Upcoming", hint: String(counts.upcoming) },
-              { value: "today", label: "Today", hint: String(counts.today) },
-              { value: "unprinted", label: "Unprinted", hint: String(counts.unprinted) },
-              { value: "all", label: "All", hint: String(counts.all) },
-            ]}
-            fit
-          />
+        {/* A RANGE rather than a tier list (Mark, 2026-09-19), at the
+            purchasing lists' measured `w-52`. Unprinted is not a date, so it
+            left the list and became its own box beside it — and now combines
+            with any window, where the tier could only mean "unprinted, ever". */}
+        <ControlField label="Window">
+          <div className="w-52">
+            <RangePicker
+              value={range}
+              onChange={setRange}
+              presets={SCHEDULE_PRESETS}
+              today={today}
+              ariaLabel="Which nights"
+              placeholder="All"
+            />
+          </div>
         </ControlField>
+        <Checkbox checked={unprintedOnly} onChange={setUnprintedOnly} className="pb-1.5">
+          Unprinted only ({unprintedCount})
+        </Checkbox>
         <ControlField label="Group by">
           <PickList
             ariaLabel="Group the schedules"
