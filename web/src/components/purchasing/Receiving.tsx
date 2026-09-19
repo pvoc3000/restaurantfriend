@@ -18,7 +18,7 @@ import {
 } from "@/lib/attachments";
 import { billsFromReadings, fileReadingsLabel } from "@/lib/invoices";
 import { fileReadings } from "@/lib/invoiceFromExtraction";
-import { matchInvoiceToOrder, matchesFromLinks } from "@/lib/invoiceMatch";
+import { matchInvoiceToOrder, matchesFromLinks, sameSku } from "@/lib/invoiceMatch";
 import type { OrderInvoice } from "@/lib/invoiceQueries";
 import {
   canClose,
@@ -364,6 +364,18 @@ export function Receiving({
    * it, survives a reload, and needs no column of its own. Editing a line's
    * product ID is already established policy on PO detail (Mark, 2026-07-28)
    * and deliberately isn't gated on status.
+   *
+   * WHICH IS WHY IT CANNOT SETTLE A DUPLICATE, and now says so instead of
+   * appearing to work (Mark, 2026-09-19: "when I try to match to the purchase
+   * order line, nothing changes. Is it getting matched?"). His order carried
+   * the same mix twice — thirteen bags and the free one — so both lines already
+   * had the right SKU and the write was a no-op: it set 08779 to 08779, the
+   * refresh returned identical rows, and the screen was right to look
+   * unchanged. `matchInvoiceToOrder` now breaks that particular tie on PRICE,
+   * so the ordinary case never reaches this dialog at all; what is left here is
+   * the genuinely undecidable one — same SKU AND same price, the split
+   * delivery — where copying a number that is already there is not an answer,
+   * and appearing to act is worse than refusing.
    */
   function matchTo(line: PoLine, invoice: InvoiceLine) {
     setMatching(null);
@@ -372,6 +384,12 @@ export function Receiving({
     // would refuse the pairing on exactly the invoices that need it most.
     const sku = matchableSku(invoice);
     if (!sku) return;
+    if (sameSku(sku, line.product_id)) {
+      setError(
+        "This line already carries that item number, so there is nothing to copy. Two lines of one item are told apart by their prices — give them different ones, or fill this line's received quantity in by hand."
+      );
+      return;
+    }
     void write(() =>
       supabase.from("purchase_order_items").update({ product_id: sku }).eq("id", line.id)
     );

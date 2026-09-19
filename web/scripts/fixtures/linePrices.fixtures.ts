@@ -140,3 +140,111 @@ test("finalize: a line that really does disagree is still named", () => {
   const drifted = withCatalog(poLine({ unit_price: 52, qty_received: 1 }), { price: 50 });
   eq(closeReadiness([drifted], 1, LOC, 1), ["1 line's price differs from the catalog"]);
 });
+
+// ── the invoice matcher's price tiebreak ────────────────────────────────────
+//
+// Mark, 2026-09-19: "for both master mix lines there's a 'match' button… when I
+// try to match to the purchase order line, nothing changes. Is it getting
+// matched?" It was not. The four SKU passes skip any number printed twice on
+// the ORDER, which was the honest answer while two lines of one SKU meant a
+// split delivery — but the add panel now creates that state deliberately, and
+// the very thing that distinguishes the two lines is the price.
+
+import { matchInvoiceToOrder, sameSku } from "../../src/lib/invoiceMatch";
+import { invoiceLine } from "./factories";
+
+/** The order as Mark's stood: thirteen bags at $50 and the free one. */
+const mixLines = () => [
+  poLine({ product_id: "08779", qty_ordered: 13, unit_price: 50, qty_received: 13 }),
+  poLine({ product_id: "08779", qty_ordered: 1, unit_price: 0, qty_received: 1 }),
+];
+
+test("tiebreak: the free bag and the thirteen each find their invoice line", () => {
+  const [paid, free] = mixLines();
+  const billed = invoiceLine({ product_id: "08779", qty: 13, extended: 650 });
+  const gratis = invoiceLine({ product_id: "08779", qty: 1, extended: 0 });
+  const { matches, unmatchedInvoice } = matchInvoiceToOrder([paid, free], [billed, gratis]);
+  eq(matches[0].invoice?.extended, 650, "the $50 line takes the $650 of billing");
+  eq(matches[1].invoice?.extended, 0, "and the free bag takes the free line");
+  eq(unmatchedInvoice, [], "nothing left over");
+});
+
+test("tiebreak: it is not fooled by the ORDER of the invoice lines", () => {
+  const [paid, free] = mixLines();
+  const gratis = invoiceLine({ product_id: "08779", qty: 1, extended: 0 });
+  const billed = invoiceLine({ product_id: "08779", qty: 13, extended: 650 });
+  const { matches } = matchInvoiceToOrder([paid, free], [gratis, billed]);
+  eq(matches[0].invoice?.extended, 650);
+  eq(matches[1].invoice?.extended, 0);
+});
+
+test("tiebreak: leading zeros still don't count", () => {
+  const [paid, free] = mixLines();
+  const billed = invoiceLine({ product_id: "8779", qty: 13, extended: 650 });
+  const gratis = invoiceLine({ product_id: "8779", qty: 1, extended: 0 });
+  const { matches } = matchInvoiceToOrder([paid, free], [billed, gratis]);
+  eq(matches[0].invoice?.extended, 650);
+  eq(matches[1].invoice?.extended, 0);
+});
+
+test("tiebreak: THE SPLIT DELIVERY IS STILL REFUSED", () => {
+  // The case the duplicate-SKU rule was written for: one SKU, two lines, SAME
+  // price. Nothing tells them apart, and pairing them in array order would
+  // propose a quantity against a line chosen by accident. Both stay unmatched.
+  //
+  // THE DESCRIPTIONS ARE REAL AND IDENTICAL ON PURPOSE. Without them this case
+  // passes for the wrong reason: two lines of one item have the same wording by
+  // construction, and before 2026-09-19 they fell out of the SKU passes into
+  // the DESCRIPTION pass, which scored both 1.0 and paired them by array order
+  // — reporting a confident match that was right only by luck.
+  const d = "MASTER MIX DONUT CAKE";
+  const a = poLine({ product_id: "08779", description: d, qty_ordered: 6, unit_price: 50 });
+  const b = poLine({ product_id: "08779", description: d, qty_ordered: 7, unit_price: 50 });
+  const one = invoiceLine({ product_id: "08779", description: d, qty: 6, extended: 300 });
+  const two = invoiceLine({ product_id: "08779", description: d, qty: 7, extended: 350 });
+  const { matches, unmatchedInvoice } = matchInvoiceToOrder([a, b], [one, two]);
+  eq(matches[0].invoice, null);
+  eq(matches[1].invoice, null);
+  eq(unmatchedInvoice.length, 2, "reported as billed-but-not-placed, the honest answer");
+});
+
+test("tiebreak: two invoice lines at one price against one order line is refused", () => {
+  // A partial shipment billed twice at the same rate. The order line's price
+  // matches both, so the price has not decided anything.
+  const [paid, free] = mixLines();
+  const half = invoiceLine({ product_id: "08779", qty: 7, extended: 350 });
+  const rest = invoiceLine({ product_id: "08779", qty: 6, extended: 300 });
+  const gratis = invoiceLine({ product_id: "08779", qty: 1, extended: 0 });
+  const { matches } = matchInvoiceToOrder([paid, free], [half, rest, gratis]);
+  eq(matches[0].invoice, null, "the $50 line has two candidates and takes neither");
+  eq(matches[1].invoice?.extended, 0, "the free bag is still unambiguous and still pairs");
+});
+
+test("tiebreak: a line with no price of its own cannot be placed by price", () => {
+  const unpriced = poLine({ product_id: "08779", qty_ordered: 13, unit_price: null });
+  const free = poLine({ product_id: "08779", qty_ordered: 1, unit_price: 0 });
+  const billed = invoiceLine({ product_id: "08779", qty: 13, extended: 650 });
+  const gratis = invoiceLine({ product_id: "08779", qty: 1, extended: 0 });
+  const { matches } = matchInvoiceToOrder([unpriced, free], [billed, gratis]);
+  eq(matches[0].invoice, null, "nothing to compare");
+  eq(matches[1].invoice?.extended, 0, "the free bag still decides itself");
+});
+
+test("tiebreak: a UNIQUE sku is untouched by any of this", () => {
+  const flour = poLine({ product_id: "12345", qty_ordered: 4, unit_price: 20 });
+  const billed = invoiceLine({ product_id: "12345", qty: 4, extended: 96 });
+  const { matches } = matchInvoiceToOrder([flour], [billed]);
+  eq(matches[0].invoice?.extended, 96, "the ordinary pass still does the ordinary work");
+});
+
+// ── sameSku ─────────────────────────────────────────────────────────────────
+
+test("sameSku: the matcher's own rules, so the Match dialog cannot disagree", () => {
+  ok(sameSku("08779", "08779"));
+  ok(sameSku("08779", "8779"), "leading zeros never mean anything");
+  ok(sameSku(" 30-111 ", "30111"), "spaces and dashes are formatting");
+  ok(sameSku("abc", "ABC"), "case is not meaning");
+  no(sameSku("08779", "50021"), "a renumbered item is a real difference — copy it");
+  no(sameSku(null, "08779"), "no number on the line is not a match");
+  no(sameSku("08779", null));
+});

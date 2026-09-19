@@ -61,6 +61,43 @@ function withoutLeadingZeros(sku: string): string {
   return sku.replace(/^0+/, "") || sku;
 }
 
+/**
+ * ARE THESE THE SAME ITEM NUMBER? By the same rules the passes join on —
+ * case, spaces and dashes never carry meaning, and leading zeros are the
+ * disagreement invoices and catalogs have constantly without ever meaning it.
+ *
+ * Exported for the receiving screen's Match dialog, which copies a number onto
+ * a line and needs to know when there is nothing to copy. Normalizing there by
+ * hand would be a second, quietly different definition of "the same SKU" than
+ * the one the matcher acts on — which is how the two would come to disagree
+ * about whether a pairing had been made.
+ */
+export function sameSku(a: string | null, b: string | null): boolean {
+  const x = normalizeSku(a);
+  const y = normalizeSku(b);
+  if (!x || !y) return false;
+  return x === y || withoutLeadingZeros(x) === withoutLeadingZeros(y);
+}
+
+/** The SKUs an invoice line could be filed under — both printed numbers, in
+ *  both the strict and the leading-zeros-relaxed form, so the price tiebreak
+ *  sees a line under exactly the keys the four SKU passes would have. */
+function skuKeys(line: InvoiceLine): string[] {
+  const out: string[] = [];
+  for (const raw of [line.product_id, line.alt_product_id ?? null]) {
+    const sku = normalizeSku(raw);
+    if (!sku) continue;
+    out.push(sku, withoutLeadingZeros(sku));
+  }
+  return out;
+}
+
+/** The order's own SKUs that are printed on more than one of its lines — the
+ *  ones the passes above deliberately declined to decide. */
+function duplicatedSkus(counts: Map<string, number>): string[] {
+  return [...counts.entries()].filter(([, n]) => n > 1).map(([sku]) => sku);
+}
+
 /** Words worth comparing: 2+ characters, punctuation dropped. */
 function tokens(text: string): Set<string> {
   return new Set(
@@ -183,10 +220,73 @@ export function matchInvoiceToOrder(
     }
   }
 
+  // THE PRICE BREAKS A TIE THE SKU CANNOT (2026-09-19, with the add panel's
+  // same-item-two-prices rule). The passes above skip any SKU printed twice on
+  // the order, which was the honest answer while a second line of one SKU meant
+  // a split delivery and nothing distinguished the two. It no longer is: the
+  // app now PUTS the same item on an order twice on purpose, and the whole
+  // reason it does is that the two lines are at different prices — thirteen
+  // bags at $50 and the free one at $0. On that order the refusal above leaves
+  // both lines reading "not billed" against an invoice that plainly bills them,
+  // and the manual Match button cannot help, because pairing IS copying a SKU
+  // and both lines already have the right one.
+  //
+  // So: among the lines sharing one SKU, pair by price, and ONLY where the
+  // price decides it outright — exactly one line of that SKU at this price on
+  // each side. Two lines of one SKU at one price is still the split delivery
+  // this refuses to guess at, and still falls through.
+  for (const sku of duplicatedSkus(poSkuCounts)) {
+    const poAt = lines.filter(
+      (l) => !found.has(l.id) && normalizeSku(l.product_id) === sku
+    );
+    // Both forms, because `poSkuCounts` is keyed strictly and an invoice may
+    // print the same part without its leading zeros — the relaxation passes 3
+    // and 4 exist for.
+    const relaxed = withoutLeadingZeros(sku);
+    const invoiceAt = invoiceLines.filter((l) => {
+      if (claimed.has(l)) return false;
+      const keys = skuKeys(l);
+      return keys.includes(sku) || keys.includes(relaxed);
+    });
+    for (const line of poAt) {
+      const price = line.unit_price === null ? null : Number(line.unit_price);
+      if (price === null) continue;
+      // Unique on BOTH sides, which is what makes this a decision rather than
+      // a guess: one invoice line at this price, and this the only order line
+      // it could be describing.
+      const hits = invoiceAt.filter(
+        (l) => !claimed.has(l) && !priceDiffers(invoiceUnitPrice(l), price)
+      );
+      if (hits.length !== 1) continue;
+      const rivals = poAt.filter(
+        (l) =>
+          !found.has(l.id) &&
+          l.unit_price !== null &&
+          !priceDiffers(invoiceUnitPrice(hits[0]), Number(l.unit_price))
+      );
+      if (rivals.length !== 1) continue;
+      claimed.add(hits[0]);
+      found.set(line.id, { invoice: hits[0], by: "product_id" });
+    }
+  }
+
   // Last pass — description, for whatever is left. Best-scoring pair above the
   // threshold wins, one line at a time, so the strongest match is taken first
   // and can't be stolen by a weaker one later.
-  const remainingPo = lines.filter((l) => !found.has(l.id));
+  // A LINE THE SKU REFUSED IS NOT HANDED TO A WEAKER SIGNAL (2026-09-19).
+  // Falling back to description after refusing on ambiguity is backwards: two
+  // lines of one item have, by construction, the SAME description, so the pass
+  // that is meant to be the careful one would score both 1.0 and pair whichever
+  // came first in the array. Measured before this: an order with 6 and 7 of one
+  // mix at one price, billed on two lines, came back fully "matched" by
+  // description — 6↔$300 and 7↔$350, right only by the accident of array order,
+  // and it would have proposed those quantities as confidently had they been
+  // reversed. Refusing is the answer the SKU passes already chose, and the
+  // Match dialog is still the way through: copying the vendor's number onto ONE
+  // of the lines makes it unique, and then both sides join properly.
+  const remainingPo = lines.filter(
+    (l) => !found.has(l.id) && (poSkuCounts.get(normalizeSku(l.product_id) ?? "") ?? 0) < 2
+  );
   const remainingInvoice = invoiceLines.filter((l) => !claimed.has(l));
   const poTokens = new Map(remainingPo.map((l) => [l.id, tokens(poLineText(l))]));
   const invoiceTokens = new Map(
