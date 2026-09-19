@@ -31,6 +31,8 @@ export type ShiftReportRow = {
   mine: boolean;
   sentAt: string | null;
   emailedAt: string | null;
+  /** Set when a sent, emailed report was reopened (107) — see `remove`. */
+  previouslyEmailedAt: string | null;
   updatedAt: string;
 };
 
@@ -156,10 +158,16 @@ export function ShiftReportsList({
       // This was one string through `splitConfirmMessage`, joined with a space
       // rather than a blank line, so the whole message landed in the title.
       title: `Delete the ${SHIFT_SLOT_LABEL[row.shift].toLowerCase()} report for ${row.reportDate}?`,
+      // THREE CASES, not two (2026-09-18). A REOPENED report is a draft whose
+      // ratings and counts the reopen already took back off the records, so
+      // this row is the only copy left — "nothing has been written… discards
+      // the draft" was false for it, and a reopened report was lost that way.
       body:
-        (row.status === "sent"
+        row.status === "sent"
           ? "It has already been sent, so the ratings and counts it wrote stay where they are — only the report goes."
-          : "Nothing has been written to the schedule or to anybody's record yet, so this discards the whole draft."),
+          : row.previouslyEmailedAt
+            ? "This report was sent and emailed, then reopened. Reopening took its ratings off people's records and its counts off the schedule, so this is the only copy left — deleting it loses them for good. To keep them, resume it and send it again."
+            : "Nothing has been written to the schedule or to anybody's record yet, so this discards the whole draft.",
       confirmLabel: "Delete",
       tone: "danger",
     });

@@ -563,3 +563,26 @@
    sent report takes no writes from anyone. Known edge: sending finishes the
    linked checklist only for whoever STARTED that checklist (076), so a manager
    sending somebody else's report gets the existing "was not finished" warning.
+
+   **INCIDENT 2026-09-18: A REOPENED REPORT WAS DELETED BY "CANCEL".** The
+   runner derived `canDiscard` from `canSend`, which was harmless while both
+   meant "the author". The 108 change widened `editable`/`canSend` to managers,
+   and through that coupling a manager's Cancel became a DELETE of somebody
+   else's draft. Mark reopened DF02's 2026-09-18 closing report (which took its
+   35 counts and its ratings back off the schedule and the HR records), pressed
+   Cancel, and the Discard confirm — "Nothing was ever written to the schedule
+   or to anybody's record, so there is nothing else to undo" — was false for a
+   reopened report; the draft was the only copy and it cascaded away. The
+   screen then did not leave, so a second Cancel reported "The report was not
+   discarded — nothing changed", the opposite of the truth. The management
+   email of 20:28 PT is the surviving copy.
+   Fixed the same night: `canDiscard` is computed on the server on its own
+   terms — the AUTHOR's draft, never sent (`previously_emailed_at` null) — and
+   passed to the runner; a successful discard leaves by HARD navigation; the
+   list's Delete confirm has a third case for a reopened report saying it is
+   the only copy. Known gap: a report reopened after a FAILED email has no
+   `previously_emailed_at`, so it still reads as never sent.
+   **Lesson: a permission widened for one act must not flow through a variable
+   another act reads.** `canDiscard = canSend && …` looked like a tidy
+   statement that the two had one owner; it was a promise nobody re-checked
+   when one of them changed.

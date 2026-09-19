@@ -779,6 +779,21 @@ export default async function RunShiftReportPage({
 
   // Everything the email says except the sales figure, which is only known
   // once the Sales page has asked Square — the runner merges that in at Send.
+  // "CANCEL" DELETES THE REPORT, so it is offered on narrower terms than Send
+  // (2026-09-18, after exactly this destroyed a reopened report):
+  //   · YOUR OWN draft — a manager may finish somebody else's (108) but not bin
+  //     it from here; the list's Delete, with its own confirm, is for that.
+  //   · NEVER ONE THAT HAS BEEN SENT. A reopened report's ratings and counts
+  //     were taken back off the records by the reopen, so its draft is the
+  //     ONLY copy left — deleting it is not "discarding a draft", and the
+  //     confirm's "nothing was ever written" would be false.
+  //     `previously_emailed_at` (107) is the evidence; a report reopened after
+  //     a FAILED email has none, which is a known gap.
+  const canDiscard =
+    !isSent &&
+    report.created_by === session.userId &&
+    !previousMail?.previously_emailed_at;
+
   const emailReport: EmailReport = {
     orgName: session.orgName,
     locationCode,
@@ -843,6 +858,7 @@ export default async function RunShiftReportPage({
       shift={shift}
       isSent={isSent}
       canSend={canSend}
+      canDiscard={canDiscard}
       emailReport={emailReport}
       pages={bodies}
       openAtPage={Number.isFinite(openAt) ? openAt : null}

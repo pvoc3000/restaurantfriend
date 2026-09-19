@@ -54,7 +54,7 @@ export default async function ShiftReportsPage() {
       // the TYPE level, and `"a" + "b"` widens to `string`, which collapses
       // every selected column to `GenericStringError`.
       .select(
-        "id, report_date, shift, status, narrative, supervisor_employee_id, created_by, task_ratings_done, task_special_orders_done, task_schedules_done, sent_at, emailed_at, updated_at"
+        "id, report_date, shift, status, narrative, supervisor_employee_id, created_by, task_ratings_done, task_special_orders_done, task_schedules_done, sent_at, emailed_at, previously_emailed_at, updated_at"
       )
       .eq("location_id", active.id)
       .gte("report_date", from)
@@ -106,6 +106,7 @@ export default async function ShiftReportsPage() {
     mine: r.created_by === session.userId,
     sentAt: (r.sent_at as string | null) ?? null,
     emailedAt: (r.emailed_at as string | null) ?? null,
+    previouslyEmailedAt: (r.previously_emailed_at as string | null) ?? null,
     updatedAt: r.updated_at as string,
   }));
 

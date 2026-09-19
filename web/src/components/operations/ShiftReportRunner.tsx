@@ -66,6 +66,7 @@ export function ShiftReportRunner({
   shift,
   isSent,
   canSend,
+  canDiscard,
   emailReport,
   pages,
   openAtPage,
@@ -76,6 +77,11 @@ export function ShiftReportRunner({
   shift: ShiftSlot;
   isSent: boolean;
   canSend: boolean;
+  /**
+   * Whether "Cancel" DELETES the report. Decided on the server and NOT derived
+   * from `canSend` — see the page, and the 2026-09-18 note below.
+   */
+  canDiscard: boolean;
   /**
    * Everything the email says, assembled on the server — except the sales
    * figure, which is only known once the Sales page has asked Square.
@@ -131,10 +137,12 @@ export function ShiftReportRunner({
   // rather than quoting a figure nobody looked at.
   const liveSales = useSyncExternalStore(subscribeSales, salesSnapshot, serverSalesSnapshot);
 
-  // Your own draft, which is exactly what 070's delete policy allows and what
-  // `editable` already means upstream. `canSend` carries that same value; the
-  // two acts have the same owner, which is the point.
-  const canDiscard = canSend && !isSent;
+  // NO LONGER `canSend && !isSent` (2026-09-18). That coupling was true only
+  // while sending and discarding had the same owner. 108 let a manager SEND
+  // anybody's draft, and through this line it also let a manager's Cancel
+  // DELETE one — which is how a supervisor's reopened report was destroyed,
+  // counts, ratings and all, the same evening. Discarding is now decided on
+  // its own terms on the server: your own draft, never sent.
   const hasChecklist = checklistRun !== null;
 
   const page = order[index];
@@ -228,7 +236,12 @@ export function ShiftReportRunner({
       );
       return;
     }
-    router.push("/shift-reports");
+    // A HARD navigation, not `router.push`. On 2026-09-18 the delete succeeded
+    // and the screen stayed on the report, so Cancel was pressed again and the
+    // second attempt — finding nothing — said "The report was not discarded",
+    // which is the opposite of what had happened. Leaving for certain is the
+    // only honest end to a delete.
+    window.location.assign("/shift-reports");
   }
 
   function pause() {
