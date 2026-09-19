@@ -152,11 +152,11 @@ export function ShiftReportsList({
 
   async function remove(row: ShiftReportRow) {
     const ok = await confirmDialog({
-      // The question moves into the body and the title asks it plainly (Mark,
-      // 2026-09-18). A blank line makes them two paragraphs in the panel.
-      title: "Are You Sure?",
+      // THE QUESTION IS THE TITLE, THE CONSEQUENCE THE BODY (Mark, 2026-09-18).
+      // This was one string through `splitConfirmMessage`, joined with a space
+      // rather than a blank line, so the whole message landed in the title.
+      title: `Delete the ${SHIFT_SLOT_LABEL[row.shift].toLowerCase()} report for ${row.reportDate}?`,
       body:
-        `Delete the ${SHIFT_SLOT_LABEL[row.shift].toLowerCase()} report for ${row.reportDate}?\n\n` +
         (row.status === "sent"
           ? "It has already been sent, so the ratings and counts it wrote stay where they are — only the report goes."
           : "Nothing has been written to the schedule or to anybody's record yet, so this discards the whole draft."),
