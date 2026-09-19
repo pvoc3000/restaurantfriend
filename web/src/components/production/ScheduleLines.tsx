@@ -154,6 +154,28 @@ function TaxonomyCell({
 type Grouping = "type" | "tray" | "none";
 
 /**
+ * The four counts summed, for a group's subtotal and the grand total alike
+ * (Mark, 2026-09-19), keyed by column so each lands under its own heading.
+ *
+ * A count cell nobody has filled is left OUT of its sum rather than read as
+ * zero, and a column with no counts at all says nothing — a "0 made" before the
+ * night is counted would read as a result.
+ */
+function lineTotals(rows: ScheduleLineRow[]): Record<string, string> {
+  const cells: Record<string, string> = {};
+  for (const [key, pick] of [
+    ["par", (r: ScheduleLineRow) => r.par],
+    ["made", (r: ScheduleLineRow) => r.made],
+    ["leftover", (r: ScheduleLineRow) => r.leftover],
+    ["sold", (r: ScheduleLineRow) => r.sold],
+  ] as const) {
+    const counted = rows.map(pick).filter((n): n is number => n !== null);
+    if (counted.length > 0) cells[key] = counted.reduce((n, v) => n + v, 0).toLocaleString();
+  }
+  return cells;
+}
+
+/**
  * The night's items.
  *
  * Every cell a human may legitimately change is editable in place — decision 2
@@ -634,13 +656,7 @@ export function ScheduleLines({
             grouping === "type"
               ? (r) => [r.item_type || "(no type)", r.size].filter(Boolean).join(" · ")
               : (r) => (r.tray_number ? `Tray ${r.tray_number}` : "Not on a tray"),
-          summary: (run) => ({
-            par: (
-              <span className="tabular-nums">
-                {run.reduce((n, r) => n + r.par, 0).toLocaleString()}
-              </span>
-            ),
-          }),
+          summary: lineTotals,
         };
 
   return (
@@ -655,26 +671,9 @@ export function ScheduleLines({
         compactBelow={1200}
         columnChooser
         group={group}
-        // THE NIGHT'S GRAND TOTALS (Mark, 2026-09-19), under the columns they
-        // sum. A count cell nobody has filled is left OUT of its sum rather
-        // than read as zero, and a column with no counts at all says nothing —
-        // a "0 made" before the night is counted would read as a result.
-        totals={(shown) => {
-          const sum = (pick: (r: ScheduleLineRow) => number | null) => {
-            const counted = shown.map(pick).filter((n): n is number => n !== null);
-            return counted.length === 0 ? null : counted.reduce((n, v) => n + v, 0).toLocaleString();
-          };
-          const cells: Record<string, string> = { item: "Total", par: sum((r) => r.par)! };
-          for (const [key, pick] of [
-            ["made", (r: ScheduleLineRow) => r.made],
-            ["leftover", (r: ScheduleLineRow) => r.leftover],
-            ["sold", (r: ScheduleLineRow) => r.sold],
-          ] as const) {
-            const total = sum(pick);
-            if (total !== null) cells[key] = total;
-          }
-          return cells;
-        }}
+        // THE NIGHT'S GRAND TOTALS (Mark, 2026-09-19) — `lineTotals`, the
+        // same sums each group's subtotal shows.
+        totals={(shown) => ({ item: "Total", ...lineTotals(shown) })}
         empty={
           <p className="text-sm text-muted">
             Nothing on this schedule. Add an item, or regenerate the day if the
