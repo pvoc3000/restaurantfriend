@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canEnterCounts } from "@/lib/roles";
+import { canEnterCounts, canReadHr } from "@/lib/roles";
 import { daysBefore, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { compareForPremadeSheet } from "@/lib/productionSchedule";
 import { localDateISO, localTime } from "@/lib/timeZone";
@@ -254,10 +254,15 @@ export default async function RunShiftReportPage({
   const nextDay = (report.next_production_date as string | null) ?? null;
   const kitchenId = (report.kitchen_location_id as string) ?? (report.location_id as string);
   const isSent = report.status === "sent";
-  // A sent report is a document. Editing is the author's while it is a draft;
-  // sending is the author's too — `submit_shift_report` re-checks both, so this
-  // only decides what the screen OFFERS.
-  const editable = !isSent && report.created_by === session.userId;
+  // A sent report is a document. A draft is editable and sendable by its author
+  // — and by a manager, whoever wrote it (migration 108, Mark 2026-09-18: "I can
+  // reopen someone else's report, but I can't send it"). 070 already let a
+  // manager update and send any report; only this screen and the three draft
+  // tables still said author-only, so a manager's reopen left a draft nobody
+  // but its author could finish. `submit_shift_report` and the policies
+  // re-check all of it, so this only decides what the screen OFFERS.
+  const editable =
+    !isSent && (report.created_by === session.userId || canReadHr(role));
   const canSend = editable;
 
   const locationCode =

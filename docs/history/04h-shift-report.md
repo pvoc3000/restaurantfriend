@@ -547,3 +547,19 @@
    absent on a report never emailed. Two fixtures cover subject, both bodies and
    that the notice leads. A report reopened BEFORE 107 (DF02's 2026-09-18
    closing) has nothing stashed and re-sends unmarked.
+
+   **A MANAGER CAN FINISH ANYBODY'S DRAFT — migration 108, NOT YET APPLIED as
+   of 2026-09-18** (Mark: "I can reopen someone else's report, but I can't send
+   it or close it again"). 070 already let owner/admin update, delete and SEND
+   any report; two things still said author-only — the runner's `editable`
+   (`created_by === session.userId`) and the write policies on the three draft
+   tables, which carried no manager exemption. So a manager's reopen of a
+   colleague's report produced a draft only its author could finish. The runner
+   now offers edit and Send to the author OR a manager (`canReadHr`), and 108
+   gives the three `*_write` policies the same owner/admin exemption their
+   parent has. Supervisors unchanged. Harness: owner and admin write a count on
+   a supervisor's draft, the author still can, a colleague supervisor is
+   refused, the owner sends it and the count reaches the schedule line, and a
+   sent report takes no writes from anyone. Known edge: sending finishes the
+   linked checklist only for whoever STARTED that checklist (076), so a manager
+   sending somebody else's report gets the existing "was not finished" warning.
