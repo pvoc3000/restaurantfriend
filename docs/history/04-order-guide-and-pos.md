@@ -1273,3 +1273,66 @@
    mid-drag in the pane with synthetic pointer events (`setPointerCapture`
    stubbed, since a synthetic pointer can't be captured): shown on press, the
    line tracking the paper edge, gone on release.
+
+**THE SAME ITEM CAN SIT ON ONE ORDER AT TWO PRICES** (Mark, 2026-09-19: "we
+ordered 13 bags of that mix, they gave us a free bag. I'd like to have the
+master mix appear twice, once at $50 ea. and once at 0 ea."). The Add-items row
+gained a PRICE box beside its amount, resting at what the catalog resolves to
+(the location override, else the base price — design rule 6) and typed over
+freely; arithmetic works in it like every numeric field, an empty box means "no
+price known" and writes null, and a hand-priced row wears a 2px border. The
+merge rule moved from "same vendor item" to `mergeTargetLine` — same vendor item
+AT THE SAME PRICE joins, anything else starts a line — and the Add button says
+which it is about to do (Add to line / New line / Add to PO). **It is the
+general case, not a free-goods special**: a price break partway through a
+quantity, a corrected rate on a split delivery. It has to be, because the
+QUANTITY is the only thing a merge can carry, so two prices in one line would
+report an average nobody was charged. `samePrice` compares at the cent, because
+`unit_price` is `numeric(10,2)` and that is the precision the row will actually
+have; **null is a value there, not a wildcard**, so two priceless lines join and
+a priceless one never absorbs a priced add. No migration — nothing ever
+constrained `(po_id, vendor_item_id)`, and one-off lines had already made two
+lines per item a real state.
+**TWO GUARDS SHIPPED WITH IT AND ARE PART OF THE FEATURE, NOT POLISH.** A $0
+line disagrees with a $50 catalog for ever, and the only way to make them agree
+is to write 0 over a live price that every guide suggestion reads. So
+`isFreeLine` (unit_price 0 — distinct from null, which is "nobody filled it in")
+now stops `priceAction`'s stage 2 offering "Update vendor", and stops
+`closeReadiness` naming the line as a price that differs. **Stage 1 is
+untouched**: an INVOICE reading $0 against a line saying $50 is exactly the
+correction receiving exists for. These two must keep asking the same question —
+the 2026-07-31 BakeMark 112-181120-01 lesson, where the confirm named a price
+the screen offered no button for.
+**A PRICE ALONE IS NOT UNADDED WORK**, and getting that wrong was the first
+thing this shipped broken (caught by Mark within the hour): `add` refuses
+without an amount and deliberately leaves the price box AS TYPED after a
+successful add — so that 13 at $50 then 1 at $0 is two amounts, not two amounts
+and two prices — which meant counting the price made "Close without adding?"
+fire on the way out of every add that had touched one, naming a row already on
+the order. A warning about nothing is how people learn to dismiss warnings.
+`scripts/fixtures/linePrices.fixtures.ts` is 26 cases over `samePrice`,
+`mergeTargetLine`, `isFreeLine` and both guards, checked by breaking the merge
+rule (3 red), receiving's guard (1) and Finalize's (1).
+**KNOWN AND DELIBERATELY LEFT**: `matchInvoiceToOrder` refuses to auto-match a
+SKU appearing twice on an order (`poSkuCounts.get(sku) !== 1`), so a split line
+falls through to the description pass or to a manual link — a refusal that was
+already right, and is now reachable on purpose. PO detail's `≠` marker still
+shows on a free line, which is true if noisy.
+
+**THE ADD-ITEMS TOOLBAR HOLDS TWO CONTROLS, NOT FOUR** (Mark, 2026-09-19, with
+a screenshot: "I'm not sure what's covering what"). The One-off item tab was
+being drawn UNDERNEATH the search box, which paints over it. Cause: the
+TabPicker is `min-w-0 flex-1` and `TextInput search` is `flex-[999_1_0%]`, so
+both have a flex BASIS OF ZERO and neither can ever claim the next line —
+`flex-wrap` on `Dialog`'s toolbar is dead while that is true — and the tab
+group, the one with no floor, was squashed to 159px against the 313px its two
+tabs needed. Measured 138px of overlap. The record count and the received
+warning moved to the FOOTER beside Done (Mark's own suggestion), which is also
+the better reading: a toolbar is what you act with, and those two only say where
+you are. Then the tabs themselves became a PickList captioned **Show:**, 166px
+against 313 — **with the caption INLINE, which is a deliberate exception to
+`ControlField`'s above-never-beside** (Mark: "make the label inline with the
+picklist not above it"). That rule is for a filter ROW, where several collapsed
+controls must begin on one margin; this row is one control and a search box, so
+there is no column to keep and a caption above was the only thing making the
+toolbar two lines tall (81px against 61px).
