@@ -273,7 +273,7 @@ export default async function RunShiftReportPage({
     { data: supervisorRows },
     { data: positionRows },
     { data: ratings },
-    { data: todaySchedule },
+    { data: todaySchedules },
     { data: batchLog },
     { data: salesDays },
     { data: tomorrowOrders },
@@ -303,10 +303,19 @@ export default async function RunShiftReportPage({
     wants("premades")
       ? supabase
           .from("production_schedules")
-          .select("id, title, production_schedule_items(id)")
+          // EVERY schedule for the shop's day except special orders, never
+          // `.maybeSingle()`. A day routinely has more than one: generating a
+          // night also writes a schedule per special order it pulls, and a
+          // shop fed by two kitchens gets one per kitchen. `.maybeSingle()`
+          // returned null with an error on two rows, and the page said "no
+          // schedule" on a day that had one (2026-09-18, DF02: a plan schedule
+          // beside Cafe Knotted's). Special orders are left out because they
+          // are made for a customer, not premades anybody counts back.
+          .select("id, title, created_at")
           .eq("location_id", report.location_id)
           .eq("schedule_date", reportDate)
-          .maybeSingle()
+          .neq("source", "special_order")
+          .order("created_at")
       : SKIP,
     wants("elements")
       ? supabase
@@ -399,13 +408,21 @@ export default async function RunShiftReportPage({
   // ---- premades: the day's lines, with any draft counts laid over them -----
   let premadeRows: PremadeRow[] = [];
   let scheduleTitle: string | null = null;
-  if (wants("premades") && todaySchedule) {
-    scheduleTitle = (todaySchedule.title as string | null) ?? null;
+  const todayScheduleRows = (todaySchedules as Record<string, unknown>[] | null) ?? [];
+  if (wants("premades") && todayScheduleRows.length > 0) {
+    scheduleTitle =
+      todayScheduleRows
+        .map((t) => t.title as string | null)
+        .filter((t): t is string => !!t)
+        .join(" · ") || null;
     const [{ data: lines }, { data: drafts }] = await Promise.all([
       supabase
         .from("v_production_schedule_lines")
         .select("id, item_name, item_type, subtype, par, note, sort")
-        .eq("schedule_id", todaySchedule.id as string)
+        .in(
+          "schedule_id",
+          todayScheduleRows.map((t) => t.id as string)
+        )
         .order("sort"),
       countsQuery(supabase, id),
     ]);
