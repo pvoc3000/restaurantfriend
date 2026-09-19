@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
 import { PickList } from "@/components/ui/PickList";
+import { TabPicker } from "@/components/ui/TabPicker";
 import { DateField } from "@/components/ui/DateField";
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import {
@@ -96,6 +97,11 @@ export function NewInvoice({
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [total, setTotal] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  // Bill or credit memo (2026-09-19). Until now every hand-filed record was a
+  // bill: `is_credit` was set only by the reader, so a credit typed in here
+  // went to QuickBooks as a Bill. The total is typed POSITIVE either way —
+  // 025's rule, the flag carries the sign.
+  const [isCredit, setIsCredit] = useState(false);
 
   const ready = vendorId !== "";
 
@@ -122,6 +128,7 @@ export function NewInvoice({
     setDueDate(null);
     setTotal("");
     setFile(null);
+    setIsCredit(false);
     setFailed(null);
   }
 
@@ -144,7 +151,8 @@ export function NewInvoice({
           invoice_number: invoiceNumber.trim() || null,
           invoice_date: invoiceDate,
           due_date: dueDate,
-          total: total.trim() === "" ? null : Number(total),
+          total: total.trim() === "" ? null : Math.abs(Number(total)),
+          is_credit: isCredit,
           status: "open",
           source: "manual",
         })
@@ -241,7 +249,7 @@ export function NewInvoice({
                 disabled={!ready || pending}
                 className={DIALOG_COMMIT_CLASS}
               >
-                {pending ? "Filing…" : "File invoice"}
+                {pending ? "Filing…" : isCredit ? "File credit memo" : "File invoice"}
               </button>
             </>
           }
@@ -256,6 +264,18 @@ export function NewInvoice({
                 placeholder="Who billed you?"
                 options={vendors.map((v) => ({ value: v.id, label: v.name, inactive: v.inactive }))}
                 activateTable="vendors"
+              />
+            </Field>
+
+            <Field label="Kind">
+              <TabPicker
+                ariaLabel="Kind"
+                value={isCredit ? "credit" : "bill"}
+                onChange={(k) => setIsCredit(k === "credit")}
+                options={[
+                  { key: "bill", label: "Bill" },
+                  { key: "credit", label: "Credit memo" },
+                ]}
               />
             </Field>
 

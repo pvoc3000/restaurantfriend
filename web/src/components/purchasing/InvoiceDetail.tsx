@@ -1384,6 +1384,43 @@ export function InvoiceDetail({
             <section className="min-w-0 space-y-2">
               <SectionHeading>Bill</SectionHeading>
               <dl className={DL_CLASS}>
+              {/* Bill or credit memo (2026-09-19). Until now nothing on
+                  screen could change `is_credit` — a credit the reader
+                  missed (a handwritten CREDIT, a page headed like an invoice)
+                  was stuck as a bill and would have posted as a QuickBooks
+                  Bill. It locks with the money (109), and for the same reason
+                  the money does: it decides the ENTITY QuickBooks receives,
+                  and a Bill there cannot be turned into a VendorCredit — it
+                  would have to be deleted and re-sent. A pick over a boolean
+                  column, so `onWrite` maps the two keys to true/false. */}
+              <Field label="Kind">
+                <Cell
+                  canEdit={canEditFinancials}
+                  value={invoice.is_credit ? "Credit memo" : "Bill"}
+                >
+                  <InlineValue
+                    boxed={BOXED_FIELDS}
+                    table="vendor_invoices"
+                    id={invoice.id}
+                    column="is_credit"
+                    ariaLabel="Kind"
+                    kind="pick"
+                    nullable={false}
+                    value={invoice.is_credit ? "credit" : "bill"}
+                    options={[
+                      { value: "bill", label: "Bill" },
+                      { value: "credit", label: "Credit memo" },
+                    ]}
+                    onWrite={async (next) => {
+                      const { error } = await supabase
+                        .from("vendor_invoices")
+                        .update({ is_credit: next === "credit" })
+                        .eq("id", invoice.id);
+                      return { error: error?.message ?? null };
+                    }}
+                  />
+                </Cell>
+              </Field>
               <Field label="Invoice number">
                 <Cell canEdit={canEditFinancials} value={invoice.invoice_number}>
                   <InlineValue

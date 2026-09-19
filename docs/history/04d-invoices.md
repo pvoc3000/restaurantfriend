@@ -998,3 +998,26 @@
    the scan dialog's rotate / tone / preview / four-corner crop, are in
    `04-order-guide-and-pos.md`. An invoice-owned upload has no `po_id`, so it
    never moves an order's status.
+   **CREDIT MEMOS CAN BE FILED AND CORRECTED BY HAND** (2026-09-19, Mark:
+   "what would we need to do in order to add credit memos to our invoices
+   page that we can push to QBO?"). The answer was: almost nothing, because
+   the plumbing had been there since 025 and 4l — `is_credit` on the row,
+   the reader setting it, `billEntity` posting a credit as a **VendorCredit**
+   with positive amounts and no DueDate, `qbo-sync` refusing an entity that
+   disagrees with the flag, find/link/balance all VendorCredit-aware. What
+   was missing was any way to SET the flag except the reader: `NewInvoice`
+   never wrote it, so a hand-typed credit posted as a Bill, and the detail
+   screen had no field for it, so a misread one was stuck. Two additions:
+   a **Kind** TabPicker (Bill / Credit memo) in the New invoice dialog, whose
+   commit reads "File credit memo" and whose total is stored `Math.abs`'d
+   either way (025: magnitudes positive, the flag carries the sign); and a
+   **Kind** pick in the record's Bill block, a `kind="pick"` InlineValue over
+   a boolean column via `onWrite`, gated on `canEditFinancials`.
+   **Migration 109 adds `is_credit` to the financials lock** — the same
+   one-clause widening as 090 — because the flag decides the QuickBooks
+   ENTITY, and a Bill there cannot become a VendorCredit; flipping it after
+   the push would need a delete-and-resend that nothing automates. Once the
+   field could change, it had to lock with the money it signs. **Credits stay
+   UNLINKED to the bill they credit** (Mark: "leave credits unlinked") — the
+   application happens in QuickBooks at payment time, which this module
+   deliberately does not model.
