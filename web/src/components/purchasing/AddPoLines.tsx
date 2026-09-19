@@ -458,43 +458,59 @@ export function AddPoLines({
                 ]}
               />
               {tab === "catalog" && (
-                <>
-                  <TextInput
-                    autoFocus
-                    value={search}
-                    onValueChange={setSearch}
-                    aria-label="Search this vendor's items"
-                    clearLabel="Clear the search"
-                    search
-                    icon={<SearchGlyph />}
-                  />
-                  <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-                    {filtered.length} of {rows.length} active
-                  </span>
-                </>
-              )}
-              {order.status !== "draft" && (
-                <span className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink">
-                  This order is {PO_STATUS_LABEL[order.status].toLowerCase()} —
-                  adding changes order history
-                </span>
+                <TextInput
+                  autoFocus
+                  value={search}
+                  onValueChange={setSearch}
+                  aria-label="Search this vendor's items"
+                  clearLabel="Clear the search"
+                  search
+                  icon={<SearchGlyph />}
+                />
               )}
             </>
           }
           footer={
-            /* BLACK ONLY WHILE NOTHING IS TYPED IN (Mark, 2026-09-08).
-               The panel-commit exception is about the one outcome a panel is
-               for, and here that outcome MOVES: the moment anything is typed,
-               Add to PO is what finishes the task and Done is the escape beside
-               it. Two black buttons would say nothing about which one to press
-               — and the pale one would be the one that discards the typing. */
-            <button
-              type="button"
-              onClick={() => void closePanel()}
-              className={typedIn ? BUTTON_CLASS : DIALOG_COMMIT_CLASS}
-            >
-              Done
-            </button>
+            <>
+              {/* THE COUNT AND THE WARNING LIVE HERE, NOT IN THE TOOLBAR (Mark,
+                  2026-09-19: "the record count and warning message could live
+                  in the footer with the Done button if needed"). Four things in
+                  the toolbar did not fit and failed SILENTLY: the TabPicker is
+                  `min-w-0 flex-1` and the search box `flex-[999_1_0%]`, so both
+                  have a flex BASIS OF ZERO and neither can ever claim the next
+                  line — `flex-wrap` on the row is therefore dead — and the tab
+                  group, being the one with no floor, was squashed to nothing
+                  and drew One-off item underneath the search box, which paints
+                  over it. Two readouts and a search are also not the same kind
+                  of thing: the toolbar is what you ACT with, and these two only
+                  say where you are. */}
+              <div className="mr-auto flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+                {tab === "catalog" && !loading && (
+                  <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+                    {filtered.length} of {rows.length} active
+                  </span>
+                )}
+                {order.status !== "draft" && (
+                  <span className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink">
+                    This order is {PO_STATUS_LABEL[order.status].toLowerCase()} —
+                    adding changes order history
+                  </span>
+                )}
+              </div>
+              {/* BLACK ONLY WHILE NOTHING IS TYPED IN (Mark, 2026-09-08).
+                  The panel-commit exception is about the one outcome a panel is
+                  for, and here that outcome MOVES: the moment anything is typed,
+                  Add to PO is what finishes the task and Done is the escape beside
+                  it. Two black buttons would say nothing about which one to press
+                  — and the pale one would be the one that discards the typing. */}
+              <button
+                type="button"
+                onClick={() => void closePanel()}
+                className={`shrink-0 ${typedIn ? BUTTON_CLASS : DIALOG_COMMIT_CLASS}`}
+              >
+                Done
+              </button>
+            </>
           }
         >
               {error && <p className="mb-3 text-sm text-accent">{error}</p>}
