@@ -660,6 +660,15 @@ export function PushToQuickBooks({
     // the refusal sentence stood permanently under the button, and under a
     // single Actions trigger that is a line of prose on every bill that is not
     // yet ready to go.
+    //
+    // ONE EXCEPTION, SINCE 2026-09-19 (Mark: "disable 'Send to QuickBooks' …
+    // if the invoice hasn't been approved yet"): approval is not a refusal
+    // that needs words — the Approve row sits directly above this one, and a
+    // greyed row under it says the order of operations by itself, where a
+    // dialog reading "approve it first" only sent you back to the row you had
+    // just passed. Every OTHER refusal (no vendor mapping, no account, no
+    // total) still opens the dialog, because those you cannot see from here.
+    const unapproved = status !== "approved";
     const items: ActionMenuItem[] = canPush
       ? [
           ...(proposal?.ok && !already
@@ -679,7 +688,7 @@ export function PushToQuickBooks({
                       : already
                         ? "Update in QuickBooks"
                         : "Send to QuickBooks",
-                  disabled: busy || checkingDuplicate,
+                  disabled: busy || checkingDuplicate || unapproved,
                   onSelect: () =>
                     void (refusals.length > 0
                       ? alertDialog({
