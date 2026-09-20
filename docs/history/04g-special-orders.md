@@ -1754,6 +1754,31 @@
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.
 
+   **THE STATUS AND "PAID" ARE CHIPS BESIDE THE TITLE SINCE 2026-09-19** (Mark:
+   "add a chip next to the page title that says the status in yellow, and a
+   chip that says 'Paid' in green if the order is paid"). `PurchaseOrderDetail`
+   already wore one — same box, same type, same `gap-4` row — so this is the
+   second record screen adopting a badge the first one settled, not a new part:
+   the layout half of the class string is a local `CHIP` const and each chip
+   states its own colours, which is CLAUDE.md's rule for a shared class string.
+   **THE STATUS MOVED OUT OF THE LINE BELOW rather than joining it.** It had
+   been plain text in `#9469 · Order · 2026-01-09 · …`; the same word twice,
+   20px apart, reads as two facts. That line keeps the KIND for a template or a
+   standing order — `#9762 · Standing order · …` — which has no status to chip
+   (decision 3), so the chip and the word are never both on screen.
+   **ONE YELLOW FOR EVERY STATUS, not a colour per rung.** Yellow is the app's
+   "worth your eye" mark and the chip is here to be read at a glance; a
+   five-colour ladder would make the colour the message and leave the word as
+   decoration. Green is spoken for by Paid.
+   **PAID IS THE `invoice_paid_at` STAMP** — what the list's Paid stage column
+   and the progress ladder's "Invoice paid" rung both mean by the word.
+   Deliberately NOT `isSettled`, which counts `ignore_balance` (decision 13's
+   weekly-statement escape hatch) as settled: a wholesale day that has not been
+   billed yet is not a paid order, and a green chip saying so would be a lie on
+   every Cafe Knotted record. The money keeps speaking for itself on the line
+   below, where an outstanding balance still prints as "$X due" in `text-accent`
+   — so the two facts stay separable, which is the whole reason there are two.
+
    **(o) THE RECORD LOST ITS PINNED BAR, THE DOCUMENT PICKER, AND THE COLUMN
    UNDER THE MONEY** (Mark, 2026-08-19, three layout notes in one).
    **THE COMMANDS ARE LEVEL WITH THE TITLE** — right-aligned in the identity

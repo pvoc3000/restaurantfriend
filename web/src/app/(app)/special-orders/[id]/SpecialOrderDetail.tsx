@@ -58,6 +58,14 @@ import { canScheduleProduction } from "@/lib/roles";
 
 const SPECIAL_ORDERS_CRUMB = { href: "/special-orders", label: "Special Orders" };
 
+/**
+ * The app's chip box, layout only — the exact string the purchase order and
+ * pay period chips carry. LAYOUT HERE, COLOURS AT THE CALL SITE, which is
+ * CLAUDE.md's rule for a shared class string.
+ */
+const CHIP =
+  "inline-flex h-6 items-center border px-2 text-[12px] font-semibold uppercase tracking-[0.12em]";
+
 /** How many log entries one record fetches. A twelve-year order carries a few
  *  hundred; the block states the total beside what it shows. */
 const LOG_PAGE = 200;
@@ -407,13 +415,43 @@ export async function SpecialOrderDetail({
           content it belongs to. */}
       <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4 lg:ml-48">
         <div className="min-w-0 space-y-2">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            {(row.title as string) || `Order ${row.number as string}`}
-          </h1>
+          {/* THE STATUS IS A CHIP BESIDE THE TITLE (Mark, 2026-09-19) — the
+              purchase order record's header exactly: same box, same type, same
+              `gap-4` row, so the two record screens wear one badge.
+
+              IT MOVED OUT OF THE LINE BELOW rather than joining it. The status
+              read as plain text there, and the same word twice 20px apart reads
+              as two different facts. The line keeps the KIND for a template or
+              a standing order, which has no status to chip (decision 3).
+
+              ONE YELLOW FOR EVERY STATUS, not a colour per rung. Yellow is this
+              app's "worth your eye" mark and the chip is here to be read at a
+              glance; a five-colour ladder would make the colour the message and
+              leave the word as decoration. Green is spoken for below.
+
+              PAID IS THE `invoice_paid_at` STAMP — what the list's Paid column
+              and the progress ladder's "Invoice paid" rung both mean by that
+              word. Deliberately NOT `isSettled`, which counts `ignore_balance`
+              (decision 13's weekly-statement escape hatch) as settled: a
+              wholesale order that has not been billed yet is not a paid one.
+              The money still speaks for itself on the line below, where an
+              outstanding balance prints as "$X due". */}
+          <div className="flex flex-wrap items-center gap-4">
+            <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+              {(row.title as string) || `Order ${row.number as string}`}
+            </h1>
+            {status ? (
+              <span className={`${CHIP} border-ink bg-[var(--rf-yellow-200)] text-ink`}>
+                {STATUS_LABEL[status]}
+              </span>
+            ) : null}
+            {row.invoice_paid_at ? (
+              <span className={`${CHIP} border-ink bg-[var(--rf-green-200)] text-ink`}>Paid</span>
+            ) : null}
+          </div>
           <p className="text-sm text-muted">
             <span className="tabular-nums">#{row.number as string}</span>
-            {" · "}
-            {kind === "order" ? (status ? STATUS_LABEL[status] : "—") : KIND_LABEL[kind]}
+            {kind === "order" ? "" : ` · ${KIND_LABEL[kind]}`}
             {row.event_date ? ` · ${row.event_date as string}` : ""}
             {" · "}
             {customer ? (
