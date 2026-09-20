@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { TextInput } from "@/components/ui/TextInput";
 import { PickList } from "@/components/ui/PickList";
 import { DateField } from "@/components/ui/DateField";
@@ -55,7 +56,20 @@ export function NewSpecialOrder({
   defaultLocationId,
   today,
   takenBy,
+  children,
 }: {
+  /**
+   * Render the command as an `ActionMenu` row instead of a button — the record
+   * screen's Actions menu (Mark, 2026-09-20: "add a 'New Order…' option to the
+   * nav menu on the special order detail page"). `ScheduleProduction`'s idiom
+   * exactly: this component keeps its own dialog, its own state and its own
+   * insert, and hands the caller a row rather than drawing a button.
+   *
+   * It is the same dialog the list opens, which is the whole point — a second
+   * create form on the record would be the "second version that never behaves
+   * quite like the first" the conventions warn about.
+   */
+  children?: (items: ActionMenuItem[]) => ReactNode;
   /** Passed down rather than looked up. The old code read `org_members`
    *  UNFILTERED and took `.maybeSingle()`, which is correct for exactly one
    *  member and an error for two — the select policy shows you every member of
@@ -172,11 +186,26 @@ export function NewSpecialOrder({
     });
   }
 
+  /**
+   * "NEW ORDER…" ON THE MENU, "NEW SPECIAL ORDER" ON THE LIST, and the two
+   * labels differ on purpose: the list's button stands beside a heading reading
+   * SPECIAL ORDERS, where the word would be said twice, and the record's menu
+   * row sits above "Duplicate", where it has to say which noun it makes.
+   * Title Case with an ellipsis, like every other row that opens a dialog.
+   */
+  const menuItems: ActionMenuItem[] = [
+    { label: "New Order…", onSelect: () => setOpen(true) },
+  ];
+
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={BUTTON_CLASS}>
-        New special order
-      </button>
+      {children ? (
+        children(menuItems)
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} className={BUTTON_CLASS}>
+          New special order
+        </button>
+      )}
 
       {open && (
         <Dialog

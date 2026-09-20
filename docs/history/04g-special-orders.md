@@ -1754,6 +1754,30 @@
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.
 
+   **"NEW ORDER…" IS ON THE RECORD'S ACTIONS MENU SINCE 2026-09-20** (Mark: "add
+   a 'New Order…' option to the navmenu on the special order detail page").
+   **It is the LIST'S dialog, not a second one** — `NewSpecialOrder` gained
+   `ScheduleProduction`'s render-prop idiom, so it keeps its own state, its own
+   dialog and its own insert and hands the menu a row instead of drawing a
+   button. A create form written again on the record is exactly the "second
+   version that never behaves quite like the first" the conventions warn about,
+   and this one would have had to learn pickup/delivery twice.
+   **IT SITS IN ITS OWN GROUP, DIRECTLY ABOVE DUPLICATE.** Those two are the
+   only rows on the menu that end with a DIFFERENT order on screen — one from
+   this shape, one from nothing — where everything above them acts on the record
+   you are standing on. Its own rule, because it is the one command here that is
+   not about this order at all.
+   **A GROUP ONLY WEARS ITS RULE WHEN SOMETHING IS ABOVE IT.** On a template
+   there are no documents and no QuickBooks row, so the first group would have
+   opened the menu with a line drawn across the top of nothing — the condition
+   the edit group already carried, now reckoning with a second optional group
+   before it.
+   **The two labels differ on purpose**: the list's button says "New special
+   order" beside a heading reading SPECIAL ORDERS, where the word would be said
+   twice; the menu row says "New Order…" above "Duplicate", where it has to name
+   the noun it makes. Title Case with an ellipsis, like every row that opens a
+   dialog.
+
    **THE CREATE DIALOG ASKS PICKUP OR DELIVERY SINCE 2026-09-20** (Mark: "give
    the user the option for pickup or delivery. If delivery, allow the user to
    enter the delivery address as well"). **It earns its place by the create-

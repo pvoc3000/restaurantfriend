@@ -598,6 +598,22 @@ export async function SpecialOrderDetail({
                     }
                   : null
               }
+              create={
+                /* "New Order…" — the list's own dialog, reached from the
+                   record (Mark, 2026-09-20). Every kind offers it: a new order
+                   is not about the record you are standing on, which is also
+                   why it wears its own rule above Duplicate. The working shop
+                   is the pickup default, exactly as it is on the list. */
+                canWrite
+                  ? {
+                      orgId: session.membership.org_id,
+                      kitchens: session.activeLocations.map((l) => ({ id: l.id, code: l.code })),
+                      defaultLocationId: session.activeLocation?.id ?? null,
+                      today,
+                      takenBy: session.membership.display_name ?? session.email,
+                    }
+                  : null
+              }
               actions={{
                 scheduled,
                 id,
