@@ -11,6 +11,7 @@ import {
   parseSpecialOrderView,
 } from "@/lib/specialOrderView";
 import { orderTotals, readSettings, topUpWindow } from "@/lib/specialOrders";
+import { orderRangeBounds } from "@/lib/specialOrderRange";
 import {
   SpecialOrdersList,
   type SpecialOrderRow,
@@ -96,19 +97,27 @@ export default async function SpecialOrdersPage({
   });
 
   /**
-   * The window. Twelve years and 8,330 orders is not a list, so the default is
-   * everything from a month ago forward plus the templates and standing orders
-   * — which is what the `upcoming` view shows anyway. `?range=all` is the
-   * escape hatch the `past` view needs, and the list says when it is capped.
+   * The window. Twelve years and 8,330 orders is not a list, so the server
+   * fetches only the dates the filter is asking for — and says when it is
+   * capped.
+   *
+   * IT RESOLVES THE SAME TOKEN THE PICKER DOES (`lib/specialOrderRange`,
+   * 2026-09-20). This used to be `view === "past" || view === "all"` with a
+   * hard-coded month of slack and a comment warning that the two must be kept
+   * in step by hand — "a window that disagrees with the filter shows an empty
+   * list and blames the filter for it". They cannot disagree now: one function
+   * turns the token into dates, and the query and the control each ask it.
+   *
+   * It is also what makes the picker's CALENDAR work at all. The old window
+   * was a month back at the widest unless you said `past` or `all`, so a range
+   * tapped in 2024 would have filtered rows the server never loaded.
+   *
+   * A null bound is all time — no date filter, the old `showAll`. And a record
+   * with NO event date (every template and standing order) survives every
+   * window, or the Kind menu would lead to an empty list.
    */
-  // `past` and `all` are the two views that ask to look backwards. They must
-  // match the `view` dimension's option values in `SpecialOrdersList` — a
-  // window that disagrees with the filter shows an empty list and blames the
-  // filter for it.
   const view = Array.isArray(viewParams.view) ? viewParams.view[0] : viewParams.view;
-  const showAll = view === "past" || view === "all";
-  const since = new Date(`${today}T00:00:00Z`);
-  since.setUTCDate(since.getUTCDate() - 30);
+  const bounds = orderRangeBounds(view, today);
 
   let query = supabase
     .from("special_orders")
@@ -125,10 +134,10 @@ export default async function SpecialOrdersPage({
     .order("event_date", { ascending: false })
     .limit(500);
 
-  // A record with no event date — every template and standing order — must
-  // survive the window, or the KIND menu would lead to an empty list.
-  if (!showAll) {
-    query = query.or(`event_date.gte.${since.toISOString().slice(0, 10)},event_date.is.null`);
+  if (bounds) {
+    query = query.or(
+      `and(event_date.gte.${bounds.from},event_date.lte.${bounds.to}),event_date.is.null`
+    );
   }
 
   const { data: orders, error } = await query;

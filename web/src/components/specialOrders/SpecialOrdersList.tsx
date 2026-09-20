@@ -2,6 +2,17 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { RangePicker } from "@/components/ui/RangePicker";
+import type { DateRange } from "@/lib/dateRange";
+import {
+  DEFAULT_ORDER_RANGE,
+  ORDER_RANGE_PRESETS,
+  inOrderRange,
+  isOrderRangeToken,
+  orderRangeBounds,
+  orderRangeToken,
+} from "@/lib/specialOrderRange";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import {
   SPECIAL_ORDER_VIEW_COOKIE,
@@ -289,49 +300,33 @@ export function SpecialOrdersList({
          */
         key: "view",
         label: "Show",
-        // The bar prepends its own FILTER_ALL option, and it is labelled the
-        // same as the explicit `all` below ON PURPOSE — see that option.
-        allLabel: "All Orders",
-        options: [
-          { value: "upcoming", label: "Upcoming" },
-          { value: "tomorrow", label: "Tomorrow" },
-          { value: "past", label: "Past" },
-          /**
-           * A REAL TOKEN FOR "NO FILTER", which a dimension with a
-           * `defaultValue` cannot do without — `lib/filterMenus` says so
-           * outright and `/recipes` writes `?tier=all` for the same reason.
-           *
-           * `FILTER_ALL` is the empty string, and an empty value cannot be
-           * written to a query string, so "absent" and "all" would be the same
-           * URL and the DEFAULT would win: picking All orders, opening a
-           * record and coming back would silently put you on Upcoming. Caught
-           * against the real 8,330 rows, not by review.
-           *
-           * The cost is that the menu carries two entries reading "All orders"
-           * — the bar's own and this one. They do the same thing; only this one
-           * survives a reload. Suppressing the bar's would mean changing a
-           * control six lists share, to remove an option that is correct
-           * everywhere else.
-           */
-          { value: "all", label: "All Orders" },
-        ],
-        // Upcoming: the working view, and the list's resting state.
-        defaultValue: "upcoming",
-        matches: (r, v) => {
-          if (v === "all") return true;
-          // Templates and standing orders have no event date, so every
-          // date-based view would hide them. They are reached through the KIND
-          // menu, which is FileMaker's saved finds, and `all` shows them.
-          if (v === "upcoming")
-            return r.kind === "order" && r.status !== "cancelled" && !!r.event_date && r.event_date >= today;
-          if (v === "tomorrow") {
-            const d = new Date(`${today}T00:00:00Z`);
-            d.setUTCDate(d.getUTCDate() + 1);
-            return r.event_date === d.toISOString().slice(0, 10);
-          }
-          if (v === "past") return !!r.event_date && r.event_date < today;
-          return true;
-        },
+        /**
+         * IT IS STILL A DIMENSION, and that is what buys the conversion for
+         * almost nothing: `parseFilterValues`, `filterHref` and the view cookie
+         * all read the dimension list, so the window keeps travelling in the
+         * URL exactly as it did. What changed is the CONTROL — `FilterMenus` is
+         * handed every dimension but this one, and a `RangePicker` is rendered
+         * in its place. A dimension nobody draws a menu for is still a filter.
+         *
+         * The options are the presets, so the ordinary machinery recognises
+         * `?view=past`; `accepts` is what lets a calendar pair through, which
+         * no list of options could hold. The vocabulary and the matcher both
+         * live in `lib/specialOrderRange` — the SERVER reads the same token to
+         * size its own window, and the one thing that must never drift is those
+         * two disagreeing about what "past" means.
+         */
+        options: ORDER_RANGE_PRESETS.map((p) => ({ value: p.key, label: p.label })),
+        accepts: isOrderRangeToken,
+        // Upcoming: the working view, and the list's resting state, as it was.
+        defaultValue: DEFAULT_ORDER_RANGE,
+        /**
+         * PURELY A DATE TEST NOW. `upcoming` used to also require
+         * `kind === "order"` and a status other than cancelled — three
+         * questions in one menu option, which is the arrangement Mark has just
+         * unpicked. Show answers WHEN; a cancelled order still happens on its
+         * day, and Status is where you say you do not want to see it.
+         */
+        matches: (r, v) => inOrderRange(r.event_date, orderRangeBounds(v, today)),
       },
       {
         key: "kind",
@@ -405,6 +400,12 @@ export function SpecialOrdersList({
     ];
   }, [rows, today, attention]);
 
+  /** Everything the bar draws a MENU for — see the `view` dimension's note. */
+  const menuDimensions = useMemo(
+    () => dimensions.filter((d) => d.key !== "view"),
+    [dimensions]
+  );
+
   /**
    * The address bar wins when it carries a view; otherwise the props do.
    *
@@ -419,6 +420,8 @@ export function SpecialOrdersList({
     const live = urlFilterParams(PATH);
     return hasViewParams(live) ? (live as RawSearchParams) : initialFilters ?? {};
   };
+
+  const router = useRouter();
 
   const [search, setSearch] = useState(() => {
     const live = urlFilterParams(PATH);
@@ -439,14 +442,50 @@ export function SpecialOrdersList({
    * A session cookie (no max-age) is what "until you log out" means here, and
    * `clearSessionCookies` drops it.
    */
-  function writeUrl(f: FilterValues, q: string, s: ListSort | null) {
+  function writeUrl(f: FilterValues, q: string, s: ListSort | null, navigate = false) {
     const href = filterHref(PATH, dimensions, f, q, s);
-    window.history.replaceState(null, "", href);
     document.cookie = `${SPECIAL_ORDER_VIEW_COOKIE}=${viewCookieValue(href)}; path=/; SameSite=Lax`;
+    // THE DATE WINDOW IS A SERVER FILTER, so changing it must re-run the page —
+    // `router.push`, where every other control gets `replaceState` (the PO
+    // list's lesson, in its own words). `page.tsx` fetches a window sized from
+    // this same token, so a range the server has not been told about would
+    // filter rows it never loaded: an empty list, blaming the filter.
+    if (navigate) router.push(href);
+    else window.history.replaceState(null, "", href);
   }
-  const changeFilters = (next: FilterValues) => { setFilters(next); writeUrl(next, search, sort); };
+  /**
+   * THE BAR'S "CLEAR" MUST NOT TAKE THE WINDOW WITH IT.
+   *
+   * `FilterMenus` is handed every dimension but `view`, so `clearedFilters`
+   * hands back a record that has no `view` in it — and this setter replaces the
+   * whole record. Without the merge, pressing Clear while looking at Past would
+   * drop the window back to Upcoming CLIENT-SIDE ONLY, leaving the server
+   * holding a year of past orders and the filter asking for future ones: the
+   * empty list `page.tsx` has always warned about.
+   *
+   * Keeping it is also the right behaviour. Clear means "clear the menus"; the
+   * range wears its own ✕, which clears it to All Time.
+   */
+  const changeFilters = (next: FilterValues) => {
+    const merged =
+      next.view === undefined && filters.view !== undefined
+        ? { ...next, view: filters.view }
+        : next;
+    setFilters(merged);
+    writeUrl(merged, search, sort);
+  };
   const changeSearch = (next: string) => { setSearch(next); writeUrl(filters, next, sort); };
   const changeSort = (next: ListSort) => { setSort(next); writeUrl(filters, search, next); };
+  /**
+   * `setFilters` AS WELL AS pushing: the push re-renders the server component
+   * but does NOT remount this one, so state seeded from props would otherwise
+   * keep showing the old window on the control.
+   */
+  function changeRange(picked: DateRange | null) {
+    const next = { ...filters, view: orderRangeToken(picked, today) };
+    setFilters(next);
+    writeUrl(next, search, sort, true);
+  }
 
   const searched = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -788,26 +827,50 @@ export function SpecialOrdersList({
           rows={searched}
           total={rows.length}
           noun="orders"
-          dimensions={dimensions}
+          /* EVERY DIMENSION BUT THE WINDOW. `view` is still a dimension — it is
+             what carries the range into the URL and the cookie — but it is
+             drawn as a `RangePicker` beside the search rather than as a menu.
+             See the dimension's own note. */
+          dimensions={menuDimensions}
           values={filters}
           onChange={changeFilters}
           leading={
-            <div className={`${SEARCH_PEN} space-y-1.5`}>
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                Search
-              </span>
-              <TextInput
-                value={search}
-                onValueChange={changeSearch}
-                fullWidth
-                // `search` for the sunken dress (Mark, 2026-09-13); `fullWidth`
-                // still decides the width, the caption block wearing the pen.
-                search
-                aria-label="Search special orders"
-                clearLabel="Clear the search"
-                icon={<SearchGlyph />}
-              />
-            </div>
+            <>
+              <div className={`${SEARCH_PEN} space-y-1.5`}>
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Search
+                </span>
+                <TextInput
+                  value={search}
+                  onValueChange={changeSearch}
+                  fullWidth
+                  // `search` for the sunken dress (Mark, 2026-09-13); `fullWidth`
+                  // still decides the width, the caption block wearing the pen.
+                  search
+                  aria-label="Search special orders"
+                  clearLabel="Clear the search"
+                  icon={<SearchGlyph />}
+                />
+              </div>
+              {/* THE WINDOW SITS FIRST AMONG THE FILTERS, straight after the
+                  search, which is where the PO list and the bill list both put
+                  theirs. It keeps the word "Show", because that is what the
+                  menu it replaces was called and it is still the same question
+                  — only now asked with a calendar. */}
+              <div className="w-44 space-y-1.5">
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Show
+                </span>
+                <RangePicker
+                  value={orderRangeBounds(filters.view ?? DEFAULT_ORDER_RANGE, today)}
+                  onChange={changeRange}
+                  presets={ORDER_RANGE_PRESETS}
+                  today={today}
+                  ariaLabel="Which orders to show"
+                  className="w-full"
+                />
+              </div>
+            </>
           }
           // `PageHeading` states the count now — see `showCount`.
           showCount={false}

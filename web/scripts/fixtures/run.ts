@@ -47,6 +47,7 @@ import "./vendors.fixtures";
 import "./workday.fixtures";
 import "./createSpecialOrder.fixtures";
 import "./percent.fixtures";
+import "./specialOrderRange.fixtures";
 import "./orderWorkflow.fixtures";
 import "./overtime.fixtures";
 import "./overtimeOrder.fixtures";

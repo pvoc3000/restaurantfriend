@@ -56,6 +56,21 @@ export type FilterDimension<T> = {
   /** What the unset option reads as, when "All" isn't the natural word. */
   allLabel?: string;
   /**
+   * A dimension whose vocabulary is OPEN — a value that is legal without being
+   * one of `options`.
+   *
+   * Built for the special order list's date window (2026-09-20), which is a
+   * `RangePicker` rather than a menu: its presets are real options, and a pair
+   * of dates somebody tapped on the calendar is `2026-01-01..2026-03-31`, which
+   * no list of options could ever hold. Without this, `parseFilterValues` reads
+   * such a URL as unrecognised and falls back to the default — so a custom
+   * range would survive being picked and not survive being bookmarked.
+   *
+   * It only ever WIDENS what parses. Nothing else about the dimension changes,
+   * and a dimension without it behaves exactly as before.
+   */
+  accepts?: (value: string) => boolean;
+  /**
    * THE RESTING VALUE — what this dimension says when the URL says nothing, and
    * the value that therefore writes no parameter.
    *
@@ -216,7 +231,8 @@ export function parseFilterValues<T>(
   const values: FilterValues = {};
   for (const dimension of dimensions) {
     const raw = one(params[dimension.key]);
-    if (raw && dimension.options.some((o) => o.value === raw)) values[dimension.key] = raw;
+    if (raw && (dimension.options.some((o) => o.value === raw) || dimension.accepts?.(raw)))
+      values[dimension.key] = raw;
     // A dimension that rests somewhere other than "All" states its resting
     // value, so a caller can drive a control from this record alone. One that
     // rests at "All" stays ABSENT, which is what every existing caller and

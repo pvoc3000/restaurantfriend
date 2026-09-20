@@ -1754,6 +1754,55 @@
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.
 
+   **AND SHOW IS A RANGEPICKER — 2026-09-20** (Mark: "convert the show picklist
+   to a rangepicker"). With the two non-time options gone to Status, what was
+   left of that menu was four words for date windows, and the app already has a
+   control for one on five other lists.
+   **IT IS STILL A DIMENSION, WHICH IS WHAT BUYS THE CONVERSION FOR ALMOST
+   NOTHING.** `parseFilterValues`, `filterHref` and the view cookie all read the
+   dimension list, so the window still travels in the URL and survives a hard
+   load exactly as it did — `FilterMenus` is simply handed every dimension BUT
+   this one, and a `RangePicker` is drawn in its place. A dimension nobody
+   draws a menu for is still a filter. `?view=past` and `?view=all` keep
+   working, so the desk start links needed no second edit.
+   **ONE TOKEN, BECAUSE THE WINDOW IS A SERVER FILTER.** `lib/specialOrderRange`
+   turns `view` into dates, and the QUERY and the PICKER each ask it. This is
+   the fix for a warning `page.tsx` has carried since the list was built — the
+   server's idea of the window and the filter's "must match — a window that
+   disagrees with the filter shows an empty list and blames the filter for it" —
+   which was kept true by hand and by a hard-coded month of slack. It is also
+   what makes the calendar work at all: the old window was a month back at its
+   widest unless you said `past` or `all`, so a range tapped in 2024 would have
+   filtered rows the server never loaded.
+   **CHANGING THE RANGE PUSHES; every other control still replaces.** The PO
+   list's lesson in its own words, and the reason `setFilters` runs beside the
+   push: the push re-renders the server component without remounting this one.
+   **TWO PRESETS ARE OPEN AT ONE END AND SAY SO WITH A SENTINEL.** `DateRange`
+   is a closed pair and Upcoming and Past are not, so they are bounded at 1900
+   and 2999 — dates no donut order will carry — which keeps them ordinary ranges
+   everywhere else: the calendar paints them, the server compares them, and
+   `matchingPreset` puts the WORD back on the control's face. Past ends
+   YESTERDAY, so today belongs to exactly one of the two.
+   **`accepts` IS A ONE-LINE WIDENING OF `lib/filterMenus`.** A calendar pair is
+   `2024-01-01..2024-03-31`, which no list of options can hold, and
+   `parseFilterValues` validated against options — so a custom range would have
+   survived being picked and not survived being bookmarked.
+   **TWO BUGS THE FIXTURES FOUND, NEITHER BY REVIEW.** A digit-shaped token
+   (`2024-13-45`) matched the pattern, and this value is interpolated STRAIGHT
+   into `event_date.gte.…`, so a typo in the address bar would have come back as
+   a Postgres date-parse error in place of the whole list; it now falls back to
+   the resting view. And the bar's **Clear** hands back a record with no `view`
+   in it, which would have dropped the window to Upcoming client-side only while
+   the server still held a year of past orders — the exact empty list above.
+   Clear now keeps the window, which is also the right reading: it clears the
+   MENUS, and the range wears its own ✕.
+   **`upcoming` LOST TWO QUESTIONS IT SHOULD NEVER HAVE ASKED.** It had matched
+   `kind === "order" && status !== "cancelled" && event_date >= today` — three
+   questions in one option. Show answers WHEN: a cancelled order still happens
+   on its day, and Status is where you say you would rather not see it.
+   The generated PostgREST filter was checked by building the query and reading
+   its URL: `or=(and(event_date.gte.…,event_date.lte.…),event_date.is.null)`.
+
    **SHOW ANSWERS "WHEN", STATUS ANSWERS "WHAT STATE" — 2026-09-20** (Mark:
    "move 'unpaid' from the show picklist to the status picklist", then "move
    'needs attention' from show to the status picklist too, and any others that
