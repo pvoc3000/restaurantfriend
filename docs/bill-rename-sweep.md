@@ -89,39 +89,65 @@ make the name lie.
 - **The edge modes** `push_bill`, `find_bills`, `refresh_status` — already
   correct before this.
 
-## Order of operations
+## Order of operations — DONE 2026-09-20
 
-The app 404'd on two screens between 005's SQL and its code ship. This one
-breaks three deployables, so the order is tighter:
+The app 404'd on two screens between 005's SQL and its code ship. This one broke
+three deployables, so the order was tighter:
 
-1. Code lands on `main`, unpushed (commits `39ac16b`, `ba4b256`, and this one).
-2. Mark runs **110** in the Supabase SQL editor, then **111**.
-   *From here `/bills`, the QuickBooks push and the realm-change clear are all
-   broken until step 3.*
+1. Code on `main` (`39ac16b`, `ba4b256`, `37fb535`).
+2. Mark ran **110** then **111** in the Supabase SQL editor. *From there
+   `/bills`, the QuickBooks push and the realm-change clear were all broken
+   until step 3.*
 3. `supabase functions deploy qbo-sync` and `supabase functions deploy qbo-oauth`.
 4. Restart `next dev`.
 
 The edge deploy **cannot** be separated from the SQL — both name the table
-literally — which is why 3 follows 2 immediately. Nothing is in production use,
+literally — which is why 3 follows 2 immediately. Nothing was in production use,
 so no dual-name compatibility shim was written.
 
-## Verify
+## Verified 2026-09-20, after both migrations were applied
 
-1. `cd web && npx tsc --noEmit && npm run lint && npm run fixtures` — all clean,
-   1,916 cases.
-2. `grep -rn "vendor_invoice" web/src supabase/functions` → no hits.
-   `grep -rn "/invoices" web/src` → no hits.
-3. 110's own verify block, run in the SQL editor: no constraint, index, policy,
-   trigger or function on either table still says "invoice"; five functions
-   under the new names and none under the old; `anon` still cannot execute
-   either definer function; row counts unchanged.
-4. Live: `/bills` lists the same rows; Void → Reopen round-trips
-   (`set_vendor_bill_approval`); editing `total` on an approved bill still
-   refuses, now saying "bill"; **after 111**, editing `discount` on an approved
-   bill refuses too — that is the only behavioural change in the pair; push a
-   bill to QuickBooks and refresh its status; vendor record → Bills tab.
-5. Confirm the A/R side is untouched: a special order still reads status
-   Invoice, still offers "Send Invoice", still pushes to QuickBooks.
+1. `npx tsc --noEmit`, `npm run lint`, `npm run fixtures` — clean, 1,916 cases.
+2. `grep -rn "vendor_invoice" web/src supabase/functions` and
+   `grep -rn "/invoices" web/src` — no hits.
+3. **Dry run before Mark touched the hosted DB.** 110 is not rerunnable, so both
+   migrations were applied first to a throwaway Postgres 15 loaded with a
+   condensed fixture carrying the real object names. Everything renamed, nothing
+   left over, `anon` still refused both definer functions.
+4. **Live schema:** 87 bills, 697 lines, 88 attachments — counts unchanged.
+   `vendor_invoices` / `vendor_invoice_lines` gone (`PGRST205`); all three old
+   columns gone (`42703`); `set_vendor_invoice_approval` gone (`PGRST202`);
+   `set_vendor_bill_approval` and `record_accounting_push(p_bill, …)` both
+   answer and refuse with zero rows.
+5. **Live lock**, on a throwaway bill created and deleted for the purpose (count
+   back to 87): on an approved bill `total` and `discount` are both REFUSED with
+   *"This bill is approved — withdraw approval before editing its figures."*,
+   `notes` is still editable, and after reopening, `discount` saves and stamps
+   `financials_touched_at`. **The `discount` refusal is 111 working — it
+   succeeded before.**
+6. **Live edge function**, the part `tsc` cannot see because Deno imports
+   nothing from `web/src`. A one-off magic-link session on the owner account
+   (read-only `find_bills` only, signed out after) returned `{"candidates":[]}`
+   for `bill_ids` with a non-matching uuid — the renamed field and
+   `vendor_bills` both cross the wire.
+   **Sharp edge found: the OLD field name does not error, it silently means "no
+   filter"**, so `find_bills` with `invoice_ids` returns candidates for every
+   unpushed bill. Pre-existing (the field was always optional), harmless now
+   that client and function deploy together, but it is how a stale client would
+   look like it was working.
+7. **Live UI:** `/bills` lists and filters (Bill / Credit Memo); the detail
+   screen keeps `INVOICE NUMBER`, `INVOICE DATE`, the `Invoiced` column and the
+   attachment kind `Invoice`; the command menu reads Approve for Payment · Send
+   to QuickBooks · Void Bill · Delete Bill…; the nav tab and the vendor record's
+   fourth tab both read Bills and `?tab=bills` resolves.
+8. **A/R untouched:** the special-order status filter still offers Invoice, and
+   the stage legend still reads Lead · Quote sent · Quote returned · Invoice
+   sent · Invoice paid · Printed & scheduled.
+
+**Not done, deliberately:** nobody pressed Approve or Void on a real bill.
+`set_vendor_bill_approval` writes `approved_by = auth.uid()`, and an approval is
+a claim about who said so — it must not say a session that was minted for
+testing.
 
 ## The bug found on the way
 

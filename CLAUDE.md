@@ -382,6 +382,46 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 
 ## Open threads (pinned by Mark — don't act without asking)
 
+- **CUSTOMER INVOICES (A/R) ON SPECIAL ORDERS — explored 2026-09-20, NOTHING
+  BUILT, don't start without asking.** This is what migration 110's rename
+  freed the word for. Mark: "Bills are documents we have to pay. An invoice, by
+  contrast, is a document our customers have to pay."
+  **The case is WHOLESALE, not proper special orders.** Those get billed once
+  and paid in full and have never been a problem. Cafe Knotted is billed WEEKLY
+  IN ADVANCE — one invoice per week, a line for each day's donuts and a line
+  for each day's delivery, 14 lines, **sent Sunday and due Thursday or service
+  stops**. Mark wants to select the week's seven standing orders and have them
+  become one invoice. So the shape is SEVEN ORDERS BILLED ONCE, which no view
+  over `special_orders` can express. Deposits on far-out bookings ("take a
+  deposit to hold the date") are the other direction — one order billed twice.
+  **THE MODEL IS ALREADY DESIGNED, on the A/P side.** 025 put the PO join on the
+  LINE and said why: "split and merge need no schema at all — one invoice across
+  two orders is lines pointing at two orders, and one order invoiced in two
+  parts is two invoices whose lines point at disjoint subsets (hence NO unique
+  constraint)". That paragraph describes Knotted's week and Mark's deposit,
+  written before either was asked for. Mirror it: `customer_invoices` +
+  `customer_invoice_lines` carrying `special_order_id` + `special_order_line_id`
+  on the LINE, with its own issue date, due date and terms (a deposit is months
+  from `date_initiated`, which the push currently uses as `TxnDate`).
+  **TWO HALVES OF THIS ARE ALREADY BUILT AND WERE NEVER JOINED.**
+  `ignore_balance` (45 orders) means "billed weekly by statement, not per
+  order", and `invoicePushRefusals` REFUSES to push such an order on its own —
+  the app already knows these must be billed together and has no way to do it.
+  `CustomerStatement` (decision 21) renders exactly that week and calls itself
+  "the dry run for the QBO era"; it stores nothing and can't be pushed. The
+  invoice record is the join between them.
+  **IT COLLIDES WITH THE STAGE MODEL.** `special_orders.status = 'invoice'`,
+  `invoice_sent_at` and `invoice_paid_at` make an invoice a STAGE OF THE ORDER;
+  once one invoice covers seven, those three become DERIVED from the records.
+  **OPEN QUESTIONS, in the order they block things:** is Cafe Knotted taxable
+  at all (a resale certificate makes every line NON and the QBO tax split stops
+  mattering); does a pushed invoice carry FOURTEEN lines or the two summary
+  lines `buildInvoicePayload` sends today; and WHERE A CUSTOMER PAYMENT GETS
+  RECORDED, which is not a detail — see the collection-channel note under
+  "What NOT to build".
+  Read `docs/history/04g-special-orders.md` and `docs/bill-rename-sweep.md` first.
+
+
 - **`InlineValue`'s OPEN EDITOR CARRIES NO `aria-label`, where its resting
   button does** (found 2026-09-03 while testing the checklist template's unit
   cell). A screen reader names the field until you click it and then loses the
@@ -573,9 +613,41 @@ Square. Also killed: any **A/R status pull** from QuickBooks, for the same
 second-source reason — where the A/P pull is right, because nothing here stores
 a vendor payment. See build step 4l.
 **QBO A/R INVOICING IS PROVISIONAL** — it comes out if special-order collection
-moves to Square invoicing, which syncs to QBO itself, at which point pushing an
-Invoice here would double-count the revenue. It does NOT double-count today
-(Mark's reading of his own books, 2026-09-02): another app records and
-categorises Square SALES nightly, and special orders are not invoiced through
-Square yet. Removal is about an hour and touches nothing A/P uses.
+moves to a channel that books the revenue in QBO itself, at which point pushing
+an Invoice here would double-count it.
+**THE 2026-09-02 READING OF THIS WAS WRONG IN ITS REASONING AND RIGHT IN ITS
+VERDICT, corrected by Mark 2026-09-20.** It said "special orders are not
+invoiced through Square yet". They ARE: retail special orders are sent as
+SQUARE invoices, the customer pays online or in the shop, and the payment is
+noted by hand in FMP. What keeps it from double-counting is not that Square is
+unused — it is that **THE QBO INVOICE PUSH ITSELF IS UNUSED** ("the
+functionality to send invoices to QBO is in place but we aren't using it yet").
+So the guard is a habit, not a mechanism, and the first person to press Send to
+QuickBooks on a Square-collected order books that revenue twice.
+**THE RULE THIS IMPLIES: WHETHER THE APP PUSHES DEPENDS ON WHO COLLECTS**, and
+that belongs on the CUSTOMER, not in a comment. Bill.com (which **pulls from
+QBO as well as pushing to it** — Mark tested this 2026-09-20, so app → QBO →
+Bill.com works and `push_invoice` is already the mechanism) → the app's push
+books the revenue, so PUSH. Square invoice → Square's nightly sync books it, so
+DO NOT PUSH. Collected directly by cheque or cash → PUSH. `ignore_balance` is
+the nearest thing to that field today and it only says "by statement".
+**TWO THINGS TO KNOW BEFORE SENDING FROM ANYWHERE BUT THIS APP:**
+`buildInvoicePayload` sends TWO SUMMARY LINES (a tax split, because QBO computes
+the tax and delivery is not taxed), not the itemisation a wholesale customer
+checks against their deliveries; and the customer's sheet is attached with
+`IncludeOnSend: false`, so an invoice emailed by QuickBooks or Bill.com arrives
+with no detail at all.
+**KILLING BILL.COM IS STILL ON THE TABLE (Mark, 2026-09-20)** and splits in two.
+The A/P half needs NO app work — bills already reach QBO with their coding and
+their scan, and where they are PAID from (QBO Bill Pay, the bank) is a
+QuickBooks-side choice; `proposeBillLink`/`find_bills` retires itself the day
+Bill.com stops creating bills, as its own comment says. The A/R half needs a rail
+that collects ACH from wholesale, which is the pinned "ACH on wholesale belongs
+with Square" question above. **The trade-off nobody has priced:** billing a week
+in advance through QBO/Bill.com puts the receivable ON the books from Sunday and
+gives QBO A/R aging; collecting through Square books a SALE when they pay, so
+nothing is on the books Sunday to Wednesday and "who owes us" lives only here.
+That is a question for whoever does the books, not a software one.
+Removal of the push is still about an hour and touches nothing A/P uses — but
+only until `customer_invoices` exists, after which it is a module.
 When in doubt whether a feature belongs, check the spec's kill list or ask Mark.
