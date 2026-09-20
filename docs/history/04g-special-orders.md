@@ -1754,6 +1754,50 @@
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.
 
+   **THE CREATE DIALOG ASKS PICKUP OR DELIVERY SINCE 2026-09-20** (Mark: "give
+   the user the option for pickup or delivery. If delivery, allow the user to
+   enter the delivery address as well"). **It earns its place by the create-
+   dialog rule** — a field makes the cut when something BREAKS without it, not
+   when it would be nice to have. `fulfillment` is `not null default 'pickup'`,
+   so a delivery taken on this form started life claiming to be a pickup, and
+   everything downstream believed it: `tabsFor` hides the Delivery TAB, so there
+   was nowhere to type the address; `stageState` returns null for
+   `delivery_scheduled` on a pickup, so the attention queue never chased the
+   booking; and both PDFs print "PICK UP TIME" over an order nobody is
+   collecting. Three silent failures, fixed by one tap at the moment the phone
+   rings.
+   **IT IS ASKED OF EVERY KIND**, unlike the two halves of "when". The column is
+   `not null` on all three, Duplicate carries fulfillment across, and a standing
+   wholesale account is the likeliest delivery in the building.
+   **KIND NO LONGER SITS ALONE.** It had the row to itself as "the switch"; the
+   new field is the second switch — Kind decides whether the date and time are
+   required, Pickup / delivery decides whether an address is asked — so the two
+   of them pair, and every row below stays a real pair rather than three fields
+   wide with a hole in it.
+   **THE ADDRESS IS OPTIONAL AND FULL WIDTH.** Mark asked to "allow" it, and an
+   order taken over the phone often has a date and a customer long before it has
+   a street, so `ready` is untouched and nothing can stop a delivery being
+   created. Full width because "1638 Colorado Blvd, Los Angeles, CA 90041" is 44
+   characters and not a half-column value. SINGLE LINE where the record's own
+   cell is `multiline`, matching the public inquiry form: a textarea in a dialog
+   invites a paragraph nobody wants to read back off a kitchen sheet. It sits
+   with Pickup shop and Kitchen rather than under its own switch two rows up —
+   those three are one question asked three ways.
+   **`deliveryFields` IS THE ONE RULE WORTH A FIXTURE**, and it says an address
+   belongs to a DELIVERY and to nothing else — the app's side of migration 058's
+   `case when v_fulfillment = 'delivery' then v_address else null end`. It
+   matters because the dialog KEEPS what you typed when you flip back to Pickup
+   (a mis-tap should not silently delete an address), so without it the row
+   would store as a pickup carrying a delivery address: true on the Info tab,
+   with no tab to show it on. It also floors anything that is not `delivery` to
+   `pickup` rather than passing it through, because the column is
+   `check (fulfillment in ('pickup','delivery'))` and a check-constraint refusal
+   is the one failure `InlineValue` cannot explain. Six cases, verified by
+   breaking the guard and watching two go red.
+   **The customer record's "New order for them" is UNCHANGED** — it is a
+   one-click stub with no dialog, so it keeps the column default, exactly as
+   before.
+
    **THE PAID DATE OFFERS TO SETTLE THE BALANCE SINCE 2026-09-19** (Mark:
    "when we set a paid date and the order is still unsettled/has a balance due,
    we should offer to create a payment for the order so it becomes settled") —

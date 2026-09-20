@@ -52,6 +52,21 @@ export type NewSpecialOrderInput = {
   locationId?: string | null;
   /** Decision 8: where it is MADE. Genuinely undecided on most new leads. */
   kitchenLocationId?: string | null;
+  /**
+   * Pickup or delivery (Mark, 2026-09-20: "give the user the option for pickup
+   * or delivery. If delivery, allow the user to enter the delivery address").
+   *
+   * IT MAKES THE CUT BY THE CREATE-DIALOG RULE — what BREAKS without it. The
+   * column is `not null default 'pickup'`, so an order that is really a
+   * delivery starts life claiming to be a pickup, and everything downstream
+   * believes it: the Delivery TAB is hidden (`tabsFor`), so there is nowhere to
+   * type the address; `stageState` returns null for `delivery_scheduled`, so
+   * the attention queue never chases the booking; and both PDFs print "PICK UP
+   * TIME" over an order nobody is collecting. Every one of those is silent.
+   */
+  fulfillment?: string | null;
+  /** Only stored on a delivery — see `deliveryFields`. */
+  deliveryAddress?: string | null;
   customerId?: string | null;
   /**
    * A customer described in the create dialog but not yet written.
@@ -129,6 +144,33 @@ async function pickupTaxRate(
   // unconverted would put a string into a numeric column's insert payload.
   const n = typeof raw === "string" ? Number(raw) : raw;
   return typeof n === "number" && Number.isFinite(n) ? n : null;
+}
+
+/**
+ * WHERE IT GOES, AS IT IS STORED — and the rule that an address belongs to a
+ * DELIVERY and to nothing else.
+ *
+ * Migration 058's inquiry RPC already writes `case when v_fulfillment =
+ * 'delivery' then v_address else null end`, and this is the same sentence on
+ * the app's side of the wire. It matters because the create dialog keeps what
+ * you typed when you flip back to Pickup — a mis-tap should not silently delete
+ * an address — so without this the order would be stored as a pickup carrying a
+ * delivery address, which is a row that reads true on the Info tab and has no
+ * tab to show it on.
+ *
+ * ANYTHING THAT IS NOT `delivery` IS `pickup`, rather than passed through: the
+ * column is `not null check (fulfillment in ('pickup','delivery'))`, and a
+ * check-constraint refusal is the one failure `InlineValue` cannot explain.
+ */
+export function deliveryFields(
+  fulfillment: string | null | undefined,
+  address: string | null | undefined
+): { fulfillment: "pickup" | "delivery"; delivery_address: string | null } {
+  const mode = fulfillment === "delivery" ? "delivery" : "pickup";
+  return {
+    fulfillment: mode,
+    delivery_address: mode === "delivery" ? orNull(address) : null,
+  };
 }
 
 /** The three `contact_*` values, as they are stored. */
@@ -259,6 +301,7 @@ export async function createSpecialOrder(
       event_time: input.eventTime ?? null,
       location_id: locationId,
       kitchen_location_id: orNull(input.kitchenLocationId),
+      ...deliveryFields(input.fulfillment, input.deliveryAddress),
       tax_rate: taxRate,
       customer_id: customerId,
       contact_name: contact.name,

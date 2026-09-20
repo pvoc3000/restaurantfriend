@@ -10,7 +10,11 @@ import { TextInput } from "@/components/ui/TextInput";
 import { PickList } from "@/components/ui/PickList";
 import { DateField } from "@/components/ui/DateField";
 import { TimePicker } from "@/components/ui/TimePicker";
-import { KIND_LABEL, type SpecialOrderKind } from "@/lib/specialOrders";
+import {
+  FULFILLMENT_OPTIONS,
+  KIND_LABEL,
+  type SpecialOrderKind,
+} from "@/lib/specialOrders";
 import { createSpecialOrder } from "@/lib/createSpecialOrder";
 import { CustomerPicker, type CustomerChoice } from "./CustomerPicker";
 import { draftIsUsable } from "@/lib/customerSearch";
@@ -25,6 +29,19 @@ import { draftIsUsable } from "@/lib/customerSearch";
  * the conversation happens; the record screen edits every one of those in
  * place. What this needs is enough to exist and be findable — which for a
  * LEAD is the title somebody will search for.
+ *
+ * PICKUP OR DELIVERY IS THE EXCEPTION, and it earns its place by the rule the
+ * conventions state: a field makes the cut when something BREAKS without it
+ * (Mark, 2026-09-20). `fulfillment` is `not null default 'pickup'`, so a
+ * delivery taken here starts life claiming to be a pickup — and then the
+ * Delivery tab is hidden, so there is nowhere to type the address; the
+ * attention queue never chases the booking, because `stageState` returns null
+ * for `delivery_scheduled` on a pickup; and both PDFs print "PICK UP TIME"
+ * over an order nobody is collecting. Each of those is silent, and each is
+ * fixed by one tap at the moment the phone call happens.
+ *
+ * The ADDRESS rides with it because it is the one thing you are told in the
+ * same breath — and it is OPTIONAL, because you are often told it later.
  *
  * The three paths that are NOT this button, so nobody adds them here:
  *   · the public inquiry form (decision 18) creates a lead with no login;
@@ -66,6 +83,8 @@ export function NewSpecialOrder({
   const [eventDate, setEventDate] = useState<string | null>(null);
   const [eventTime, setEventTime] = useState<string | null>(null);
   const [kitchenId, setKitchenId] = useState("");
+  const [fulfillment, setFulfillment] = useState("pickup");
+  const [address, setAddress] = useState("");
   const [locationId, setLocationId] = useState(defaultLocationId ?? "");
   const [customer, setCustomer] = useState<CustomerChoice>(null);
 
@@ -108,6 +127,8 @@ export function NewSpecialOrder({
     setEventDate(null);
     setEventTime(null);
     setKitchenId("");
+    setFulfillment("pickup");
+    setAddress("");
     setLocationId(defaultLocationId ?? "");
     setCustomer(null);
     setFailed(null);
@@ -135,6 +156,10 @@ export function NewSpecialOrder({
         takenBy,
         locationId,
         kitchenLocationId: kitchenId,
+        fulfillment,
+        // Kept in state through a flip back to Pickup, and dropped on the way
+        // to the database — `deliveryFields` owns that rule, not this form.
+        deliveryAddress: address,
         customerId: customer?.kind === "existing" ? customer.id : null,
         newCustomer: customer?.kind === "new" ? customer.draft : null,
       });
@@ -190,11 +215,15 @@ export function NewSpecialOrder({
               />
             </Field>
 
-            {/* KIND LEADS AND SITS ALONE, because it is the switch: it decides
-                whether the two fields under it are required at all. Everything
-                below it is a real PAIR — the two halves of "when", decision 8's
-                two shops, and the two ways to reach somebody — so no row is
-                three fields wide with a hole in it. */}
+            {/* THE TWO SWITCHES LEAD, and they are a pair because they are the
+                same kind of thing: each one decides what is asked BELOW it.
+                Kind decides whether the two halves of "when" are required at
+                all; Pickup / delivery decides whether there is an address to
+                give. Everything under them is a real pair too — the two halves
+                of "when" and decision 8's two shops — so no row is three fields
+                wide with a hole in it.
+                Kind sat alone here until 2026-09-20, when the second switch
+                arrived and filled the slot beside it. */}
             {/* WHO IS ORDERING, which is what you know when the phone rings.
                 This replaced Contact / Phone / Email, and those wrote the
                 DAY-OF contact — a different person on a corporate order, and
@@ -225,6 +254,26 @@ export function NewSpecialOrder({
                           ? "a shape to duplicate from"
                           : "recurring wholesale, materialized by weekday",
                   }))}
+                  className="w-full"
+                />
+              </Field>
+              {/* ASKED OF EVERY KIND, unlike the two "when" fields below. The
+                  column is `not null` on all three, a template is duplicated
+                  WITH its fulfillment, and a standing wholesale account is the
+                  most likely delivery in the building.
+
+                  `FULFILLMENT_OPTIONS` rather than a local pair, so the dialog
+                  and the record's own cell can never drift apart — the hint
+                  under Delivery ("adds the Delivery tab") is the sentence that
+                  explains what this choice DOES, which is more than a label
+                  here could. */}
+              <Field label="Pickup / delivery">
+                <PickList
+                  value={fulfillment}
+                  onPick={(next) => setFulfillment(next || "pickup")}
+                  variant="field"
+                  ariaLabel="Pickup or delivery"
+                  options={FULFILLMENT_OPTIONS}
                   className="w-full"
                 />
               </Field>
@@ -295,6 +344,35 @@ export function NewSpecialOrder({
                 />
               </Field>
             </div>
+
+            {/* THE ADDRESS SITS WITH THE OTHER "WHERE" FIELDS, not under its
+                own switch two rows up. Pickup shop, Kitchen and this are one
+                question asked three ways, and the address is full width because
+                a street address is not a half-column value — "1638 Colorado
+                Blvd, Los Angeles, CA 90041" is 44 characters.
+
+                IT IS OPTIONAL, deliberately. Mark asked to "allow" it, and an
+                order taken over the phone often has a date and a customer long
+                before it has a street — `ready` is untouched, so nothing here
+                can stop a delivery being created.
+
+                SINGLE LINE, where the record's own cell is `multiline`: the
+                inquiry form asks the public for an address in one line too, and
+                a textarea in a dialog invites a paragraph nobody wants to read
+                back off a kitchen sheet. `autoComplete` is the browser's own
+                street-address hint. */}
+            {fulfillment === "delivery" && (
+              <Field label="Delivery address">
+                <TextInput
+                  value={address}
+                  onValueChange={setAddress}
+                  placeholder="1638 Colorado Blvd, Los Angeles, CA 90041"
+                  aria-label="Delivery address"
+                  autoComplete="street-address"
+                  fullWidth
+                />
+              </Field>
+            )}
 
             <p className="text-[13px] text-muted">
               The lines, the money and the day-of contact are set on the

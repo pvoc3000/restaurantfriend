@@ -45,6 +45,7 @@ import "./nav.fixtures";
 import "./pageAccess.fixtures";
 import "./vendors.fixtures";
 import "./workday.fixtures";
+import "./createSpecialOrder.fixtures";
 import "./orderWorkflow.fixtures";
 import "./overtime.fixtures";
 import "./overtimeOrder.fixtures";
