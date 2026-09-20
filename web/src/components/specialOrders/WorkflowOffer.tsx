@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { createClient } from "@/lib/supabase/client";
-import { consequenceSummary, type Consequence } from "@/lib/orderWorkflow";
+import {
+  consequenceSummary,
+  type Consequence,
+  type PaymentConsequence,
+} from "@/lib/orderWorkflow";
 
 /**
  * "…and should I also?" — the one prompt every workflow trigger shares.
@@ -35,6 +39,22 @@ import { consequenceSummary, type Consequence } from "@/lib/orderWorkflow";
  * never come to rest half-advanced — status moved and to-do not, or the other
  * way about — which is the state nothing downstream knows how to read.
  *
+ * IT CAN NOW RECORD A PAYMENT, AND THAT IS THE ONE THING IT WRITES SOMEWHERE
+ * ELSE (2026-09-19). A `payment` consequence is an INSERT into
+ * `special_order_payments`, so this takes an `orgId` — REQUIRED of every
+ * caller, not optional, because design rule 1's failure mode is an insert that
+ * omits `org_id` and reports "new row violates row-level security policy",
+ * which sends you to look at roles. A required prop makes the compiler ask the
+ * question instead.
+ *
+ * THE MONEY LANDS FIRST, AND A FAILURE THERE WRITES NOTHING ELSE. The one
+ * update statement below is still one statement; what is no longer true is that
+ * the dialog does exactly one write. Given two, the order matters: a payment
+ * that lands without the status move leaves the catch-up offer to propose it,
+ * where a status move without the payment leaves an order reading "Order" over
+ * a balance nobody has settled — which is the very thing this consequence
+ * exists to stop.
+ *
  * IT WRITES ITS OWN LOG ENTRY ONLY IF THE TRIGGER DID NOT. Migration 054's
  * trigger already narrates a column change ("Status changed from lead to
  * quote"), so this adds nothing — the history reads the same whether a person
@@ -42,11 +62,14 @@ import { consequenceSummary, type Consequence } from "@/lib/orderWorkflow";
  */
 export function WorkflowOffer({
   orderId,
+  orgId,
   consequences,
   onClose,
   title = "One more thing",
 }: {
   orderId: string;
+  /** Design rule 1: a payment consequence inserts, and an insert says its org. */
+  orgId: string;
   /** From `lib/orderWorkflow`. An empty list renders nothing. */
   consequences: Consequence[];
   onClose: () => void;
@@ -59,6 +82,8 @@ export function WorkflowOffer({
   const [taken, setTaken] = useState<boolean[]>(() => consequences.map(() => true));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Has the payment already landed? See `apply`. */
+  const recorded = useRef(false);
 
   if (consequences.length === 0) return null;
 
@@ -72,8 +97,51 @@ export function WorkflowOffer({
     setSaving(true);
     setError(null);
 
+    // THE MONEY FIRST — see the header. `payment_type` is deliberately unset:
+    // the app knows what is owed and when it was paid, not how.
+    //
+    // `recorded` IS WHY THIS IS A REF AND NOT STATE. The dialog stays open on a
+    // failure so the error can be read and "Do it" pressed again — and if the
+    // payment landed and the status move was what failed, a second press must
+    // not take the money twice. A ref because it is read inside the same call
+    // that sets it, where a state update would not have arrived yet.
+    const pay = chosen.find((c): c is PaymentConsequence => c.column === "payment");
+    if (pay && !recorded.current) {
+      const { data, error: e } = await supabase
+        .from("special_order_payments")
+        .insert({
+          // Explicit — design rule 1.
+          org_id: orgId,
+          order_id: orderId,
+          amount: pay.amount,
+          paid_on: pay.on,
+        })
+        .select("id");
+      if (e) {
+        setSaving(false);
+        setError(e.message);
+        return;
+      }
+      if (!data?.length) {
+        setSaving(false);
+        setError("The payment wasn't recorded — the database refused it silently.");
+        return;
+      }
+      recorded.current = true;
+    }
+
     const patch: Record<string, string | null> = {};
-    for (const c of chosen) patch[c.column] = c.value;
+    for (const c of chosen) {
+      if (c.column === "payment") continue;
+      patch[c.column] = c.value;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      setSaving(false);
+      router.refresh();
+      onClose();
+      return;
+    }
 
     // `.select()` its own result: an update matching no RLS policy changes
     // nothing and PostgREST returns NO error, so a bare update would report a

@@ -48,6 +48,7 @@
 import {
   STATUS_ORDER,
   STATUS_LABEL,
+  money,
   type SpecialOrderStatus,
 } from "./specialOrders";
 
@@ -70,13 +71,62 @@ export const DOCUMENT_STAMPS: Record<string, StageColumn> = {
   order: "order_printed_at",
 };
 
-/** One proposed write, and the sentence offering it. */
-export type Consequence = {
+/** One proposed write to the ORDER, and the sentence offering it. */
+export type ColumnConsequence = {
   column: "status" | "todo" | StageColumn;
   value: string | null;
   /** What the checkbox says. A sentence, not a field name. */
   label: string;
 };
+
+/**
+ * ONE PROPOSED PAYMENT — the only consequence that is not a column on
+ * `special_orders` (Mark, 2026-09-19: "when we set a paid date and the order is
+ * still unsettled/has a balance due, we should offer to create a payment for
+ * the order so it becomes settled").
+ *
+ * It is the mirror of `afterPaymentSettled`, which offers the DATE when the
+ * money lands. Both exist because the two facts are entered from two screens
+ * and either one can come first; the pair is what stops the record saying it
+ * was paid while the balance says otherwise.
+ *
+ * IT CARRIES NO PAYMENT TYPE, deliberately. The amount and the date are
+ * DERIVED — what is outstanding, and the day somebody just said it was paid —
+ * where "Square Invoice" would be a guess about how the money arrived, written
+ * into a record of money received. `OrderPayments` shows the method as an
+ * inline cell, so the one fact the app cannot know is the one it leaves for a
+ * human to fill in.
+ */
+export type PaymentConsequence = {
+  column: "payment";
+  /** Dollars, rounded to the cent: the whole outstanding balance. */
+  amount: number;
+  /** `paid_on` for the new row — the date that raised the question. */
+  on: string;
+  label: string;
+};
+
+export type Consequence = ColumnConsequence | PaymentConsequence;
+
+/**
+ * Just enough of the money to know whether the order is settled.
+ *
+ * `balance` is `OrderTotals.balance` — total minus payments — and
+ * `ignore_balance` is decision 13's weekly-statement escape hatch, which is why
+ * this takes the WHOLE question rather than a number: a wholesale day billed in
+ * arrears has a balance and is not owed, and `lib/specialOrders`'s `isSettled`
+ * says so in one place.
+ */
+export type OrderMoney = {
+  balance: number;
+  ignore_balance?: boolean | null;
+};
+
+/**
+ * Half a cent, the same epsilon `OrderPayments` settles by. Money arrives here
+ * as a float sum of line totals; `0.004` of a dollar is arithmetic, not a debt.
+ */
+const SETTLED_EPSILON = 0.005;
 
 /** Just enough of an order to reason about. */
 export type WorkflowOrder = {
@@ -113,15 +163,21 @@ export function isAdvanceable(order: WorkflowOrder): boolean {
  * because half of them depend on what the order already says.
  */
 const DATE_IMPLIES: Partial<
-  Record<StageColumn, (order: WorkflowOrder) => Consequence[]>
+  Record<StageColumn, (order: WorkflowOrder, money?: OrderMoney) => Consequence[]>
 > = {
   quote_sent_at: () => [status("quote")],
   // Approved. The ball is ours again, and the next document is the invoice.
   quote_returned_at: () => [todo("Send Invoice")],
   invoice_sent_at: () => [status("invoice")],
   // Mark's own pairing: paid means it is an Order, and the thing left is to
-  // print it.
-  invoice_paid_at: () => [status("order"), todo("Print Order")],
+  // print it. THE MONEY COMES FIRST (2026-09-19) — a date saying the invoice
+  // was paid while the balance still shows the whole amount outstanding is the
+  // record disagreeing with itself, and that is worth more than the ladder.
+  invoice_paid_at: (o, m) => [
+    ...settlingPayment(o.invoice_paid_at, m),
+    status("order"),
+    todo("Print Order"),
+  ],
   // CLEARED ONLY IF IT IS STILL THE PRINT TO-DO. Somebody who has typed
   // "call about the balloons" in there is not asking for it to be thrown away
   // because a sheet came off the printer.
@@ -136,7 +192,35 @@ const DATE_IMPLIES: Partial<
   receipt_sent_at: (o) => (o.todo === "Send Receipt" ? [clearTodo("Send Receipt")] : []),
 };
 
-function status(next: SpecialOrderStatus): Consequence {
+/**
+ * THE PAYMENT THAT WOULD SETTLE THIS ORDER, or nothing at all.
+ *
+ * Three ways to get nothing, and each is a real order:
+ *   · **No money passed.** Only the caller that knows the balance can ask, and
+ *     `afterPaymentSettled` deliberately does not — a payment just landed
+ *     there, so proposing another is proposing to take the money twice.
+ *   · **`ignore_balance`.** Decision 13's wholesale account is billed weekly in
+ *     arrears; its balance is a statement waiting to go out, not an unpaid
+ *     invoice, and `isSettled` has said so since the queue was built.
+ *   · **Nothing outstanding.** Including a CREDIT — an overpayment leaves a
+ *     negative balance, and "record a -$4 payment" is not a thing to offer.
+ */
+function settlingPayment(on: string | null, m?: OrderMoney): PaymentConsequence[] {
+  if (!m || !on) return [];
+  if (m.ignore_balance) return [];
+  if (m.balance <= SETTLED_EPSILON) return [];
+  const amount = Math.round(m.balance * 100) / 100;
+  return [
+    {
+      column: "payment",
+      amount,
+      on,
+      label: `Record a ${money(amount)} payment so the balance is clear`,
+    },
+  ];
+}
+
+function status(next: SpecialOrderStatus): ColumnConsequence {
   return {
     column: "status",
     value: next,
@@ -144,11 +228,11 @@ function status(next: SpecialOrderStatus): Consequence {
   };
 }
 
-function todo(next: string): Consequence {
+function todo(next: string): ColumnConsequence {
   return { column: "todo", value: next, label: `Set the to-do to ${next}` };
 }
 
-function clearTodo(was: string): Consequence {
+function clearTodo(was: string): ColumnConsequence {
   return { column: "todo", value: null, label: `Clear the ${was} to-do` };
 }
 
@@ -167,7 +251,12 @@ const DATE_LABEL: Record<StageColumn, string> = {
 function keepUseful(order: WorkflowOrder, proposed: Consequence[]): Consequence[] {
   const out: Consequence[] = [];
   for (const c of proposed) {
-    if (c.column === "status") {
+    if (c.column === "payment") {
+      // Nothing to drop. `settlingPayment` has already asked the only three
+      // questions there are, and unlike every other consequence this one is not
+      // a column that can already say what is being proposed — an order that
+      // has been paid twice is a mistake, not a no-op.
+    } else if (c.column === "status") {
       // Forward only — see the header.
       if (rank(c.value) <= rank(order.status)) continue;
     } else if (c.column === "todo") {
@@ -189,10 +278,21 @@ function keepUseful(order: WorkflowOrder, proposed: Consequence[]): Consequence[
  * The caller decides WHEN to ask — see the fourth guard in the header — and
  * this decides what to ask for.
  */
-export function afterDateSet(order: WorkflowOrder, column: StageColumn): Consequence[] {
+export function afterDateSet(
+  order: WorkflowOrder,
+  column: StageColumn,
+  /**
+   * The order's money, where the caller has it. OPTIONAL, and the two callers
+   * that leave it out are not being lazy: scheduling production and sending a
+   * document stamp dates that imply nothing about a balance, so a screen that
+   * would have to fetch the totals to answer a question nobody asked should
+   * not have to.
+   */
+  money?: OrderMoney
+): Consequence[] {
   if (!isAdvanceable(order)) return [];
   const rule = DATE_IMPLIES[column];
-  return rule ? keepUseful(order, rule(order)) : [];
+  return rule ? keepUseful(order, rule(order, money)) : [];
 }
 
 /**
@@ -251,7 +351,7 @@ export function afterPaymentSettled(order: WorkflowOrder, on: string): Consequen
  * note to themselves, where a status behind its own evidence is the record
  * disagreeing with itself.
  */
-export function statusCatchUp(order: WorkflowOrder): Consequence | null {
+export function statusCatchUp(order: WorkflowOrder): ColumnConsequence | null {
   if (!isAdvanceable(order)) return null;
   // The furthest rung the dates justify, taken in ladder order so the LAST
   // match wins.
@@ -260,7 +360,9 @@ export function statusCatchUp(order: WorkflowOrder): Consequence | null {
   if (order.invoice_sent_at) furthest = "invoice";
   if (order.invoice_paid_at) furthest = "order";
   if (!furthest) return null;
-  const [proposal] = keepUseful(order, [status(furthest)]);
+  // `keepUseful` speaks the union; this only ever proposes a status, and the
+  // caller writes `proposal.value` straight into a column.
+  const [proposal] = keepUseful(order, [status(furthest)]) as ColumnConsequence[];
   return proposal ?? null;
 }
 

@@ -9,6 +9,7 @@ import { WorkflowOffer } from "./WorkflowOffer";
 import {
   afterDateSet,
   type Consequence,
+  type OrderMoney,
   type StageColumn,
   type WorkflowOrder,
 } from "@/lib/orderWorkflow";
@@ -32,6 +33,17 @@ import {
  * proposing a status move in the middle of an undo is the opposite of helping.
  *
  * ---------------------------------------------------------------------------
+ * THE PAID DATE ALSO READS THE MONEY (Mark, 2026-09-19)
+ * ---------------------------------------------------------------------------
+ * "When we set a paid date and the order is still unsettled/has a balance due,
+ * we should offer to create a payment for the order so it becomes settled."
+ * The reasoning is `lib/orderWorkflow`'s; what this screen contributes is the
+ * `money` prop, because a stage date on its own cannot tell you what is owed.
+ * It is the mirror of the offer `OrderPayments` already makes in the other
+ * direction, and between them the date and the balance can no longer disagree
+ * without somebody having said so.
+ *
+ * ---------------------------------------------------------------------------
  * IT ASKS AFTER THE WRITE, WHICH IS WHY IT USES `onWrite` AND NOT `alsoUpdate`
  * ---------------------------------------------------------------------------
  * `alsoUpdate` composes the statement and therefore runs BEFORE it — asking
@@ -46,11 +58,20 @@ import {
  */
 export function CompletionDates({
   id,
+  orgId,
   order,
+  money,
   canWrite,
 }: {
   id: string;
+  /** Design rule 1 — the paid date's offer can insert a payment. */
+  orgId: string;
   order: WorkflowOrder & Record<string, unknown>;
+  /**
+   * What is still owed, and whether it is owed at all. The Invoice paid date is
+   * the only row here that reads it (Mark, 2026-09-19) — see the module header.
+   */
+  money: OrderMoney;
   canWrite: boolean;
 }) {
   const supabase = createClient();
@@ -130,7 +151,8 @@ export function CompletionDates({
                       if (next && !value) {
                         const cs = afterDateSet(
                           { ...order, [r.column]: String(next) },
-                          r.column as StageColumn
+                          r.column as StageColumn,
+                          money
                         );
                         if (cs.length > 0) setOffer(cs);
                       }
@@ -149,6 +171,7 @@ export function CompletionDates({
       {offer && (
         <WorkflowOffer
           orderId={id}
+          orgId={orgId}
           consequences={offer}
           onClose={() => setOffer(null)}
         />

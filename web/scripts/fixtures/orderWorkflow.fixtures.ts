@@ -13,6 +13,7 @@ import {
   consequenceSummary,
   isAdvanceable,
   statusCatchUp,
+  type Consequence,
   type WorkflowOrder,
 } from "../../src/lib/orderWorkflow";
 
@@ -35,8 +36,12 @@ function order(patch: Partial<WorkflowOrder> = {}): WorkflowOrder {
   };
 }
 
-const cols = (cs: { column: string; value: string | null }[]) =>
-  cs.map((c) => [c.column, c.value]);
+// A payment has no `value` — it has an amount and a date, and printing both is
+// what makes a wrong figure fail loudly rather than pass as "a payment".
+const cols = (cs: Consequence[]) =>
+  cs.map((c) =>
+    c.column === "payment" ? [c.column, `${c.amount} on ${c.on}`] : [c.column, c.value]
+  );
 
 /* -------------------------------------------------------------------------
  * Mark's six, in his words
@@ -207,6 +212,122 @@ test("…and says nothing when the paid date is already there", () => {
 });
 
 /* -------------------------------------------------------------------------
+ * The paid date, when the balance says otherwise (Mark, 2026-09-19)
+ * ---------------------------------------------------------------------- */
+
+test("paid date set with a balance outstanding → offer to record it", () => {
+  // The money leads the ladder: the whole point is that the date and the
+  // balance were about to disagree.
+  eq(
+    cols(
+      afterDateSet(order({ status: "invoice", invoice_paid_at: TODAY }), "invoice_paid_at", {
+        balance: 267.09,
+      })
+    ),
+    [["payment", `267.09 on ${TODAY}`], ["status", "order"], ["todo", "Print Order"]]
+  );
+});
+
+test("…and the amount is the WHOLE balance, to the cent", () => {
+  const [pay] = afterDateSet(
+    order({ status: "order", todo: "Print Order", invoice_paid_at: TODAY }),
+    "invoice_paid_at",
+    { balance: 100 / 3 }
+  );
+  eq(pay.column, "payment");
+  eq(pay.column === "payment" ? pay.amount : null, 33.33);
+  eq(pay.label, "Record a $33.33 payment so the balance is clear");
+});
+
+test("…nothing when the balance is already clear", () => {
+  eq(
+    cols(
+      afterDateSet(order({ status: "invoice", invoice_paid_at: TODAY }), "invoice_paid_at", {
+        balance: 0,
+      })
+    ),
+    [["status", "order"], ["todo", "Print Order"]]
+  );
+});
+
+test("…nor for a credit balance, which is not a payment to take", () => {
+  // An overpayment leaves a negative balance. "Record a -$4.00 payment" is not
+  // a thing to offer, and `<=` is what keeps it off the screen.
+  eq(
+    cols(
+      afterDateSet(order({ status: "order", todo: "Print Order", invoice_paid_at: TODAY }), "invoice_paid_at", {
+        balance: -4,
+      })
+    ),
+    []
+  );
+});
+
+test("…nor a third of a cent, which is arithmetic rather than a debt", () => {
+  eq(
+    cols(
+      afterDateSet(order({ status: "order", todo: "Print Order", invoice_paid_at: TODAY }), "invoice_paid_at", {
+        balance: 0.004,
+      })
+    ),
+    []
+  );
+});
+
+test("…NEVER on a wholesale day billed in arrears (`ignore_balance`)", () => {
+  // Decision 13's escape hatch. Cafe Knotted has seven of these a week and
+  // every one of them carries a balance on purpose.
+  eq(
+    cols(
+      afterDateSet(order({ status: "order", todo: "Print Order", invoice_paid_at: TODAY }), "invoice_paid_at", {
+        balance: 613.5,
+        ignore_balance: true,
+      })
+    ),
+    []
+  );
+});
+
+test("…and nothing at all when the caller passes no money", () => {
+  // Scheduling and sending a document stamp dates that imply nothing about a
+  // balance, and must not start asking about one.
+  eq(
+    cols(afterDateSet(order({ status: "invoice", invoice_paid_at: TODAY }), "invoice_paid_at")),
+    [["status", "order"], ["todo", "Print Order"]]
+  );
+});
+
+test("a settling payment still never proposes ANOTHER payment", () => {
+  // `afterPaymentSettled` reaches the same rule from the other side. The money
+  // has just landed; offering to take it again is the one thing that would be
+  // worse than saying nothing.
+  eq(
+    cols(afterPaymentSettled(order({ status: "invoice" }), TODAY)),
+    [["invoice_paid_at", TODAY], ["status", "order"], ["todo", "Print Order"]]
+  );
+});
+
+test("a cancelled order is offered nothing, balance or no balance", () => {
+  eq(
+    afterDateSet(order({ status: "cancelled", invoice_paid_at: TODAY }), "invoice_paid_at", {
+      balance: 500,
+    }),
+    []
+  );
+});
+
+test("nor a standing order, whose status its own constraint forbids", () => {
+  eq(
+    afterDateSet(
+      order({ kind: "standing_order", status: null, invoice_paid_at: TODAY }),
+      "invoice_paid_at",
+      { balance: 613.5 }
+    ),
+    []
+  );
+});
+
+/* -------------------------------------------------------------------------
  * The catch-up offer
  * ---------------------------------------------------------------------- */
 
@@ -248,6 +369,15 @@ test("the summary reads as a question, however many parts", () => {
     ),
     "Move the order to Order, and set the to-do to Print Order?",
     "only the first part keeps its capital"
+  );
+  eq(
+    consequenceSummary(
+      afterDateSet(order({ status: "order", todo: "Print Order", invoice_paid_at: TODAY }), "invoice_paid_at", {
+        balance: 267.09,
+      })
+    ),
+    "Record a $267.09 payment so the balance is clear?",
+    "a payment reads as a sentence like any other consequence"
   );
 });
 

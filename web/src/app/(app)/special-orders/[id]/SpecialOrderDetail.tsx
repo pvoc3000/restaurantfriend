@@ -576,6 +576,7 @@ export async function SpecialOrderDetail({
                 kind === "order" && status !== "cancelled" && canScheduleProduction(session.membership.role)
                   ? {
                       orderId: id,
+                      orgId: row.org_id as string,
                       number: row.number as string,
                       title: (row.title as string | null) ?? null,
                       eventDate: (row.event_date as string | null) ?? null,
@@ -857,9 +858,17 @@ export async function SpecialOrderDetail({
                           inline where Details and Customer went back to
                           stacked, because a date is a short value and a name
                           or a phone is not — those wrapped. */}
+                      {/* The paid date offers to settle the balance, so it
+                          needs the balance — and `ignore_balance` with it, or
+                          it would offer one on every wholesale day. */}
                       <CompletionDates
                         id={id}
+                        orgId={row.org_id as string}
                         order={row as never}
+                        money={{
+                          balance: totals.balance,
+                          ignore_balance: moneyInputs.ignore_balance,
+                        }}
                         canWrite={canWrite}
                       />
                     </section>

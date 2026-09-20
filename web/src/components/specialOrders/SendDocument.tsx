@@ -483,6 +483,7 @@ export function SendDocument({
       {offer && (
         <WorkflowOffer
           orderId={orderId}
+          orgId={orgId}
           consequences={offer}
           onClose={() => setOffer(null)}
         />

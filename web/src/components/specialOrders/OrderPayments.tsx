@@ -308,6 +308,7 @@ export function OrderPayments({
       {offer && (
         <WorkflowOffer
           orderId={orderId}
+          orgId={orgId}
           consequences={offer}
           onClose={() => setOffer(null)}
           title="Paid in full"

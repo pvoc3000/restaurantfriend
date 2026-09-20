@@ -1754,6 +1754,57 @@
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.
 
+   **THE PAID DATE OFFERS TO SETTLE THE BALANCE SINCE 2026-09-19** (Mark:
+   "when we set a paid date and the order is still unsettled/has a balance due,
+   we should offer to create a payment for the order so it becomes settled") —
+   the mirror of the offer that has run the other way since 2026-08-21, where
+   recording the money offers the date. Both directions exist because the two
+   facts are entered from two tabs and either can come first; together they are
+   what stops a record saying it was paid over a balance nobody cleared, which
+   is precisely the disagreement the new PAID chip would otherwise put on
+   screen beside "$1,125.00 due".
+   **IT IS A LINE IN THE SAME DIALOG, NOT A SECOND ONE.** `whatFollows` returns
+   everything at once for exactly this reason — a second prompt reads as the app
+   second-guessing the answer you just gave — so setting the paid date on an
+   unsettled invoice asks one question with three ticks: record the payment,
+   move to Order, set the Print Order to-do. **The money is FIRST in the list**:
+   the ladder is bookkeeping, the balance is money.
+   **THE CONSEQUENCE TYPE IS NOW A UNION**, and `payment` is the only member
+   that is not a column on `special_orders`. `Consequence` = `ColumnConsequence`
+   | `PaymentConsequence`, the latter carrying an `amount` and an `on` rather
+   than a `value`. That is what makes `WorkflowOffer` handle it — the compiler
+   refuses `patch[c.column] = c.value` until it does — and it is why
+   `statusCatchUp` now returns the narrower `ColumnConsequence`.
+   **THE AMOUNT AND DATE ARE DERIVED; THE METHOD IS LEFT BLANK.** The app knows
+   what is outstanding and the day somebody just said it was paid. It does not
+   know how the money arrived, and "Square Invoice" — right on 1,188 of 1,190
+   real payments — would still be a guess written into a record of money
+   received. `OrderPayments` shows the method as an inline cell, so the one fact
+   the app cannot know is the one left for a human.
+   **THREE WAYS TO GET NO OFFER, AND EACH IS A REAL ORDER** (`settlingPayment`,
+   all fixture-tested by breaking the guard and watching the case go red):
+   no money passed — `afterPaymentSettled` deliberately passes none, because a
+   payment just landed there and proposing another is proposing to take the
+   money twice; **`ignore_balance`** — decision 13's wholesale account is billed
+   weekly in arrears, and Cafe Knotted has seven of those days a week, every one
+   carrying a balance on purpose; and nothing outstanding, which is `<=` half a
+   cent rather than `=== 0` so that a CREDIT (an overpayment, where "record a
+   -$4.00 payment" is not a thing to offer) and a third of a cent of float
+   arithmetic both stay off the screen. The broken-epsilon run proved the last
+   one earns its keep: it offered a **$0.00** payment.
+   **`WorkflowOffer` TAKES A REQUIRED `orgId` NOW**, which is why two components
+   that can never raise a payment gained a prop they do not use. Design rule 1's
+   failure mode is an insert that omits `org_id` and reports "new row violates
+   row-level security policy" — a message that sends you to read policies when
+   the fault is a missing column. A required prop makes the compiler ask first.
+   **TWO WRITES, AND THE MONEY GOES FIRST.** The dialog is no longer one
+   statement. A payment that lands without the status move leaves the catch-up
+   offer to propose it; a status move without the payment leaves an order
+   reading "Order" over an unsettled balance, which is the state this whole
+   consequence exists to prevent. A failed insert writes nothing else, and
+   `recorded` is a REF rather than state so that pressing "Do it" again after a
+   failed status move cannot take the money twice.
+
    **THE STATUS AND "PAID" ARE CHIPS BESIDE THE TITLE SINCE 2026-09-19** (Mark:
    "add a chip next to the page title that says the status in yellow, and a
    chip that says 'Paid' in green if the order is paid"). `PurchaseOrderDetail`
