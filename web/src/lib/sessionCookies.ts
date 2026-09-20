@@ -1,6 +1,6 @@
 import type { cookies } from "next/headers";
 
-import { INVOICE_VIEW_COOKIE } from "@/lib/invoiceFilters";
+import { BILL_VIEW_COOKIE } from "@/lib/billFilters";
 import { NAV_COOKIE } from "@/lib/navMemory";
 import { GUIDE_VIEW_COOKIE } from "@/lib/orderGuide";
 import { PO_VIEW_COOKIE } from "@/lib/poFilters";
@@ -24,7 +24,7 @@ export type CookieJar = Awaited<ReturnType<typeof cookies>>;
 export function clearSessionCookies(jar: CookieJar) {
   jar.delete(GUIDE_VIEW_COOKIE);
   jar.delete(PO_VIEW_COOKIE);
-  jar.delete(INVOICE_VIEW_COOKIE);
+  jar.delete(BILL_VIEW_COOKIE);
   jar.delete(SPECIAL_ORDER_VIEW_COOKIE);
   jar.delete(NAV_COOKIE);
   jar.delete(PIN_SESSION_COOKIE);

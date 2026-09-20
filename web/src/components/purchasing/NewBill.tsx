@@ -18,21 +18,21 @@ import { FileDropZone } from "@/components/ui/FileDropZone";
 import {
   attachmentPath,
   attachmentRejection,
-  invoiceOwner,
+  billOwner,
   ATTACHMENT_ACCEPT,
   ATTACHMENT_ACCEPT_ATTR,
   ATTACHMENT_BUCKET,
 } from "@/lib/attachments";
-import { findPossibleDuplicates, type VendorInvoice } from "@/lib/invoices";
+import { findPossibleDuplicates, type VendorBill } from "@/lib/bills";
 import { money } from "@/lib/purchaseOrders";
 
 /** Exactly what the duplicate check reads, and no more. */
 type DuplicateCandidate = Pick<
-  VendorInvoice,
+  VendorBill,
   "id" | "vendor_id" | "invoice_number" | "invoice_date" | "total" | "status"
 >;
 
-export type InvoiceKind = "bill" | "credit";
+export type BillKind = "bill" | "credit";
 
 /**
  * File a bill that no purchase order produced.
@@ -56,7 +56,7 @@ export type InvoiceKind = "bill" | "credit";
  * the rent bill, and is why the detail screen tolerates an invoice with no
  * lines at all.
  */
-export function NewInvoice({
+export function NewBill({
   orgId,
   locationId,
   vendors,
@@ -73,8 +73,8 @@ export function NewInvoice({
   today: string;
   existing: DuplicateCandidate[];
   /**
-   * Extra classes on the "New invoice" trigger button. Added for the classic
-   * Mac look parked on /invoices (`styles/mac-look.css`, Mark 2026-09-10); the
+   * Extra classes on the "New bill" trigger button. Added for the classic
+   * Mac look parked on /bills (`styles/mac-look.css`, Mark 2026-09-10); the
    * button's own dress is unchanged without it.
    */
   triggerClassName?: string;
@@ -89,7 +89,7 @@ export function NewInvoice({
    * this one dialog serves both, arriving preset; the Kind picker inside it
    * still lets you change your mind.
    */
-  children?: (open: (kind: InvoiceKind) => void) => ReactNode;
+  children?: (open: (kind: BillKind) => void) => ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -145,7 +145,7 @@ export function NewInvoice({
     reset();
   }
 
-  function openAs(kind: InvoiceKind) {
+  function openAs(kind: BillKind) {
     setIsCredit(kind === "credit");
     setOpen(true);
   }
@@ -155,7 +155,7 @@ export function NewInvoice({
     setFailed(null);
     startTransition(async () => {
       const { data, error } = await supabase
-        .from("vendor_invoices")
+        .from("vendor_bills")
         .insert({
           org_id: orgId,
           location_id: locationId,
@@ -172,10 +172,10 @@ export function NewInvoice({
         .single();
 
       if (error || !data) {
-        setFailed(error?.message ?? "The invoice could not be created.");
+        setFailed(error?.message ?? "The bill could not be created.");
         return;
       }
-      const invoiceId = data.id as string;
+      const billId = data.id as string;
 
       // This INVERTS 018's Storage-then-row rule, and it's forced: the object
       // key needs the invoice's id, which only exists once the row does. It is
@@ -184,7 +184,7 @@ export function NewInvoice({
       // hand-typed rent bill lives in — so the intermediate state is legal
       // rather than broken.
       if (file) {
-        const path = attachmentPath(orgId, invoiceOwner(invoiceId), file.name);
+        const path = attachmentPath(orgId, billOwner(billId), file.name);
         const { error: uploadError } = await supabase.storage
           .from(ATTACHMENT_BUCKET)
           .upload(path, file, { contentType: file.type || undefined });
@@ -193,7 +193,7 @@ export function NewInvoice({
             `Filed the invoice, but the file didn't upload: ${uploadError.message}`
           );
           router.refresh();
-          router.push(`/invoices/${invoiceId}`);
+          router.push(`/bills/${billId}`);
           return;
         }
         const { error: rowError } = await supabase
@@ -201,7 +201,7 @@ export function NewInvoice({
           .insert({
             org_id: orgId,
             po_id: null,
-            invoice_id: invoiceId,
+            bill_id: billId,
             storage_path: path,
             kind: "invoice",
             file_name: file.name,
@@ -218,7 +218,7 @@ export function NewInvoice({
       // Read — not here. A 30-second model call behind a dialog's commit
       // button would make filing a rent bill feel like it had hung.
       router.refresh();
-      router.push(`/invoices/${invoiceId}`);
+      router.push(`/bills/${billId}`);
     });
   }
 
@@ -298,16 +298,16 @@ export function NewInvoice({
                 </p>
                 <ul className="mt-1 space-y-0.5">
                   {duplicates.map((d) => (
-                    <li key={d.invoice.id}>
+                    <li key={d.bill.id}>
                       <Link
-                        href={`/invoices/${d.invoice.id}`}
+                        href={`/bills/${d.bill.id}`}
                         className="underline decoration-neutral-500 underline-offset-[3px] hover:decoration-neutral-900"
                       >
-                        {d.invoice.invoice_number ?? "No number"}
+                        {d.bill.invoice_number ?? "No number"}
                       </Link>{" "}
                       <span className="text-muted">
                         — {d.reason}
-                        {d.invoice.total !== null ? ` · ${money(d.invoice.total)}` : ""}
+                        {d.bill.total !== null ? ` · ${money(d.bill.total)}` : ""}
                       </span>
                     </li>
                   ))}

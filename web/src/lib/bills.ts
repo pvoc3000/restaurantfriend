@@ -1,8 +1,8 @@
-// The vendor invoice: its vocabulary, its money, and the two questions the
-// Invoices module exists to answer — "when is this due" and "should we pay it".
+// The vendor bill: its vocabulary, its money, and the two questions the
+// Bills module exists to answer — "when is this due" and "should we pay it".
 //
-// Everything here is PURE and fixture-tested (scripts/fixtures/invoices.fixtures).
-// The screens hold no arithmetic of their own; see docs/invoices-brief.md.
+// Everything here is PURE and fixture-tested (scripts/fixtures/bills.fixtures).
+// The screens hold no arithmetic of their own; see docs/bills-brief.md.
 //
 // The record and the READING are deliberately different things. A reading
 // (lib/invoiceExtraction) transcribes a photograph exactly as printed, negative
@@ -27,9 +27,9 @@ import type { LineMatch } from "./invoiceMatch";
 // Status
 // ---------------------------------------------------------------------------
 
-export type InvoiceStatus = "open" | "approved" | "void";
+export type BillStatus = "open" | "approved" | "void";
 
-export const INVOICE_STATUS_ORDER: InvoiceStatus[] = ["open", "approved", "void"];
+export const BILL_STATUS_ORDER: BillStatus[] = ["open", "approved", "void"];
 
 // `INVOICE_STATUS_LABEL` / `INVOICE_STATUS_CLASS` (open/approved/void only, no
 // `paid`) are GONE — see below. Both status chips in the app now read
@@ -40,11 +40,11 @@ export const INVOICE_STATUS_ORDER: InvoiceStatus[] = ["open", "approved", "void"
 // Shapes
 // ---------------------------------------------------------------------------
 
-export type InvoiceLineKind = "item" | "freight" | "other";
+export type BillLineKind = "item" | "freight" | "other";
 
-export type VendorInvoiceLine = {
+export type VendorBillLine = {
   id: string;
-  invoice_id: string;
+  bill_id: string;
   purchase_order_id: string | null;
   purchase_order_item_id: string | null;
   line_no: number | null;
@@ -55,11 +55,11 @@ export type VendorInvoiceLine = {
   qty: number | null;
   unit_price: number | null;
   extended: number | null;
-  kind: InvoiceLineKind;
+  kind: BillLineKind;
   notes: string | null;
 };
 
-export type VendorInvoice = {
+export type VendorBill = {
   id: string;
   org_id: string;
   location_id: string;
@@ -72,13 +72,13 @@ export type VendorInvoice = {
   tax: number | null;
   freight: number | null;
   other_charges: number | null;
-  /** A discount printed on the invoice — positive, and SUBTRACTED from the
+  /** A discount printed on the bill — positive, and SUBTRACTED from the
    *  total (091), the opposite sign convention from `other_charges`, which is
    *  signed as printed. Null on nearly every bill. */
   discount: number | null;
   total: number | null;
   is_credit: boolean;
-  status: InvoiceStatus;
+  status: BillStatus;
   approved_at: string | null;
   approved_by: string | null;
   source: "manual" | "extraction";
@@ -104,27 +104,27 @@ export type VendorInvoice = {
 // ---------------------------------------------------------------------------
 
 /**
- * What this invoice does to the amount we owe.
+ * What this bill does to the amount we owe.
  *
  * Amounts are stored POSITIVE and a credit carries `is_credit` (migration 025),
  * so this is the single place the sign lives. Every total on every screen goes
  * through it — a list that summed the raw column would report a credit memo as
  * money owed.
  */
-export function signedTotal(invoice: Pick<VendorInvoice, "total" | "is_credit">): number {
-  const total = Number(invoice.total ?? 0);
-  return invoice.is_credit ? -total : total;
+export function signedTotal(bill: Pick<VendorBill, "total" | "is_credit">): number {
+  const total = Number(bill.total ?? 0);
+  return bill.is_credit ? -total : total;
 }
 
 /** The same, over a set — the list's Window / Open / Overdue figures. */
 export function sumSignedTotals(
-  invoices: Pick<VendorInvoice, "total" | "is_credit">[]
+  bills: Pick<VendorBill, "total" | "is_credit">[]
 ): number {
-  return invoices.reduce((sum, i) => sum + signedTotal(i), 0);
+  return bills.reduce((sum, i) => sum + signedTotal(i), 0);
 }
 
 /** What the LINES add up to. Kind-blind: a freight LINE is money billed. */
-export function lineTotal(lines: Pick<VendorInvoiceLine, "extended">[]): number {
+export function lineTotal(lines: Pick<VendorBillLine, "extended">[]): number {
   return lines.reduce((sum, l) => sum + Number(l.extended ?? 0), 0);
 }
 
@@ -134,7 +134,7 @@ const MONEY_EPSILON = 0.005;
 export type AmountCheck = {
   /** What the parts add up to, or null when there is nothing to add. */
   computed: number | null;
-  /** What the invoice claims. */
+  /** What the bill claims. */
   stated: number | null;
   differs: boolean;
   /** Named in the caveat, so "we assumed no tax" is visible rather than implied. */
@@ -142,10 +142,10 @@ export type AmountCheck = {
 };
 
 /**
- * Does the foot of the invoice add up — subtotal + tax + freight + other = total?
+ * Does the foot of the bill add up — subtotal + tax + freight + other = total?
  *
- * Nulls count as zero for the ARITHMETIC (an invoice printing no tax line is an
- * invoice with no tax) but are reported in `missing`, because "we treated the
+ * Nulls count as zero for the ARITHMETIC (an bill printing no tax line is an
+ * bill with no tax) but are reported in `missing`, because "we treated the
  * absent tax as nothing" is an assumption the person approving should see
  * rather than infer from a number that happens to work out.
  *
@@ -154,49 +154,49 @@ export type AmountCheck = {
  *
  * NEITHER IS A TOTAL WITH NO SUBTOTAL, which is the same statement made
  * properly. The escape used to require all FOUR parts to be null, and a reader
- * that writes `tax: 0` for an invoice printing no tax — which is the honest
- * reading, and the commonest one — took the invoice out of that branch while
+ * that writes `tax: 0` for an bill printing no tax — which is the honest
+ * reading, and the commonest one — took the bill out of that branch while
  * leaving nothing to add up. BakeMark 452660 then reported "the parts add up to
- * $0.00 against a total of $1,001.26" on an invoice whose seven lines sum to
+ * $0.00 against a total of $1,001.26" on an bill whose seven lines sum to
  * $1,001.26 exactly (Mark, 2026-09-02).
  *
  * The subtotal is the only part that can carry the bulk of a bill; tax, freight
  * and other are addenda. Without it the equation is UNVERIFIABLE rather than
  * violated, and saying so is different from crying wolf. It is still named in
  * `missing`, so "the subtotal was never read" stays visible — which is the
- * thing actually worth fixing on that invoice.
+ * thing actually worth fixing on that bill.
  */
 export function amountReconciliation(
-  invoice: Pick<
-    VendorInvoice,
+  bill: Pick<
+    VendorBill,
     "subtotal" | "tax" | "freight" | "other_charges" | "discount" | "total"
   >
 ): AmountCheck {
   const parts = [
-    ["subtotal", invoice.subtotal],
-    ["tax", invoice.tax],
-    ["freight", invoice.freight],
-    ["other", invoice.other_charges],
+    ["subtotal", bill.subtotal],
+    ["tax", bill.tax],
+    ["freight", bill.freight],
+    ["other", bill.other_charges],
   ] as const;
 
   const missing = parts.filter(([, v]) => v === null).map(([k]) => k);
-  const stated = invoice.total === null ? null : Number(invoice.total);
+  const stated = bill.total === null ? null : Number(bill.total);
 
   // Nothing to check: either nothing was printed at the foot at all, or the one
   // part that could carry the bill is absent. See the note above — a `tax: 0`
   // reading used to sneak past the first test and fail the arithmetic on its own.
-  if (missing.length === parts.length || invoice.subtotal === null) {
+  if (missing.length === parts.length || bill.subtotal === null) {
     return { computed: null, stated, differs: false, missing: [...missing] };
   }
 
   // DISCOUNT IS NOT ONE OF `parts` AND NEVER `missing` (091) — nearly every
-  // invoice has none, and reporting an absent discount as missing data would
+  // bill has none, and reporting an absent discount as missing data would
   // be noise on the overwhelming majority of bills this checks. Read as zero
   // when absent, same as the others, but SUBTRACTED — it's the one part of
   // the foot that reduces what's owed rather than adding to it.
   const computed =
     parts.reduce((sum, [, v]) => sum + Number(v ?? 0), 0) -
-    Number(invoice.discount ?? 0);
+    Number(bill.discount ?? 0);
   const differs =
     stated !== null && Math.abs(computed - stated) > MONEY_EPSILON;
   return { computed, stated, differs, missing: [...missing] };
@@ -215,13 +215,13 @@ export type LineSumCheck = {
  * header `freight` amount are the SAME charge described twice — the reader put
  * a delivery fee in both places because it was printed in both places — so
  * counting it here as well as in `amountReconciliation` would double it and
- * report a disagreement on a perfectly good invoice.
+ * report a disagreement on a perfectly good bill.
  *
  * A subtotal with no lines is not a disagreement: that's a one-line bill typed
  * by hand, which is allowed to have no lines at all.
  */
 export function lineSumReconciliation(
-  lines: Pick<VendorInvoiceLine, "extended" | "kind">[],
+  lines: Pick<VendorBillLine, "extended" | "kind">[],
   subtotal: number | null
 ): LineSumCheck {
   const items = lines.filter((l) => l.kind === "item");
@@ -268,7 +268,7 @@ export const AGING_LABEL: Record<AgingBucket, string> = {
  *
  * Due TODAY is `due7`, not overdue. You have until the end of the day.
  *
- * An APPROVED invoice still buckets. Approval is not payment, and "approved and
+ * An APPROVED bill still buckets. Approval is not payment, and "approved and
  * overdue" is a real state worth seeing; only `void` should drop out, which is
  * the caller's filter rather than this function's business.
  */
@@ -298,14 +298,14 @@ function daysBetween(from: string, to: string): number | null {
 // ---------------------------------------------------------------------------
 
 export type DuplicateMatch = {
-  invoice: Pick<VendorInvoice, "id" | "invoice_number" | "invoice_date" | "total">;
+  bill: Pick<VendorBill, "id" | "invoice_number" | "invoice_date" | "total">;
   /** 0 = same number, 1 = same money on about the same day. Lower is stronger. */
   rank: 0 | 1;
   reason: string;
 };
 
 /**
- * An invoice number is printed by a human and typed by a human. Case, spaces
+ * An bill number is printed by a human and typed by a human. Case, spaces
  * and dashes never carry meaning here — the same reasoning, and nearly the same
  * code, as `normalizeSku`.
  */
@@ -314,14 +314,14 @@ export function normalizeInvoiceNumber(raw: string | null): string | null {
   const cleaned = raw.trim().toUpperCase().replace(/[\s-]+/g, "");
   if (!cleaned) return null;
   // Leading zeros are stripped here rather than kept for a second pass (which
-  // is what the SKU join does): two invoices differing only by a leading zero
+  // is what the SKU join does): two bills differing only by a leading zero
   // being genuinely different documents is not a real case, and this only ever
   // WARNS — the cost of an extra question is far below the cost of paying twice.
   return cleaned.replace(/^0+/, "") || cleaned;
 }
 
 /**
- * The invoice a READING should join rather than duplicate.
+ * The bill a READING should join rather than duplicate.
  *
  * `findPossibleDuplicates` below is the same question asked of a HUMAN, and it
  * warns rather than blocking because a person is standing there to judge. The
@@ -344,19 +344,19 @@ export function normalizeInvoiceNumber(raw: string | null): string | null {
  *   receipt have no key, which is the same reason migration 025 declines a
  *   unique index; a null must not match another null.
  * - **`is_credit` must agree.** A credit memo legitimately repeats the number
- *   of the invoice it credits — that is the case the constraint discussion in
+ *   of the bill it credits — that is the case the constraint discussion in
  *   025 names — so merging the two would fold a refund into the bill.
- * - **A VOID invoice is not a match.** Void means somebody decided that record
+ * - **A VOID bill is not a match.** Void means somebody decided that record
  *   should not exist, so it no longer holds the number; filing the document
  *   again is how you replace it.
  */
-export function filedInvoiceFor(
+export function filedBillFor(
   reading: { vendor_id: string; invoice_number: string | null; is_credit: boolean },
   others: Pick<
-    VendorInvoice,
+    VendorBill,
     "id" | "vendor_id" | "invoice_number" | "status" | "is_credit"
   >[]
-): Pick<VendorInvoice, "id" | "invoice_number"> | null {
+): Pick<VendorBill, "id" | "invoice_number"> | null {
   const number = normalizeInvoiceNumber(reading.invoice_number);
   if (!number) return null;
 
@@ -380,7 +380,7 @@ export function filedInvoiceFor(
  * hands numerics back as strings, so `1` and `"1.000"` must key the same or
  * every comparison silently fails (`toInvoiceLine` carries the same warning).
  *
- * EXPORTED for `migration/cleanup-duplicate-invoices.mjs`, which folds records
+ * EXPORTED for `migration/cleanup-duplicate-bills.mjs`, which folds records
  * the old auto-filer produced. That script has to pair a duplicate's lines with
  * the survivor's to carry PO links across, and pairing by anything other than
  * this would be a second definition of "the same printed line" — the drift this
@@ -405,20 +405,20 @@ export function linePrint(line: {
 }
 
 /**
- * The lines of a reading that this invoice does NOT already hold — what a
+ * The lines of a reading that this bill does NOT already hold — what a
  * second page adds, and what a second copy of the same page does not.
  *
- * An invoice's pages are scanned and attached separately (Mark, 2026-08-27:
+ * An bill's pages are scanned and attached separately (Mark, 2026-08-27:
  * "I've uploaded individual pages from the same invoice"), and the totals block
  * prints on every page, so each page reads as the WHOLE bill: measured on Chefs
  * Warehouse 73535581 at DF02, two pages produced two records both claiming
- * $394.16, one holding 4 lines and the other 7 — so /invoices showed $788.32
+ * $394.16, one holding 4 lines and the other 7 — so /bills showed $788.32
  * owed for a $394.16 bill. Joining them on the header is only half an answer;
  * the record then has to end up holding the union of what its pages say, or
  * seven lines are silently lost.
  *
  * A MULTISET, not a set, and that is the case worth not getting wrong: one
- * invoice may legitimately print the same item twice at the same price. Each
+ * bill may legitimately print the same item twice at the same price. Each
  * existing line is consumed at most once, so re-reading a page with [A, A]
  * matches both and adds nothing, while a page with [A, A] against a record
  * holding one A adds exactly one.
@@ -453,7 +453,7 @@ export function unfiledLines<T extends PrintedLine & { line_no: number | null }>
  * writes rows, and `billsFromReadings`, which reconciles against readings that
  * have not been written yet. Two spellings of "the same printed line" is
  * exactly the drift this file keeps warning about, and here it would be
- * invisible: the two would agree on every ordinary invoice and disagree on the
+ * invisible: the two would agree on every ordinary bill and disagree on the
  * re-uploaded page, which is the case both exist for.
  *
  * Each held line is consumed at most once — see `unfiledLines` for why a
@@ -484,14 +484,14 @@ function surplusLines<T extends PrintedLine>(
 /**
  * The BILLS an order's paperwork amounts to, before any of it is filed.
  *
- * This is `createInvoiceFromReading`'s joining rule — same vendor, same number
+ * This is `createBillFromReading`'s joining rule — same vendor, same number
  * — done in the head rather than in the database, and it exists because filing
  * moved to close (Mark, 2026-09-01). The receiving screen reconciles against
  * whatever paperwork is on the order, and until that day it could rely on the
- * FILED invoices to have already been joined and unioned for it. Now they have
+ * FILED bills to have already been joined and unioned for it. Now they have
  * not been, so the same three facts have to be worked out from the readings:
  *
- *   · two DIFFERENT invoices against one order are a partial shipment, and
+ *   · two DIFFERENT bills against one order are a partial shipment, and
  *     both are billing this delivery — `latestRead` alone would reconcile
  *     against whichever was read last and report every line of the other as
  *     unbilled;
@@ -500,7 +500,7 @@ function surplusLines<T extends PrintedLine>(
  *   · a second page ADDS its lines, a second copy of a page adds nothing.
  *
  * A reading with no printed number never joins anything — the same refusal
- * `filedInvoiceFor` makes, and for the same reason: there is nothing to be
+ * `filedBillFor` makes, and for the same reason: there is nothing to be
  * confident on. Two numberless readings of one document therefore read as two
  * bills, which is what the FILED path does with them too. Parity with what
  * filing would produce is the whole target here; a cleverer rule would be a
@@ -544,7 +544,7 @@ export function billsFromReadings<
 /**
  * The header fields a later page can fill IN, never overwrite.
  *
- * A multi-page invoice does not print everything on page one — the totals block
+ * A multi-page bill does not print everything on page one — the totals block
  * and the due date routinely sit on the last page — so a record filed from page
  * one can be missing figures that page two has. Filling only what is null is
  * what keeps this from being an edit: a value already on the record was either
@@ -572,14 +572,14 @@ export function blankHeaderFields(
  * What the close confirm's checkbox says.
  *
  * It counts BILLS, not documents, and that distinction is the whole of it: two
- * pages of one invoice are two attachments that will JOIN into a single record
- * (`filedInvoiceFor`), so "File 2 invoices" would promise something the write
+ * pages of one bill are two attachments that will JOIN into a single record
+ * (`filedBillFor`), so "File 2 bills" would promise something the write
  * will not do and would read as the duplicate bug still being there. Distinct
  * printed numbers is the closest thing to a bill count available before the
  * write, and it is exactly what the join keys on.
  *
  * A reading with no number is its own bill for counting purposes — there is
- * nothing to join it to, which is the same reason `filedInvoiceFor` refuses to
+ * nothing to join it to, which is the same reason `filedBillFor` refuses to
  * match one.
  */
 export function fileReadingsLabel(
@@ -608,23 +608,23 @@ export function fileReadingsLabel(
 const NEAR_DUPLICATE_DAYS = 7;
 
 /**
- * Other invoices that might be this same bill.
+ * Other bills that might be this same bill.
  *
  * WARNS, never blocks — `findPossibleRehires`' rule, and migration 025 declines
  * to add a unique constraint for the reasons written there. Paying a vendor
  * twice is the single most expensive mistake this module can prevent, and the
  * only thing that reliably prevents it is a human being asked.
  *
- * An invoice never reports ITSELF: this runs on a detail screen against the
+ * An bill never reports ITSELF: this runs on a detail screen against the
  * list the record is already in.
  */
 export function findPossibleDuplicates(
   candidate: Pick<
-    VendorInvoice,
+    VendorBill,
     "id" | "vendor_id" | "invoice_number" | "invoice_date" | "total"
   >,
   others: Pick<
-    VendorInvoice,
+    VendorBill,
     "id" | "vendor_id" | "invoice_number" | "invoice_date" | "total" | "status"
   >[]
 ): DuplicateMatch[] {
@@ -634,14 +634,14 @@ export function findPossibleDuplicates(
   for (const other of others) {
     if (other.id === candidate.id) continue;
     if (other.vendor_id !== candidate.vendor_id) continue;
-    // A voided invoice is a document someone has already dealt with; raising it
+    // A voided bill is a document someone has already dealt with; raising it
     // again is noise.
     if (other.status === "void") continue;
 
     const otherNumber = normalizeInvoiceNumber(other.invoice_number);
     if (number && otherNumber && number === otherNumber) {
       found.push({
-        invoice: other,
+        bill: other,
         rank: 0,
         reason: `same invoice number at this vendor`,
       });
@@ -661,7 +661,7 @@ export function findPossibleDuplicates(
           : null;
       if (gap !== null && Math.abs(gap) <= NEAR_DUPLICATE_DAYS) {
         found.push({
-          invoice: other,
+          bill: other,
           rank: 1,
           reason: `same amount at this vendor, ${
             gap === 0 ? "the same day" : `${Math.abs(gap)} days apart`
@@ -702,11 +702,11 @@ export type LinkedOrder = {
  * teaches you to stop reading confirms.
  */
 export function approvalReadiness(
-  invoice: Pick<
-    VendorInvoice,
+  bill: Pick<
+    VendorBill,
     "subtotal" | "tax" | "freight" | "other_charges" | "discount" | "total"
   >,
-  lines: Pick<VendorInvoiceLine, "extended" | "kind" | "purchase_order_id">[],
+  lines: Pick<VendorBillLine, "extended" | "kind" | "purchase_order_id">[],
   linked: LinkedOrder[],
   documentCount: number,
   duplicates: DuplicateMatch[],
@@ -716,16 +716,16 @@ export function approvalReadiness(
 ): string[] {
   const caveats: string[] = [];
 
-  const amounts = amountReconciliation(invoice);
+  const amounts = amountReconciliation(bill);
   if (amounts.differs) {
     caveats.push(
-      `the parts add up to ${money(amounts.computed)}, but the invoice says ${money(
+      `the parts add up to ${money(amounts.computed)}, but the bill says ${money(
         amounts.stated
       )}`
     );
   }
 
-  const sums = lineSumReconciliation(lines, invoice.subtotal);
+  const sums = lineSumReconciliation(lines, bill.subtotal);
   if (sums.differs) {
     caveats.push(
       `the item lines come to ${money(sums.computed)} against a subtotal of ${money(
@@ -735,7 +735,7 @@ export function approvalReadiness(
   }
 
   // Silent when NONE of them are attributed: that's a rent bill or a plumber's
-  // invoice, and complaining about a missing purchase order every single time
+  // bill, and complaining about a missing purchase order every single time
   // is how a caveat becomes noise.
   const unattributed = lines.filter((l) => l.purchase_order_id === null).length;
   if (unattributed > 0 && unattributed < lines.length) {
@@ -783,7 +783,7 @@ export function approvalReadiness(
           receivedNotBilled === 1 ? "line was" : "lines were"
         } received on ${order.poNumber} but ${
           receivedNotBilled === 1 ? "isn't" : "aren't"
-        } on this invoice`
+        } on this bill`
       );
     }
   }
@@ -794,7 +794,7 @@ export function approvalReadiness(
     const first = duplicates[0];
     caveats.push(
       `it may be a duplicate — ${first.reason}${
-        first.invoice.invoice_number ? ` (${first.invoice.invoice_number})` : ""
+        first.bill.invoice_number ? ` (${first.bill.invoice_number})` : ""
       }`
     );
   }
@@ -816,7 +816,7 @@ export { qtyDiffers };
 // From a reading to a record
 // ---------------------------------------------------------------------------
 
-export type InvoiceHeaderDraft = {
+export type BillHeaderDraft = {
   invoice_number: string | null;
   invoice_date: string | null;
   due_date: string | null;
@@ -857,7 +857,7 @@ function termsDays(terms: string): number | null {
 }
 
 /**
- * The due date implied by the invoice date and the vendor's printed terms —
+ * The due date implied by the bill date and the vendor's printed terms —
  * for the moment a reading has one but not the other, which happens: the
  * model transcribes what it can find, and a due date is sometimes simply not
  * printed on the page while the terms are.
@@ -901,18 +901,18 @@ export function dueDateFromTerms(
  * an unchecked "2026-02-31" rolls over to March 2nd rather than failing.
  *
  * DUE DATE FALLS BACK TO THE TERMS (Mark, 2026-09-03: "when creating a new
- * invoice, if no due date is set, can we calculate one based on invoice date
+ * bill, if no due date is set, can we calculate one based on bill date
  * and terms?"). Scoped to this reading path deliberately — it's where a
  * bill's terms are already being transcribed, so a due date the model missed
  * (or the vendor simply didn't print) is filled from a fact already on the
  * same page, rather than left for someone to notice is blank. The manual
- * "New invoice" dialog has no Terms field to compute from — see its own
+ * "New bill" dialog has no Terms field to compute from — see its own
  * comment — so this stays a creation-time fallback, never a live recompute
  * on the detail screen where `due_date` is typed directly.
  */
 export function invoiceHeaderFromExtraction(
   extraction: InvoiceExtraction
-): InvoiceHeaderDraft {
+): BillHeaderDraft {
   const charges = invoiceCharges(extraction);
   const isCredit = isCreditReading(extraction);
   const magnitude = (v: number | null) => (v === null ? null : Math.abs(Number(v)));
@@ -943,7 +943,7 @@ export function invoiceHeaderFromExtraction(
  */
 export function invoiceLinesFromExtraction(
   extraction: InvoiceExtraction
-): Omit<VendorInvoiceLine, "id" | "invoice_id">[] {
+): Omit<VendorBillLine, "id" | "bill_id">[] {
   return extraction.lines.map((line, index) => ({
     purchase_order_id: null,
     purchase_order_item_id: null,
@@ -970,7 +970,7 @@ export function invoiceLinesFromExtraction(
  * strings on a numeric column, and a string quantity silently fails every
  * comparison downstream.
  */
-export function toInvoiceLine(line: VendorInvoiceLine): InvoiceLine {
+export function toInvoiceLine(line: VendorBillLine): InvoiceLine {
   return {
     product_id: line.product_id,
     alt_product_id: line.alt_product_id,
@@ -983,11 +983,11 @@ export function toInvoiceLine(line: VendorInvoiceLine): InvoiceLine {
 }
 
 /**
- * The purchase order number this invoice prints back at us, if a single one
+ * The purchase order number this bill prints back at us, if a single one
  * covers the page.
  *
  * A per-LINE number wins over the header one where the lines agree — that is
- * the shape a consolidated invoice takes, and the header on those is often
+ * the shape a consolidated bill takes, and the header on those is often
  * blank or carries only the first order. Where the lines DISAGREE this returns
  * null: the document covers more than one order, and picking one of them would
  * be worse than saying nothing (the Link to PO dialog is where that gets
@@ -1005,7 +1005,7 @@ export function printedPoNumber(extraction: InvoiceExtraction): string | null {
 }
 
 /**
- * Every purchase order number printed anywhere on this invoice — header and
+ * Every purchase order number printed anywhere on this bill — header and
  * lines together. What the Link block offers when the page names more than one.
  */
 export function printedPoNumbers(extraction: InvoiceExtraction): string[] {
@@ -1020,17 +1020,17 @@ export function printedPoNumbers(extraction: InvoiceExtraction): string[] {
 }
 
 /**
- * The purchase order numbers this invoice prints that are NOT the order you are
+ * The purchase order numbers this bill prints that are NOT the order you are
  * standing in front of — or null when there is nothing to say.
  *
- * Three rules, and each one is a real invoice rather than a hypothetical:
+ * Three rules, and each one is a real bill rather than a hypothetical:
  *
  * SILENCE IS NOT DISAGREEMENT. BakeMark prints no customer PO number at all, so
  * an absent value must never warn — otherwise the one vendor whose paperwork is
  * simply built differently flags every delivery, and the mark stops meaning
  * anything on the deliveries where it does.
  *
- * ANY MATCH IS AGREEMENT. A consolidated invoice legitimately names several
+ * ANY MATCH IS AGREEMENT. A consolidated bill legitimately names several
  * orders (that is why `printedPoNumbers` reads the lines as well as the header),
  * so ours being among them is agreement, not a partial one.
  *
@@ -1067,7 +1067,7 @@ export function printedPoDisagreement(
  * Paper Co" apart — without this list they would share `paper` and the check
  * would stay quiet on a real mis-filing.
  *
- * Measured against the seven vendors whose invoices are on file; add to it when
+ * Measured against the seven vendors whose bills are on file; add to it when
  * a real pair asks, never speculatively.
  */
 const VENDOR_NOISE = new Set([
@@ -1099,19 +1099,19 @@ function vendorWords(name: string | null): Set<string> {
 }
 
 /**
- * The vendor this invoice says it is from, when that cannot be the vendor whose
+ * The vendor this bill says it is from, when that cannot be the vendor whose
  * order you are standing in front of — or null when there is nothing to say.
  *
- * It exists because of one real record. A Dawn Foods invoice was attached to a
+ * It exists because of one real record. A Dawn Foods bill was attached to a
  * Vesta Foodservice order, and the filer takes the vendor from the ORDER and
  * never from the page, so $1,985.99 of Dawn's bill sat on the books under Vesta
  * — a duplicate no number-based check could ever catch, because it was filed
- * under a vendor the real invoice has nothing to do with.
+ * under a vendor the real bill has nothing to do with.
  *
  * IT WARNS ONLY WHEN THE TWO NAMES SHARE NOTHING, and that threshold is a
  * measurement rather than a preference. Over the 49 readings on file, only
  * three of twelve distinct pairs match as text: our catalog carries the name
- * staff say and the invoice prints the name lawyers use.
+ * staff say and the bill prints the name lawyers use.
  *
  *     BakeMark              BAKEMARK USA LLC
  *     Chefs Warehouse       The Chefs' Warehouse West Coast, LLC
@@ -1205,7 +1205,7 @@ function money(value: number | null | undefined): string {
  * says a bill is on the books and `qbo_balance` says what is left on it; a
  * status column repeating either would be two answers to one question, which
  * is the thing this schema keeps refusing (051's biconditional, 016's
- * `nextDeliveryDate`). `invoices.status` stays open/approved/void.
+ * `nextDeliveryDate`). `bills.status` stays open/approved/void.
  *
  * THE FIRST TWO ARE OURS AND THE LAST TWO ARE NOT, and that is the distinction
  * the colours cannot carry. Open and Approved are acts we performed and are
@@ -1260,10 +1260,10 @@ export const BILL_STAGE_CLASS: Record<BillStage, string> = {
 };
 
 /** Everything the stage is read from. Plain fields rather than the QuickBooks
- *  types, so `lib/invoices` stays free of that module and the fixtures can
+ *  types, so `lib/bills` stays free of that module and the fixtures can
  *  build a case in one line. */
 export type BillStageInput = {
-  status: InvoiceStatus;
+  status: BillStatus;
   /** Whether a QuickBooks document is linked — `external_ref.qbo.id`. */
   linked: boolean;
   /** 088's cache. Null means either nobody asked or QuickBooks no longer has
@@ -1272,14 +1272,14 @@ export type BillStageInput = {
   qbo_checked_at: string | null;
 };
 
-export function billStage(invoice: BillStageInput): BillStage {
+export function billStage(bill: BillStageInput): BillStage {
   // Void first: it is an exit from the ladder, not a position on it, and a
   // voided bill that happens to carry a link must not read as Submitted.
-  if (invoice.status === "void") return "void";
-  if (!invoice.linked) return invoice.status === "approved" ? "approved" : "open";
+  if (bill.status === "void") return "void";
+  if (!bill.linked) return bill.status === "approved" ? "approved" : "open";
   // Zero is the only balance that means paid, and it must be a NUMBER — null
   // here is "not asked" or "no longer there", neither of which is paid.
-  if (invoice.qbo_balance !== null && invoice.qbo_balance <= 0.005) return "paid";
+  if (bill.qbo_balance !== null && bill.qbo_balance <= 0.005) return "paid";
   return "submitted";
 }
 
@@ -1291,22 +1291,22 @@ export function billStage(invoice: BillStageInput): BillStage {
  * nothing rather than implying it was checked and found unpaid.
  */
 export function billPaymentNote(
-  invoice: BillStageInput,
+  bill: BillStageInput,
   money: (n: number) => string
 ): string | null {
-  if (!invoice.linked || !invoice.qbo_checked_at) return null;
-  const when = invoice.qbo_checked_at.slice(0, 10);
+  if (!bill.linked || !bill.qbo_checked_at) return null;
+  const when = bill.qbo_checked_at.slice(0, 10);
   // Checked, and the document is not there. The one answer that needs an act
   // rather than a figure — the bill can neither be updated nor sent until the
   // link is forgotten.
-  if (invoice.qbo_balance === null) return `no longer in QuickBooks · as of ${when}`;
-  if (invoice.qbo_balance <= 0.005) return `paid · as of ${when}`;
-  return `${money(invoice.qbo_balance)} owed · as of ${when}`;
+  if (bill.qbo_balance === null) return `no longer in QuickBooks · as of ${when}`;
+  if (bill.qbo_balance <= 0.005) return `paid · as of ${when}`;
+  return `${money(bill.qbo_balance)} owed · as of ${when}`;
 }
 
 /**
  * What is still OWED on a bill, from what is on the row (Mark, 2026-09-05, for
- * the vendor record's Invoices tab: "a 'Balance' owed column with the total
+ * the vendor record's Bills tab: "a 'Balance' owed column with the total
  * below it").
  *
  * This app deliberately stores no vendor payment — QuickBooks is the only
@@ -1326,17 +1326,17 @@ export function billPaymentNote(
  * QuickBooks reports a VendorCredit's `Balance` as the credit still unapplied,
  * a positive number, which is why the sign is put back here.
  */
-export function balanceOwed(invoice: {
-  status: InvoiceStatus;
+export function balanceOwed(bill: {
+  status: BillStatus;
   total: number | null;
   is_credit: boolean;
   linked: boolean;
   qbo_balance: number | null;
 }): number {
-  if (invoice.status === "void") return 0;
-  const sign = invoice.is_credit ? -1 : 1;
-  if (invoice.linked && invoice.qbo_balance !== null) return sign * invoice.qbo_balance;
-  return sign * Number(invoice.total ?? 0);
+  if (bill.status === "void") return 0;
+  const sign = bill.is_credit ? -1 : 1;
+  if (bill.linked && bill.qbo_balance !== null) return sign * bill.qbo_balance;
+  return sign * Number(bill.total ?? 0);
 }
 
 /**
@@ -1344,18 +1344,18 @@ export function balanceOwed(invoice: {
  *
  * 089's whole point: `financials_touched_at` is bumped ONLY by the LOCKED
  * columns, never by a notes or terms edit, so this can't false-alarm on a
- * typo fixed while the invoice happened to be open. Both sides are needed —
+ * typo fixed while the bill happened to be open. Both sides are needed —
  * nothing pushed yet (`synced_at` null) is not stale, and nothing edited
  * since creation (`financials_touched_at` null) is not stale either, however
  * long ago the push was.
  */
 export function pushIsStale(
-  invoice: Pick<VendorInvoice, "synced_at" | "financials_touched_at">
+  bill: Pick<VendorBill, "synced_at" | "financials_touched_at">
 ): boolean {
-  if (!invoice.synced_at || !invoice.financials_touched_at) return false;
+  if (!bill.synced_at || !bill.financials_touched_at) return false;
   return (
-    new Date(invoice.financials_touched_at).getTime() >
-    new Date(invoice.synced_at).getTime()
+    new Date(bill.financials_touched_at).getTime() >
+    new Date(bill.synced_at).getTime()
   );
 }
 
@@ -1367,10 +1367,10 @@ export function pushIsStale(
  * A line's own money: what was billed times what it cost.
  *
  * ONLY WHERE THE PAGE'S OWN ARITHMETIC IS THIS ARITHMETIC, which on a food
- * distributor's invoice is not always. Chefs Warehouse 73358289 bills BROKEN
+ * distributor's bill is not always. Chefs Warehouse 73358289 bills BROKEN
  * CASES — pack `24/1 LB BC` — printing the CASE price as the unit price and
  * charging for eaches: 7 units of a $62.68 case is $18.28, not $438.76.
- * Computing that invoice from qty × unit_price turns $472.13 into $1,952.90,
+ * Computing that bill from qty × unit_price turns $472.13 into $1,952.90,
  * measured, on a bill already approved.
  *
  * So this is the SIMPLE case only, and `rescaledExtended` is what a quantity
@@ -1403,7 +1403,7 @@ export function lineExtended(
  * neither, because 0 would be a claim that the line was free.
  */
 export function rescaledExtended(
-  line: Pick<VendorInvoiceLine, "qty" | "unit_price" | "extended">,
+  line: Pick<VendorBillLine, "qty" | "unit_price" | "extended">,
   next: { qty?: number | null; unit_price?: number | null }
 ): number | null {
   const qty = next.qty !== undefined ? next.qty : line.qty;
@@ -1438,7 +1438,7 @@ export type ComputedAmounts = {
 };
 
 /**
- * What the invoice comes to, from its lines and its charges.
+ * What the bill comes to, from its lines and its charges.
  *
  * ITEM LINES ONLY for the subtotal, and the exclusion is the same one
  * `lineSumReconciliation` makes: a freight LINE and the header `freight` are one
@@ -1447,11 +1447,11 @@ export type ComputedAmounts = {
  * NULL WHEN THERE ARE NO LINES, which is the rent bill and every other
  * hand-typed one-line bill. Those keep their typed total — computing 0 for them
  * would replace a real figure with a claim that nothing is owed, and they are
- * precisely the invoices this module exists to carry.
+ * precisely the bills this module exists to carry.
  */
 export function computedAmounts(
-  lines: Pick<VendorInvoiceLine, "qty" | "unit_price" | "extended" | "kind">[],
-  charges: Pick<VendorInvoice, "tax" | "freight" | "other_charges" | "discount">
+  lines: Pick<VendorBillLine, "qty" | "unit_price" | "extended" | "kind">[],
+  charges: Pick<VendorBill, "tax" | "freight" | "other_charges" | "discount">
 ): ComputedAmounts {
   const items = lines.filter((l) => l.kind === "item");
   if (lines.length === 0) return { subtotal: null, total: null };

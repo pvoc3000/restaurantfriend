@@ -23,8 +23,8 @@ import {
 } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import { unfiledReadings, type SignedAttachment } from "@/lib/attachments";
-import { fileReadingsLabel } from "@/lib/invoices";
-import { fileReadings } from "@/lib/invoiceFromExtraction";
+import { fileReadingsLabel } from "@/lib/bills";
+import { fileReadings } from "@/lib/billFromExtraction";
 import { PoAttachments } from "./PoAttachments";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { SaveLineToCatalog } from "./SaveLineToCatalog";
@@ -96,7 +96,7 @@ export function PurchaseOrderDetail({
    *  the server, which is the only side that has the search params. */
   receiveHref: string;
   /**
-   * May this role turn paperwork into a BILL — a row on /invoices? The Page
+   * May this role turn paperwork into a BILL — a row on /bills? The Page
    * Permissions sheet has a purchaser at Read Only there, so a purchaser who
    * can process and close this order is still not offered "File as bill" or
    * the ticked box on Close: a record they could create and then not open is
@@ -239,18 +239,18 @@ export function PurchaseOrderDetail({
   async function close() {
     // Read first: the confirm is composed out of it twice — see the receiving
     // screen's `close`, which this mirrors deliberately. Empty for a role the
-    // sheet keeps off /invoices, so the box is never offered to them.
+    // sheet keeps off /bills, so the box is never offered to them.
     const unfiled = canFileBills ? unfiledReadings(attachments) : [];
     // The fourth argument is how many invoices are FILED against this order.
     // PO detail does not query them, so it passes the count it can see: an
-    // attachment tagged with an invoice_id IS a filed invoice. The fifth is
+    // attachment tagged with an bill_id IS a filed invoice. The fifth is
     // what the tick box is about to offer, so the confirm doesn't name a gap
     // it is closing in the same breath.
     const caveats = closeReadiness(
       lines,
       attachments.length,
       order.location_id,
-      new Set(attachments.map((a) => a.invoice_id).filter(Boolean)).size,
+      new Set(attachments.map((a) => a.bill_id).filter(Boolean)).size,
       unfiled.length
     );
     const message =

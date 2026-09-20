@@ -153,7 +153,7 @@ export const canSyncSales = canWriteCatalog;
 
 /**
  * Approve a vendor invoice for payment — migration 025's
- * `set_vendor_invoice_approval`, which checks this same set inside the
+ * `set_vendor_bill_approval`, which checks this same set inside the
  * function because RLS filters rows and this is a COLUMN rule.
  *
  * Purchaser+ can create and edit an invoice; saying "we owe this money" is

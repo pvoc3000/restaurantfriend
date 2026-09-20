@@ -4,14 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ATTACHMENT_BUCKET } from "@/lib/attachments";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { InvoiceStatus } from "@/lib/invoices";
+import type { BillStatus } from "@/lib/bills";
 import type { ReactNode } from "react";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
- * The invoice's own commands — approve, void, delete — and, since 2026-09-12,
+ * The bill's own commands — approve, void, delete — and, since 2026-09-12,
  * ROWS OF AN `ActionMenu` RATHER THAN BUTTONS (Mark: "move all the action
  * buttons into our new ActionMenu"). Pass `children` and this hands its rows
  * back in two named groups, keeping the writes, the row-count checks and every
@@ -40,8 +40,8 @@ import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
  * want to read, so the state is the feedback — the command is replaced by who
  * approved it and when.
  */
-export function InvoiceActions({
-  invoiceId,
+export function BillActions({
+  billId,
   status,
   approvedAt,
   caveats,
@@ -52,8 +52,8 @@ export function InvoiceActions({
   onDone,
   children,
 }: {
-  invoiceId: string;
-  status: InvoiceStatus;
+  billId: string;
+  status: BillStatus;
   approvedAt: string | null;
   /** What `approvalReadiness` found — named in the confirm, never blocking. */
   caveats: string[];
@@ -77,7 +77,7 @@ export function InvoiceActions({
 
   async function setApproval(approved: boolean) {
     if (approved && caveats.length > 0) {
-      const ok = (await confirmDialog({ ...splitConfirmMessage(`Approve this invoice for payment?\n\n` +
+      const ok = (await confirmDialog({ ...splitConfirmMessage(`Approve this bill for payment?\n\n` +
           caveats.map((c) => `• ${c}`).join("\n") +
           `\n\nApproving anyway is fine — it just records that you've said this ` +
           `bill is payable.`), confirmLabel: "Approve" }));
@@ -91,8 +91,8 @@ export function InvoiceActions({
     // approved_at" is a COLUMN rule, so migration 025 names those columns in a
     // security definer function instead.
     const { data, error: rpcError } = await supabase.rpc(
-      "set_vendor_invoice_approval",
-      { p_invoice: invoiceId, p_approved: approved }
+      "set_vendor_bill_approval",
+      { p_bill: billId, p_approved: approved }
     );
     setBusy(null);
 
@@ -101,13 +101,13 @@ export function InvoiceActions({
       return;
     }
     // ROW COUNT, not the absence of an error. The function returns no rows when
-    // it refuses — wrong role, wrong org, a voided invoice — and PostgREST
+    // it refuses — wrong role, wrong org, a voided bill — and PostgREST
     // reports that as a perfectly successful call. A cheerful false success
     // about money is the employee-delete lesson with more at stake.
     if (!Array.isArray(data) || data.length === 0) {
       setError(
         approved
-          ? "That wasn't approved — a voided invoice can't be, and approving needs a manager."
+          ? "That wasn't approved — a voided bill can't be, and approving needs a manager."
           : "That wasn't changed — approval can only be withdrawn by a manager."
       );
       return;
@@ -118,17 +118,17 @@ export function InvoiceActions({
   async function setStatus(next: "void" | "open") {
     if (
       next === "void" &&
-      !(await confirmDialog({ ...splitConfirmMessage("Void this invoice?\n\nIt stays on file and stops counting toward what " +
-          "you owe. A voided invoice can't be approved until it's reopened."), confirmLabel: "Void", tone: "danger" }))
+      !(await confirmDialog({ ...splitConfirmMessage("Void this bill?\n\nIt stays on file and stops counting toward what " +
+          "you owe. A voided bill can't be approved until it's reopened."), confirmLabel: "Void", tone: "danger" }))
     ) {
       return;
     }
     setBusy(next);
     setError(null);
     const { data, error: updateError } = await supabase
-      .from("vendor_invoices")
+      .from("vendor_bills")
       .update({ status: next })
-      .eq("id", invoiceId)
+      .eq("id", billId)
       .select("id");
     setBusy(null);
     if (updateError) {
@@ -143,24 +143,24 @@ export function InvoiceActions({
   }
 
   /**
-   * Delete the invoice — for the one you filed by mistake, not for the one you
+   * Delete the bill — for the one you filed by mistake, not for the one you
    * decided not to pay. That's Void, and the confirm says so.
    *
-   * The order matters and it's 018's rule read backwards. `invoice_id` is
+   * The order matters and it's 018's rule read backwards. `bill_id` is
    * `on delete set null`, so a document that ALSO belongs to a purchase order
-   * survives and simply stops naming this invoice — which is right; the
+   * survives and simply stops naming this bill — which is right; the
    * delivery's paperwork isn't the bookkeeping. A document that belongs ONLY to
-   * this invoice would be orphaned instead, so it goes first: row, then object,
+   * this bill would be orphaned instead, so it goes first: row, then object,
    * exactly the direction `useAttachmentActions.remove` uses and for the same
    * reason (an orphan object is invisible and harmless; a row pointing at a
    * missing file renders broken).
    */
   async function destroy() {
     if (
-      !(await confirmDialog({ ...splitConfirmMessage(`Delete this invoice?\n\n` +
+      !(await confirmDialog({ ...splitConfirmMessage(`Delete this bill?\n\n` +
           `Its lines go with it. Any document filed only here is removed; a ` +
           `document that also belongs to a purchase order stays on that order.\n\n` +
-          `This is for an invoice filed by mistake. To keep the record but stop ` +
+          `This is for an bill filed by mistake. To keep the record but stop ` +
           `it counting toward what you owe, use Void instead.\n\nThis cannot be undone.`), confirmLabel: "Delete", tone: "danger" }))
     ) {
       return;
@@ -168,11 +168,11 @@ export function InvoiceActions({
     setBusy("delete");
     setError(null);
 
-    // Invoice-only documents: the rows first, then their objects.
+    // Bill-only documents: the rows first, then their objects.
     const { data: own } = await supabase
       .from("purchase_order_attachments")
       .select("id, storage_path")
-      .eq("invoice_id", invoiceId)
+      .eq("bill_id", billId)
       .is("po_id", null);
     if (own && own.length > 0) {
       await supabase
@@ -187,9 +187,9 @@ export function InvoiceActions({
     // `.select()` so a delete matching no policy can't report a cheerful
     // success and then navigate — the employee-delete lesson.
     const { data, error: deleteError } = await supabase
-      .from("vendor_invoices")
+      .from("vendor_bills")
       .delete()
-      .eq("id", invoiceId)
+      .eq("id", billId)
       .select("id");
     setBusy(null);
     if (deleteError) {
@@ -249,9 +249,9 @@ export function InvoiceActions({
         ? [
             {
               // NOT destructive and NOT red — it is the UNDO of Void, and the
-              // only thing a voided invoice can do. It sits with the approval
+              // only thing a voided bill can do. It sits with the approval
               // decisions because it is one: what state this record is in.
-              label: busy === "open" ? "Reopening…" : "Reopen Invoice",
+              label: busy === "open" ? "Reopening…" : "Reopen Bill",
               disabled: busy !== null,
               onSelect: () => void setStatus("open"),
             },
@@ -262,7 +262,7 @@ export function InvoiceActions({
       ...(canEdit && status !== "void"
         ? [
             {
-              label: busy === "void" ? "Voiding…" : "Void Invoice",
+              label: busy === "void" ? "Voiding…" : "Void Bill",
               danger: true,
               disabled: busy !== null,
               onSelect: () => void setStatus("void"),
@@ -272,7 +272,7 @@ export function InvoiceActions({
       ...(canEdit
         ? [
             {
-              label: busy === "delete" ? "Deleting…" : "Delete Invoice…",
+              label: busy === "delete" ? "Deleting…" : "Delete Bill…",
               danger: true,
               disabled: busy !== null,
               onSelect: () => void destroy(),
@@ -290,7 +290,7 @@ export function InvoiceActions({
 
   // ITS OWN BOX NOW, matching `PushToQuickBooks`'s shape (Mark, 2026-09-03) —
   // a button row, then its own prose stacked beneath, in the fourth grid
-  // column `InvoiceDetail` gives it. Sharing one row with QuickBooks' buttons
+  // column `BillDetail` gives it. Sharing one row with QuickBooks' buttons
   // was the "put the send to quickbooks button in the same div" ask from
   // 2026-09-02; putting each in its OWN box is the further step Mark asked
   // for the next day, once four clearly separated areas turned out to matter

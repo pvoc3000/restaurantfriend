@@ -23,7 +23,7 @@
  * 'Invoices' tabs to the Vendor detail page"). The two new ones are the
  * vendor's RECORDS — every order placed with them and every bill they sent,
  * across every shop — as a simplified reading of `/purchase-orders` and
- * `/invoices`: no filters, no selection bar, no commands, just the rows and
+ * `/bills`: no filters, no selection bar, no commands, just the rows and
  * a link into each. Not the scanned documents; those live on the order.
  *
  * SCOPED TO THE WORKING SHOP (Mark, 2026-09-11), which REVERSES how they
@@ -47,21 +47,21 @@
  * rather than repeated down every row. The caps below are now per shop, so
  * they bite later than they did.
  */
-export type VendorTab = "info" | "items" | "purchase-orders" | "invoices";
+export type VendorTab = "info" | "items" | "purchase-orders" | "bills";
 
 /** Caps on the two record tabs' fetches — the lists' own 500. Here and not
  *  in the components, because a server component reads them: see
  *  `ITEM_PURCHASE_CAP` in `lib/inventoryItems` for the trap. */
 export const VENDOR_PO_CAP = 500;
-export const VENDOR_INVOICE_CAP = 500;
+export const VENDOR_BILL_CAP = 500;
 
-export const VENDOR_TABS: VendorTab[] = ["info", "items", "purchase-orders", "invoices"];
+export const VENDOR_TABS: VendorTab[] = ["info", "items", "purchase-orders", "bills"];
 
 export const VENDOR_TAB_LABEL: Record<VendorTab, string> = {
   info: "Info",
   items: "Items",
   "purchase-orders": "Purchase Orders",
-  invoices: "Invoices",
+  bills: "Bills",
 };
 
 /**

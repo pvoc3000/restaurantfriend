@@ -23,11 +23,11 @@ import {
   qboVendorId,
   splitAccountName,
   DOC_NUMBER_MAX,
-  type BillInvoice,
+  type PushableBill,
   type BillPushInputs,
 } from "../../src/lib/quickbooks";
 
-function invoice(over: Partial<BillInvoice> = {}): BillInvoice {
+function bill(over: Partial<PushableBill> = {}): PushableBill {
   return {
     id: "inv-1",
     invoice_number: "73535581",
@@ -43,7 +43,7 @@ function invoice(over: Partial<BillInvoice> = {}): BillInvoice {
 
 function inputs(over: Partial<BillPushInputs> = {}): BillPushInputs {
   return {
-    invoice: invoice(),
+    bill: bill(),
     vendorRef: "58",
     vendorName: "Chefs Warehouse",
     accountRef: "63",
@@ -83,7 +83,7 @@ test("the dates and doc number ride the bill", () => {
 
 test("a null date is omitted rather than sent empty", () => {
   const { body } = buildBillPayload(
-    inputs({ invoice: invoice({ invoice_date: null, due_date: null }) })
+    inputs({ bill: bill({ invoice_date: null, due_date: null }) })
   );
   no("TxnDate" in body, "TxnDate absent");
   no("DueDate" in body, "DueDate absent");
@@ -94,7 +94,7 @@ test("a null date is omitted rather than sent empty", () => {
 // ---------------------------------------------------------------------------
 
 test("a credit posts as VendorCredit with a POSITIVE amount", () => {
-  const built = buildBillPayload(inputs({ invoice: invoice({ is_credit: true }) }));
+  const built = buildBillPayload(inputs({ bill: bill({ is_credit: true }) }));
   eq(built.entity, "VendorCredit", "entity");
   eq(built.path, "vendorcredit", "path");
 
@@ -109,7 +109,7 @@ test("a credit posts as VendorCredit with a POSITIVE amount", () => {
 test("a credit carries no due date", () => {
   // QBO ignores it, and sending one implies a payment schedule for money going
   // the other way.
-  const { body } = buildBillPayload(inputs({ invoice: invoice({ is_credit: true }) }));
+  const { body } = buildBillPayload(inputs({ bill: bill({ is_credit: true }) }));
   no("DueDate" in body, "DueDate absent on a credit");
   eq(body.TxnDate, "2026-08-17", "but the transaction date stays");
 });
@@ -128,14 +128,14 @@ test("a first push carries no Id, SyncToken or sparse", () => {
   no("Id" in body, "Id absent");
   no("SyncToken" in body, "SyncToken absent");
   no("sparse" in body, "sparse absent");
-  eq(pushMode(invoice()), "create", "mode");
+  eq(pushMode(bill()), "create", "mode");
 });
 
 test("a second push is an update carrying all three", () => {
-  const pushed = invoice({
+  const pushed = bill({
     external_ref: { qbo: { id: "1043", sync_token: "3" } },
   });
-  const { body } = buildBillPayload(inputs({ invoice: pushed }));
+  const { body } = buildBillPayload(inputs({ bill: pushed }));
   eq(body.Id, "1043", "Id");
   eq(body.SyncToken, "3", "SyncToken");
   eq(body.sparse, true, "sparse");
@@ -166,7 +166,7 @@ test("DocNumber is capped at 21 and trimmed", () => {
 test("a missing invoice number omits DocNumber rather than sending empty", () => {
   eq(docNumberFor(null), undefined, "null");
   eq(docNumberFor("   "), undefined, "blank");
-  const { body } = buildBillPayload(inputs({ invoice: invoice({ invoice_number: null }) }));
+  const { body } = buildBillPayload(inputs({ bill: bill({ invoice_number: null }) }));
   no("DocNumber" in body, "absent from the payload");
 });
 
@@ -182,12 +182,12 @@ test("the line describes itself, and a caller may override", () => {
 
 test("nothing but an approved invoice is pushed", () => {
   ok(
-    billPushRefusals(inputs({ invoice: invoice({ status: "open" }) }))
+    billPushRefusals(inputs({ bill: bill({ status: "open" }) }))
       .some((r) => r.includes("approve it first")),
     "an open invoice is refused"
   );
   ok(
-    billPushRefusals(inputs({ invoice: invoice({ status: "void" }) }))
+    billPushRefusals(inputs({ bill: bill({ status: "void" }) }))
       .some((r) => r.includes("void")),
     "a void invoice is refused"
   );
@@ -209,7 +209,7 @@ test("a missing expense account is refused", () => {
 
 test("a null total is refused, and so is a negative one", () => {
   ok(
-    billPushRefusals(inputs({ invoice: invoice({ total: null }) }))
+    billPushRefusals(inputs({ bill: bill({ total: null }) }))
       .some((r) => r.includes("no total")),
     "null"
   );
@@ -217,11 +217,11 @@ test("a null total is refused, and so is a negative one", () => {
   // negative here means the column and the flag disagree — and guessing which
   // is right would post real money the wrong way round.
   ok(
-    billPushRefusals(inputs({ invoice: invoice({ total: -472.13 }) }))
+    billPushRefusals(inputs({ bill: bill({ total: -472.13 }) }))
       .some((r) => r.includes("negative")),
     "negative"
   );
-  eq(billPushRefusals(inputs({ invoice: invoice({ total: 0 }) })), [], "zero is allowed");
+  eq(billPushRefusals(inputs({ bill: bill({ total: 0 }) })), [], "zero is allowed");
 });
 
 test("a refused push never builds a payload", () => {
@@ -753,7 +753,7 @@ test("a ref with no sync token is a CREATE, which is why one is never rebuilt", 
 // Adopting a bill QuickBooks already has — the Bill.com parallel run
 // ---------------------------------------------------------------------------
 
-// The real normaliser, copied in shape from `lib/invoices` so these cases pin
+// The real normaliser, copied in shape from `lib/bills` so these cases pin
 // the behaviour the app actually uses.
 const norm = (raw: string | null): string | null => {
   if (!raw) return null;
@@ -867,7 +867,7 @@ test("poNumbersPhrase: one, several, duplicates and blanks, none", () => {
 
 test("a bill linked to an order names the PO in its line description and memo", () => {
   const { body } = buildBillPayload(
-    inputs({ invoice: invoice({ po_numbers: ["132-181227-01"] }) })
+    inputs({ bill: bill({ po_numbers: ["132-181227-01"] }) })
   );
   const line = (body.Line as Record<string, unknown>[])[0];
   eq(line.Description, "Invoice 73535581 · PO 132-181227-01", "description");
@@ -875,7 +875,7 @@ test("a bill linked to an order names the PO in its line description and memo", 
 });
 
 test("a bill with no linked order sends exactly what it always did", () => {
-  const { body } = buildBillPayload(inputs({ invoice: invoice({ po_numbers: [] }) }));
+  const { body } = buildBillPayload(inputs({ bill: bill({ po_numbers: [] }) }));
   const line = (body.Line as Record<string, unknown>[])[0];
   eq(line.Description, billLineDescription({ invoice_number: "73535581" }), "description unchanged");
   eq(body.PrivateNote, "restaurantfriend inv-1", "memo unchanged");

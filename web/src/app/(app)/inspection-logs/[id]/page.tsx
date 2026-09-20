@@ -150,7 +150,7 @@ export default async function InspectionPage({
       </div>
 
       {/* THE RECORD ON THE LEFT, THE REPORT ON THE RIGHT (Mark, 2026-09-05) —
-          the invoice record mirrored: here the document is what you check the
+          the bill record mirrored: here the document is what you check the
           typed record against, so it stands beside it rather than above. The
           right column measures its own height; see `InspectionDocuments`. */}
       <div className="grid gap-12 xl:grid-cols-2 xl:items-start">

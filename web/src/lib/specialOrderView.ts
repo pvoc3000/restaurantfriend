@@ -15,7 +15,7 @@
  * which is Upcoming.
  *
  * A SESSION COOKIE is this app's answer to exactly that, three times over
- * already — `rf.guide.view`, `rf.po.view`, `rf.invoice.view` — and the order
+ * already — `rf.guide.view`, `rf.po.view`, `rf.bill.view` — and the order
  * guide's stated reason applies here word for word: the nav link is a bare
  * path with no query to carry, AND the server has to know the view before it
  * queries (the window below the filters is `event_date >= a month ago` unless

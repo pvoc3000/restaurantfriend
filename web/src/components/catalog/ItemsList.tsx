@@ -261,7 +261,7 @@ export function ItemsList({
 
   /**
    * `NewInventoryItem` owns its own dialog, so the menu's row has to come FROM
-   * it — `NewInvoice`'s shape one screen over. No fallback branch: this is only
+   * it — `NewBill`'s shape one screen over. No fallback branch: this is only
    * ever called inside the `editable` test that used to gate the button.
    */
   const withNewItem = (render: (items: ActionMenuItem[]) => ReactNode) => (
@@ -425,7 +425,7 @@ export function ItemsList({
   return (
     <div className="space-y-4">
       {/* ONE "ACTIONS" MENU FOR THE SCREEN (Mark, 2026-09-11), the third in a
-          day after the purchase order and invoice lists, in the TITLE row the
+          day after the purchase order and bill lists, in the TITLE row the
           create command already rode in (Mark, 2026-09-10: "move the action
           button into the identity row top right aligned"), in FOUR GROUPS
           (Mark, 2026-09-11, adding the rules one at a time once he had it in
@@ -445,7 +445,7 @@ export function ItemsList({
           pair deserves to be VISIBLE rather than a hover away, which is the
           opposite of what hiding it would achieve.
 
-          NOTHING IS RENDERED BELOW purchaser+, unlike the invoice list's,
+          NOTHING IS RENDERED BELOW purchaser+, unlike the bill list's,
           because every row here writes: there is no read command to keep the
           menu meaningful, so an empty one would be worse than none. */}
       <PageHeading

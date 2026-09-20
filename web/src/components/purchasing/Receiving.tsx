@@ -16,10 +16,10 @@ import {
   type AttachmentKind,
   type SignedAttachment,
 } from "@/lib/attachments";
-import { billsFromReadings, fileReadingsLabel } from "@/lib/invoices";
-import { fileReadings } from "@/lib/invoiceFromExtraction";
+import { billsFromReadings, fileReadingsLabel } from "@/lib/bills";
+import { fileReadings } from "@/lib/billFromExtraction";
 import { matchInvoiceToOrder, matchesFromLinks, sameSku } from "@/lib/invoiceMatch";
-import type { OrderInvoice } from "@/lib/invoiceQueries";
+import type { OrderBill } from "@/lib/billQueries";
 import {
   canClose,
   closeReadiness,
@@ -56,7 +56,7 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { AddPoLines } from "./AddPoLines";
 import { DocumentPane } from "./DocumentPane";
-import { InvoiceSummary } from "./InvoiceSummary";
+import { BillSummary } from "./BillSummary";
 import { ReceivingRow } from "./ReceivingRow";
 import { useAttachmentActions } from "./useAttachmentActions";
 import { confirmDialog, confirmDialogWithOption, splitConfirmMessage } from "@/lib/confirm";
@@ -87,7 +87,7 @@ export function Receiving({
   canFileBills,
   attachments,
   attachmentError,
-  linkedInvoices,
+  linkedBills,
   closeHref,
 }: {
   order: PurchaseOrder & { vendors: { id: string; name: string } | null };
@@ -102,9 +102,9 @@ export function Receiving({
   attachments: SignedAttachment[];
   attachmentError: string | null;
   /** Invoices FILED against this order (migration 025). Empty on every order
-   *  that predates the Invoices module, which is what makes the fallback to
+   *  that predates the Bills module, which is what makes the fallback to
    *  `latestRead` below the ordinary path rather than a special case. */
-  linkedInvoices: OrderInvoice[];
+  linkedBills: OrderBill[];
   /** Where the bar's Close goes: the order, carrying the trail that led here.
    *  Built on the server, which is the only side that has the query string. */
   closeHref: string;
@@ -193,13 +193,13 @@ export function Receiving({
    * somebody had read — which is not a bill and so never becomes one above.
    */
   const match = useMemo(() => {
-    const filed = linkedInvoices.flatMap((i) => i.lines);
+    const filed = linkedBills.flatMap((i) => i.lines);
     if (filed.length > 0) return matchesFromLinks(lines, filed);
     const billed = bills.flatMap((b) => b.lines);
     if (billed.length > 0) return matchInvoiceToOrder(lines, billed);
     if (source?.extraction) return matchInvoiceToOrder(lines, source.extraction.lines);
     return null;
-  }, [lines, source, linkedInvoices, bills]);
+  }, [lines, source, linkedBills, bills]);
 
   /**
    * How many BILLS the rows below are reconciled against — what the band's
@@ -209,13 +209,13 @@ export function Receiving({
    * invoices unconditionally would say "1" on a delivery being reconciled
    * against two unfiled readings, which is the one case the chip exists for.
    */
-  const billCount = linkedInvoices.some((i) => i.lines.length > 0)
-    ? linkedInvoices.length
+  const billCount = linkedBills.some((i) => i.lines.length > 0)
+    ? linkedBills.length
     : bills.length;
 
   /** Whether anything at all is billed — what the fill control's wording and
    *  `fillable`'s never-overwrite rule both turn on. */
-  const hasBilling = linkedInvoices.some((i) => i.lines.length > 0) ||
+  const hasBilling = linkedBills.some((i) => i.lines.length > 0) ||
     source?.extraction != null;
   const matchByLine = useMemo(
     () => new Map((match?.matches ?? []).map((m) => [m.line.id, m])),
@@ -452,7 +452,7 @@ export function Receiving({
       lines,
       attachments.length,
       order.location_id,
-      linkedInvoices.length,
+      linkedBills.length,
       // What the tick box below is about to offer, so the confirm doesn't name
       // a gap it is closing in the same breath.
       unfiled.length
@@ -712,7 +712,7 @@ export function Receiving({
         )}
 
         {source?.extraction && match && (
-          <InvoiceSummary
+          <BillSummary
             invoiceCount={billCount}
             poNumber={order.po_number}
             vendorName={order.vendors?.name ?? null}

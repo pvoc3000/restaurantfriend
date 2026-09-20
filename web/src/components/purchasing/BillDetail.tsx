@@ -34,18 +34,18 @@ import {
   BILL_STAGE_CLASS,
   BILL_STAGE_LABEL,
   type LinkedOrder,
-  type VendorInvoice,
-  type VendorInvoiceLine,
-} from "@/lib/invoices";
+  type VendorBill,
+  type VendorBillLine,
+} from "@/lib/bills";
 import { matchInvoiceToOrder, matchesFromLinks } from "@/lib/invoiceMatch";
 import type { InvoiceLine } from "@/lib/invoiceExtraction";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { LinkToPo, type LinkCandidate } from "./LinkToPo";
-import type { LinkedPurchaseOrder } from "@/lib/invoiceQueries";
+import type { LinkedPurchaseOrder } from "@/lib/billQueries";
 import type { SignedAttachment } from "@/lib/attachments";
 import { DocumentPane } from "./DocumentPane";
 import { useAttachmentActions } from "./useAttachmentActions";
-import { InvoiceCommandMenu } from "./InvoiceCommandMenu";
+import { BillCommandMenu } from "./BillCommandMenu";
 import { attachmentRejection, type AttachmentKind } from "@/lib/attachments";
 import {
   handAmendment,
@@ -53,11 +53,11 @@ import {
   invoiceCharges,
 } from "@/lib/invoiceExtraction";
 
-type InvoiceRecord = VendorInvoice & {
+type BillRecord = VendorBill & {
   vendors: { id: string; name: string; order_type: string } | null;
 };
 
-const INVOICE_LINE_WIDTHS_KEY = "rf.invoiceLines.columnWidths.v1";
+const BILL_LINE_WIDTHS_KEY = "rf.billLines.columnWidths.v1";
 
 /**
  * The label column for the Bill and Amounts lists.
@@ -66,7 +66,7 @@ const INVOICE_LINE_WIDTHS_KEY = "rf.invoiceLines.columnWidths.v1";
  * column these boxes are ~330px at `xl`, and 144px of that spent on a label
  * leaves a vendor name nowhere to go.
  *
- * Not 7rem either, which was the first try: "Invoice number" wrapped to two
+ * Not 7rem either, which was the first try: "Bill number" wrapped to two
  * lines at 112px while every other label sat on one, so that row alone stood
  * 17px taller and the column read as ragged beside Amounts. 128px clears it —
  * measured, not guessed.
@@ -74,13 +74,13 @@ const INVOICE_LINE_WIDTHS_KEY = "rf.invoiceLines.columnWidths.v1";
 const DL_CLASS = "grid grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm";
 
 /**
- * One invoice: what we were billed, what it belongs to, and whether it should
+ * One bill: what we were billed, what it belongs to, and whether it should
  * be paid.
  *
  * LAYOUT — document left, record right, ONE viewport, with the buttons in a
- * footer both columns end at (Mark, 2026-08-05: "the buttons under the invoice
+ * footer both columns end at (Mark, 2026-08-05: "the buttons under the bill
  * item datatable should be in the footer area of the screen. The bottoms of the
- * pdf preview pane and the invoice items datatable should extend to the top of
+ * pdf preview pane and the bill items datatable should extend to the top of
  * the footer"). The same shape as the receiving screen, and it now shares that
  * screen's measuring hook rather than owning a second copy — see
  * lib/fillHeight.
@@ -91,12 +91,12 @@ const DL_CLASS = "grid grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm
  *
  * This started as a page that scrolled, on the reasoning that a desk screen
  * isn't a standing task. That was wrong about the READER rather than about the
- * task: an invoice is a document you check against a record, and a page three
+ * task: an bill is a document you check against a record, and a page three
  * screens tall means the thing you are checking has scrolled away. Measured on
- * a 15-line invoice at 1280×720: 2,463px → one viewport.
+ * a 15-line bill at 1280×720: 2,463px → one viewport.
  */
-export function InvoiceDetail({
-  invoice,
+export function BillDetail({
+  bill,
   lines,
   linkedOrders,
   linkError,
@@ -113,13 +113,13 @@ export function InvoiceDetail({
   selfHref,
   closeHref,
 }: {
-  invoice: InvoiceRecord;
-  lines: VendorInvoiceLine[];
+  bill: BillRecord;
+  lines: VendorBillLine[];
   linkedOrders: LinkedPurchaseOrder[];
   linkError: string | null;
   attachments: SignedAttachment[];
   documentError: string | null;
-  duplicateCandidates: VendorInvoice[];
+  duplicateCandidates: VendorBill[];
   /** This vendor's recent orders at this location, for Link to PO…. */
   linkCandidates: LinkCandidate[];
   locationCode: string;
@@ -166,11 +166,11 @@ export function InvoiceDetail({
   useFillToBottom(rowRef, useViewportAtLeast(1280), 560);
 
   /**
-   * 089 (Mark, 2026-09-03: "a lot of the invoice should not be editable once
+   * 089 (Mark, 2026-09-03: "a lot of the bill should not be editable once
    * it has been approved for payment… If the user wants to edit these
    * things, they need to withdraw approval first").
    *
-   * EDITABLE IFF status = "open" — a voided invoice locks exactly like an
+   * EDITABLE IFF status = "open" — a voided bill locks exactly like an
    * approved one, and Reopen is its own unlock path, the same shape as
    * Withdraw approval. This is a UI convenience only; the real gate is the
    * DATABASE trigger (089), which refuses the write regardless of what this
@@ -187,25 +187,25 @@ export function InvoiceDetail({
    * joined the locked set in 090, Mark, 2026-09-03, having seen the screen
    * with the rest of it locked: "we should lock the terms too.")
    */
-  const financialsLocked = invoice.status !== "open";
+  const financialsLocked = bill.status !== "open";
   const canEditFinancials = canEdit && !financialsLocked;
 
   /**
-   * Open → Approved → Submitted → Paid — the LIST's own ladder (`lib/invoices`
+   * Open → Approved → Submitted → Paid — the LIST's own ladder (`lib/bills`
    * §"Where a bill has got to"), read here too now (Mark, 2026-09-03: "no
    * matter what the status on the detail page never said 'paid'"). The
    * header chip had stayed on the raw `status` column — open/approved/void —
    * because this screen never fetched what the list already did:
    * `external_ref`, `qbo_balance`, `qbo_checked_at`. It does now
-   * (`INVOICE_SELECT`), so linking, pushing, or a plain "Check QuickBooks"
+   * (`BILL_SELECT`), so linking, pushing, or a plain "Check QuickBooks"
    * all move this chip the moment the page has the fresh figures — see
    * `PushToQuickBooks`'s `onDone()` calls, which is what puts them there.
    */
   const stage = billStage({
-    status: invoice.status,
-    linked: invoice.qbo_linked,
-    qbo_balance: invoice.qbo_balance,
-    qbo_checked_at: invoice.qbo_checked_at,
+    status: bill.status,
+    linked: bill.qbo_linked,
+    qbo_balance: bill.qbo_balance,
+    qbo_checked_at: bill.qbo_checked_at,
   });
 
   const {
@@ -217,7 +217,7 @@ export function InvoiceDetail({
     read,
     remove,
     reportError,
-  } = useAttachmentActions({ poId: null, orgId, invoiceId: invoice.id });
+  } = useAttachmentActions({ poId: null, orgId, billId: bill.id });
 
   const shown =
     attachments.find((a) => a.id === shownId) ?? attachments[0] ?? null;
@@ -243,8 +243,8 @@ export function InvoiceDetail({
   );
 
   const duplicates = useMemo(
-    () => findPossibleDuplicates(invoice, duplicateCandidates),
-    [invoice, duplicateCandidates]
+    () => findPossibleDuplicates(bill, duplicateCandidates),
+    [bill, duplicateCandidates]
   );
 
   /**
@@ -252,7 +252,7 @@ export function InvoiceDetail({
    * 2026-09-02: "there's a warning that isn't appropriate … after I changed it
    * back the warning didn't go away").
    *
-   * They read `invoice.subtotal` and the stored parts until then, which was
+   * They read `bill.subtotal` and the stored parts until then, which was
    * right while those were transcribed off the document and became meaningless
    * the day the figures were computed from the lines: the stored columns are
    * now a CACHE the list reads, maintained on every line write, so comparing
@@ -278,18 +278,18 @@ export function InvoiceDetail({
 
   // What the reader took off the page, when it cannot be the vendor on the
   // record — the check that catches a wrong-vendor pick on a hand-created
-  // invoice and a mis-filed auto-created one.
+  // bill and a mis-filed auto-created one.
   //
   // This compared the two names for EQUALITY until 2026-08-27, punctuation
   // stripped, and that is far too strict to be worth reading: measured over the
   // 49 readings on file, only three of twelve distinct pairs match as text,
-  // because our catalog carries the name staff say and the invoice prints the
+  // because our catalog carries the name staff say and the bill prints the
   // name lawyers use ("BakeMark" against "BAKEMARK USA LLC"). It was warning on
-  // most invoices in the system, which is the same as warning on none.
-  // `printedVendorDisagreement` is the measured rule and lives in lib/invoices
+  // most bills in the system, which is the same as warning on none.
+  // `printedVendorDisagreement` is the measured rule and lives in lib/bills
   // so the receiving screen's chip and this caveat cannot disagree.
   const vendorDisagreement = shown?.extraction
-    ? printedVendorDisagreement(shown.extraction, invoice.vendors?.name ?? null)
+    ? printedVendorDisagreement(shown.extraction, bill.vendors?.name ?? null)
     : null;
 
   /**
@@ -315,7 +315,7 @@ export function InvoiceDetail({
    * last two apart. "Never counted" is the state that hid two cases of whipped
    * topping (Mark, 2026-09-02).
    */
-  function receivedFor(l: VendorInvoiceLine): { qty: number | null; linked: boolean } {
+  function receivedFor(l: VendorBillLine): { qty: number | null; linked: boolean } {
     if (!l.purchase_order_item_id) return { qty: null, linked: false };
     for (const order of linkedOrders) {
       const poLine = order.lines.find((p) => p.id === l.purchase_order_item_id);
@@ -342,9 +342,9 @@ export function InvoiceDetail({
   async function takeAmendedTotal(next: number) {
     setSettingTotal(true);
     const { data, error } = await supabase
-      .from("vendor_invoices")
+      .from("vendor_bills")
       .update({ total: next })
-      .eq("id", invoice.id)
+      .eq("id", bill.id)
       .select("id");
     setSettingTotal(false);
     // Its own row count: below purchaser+ this changes nothing and returns NO
@@ -353,11 +353,11 @@ export function InvoiceDetail({
     router.refresh();
   }
 
-  /** What the invoice adds up to from its own lines and charges. Null on a
+  /** What the bill adds up to from its own lines and charges. Null on a
    *  hand-typed bill with no lines, which keeps whatever was typed. */
   const computed = useMemo(
-    () => computedAmounts(lines, invoice),
-    [lines, invoice]
+    () => computedAmounts(lines, bill),
+    [lines, bill]
   );
 
   /**
@@ -368,7 +368,7 @@ export function InvoiceDetail({
    * other and compared the sum against the READING's own total — which is
    * really an OCR SELF-CONSISTENCY check, not "does our record match the
    * document". It broke exactly the way self-consistency checks do: a
-   * driver's invoice priced $102.04 before a $15.31 credit landing at $86.73,
+   * driver's bill priced $102.04 before a $15.31 credit landing at $86.73,
    * where the OCR correctly read `subtotal` (102.04) and `invoice_total`
    * (86.73) but never populated `other_charges` — so Mark had ALREADY typed
    * -15.31 into Other, correctly reconciling the STORED figures, while this
@@ -381,16 +381,16 @@ export function InvoiceDetail({
    * charges, never a stored cache that can go stale), so comparing it
    * against the document's own total asks the right question and answers it
    * correctly the moment a gap like Mark's is corrected. Falls back to
-   * `invoice.total` for a hand-typed, lineless bill, where `computed.total`
+   * `bill.total` for a hand-typed, lineless bill, where `computed.total`
    * is null.
    *
-   * SUPPRESSED WHILE `lineSums.differs` (Mark, 2026-09-03, on invoice
+   * SUPPRESSED WHILE `lineSums.differs` (Mark, 2026-09-03, on bill
    * 15476478: "I'm getting multiple similar warnings"). When tax, freight
    * and other are all zero — the common case — `computed.total` REDUCES TO
    * `computed.subtotal`, and the document's `total` reduces to its own
    * `subtotal` the same way, so this check and `lineSums` end up comparing
    * the identical pair of numbers and saying so in two different sentences:
-   * "the lines come to $216.35, where the invoice says $190.95" right above
+   * "the lines come to $216.35, where the bill says $190.95" right above
    * "the item lines come to $216.35 against a printed subtotal of $190.95".
    * `lineSums` is the more USEFUL of the two when both would fire — it names
    * the SUBTOTAL, which is what actually needs checking (15476478's own
@@ -403,7 +403,7 @@ export function InvoiceDetail({
   const totalDisagreement = lineSums.differs
     ? null
     : totalDisagreesWithDocument(
-        computed.total ?? invoice.total,
+        computed.total ?? bill.total,
         printedCharges?.total ?? null
       );
 
@@ -412,7 +412,7 @@ export function InvoiceDetail({
    *
    * ONE STATEMENT FOR THE LINE — the charge rides along, so a row can never be
    * caught with a quantity and a stale total beside it — and then a SECOND for
-   * the invoice, because the totals live on another table and `alsoUpdate`
+   * the bill, because the totals live on another table and `alsoUpdate`
    * cannot reach it.
    *
    * The charge is RESCALED, not recomputed: `rescaledExtended` moves it by the
@@ -420,7 +420,7 @@ export function InvoiceDetail({
    * on a broken case. Recomputing it as qty × unit_price turned Chefs Warehouse
    * 73358289 from $472.13 into $1,952.90.
    *
-   * The invoice write is skipped when there is nothing to compute, which is the
+   * The bill write is skipped when there is nothing to compute, which is the
    * hand-typed bill: its total is the only figure it has.
    */
   async function writeLineAmount(
@@ -434,7 +434,7 @@ export function InvoiceDetail({
     const price = column === "unit_price" ? value : (line?.unit_price ?? null);
 
     const { error } = await supabase
-      .from("vendor_invoice_lines")
+      .from("vendor_bill_lines")
       .update(
         column === "extended"
           ? { extended: value }
@@ -467,23 +467,23 @@ export function InvoiceDetail({
           }
         : l
     );
-    const sums = computedAmounts(after, invoice);
+    const sums = computedAmounts(after, bill);
     if (sums.total !== null) {
       // ITS OWN ROW COUNT, like every other money write here. This one took
       // `.select("id")` and threw the answer away, so a second statement that
       // changed nothing — a refused write, a row that had moved — left the line
-      // correct and the invoice's cached figures behind it, which is how
+      // correct and the bill's cached figures behind it, which is how
       // 15490761 came to sit at $452.29 while its own lines said $535.33 and
       // the LIST quoted the stale one. Reported through the cell, which reopens
       // on a refusal rather than closing over a number that did not stick.
       const { data, error: totalsError } = await supabase
-        .from("vendor_invoices")
+        .from("vendor_bills")
         .update({ subtotal: sums.subtotal, total: sums.total })
-        .eq("id", invoice.id)
+        .eq("id", bill.id)
         .select("id");
       if (totalsError) return { error: totalsError.message };
       if (!data || data.length === 0) {
-        return { error: "The line saved, but the invoice total did not." };
+        return { error: "The line saved, but the bill total did not." };
       }
     }
     return { error: null };
@@ -495,13 +495,13 @@ export function InvoiceDetail({
    *
    * GOES THROUGH `writeLineAmount`, not a separate write — one implementation
    * of "set this line's qty", so the rescale that already keeps `extended`
-   * honest on a broken case applies here too, and the invoice's cached totals
+   * honest on a broken case applies here too, and the bill's cached totals
    * move with it in the same statement, exactly as a manual edit would.
    *
    * SILENT ON A REFUSAL, matching `takeAmendedTotal` beside it: the primary
-   * defence is the button not rendering at all once the invoice is locked
+   * defence is the button not rendering at all once the bill is locked
    * (`canEditFinancials`), so reaching the trigger's refusal here means the
-   * invoice was approved in the moment between render and click — rare
+   * bill was approved in the moment between render and click — rare
    * enough that this follows the same precedent rather than inventing a
    * second way to report a write failure in a table this dense.
    */
@@ -515,16 +515,16 @@ export function InvoiceDetail({
 
   /**
    * A new line, added blank (Mark, 2026-09-03: "we need to be able to delete
-   * and add lines to the invoice").
+   * and add lines to the bill").
    *
-   * NO PICKER, unlike a purchase order's Add item — an invoice line is
+   * NO PICKER, unlike a purchase order's Add item — an bill line is
    * transcribed off a page, not chosen from the catalog, and every cell on
    * this table is already `InlineValue`-editable. The fastest way a blank
    * line gets onto the page is the way every other line already gets edited:
    * type straight into it. `kind: "item"` matches the column's own default.
    *
    * GATED ON `canEditFinancials`, same as adding or removing a line's own
-   * qty/price does — a new row changes the invoice's total exactly as an
+   * qty/price does — a new row changes the bill's total exactly as an
    * edited one would, so it follows 089's rule even though the trigger only
    * locks UPDATE and would not itself refuse this insert.
    */
@@ -532,8 +532,8 @@ export function InvoiceDetail({
     setAddingLine(true);
     setLineActionError(null);
     const { error } = await supabase
-      .from("vendor_invoice_lines")
-      .insert({ org_id: orgId, invoice_id: invoice.id, kind: "item" });
+      .from("vendor_bill_lines")
+      .insert({ org_id: orgId, bill_id: bill.id, kind: "item" });
     setAddingLine(false);
     if (error) {
       setLineActionError(error.message);
@@ -546,12 +546,12 @@ export function InvoiceDetail({
    * Delete a line — CONFIRMED, naming what it takes with it, the PO line
    * table's own pattern (Mark, 2026-09-03, the same request as `addLine`).
    *
-   * The invoice's cached subtotal/total are recomputed from what's LEFT,
+   * The bill's cached subtotal/total are recomputed from what's LEFT,
    * same discipline as `writeLineAmount`: the total lives on another table,
    * so removing a line has to write it too or the record disagrees with its
    * own lines the moment the row is gone.
    */
-  async function deleteLine(l: VendorInvoiceLine) {
+  async function deleteLine(l: VendorBillLine) {
     const named = l.description?.trim() || l.product_id?.trim() || "this line";
     const message =
       `Delete ${named}${l.extended !== null ? ` — ${money(l.extended)}` : ""}?` +
@@ -568,7 +568,7 @@ export function InvoiceDetail({
     setDeletingLineId(l.id);
     setLineActionError(null);
     const { data, error } = await supabase
-      .from("vendor_invoice_lines")
+      .from("vendor_bill_lines")
       .delete()
       .eq("id", l.id)
       .select("id");
@@ -581,12 +581,12 @@ export function InvoiceDetail({
     }
 
     const remaining = lines.filter((line) => line.id !== l.id);
-    const sums = computedAmounts(remaining, invoice);
+    const sums = computedAmounts(remaining, bill);
     if (sums.total !== null) {
       await supabase
-        .from("vendor_invoices")
+        .from("vendor_bills")
         .update({ subtotal: sums.subtotal, total: sums.total })
-        .eq("id", invoice.id);
+        .eq("id", bill.id);
     }
     setDeletingLineId(null);
     router.refresh();
@@ -605,13 +605,13 @@ export function InvoiceDetail({
   );
 
   /**
-   * The purchase order this invoice PRINTS, when exactly one candidate answers
+   * The purchase order this bill PRINTS, when exactly one candidate answers
    * to it — a proposal, never an automatic link. A printed number is one OCR
    * digit from someone else's order, so the same uniqueness discipline the SKU
    * join uses applies here one level up: two matches, another vendor or another
    * location all refuse.
    *
-   * Provenance is different and DOES link by itself: an invoice created from a
+   * Provenance is different and DOES link by itself: an bill created from a
    * purchase order's own Paperwork card is linked to that order because you
    * attached it there.
    */
@@ -624,19 +624,19 @@ export function InvoiceDetail({
       .map((printed) => ({
         printed,
         hit: matchPrintedPoNumber(printed, linkCandidates, {
-          vendor_id: invoice.vendor_id,
-          location_id: invoice.location_id,
+          vendor_id: bill.vendor_id,
+          location_id: bill.location_id,
         }),
       }))
       .filter((p) => p.hit && !alreadyLinked.has(p.hit.po_number.toUpperCase()));
-  }, [shown, linkCandidates, invoice.vendor_id, invoice.location_id, linkedOrders]);
+  }, [shown, linkCandidates, bill.vendor_id, bill.location_id, linkedOrders]);
 
   async function linkPrinted(orderId: string) {
     const order = linkCandidates.find((c) => c.id === orderId);
     if (!order) return;
     // Keyed by the OBJECT the matcher was handed, so its answer maps back to a
     // row with no index arithmetic to get wrong.
-    const rowOf = new Map<InvoiceLine, VendorInvoiceLine>();
+    const rowOf = new Map<InvoiceLine, VendorBillLine>();
     const asInvoiceLines: InvoiceLine[] = lines
       .filter((l) => l.purchase_order_id === null)
       .map((l) => {
@@ -651,7 +651,7 @@ export function InvoiceDetail({
       const row = rowOf.get(m.invoice);
       if (!row) continue;
       await supabase
-        .from("vendor_invoice_lines")
+        .from("vendor_bill_lines")
         .update({
           purchase_order_id: order.id,
           purchase_order_item_id: m.line.id,
@@ -663,7 +663,7 @@ export function InvoiceDetail({
 
   const caveats = useMemo(() => {
     const list = approvalReadiness(
-      invoice,
+      bill,
       lines,
       matched,
       attachments.length,
@@ -688,7 +688,7 @@ export function InvoiceDetail({
     const off = totalDisagreesWithDocument(computed.total, printed);
     return off ? [...list, off] : list;
   }, [
-    invoice,
+    bill,
     lines,
     matched,
     attachments.length,
@@ -698,7 +698,7 @@ export function InvoiceDetail({
     shown,
   ]);
 
-  const columns: DataColumn<VendorInvoiceLine>[] = [
+  const columns: DataColumn<VendorBillLine>[] = [
     {
       key: "product_id",
       label: "Product ID",
@@ -708,7 +708,7 @@ export function InvoiceDetail({
       render: (l) =>
         canEdit ? (
           <InlineValue
-            table="vendor_invoice_lines"
+            table="vendor_bill_lines"
             id={l.id}
             column="product_id"
             value={l.product_id}
@@ -733,7 +733,7 @@ export function InvoiceDetail({
           <span className="flex flex-wrap items-baseline gap-x-2">
             {canEdit ? (
               <InlineValue
-                table="vendor_invoice_lines"
+                table="vendor_bill_lines"
                 id={l.id}
                 column="description"
                 value={l.description}
@@ -759,7 +759,7 @@ export function InvoiceDetail({
       render: (l) =>
         canEdit ? (
           <InlineValue
-            table="vendor_invoice_lines"
+            table="vendor_bill_lines"
             id={l.id}
             column="pack"
             value={l.pack}
@@ -841,7 +841,7 @@ export function InvoiceDetail({
             )}
             {canEditFinancials ? (
               <InlineValue
-                table="vendor_invoice_lines"
+                table="vendor_bill_lines"
                 id={l.id}
                 column="qty"
                 value={l.qty}
@@ -865,7 +865,7 @@ export function InvoiceDetail({
       render: (l) =>
         canEditFinancials ? (
           <InlineValue
-            table="vendor_invoice_lines"
+            table="vendor_bill_lines"
             id={l.id}
             column="unit_price"
             value={l.unit_price}
@@ -901,7 +901,7 @@ export function InvoiceDetail({
           Number(l.qty ?? 0) === 0 && Number(l.extended ?? 0) !== 0;
         const cell = canEditFinancials ? (
           <InlineValue
-            table="vendor_invoice_lines"
+            table="vendor_bill_lines"
             id={l.id}
             column="extended"
             value={l.extended}
@@ -947,7 +947,7 @@ export function InvoiceDetail({
             <Link
               href={withFrom(`/purchase-orders/${order.id}`, {
                 href: selfHref,
-                label: invoice.invoice_number ?? "Invoice",
+                label: bill.invoice_number ?? "Bill",
               })}
               className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
             >
@@ -1005,7 +1005,7 @@ export function InvoiceDetail({
               // total exactly as editing its qty or price would.
               hint: financialsLocked
                 ? "Withdraw approval to change this"
-                : "Remove this line from the invoice",
+                : "Remove this line from the bill",
               disabled: financialsLocked || deletingLineId !== null,
               danger: true,
               onSelect: () => void deleteLine(l),
@@ -1022,7 +1022,7 @@ export function InvoiceDetail({
     purchaseOrderItemId: string | null
   ) {
     await supabase
-      .from("vendor_invoice_lines")
+      .from("vendor_bill_lines")
       .update({
         purchase_order_id: purchaseOrderId,
         purchase_order_item_id: purchaseOrderItemId,
@@ -1031,8 +1031,8 @@ export function InvoiceDetail({
     router.refresh();
   }
 
-  async function setLineKind(lineId: string, kind: VendorInvoiceLine["kind"]) {
-    await supabase.from("vendor_invoice_lines").update({ kind }).eq("id", lineId);
+  async function setLineKind(lineId: string, kind: VendorBillLine["kind"]) {
+    await supabase.from("vendor_bill_lines").update({ kind }).eq("id", lineId);
     router.refresh();
   }
 
@@ -1046,20 +1046,20 @@ export function InvoiceDetail({
           <p className="font-semibold">This may be a duplicate.</p>
           <ul className="mt-1 space-y-0.5">
             {duplicates.map((d) => (
-              <li key={d.invoice.id}>
+              <li key={d.bill.id}>
                 <Link
-                  href={withFrom(`/invoices/${d.invoice.id}`, {
+                  href={withFrom(`/bills/${d.bill.id}`, {
                     href: selfHref,
-                    label: invoice.invoice_number ?? "Invoice",
+                    label: bill.invoice_number ?? "Bill",
                   })}
                   className="underline decoration-neutral-500 underline-offset-[3px] hover:decoration-neutral-900"
                 >
-                  {d.invoice.invoice_number ?? "No number"}
+                  {d.bill.invoice_number ?? "No number"}
                 </Link>{" "}
                 <span className="text-muted">
                   — {d.reason}
-                  {d.invoice.invoice_date ? ` · ${d.invoice.invoice_date}` : ""}
-                  {d.invoice.total !== null ? ` · ${money(d.invoice.total)}` : ""}
+                  {d.bill.invoice_date ? ` · ${d.bill.invoice_date}` : ""}
+                  {d.bill.total !== null ? ` · ${money(d.bill.total)}` : ""}
                 </span>
               </li>
             ))}
@@ -1091,7 +1091,7 @@ export function InvoiceDetail({
         {/* LEFT — identity | total, matching the document pane's width.
             TOTAL IS SIZED TO ITS OWN CONTENT (`max-content`), not half the
             column — a 50/50 split left identity with only ~257px at 1440,
-            which wraps "APPROVED" onto its own line the moment the invoice
+            which wraps "APPROVED" onto its own line the moment the bill
             number runs long (Mark, 2026-09-03: "ARINT2000689768"). Total
             never needs more than a label and a dollar figure, so it takes
             only that, and identity gets everything left over. */}
@@ -1099,39 +1099,39 @@ export function InvoiceDetail({
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-                {invoice.invoice_number ?? "No number"}
+                {bill.invoice_number ?? "No number"}
               </h1>
               <span
                 className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${BILL_STAGE_CLASS[stage]}`}
               >
                 {BILL_STAGE_LABEL[stage]}
               </span>
-              {invoice.is_credit && (
+              {bill.is_credit && (
                 <span className="inline-flex h-6 items-center border border-ink bg-mark-fill px-2 text-[12px] font-semibold uppercase tracking-[0.12em]">
                   Credit memo
                 </span>
               )}
             </div>
             <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
-              {invoice.vendors ? (
+              {bill.vendors ? (
                 // Underlined AT REST, not on hover: the iPad has no hover, and
                 // a link the colour of the line it sits in reads as more
                 // subtitle.
                 <Link
-                  href={withFrom(`/vendors/${invoice.vendors.id}`, {
+                  href={withFrom(`/vendors/${bill.vendors.id}`, {
                     href: selfHref,
-                    label: invoice.invoice_number ?? "Invoice",
+                    label: bill.invoice_number ?? "Bill",
                   })}
                   className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
                 >
-                  {invoice.vendors.name}
+                  {bill.vendors.name}
                 </Link>
               ) : (
                 "No vendor"
               )}{" "}
               · {locationCode}
-              {invoice.due_date &&
-                ` · ${AGING_LABEL[agingBucket(invoice.due_date, todayLocal())]}`}
+              {bill.due_date &&
+                ` · ${AGING_LABEL[agingBucket(bill.due_date, todayLocal())]}`}
             </p>
           </div>
 
@@ -1150,8 +1150,8 @@ export function InvoiceDetail({
             <div className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
               {money(
                 computed.total === null
-                  ? signedTotal(invoice)
-                  : invoice.is_credit
+                  ? signedTotal(bill)
+                  : bill.is_credit
                     ? -computed.total
                     : computed.total
               )}
@@ -1185,13 +1185,13 @@ export function InvoiceDetail({
             THE PROSE STACKS BENEATH, right-aligned, and it is not a leftover:
             both components still render their own result lines, refusals and
             yellow notes, in that order — QuickBooks' first because it is the
-            inner wrapper. See `InvoiceCommandMenu`. */}
+            inner wrapper. See `BillCommandMenu`. */}
         <div className="flex flex-col items-end gap-2">
-          <InvoiceCommandMenu
+          <BillCommandMenu
             actions={{
-              invoiceId: invoice.id,
-              status: invoice.status,
-              approvedAt: invoice.approved_at,
+              billId: bill.id,
+              status: bill.status,
+              approvedAt: bill.approved_at,
               caveats,
               canApprove,
               canEdit,
@@ -1200,21 +1200,21 @@ export function InvoiceDetail({
               onDone: () => router.refresh(),
             }}
             quickbooks={{
-              invoiceId: invoice.id,
-              vendorId: invoice.vendor_id,
-              locationId: invoice.location_id,
+              billId: bill.id,
+              vendorId: bill.vendor_id,
+              locationId: bill.location_id,
               orgId,
-              status: invoice.status,
-              total: invoice.total,
-              isCredit: invoice.is_credit,
-              invoiceNumber: invoice.invoice_number,
+              status: bill.status,
+              total: bill.total,
+              isCredit: bill.is_credit,
+              invoiceNumber: bill.invoice_number,
               // The orders this bill is linked to, sent in its description
               // and memo (Mark, 2026-09-14).
               poNumbers: linkedOrders.map((o) => o.po_number),
-              invoiceDate: invoice.invoice_date,
-              dueDate: invoice.due_date,
-              financialsTouchedAt: invoice.financials_touched_at,
-              syncedAt: invoice.synced_at,
+              invoiceDate: bill.invoice_date,
+              dueDate: bill.due_date,
+              financialsTouchedAt: bill.financials_touched_at,
+              syncedAt: bill.synced_at,
               canPush: canEdit,
               supabase,
               onDone: () => router.refresh(),
@@ -1300,7 +1300,7 @@ export function InvoiceDetail({
                     className="flex flex-wrap items-center gap-3 border border-ink bg-mark-fill px-4 py-2 text-sm"
                   >
                     <span>
-                      This invoice prints{" "}
+                      This bill prints{" "}
                       <strong>{p.hit!.po_number}</strong>.
                     </span>
                     <button
@@ -1315,14 +1315,14 @@ export function InvoiceDetail({
 
               {linkedOrders.length === 0 ? (
                 // A landlord bill should not be nagged about a purchase order.
-                invoice.vendors?.order_type === "none" ? (
+                bill.vendors?.order_type === "none" ? (
                   <p className="text-sm text-muted">
                     This vendor isn&rsquo;t ordered from, so there&rsquo;s no
                     purchase order to link.
                   </p>
                 ) : (
                   <p className="text-sm text-muted">
-                    No lines on this invoice point at a purchase order yet.
+                    No lines on this bill point at a purchase order yet.
                   </p>
                 )
               ) : (
@@ -1339,7 +1339,7 @@ export function InvoiceDetail({
                         <Link
                           href={withFrom(`/purchase-orders/${order.id}`, {
                             href: selfHref,
-                            label: invoice.invoice_number ?? "Invoice",
+                            label: bill.invoice_number ?? "Bill",
                           })}
                           className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
                         >
@@ -1352,7 +1352,7 @@ export function InvoiceDetail({
                         <Link
                           href={withFrom(`/purchase-orders/${order.id}/receive`, {
                             href: selfHref,
-                            label: invoice.invoice_number ?? "Invoice",
+                            label: bill.invoice_number ?? "Bill",
                           })}
                           className="ml-auto text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
                         >
@@ -1386,7 +1386,7 @@ export function InvoiceDetail({
               <dl className={DL_CLASS}>
               {/* Bill or credit memo (2026-09-19). Until now nothing on
                   screen could change `is_credit` — a credit the reader
-                  missed (a handwritten CREDIT, a page headed like an invoice)
+                  missed (a handwritten CREDIT, a page headed like an bill)
                   was stuck as a bill and would have posted as a QuickBooks
                   Bill. It locks with the money (109), and for the same reason
                   the money does: it decides the ENTITY QuickBooks receives,
@@ -1396,61 +1396,61 @@ export function InvoiceDetail({
               <Field label="Kind">
                 <Cell
                   canEdit={canEditFinancials}
-                  value={invoice.is_credit ? "Credit memo" : "Bill"}
+                  value={bill.is_credit ? "Credit memo" : "Bill"}
                 >
                   <InlineValue
                     boxed={BOXED_FIELDS}
-                    table="vendor_invoices"
-                    id={invoice.id}
+                    table="vendor_bills"
+                    id={bill.id}
                     column="is_credit"
                     ariaLabel="Kind"
                     kind="pick"
                     nullable={false}
-                    value={invoice.is_credit ? "credit" : "bill"}
+                    value={bill.is_credit ? "credit" : "bill"}
                     options={[
                       { value: "bill", label: "Bill" },
                       { value: "credit", label: "Credit memo" },
                     ]}
                     onWrite={async (next) => {
                       const { error } = await supabase
-                        .from("vendor_invoices")
+                        .from("vendor_bills")
                         .update({ is_credit: next === "credit" })
-                        .eq("id", invoice.id);
+                        .eq("id", bill.id);
                       return { error: error?.message ?? null };
                     }}
                   />
                 </Cell>
               </Field>
               <Field label="Invoice number">
-                <Cell canEdit={canEditFinancials} value={invoice.invoice_number}>
+                <Cell canEdit={canEditFinancials} value={bill.invoice_number}>
                   <InlineValue
                     boxed={BOXED_FIELDS}
-                    table="vendor_invoices"
-                    id={invoice.id}
+                    table="vendor_bills"
+                    id={bill.id}
                     column="invoice_number"
-                    value={invoice.invoice_number}
+                    value={bill.invoice_number}
                   />
                 </Cell>
               </Field>
               <Field label="Invoice date">
-                <Cell canEdit={canEditFinancials} value={invoice.invoice_date}>
+                <Cell canEdit={canEditFinancials} value={bill.invoice_date}>
                   <InlineValue
                     boxed={BOXED_FIELDS}
-                    table="vendor_invoices"
-                    id={invoice.id}
+                    table="vendor_bills"
+                    id={bill.id}
                     column="invoice_date"
-                    value={invoice.invoice_date}
+                    value={bill.invoice_date}
                     kind="date"
                     // Only while NOTHING has been said about when this is due
                     // — a due date once set, by hand or by this same
                     // computation, is never silently moved by a later edit to
                     // the date beside it.
                     alsoUpdate={
-                      invoice.due_date === null
+                      bill.due_date === null
                         ? (next) => {
                             const due = dueDateFromTerms(
                               next === null || next === "" ? null : String(next),
-                              invoice.terms
+                              bill.terms
                             );
                             return due === null ? null : { due_date: due };
                           }
@@ -1460,13 +1460,13 @@ export function InvoiceDetail({
                 </Cell>
               </Field>
               <Field label="Due date">
-                <Cell canEdit={canEditFinancials} value={invoice.due_date}>
+                <Cell canEdit={canEditFinancials} value={bill.due_date}>
                   <InlineValue
                     boxed={BOXED_FIELDS}
-                    table="vendor_invoices"
-                    id={invoice.id}
+                    table="vendor_bills"
+                    id={bill.id}
                     column="due_date"
-                    value={invoice.due_date}
+                    value={bill.due_date}
                     kind="date"
                   />
                 </Cell>
@@ -1475,23 +1475,23 @@ export function InvoiceDetail({
                   ours, and an allowNew-less list would make an unlisted value
                   unenterable — the GAL/QT lesson. */}
               <Field label="Terms">
-                <Cell canEdit={canEditFinancials} value={invoice.terms}>
+                <Cell canEdit={canEditFinancials} value={bill.terms}>
                   <InlineValue
                     boxed={BOXED_FIELDS}
-                    table="vendor_invoices"
-                    id={invoice.id}
+                    table="vendor_bills"
+                    id={bill.id}
                     column="terms"
-                    value={invoice.terms}
-                    // Same guard as Invoice date's, from the other side — a
-                    // manual bill (NewInvoice asks for no terms at all) most
+                    value={bill.terms}
+                    // Same guard as Bill date's, from the other side — a
+                    // manual bill (NewBill asks for no terms at all) most
                     // often gets its terms typed in HERE, after the record
                     // already exists, which is "no due date is set" just as
                     // much as the moment of creation is.
                     alsoUpdate={
-                      invoice.due_date === null
+                      bill.due_date === null
                         ? (next) => {
                             const due = dueDateFromTerms(
-                              invoice.invoice_date,
+                              bill.invoice_date,
                               next === null || next === "" ? null : String(next)
                             );
                             return due === null ? null : { due_date: due };
@@ -1502,13 +1502,13 @@ export function InvoiceDetail({
                 </Cell>
               </Field>
               <Field label="Vendor">
-                <Cell canEdit={canEditFinancials} value={invoice.vendors?.name ?? null}>
+                <Cell canEdit={canEditFinancials} value={bill.vendors?.name ?? null}>
                   <InlineValue
                     boxed={BOXED_FIELDS}
-                    table="vendor_invoices"
-                    id={invoice.id}
+                    table="vendor_bills"
+                    id={bill.id}
                     column="vendor_id"
-                    value={invoice.vendor_id}
+                    value={bill.vendor_id}
                     kind="pick"
                     nullable={false}
                     options={vendors.map((v) => ({ value: v.id, label: v.name, inactive: v.inactive }))}
@@ -1520,10 +1520,10 @@ export function InvoiceDetail({
                 <Cell canEdit={canEditFinancials} value={locationCode}>
                   <InlineValue
                     boxed={BOXED_FIELDS}
-                    table="vendor_invoices"
-                    id={invoice.id}
+                    table="vendor_bills"
+                    id={bill.id}
                     column="location_id"
-                    value={invoice.location_id}
+                    value={bill.location_id}
                     kind="pick"
                     nullable={false}
                     options={locations.map((l) => ({
@@ -1535,13 +1535,13 @@ export function InvoiceDetail({
                 </Cell>
               </Field>
               <Field label="Note">
-                <Cell canEdit={canEdit} value={invoice.notes}>
+                <Cell canEdit={canEdit} value={bill.notes}>
                   <InlineValue
                     boxed={BOXED_FIELDS}
-                    table="vendor_invoices"
-                    id={invoice.id}
+                    table="vendor_bills"
+                    id={bill.id}
                     column="notes"
-                    value={invoice.notes}
+                    value={bill.notes}
                   />
                 </Cell>
               </Field>
@@ -1554,20 +1554,20 @@ export function InvoiceDetail({
             <dl className={DL_CLASS}>
               {(
                 [
-                  ["Subtotal", "subtotal", invoice.subtotal],
-                  ["Tax", "tax", invoice.tax],
-                  ["Freight", "freight", invoice.freight],
-                  ["Other", "other_charges", invoice.other_charges],
+                  ["Subtotal", "subtotal", bill.subtotal],
+                  ["Tax", "tax", bill.tax],
+                  ["Freight", "freight", bill.freight],
+                  ["Other", "other_charges", bill.other_charges],
                   // POSITIVE, AND SUBTRACTED — the opposite sign convention
                   // from Other, which is signed as printed (091). Typing what
                   // the page shows as a plain positive number is the natural
                   // entry; `computedAmounts` does the subtracting.
-                  ["Discounts", "discount", invoice.discount],
-                  ["Total", "total", invoice.total],
+                  ["Discounts", "discount", bill.discount],
+                  ["Total", "total", bill.total],
                 ] as const
               ).map(([label, column, value]) => (
                 <Field key={column} label={label}>
-                  {/* SUBTOTAL AND TOTAL ARE READ once the invoice has lines to
+                  {/* SUBTOTAL AND TOTAL ARE READ once the bill has lines to
                       add up — the same decision as `extended`, one level up.
                       Tax, freight, other and discounts stay typed: they are on
                       the page and follow from nothing. A bill with NO lines
@@ -1582,8 +1582,8 @@ export function InvoiceDetail({
                   <Cell canEdit={canEditFinancials} value={value === null ? null : money(value)}>
                     <InlineValue
                       boxed={BOXED_FIELDS}
-                      table="vendor_invoices"
-                      id={invoice.id}
+                      table="vendor_bills"
+                      id={bill.id}
                       column={column}
                       value={value}
                       kind="number"
@@ -1596,7 +1596,7 @@ export function InvoiceDetail({
                         column === "discount"
                           ? (next) => {
                               const sums = computedAmounts(lines, {
-                                ...invoice,
+                                ...bill,
                                 [column]: next === null || next === "" ? null : Number(next),
                               });
                               return sums.total === null
@@ -1672,15 +1672,15 @@ export function InvoiceDetail({
                     have read it, and making somebody retype it is the friction
                     Mark hit (2026-09-02). A number the page supplies, offered
                     beside the one it replaces. */}
-                {Math.abs(Number(invoice.total ?? 0) - amendedTotal(amendment)) > 0.005 && (
+                {Math.abs(Number(bill.total ?? 0) - amendedTotal(amendment)) > 0.005 && (
                   <p className="flex flex-wrap items-center gap-2 text-[13px]">
                     <span>
                       This record still says{" "}
-                      <span className="tabular-nums">{money(invoice.total)}</span>.
+                      <span className="tabular-nums">{money(bill.total)}</span>.
                     </span>
                     {/* `canEditFinancials`, not plain `canEdit` — `total` is
                         one of the columns 089 locks, so this button was
-                        rendering enabled on an approved invoice and quietly
+                        rendering enabled on an approved bill and quietly
                         doing nothing when pressed (found while wiring the
                         Billed flag's own button to the same gate). */}
                     {canEditFinancials && (
@@ -1725,7 +1725,7 @@ export function InvoiceDetail({
             rows={lines}
             columns={columns}
             rowKey={(l) => l.id}
-            storageKey={INVOICE_LINE_WIDTHS_KEY}
+            storageKey={BILL_LINE_WIDTHS_KEY}
             columnChooser
             scroll
             fill
@@ -1753,7 +1753,7 @@ export function InvoiceDetail({
                     onClick={() => void addLine()}
                     className={`${BUTTON_CLASS} shrink-0`}
                   >
-                    {addingLine ? "Adding…" : "New Invoice Item"}
+                    {addingLine ? "Adding…" : "New Bill Item"}
                   </button>
                 )}
               </div>
@@ -1771,7 +1771,7 @@ export function InvoiceDetail({
   );
 }
 
-const ATTACHMENT_LINE_KIND: Record<VendorInvoiceLine["kind"], string> = {
+const ATTACHMENT_LINE_KIND: Record<VendorBillLine["kind"], string> = {
   item: "—",
   freight: "Freight",
   other: "Other",

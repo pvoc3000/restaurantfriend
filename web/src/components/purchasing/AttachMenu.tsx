@@ -13,7 +13,7 @@ import { ScanDialog, type ScanPage } from "./ScanDialog";
  * pages with the camera and attaches them as ONE PDF.
  *
  * Shared by the Paperwork card on PO detail and `DocumentPane` (receiving and
- * the invoice record), because the two Attach buttons were already twins and a
+ * the bill record), because the two Attach buttons were already twins and a
  * menu on one of them only would be the drift this codebase keeps warning
  * about. Both hidden inputs live HERE, beside the menu that clicks them:
  * `input.click()` is honoured only inside a user gesture, and `MenuButton` runs

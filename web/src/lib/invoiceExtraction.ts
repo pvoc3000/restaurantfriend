@@ -220,7 +220,7 @@ export function invoiceDeliveryDate(e: InvoiceExtraction): InvoiceDeliveryDate |
  * The due date this invoice printed, if it printed a real one.
  *
  * Same round trip as every other date here, and for the same reason:
- * `vendor_invoices.due_date` is a `date` column, and the aging buckets that
+ * `vendor_bills.due_date` is a `date` column, and the aging buckets that
  * read it would otherwise sort a bill by a day that doesn't exist.
  */
 export function invoiceDueDate(e: InvoiceExtraction): string | null {

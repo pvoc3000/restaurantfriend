@@ -1,5 +1,5 @@
 import type { RawSearchParams } from "@/lib/itemFilters";
-import { InvoiceDetailView } from "./InvoiceDetailView";
+import { BillDetailView } from "./BillDetailView";
 
 export default async function InvoicePage({
   params,
@@ -10,8 +10,8 @@ export default async function InvoicePage({
 }) {
   const { id } = await params;
   const rawParams = await searchParams;
-  // Keyed by the record's id, like every other detail screen: /invoices/A →
-  // /invoices/B is a soft navigation within one dynamic segment, so a client
+  // Keyed by the record's id, like every other detail screen: /bills/A →
+  // /bills/B is a soft navigation within one dynamic segment, so a client
   // child seeding useState from props would show A's data beside B's text.
-  return <InvoiceDetailView key={id} id={id} rawParams={rawParams} />;
+  return <BillDetailView key={id} id={id} rawParams={rawParams} />;
 }

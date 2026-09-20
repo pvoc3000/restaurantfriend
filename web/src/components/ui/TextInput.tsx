@@ -88,7 +88,7 @@ export function TextInput({
   /**
    * A glyph shown in the field's right-hand slot WHILE IT IS EMPTY — a
    * magnifier in place of a search box's hint text (Mark, 2026-09-10, on
-   * /invoices). It occupies exactly the slot the clear button uses, and the
+   * /bills). It occupies exactly the slot the clear button uses, and the
    * two can never show together: this one only when there is nothing typed,
    * the ✕ only when there is. Decorative and click-through; a caller that
    * drops its placeholder for this must pass an `aria-label` instead, or the

@@ -82,8 +82,8 @@ export type PoAttachment = {
   po_id: string | null;
   /** The vendor invoice this document was filed as, if any (migration 026).
    *  Auto-creation fires only while this is null, which is the structural guard
-   *  that stops a re-read producing a second invoice record. */
-  invoice_id: string | null;
+   *  that stops a re-read producing a second bill record. */
+  bill_id: string | null;
   id: string;
   storage_path: string;
   kind: AttachmentKind;
@@ -114,10 +114,10 @@ export type PoAttachment = {
  *
  * Measured on the live database 2026-08-27: 8 closed orders are in this state.
  */
-export function unfiledReadings<T extends Pick<PoAttachment, "kind" | "extraction" | "invoice_id">>(
+export function unfiledReadings<T extends Pick<PoAttachment, "kind" | "extraction" | "bill_id">>(
   attachments: readonly T[]
 ): T[] {
-  return attachments.filter((a) => a.kind === "invoice" && a.extraction !== null && !a.invoice_id);
+  return attachments.filter((a) => a.kind === "invoice" && a.extraction !== null && !a.bill_id);
 }
 
 /** An attachment plus somewhere to look at it — null when signing failed. */
@@ -126,18 +126,25 @@ export type SignedAttachment = PoAttachment & { url: string | null };
 /**
  * Who a document is filed under, in the object key's second segment.
  *
- * A purchase order is its id; an invoice with no order behind it is the literal
+ * A purchase order is its id; a bill with no order behind it is the literal
  * `invoices/{id}`, which makes segment 2 a word where the PO form has a uuid.
  * That small irregularity is deliberate and safe: migration 018's storage
  * policies authorise on the FIRST segment only, so both forms are covered with
  * no new policy — verified against 018's own SQL.
+ *
+ * THE WORD STAYS `invoices/` AFTER MIGRATION 110's RENAME, and that is not an
+ * oversight. This string is not a name, it is a KEY: every document already in
+ * the bucket was written under it, and `purchase_order_attachments.storage_path`
+ * records where each one went. Changing it would orphan all of them, and buy
+ * nothing — 018 never reads this segment. The same reasoning kept the
+ * `extract-invoice` function's name.
  */
 export function poOwner(poId: string): string {
   return poId;
 }
 
-export function invoiceOwner(invoiceId: string): string {
-  return `invoices/${invoiceId}`;
+export function billOwner(billId: string): string {
+  return `invoices/${billId}`;
 }
 
 /**

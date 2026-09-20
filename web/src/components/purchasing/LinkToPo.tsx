@@ -10,7 +10,7 @@ import {
 import { Checkbox } from "@/components/ui/Checkbox";
 import { money } from "@/lib/purchaseOrders";
 import { matchInvoiceToOrder } from "@/lib/invoiceMatch";
-import { toInvoiceLine, type VendorInvoiceLine } from "@/lib/invoices";
+import { toInvoiceLine, type VendorBillLine } from "@/lib/bills";
 import type { InvoiceLine } from "@/lib/invoiceExtraction";
 import type { PoLine } from "@/lib/purchaseOrders";
 
@@ -47,7 +47,7 @@ export function LinkToPo({
   candidates,
   onDone,
 }: {
-  lines: VendorInvoiceLine[];
+  lines: VendorBillLine[];
   /** This vendor's orders at this location, in a recent window. */
   candidates: LinkCandidate[];
   onDone: () => void;
@@ -92,7 +92,7 @@ export function LinkToPo({
     startTransition(async () => {
       // Keyed by the OBJECT handed to the matcher, so its answer maps back to a
       // row with no index arithmetic to get wrong.
-      const rowOf = new Map<InvoiceLine, VendorInvoiceLine>();
+      const rowOf = new Map<InvoiceLine, VendorBillLine>();
       const asInvoiceLines: InvoiceLine[] = unlinked.map((l) => {
         const shape = toInvoiceLine(l);
         rowOf.set(shape, l);
@@ -107,7 +107,7 @@ export function LinkToPo({
         const row = rowOf.get(match.invoice);
         if (!row) continue;
         const { error } = await supabase
-          .from("vendor_invoice_lines")
+          .from("vendor_bill_lines")
           .update({
             purchase_order_id: order.id,
             purchase_order_item_id: match.line.id,
@@ -129,7 +129,7 @@ export function LinkToPo({
         const rest = unlinked.filter((l) => !linked.has(l.id)).map((l) => l.id);
         if (rest.length > 0) {
           const { error } = await supabase
-            .from("vendor_invoice_lines")
+            .from("vendor_bill_lines")
             .update({ purchase_order_id: order.id })
             .in("id", rest);
           if (error) {

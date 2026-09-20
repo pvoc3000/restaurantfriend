@@ -67,7 +67,7 @@ import { evaluateNumeric } from "@/lib/calc";
 import { alertDialog, confirmDialog, confirmDialogWithOption } from "@/lib/confirm";
 import type { DateRange } from "@/lib/dateRange";
 import { applyListFilters, type FilterDimension, type FilterValues } from "@/lib/filterMenus";
-import { BILL_STAGE_CLASS, BILL_STAGE_LABEL, BILL_STAGE_ORDER } from "@/lib/invoices";
+import { BILL_STAGE_CLASS, BILL_STAGE_LABEL, BILL_STAGE_ORDER } from "@/lib/bills";
 import { PAY_PERIOD_STATUS } from "@/lib/payPeriods";
 import { PO_STATUS_CLASS, PO_STATUS_LABEL, PO_STATUS_ORDER } from "@/lib/purchaseOrders";
 import { usePublishRecordSet } from "@/lib/recordSet";
@@ -1182,7 +1182,7 @@ const SECTION_ITEMS = [
   { key: "info", label: "Info" },
   { key: "items", label: "Items", count: 95 },
   { key: "orders", label: "Purchase Orders", count: 19 },
-  { key: "invoices", label: "Invoices", count: 10 },
+  { key: "bills", label: "Bills", count: 10 },
 ] as const;
 
 function NavigationBlock() {

@@ -7,9 +7,9 @@ import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { ATTACHMENT_BUCKET } from "@/lib/attachments";
 import { money } from "@/lib/purchaseOrders";
-import type { InvoiceListRow } from "@/app/(app)/invoices/page";
+import type { BillListRow } from "@/app/(app)/bills/page";
 import { invokeQbo } from "@/lib/qboClient";
-import { normalizeInvoiceNumber, pushIsStale } from "@/lib/invoices";
+import { normalizeInvoiceNumber, pushIsStale } from "@/lib/bills";
 import {
   billPushRefusals,
   expenseAccountFor,
@@ -17,15 +17,15 @@ import {
   pushedLabel,
   qboTrackingFor,
   qboVendorId,
-  type BillInvoice,
+  type PushableBill,
   type QboCandidate,
 } from "@/lib/quickbooks";
 import { readBillPushContext, sendBillToQuickBooks } from "./qboBillPush";
 
 /**
- * What you can do to a handful of invoices at once.
+ * What you can do to a handful of bills at once.
  *
- * Both commands already exist for ONE invoice on `InvoiceFooter`, and this is
+ * Both commands already exist for ONE bill on `InvoiceFooter`, and this is
  * deliberately the same logic rather than a second implementation — the row
  * count check on the approval RPC, and the document order on the delete, are
  * each a lesson this module paid for once.
@@ -35,7 +35,7 @@ import { readBillPushContext, sendBillToQuickBooks } from "./qboBillPush";
  * already in QuickBooks. Every command says what it will SKIP before it runs,
  * and reports what actually happened rather than what was asked for.
  */
-export function InvoiceBatchActions({
+export function BillBatchActions({
   selected,
   orgId,
   canEdit,
@@ -43,19 +43,19 @@ export function InvoiceBatchActions({
   onReport,
   children,
 }: {
-  selected: InvoiceListRow[];
+  selected: BillListRow[];
   orgId: string;
   /** purchaser+, matching what 025's delete policy allows. */
   canEdit: boolean;
   /** Manager and Owner only — the module's own decision, and what
-   *  `set_vendor_invoice_approval` enforces regardless of what is on screen. */
+   *  `set_vendor_bill_approval` enforces regardless of what is on screen. */
   canApprove: boolean;
   /**
    * Hand the outcome UP and clear the selection.
    *
    * IT CANNOT REPORT FOR ITSELF. Clearing the selection unmounts the bar this
    * lives in, so a `done` message set here is destroyed the instant it is set —
-   * which is exactly what happened on the first real bulk approve: two invoices
+   * which is exactly what happened on the first real bulk approve: two bills
    * were approved, correctly, and the screen said nothing at all. The report
    * has to outlive the thing that produced it.
    */
@@ -96,7 +96,7 @@ export function InvoiceBatchActions({
   // one bill, and the count in the label says it for the selection.
   const pushable = selected.filter((i) => i.status === "approved");
 
-  // Only an OPEN invoice can be approved: an approved one is already there and
+  // Only an OPEN bill can be approved: an approved one is already there and
   // a voided one is refused by the function anyway. Naming the skipped ones in
   // the confirm is what stops "Approve 8" quietly meaning five.
   const approvable = selected.filter((i) => i.status === "open");
@@ -111,7 +111,7 @@ export function InvoiceBatchActions({
     ].filter(Boolean);
     const ok = await confirmDialog({
       ...splitConfirmMessage(
-        `Approve ${approvable.length} invoice${approvable.length === 1 ? "" : "s"} for payment?\n\n` +
+        `Approve ${approvable.length} bill${approvable.length === 1 ? "" : "s"} for payment?\n\n` +
           `${money(approvableTotal)} in total.` +
           (skipped.length ? `\n\n${skipped.join(" and ")} — those are left alone.` : "")
       ),
@@ -122,20 +122,20 @@ export function InvoiceBatchActions({
     setBusy("approve");
     let approved = 0;
     const refused: string[] = [];
-    for (const invoice of approvable) {
+    for (const bill of approvable) {
       // THE RPC, NEVER AN UPDATE. RLS filters rows and "only a manager may set
       // approved_at" is a COLUMN rule, so 025 names those columns in a definer.
-      const { data, error: rpcError } = await supabase.rpc("set_vendor_invoice_approval", {
-        p_invoice: invoice.id,
+      const { data, error: rpcError } = await supabase.rpc("set_vendor_bill_approval", {
+        p_bill: bill.id,
         p_approved: true,
       });
       // ROW COUNT, not the absence of an error: the function returns NO ROWS
-      // when it refuses — wrong role, wrong org, a voided invoice — and
+      // when it refuses — wrong role, wrong org, a voided bill — and
       // PostgREST reports that as a perfectly successful call. A cheerful false
       // success about money is the employee-delete lesson with more at stake,
       // and in a loop it would be that lesson eight times over.
       if (rpcError || !Array.isArray(data) || data.length === 0) {
-        refused.push(invoice.invoice_number ?? "no number");
+        refused.push(bill.invoice_number ?? "no number");
       } else {
         approved++;
       }
@@ -149,7 +149,7 @@ export function InvoiceBatchActions({
         "error"
       );
     } else {
-      onReport(`Approved ${approved} invoice${approved === 1 ? "" : "s"} for payment.`, "done");
+      onReport(`Approved ${approved} bill${approved === 1 ? "" : "s"} for payment.`, "done");
     }
     if (approved > 0) router.refresh();
   }
@@ -161,7 +161,7 @@ export function InvoiceBatchActions({
 
     const ok = await confirmDialog({
       ...splitConfirmMessage(
-        `Delete ${selected.length} invoice${selected.length === 1 ? "" : "s"} and their lines?\n\n` +
+        `Delete ${selected.length} bill${selected.length === 1 ? "" : "s"} and their lines?\n\n` +
           (approvedCount
             ? `WARNING: ${approvedCount} of them ${approvedCount === 1 ? "is" : "are"} ` +
               `approved for payment. To keep the record but stop it counting toward what ` +
@@ -185,15 +185,15 @@ export function InvoiceBatchActions({
     setBusy("delete");
     const ids = selected.map((i) => i.id);
 
-    // Invoice-ONLY documents: rows first, then their objects. 018's rule read
+    // Bill-ONLY documents: rows first, then their objects. 018's rule read
     // backwards — an orphan object is invisible and harmless, where a row
     // pointing at a missing file renders broken. A document that also belongs
     // to a purchase order is `on delete set null` and simply stops naming this
-    // invoice, which is right: the delivery's paperwork is not the bookkeeping.
+    // bill, which is right: the delivery's paperwork is not the bookkeeping.
     const { data: own } = await supabase
       .from("purchase_order_attachments")
       .select("id, storage_path")
-      .in("invoice_id", ids)
+      .in("bill_id", ids)
       .is("po_id", null);
     if (own && own.length > 0) {
       await supabase
@@ -209,7 +209,7 @@ export function InvoiceBatchActions({
     // rows and PostgREST returns NO error, so a bare delete reports a cheerful
     // success and everything is still there after the refresh.
     const { data, error: deleteError } = await supabase
-      .from("vendor_invoices")
+      .from("vendor_bills")
       .delete()
       .in("id", ids)
       .select("id");
@@ -227,7 +227,7 @@ export function InvoiceBatchActions({
     // and the only one a count can reveal.
     onReport(
       removed === ids.length
-        ? `Deleted ${removed} invoice${removed === 1 ? "" : "s"}.`
+        ? `Deleted ${removed} bill${removed === 1 ? "" : "s"}.`
         : `Deleted ${removed} of ${ids.length} — the rest were refused.`,
       removed === ids.length ? "done" : "error"
     );
@@ -266,14 +266,14 @@ export function InvoiceBatchActions({
     setBusy("push");
     const ids = pushable.map((i) => i.id);
     const { data: rows, error: rowsError } = await supabase
-      .from("vendor_invoices")
+      .from("vendor_bills")
       .select(
         "id, vendor_id, location_id, invoice_number, invoice_date, due_date, total, is_credit, status, financials_touched_at, synced_at"
       )
       .in("id", ids);
     if (rowsError || !rows) {
       setBusy(null);
-      onReport(rowsError?.message ?? "The invoices could not be read.", "error");
+      onReport(rowsError?.message ?? "The bills could not be read.", "error");
       return;
     }
 
@@ -284,7 +284,7 @@ export function InvoiceBatchActions({
     if (unlinked.length > 0) {
       const { data, message } = await invokeQbo(supabase, {
         mode: "find_bills",
-        invoice_ids: unlinked,
+        bill_ids: unlinked,
       });
       if (message) {
         // The record falls through on a failed lookup; a BATCH must not, or a
@@ -311,13 +311,13 @@ export function InvoiceBatchActions({
         orgId,
         vendorId: inv.vendor_id as string,
         locationId: inv.location_id as string,
-        invoiceId: inv.id as string,
+        billId: inv.id as string,
       });
       if (!ctx.connected) {
         failed.push(`${name}: QuickBooks is not connected`);
         break;
       }
-      const already = pushedLabel(ctx.invoiceRef);
+      const already = pushedLabel(ctx.billRef);
       if (
         already &&
         !pushIsStale({
@@ -330,7 +330,7 @@ export function InvoiceBatchActions({
       }
       const account = expenseAccountFor(ctx.atShop, ctx.orgAccount);
       const vendorRef = qboVendorId(ctx.atShop?.external_ref ?? null);
-      const billInvoice: BillInvoice = {
+      const bill: PushableBill = {
         id: inv.id as string,
         po_numbers: listRow.purchase_orders.map((p) => p.po_number),
         invoice_number: inv.invoice_number as string | null,
@@ -338,16 +338,16 @@ export function InvoiceBatchActions({
         due_date: inv.due_date as string | null,
         total: inv.total as number | null,
         is_credit: inv.is_credit as boolean,
-        status: inv.status as BillInvoice["status"],
-        external_ref: ctx.invoiceRef,
+        status: inv.status as PushableBill["status"],
+        external_ref: ctx.billRef,
       };
       if (!already) {
         const found = proposeBillLink(
           {
-            invoice_number: billInvoice.invoice_number,
-            total: billInvoice.total,
-            is_credit: billInvoice.is_credit,
-            external_ref: ctx.invoiceRef,
+            invoice_number: bill.invoice_number,
+            total: bill.total,
+            is_credit: bill.is_credit,
+            external_ref: ctx.billRef,
           },
           candidates,
           vendorRef,
@@ -359,7 +359,7 @@ export function InvoiceBatchActions({
         }
       }
       const refusals = billPushRefusals({
-        invoice: billInvoice,
+        bill: bill,
         vendorRef,
         vendorName: ctx.vendorName,
         accountRef: account?.ref ?? null,
@@ -369,9 +369,9 @@ export function InvoiceBatchActions({
         continue;
       }
       const result = await sendBillToQuickBooks(supabase, {
-        invoiceId: inv.id as string,
+        billId: inv.id as string,
         ctx,
-        billInvoice,
+        bill,
         account,
         vendorRef,
         tracking: qboTrackingFor(ctx.atShop),
@@ -415,7 +415,7 @@ export function InvoiceBatchActions({
           },
         ]
       : []),
-    // Same gate as the record's push (`canPush` is the Invoices edit cell),
+    // Same gate as the record's push (`canPush` is the Bills edit cell),
     // and absent until QuickBooks is known to be connected.
     ...(canEdit && qboConnected
       ? [

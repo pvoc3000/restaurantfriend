@@ -317,8 +317,8 @@ export const SECTIONS: NavSection[] = [
       },
       // After Purchase Orders, which is the order the work happens in: you
       // order, you receive, you owe. `resolveRoute` prefix-matches, so
-      // /invoices/[id] lights this without an `also`.
-      { slug: "invoices", label: "Invoices", href: "/invoices", built: true },
+      // /bills/[id] lights this without an `also`.
+      { slug: "bills", label: "Bills", href: "/bills", built: true },
       // Last on purpose: a migration-era tool, easy to drop when the catalog
       // is clean.
     ],

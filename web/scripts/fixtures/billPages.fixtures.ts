@@ -4,13 +4,13 @@
 // The case is real and Mark found it (2026-08-27): Chefs Warehouse 73535581 at
 // DF02 was scanned a page at a time and attached as two files. The totals block
 // prints on every page, so each page read as the whole $394.16 bill and each
-// became its own record — one holding 4 lines, the other 7, with /invoices
+// became its own record — one holding 4 lines, the other 7, with /bills
 // showing $788.32 owed for a $394.16 invoice. The header rule joins them; these
 // are what stop the join losing seven lines on the way.
 //
 // The numbers below are that invoice, transcribed from the live rows.
 
-import { blankHeaderFields, unfiledLines } from "../../src/lib/invoices";
+import { blankHeaderFields, unfiledLines } from "../../src/lib/bills";
 import { eq, test } from "./harness";
 
 type Draft = {

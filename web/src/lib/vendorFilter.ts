@@ -1,5 +1,5 @@
 // Filtering a purchasing list to one vendor or several — the order guide, the
-// PO list and the invoice list (Mark, 2026-09-08: "a picklist of vendors … so
+// PO list and the bill list (Mark, 2026-09-08: "a picklist of vendors … so
 // that we can easily filter by vendor? selecting multiple options should be
 // allowed").
 //

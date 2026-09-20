@@ -989,7 +989,7 @@ export function PurchaseOrderList({
         </ControlField>
 
         {/* A LIST RATHER THAN A ROW OF TABS (Mark, 2026-09-10), which is the
-            conversion `/invoices` made for its Due tabs and the order guide
+            conversion `/bills` made for its Due tabs and the order guide
             made for its tier and grouping. Same reason each time: a tab row
             spends its width whether or not you are looking at it, and this row
             already carries a search box, a range and a vendor set.

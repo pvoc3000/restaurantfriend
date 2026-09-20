@@ -27,21 +27,21 @@ import {
   BILL_STAGE_ORDER,
   billStage,
   type AgingBucket,
-} from "@/lib/invoices";
+} from "@/lib/bills";
 import {
-  invoiceDetailHref,
-  invoiceFiltersToQuery,
-  invoiceListHref,
-  parseInvoiceFilters,
-  serializeInvoiceView,
-  INVOICE_VIEW_COOKIE,
-  INVOICE_KIND_LABEL,
+  billDetailHref,
+  billFiltersToQuery,
+  billListHref,
+  parseBillFilters,
+  serializeBillView,
+  BILL_VIEW_COOKIE,
+  BILL_KIND_LABEL,
   type AgingFilter,
-  type InvoiceKindFilter,
-  type InvoiceFilters,
-  type InvoiceSortKey,
-  type InvoiceStatusFilter,
-} from "@/lib/invoiceFilters";
+  type BillKindFilter,
+  type BillFilters,
+  type BillSortKey,
+  type BillStatusFilter,
+} from "@/lib/billFilters";
 import { urlFilterParams } from "@/lib/filterMenus";
 import { makeComparator, type SortValue } from "@/lib/tableSort";
 import { withFrom } from "@/lib/breadcrumbs";
@@ -53,16 +53,16 @@ import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { ATTACHMENT_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/attachments";
 import { openWindowNow, showBlob, downloadBlob } from "@/lib/poProcessing";
 import { Checkbox } from "@/components/ui/Checkbox";
-import { InvoiceBatchActions } from "./InvoiceBatchActions";
-import { NewInvoice } from "./NewInvoice";
-import type { InvoiceListRow } from "@/app/(app)/invoices/page";
+import { BillBatchActions } from "./BillBatchActions";
+import { NewBill } from "./NewBill";
+import type { BillListRow } from "@/app/(app)/bills/page";
 
-const INVOICE_WIDTHS_KEY = "rf.invoices.columnWidths.v1";
+const BILL_WIDTHS_KEY = "rf.bills.columnWidths.v1";
 
-/** When the ordering behind this invoice began — the earliest of its purchase
+/** When the ordering behind this bill began — the earliest of its purchase
  *  orders' dates, or null when it has none. Sorting, grouping and the cell all
  *  read this one function, so they cannot disagree about which date it is. */
-function poDate(i: InvoiceListRow): string | null {
+function poDate(i: BillListRow): string | null {
   const dates = i.purchase_orders.map((p) => p.order_date).filter(Boolean) as string[];
   if (dates.length === 0) return null;
   // ISO strings, so a plain comparison is a date comparison — `new Date` here
@@ -73,7 +73,7 @@ function poDate(i: InvoiceListRow): string | null {
 /** Where a bill has got to, from what is on the row. Derived here rather than
  *  stored — see `billStage`. One call, so the chip, the sort and the search
  *  cannot disagree about which rung a bill is on. */
-function stageOf(i: InvoiceListRow) {
+function stageOf(i: BillListRow) {
   return billStage({
     status: i.status,
     linked: i.qbo_linked,
@@ -82,34 +82,34 @@ function stageOf(i: InvoiceListRow) {
   });
 }
 
-function sortValue(invoice: InvoiceListRow, key: InvoiceSortKey): SortValue {
+function sortValue(bill: BillListRow, key: BillSortKey): SortValue {
   switch (key) {
     case "invoice_number":
-      return invoice.invoice_number;
+      return bill.invoice_number;
     case "invoice_date":
-      return invoice.invoice_date;
+      return bill.invoice_date;
     case "due_date":
-      return invoice.due_date;
+      return bill.due_date;
     case "vendor":
-      return invoice.vendors?.name ?? null;
+      return bill.vendors?.name ?? null;
     case "status":
       // THE LADDER, because that is what the chip says. It read
-      // `INVOICE_STATUS_ORDER.indexOf(invoice.status)` until 2026-09-02, so
+      // `BILL_STATUS_ORDER.indexOf(bill.status)` until 2026-09-02, so
       // after the chip became Open/Approved/Submitted/Paid the column sorted by
       // a vocabulary it no longer displayed — Paid and Submitted tied, since
       // both are `approved` underneath.
-      return BILL_STAGE_ORDER.indexOf(stageOf(invoice));
+      return BILL_STAGE_ORDER.indexOf(stageOf(bill));
     case "po":
       // A set, so it sorts by how MANY orders it touches — there is no single
       // number to order by, and "which one comes first alphabetically" would
       // be an answer about a detail the column only shows part of.
-      return invoice.purchase_orders.length;
+      return bill.purchase_orders.length;
     case "total":
-      return signedTotal(invoice);
+      return signedTotal(bill);
     case "po_date":
-      return poDate(invoice);
+      return poDate(bill);
     case "lines":
-      return invoice.line_count;
+      return bill.line_count;
   }
   // EXHAUSTIVE, AND THE COMPILER CHECKS IT. This used to fall through to the
   // aging bucket "for the linter's benefit", which meant a sort key added later
@@ -123,9 +123,9 @@ function sortValue(invoice: InvoiceListRow, key: InvoiceSortKey): SortValue {
 /**
  * The columns whose runs are worth a band — few values, many rows each.
  *
- * No `invoice_date`, deliberately, and this is where the invoice list departs
+ * No `invoice_date`, deliberately, and this is where the bill list departs
  * from the PO list: purchase orders are generated in a Monday batch, so a date
- * band there names a real run. Invoices arrive one per delivery, all week, so a
+ * band there names a real run. Bills arrive one per delivery, all week, so a
  * date band would be a heading above one or two rows.
  *
  * `due_date` bands by BUCKET rather than raw value — the one place a band names
@@ -134,7 +134,7 @@ function sortValue(invoice: InvoiceListRow, key: InvoiceSortKey): SortValue {
  * buckets come out contiguous, so the band is honest about what it opens.
  */
 const GROUP_LABEL: Partial<
-  Record<InvoiceSortKey, (i: InvoiceListRow, today: string) => string>
+  Record<BillSortKey, (i: BillListRow, today: string) => string>
 > = {
   status: (i) => BILL_STAGE_LABEL[stageOf(i)],
   vendor: (i) => i.vendors?.name ?? "No vendor",
@@ -146,13 +146,13 @@ const GROUP_LABEL: Partial<
 };
 
 /**
- * The invoice list — what we owe, and what needs a decision.
+ * The bill list — what we owe, and what needs a decision.
  *
  * Where the PO list answers "what did we order", this answers "what do we owe
  * and when", which is why it opens on Open and sorts by due date ascending.
  */
-export function InvoiceList({
-  invoices,
+export function BillList({
+  bills,
   initialFilters,
   activeLocationCode,
   today,
@@ -163,8 +163,8 @@ export function InvoiceList({
   canEdit,
   canApprove,
 }: {
-  invoices: InvoiceListRow[];
-  initialFilters: InvoiceFilters;
+  bills: BillListRow[];
+  initialFilters: BillFilters;
   activeLocationCode: string;
   /** The org's calendar day, computed once on the server — see lib/today. */
   today: string;
@@ -184,21 +184,21 @@ export function InvoiceList({
   // component the props of whatever query the history entry was created with,
   // which after a `replaceState` is not the query it now shows.
   // The props are the fallback PER FIELD — see the PO list for the argument.
-  const [filters, setFilters] = useState<InvoiceFilters>(() => {
-    const live = urlFilterParams("/invoices");
-    return live ? parseInvoiceFilters(live, initialFilters) : initialFilters;
+  const [filters, setFilters] = useState<BillFilters>(() => {
+    const live = urlFilterParams("/bills");
+    return live ? parseBillFilters(live, initialFilters) : initialFilters;
   });
   const [checked, setChecked] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    document.cookie = `${INVOICE_VIEW_COOKIE}=${serializeInvoiceView(filters)}; path=/; SameSite=Lax`;
+    document.cookie = `${BILL_VIEW_COOKIE}=${serializeBillView(filters)}; path=/; SameSite=Lax`;
   }, [filters]);
 
-  function update(patch: Partial<InvoiceFilters>) {
+  function update(patch: Partial<BillFilters>) {
     const next = { ...filters, ...patch };
     setFilters(next);
-    const query = invoiceFiltersToQuery(next);
-    window.history.replaceState(null, "", query ? `/invoices?${query}` : "/invoices");
+    const query = billFiltersToQuery(next);
+    window.history.replaceState(null, "", query ? `/bills?${query}` : "/bills");
   }
 
   // The date window is a SERVER filter, so it has to re-run the page —
@@ -207,33 +207,33 @@ export function InvoiceList({
   function setRange(picked: DateRange | null) {
     const next = { ...filters, range: poRangeFromPicker(picked, today) };
     setFilters(next);
-    router.push(invoiceListHref(next));
+    router.push(billListHref(next));
   }
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const i of invoices) {
+    for (const i of bills) {
       const stage = stageOf(i);
       counts[stage] = (counts[stage] ?? 0) + 1;
     }
     return counts;
-  }, [invoices]);
+  }, [bills]);
 
-  const creditCount = useMemo(() => invoices.filter((i) => i.is_credit).length, [invoices]);
+  const creditCount = useMemo(() => bills.filter((i) => i.is_credit).length, [bills]);
 
   const agingCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const i of invoices) {
+    for (const i of bills) {
       const bucket = agingBucket(i.due_date, today);
       counts[bucket] = (counts[bucket] ?? 0) + 1;
     }
     return counts;
-  }, [invoices, today]);
+  }, [bills, today]);
 
   /** Everything but the vendor filter — see the PO list for why. */
   const beforeVendor = useMemo(() => {
     const words = filters.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    return invoices.filter((i) => {
+    return bills.filter((i) => {
       if (filters.status !== "all" && stageOf(i) !== filters.status) return false;
       if (filters.aging !== "all" && agingBucket(i.due_date, today) !== filters.aging) {
         return false;
@@ -250,7 +250,7 @@ export function InvoiceList({
         .toLowerCase();
       return words.every((w) => haystack.includes(w));
     });
-  }, [invoices, filters.status, filters.aging, filters.kind, filters.q, today]);
+  }, [bills, filters.status, filters.aging, filters.kind, filters.q, today]);
 
   const vendorOptions = useMemo(
     () => vendorFilterOptions(beforeVendor.map((i) => i.vendors?.name), filters.vendors),
@@ -265,12 +265,12 @@ export function InvoiceList({
   const sorted = useMemo(
     () =>
       [...visible].sort(
-        makeComparator<InvoiceListRow>({
+        makeComparator<BillListRow>({
           value: (i) => sortValue(i, filters.sort),
           dir: filters.dir,
           // Vendor as the secondary sort whatever the primary is, matching the
           // PO list: a due-date band and a status band are both read vendor by
-          // vendor. The invoice number is last because it is the closest thing
+          // vendor. The bill number is last because it is the closest thing
           // to unique per row, so it makes the whole order deterministic.
           tiebreaks: [
             (i) => i.vendors?.name ?? "",
@@ -282,9 +282,9 @@ export function InvoiceList({
   );
 
   usePublishRecordSet(
-    "/invoices",
+    "/bills",
     useMemo(
-      () => sorted.map((i) => ({ id: i.id, href: invoiceDetailHref(i.id, filters) })),
+      () => sorted.map((i) => ({ id: i.id, href: billDetailHref(i.id, filters) })),
       [sorted, filters]
     )
   );
@@ -339,7 +339,7 @@ export function InvoiceList({
   }
 
   /** What the last bulk command did. Held HERE and not in the component that
-   *  ran it: `InvoiceBatchActions` clears the selection on its way out, and a
+   *  ran it: `BillBatchActions` clears the selection on its way out, and a
    *  message owned by something the clearing unmounts is destroyed the instant
    *  it is set — which is exactly what the first real bulk approve did. */
   const [batchReport, setBatchReport] = useState<{
@@ -351,24 +351,24 @@ export function InvoiceList({
   const [scansBusy, startScans] = useTransition();
   const qboSupabase = createClient();
 
-  /** Every command in the menu but New invoice and Sync acts on the ticked
+  /** Every command in the menu but New bill and Sync acts on the ticked
    *  rows, so with none ticked those rows are dead — and say why. */
   const nothingTicked = checked.size === 0;
 
   /**
    * THE SELECTION'S FILED PAPERWORK, AS ONE PDF (Mark, 2026-09-11, asking for
-   * Documents ▸ Preview / Download Invoices).
+   * Documents ▸ Preview / Download Bills).
    *
-   * A VENDOR INVOICE IS A DOCUMENT WE RECEIVE, so there is no invoice PDF for
+   * A VENDOR INVOICE IS A DOCUMENT WE RECEIVE, so there is no bill PDF for
    * this app to render and there must not be one: the real document is the
    * scan the vendor sent, and a generated sheet beside it would be a second
    * answer to "what were we billed" with no original behind it. So Documents
    * means the SCANS — `DocumentsList`'s merge, one screen over, over the
    * attachments this module already files.
    *
-   * An invoice with nothing filed is SKIPPED AND COUNTED rather than silently
+   * An bill with nothing filed is SKIPPED AND COUNTED rather than silently
    * absent: "3 of 5 had nothing filed" is the useful half of the answer, and a
-   * merge quietly two invoices short is worse than one that refused.
+   * merge quietly two bills short is worse than one that refused.
    *
    * THE TAB IS OPENED BEFORE ANYTHING IS AWAITED (`openWindowNow`'s rule) —
    * a window opened after an await is silently blocked, and `ActionMenu` runs
@@ -379,7 +379,7 @@ export function InvoiceList({
     const empty = checked.size - targets.length;
     if (targets.length === 0) {
       setBatchReport({
-        message: "None of those invoices has any paperwork filed, so there was nothing to open.",
+        message: "None of those bills has any paperwork filed, so there was nothing to open.",
         tone: "error",
       });
       return;
@@ -397,23 +397,23 @@ export function InvoiceList({
       try {
         const { data, error } = await qboSupabase
           .from("purchase_order_attachments")
-          .select("invoice_id, storage_path, file_name, content_type")
-          .in("invoice_id", targets.map((i) => i.id))
+          .select("bill_id, storage_path, file_name, content_type")
+          .in("bill_id", targets.map((i) => i.id))
           .order("created_at");
         if (error) throw new Error(error.message);
 
-        // In the order the LIST is showing them, each invoice's files oldest
+        // In the order the LIST is showing them, each bill's files oldest
         // first — so the merged file reads down the screen rather than in
         // whatever order Postgres answered.
         const byInvoice = new Map<string, { path: string; name: string | null; type: string | null }[]>();
         for (const a of data ?? []) {
-          const list = byInvoice.get(a.invoice_id as string) ?? [];
+          const list = byInvoice.get(a.bill_id as string) ?? [];
           list.push({
             path: a.storage_path as string,
             name: (a.file_name as string | null) ?? null,
             type: (a.content_type as string | null) ?? null,
           });
-          byInvoice.set(a.invoice_id as string, list);
+          byInvoice.set(a.bill_id as string, list);
         }
         const files = targets.flatMap((i) => byInvoice.get(i.id) ?? []);
         const { data: urls } = await qboSupabase.storage
@@ -430,7 +430,7 @@ export function InvoiceList({
         const { mergeToSinglePdf, mergedFileName } = await import("@/lib/mergeDocuments");
         const result = await mergeToSinglePdf(sources);
         if (result.merged === 0) throw new Error("None of those files could be read.");
-        const name = mergedFileName(today, result.merged, "invoices");
+        const name = mergedFileName(today, result.merged, "paperwork");
         if (mode === "open") showBlob(win, result.blob, name);
         else downloadBlob(result.blob, name);
 
@@ -459,7 +459,7 @@ export function InvoiceList({
    * refresh so the STORED figures land on screen.
    *
    * NO LOCAL PREVIEW ANY MORE (Mark, 2026-09-03: the per-row "paid · as
-   * of…" line under the invoice number "not necessary"). `refresh_status`'s
+   * of…" line under the bill number "not necessary"). `refresh_status`'s
    * response used to be held in state so a row could say what QuickBooks
    * *just* answered before the page had re-read it; without that line to
    * feed, there is nothing left to hold — the router refresh below is the
@@ -494,7 +494,7 @@ export function InvoiceList({
     }
   }
 
-  const columns: DataColumn<InvoiceListRow>[] = [
+  const columns: DataColumn<BillListRow>[] = [
     // THE SELECTION IS FOR EVERY ROLE SINCE 2026-09-11, where it used to need
     // approve (manager+) or delete (`canEdit`) — the two commands the old batch
     // bar held — so that a purchaser, Read Only here per the Page Permissions
@@ -502,7 +502,7 @@ export function InvoiceList({
     //
     // Documents ▸ Preview / Download is what changed it: opening the selection's
     // filed scans is a READ, and this screen is already role-gated, so a reader
-    // who may open each invoice's paperwork one at a time on its record may
+    // who may open each bill's paperwork one at a time on its record may
     // certainly open several at once. Withholding the ticks would leave that
     // row permanently dead for the one role most likely to want it.
     {
@@ -520,7 +520,7 @@ export function InvoiceList({
         <Checkbox
           checked={checked.has(i.id)}
           onChange={() => toggleOne(i.id)}
-          label={`select ${i.invoice_number ?? "invoice"}`}
+          label={`select ${i.invoice_number ?? "bill"}`}
         />
       ),
     },
@@ -532,7 +532,7 @@ export function InvoiceList({
       sortValue: (i) => i.invoice_number,
       render: (i) => (
         <Link
-          href={invoiceDetailHref(i.id, filters)}
+          href={billDetailHref(i.id, filters)}
           className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
         >
           {/* A rent bill has no number, and saying so beats an em dash you
@@ -550,8 +550,8 @@ export function InvoiceList({
         i.vendors ? (
           <Link
             href={withFrom(`/vendors/${i.vendors.id}`, {
-              href: invoiceListHref(filters),
-              label: "Invoices",
+              href: billListHref(filters),
+              label: "Bills",
             })}
             className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
           >
@@ -619,8 +619,8 @@ export function InvoiceList({
           <span className="text-muted">
             <Link
               href={withFrom(`/purchase-orders/${first.id}`, {
-                href: invoiceListHref(filters),
-                label: "Invoices",
+                href: billListHref(filters),
+                label: "Bills",
               })}
               className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
             >
@@ -635,9 +635,9 @@ export function InvoiceList({
       key: "po_date",
       label: "PO Date",
       width: 120,
-      // THE EARLIEST, when an invoice covers more than one order — the question
+      // THE EARLIEST, when an bill covers more than one order — the question
       // this column answers is "when was this ordered", and that is when the
-      // ordering began. Measured on the real data: 47 of 50 linked invoices
+      // ordering began. Measured on the real data: 47 of 50 linked bills
       // carry ONE purchase order, the other 3 carry two a week apart, and in
       // all three the lowest PO NUMBER is also the earliest date, so this
       // agrees with the PO column beside it rather than naming a different
@@ -705,13 +705,13 @@ export function InvoiceList({
    * is always here (2026-09-10, the PO list's rule).
    *
    * The exception is what a collapsed control needs and a row of tabs did not:
-   * narrow the window until your chosen stage has no invoices and the option
+   * narrow the window until your chosen stage has no bills and the option
    * would vanish, leaving `PickList` to fall back to the raw column value and
    * render a lowercase "submitted". Kept, the trigger reads "Submitted" and
    * the list reads "Submitted 0" — you filtered to Submitted and this window
    * holds none.
    */
-  const statusTabs: InvoiceStatusFilter[] = [
+  const statusTabs: BillStatusFilter[] = [
     "all",
     "open",
     ...BILL_STAGE_ORDER.filter(
@@ -721,13 +721,13 @@ export function InvoiceList({
 
   /** Same rule — this one has been a `PickList` since 2026-09-08. */
   /**
-   * `NewInvoice` owns its own dialog, so the menu's row has to come FROM it —
+   * `NewBill` owns its own dialog, so the menu's row has to come FROM it —
    * and a role that cannot create one renders no component at all, hence the
    * empty-row fallback (`OrderCommandMenu`'s `withX` shape).
    */
-  const withNewInvoice = (render: (items: ActionMenuItem[]) => ReactNode) =>
+  const withNewBill = (render: (items: ActionMenuItem[]) => ReactNode) =>
     canEdit ? (
-      <NewInvoice
+      <NewBill
         orgId={orgId}
         locationId={locationId}
         vendors={vendors}
@@ -735,7 +735,7 @@ export function InvoiceList({
         // The vendor's id lives on the embed, not as its own column on the row
         // — the duplicate check only ever compares within one vendor, so that
         // is the shape it wants.
-        existing={invoices.map((i) => ({
+        existing={bills.map((i) => ({
           id: i.id,
           vendor_id: i.vendors?.id ?? "",
           invoice_number: i.invoice_number,
@@ -750,7 +750,7 @@ export function InvoiceList({
             { label: "New Credit Memo", onSelect: () => open("credit") },
           ])
         }
-      </NewInvoice>
+      </NewBill>
     ) : (
       render([])
     );
@@ -763,17 +763,17 @@ export function InvoiceList({
   return (
     <div className="space-y-4">
       {/* THE IDENTITY ROW: title, the three totals, then the commands at the far
-          right (Mark, 2026-09-10: "the invoices action buttons should move to
+          right (Mark, 2026-09-10: "the bills action buttons should move to
           the identity row too"). `items-start`, so the buttons' top is the
           title's top — the app's rule for a command in the title row. They had
           their own right-aligned strip under this row. */}
       <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
         <div>
           <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            Invoices
+            Bills
           </h1>
           <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
-            {activeLocationCode} · {visible.length} of {invoices.length} invoices
+            {activeLocationCode} · {visible.length} of {bills.length} bills
           </p>
         </div>
         {/* THE TOTALS RIDE 5px UP so their small-caps labels' INK meets the
@@ -817,10 +817,10 @@ export function InvoiceList({
             Documents ▸ ·
             Check QuickBooks · Approve · Push to QuickBooks, then a rule, then Delete Selected… and
             Clear Selection. It replaces a Check QuickBooks button, a New
-            invoice button and a selection bar carrying two more.
+            bill button and a selection bar carrying two more.
 
             THE TWO COMPONENTS THAT OWN THEIR COMMANDS KEEP OWNING THEM —
-            `NewInvoice` its dialog and duplicate warning, `InvoiceBatchActions`
+            `NewBill` its dialog and duplicate warning, `BillBatchActions`
             its confirms, the approval RPC's row count and the document order on
             the delete — and hand their rows out through a render prop, which is
             `OrderCommandMenu`'s arrangement and its reason: those are each a
@@ -830,8 +830,8 @@ export function InvoiceList({
             the ROWS carry the refusals, with their counts in the labels
             ("Approve (0)"), so the menu explains itself where a dead trigger
             could not — the PO list's rule, argued there at length. */}
-        {withNewInvoice((newInvoice) => (
-          <InvoiceBatchActions
+        {withNewBill((newInvoice) => (
+          <BillBatchActions
             selected={sorted.filter((i) => checked.has(i.id))}
             orgId={orgId}
             canEdit={canEdit}
@@ -846,8 +846,8 @@ export function InvoiceList({
                 label={scansBusy ? "Merging…" : qboBusy ? "Checking…" : "Actions"}
                 ariaLabel={
                   nothingTicked
-                    ? "Actions — select invoices first"
-                    : `Actions for ${checked.size} selected invoices`
+                    ? "Actions — select bills first"
+                    : `Actions for ${checked.size} selected bills`
                 }
                 disabled={scansBusy || qboBusy}
                 minWidth={230}
@@ -857,8 +857,8 @@ export function InvoiceList({
                     label: "Documents",
                     disabled: nothingTicked,
                     items: [
-                      { label: "Preview Invoices", onSelect: () => openScans("open") },
-                      { label: "Download Invoices", onSelect: () => openScans("download") },
+                      { label: "Preview Paperwork", onSelect: () => openScans("open") },
+                      { label: "Download Paperwork", onSelect: () => openScans("download") },
                     ],
                   },
                   { label: "Check QuickBooks", onSelect: () => void checkQuickBooks() },
@@ -871,7 +871,7 @@ export function InvoiceList({
                 ]}
               />
             )}
-          </InvoiceBatchActions>
+          </BillBatchActions>
         ))}
       </div>
 
@@ -940,13 +940,13 @@ export function InvoiceList({
             options={agingTabs.map((b) => ({
               value: b,
               label: b === "all" ? "Any due date" : AGING_LABEL[b as AgingBucket],
-              hint: String(b === "all" ? invoices.length : agingCounts[b] ?? 0),
+              hint: String(b === "all" ? bills.length : agingCounts[b] ?? 0),
             }))}
             fit          />
         </ControlField>
 
         {/* A LIST RATHER THAN A ROW OF TABS (Mark, 2026-09-10) — the fourth
-            time, after `/invoices`' own Due, the order guide's tier and
+            time, after `/bills`' own Due, the order guide's tier and
             grouping, and the PO list's status. Here it was the widest thing in
             the row by a distance: **478px** with five stages and their counts,
             against 160 as a list, and that 478 was the whole reason this row
@@ -956,11 +956,11 @@ export function InvoiceList({
             ariaLabel="Status"
             variant="field"
             value={filters.status}
-            onPick={(status) => update({ status: status as InvoiceStatusFilter })}
+            onPick={(status) => update({ status: status as BillStatusFilter })}
             options={statusTabs.map((s) => ({
               value: s,
               label: s === "all" ? "All" : BILL_STAGE_LABEL[s],
-              hint: String(s === "all" ? invoices.length : statusCounts[s] ?? 0),
+              hint: String(s === "all" ? bills.length : statusCounts[s] ?? 0),
             }))}
             fit          />
         </ControlField>
@@ -970,16 +970,16 @@ export function InvoiceList({
             ariaLabel="Type"
             variant="field"
             value={filters.kind}
-            onPick={(kind) => update({ kind: kind as InvoiceKindFilter })}
+            onPick={(kind) => update({ kind: kind as BillKindFilter })}
             options={(["all", "bill", "credit"] as const).map((k) => ({
               value: k,
-              label: INVOICE_KIND_LABEL[k],
+              label: BILL_KIND_LABEL[k],
               hint: String(
                 k === "all"
-                  ? invoices.length
+                  ? bills.length
                   : k === "credit"
                     ? creditCount
-                    : invoices.length - creditCount
+                    : bills.length - creditCount
               ),
             }))}
             fit
@@ -990,7 +990,7 @@ export function InvoiceList({
 
       {capped && (
         <p className="border border-ink bg-mark-fill px-4 py-3 text-sm text-ink">
-          Showing the 500 most recent invoices in this window — narrow the window
+          Showing the 500 most recent bills in this window — narrow the window
           to see everything in it.
         </p>
       )}
@@ -1026,18 +1026,18 @@ export function InvoiceList({
         // were tuned to. Tax and Freight came off on 2026-09-02 and PO Date
         // took part of what they left; the compact set drops Lines.
         compactBelow={1280}
-        storageKey={INVOICE_WIDTHS_KEY}
+        storageKey={BILL_WIDTHS_KEY}
         columnChooser
         sort={{ key: filters.sort, dir: filters.dir }}
         onSortChange={(next) =>
-          update({ sort: next.key as InvoiceSortKey, dir: next.dir })
+          update({ sort: next.key as BillSortKey, dir: next.dir })
         }
         group={
           GROUP_LABEL[filters.sort]
-            ? { label: (i: InvoiceListRow) => GROUP_LABEL[filters.sort]!(i, today) }
+            ? { label: (i: BillListRow) => GROUP_LABEL[filters.sort]!(i, today) }
             : undefined
         }
-        empty={<p className="text-sm text-muted">No invoices in this window.</p>}
+        empty={<p className="text-sm text-muted">No bills in this window.</p>}
       />
     </div>
   );

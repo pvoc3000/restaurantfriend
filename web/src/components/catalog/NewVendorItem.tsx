@@ -260,7 +260,7 @@ export function NewVendorItem({
               <Field label="Vendor">
                 {/* Every vendor, inactive ones marked and sunk, with
                     `activateTable` so choosing one offers to revive it first —
-                    `NewInvoice`'s pairing. Filtering them out instead would
+                    `NewBill`'s pairing. Filtering them out instead would
                     leave a shop that has just been reopened unreachable from
                     the one screen where you would look for it, and would also
                     let a new item land under a vendor whose items this tab

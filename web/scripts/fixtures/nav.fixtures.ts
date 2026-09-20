@@ -86,8 +86,8 @@ test("a sub tab returns to the remembered record — the Employees/Timesheets ca
 });
 
 test("a remembered LIST comes back as that list", () => {
-  const memory = memoryWith("purchasing", "invoices", DF01, "/invoices");
-  eq(sectionHref(section("purchasing"), memory, DF01, "hr"), "/invoices");
+  const memory = memoryWith("purchasing", "bills", DF01, "/bills");
+  eq(sectionHref(section("purchasing"), memory, DF01, "hr"), "/bills");
 });
 
 // ------------------------------------------- the tab you're on goes to the list
@@ -108,10 +108,10 @@ test("the ACTIVE sub tab goes to the list, not the remembered record", () => {
 test("an inactive sub of the active section still carries its own record", () => {
   // A vendor item lights Vendors (nav's `also`), so Purchasing is active and the
   // Vendors tab is the active sub — but Invoices is not, and keeps its record.
-  const invoice = "/invoices/i1";
+  const bill = "/bills/i1";
   let memory = memoryWith("purchasing", "vendors", DF01, "/vendor-items/v1");
-  memory = rememberIn(memory, { sectionSlug: "purchasing", subSlug: "invoices" }, DF01, invoice);
-  eq(subHref(section("purchasing"), sub("purchasing", "invoices"), memory, DF01, "vendors"), invoice);
+  memory = rememberIn(memory, { sectionSlug: "purchasing", subSlug: "bills" }, DF01, bill);
+  eq(subHref(section("purchasing"), sub("purchasing", "bills"), memory, DF01, "vendors"), bill);
 });
 
 // ------------------------------------------------------------- location keying
@@ -125,11 +125,11 @@ test("a record remembered at one shop does not answer for another", () => {
 
 test("navPathKey tells two shops apart, and a null location has its own bucket", () => {
   ok(
-    navPathKey(DF01, "purchasing", "invoices") !== navPathKey(DF02, "purchasing", "invoices"),
+    navPathKey(DF01, "purchasing", "bills") !== navPathKey(DF02, "purchasing", "bills"),
     "two shops differ"
   );
   ok(
-    navPathKey(null, "purchasing", "invoices") !== navPathKey(DF01, "purchasing", "invoices"),
+    navPathKey(null, "purchasing", "bills") !== navPathKey(DF01, "purchasing", "bills"),
     "no shop differs from a shop"
   );
 });
@@ -175,9 +175,9 @@ test("no url ever reaches the cookie", () => {
 
 test("the cookie round-trips, and comes back with no paths", () => {
   let memory = memoryWith("hr", "timesheets", DF01, "/timesheets");
-  memory = rememberIn(memory, { sectionSlug: "purchasing", subSlug: "invoices" }, DF01, "/invoices/i1");
+  memory = rememberIn(memory, { sectionSlug: "purchasing", subSlug: "bills" }, DF01, "/bills/i1");
   const reparsed = parseNavMemory(serializeNavMemory(memory));
-  eq(reparsed.subs, { hr: "timesheets", purchasing: "invoices" });
+  eq(reparsed.subs, { hr: "timesheets", purchasing: "bills" });
   eq(reparsed.paths, {});
 });
 

@@ -5,15 +5,15 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   attachmentPath,
-  invoiceOwner,
+  billOwner,
   ATTACHMENT_BUCKET,
   type AttachmentKind,
   type PoAttachment,
 } from "@/lib/attachments";
 import {
-  createInvoiceFromReading,
-  type InvoiceCreationOrder,
-} from "@/lib/invoiceFromExtraction";
+  createBillFromReading,
+  type BillCreationOrder,
+} from "@/lib/billFromExtraction";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
@@ -34,11 +34,11 @@ import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
  * reconciled and closed"). Attaching an invoice has it READ, because the
  * reading is what the receiving screen reconciles against and it is wanted the
  * moment the document is on the order. It does not create a BILL: a record on
- * /invoices is something somebody is going to be asked to approve and pay, and
+ * /bills is something somebody is going to be asked to approve and pay, and
  * a scan taken to help count a delivery is not yet a claim that we owe
  * anybody. The bill is offered when the order is CLOSED — a ticked line in the
  * close confirm, which both this order's screens already make — and
- * `fileAsInvoice` below is the standing manual route for the exceptions.
+ * `fileAsBill` below is the standing manual route for the exceptions.
  *
  * The two write orders are opposite on purpose, and both are load-bearing:
  *
@@ -60,19 +60,19 @@ export function useAttachmentActions({
   poId,
   orgId,
   order,
-  invoiceId,
+  billId,
 }: {
   /** The purchase order these documents hang off, or null on an invoice with
    *  no order behind it (migration 026 made `po_id` nullable). */
   poId: string | null;
   orgId: string;
   /** What an auto-filed invoice needs to know: whose vendor, whose location,
-   *  and the lines to match against. Absent on the Invoices section's own
+   *  and the lines to match against. Absent on the Bills section's own
    *  upload, which supplies a vendor directly. */
-  order?: InvoiceCreationOrder | null;
+  order?: BillCreationOrder | null;
   /** Where an invoice-owned upload's objects go, and the vendor/location a
    *  reading is filed under when there is no order. */
-  invoiceId?: string | null;
+  billId?: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -87,7 +87,7 @@ export function useAttachmentActions({
    * extraction onto the attachment row; the refresh brings it back.
    *
    * NOTHING ELSE CHANGES — not the order, and since 2026-09-01 not the
-   * Invoices module either. An extraction is only ever a proposal to compare
+   * Bills module either. An extraction is only ever a proposal to compare
    * against, which a person then accepts line by line; filing it as a bill is
    * a separate act, taken at close. See the note on the hook above.
    */
@@ -136,7 +136,7 @@ export function useAttachmentActions({
       // An order's own paperwork keeps 018's key; an invoice with no order
       // behind it files under `invoices/{id}`. Both are authorised by the same
       // policies, which read the first segment only.
-      const owner = poId ?? (invoiceId ? invoiceOwner(invoiceId) : null);
+      const owner = poId ?? (billId ? billOwner(billId) : null);
       if (!owner) {
         setPhase(IDLE);
         setError("Nothing to attach this to.");
@@ -160,7 +160,7 @@ export function useAttachmentActions({
         .insert({
           org_id: orgId,
           po_id: poId,
-          invoice_id: invoiceId ?? null,
+          bill_id: billId ?? null,
           storage_path: path,
           kind,
           file_name: file.name,
@@ -219,25 +219,25 @@ export function useAttachmentActions({
   }
 
   /**
-   * File an ALREADY-READ document as an invoice record, on its own.
+   * File an ALREADY-READ document as an bill record, on its own.
    *
    * Closing the order is the ordinary route (see the note on the hook), and
-   * this is the standing exception to it — the bill you want on /invoices
+   * this is the standing exception to it — the bill you want on /bills
    * today, on an order that will not be closed for a fortnight; the document
    * attached as a `photo` that turns out to be the invoice; the readings
    * stored before this module existed.
    */
-  async function fileAsInvoice(
-    attachment: Pick<PoAttachment, "id" | "file_name" | "invoice_id" | "extraction">
+  async function fileAsBill(
+    attachment: Pick<PoAttachment, "id" | "file_name" | "bill_id" | "extraction">
   ) {
-    if (attachment.invoice_id) return;
+    if (attachment.bill_id) return;
     if (!attachment.extraction) {
       setError("Read the invoice first — there's nothing to file yet.");
       return;
     }
     setPhase({ kind: "filing", label: "Filing it as an invoice…" });
     setError(null);
-    const result = await createInvoiceFromReading(supabase, {
+    const result = await createBillFromReading(supabase, {
       orgId,
       attachmentId: attachment.id,
       extraction: attachment.extraction,
@@ -297,7 +297,7 @@ export function useAttachmentActions({
     fileRef,
     upload,
     read,
-    fileAsInvoice,
+    fileAsBill,
     remove,
   };
 }

@@ -51,7 +51,7 @@ function group(items: ActionMenuItem[]): ActionMenuItem[] {
  * elsewhere: Import and Close each filled BLACK conditionally, so the screen
  * said which of the two was the obvious next act — Import on an empty pay
  * period, Close on a full one. A menu row has no weight, so that is gone. The
- * app has met this before (the PO list's per-row hints, the invoice list's
+ * app has met this before (the PO list's per-row hints, the bill list's
  * Approve fill) and accepted it; if it is missed here, the honest fix is a
  * sentence, not a coloured row.
  *

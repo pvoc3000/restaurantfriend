@@ -281,7 +281,7 @@ Deno.serve(async (req) => {
     // they have not been. `synced_at` goes with them or the row claims a sync
     // that happened to somebody else's ledger.
     await clear("pushed bills", admin
-      .from("vendor_invoices")
+      .from("vendor_bills")
       // 088's cached balance goes in the SAME statement, which is what stops
       // the next person forgetting it — a balance from another company file is
       // worse than no balance.

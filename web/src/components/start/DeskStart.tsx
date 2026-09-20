@@ -29,12 +29,12 @@ import {
   type CustomerName,
 } from "@/lib/specialOrders";
 import {
-  invoiceAttention,
+  billAttention,
   isOverdueBill,
   missedClosingNights,
   paperworkAlerts,
   yearOverYearTrend,
-  type StartInvoice,
+  type StartBill,
 } from "@/lib/startPage";
 import { createClient } from "@/lib/supabase/server";
 import { daysAfter, daysBefore, serverTimeZone, todayInTimeZone } from "@/lib/today";
@@ -74,7 +74,7 @@ export async function DeskStart({ session }: { session: AppSession }) {
 
   const may = {
     sales: canReachPage(role, "/sales"),
-    invoices: canReachPage(role, "/invoices"),
+    bills: canReachPage(role, "/bills"),
     pos: canReachPage(role, "/purchase-orders"),
     orders: canReachPage(role, "/special-orders"),
     reports: canReachPage(role, "/shift-reports"),
@@ -107,9 +107,9 @@ export async function DeskStart({ session }: { session: AppSession }) {
   }
   const loc = shop.id;
 
-  const [sales, invoices, pos, orders, reports, paperwork, reminders, requests] = await Promise.all([
+  const [sales, bills, pos, orders, reports, paperwork, reminders, requests] = await Promise.all([
     may.sales ? loadSales(supabase, today, loc, shop.code) : null,
-    may.invoices ? loadInvoices(supabase, loc) : null,
+    may.bills ? loadBills(supabase, loc) : null,
     may.pos ? loadPurchaseOrders(supabase, today, loc) : null,
     may.orders ? loadSpecialOrders(supabase, session.membership.org_id, today, loc) : null,
     may.reports ? loadShiftReports(supabase, today, loc, shop.code) : null,
@@ -158,7 +158,7 @@ export async function DeskStart({ session }: { session: AppSession }) {
         ))}
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {invoices && <InvoicesCard result={invoices} today={today} />}
+        {bills && <BillsCard result={bills} today={today} />}
         {pos && <PurchaseOrdersCard result={pos} today={today} />}
         {orders && (
           <SpecialOrdersCard result={orders} today={today} thresholds={settings.attention} />
@@ -276,23 +276,23 @@ function SalesBand({
 }
 
 // ---------------------------------------------------------------------------
-// Invoices
+// Bills
 // ---------------------------------------------------------------------------
 
-type InvoiceRow = StartInvoice & {
+type BillRow = StartBill & {
   id: string;
   invoice_number: string | null;
   location_id: string | null;
   vendor: string | null;
 };
 
-async function loadInvoices(supabase: Supabase, loc: string): Promise<Result<InvoiceRow[]>> {
-  const rows: InvoiceRow[] = [];
+async function loadBills(supabase: Supabase, loc: string): Promise<Result<BillRow[]>> {
+  const rows: BillRow[] = [];
   for (let from = 0; ; from += 1000) {
     // Everything not void and not known to be paid — the only bills any of
     // the three counts can be about. A QuickBooks balance of zero is paid.
     const { data, error } = await supabase
-      .from("vendor_invoices")
+      .from("vendor_bills")
       .select(
         `id, invoice_number, due_date, total, is_credit, status, external_ref,
          qbo_balance, qbo_checked_at, location_id, vendors ( name )`
@@ -312,7 +312,7 @@ async function loadInvoices(supabase: Supabase, loc: string): Promise<Result<Inv
         invoice_number: (raw.invoice_number as string | null) ?? null,
         location_id: (raw.location_id as string | null) ?? null,
         vendor: (Array.isArray(vendor) ? vendor[0]?.name : vendor?.name) ?? null,
-        status: raw.status as StartInvoice["status"],
+        status: raw.status as StartBill["status"],
         due_date: (raw.due_date as string | null) ?? null,
         total: raw.total === null ? null : Number(raw.total),
         is_credit: Boolean(raw.is_credit),
@@ -326,16 +326,16 @@ async function loadInvoices(supabase: Supabase, loc: string): Promise<Result<Inv
   return { data: rows, error: null };
 }
 
-function InvoicesCard({
+function BillsCard({
   result,
   today,
 }: {
-  result: Result<InvoiceRow[]>;
+  result: Result<BillRow[]>;
   today: string;
 }) {
-  if (result.data === null) return <StartCard title="Invoices" href="/invoices" lines={[]} error={result.error} />;
+  if (result.data === null) return <StartCard title="Bills" href="/bills" lines={[]} error={result.error} />;
   const rows = result.data;
-  const counts = invoiceAttention(rows, today);
+  const counts = billAttention(rows, today);
 
   // Overdue first, oldest due date first; then whatever is waiting on an
   // approval, oldest due date first.
@@ -348,20 +348,20 @@ function InvoicesCard({
   const items: CardItem[] = [...overdue, ...waiting].slice(0, ITEMS).map((r) => ({
     primary: `${r.vendor ?? "Unknown vendor"} ${r.invoice_number ?? ""}`.trim(),
     secondary: `${overdue.includes(r) ? "Overdue" : "Due"} ${shortDate(r.due_date)}`,
-    href: `/invoices/${r.id}`,
+    href: `/bills/${r.id}`,
   }));
 
   return (
     <StartCard
-      title="Invoices"
-      href="/invoices"
+      title="Bills"
+      href="/bills"
       lines={[
-        { count: counts.overdue, label: "overdue", href: "/invoices?status=all&aging=overdue&range=all" },
-        { count: counts.awaitingApproval, label: "awaiting approval", href: "/invoices?status=open&range=all" },
+        { count: counts.overdue, label: "overdue", href: "/bills?status=all&aging=overdue&range=all" },
+        { count: counts.awaitingApproval, label: "awaiting approval", href: "/bills?status=open&range=all" },
         {
           count: counts.notSent,
           label: "approved, not sent to QuickBooks",
-          href: "/invoices?status=approved&range=all",
+          href: "/bills?status=approved&range=all",
         },
       ]}
       items={items}

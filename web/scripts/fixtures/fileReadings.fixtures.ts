@@ -7,7 +7,7 @@
 // 2026-08-27: 8 closed orders are in exactly that state.
 
 import { unfiledReadings } from "../../src/lib/attachments";
-import { fileReadingsLabel } from "../../src/lib/invoices";
+import { fileReadingsLabel } from "../../src/lib/bills";
 import { eq, test } from "./harness";
 
 const reading = (number: string | null) =>
@@ -17,7 +17,7 @@ const att = (over: Record<string, unknown> = {}) => ({
   id: "a-1",
   kind: "invoice" as const,
   extraction: reading("73535581"),
-  invoice_id: null,
+  bill_id: null,
   ...over,
 });
 
@@ -28,7 +28,7 @@ test("unfiledReadings: a read invoice with no bill is offered", () => {
 test("unfiledReadings: anything already recorded is not offered again", () => {
   // The rule that stops a second record being minted for one invoice — the
   // duplicate bug this module spent two commits on.
-  eq(unfiledReadings([att({ invoice_id: "i-1" })]).length, 0, "already filed");
+  eq(unfiledReadings([att({ bill_id: "i-1" })]).length, 0, "already filed");
 });
 
 test("unfiledReadings: a document nobody has read is not offered", () => {
@@ -75,7 +75,7 @@ test("fileReadingsLabel: two different invoices are two bills", () => {
 });
 
 test("fileReadingsLabel: a numberless reading is its own bill", () => {
-  // Nothing to join it to — the same reason `filedInvoiceFor` refuses to match
+  // Nothing to join it to — the same reason `filedBillFor` refuses to match
   // one — so two of them are two bills, not one.
   eq(fileReadingsLabel([att({ extraction: reading(null) })]), "Also file this invoice as a bill", "one");
   eq(

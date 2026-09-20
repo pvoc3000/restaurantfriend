@@ -3,7 +3,7 @@
  * inlined as one `currentColor` path rather than adding an icon dependency.
  *
  * A search box's magnifier, passed to `TextInput`'s `icon` in place of hint
- * text (Mark, 2026-09-10, first on /invoices, then /batch-logs). A caller that
+ * text (Mark, 2026-09-10, first on /bills, then /batch-logs). A caller that
  * drops its placeholder for this must give the field an `aria-label`, or it
  * loses its only name.
  */

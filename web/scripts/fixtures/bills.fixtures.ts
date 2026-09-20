@@ -1,4 +1,4 @@
-// lib/invoices — aging, duplicates, the money checks, the approval caveats, and
+// lib/bills — aging, duplicates, the money checks, the approval caveats, and
 // the reading → record normalization. Plus the two additive matchers in
 // lib/invoiceMatch that the Invoices module adds.
 //
@@ -24,10 +24,10 @@ import {
   printedPoNumber,
   signedTotal,
   sumSignedTotals,
-  type VendorInvoice,
-  type VendorInvoiceLine,
+  type VendorBill,
+  type VendorBillLine,
   balanceOwed,
-} from "../../src/lib/invoices";
+} from "../../src/lib/bills";
 import {
   invoiceDueDate,
   isCreditReading,
@@ -53,7 +53,7 @@ function extraction(over: Partial<InvoiceExtraction> = {}): InvoiceExtraction {
 }
 
 let invSeq = 0;
-function invoice(over: Partial<VendorInvoice> = {}): VendorInvoice {
+function invoice(over: Partial<VendorBill> = {}): VendorBill {
   invSeq += 1;
   return {
     id: `inv-${invSeq}`,
@@ -86,11 +86,11 @@ function invoice(over: Partial<VendorInvoice> = {}): VendorInvoice {
 }
 
 let lineSeq = 0;
-function invLine(over: Partial<VendorInvoiceLine> = {}): VendorInvoiceLine {
+function invLine(over: Partial<VendorBillLine> = {}): VendorBillLine {
   lineSeq += 1;
   return {
     id: `il-${lineSeq}`,
-    invoice_id: "inv-1",
+    bill_id: "inv-1",
     purchase_order_id: null,
     purchase_order_item_id: null,
     line_no: lineSeq,
@@ -199,7 +199,7 @@ test("duplicates: exact number at the same vendor is rank 0", () => {
   const found = findPossibleDuplicates(a, [b]);
   eq(found.length, 1);
   eq(found[0].rank, 0);
-  eq(found[0].invoice.id, b.id);
+  eq(found[0].bill.id, b.id);
 });
 
 test("duplicates: the same number at a DIFFERENT vendor is not a duplicate", () => {

@@ -85,7 +85,7 @@ export async function PurchaseOrderDetailView({
       ) : (
         <PurchaseOrderDetail
           autoAddItem={rawParams.add === "1"}
-          canFileBills={canEditPage(session.membership.role, "/invoices")}
+          canFileBills={canEditPage(session.membership.role, "/bills")}
           order={order}
           lines={lines}
           locationCode={locationCode}

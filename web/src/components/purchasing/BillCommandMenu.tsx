@@ -3,10 +3,10 @@
 import type { ComponentProps } from "react";
 
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
-import { InvoiceActions } from "./InvoiceActions";
+import { BillActions } from "./BillActions";
 import { PushToQuickBooks } from "./PushToQuickBooks";
 
-type ActionProps = Omit<ComponentProps<typeof InvoiceActions>, "children">;
+type ActionProps = Omit<ComponentProps<typeof BillActions>, "children">;
 type QuickBooksProps = Omit<ComponentProps<typeof PushToQuickBooks>, "children">;
 
 /** The first row of a group carries the rule above it. */
@@ -17,7 +17,7 @@ function group(items: ActionMenuItem[]): ActionMenuItem[] {
 /**
  * THE INVOICE RECORD'S COMMANDS, AS ONE "ACTIONS" MENU (Mark, 2026-09-12:
  * "move all the action buttons into our new ActionMenu"), the fourth screen to
- * take this shape after the special order record and the PO, invoice and
+ * take this shape after the special order record and the PO, bill and
  * inventory LISTS. It replaces Void · Delete · Approve for payment in one box
  * and Send/Update/Link · Check QuickBooks · Forget the link in another.
  *
@@ -31,13 +31,13 @@ function group(items: ActionMenuItem[]): ActionMenuItem[] {
  *
  * THREE GROUPS, decide · send · destroy:
  *
- *   Approve for Payment / Withdraw Approval / Reopen Invoice
+ *   Approve for Payment / Withdraw Approval / Reopen Bill
  *   ─────
  *   Send to QuickBooks · Check QuickBooks · Forget the Link
  *   ─────
- *   Void Invoice · Delete Invoice…            (both red)
+ *   Void Bill · Delete Bill…            (both red)
  *
- * Which is why `InvoiceActions` hands back TWO named groups rather than one
+ * Which is why `BillActions` hands back TWO named groups rather than one
  * array: QuickBooks sits BETWEEN its halves, and the app's rule is that the
  * destructive rows come last (`OrderActions`' own `{ edit, destructive }`).
  *
@@ -46,10 +46,10 @@ function group(items: ActionMenuItem[]): ActionMenuItem[] {
  * submenu — that one groups three and Documents four". A submenu would also
  * cost the ordinary case, one Send, a second gesture.
  *
- * A CLIENT component because render props are functions, and `InvoiceDetail`
+ * A CLIENT component because render props are functions, and `BillDetail`
  * places it from a tree the server renders.
  */
-export function InvoiceCommandMenu({
+export function BillCommandMenu({
   actions,
   quickbooks,
 }: {
@@ -59,7 +59,7 @@ export function InvoiceCommandMenu({
   quickbooks: QuickBooksProps;
 }) {
   return (
-    <InvoiceActions {...actions}>
+    <BillActions {...actions}>
       {({ decide, destructive }) => (
         <PushToQuickBooks {...quickbooks}>
           {(quickbooksItems) => {
@@ -81,11 +81,11 @@ export function InvoiceCommandMenu({
             // the prose below still renders, which is what a reader came for.
             if (items.length === 0) return null;
             return (
-              <ActionMenu ariaLabel="Actions for this invoice" minWidth={230} items={items} />
+              <ActionMenu ariaLabel="Actions for this bill" minWidth={230} items={items} />
             );
           }}
         </PushToQuickBooks>
       )}
-    </InvoiceActions>
+    </BillActions>
   );
 }

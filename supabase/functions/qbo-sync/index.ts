@@ -18,7 +18,7 @@
 //   classes        → QBO Classes, for the per-shop picker (Plus and above)
 //   departments    → QBO Locations, ditto — Intuit calls them Departments
 //   items          → service items, for the settings picker
-//   push_bill      → send one approved invoice to QuickBooks as a Bill
+//   push_bill      → send one approved bill to QuickBooks as a Bill
 //   find_bills     → what QuickBooks already has, so a bill can be ADOPTED
 //                    rather than created twice (the Bill.com parallel run)
 //   refresh_status → what QuickBooks says is still owed. RETURNS, never stores
@@ -500,7 +500,7 @@ Deno.serve(async (req) => {
     }
 
     // -----------------------------------------------------------------------
-    // push_bill — one approved invoice becomes a Bill (or a VendorCredit)
+    // push_bill — one approved bill becomes a Bill (or a VendorCredit)
     // -----------------------------------------------------------------------
     //
     // THE BROWSER BUILDS THE PAYLOAD AND THIS VALIDATES IT, which is
@@ -511,12 +511,12 @@ Deno.serve(async (req) => {
     // way.
     //
     // What that costs is that a caller could craft a payload, so every claim in
-    // it is checked against the invoice it names — amount, vendor, entity and
+    // it is checked against the bill it names — amount, vendor, entity and
     // status — read through the CALLER's client so RLS decides what they can
     // see in the first place.
     if (mode === "push_bill") {
       const req = body as unknown as {
-        invoice_id?: string;
+        bill_id?: string;
         entity?: string;
         payload?: Record<string, unknown>;
         /** Paperwork to put on the bill once it exists. The caller decides
@@ -524,41 +524,41 @@ Deno.serve(async (req) => {
          *  second upload of the same file makes a second copy (measured). */
         attachments?: AttachRequest[];
       };
-      if (!req.invoice_id || !req.entity || !req.payload) {
-        return json(400, { error: "missing invoice_id, entity or payload" });
+      if (!req.bill_id || !req.entity || !req.payload) {
+        return json(400, { error: "missing bill_id, entity or payload" });
       }
       if (req.entity !== "Bill" && req.entity !== "VendorCredit") {
         return json(400, { error: `unknown entity: ${req.entity}` });
       }
 
-      const { data: invoice, error: invErr } = await supabase
-        .from("vendor_invoices")
+      const { data: bill, error: invErr } = await supabase
+        .from("vendor_bills")
         .select("id, org_id, vendor_id, location_id, status, total, is_credit, invoice_number, external_ref")
-        .eq("id", req.invoice_id)
+        .eq("id", req.bill_id)
         .maybeSingle();
       if (invErr) return json(500, { error: invErr.message });
-      if (!invoice) return json(404, { error: "No such invoice" });
+      if (!bill) return json(404, { error: "No such bill" });
 
-      if (invoice.status !== "approved") {
+      if (bill.status !== "approved") {
         return json(400, {
-          error: "Only an approved invoice goes to QuickBooks — approve it first.",
+          error: "Only an approved bill goes to QuickBooks — approve it first.",
         });
       }
-      const wanted = invoice.is_credit ? "VendorCredit" : "Bill";
+      const wanted = bill.is_credit ? "VendorCredit" : "Bill";
       if (req.entity !== wanted) {
-        return json(400, { error: `A ${invoice.is_credit ? "credit" : "bill"} posts as ${wanted}` });
+        return json(400, { error: `A ${bill.is_credit ? "credit" : "bill"} posts as ${wanted}` });
       }
 
       // The mapping is the SHOP's, not the vendor's (Mark, 2026-09-01: every
       // QuickBooks setting lives on the vendor's per-location row). Read here
       // rather than trusted from the payload.
       const [{ data: vendor }, { data: atShop }] = await Promise.all([
-        supabase.from("vendors").select("name").eq("id", invoice.vendor_id).maybeSingle(),
+        supabase.from("vendors").select("name").eq("id", bill.vendor_id).maybeSingle(),
         supabase
           .from("vendor_locations")
           .select("external_ref")
-          .eq("vendor_id", invoice.vendor_id)
-          .eq("location_id", invoice.location_id)
+          .eq("vendor_id", bill.vendor_id)
+          .eq("location_id", bill.location_id)
           .maybeSingle(),
       ]);
       const vendorRef =
@@ -573,15 +573,15 @@ Deno.serve(async (req) => {
       const line = (req.payload.Line as Record<string, unknown>[] | undefined)?.[0];
       const sentRef = (req.payload.VendorRef as { value?: string } | undefined)?.value;
       const sentAmount = Number(line?.Amount);
-      const invoiceTotal = Number(invoice.total);
+      const billTotal = Number(bill.total);
 
       if (sentRef !== vendorRef) {
         return json(400, { error: "The payload names a different QuickBooks vendor." });
       }
       // Half a cent, matching the app's own money epsilon.
-      if (!Number.isFinite(sentAmount) || Math.abs(sentAmount - invoiceTotal) > 0.005) {
+      if (!Number.isFinite(sentAmount) || Math.abs(sentAmount - billTotal) > 0.005) {
         return json(400, {
-          error: `The payload's amount (${sentAmount}) does not match the invoice total (${invoiceTotal}).`,
+          error: `The payload's amount (${sentAmount}) does not match the bill total (${billTotal}).`,
         });
       }
 
@@ -634,7 +634,7 @@ Deno.serve(async (req) => {
       // second push emptied `attachments` while the file sat in QuickBooks.
       // The same shape as the sync token a commit earlier, one level up: the
       // server was still rebuilding a ref from parts.
-      const priorBill = (invoice.external_ref as { qbo?: { attachments?: Record<string, string> } } | null)
+      const priorBill = (bill.external_ref as { qbo?: { attachments?: Record<string, string> } } | null)
         ?.qbo?.attachments;
       const ref = {
         qbo: {
@@ -648,7 +648,7 @@ Deno.serve(async (req) => {
         },
       };
       const { data: recorded, error: recErr } = await supabase.rpc("record_accounting_push", {
-        p_invoice: invoice.id,
+        p_bill: bill.id,
         p_ref: ref,
       });
       if (recErr) return json(500, { error: recErr.message, qbo_id: String(doc.Id) });
@@ -713,7 +713,7 @@ Deno.serve(async (req) => {
     // find_bills — what QuickBooks already has under these invoices' numbers
     //
     // The parallel run with Bill.com: bills reach the books there and sync to
-    // QuickBooks, so nearly every invoice in this app ALREADY exists over there
+    // QuickBooks, so nearly every bill in this app ALREADY exists over there
     // (measured: 51 of 52) and pushing would double it. This finds the one that
     // is already there so it can be adopted instead.
     //
@@ -727,9 +727,9 @@ Deno.serve(async (req) => {
     // split `taxDisagreement` had to be pulled back to.
     // -----------------------------------------------------------------------
     if (mode === "find_bills") {
-      const wanted = (body as unknown as { invoice_ids?: string[] }).invoice_ids;
+      const wanted = (body as unknown as { bill_ids?: string[] }).bill_ids;
       let sel = supabase
-        .from("vendor_invoices")
+        .from("vendor_bills")
         .select("id, invoice_number")
         .not("invoice_number", "is", null);
       if (Array.isArray(wanted) && wanted.length > 0) sel = sel.in("id", wanted);
@@ -781,12 +781,12 @@ Deno.serve(async (req) => {
     }
 
     if (mode === "refresh_status") {
-      const wanted = (body as unknown as { invoice_ids?: string[] }).invoice_ids;
+      const wanted = (body as unknown as { bill_ids?: string[] }).bill_ids;
 
       // Through the CALLER's client: RLS decides which invoices they can see,
       // so this can never report on another org's books.
       let q = supabase
-        .from("vendor_invoices")
+        .from("vendor_bills")
         .select("id, invoice_number, external_ref, qbo_balance")
         .not("external_ref->qbo->>id", "is", null);
       if (Array.isArray(wanted) && wanted.length > 0) q = q.in("id", wanted);
@@ -811,12 +811,12 @@ Deno.serve(async (req) => {
       const byEntity = new Map<string, Pushed[]>();
       for (const r of pushed) {
         // TWO-WAY ON PURPOSE, and only because this query reads
-        // `vendor_invoices`, which can hold nothing but a Bill or a
+        // `vendor_bills`, which can hold nothing but a Bill or a
         // VendorCredit. Widen it to `special_orders` and this line silently
         // asks QuickBooks for every customer Invoice as a Bill and finds
         // none — which reads as "no longer in QuickBooks", i.e. as a deleted
         // document rather than a bug. The same ternary shipped in
-        // `pushedLabel` and mislabelled the first real invoice (2026-09-02);
+        // `pushedLabel` and mislabelled the first real bill (2026-09-02);
         // if A/R status pull is ever built, read the stored entity here.
         const entity = r.external_ref?.qbo?.entity === "VendorCredit" ? "VendorCredit" : "Bill";
         (byEntity.get(entity) ?? byEntity.set(entity, []).get(entity)!).push(r);
@@ -848,11 +848,11 @@ Deno.serve(async (req) => {
         // MISSING IS ITS OWN ANSWER, not a zero: a document deleted or voided
         // in QuickBooks would otherwise read as paid in full.
         if (!doc) {
-          return { invoice_id: r.id, qbo_id: r.external_ref?.qbo?.id ?? null, entity, missing: true };
+          return { bill_id: r.id, qbo_id: r.external_ref?.qbo?.id ?? null, entity, missing: true };
         }
         const balance = Number(doc.Balance ?? 0);
         return {
-          invoice_id: r.id,
+          bill_id: r.id,
           qbo_id: String(doc.Id),
           entity,
           doc_number: doc.DocNumber === undefined || doc.DocNumber === null ? null : String(doc.DocNumber),
@@ -880,16 +880,16 @@ Deno.serve(async (req) => {
       let stored = 0;
       let refused = 0;
       for (const st of statuses) {
-        const row = pushed.find((r) => r.id === st.invoice_id);
+        const row = pushed.find((r) => r.id === st.bill_id);
         const next = st.missing ? null : Number(st.balance);
         const before = row?.qbo_balance === undefined || row?.qbo_balance === null
           ? null
           : Number(row.qbo_balance);
         if (before === next) continue;
         const { data: done, error: upErr } = await supabase
-          .from("vendor_invoices")
+          .from("vendor_bills")
           .update({ qbo_balance: next, qbo_checked_at: checkedAt })
-          .eq("id", st.invoice_id)
+          .eq("id", st.bill_id)
           .select("id");
         if (upErr || !done || done.length === 0) refused++;
         else stored++;

@@ -2,12 +2,12 @@
 // reading of a rule a list already owns, so these pin that the reading agrees.
 
 import {
-  invoiceAttention,
+  billAttention,
   isOverdueBill,
   missedClosingNights,
   paperworkAlerts,
   yearOverYearTrend,
-  type StartInvoice,
+  type StartBill,
 } from "../../src/lib/startPage";
 import type { SalesDay } from "../../src/lib/sales";
 import { eq, no, ok, test } from "./harness";
@@ -38,7 +38,7 @@ test("trend folds the shops together and compares 364 days back", () => {
   eq(points[1].thisYear, null);
 });
 
-const bill = (over: Partial<StartInvoice>): StartInvoice => ({
+const bill = (over: Partial<StartBill>): StartBill => ({
   status: "open",
   due_date: null,
   total: 100,
@@ -60,7 +60,7 @@ test("invoice counts: open, approved-not-sent, overdue-and-owed", () => {
     bill({ is_credit: true, due_date: "2026-09-01" }), // a credit is never overdue
     bill({ due_date: "2026-09-17" }), // due today is not late
   ];
-  eq(invoiceAttention(rows, today), { awaitingApproval: 3, notSent: 1, overdue: 1 });
+  eq(billAttention(rows, today), { awaitingApproval: 3, notSent: 1, overdue: 1 });
   ok(isOverdueBill(rows[2], today));
   no(isOverdueBill(rows[3], today));
   no(isOverdueBill(rows[6], today));

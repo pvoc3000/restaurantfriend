@@ -1092,14 +1092,14 @@ export function OrderGuide({
             announced twice. */}
         <ControlField label="Show">
           {/* A LIST RATHER THAN FOUR TABS (Mark, 2026-09-10), which is the
-              conversion `/invoices` already made for its Due tabs and is made
+              conversion `/bills` already made for its Due tabs and is made
               here for that one's reason: this band is the one thing on the
               guide that must stay on screen for a 66,000px walk, and four tabs
               plus three groupings plus a search box plus a vendor set plus a
               switch is more than a row can hold.
 
               THE COUNTS RIDE AS HINTS, which is where the tabs carried them
-              and where `/invoices` put them. What that costs is the count of
+              and where `/bills` put them. What that costs is the count of
               the tier you are ON at rest — the burn-down when you are working
               Skipped down to zero — and what it buys is that all four are
               still one tap away, conditioned exactly as before.

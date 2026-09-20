@@ -144,7 +144,7 @@ export const PAGE_ACCESS: Record<string, Record<Role, PageAccess>> = {
   "/purchase-requests":    row("R", "W", "W", "W", "W"),
   "/order-guide":          row("-", "W", "W", "W", "W"),
   "/purchase-orders":      row("-", "R", "W", "W", "W"),
-  "/invoices":             row("-", "-", "W", "W", "W"),
+  "/bills":             row("-", "-", "W", "W", "W"),
 
   // ── The masthead's org icon ───────────────────────────────────────────────
   // Not on the sheet. Org settings were open to everyone until 2026-09-04

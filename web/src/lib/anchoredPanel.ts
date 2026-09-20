@@ -81,7 +81,7 @@ export const MENU_ITEM_CLASS =
  */
 export function menuItemState(active: boolean): string {
   // LIGHT GREY FILL, BLACK TYPE — #c0c0c0, the same grey the classic-Mac
-  // controls on /invoices fill with on hover (Mark, 2026-09-10: "instead of the
+  // controls on /bills fill with on hover (Mark, 2026-09-10: "instead of the
   // yellow fill for selected options in the picklists, can we use that same
   // onHover grey?"). Before it: an hour as yellow (`bg-mark-fill`), an hour as
   // dark grey, months as black. Ink on it is ~12.6:1; a row's muted HINT is

@@ -19,7 +19,7 @@ import { DocumentChip } from "@/components/ui/DocumentChip";
 import { RevealPanel } from "@/components/ui/RevealPanel";
 import { useAttachmentActions } from "./useAttachmentActions";
 import { AttachMenu } from "./AttachMenu";
-import type { InvoiceCreationOrder } from "@/lib/invoiceFromExtraction";
+import type { BillCreationOrder } from "@/lib/billFromExtraction";
 
 /**
  * The paperwork for a delivery (spec §2 step 5). Until now receiving wrote
@@ -73,12 +73,12 @@ export function PoAttachments({
   /** Signed by the server at render — see PurchaseOrderDetailView. */
   attachments: SignedAttachment[];
   canEdit: boolean;
-  /** May a reading be FILED as an invoice record — the Invoices cell of the
+  /** May a reading be FILED as an bill record — the Bills cell of the
    *  Page Permissions sheet, which a purchaser is Read Only on. */
   canFile: boolean;
   /** The order these belong to, so a read invoice can be filed as a record
    *  against the right vendor and matched to the right lines. */
-  order: InvoiceCreationOrder;
+  order: BillCreationOrder;
 }) {
   const [kind, setKind] = useState<AttachmentKind>("invoice");
   const {
@@ -88,7 +88,7 @@ export function PoAttachments({
     fileRef,
     upload,
     read,
-    fileAsInvoice,
+    fileAsBill,
     remove,
     reportError,
   } = useAttachmentActions({ poId, orgId, order });
@@ -209,10 +209,10 @@ export function PoAttachments({
                     record; one that's been read but not filed offers the
                     button, which is how the readings stored before this module
                     existed get cleared and how a failed auto-file recovers. */}
-                {a.invoice_id && (
+                {a.bill_id && (
                   <p className="text-[11px] uppercase tracking-[0.12em]">
                     <Link
-                      href={withFrom(`/invoices/${a.invoice_id}`, {
+                      href={withFrom(`/bills/${a.bill_id}`, {
                         href: `/purchase-orders/${poId}`,
                         label: "PO",
                       })}
@@ -232,11 +232,11 @@ export function PoAttachments({
                     >
                       {a.extraction ? "Read again" : "Read invoice"}
                     </button>
-                    {canFile && a.extraction && !a.invoice_id && (
+                    {canFile && a.extraction && !a.bill_id && (
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => void fileAsInvoice(a)}
+                        onClick={() => void fileAsBill(a)}
                         className="text-[11px] uppercase tracking-[0.06em] text-ink hover:underline disabled:opacity-35"
                       >
                         File as invoice

@@ -18,7 +18,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { VendorFields, VendorTitle } from "@/components/catalog/VendorFields";
 import {
-  VENDOR_INVOICE_CAP,
+  VENDOR_BILL_CAP,
   VENDOR_PO_CAP,
   VENDOR_TABS,
   VENDOR_TAB_LABEL,
@@ -32,9 +32,9 @@ import {
   type VendorPoRow,
 } from "@/components/catalog/VendorPurchaseOrders";
 import {
-  VendorInvoices,
-  type VendorInvoiceRow,
-} from "@/components/catalog/VendorInvoices";
+  VendorBills,
+  type VendorBillRow,
+} from "@/components/catalog/VendorBills";
 
 type VendorLocationRow = {
   id: string;
@@ -95,7 +95,7 @@ export async function VendorDetail({
   // rendering an empty table that reads as "we have never ordered from them".
   const workingShop = session.activeLocation;
   const wantsOrders = tab === "purchase-orders" && Boolean(workingShop);
-  const wantsInvoices = tab === "invoices" && Boolean(workingShop);
+  const wantsInvoices = tab === "bills" && Boolean(workingShop);
 
   // Every location's config is listed (not just the active one) — the vendor's
   // account number and minimum differ per shop, and seeing them together is the
@@ -160,7 +160,7 @@ export async function VendorDetail({
       // never reaches the browser (086).
       wantsInvoices && workingShop
         ? supabase
-            .from("vendor_invoices")
+            .from("vendor_bills")
             .select(
               `id, invoice_number, invoice_date, due_date, total, is_credit, status,
                external_ref, qbo_balance, qbo_checked_at`
@@ -168,7 +168,7 @@ export async function VendorDetail({
             .eq("vendor_id", id)
             .eq("location_id", workingShop.id)
             .order("invoice_date", { ascending: false })
-            .limit(VENDOR_INVOICE_CAP)
+            .limit(VENDOR_BILL_CAP)
         : SKIP,
       // The Actions menu's New Vendor Item… warns on a SKU already on this
       // list, and the menu is on EVERY tab — so off the Items tab (which
@@ -296,25 +296,25 @@ export async function VendorDetail({
     });
   }
 
-  // ---- the Invoices tab's rows -------------------------------------------
-  // The PO link is DERIVED from the lines, as `/invoices` derives it — an
+  // ---- the Bills tab's rows -------------------------------------------
+  // The PO link is DERIVED from the lines, as `/bills` derives it — an
   // invoice claims an order only where one of its lines points at it.
-  let invoices: VendorInvoiceRow[] = [];
+  let invoices: VendorBillRow[] = [];
   if (wantsInvoices && invoiceRows) {
     const ids = invoiceRows.map((i) => i.id);
     const poIdsByInvoice = new Map<string, Set<string>>();
     for (let from = 0; ids.length > 0; from += 1000) {
       const { data: lines } = await supabase
-        .from("vendor_invoice_lines")
-        .select("id, invoice_id, purchase_order_id")
-        .in("invoice_id", ids)
+        .from("vendor_bill_lines")
+        .select("id, bill_id, purchase_order_id")
+        .in("bill_id", ids)
         .order("id")
         .range(from, from + 999);
       for (const line of lines ?? []) {
         if (!line.purchase_order_id) continue;
-        const set = poIdsByInvoice.get(line.invoice_id) ?? new Set<string>();
+        const set = poIdsByInvoice.get(line.bill_id) ?? new Set<string>();
         set.add(line.purchase_order_id);
-        poIdsByInvoice.set(line.invoice_id, set);
+        poIdsByInvoice.set(line.bill_id, set);
       }
       if (!lines || lines.length < 1000) break;
     }
@@ -528,17 +528,17 @@ export async function VendorDetail({
               />
             ))}
 
-          {tab === "invoices" &&
+          {tab === "bills" &&
             (invoiceError ? (
               <p className="text-sm text-accent">
                 Could not load invoices: {invoiceError.message}
               </p>
             ) : (
-              <VendorInvoices
-                invoices={invoices}
+              <VendorBills
+                bills={invoices}
                 from={here}
                 today={todayInTimeZone(timeZone)}
-                capped={invoices.length === VENDOR_INVOICE_CAP}
+                capped={invoices.length === VENDOR_BILL_CAP}
                 locationCode={workingShop?.code ?? null}
               />
             ))}

@@ -9,11 +9,11 @@
 // that do that work from the readings instead.
 //
 // The target is PARITY with what filing would have produced — see
-// `filedInvoice.fixtures` for the join rule and `invoicePages.fixtures` for the
+// `filedBill.fixtures` for the join rule and `billPages.fixtures` for the
 // page rule. If these two ever disagree with those, the screen and the record
 // have started telling different stories about one delivery.
 
-import { billsFromReadings } from "../../src/lib/invoices";
+import { billsFromReadings } from "../../src/lib/bills";
 import type { InvoiceExtraction, InvoiceLine } from "../../src/lib/invoiceExtraction";
 import { eq, test } from "./harness";
 
@@ -98,7 +98,7 @@ test("one invoice printing the same item twice keeps both", () => {
 // ── what never joins ────────────────────────────────────────────────────────
 
 test("a reading with no printed number never joins anything", () => {
-  // `filedInvoiceFor` refuses a numberless match for the same reason: there is
+  // `filedBillFor` refuses a numberless match for the same reason: there is
   // nothing to be confident on. Two numberless readings therefore read as two
   // bills — which is exactly what filing them would produce.
   const bills = billsFromReadings([

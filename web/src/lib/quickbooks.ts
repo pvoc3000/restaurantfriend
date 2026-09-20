@@ -60,7 +60,7 @@ export type QboEntity = "Bill" | "VendorCredit" | "Invoice";
 
 /**
  * What we remember about a pushed document, and what `record_accounting_push`
- * merges into `vendor_invoices.external_ref`. 025 wrote this shape down before
+ * merges into `vendor_bills.external_ref`. 025 wrote this shape down before
  * anything could read it: `{"qbo": {"id": "1234", "sync_token": "3"}}`.
  */
 export type AccountingRef = {
@@ -79,7 +79,7 @@ export type AccountingRef = {
   };
 };
 
-export type BillInvoice = {
+export type PushableBill = {
   id: string;
   invoice_number: string | null;
   invoice_date: string | null;
@@ -106,7 +106,7 @@ export function poNumbersPhrase(poNumbers: readonly string[] | undefined): strin
 }
 
 export type BillPushInputs = {
-  invoice: BillInvoice;
+  bill: PushableBill;
   /** `vendors.external_ref -> qbo -> id`. Null when nobody has mapped it. */
   vendorRef: string | null;
   /** Only ever used to word a refusal. */
@@ -148,13 +148,13 @@ export function qboRef(
 }
 
 /** Whether this push will create a new QBO document or update one. */
-export function pushMode(invoice: Pick<BillInvoice, "external_ref">): "create" | "update" {
-  return qboRef(invoice.external_ref) ? "update" : "create";
+export function pushMode(bill: Pick<PushableBill, "external_ref">): "create" | "update" {
+  return qboRef(bill.external_ref) ? "update" : "create";
 }
 
 /** The entity a bill becomes. The sign lives here, not on the amount. */
-export function billEntity(invoice: Pick<BillInvoice, "is_credit">): QboEntity {
-  return invoice.is_credit ? "VendorCredit" : "Bill";
+export function billEntity(bill: Pick<PushableBill, "is_credit">): QboEntity {
+  return bill.is_credit ? "VendorCredit" : "Bill";
 }
 
 /**
@@ -179,14 +179,14 @@ export function qboEntityPath(entity: QboEntity): string {
  * a worse bill, it is a request QBO rejects with a fault nobody can act on.
  */
 export function billPushRefusals(inputs: BillPushInputs): string[] {
-  const { invoice, vendorRef, vendorName, accountRef } = inputs;
+  const { bill, vendorRef, vendorName, accountRef } = inputs;
   const out: string[] = [];
 
-  if (invoice.status !== "approved") {
+  if (bill.status !== "approved") {
     out.push(
-      invoice.status === "void"
-        ? "This invoice is void."
-        : "Only an approved invoice goes to QuickBooks — approve it first."
+      bill.status === "void"
+        ? "This bill is void."
+        : "Only an approved bill goes to QuickBooks — approve it first."
     );
   }
   if (!vendorRef) {
@@ -197,14 +197,14 @@ export function billPushRefusals(inputs: BillPushInputs): string[] {
   if (!accountRef) {
     out.push("No expense account is set. Choose one in Settings → Accounting.");
   }
-  if (invoice.total === null || invoice.total === undefined) {
-    out.push("This invoice has no total.");
-  } else if (Number(invoice.total) < 0) {
+  if (bill.total === null || bill.total === undefined) {
+    out.push("This bill has no total.");
+  } else if (Number(bill.total) < 0) {
     // The sign belongs to `is_credit` (025). A negative here means the column
     // and the flag disagree, and guessing which one is right would post real
     // money the wrong way round.
     out.push(
-      "This invoice's total is negative. Amounts are stored positive — mark it a credit instead."
+      "This bill's total is negative. Amounts are stored positive — mark it a credit instead."
     );
   }
 
@@ -224,14 +224,14 @@ export function docNumberFor(invoiceNumber: string | null | undefined): string |
 
 /** What QBO's own register shows on the line. */
 export function billLineDescription(
-  invoice: Pick<BillInvoice, "invoice_number" | "po_numbers">,
+  bill: Pick<PushableBill, "invoice_number" | "po_numbers">,
   override?: string | null
 ): string {
   const o = override?.trim();
   if (o) return o;
-  const n = invoice.invoice_number?.trim();
+  const n = bill.invoice_number?.trim();
   const base = n ? `Invoice ${n}` : "Vendor bill";
-  const pos = poNumbersPhrase(invoice.po_numbers);
+  const pos = poNumbersPhrase(bill.po_numbers);
   return pos ? `${base} · ${pos}` : base;
 }
 
@@ -249,9 +249,9 @@ export function buildBillPayload(
     throw new Error(refusals[0]);
   }
 
-  const { invoice, vendorRef, accountRef } = inputs;
-  const entity = billEntity(invoice);
-  const amount = Number(invoice.total);
+  const { bill, vendorRef, accountRef } = inputs;
+  const entity = billEntity(bill);
+  const amount = Number(bill.total);
 
   const body: Record<string, unknown> = {
     VendorRef: { value: vendorRef },
@@ -260,7 +260,7 @@ export function buildBillPayload(
         // POSITIVE on both entities. See the header.
         Amount: amount,
         DetailType: "AccountBasedExpenseLineDetail",
-        Description: billLineDescription(invoice, inputs.description),
+        Description: billLineDescription(bill, inputs.description),
         AccountBasedExpenseLineDetail: {
           AccountRef: { value: accountRef },
           // ON THE LINE, deliberately. A Bill carries its class per expense
@@ -275,22 +275,22 @@ export function buildBillPayload(
     // The PO numbers LEAD where there are any, because the memo is what a
     // QuickBooks bill list shows at a glance.
     PrivateNote: (() => {
-      const pos = poNumbersPhrase(invoice.po_numbers);
-      return pos ? `${pos} · restaurantfriend ${invoice.id}` : `restaurantfriend ${invoice.id}`;
+      const pos = poNumbersPhrase(bill.po_numbers);
+      return pos ? `${pos} · restaurantfriend ${bill.id}` : `restaurantfriend ${bill.id}`;
     })(),
   };
 
   // On the HEADER, which is where a Bill takes its location.
   if (inputs.department) body.DepartmentRef = { value: inputs.department.ref };
 
-  const docNumber = docNumberFor(invoice.invoice_number);
+  const docNumber = docNumberFor(bill.invoice_number);
   if (docNumber) body.DocNumber = docNumber;
-  if (invoice.invoice_date) body.TxnDate = invoice.invoice_date;
+  if (bill.invoice_date) body.TxnDate = bill.invoice_date;
   // A VendorCredit has no due date — QBO ignores it, and sending one implies a
   // payment schedule for money flowing the other way.
-  if (invoice.due_date && entity === "Bill") body.DueDate = invoice.due_date;
+  if (bill.due_date && entity === "Bill") body.DueDate = bill.due_date;
 
-  const existing = qboRef(invoice.external_ref);
+  const existing = qboRef(bill.external_ref);
   if (existing) {
     body.Id = existing.id;
     body.SyncToken = existing.syncToken;
@@ -1021,7 +1021,7 @@ export function linkedRef(candidate: QboCandidate): AccountingRef {
  * candidate it returns — accepting a proposal is adopting a document
  * QuickBooks has already answered about, so there is nothing left to ask a
  * second time. Half a cent, matching the `exact` check a few lines up and
- * `MONEY_EPSILON` in lib/invoices — one epsilon for money, everywhere.
+ * `MONEY_EPSILON` in lib/bills — one epsilon for money, everywhere.
  */
 export function balanceLabel(
   entity: QboEntity,

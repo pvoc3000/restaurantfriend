@@ -6,7 +6,7 @@ import {
   BILL_STAGE_LABEL,
   BILL_STAGE_ORDER,
   type BillStageInput,
-} from "../../src/lib/invoices";
+} from "../../src/lib/bills";
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 const bill = (over: Partial<BillStageInput> = {}): BillStageInput => ({

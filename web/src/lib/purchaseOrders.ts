@@ -286,14 +286,14 @@ export function closeReadiness(
    *
    * A file on the order and a bill in the system are different facts, and the
    * gap between them is real work: an invoice nobody filed never reaches the
-   * Invoices list, so it never gets approved and never gets paid.
+   * Bills list, so it never gets approved and never gets paid.
    *
    * Deliberately does NOT ask whether those invoices are APPROVED. Approval
    * runs on a different clock — a delivery can be complete on Friday and the
    * bill approved next Tuesday — and gating a closed order on it would put the
    * receiving screen at the mercy of the accounts calendar.
    */
-  linkedInvoiceCount = 0,
+  linkedBillCount = 0,
   /**
    * How many readings the confirm this feeds is OFFERING TO FILE in the same
    * breath — `unfiledReadings(attachments).length` at both call sites.
@@ -356,7 +356,7 @@ export function closeReadiness(
   // where that box is on offer the clause holds its tongue.
   if (attachmentCount === 0) {
     caveats.push("no invoice or packing slip is attached");
-  } else if (linkedInvoiceCount === 0 && offeredReadingCount === 0) {
+  } else if (linkedBillCount === 0 && offeredReadingCount === 0) {
     caveats.push("the paperwork on file isn't recorded as a bill yet");
   }
   return caveats;

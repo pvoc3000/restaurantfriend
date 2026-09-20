@@ -58,9 +58,9 @@ test("production is read-only for a supervisor and open to a purchaser", () => {
 });
 
 test("invoices are hidden below purchaser and open from one up", () => {
-  eq(pageAccess("supervisor", "/invoices"), "none");
-  eq(pageAccess("purchaser", "/invoices"), "write");
-  eq(pageAccess("admin", "/invoices"), "write");
+  eq(pageAccess("supervisor", "/bills"), "none");
+  eq(pageAccess("purchaser", "/bills"), "write");
+  eq(pageAccess("admin", "/bills"), "write");
 });
 
 test("staff read special orders and customers, supervisors write orders and read customers", () => {

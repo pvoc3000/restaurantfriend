@@ -9,7 +9,7 @@ import {
   fetchPoWithLines,
   fetchSignedAttachments,
 } from "@/lib/purchaseOrderQueries";
-import { fetchInvoicesForOrder } from "@/lib/invoiceQueries";
+import { fetchBillsForOrder } from "@/lib/billQueries";
 import { Receiving } from "@/components/purchasing/Receiving";
 import { canEditPage } from "@/lib/pageAccess";
 
@@ -31,10 +31,10 @@ export async function ReceivingView({
   const attachmentsPromise = fetchSignedAttachments(supabase, id).then((r) => r);
   // The invoices FILED against this order (migration 025). Third on the wire
   // with the other two, for the same lazy-thenable reason.
-  const invoicesPromise = fetchInvoicesForOrder(supabase, id).then((r) => r);
+  const billsPromise = fetchBillsForOrder(supabase, id).then((r) => r);
   const { order, lines, error, lineError } = await fetchPoWithLines(supabase, id);
   const { attachments, error: attachmentError } = await attachmentsPromise;
-  const { invoices: linkedInvoices } = await invoicesPromise;
+  const { bills: linkedBills } = await billsPromise;
 
   if (error) {
     return <p className="text-sm text-accent">Could not load order: {error}</p>;
@@ -88,16 +88,16 @@ export async function ReceivingView({
           locationCode={locationCode}
           orgId={session.membership.org_id}
           canReceive={canReceive}
-          canFileBills={canEditPage(session.membership.role, "/invoices")}
+          canFileBills={canEditPage(session.membership.role, "/bills")}
           attachments={attachments}
           // Said out loud rather than swallowed: if this query fails on its own
           // columns, an empty document pane would read as "no invoice yet"
           // instead of "this isn't wired up at this end".
           attachmentError={attachmentError}
           // Deliberately NOT surfaced as an error: an order that predates the
-          // Invoices module has none, and a failure here must not stop anyone
+          // Bills module has none, and a failure here must not stop anyone
           // receiving a delivery. The fallback is exactly today's behaviour.
-          linkedInvoices={linkedInvoices}
+          linkedBills={linkedBills}
           closeHref={closeHref}
         />
       )}

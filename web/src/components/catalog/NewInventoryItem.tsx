@@ -37,7 +37,7 @@ export function NewInventoryItem({
   categories: string[];
   existingNames: string[];
   /**
-   * HAND THE COMMAND OUT INSTEAD OF DRAWING A BUTTON — `NewInvoice`'s render
+   * HAND THE COMMAND OUT INSTEAD OF DRAWING A BUTTON — `NewBill`'s render
    * prop and `OrderCommandMenu`'s shape, so this keeps owning its dialog, its
    * duplicate warning and its write while the list's Actions menu owns where
    * the command SITS (2026-09-11). Without it the button is drawn as before.

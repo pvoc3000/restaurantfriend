@@ -13,7 +13,7 @@ import { BUTTON_CLASS } from "@/components/ui/buttons";
 import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { alertDialog } from "@/lib/confirm";
 import { money } from "@/lib/purchaseOrders";
-import { normalizeInvoiceNumber, pushIsStale } from "@/lib/invoices";
+import { normalizeInvoiceNumber, pushIsStale } from "@/lib/bills";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import {
   billPushRefusals,
@@ -30,7 +30,7 @@ import {
   type BillLinkProposal,
   type QboCandidate,
   type QboEntity,
-  type BillInvoice,
+  type PushableBill,
 } from "@/lib/quickbooks";
 
 /** The clock reading beside a balance — one implementation for `checkBalance`
@@ -57,7 +57,7 @@ function checkedAtLabel(iso: string): string {
 type Ctx = BillPushContext;
 
 export function PushToQuickBooks({
-  invoiceId,
+  billId,
   vendorId,
   locationId,
   orgId,
@@ -77,9 +77,9 @@ export function PushToQuickBooks({
 }: {
   /** The purchase orders the bill is for — sent in its description and memo. */
   poNumbers?: string[];
-  invoiceId: string;
+  billId: string;
   vendorId: string;
-  /** The invoice's own shop — `vendor_invoices.location_id`, NOT NULL. */
+  /** The invoice's own shop — `vendor_bills.location_id`, NOT NULL. */
   locationId: string;
   orgId: string;
   status: "open" | "approved" | "void";
@@ -156,7 +156,7 @@ export function PushToQuickBooks({
     // as the alternative — mutating a ref outside an effect is exactly what
     // it exists to catch, so this effect does the whole job itself instead.
     if (!ctx || !ctx.connected) return;
-    const already = pushedLabel(ctx.invoiceRef);
+    const already = pushedLabel(ctx.billRef);
     const stale = pushIsStale({
       financials_touched_at: financialsTouchedAt,
       synced_at: syncedAt,
@@ -165,15 +165,15 @@ export function PushToQuickBooks({
     const account = expenseAccountFor(ctx.atShop, ctx.orgAccount);
     const vendorRef = qboVendorId(ctx.atShop?.external_ref ?? null);
     const refusals = billPushRefusals({
-      invoice: {
-        id: invoiceId,
+      bill: {
+        id: billId,
         invoice_number: invoiceNumber,
         invoice_date: invoiceDate,
         due_date: dueDate,
         total,
         is_credit: isCredit,
         status,
-        external_ref: ctx.invoiceRef,
+        external_ref: ctx.billRef,
       },
       vendorRef,
       vendorName: ctx.vendorName,
@@ -182,8 +182,8 @@ export function PushToQuickBooks({
     if (refusals.length > 0) return;
     if (!account) return;
     const tracking = qboTrackingFor(ctx.atShop);
-    const billInvoice: BillInvoice = {
-      id: invoiceId,
+    const bill: PushableBill = {
+      id: billId,
       po_numbers: poNumbers,
       invoice_number: invoiceNumber,
       invoice_date: invoiceDate,
@@ -191,7 +191,7 @@ export function PushToQuickBooks({
       total,
       is_credit: isCredit,
       status,
-      external_ref: ctx.invoiceRef,
+      external_ref: ctx.billRef,
     };
     // ITS OWN CONFIRM, WORDED FOR THIS MOMENT rather than `push()`'s — reusing
     // that one would show a SECOND, differently-worded dialog asking the same
@@ -205,14 +205,14 @@ export function PushToQuickBooks({
         confirmLabel: "Update in QuickBooks",
       });
       if (!ok) return;
-      await sendToQuickBooks({ ctx, billInvoice, account, vendorRef, tracking });
+      await sendToQuickBooks({ ctx, bill, account, vendorRef, tracking });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, ctx, financialsTouchedAt, syncedAt, canPush]);
 
   const readContext = useCallback(
-    (): Promise<Ctx> => readBillPushContext(supabase, { orgId, vendorId, locationId, invoiceId }),
-    [supabase, orgId, vendorId, locationId, invoiceId]
+    (): Promise<Ctx> => readBillPushContext(supabase, { orgId, vendorId, locationId, billId }),
+    [supabase, orgId, vendorId, locationId, billId]
   );
 
   useEffect(() => {
@@ -237,7 +237,7 @@ export function PushToQuickBooks({
    * TAKES ITS INPUTS AS PARAMETERS rather than closing over the render
    * body's locals, which is what lets it be DECLARED HERE — above the two
    * early returns below, alongside the hooks — while `push()` still calls it
-   * from much further down, after those returns. `ctx`/`billInvoice`/
+   * from much further down, after those returns. `ctx`/`bill`/
    * `account`/`vendorRef`/`tracking` don't exist yet from a hook's vantage
    * point; taking them as arguments means this function doesn't need them to
    * exist until it is actually CALLED, which both call sites already
@@ -245,7 +245,7 @@ export function PushToQuickBooks({
    */
   async function sendToQuickBooks(input: {
     ctx: Ctx;
-    billInvoice: BillInvoice;
+    bill: PushableBill;
     account: ResolvedAccount;
     vendorRef: string | null;
     tracking: { location: QboRefValue | null; klass: QboRefValue | null };
@@ -253,7 +253,7 @@ export function PushToQuickBooks({
     setBusy(true);
     setError(null);
     setWarnings([]);
-    const result = await sendBillToQuickBooks(supabase, { invoiceId, ...input });
+    const result = await sendBillToQuickBooks(supabase, { billId, ...input });
     setBusy(false);
     if (!result.ok) {
       setError(result.message);
@@ -294,7 +294,7 @@ export function PushToQuickBooks({
     );
   }
 
-  // NOTHING AT ALL once we know: an invoice screen is not the place to
+  // NOTHING AT ALL once we know: an bill screen is not the place to
   // advertise a feature nobody has set up.
   if (!ctx.connected) return children ? <>{children([])}</> : null;
 
@@ -302,8 +302,8 @@ export function PushToQuickBooks({
   // The mapping is the SHOP's now, not the vendor's — 026's column, finally read.
   const vendorRef = qboVendorId(ctx.atShop?.external_ref ?? null);
   const tracking = qboTrackingFor(ctx.atShop);
-  const billInvoice: BillInvoice = {
-    id: invoiceId,
+  const bill: PushableBill = {
+    id: billId,
     po_numbers: poNumbers,
     invoice_number: invoiceNumber,
     invoice_date: invoiceDate,
@@ -311,15 +311,15 @@ export function PushToQuickBooks({
     total,
     is_credit: isCredit,
     status,
-    external_ref: ctx.invoiceRef,
+    external_ref: ctx.billRef,
   };
   const refusals = billPushRefusals({
-    invoice: billInvoice,
+    bill: bill,
     vendorRef,
     vendorName: ctx.vendorName,
     accountRef: account?.ref ?? null,
   });
-  const already = pushedLabel(ctx.invoiceRef);
+  const already = pushedLabel(ctx.billRef);
   /** The refusal worth words. `billPushRefusals` still returns the approval one
    *  — the BUTTON is still correctly disabled by it — this only declines to
    *  restate it beside the control that settles it. */
@@ -338,7 +338,7 @@ export function PushToQuickBooks({
     setError(null);
     const { data, message } = await invokeQbo(supabase, {
       mode: "refresh_status",
-      invoice_ids: [invoiceId],
+      bill_ids: [billId],
     });
     setBusy(false);
     if (message) {
@@ -385,7 +385,7 @@ export function PushToQuickBooks({
       setCheckingDuplicate(true);
       const { data, message } = await invokeQbo(supabase, {
         mode: "find_bills",
-        invoice_ids: [invoiceId],
+        bill_ids: [billId],
       });
       setCheckingDuplicate(false);
       if (!message) {
@@ -394,7 +394,7 @@ export function PushToQuickBooks({
             invoice_number: invoiceNumber,
             total,
             is_credit: isCredit,
-            external_ref: ctx!.invoiceRef,
+            external_ref: ctx!.billRef,
           },
           (data?.candidates as QboCandidate[]) ?? [],
           vendorRef,
@@ -422,7 +422,7 @@ export function PushToQuickBooks({
       confirmLabel: already ? "Update" : "Send",
     });
     if (!ok) return;
-    await sendToQuickBooks({ ctx: ctx!, billInvoice, account: account!, vendorRef, tracking });
+    await sendToQuickBooks({ ctx: ctx!, bill, account: account!, vendorRef, tracking });
   }
 
   /** Adopt the bill QuickBooks already has. Writes the SAME ref a push would,
@@ -444,7 +444,7 @@ export function PushToQuickBooks({
     setBusy(true);
     setError(null);
     const { data: rec, error: refErr } = await supabase.rpc("record_accounting_push", {
-      p_invoice: invoiceId,
+      p_bill: billId,
       p_ref: linkedRef(candidate),
     });
     if (refErr || !Array.isArray(rec) || rec.length === 0) {
@@ -472,9 +472,9 @@ export function PushToQuickBooks({
     if (candidate.balance !== null) {
       const checkedAt = new Date().toISOString();
       const { data: cached, error: balErr } = await supabase
-        .from("vendor_invoices")
+        .from("vendor_bills")
         .update({ qbo_balance: candidate.balance, qbo_checked_at: checkedAt })
-        .eq("id", invoiceId)
+        .eq("id", billId)
         .select("id");
       if (balErr || !cached || cached.length === 0) {
         setWarnings((prev) => [
@@ -536,9 +536,9 @@ export function PushToQuickBooks({
     // Its own row count: 025's update policy is purchaser+, so below that this
     // changes nothing and returns NO error — the cheerful-success trap.
     const { data: cleared, error: clearErr } = await supabase
-      .from("vendor_invoices")
+      .from("vendor_bills")
       .update({ external_ref: {}, synced_at: null })
-      .eq("id", invoiceId)
+      .eq("id", billId)
       .select("id");
     setBusy(false);
     if (clearErr || !cleared || cleared.length === 0) {

@@ -2,7 +2,7 @@
 
 /**
  * SCANNED PAGES → ONE PDF (Mark, 2026-09-18: "scan invoices directly into a
- * purchase order or invoice record").
+ * purchase order or bill record").
  *
  * A scan is a stack of camera photos, one per page, and it lands as ONE file
  * for two reasons that are both about reading it afterwards:

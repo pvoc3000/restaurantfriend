@@ -1,6 +1,6 @@
 /*
  * THE CLASSIC MAC LOOK — APP-WIDE since 2026-09-10 (Mark: "apply the mac look
- * across the entire app"), after an afternoon parked on /invoices.
+ * across the entire app"), after an afternoon parked on /bills.
  *
  * STILL TWO CLASSES, but they now ride on the SHARED PARTS rather than on one
  * screen's call sites, so a control gets the look by being built from them:

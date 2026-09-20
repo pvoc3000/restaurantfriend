@@ -11,22 +11,22 @@ import {
   agingBucket,
   balanceOwed,
   billStage,
-  type InvoiceStatus,
-} from "@/lib/invoices";
+  type BillStatus,
+} from "@/lib/bills";
 import { money } from "@/lib/purchaseOrders";
-import { VENDOR_INVOICE_CAP } from "@/lib/vendors";
+import { VENDOR_BILL_CAP } from "@/lib/vendors";
 
-/** One bill from this vendor. What the vendor record's Invoices tab shows —
+/** One bill from this vendor. What the vendor record's Bills tab shows —
  *  the RECORD, never the scanned document (Mark, 2026-09-05). */
-export type VendorInvoiceRow = {
+export type VendorBillRow = {
   id: string;
   invoice_number: string | null;
   invoice_date: string | null;
   due_date: string | null;
   total: number | null;
   is_credit: boolean;
-  status: InvoiceStatus;
-  /** The orders its lines point at, derived exactly as `/invoices` derives
+  status: BillStatus;
+  /** The orders its lines point at, derived exactly as `/bills` derives
    *  them — never a header claim. */
   purchase_orders: { id: string; po_number: string }[];
   /** The PRESENCE of a QuickBooks link, never the id (086's rule). */
@@ -38,12 +38,12 @@ export type VendorInvoiceRow = {
 const LINK =
   "text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900";
 
-function signedTotal(i: VendorInvoiceRow): number {
+function signedTotal(i: VendorBillRow): number {
   const t = Number(i.total ?? 0);
   return i.is_credit ? -t : t;
 }
 
-function owed(i: VendorInvoiceRow): number {
+function owed(i: VendorBillRow): number {
   return balanceOwed({
     status: i.status,
     total: i.total,
@@ -53,7 +53,7 @@ function owed(i: VendorInvoiceRow): number {
   });
 }
 
-function stageOf(i: VendorInvoiceRow) {
+function stageOf(i: VendorBillRow) {
   return billStage({
     status: i.status,
     linked: i.qbo_linked,
@@ -63,9 +63,9 @@ function stageOf(i: VendorInvoiceRow) {
 }
 
 /**
- * A vendor's invoices — `/invoices` read rather than worked (Mark,
- * 2026-09-05: "a simplified version of the invoices screen"). No aging tiers,
- * no status menu, no selection bar, no Check QuickBooks, no New invoice: from
+ * A vendor's bills — `/bills` read rather than worked (Mark,
+ * 2026-09-05: "a simplified version of the bills screen"). No aging tiers,
+ * no status menu, no selection bar, no Check QuickBooks, no New bill: from
  * the vendor's record the question is "what have they billed us", and the
  * answer is the rows, newest first, each a link to the bill.
  *
@@ -79,14 +79,14 @@ function stageOf(i: VendorInvoiceRow) {
  * ladder so Paid and Submitted read the same here as there, and an overdue
  * OPEN bill is red by the list's own rule.
  */
-export function VendorInvoices({
-  invoices,
+export function VendorBills({
+  bills,
   from,
   today,
   capped,
   locationCode,
 }: {
-  invoices: VendorInvoiceRow[];
+  bills: VendorBillRow[];
   from: Crumb;
   /** The org's calendar day (lib/today) — the overdue test is measured from it. */
   today: string;
@@ -95,7 +95,7 @@ export function VendorInvoices({
    *  which case there is nothing to scope by and nothing is listed. */
   locationCode: string | null;
 }) {
-  const columns: DataColumn<VendorInvoiceRow>[] = [
+  const columns: DataColumn<VendorBillRow>[] = [
     {
       key: "invoice_number",
       label: "Invoice",
@@ -103,7 +103,7 @@ export function VendorInvoices({
       width: 150,
       sortValue: (i) => i.invoice_number,
       render: (i) => (
-        <Link href={withFrom(`/invoices/${i.id}`, from)} className={LINK}>
+        <Link href={withFrom(`/bills/${i.id}`, from)} className={LINK}>
           {i.invoice_number ?? <span className="text-faint">No number</span>}
         </Link>
       ),
@@ -205,21 +205,21 @@ export function VendorInvoices({
 
   return (
     <DataTable
-      rows={invoices}
+      rows={bills}
       columns={columns}
       rowKey={(i) => i.id}
       // v2: Balance joined the columns (2026-09-05).
-      storageKey="rf.vendorInvoices.v2"
+      storageKey="rf.vendorBills.v2"
       defaultSort={{ key: "invoice_date", dir: "desc" }}
       compactBelow={1100}
       leading={
         <div className="space-y-1">
-          <SectionHeading count={invoices.length}>
-            Invoices{locationCode ? ` at ${locationCode}` : ""}
+          <SectionHeading count={bills.length}>
+            Bills{locationCode ? ` at ${locationCode}` : ""}
           </SectionHeading>
           {capped && (
             <p className="text-sm text-muted">
-              The most recent {VENDOR_INVOICE_CAP}. Older bills are on the invoice list.
+              The most recent {VENDOR_BILL_CAP}. Older bills are on the bill list.
             </p>
           )}
         </div>
@@ -239,7 +239,7 @@ export function VendorInvoices({
       empty={
         <p className="text-sm text-muted">
           {locationCode
-            ? `No invoices from this vendor at ${locationCode}.`
+            ? `No bills from this vendor at ${locationCode}.`
             : "Pick a working shop to see this vendor's bills."}
         </p>
       }

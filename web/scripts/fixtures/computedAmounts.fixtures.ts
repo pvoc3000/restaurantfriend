@@ -4,7 +4,7 @@ import {
   rescaledExtended,
   computedAmounts,
   totalDisagreesWithDocument,
-} from "../../src/lib/invoices";
+} from "../../src/lib/bills";
 
 /** A line is a CHARGE with a quantity and a rate beside it — and on a broken
  *  case those three do not multiply out. Every case below states all three. */

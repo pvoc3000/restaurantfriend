@@ -4,17 +4,17 @@ import { getAppSession } from "@/lib/session";
 import { canApprovePayment } from "@/lib/roles";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import {
-  parseInvoiceFilters,
-  parseInvoiceView,
-  INVOICE_VIEW_COOKIE,
-} from "@/lib/invoiceFilters";
+  parseBillFilters,
+  parseBillView,
+  BILL_VIEW_COOKIE,
+} from "@/lib/billFilters";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { poRangeBounds } from "@/lib/poFilters";
-import type { InvoiceStatus } from "@/lib/invoices";
-import { InvoiceList } from "@/components/purchasing/InvoiceList";
+import type { BillStatus } from "@/lib/bills";
+import { BillList } from "@/components/purchasing/BillList";
 import { canEditPage } from "@/lib/pageAccess";
 
-export type InvoiceListRow = {
+export type BillListRow = {
   id: string;
   invoice_number: string | null;
   invoice_date: string | null;
@@ -23,10 +23,10 @@ export type InvoiceListRow = {
   tax: number | null;
   freight: number | null;
   is_credit: boolean;
-  status: InvoiceStatus;
+  status: BillStatus;
   vendors: { id: string; name: string } | null;
   line_count: number;
-  /** The purchase orders this invoice's lines point at — derived, never a
+  /** The purchase orders this bill's lines point at — derived, never a
    *  column, so it cannot claim an order none of its lines touch. */
   purchase_orders: { id: string; po_number: string; order_date: string | null }[];
   document_count: number;
@@ -46,16 +46,16 @@ export default async function InvoicesPage({
 }) {
   // How you left the list last time, read on the server so the first paint is
   // already filtered — same session cookie as the PO list, same reasoning.
-  const remembered = parseInvoiceView(
-    (await cookies()).get(INVOICE_VIEW_COOKIE)?.value
+  const remembered = parseBillView(
+    (await cookies()).get(BILL_VIEW_COOKIE)?.value
   );
-  const filters = parseInvoiceFilters(await searchParams, remembered);
+  const filters = parseBillFilters(await searchParams, remembered);
   const session = await getAppSession();
   const supabase = await createClient();
 
   if (!session.activeLocation) {
     return (
-      <p className="text-sm text-muted">Pick a location to see its invoices.</p>
+      <p className="text-sm text-muted">Pick a location to see its bills.</p>
     );
   }
 
@@ -74,7 +74,7 @@ export default async function InvoicesPage({
   // row to `GenericStringError` — which is what happened when this was written
   // that way (2026-09-02), and is the same trap `CONNECTION_COLUMNS` fell into.
   let query = supabase
-    .from("vendor_invoices")
+    .from("vendor_bills")
     .select(
       `id, invoice_number, invoice_date, due_date, total, tax, freight,
        is_credit, status, external_ref, qbo_balance, qbo_checked_at,
@@ -85,10 +85,10 @@ export default async function InvoicesPage({
     .limit(500);
   if (bounds) query = query.gte("invoice_date", bounds.from).lte("invoice_date", bounds.to);
 
-  let { data: invoices, error } = await query;
+  let { data: bills, error } = await query;
 
   // 088's two columns arrive after this code. Selecting a column that does not
-  // exist yet 400s the WHOLE query, which would take the invoice list down
+  // exist yet 400s the WHOLE query, which would take the bill list down
   // rather than costing it one chip — so on that ONE failure it asks again
   // without them. Bills then read Submitted where they would read Paid, which
   // is the honest answer when nothing has been cached.
@@ -97,7 +97,7 @@ export default async function InvoicesPage({
   // failure is still reported rather than swallowed.
   if (error && /qbo_balance|qbo_checked_at/.test(error.message)) {
     let retry = supabase
-      .from("vendor_invoices")
+      .from("vendor_bills")
       .select(
         `id, invoice_number, invoice_date, due_date, total, tax, freight,
          is_credit, status, external_ref, vendors ( id, name )`
@@ -107,45 +107,45 @@ export default async function InvoicesPage({
       .limit(500);
     if (bounds) retry = retry.gte("invoice_date", bounds.from).lte("invoice_date", bounds.to);
     const fallback = await retry;
-    invoices = fallback.data as unknown as typeof invoices;
+    bills = fallback.data as unknown as typeof bills;
     error = fallback.error;
   }
 
   if (error) {
     return (
       <p className="text-sm text-accent">
-        Could not load invoices: {error.message}
+        Could not load bills: {error.message}
       </p>
     );
   }
 
-  const ids = (invoices ?? []).map((i) => i.id);
+  const ids = (bills ?? []).map((i) => i.id);
 
-  // Line counts and the PO link, in one bulk pass rather than per invoice.
+  // Line counts and the PO link, in one bulk pass rather than per bill.
   // Paginated for the same reason the PO list's totals pass is: PostgREST caps
   // a page at 1000.
   const counts = new Map<string, number>();
   const poIdsByInvoice = new Map<string, Set<string>>();
   for (let from = 0; ids.length > 0; from += 1000) {
     const { data: lines, error: lineError } = await supabase
-      .from("vendor_invoice_lines")
-      .select("invoice_id, purchase_order_id")
-      .in("invoice_id", ids)
+      .from("vendor_bill_lines")
+      .select("bill_id, purchase_order_id")
+      .in("bill_id", ids)
       .range(from, from + 999);
 
     if (lineError) {
       return (
         <p className="text-sm text-accent">
-          Could not load invoice lines: {lineError.message}
+          Could not load bill lines: {lineError.message}
         </p>
       );
     }
     for (const line of lines ?? []) {
-      counts.set(line.invoice_id, (counts.get(line.invoice_id) ?? 0) + 1);
+      counts.set(line.bill_id, (counts.get(line.bill_id) ?? 0) + 1);
       if (line.purchase_order_id) {
-        const set = poIdsByInvoice.get(line.invoice_id) ?? new Set<string>();
+        const set = poIdsByInvoice.get(line.bill_id) ?? new Set<string>();
         set.add(line.purchase_order_id);
-        poIdsByInvoice.set(line.invoice_id, set);
+        poIdsByInvoice.set(line.bill_id, set);
       }
     }
     if (!lines || lines.length < 1000) break;
@@ -167,17 +167,17 @@ export default async function InvoicesPage({
   if (ids.length > 0) {
     const { data: files } = await supabase
       .from("purchase_order_attachments")
-      .select("invoice_id")
-      .in("invoice_id", ids);
+      .select("bill_id")
+      .in("bill_id", ids);
     for (const f of files ?? []) {
-      if (!f.invoice_id) continue;
-      documentCounts.set(f.invoice_id, (documentCounts.get(f.invoice_id) ?? 0) + 1);
+      if (!f.bill_id) continue;
+      documentCounts.set(f.bill_id, (documentCounts.get(f.bill_id) ?? 0) + 1);
     }
   }
 
-  const rows: InvoiceListRow[] = (invoices ?? []).map((i) => ({
+  const rows: BillListRow[] = (bills ?? []).map((i) => ({
     ...(i as unknown as Omit<
-      InvoiceListRow,
+      BillListRow,
       "line_count" | "purchase_orders" | "document_count" | "qbo_linked"
     >),
     // The PRESENCE of a link, never the id — a list has no use for it, and
@@ -198,7 +198,7 @@ export default async function InvoicesPage({
   }));
 
   // Every active vendor, order_type 'none' included — the landlord and the
-  // plumber are precisely why this screen can create an invoice at all.
+  // plumber are precisely why this screen can create an bill at all.
   // NO ACTIVE FILTER (Mark, 2026-08-15): a retired vendor is listed under
   // `PickList`'s own Inactive heading rather than being unfindable. A bill
   // from a vendor you have stopped ordering from still arrives.
@@ -209,8 +209,8 @@ export default async function InvoicesPage({
     .order("name");
 
   return (
-    <InvoiceList
-      invoices={rows}
+    <BillList
+      bills={rows}
       initialFilters={filters}
       activeLocationCode={session.activeLocation.code}
       today={today}
@@ -222,7 +222,7 @@ export default async function InvoicesPage({
         name: v.name as string,
         inactive: v.is_active === false,
       }))}
-      canEdit={canEditPage(session.membership.role, "/invoices")}
+      canEdit={canEditPage(session.membership.role, "/bills")}
       canApprove={canApprovePayment(session.membership.role)}
     />
   );

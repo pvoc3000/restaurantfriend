@@ -8,7 +8,7 @@ import {
   type InvoiceExtraction,
 } from "@/lib/invoiceExtraction";
 import type { MatchResult } from "@/lib/invoiceMatch";
-import { printedPoDisagreement, printedVendorDisagreement } from "@/lib/invoices";
+import { printedPoDisagreement, printedVendorDisagreement } from "@/lib/bills";
 
 /**
  * What was read, how much of it lined up, and — deliberately prominent —
@@ -47,7 +47,7 @@ function takeLabel(
   return `${from} Set it to ${date}, ${provenance}.`;
 }
 
-export function InvoiceSummary({
+export function BillSummary({
   invoiceCount = 0,
   poNumber,
   vendorName,

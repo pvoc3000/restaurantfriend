@@ -8,7 +8,7 @@
 // what "overdue" or "a missed night" means.
 
 import { expiryState, soonestExpiry, type DocumentKind, type ExpiryState } from "./employeeDocuments";
-import { agingBucket, balanceOwed, billStage, type InvoiceStatus } from "./invoices";
+import { agingBucket, balanceOwed, billStage, type BillStatus } from "./bills";
 import { addDays, isoWeekday } from "./payPeriods";
 import { rollUpByDate, type DateRange, type SalesDay } from "./sales";
 import { missingNights } from "./shiftReports";
@@ -54,8 +54,8 @@ export function yearOverYearTrend(days: readonly SalesDay[], range: DateRange): 
 // Invoices
 // ---------------------------------------------------------------------------
 
-export type StartInvoice = {
-  status: InvoiceStatus;
+export type StartBill = {
+  status: BillStatus;
   due_date: string | null;
   total: number | null;
   is_credit: boolean;
@@ -64,7 +64,7 @@ export type StartInvoice = {
   qbo_checked_at: string | null;
 };
 
-export type InvoiceAttention = {
+export type BillAttention = {
   /** Open — somebody still has to approve it. */
   awaitingApproval: number;
   /** Approved and not yet in QuickBooks. */
@@ -73,7 +73,7 @@ export type InvoiceAttention = {
   overdue: number;
 };
 
-export function invoiceAttention(rows: readonly StartInvoice[], today: string): InvoiceAttention {
+export function billAttention(rows: readonly StartBill[], today: string): BillAttention {
   let awaitingApproval = 0;
   let notSent = 0;
   let overdue = 0;
@@ -89,7 +89,7 @@ export function invoiceAttention(rows: readonly StartInvoice[], today: string): 
 }
 
 /** Is this one of the bills the card should list — overdue and still owed? */
-export function isOverdueBill(r: StartInvoice, today: string): boolean {
+export function isOverdueBill(r: StartBill, today: string): boolean {
   const stage = billStage(r);
   if (stage === "void" || stage === "paid") return false;
   return agingBucket(r.due_date, today) === "overdue" && balanceOwed(r) > 0.005;

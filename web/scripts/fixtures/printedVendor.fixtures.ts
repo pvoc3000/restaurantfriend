@@ -13,7 +13,7 @@
 // and a mark that fires on three quarters of deliveries means nothing on the
 // one that matters.
 
-import { printedVendorDisagreement } from "../../src/lib/invoices";
+import { printedVendorDisagreement } from "../../src/lib/bills";
 import { eq, test } from "./harness";
 
 const read = (vendor_name: string | null) =>

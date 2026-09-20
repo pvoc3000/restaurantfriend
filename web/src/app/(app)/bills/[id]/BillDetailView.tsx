@@ -8,46 +8,46 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import {
   fetchDuplicateCandidates,
-  fetchInvoiceDocuments,
-  fetchInvoiceWithLines,
+  fetchBillDocuments,
+  fetchBillWithLines,
   fetchLinkCandidates,
   fetchLinkedOrders,
-} from "@/lib/invoiceQueries";
+} from "@/lib/billQueries";
 import { daysBefore, serverTimeZone, todayInTimeZone } from "@/lib/today";
-import { InvoiceDetail } from "@/components/purchasing/InvoiceDetail";
+import { BillDetail } from "@/components/purchasing/BillDetail";
 import { canEditPage } from "@/lib/pageAccess";
 
-/** The invoice detail's whole body — every query lives here. */
-export async function InvoiceDetailView({
+/** The bill detail's whole body — every query lives here. */
+export async function BillDetailView({
   id,
   rawParams,
 }: {
   id: string;
   rawParams: RawSearchParams;
 }) {
-  const trail = parseTrail(rawParams, { href: "/invoices", label: "Invoices" });
+  const trail = parseTrail(rawParams, { href: "/bills", label: "Bills" });
   const session = await getAppSession();
   const supabase = await createClient();
 
-  const { invoice, lines, error, lineError } = await fetchInvoiceWithLines(
+  const { bill, lines, error, lineError } = await fetchBillWithLines(
     supabase,
     id
   );
 
   if (error) {
-    return <p className="text-sm text-accent">Could not load invoice: {error}</p>;
+    return <p className="text-sm text-accent">Could not load bill: {error}</p>;
   }
-  if (!invoice) notFound();
+  if (!bill) notFound();
 
   const locationCode =
-    session.locations.find((l) => l.id === invoice.location_id)?.code ?? "—";
+    session.locations.find((l) => l.id === bill.location_id)?.code ?? "—";
 
   // Three more, overlapped where they can be. The linked orders depend on the
   // lines, so that one genuinely has to wait.
-  const documentsPromise = fetchInvoiceDocuments(supabase, id).then((r) => r);
+  const documentsPromise = fetchBillDocuments(supabase, id).then((r) => r);
   const candidatesPromise = fetchDuplicateCandidates(supabase, {
-    orgId: invoice.org_id,
-    vendorId: invoice.vendor_id,
+    orgId: bill.org_id,
+    vendorId: bill.vendor_id,
   }).then((r) => r);
   const { orders: linkedOrders, error: linkError } = await fetchLinkedOrders(
     supabase,
@@ -61,12 +61,12 @@ export async function InvoiceDetailView({
   // timezone, so the window doesn't shift under a UTC host.
   const timeZone = session.orgSettings.timezone ?? serverTimeZone();
   const linkCandidates = await fetchLinkCandidates(supabase, {
-    vendorId: invoice.vendor_id,
-    locationId: invoice.location_id,
+    vendorId: bill.vendor_id,
+    locationId: bill.location_id,
     since: daysBefore(todayInTimeZone(timeZone), 60),
   });
 
-  // Every active vendor, for the vendor picker — an invoice filed against the
+  // Every active vendor, for the vendor picker — an bill filed against the
   // wrong vendor is a likely mistake on a hand-created one, and the PO links
   // are per-line so changing it disturbs nothing.
   // NO ACTIVE FILTER (Mark, 2026-08-15): a retired vendor is listed under
@@ -75,11 +75,11 @@ export async function InvoiceDetailView({
   const { data: vendors } = await supabase
     .from("vendors")
     .select("id, name, is_active")
-    .eq("org_id", invoice.org_id)
+    .eq("org_id", bill.org_id)
     .order("name");
 
   return (
-    // space-y-6, not the space-y-16 a stacked detail screen uses: InvoiceDetail
+    // space-y-6, not the space-y-16 a stacked detail screen uses: BillDetail
     // returns a FRAGMENT, so its band, header, grid and footer are all direct
     // children of this box — 64px between each of them put 192px of air into a
     // screen whose problem was height. The blocks INSIDE the record column keep
@@ -87,17 +87,17 @@ export async function InvoiceDetailView({
     <div className="space-y-6">
       <Breadcrumbs
         trail={trail}
-        current={invoice.invoice_number ?? "No number"}
+        current={bill.invoice_number ?? "No number"}
         trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
       />
 
       {lineError ? (
         <p className="text-sm text-accent">
-          Could not load this invoice&rsquo;s lines: {lineError}
+          Could not load this bill&rsquo;s lines: {lineError}
         </p>
       ) : (
-        <InvoiceDetail
-          invoice={invoice}
+        <BillDetail
+          bill={bill}
           lines={lines}
           linkedOrders={linkedOrders}
           linkError={linkError}
@@ -111,12 +111,12 @@ export async function InvoiceDetailView({
             po_number: o.po_number,
             order_date: o.order_date,
             status: o.status,
-            vendor_id: o.vendor_id ?? invoice.vendor_id,
-            location_id: o.location_id ?? invoice.location_id,
+            vendor_id: o.vendor_id ?? bill.vendor_id,
+            location_id: o.location_id ?? bill.location_id,
             lines: o.lines,
           }))}
           locationCode={locationCode}
-          orgId={invoice.org_id}
+          orgId={bill.org_id}
           vendors={(vendors ?? []).map((v) => ({
         id: v.id as string,
         name: v.name as string,
@@ -127,13 +127,13 @@ export async function InvoiceDetailView({
             code: l.code,
             name: l.name,
           }))}
-          canEdit={canEditPage(session.membership.role, "/invoices")}
+          canEdit={canEditPage(session.membership.role, "/bills")}
           canApprove={canApprovePayment(session.membership.role)}
           // Built here because only the server has rawParams — without
           // currentQuery a stamped crumb is a bare href and the trail that led
           // here is lost.
-          selfHref={`/invoices/${id}${currentQuery(rawParams)}`}
-          closeHref={crumbPath(trail[trail.length - 1]) ?? "/invoices"}
+          selfHref={`/bills/${id}${currentQuery(rawParams)}`}
+          closeHref={crumbPath(trail[trail.length - 1]) ?? "/bills"}
         />
       )}
     </div>

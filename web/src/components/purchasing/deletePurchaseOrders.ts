@@ -31,8 +31,8 @@ export async function confirmAndDeletePurchaseOrders(
    */
   let attributed: string[] = [];
   const { data: linked } = await supabase
-    .from("vendor_invoice_lines")
-    .select("invoice_id, vendor_invoices ( invoice_number )")
+    .from("vendor_bill_lines")
+    .select("bill_id, vendor_bills ( invoice_number )")
     .in("purchase_order_id", selected.map((po) => po.id));
   if (linked && linked.length > 0) {
     attributed = [
@@ -40,7 +40,7 @@ export async function confirmAndDeletePurchaseOrders(
         linked
           .map(
             (l) =>
-              (l.vendor_invoices as unknown as { invoice_number: string | null } | null)
+              (l.vendor_bills as unknown as { invoice_number: string | null } | null)
                 ?.invoice_number ?? "no number"
           )
           .filter(Boolean)

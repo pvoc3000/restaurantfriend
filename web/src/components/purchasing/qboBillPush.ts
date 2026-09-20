@@ -8,7 +8,7 @@ import {
   buildBillPayload,
   withAttachments,
   type AccountingRef,
-  type BillInvoice,
+  type PushableBill,
   type QboEntity,
   type QboRefValue,
   type ResolvedAccount,
@@ -17,8 +17,8 @@ import {
 
 /**
  * SENDING A BILL TO QUICKBOOKS, ONE IMPLEMENTATION BEHIND TWO DOORS — the
- * invoice record's Send/Update (`PushToQuickBooks`) and the list's batch Push
- * to QuickBooks (`InvoiceBatchActions`, Mark, 2026-09-16). What gets remembered
+ * bill record's Send/Update (`PushToQuickBooks`) and the list's batch Push
+ * to QuickBooks (`BillBatchActions`, Mark, 2026-09-16). What gets remembered
  * in one copy and forgotten in the other is exactly what lives here: the scan
  * going up only once (QuickBooks has no upsert), a refused attachment arriving
  * as HTTP 200, and the ref being recorded through 081's definer with the token
@@ -36,7 +36,7 @@ export type BillPushContext = {
    *  vendor there — or when the migration is not applied yet. */
   atShop: VendorLocationAccounting | null;
   schemaError: string | null;
-  invoiceRef: AccountingRef | null;
+  billRef: AccountingRef | null;
   /** What is filed on this bill. The `invoice` ones go up with it (Mark,
    *  2026-09-02) — a two-page scan is two rows and QuickBooks should get both. */
   documents: {
@@ -50,13 +50,13 @@ export type BillPushContext = {
 
 export async function readBillPushContext(
   supabase: SupabaseClient,
-  ids: { orgId: string; vendorId: string; locationId: string; invoiceId: string }
+  ids: { orgId: string; vendorId: string; locationId: string; billId: string }
 ): Promise<BillPushContext> {
-  const { orgId, vendorId, locationId, invoiceId } = ids;
+  const { orgId, vendorId, locationId, billId } = ids;
   const [conn, vendor, invoice, atShop, docs] = await Promise.all([
     supabase.rpc("accounting_connection_status", { p_org: orgId }),
     supabase.from("vendors").select("name").eq("id", vendorId).maybeSingle(),
-    supabase.from("vendor_invoices").select("external_ref").eq("id", invoiceId).maybeSingle(),
+    supabase.from("vendor_bills").select("external_ref").eq("id", billId).maybeSingle(),
     // Separate and allowed to fail: these columns arrive with 083, and folding
     // them into a query the rest depends on would take the whole thing down
     // until it is applied.
@@ -71,7 +71,7 @@ export async function readBillPushContext(
     supabase
       .from("purchase_order_attachments")
       .select("id, kind, file_name, content_type, storage_path")
-      .eq("invoice_id", invoiceId),
+      .eq("bill_id", billId),
   ]);
 
   const row = Array.isArray(conn.data)
@@ -92,7 +92,7 @@ export async function readBillPushContext(
     vendorName: (vendor.data?.name as string) ?? "this vendor",
     atShop: (atShop.data ?? null) as VendorLocationAccounting | null,
     schemaError: atShop.error?.message ?? null,
-    invoiceRef: (invoice.data?.external_ref ?? null) as AccountingRef | null,
+    billRef: (invoice.data?.external_ref ?? null) as AccountingRef | null,
     documents: (docs.data ?? []) as BillPushContext["documents"],
   };
 }
@@ -115,18 +115,18 @@ export type BillSendResult =
 export async function sendBillToQuickBooks(
   supabase: SupabaseClient,
   input: {
-    invoiceId: string;
+    billId: string;
     ctx: BillPushContext;
-    billInvoice: BillInvoice;
+    bill: PushableBill;
     account: ResolvedAccount;
     vendorRef: string | null;
     tracking: { location: QboRefValue | null; klass: QboRefValue | null };
   }
 ): Promise<BillSendResult> {
-  const { invoiceId, ctx, billInvoice, account, vendorRef, tracking } = input;
-  const qboRefId = ctx.invoiceRef?.qbo?.id ?? null;
+  const { billId, ctx, bill, account, vendorRef, tracking } = input;
+  const qboRefId = ctx.billRef?.qbo?.id ?? null;
   const { entity, body: payload } = buildBillPayload({
-    invoice: billInvoice,
+    bill: bill,
     vendorRef,
     vendorName: ctx.vendorName,
     accountRef: account.ref,
@@ -138,7 +138,7 @@ export async function sendBillToQuickBooks(
   // `invoice`, and only what is not already up there: a second upload of the
   // same file makes a SECOND attachment — QuickBooks has no upsert, measured.
   const warnings: string[] = [];
-  const files = attachmentsToSend(ctx.documents, ctx.invoiceRef)
+  const files = attachmentsToSend(ctx.documents, ctx.billRef)
     .filter((d) => {
       const no = attachmentRefusal(d.content_type, d.file_name);
       if (no) warnings.push(no);
@@ -161,7 +161,7 @@ export async function sendBillToQuickBooks(
 
   const { data, message } = await invokeQbo(supabase, {
     mode: "push_bill",
-    invoice_id: invoiceId,
+    bill_id: billId,
     entity,
     payload,
     ...(files.length ? { attachments: files } : {}),
@@ -191,7 +191,7 @@ export async function sendBillToQuickBooks(
     // bumps the bill's own token and the push response predates that.
     const ref = withAttachments(data!.ref as AccountingRef, added);
     const { data: rec, error: refErr } = await supabase.rpc("record_accounting_push", {
-      p_invoice: invoiceId,
+      p_bill: billId,
       p_ref: ref,
     });
     if (refErr || !Array.isArray(rec) || rec.length === 0) {

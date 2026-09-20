@@ -1,4 +1,4 @@
-// Reading one invoice, everything the detail screen needs — the shape
+// Reading one bill, everything the detail screen needs — the shape
 // lib/purchaseOrderQueries.ts established for a purchase order.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -9,74 +9,74 @@ import {
   type SignedAttachment,
 } from "./attachments";
 import type { InvoiceLine } from "./invoiceExtraction";
-import type { VendorInvoice, VendorInvoiceLine } from "./invoices";
+import type { VendorBill, VendorBillLine } from "./bills";
 import { PO_LINE_SELECT } from "./purchaseOrderQueries";
 import type { PoLine } from "./purchaseOrders";
 
-export const INVOICE_SELECT = `id, org_id, location_id, vendor_id, invoice_number,
+export const BILL_SELECT = `id, org_id, location_id, vendor_id, invoice_number,
    invoice_date, due_date, terms, subtotal, tax, freight, other_charges, discount, total,
    is_credit, status, approved_at, approved_by, source, notes,
    synced_at, financials_touched_at, external_ref, qbo_balance, qbo_checked_at,
    vendors ( id, name, order_type )`;
 
-export const INVOICE_LINE_SELECT = `id, invoice_id, purchase_order_id,
+export const BILL_LINE_SELECT = `id, bill_id, purchase_order_id,
    purchase_order_item_id, line_no, product_id, alt_product_id, description,
    pack, qty, unit_price, extended, kind, notes`;
 
-export type InvoiceWithLines = {
-  invoice:
-    | (VendorInvoice & {
+export type BillWithLines = {
+  bill:
+    | (VendorBill & {
         vendors: { id: string; name: string; order_type: string } | null;
       })
     | null;
-  lines: VendorInvoiceLine[];
+  lines: VendorBillLine[];
   error: string | null;
   lineError: string | null;
 };
 
 /**
- * The invoice and its lines in one round trip's worth of wall clock.
+ * The bill and its lines in one round trip's worth of wall clock.
  *
  * `Promise.all`, not two awaits: a Supabase query builder is a lazy thenable,
  * so these only go on the wire when awaited, and awaiting them together is the
  * difference between one round trip and two.
  */
-export async function fetchInvoiceWithLines(
+export async function fetchBillWithLines(
   supabase: SupabaseClient,
   id: string
-): Promise<InvoiceWithLines> {
-  const [{ data: invoice, error }, { data: lines, error: lineError }] =
+): Promise<BillWithLines> {
+  const [{ data: bill, error }, { data: lines, error: lineError }] =
     await Promise.all([
-      supabase.from("vendor_invoices").select(INVOICE_SELECT).eq("id", id).maybeSingle(),
+      supabase.from("vendor_bills").select(BILL_SELECT).eq("id", id).maybeSingle(),
       supabase
-        .from("vendor_invoice_lines")
-        .select(INVOICE_LINE_SELECT)
-        .eq("invoice_id", id)
+        .from("vendor_bill_lines")
+        .select(BILL_LINE_SELECT)
+        .eq("bill_id", id)
         .order("line_no"),
     ]);
 
   // The PRESENCE of a link, never the id — the list's own rule (086 exists to
   // stop a QuickBooks id reaching the browser), applied here too now that the
   // status chip needs `billStage` and not just the raw open/approved/void.
-  const { external_ref, ...rest } = (invoice ?? {}) as Record<string, unknown> & {
+  const { external_ref, ...rest } = (bill ?? {}) as Record<string, unknown> & {
     external_ref?: { qbo?: { id?: string } } | null;
   };
 
   return {
-    invoice: invoice
+    bill: bill
       ? ({
           ...rest,
           qbo_linked: Boolean(external_ref?.qbo?.id),
-        } as InvoiceWithLines["invoice"])
+        } as BillWithLines["bill"])
       : null,
-    lines: (lines ?? []) as unknown as VendorInvoiceLine[],
+    lines: (lines ?? []) as unknown as VendorBillLine[],
     error: error?.message ?? null,
     lineError: lineError?.message ?? null,
   };
 }
 
 /**
- * The documents filed under this invoice, with somewhere to look at them.
+ * The documents filed under this bill, with somewhere to look at them.
  *
  * Signed SERVER-side in one `createSignedUrls` batch: one round trip instead of
  * one per card, and a URL built to expire doesn't outlive the page.
@@ -84,17 +84,17 @@ export async function fetchInvoiceWithLines(
  * Returns the error rather than throwing — a screen that can't read its
  * documents must still be able to show and approve the bill.
  */
-export async function fetchInvoiceDocuments(
+export async function fetchBillDocuments(
   supabase: SupabaseClient,
-  invoiceId: string
+  billId: string
 ): Promise<{ attachments: SignedAttachment[]; error: string | null }> {
   const { data, error } = await supabase
     .from("purchase_order_attachments")
     .select(
-      `id, po_id, invoice_id, storage_path, kind, file_name, content_type,
+      `id, po_id, bill_id, storage_path, kind, file_name, content_type,
        byte_size, created_at, extraction, extracted_at, extraction_model`
     )
-    .eq("invoice_id", invoiceId)
+    .eq("bill_id", billId)
     .order("created_at");
 
   if (error) return { attachments: [], error: error.message };
@@ -128,10 +128,10 @@ export type LinkedPurchaseOrder = {
 };
 
 /**
- * The purchase orders this invoice's lines point at — DERIVED from the lines,
+ * The purchase orders this bill's lines point at — DERIVED from the lines,
  * never a column on the header.
  *
- * That is the whole shape of the many-to-many (migration 025): an invoice
+ * That is the whole shape of the many-to-many (migration 025): an bill
  * covering two orders is lines pointing at two orders, so this is a `distinct`
  * over one indexed column rather than a join table that could disagree with
  * the lines it claims to summarize.
@@ -141,7 +141,7 @@ export type LinkedPurchaseOrder = {
  */
 export async function fetchLinkedOrders(
   supabase: SupabaseClient,
-  lines: VendorInvoiceLine[]
+  lines: VendorBillLine[]
 ): Promise<{ orders: LinkedPurchaseOrder[]; error: string | null }> {
   const ids = [
     ...new Set(
@@ -187,53 +187,53 @@ export async function fetchLinkedOrders(
   };
 }
 
-export type OrderInvoice = {
+export type OrderBill = {
   id: string;
   invoice_number: string | null;
   invoice_date: string | null;
-  /** This invoice's lines that point at THIS order, in the matcher's shape. */
+  /** This bill's lines that point at THIS order, in the matcher's shape. */
   lines: (InvoiceLine & { purchase_order_item_id: string | null })[];
 };
 
 /**
- * The invoices filed against a purchase order — the receiving screen's
- * question, answered by the same index the invoice screen uses in reverse.
+ * The bills filed against a purchase order — the receiving screen's
+ * question, answered by the same index the bill screen uses in reverse.
  *
  * The link lives on the LINE (migration 025), so this is a `distinct` over one
- * indexed column. Two invoices against one order is the backorder case and
+ * indexed column. Two bills against one order is the backorder case and
  * needs no special handling: each brings its own lines.
  *
- * Only the lines pointing at THIS order come back. An invoice covering two
+ * Only the lines pointing at THIS order come back. An bill covering two
  * orders would otherwise offer the other order's lines to a matcher that has
  * no business seeing them.
  */
-export async function fetchInvoicesForOrder(
+export async function fetchBillsForOrder(
   supabase: SupabaseClient,
   poId: string
-): Promise<{ invoices: OrderInvoice[]; error: string | null }> {
+): Promise<{ bills: OrderBill[]; error: string | null }> {
   const { data: lines, error } = await supabase
-    .from("vendor_invoice_lines")
+    .from("vendor_bill_lines")
     .select(
-      `invoice_id, purchase_order_item_id, product_id, alt_product_id,
+      `bill_id, purchase_order_item_id, product_id, alt_product_id,
        description, qty, unit_price, extended, pack`
     )
     .eq("purchase_order_id", poId);
 
-  if (error) return { invoices: [], error: error.message };
-  if (!lines || lines.length === 0) return { invoices: [], error: null };
+  if (error) return { bills: [], error: error.message };
+  if (!lines || lines.length === 0) return { bills: [], error: null };
 
-  const ids = [...new Set(lines.map((l) => l.invoice_id as string))];
+  const ids = [...new Set(lines.map((l) => l.bill_id as string))];
   const { data: headers, error: headerError } = await supabase
-    .from("vendor_invoices")
+    .from("vendor_bills")
     .select("id, invoice_number, invoice_date")
     .in("id", ids)
-    // A voided invoice is not a claim about this delivery any more.
+    // A voided bill is not a claim about this delivery any more.
     .neq("status", "void");
-  if (headerError) return { invoices: [], error: headerError.message };
+  if (headerError) return { bills: [], error: headerError.message };
 
-  const byInvoice = new Map<string, OrderInvoice["lines"]>();
+  const byInvoice = new Map<string, OrderBill["lines"]>();
   for (const l of lines) {
-    const id = l.invoice_id as string;
+    const id = l.bill_id as string;
     byInvoice.set(id, [
       ...(byInvoice.get(id) ?? []),
       {
@@ -250,7 +250,7 @@ export async function fetchInvoicesForOrder(
   }
 
   return {
-    invoices: (headers ?? []).map((h) => ({
+    bills: (headers ?? []).map((h) => ({
       id: h.id as string,
       invoice_number: h.invoice_number as string | null,
       invoice_date: h.invoice_date as string | null,
@@ -313,7 +313,7 @@ export async function fetchLinkCandidates(
 }
 
 /**
- * Other invoices at this vendor, for the duplicate check.
+ * Other bills at this vendor, for the duplicate check.
  *
  * Vendor-scoped and unbounded by location: the same bill uploaded twice at two
  * shops is still the same bill, and paying it twice is the mistake this whole
@@ -322,12 +322,12 @@ export async function fetchLinkCandidates(
 export async function fetchDuplicateCandidates(
   supabase: SupabaseClient,
   { orgId, vendorId }: { orgId: string; vendorId: string }
-): Promise<(VendorInvoice & { status: VendorInvoice["status"] })[]> {
+): Promise<(VendorBill & { status: VendorBill["status"] })[]> {
   const { data } = await supabase
-    .from("vendor_invoices")
+    .from("vendor_bills")
     .select("id, vendor_id, invoice_number, invoice_date, total, status, is_credit")
     .eq("org_id", orgId)
     .eq("vendor_id", vendorId)
     .limit(500);
-  return (data ?? []) as unknown as VendorInvoice[];
+  return (data ?? []) as unknown as VendorBill[];
 }
