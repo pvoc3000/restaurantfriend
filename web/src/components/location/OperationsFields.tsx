@@ -2,6 +2,7 @@
 
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
+import { PERCENT_SCALE, percentLabel, toPercent } from "@/lib/percent";
 
 /**
  * Tax rate, labor rate, register count.
@@ -37,15 +38,19 @@ export function OperationsFields({
             column="tax_rate"
             value={taxRate}
             kind="number"
-            // Stored as a FRACTION, shown as a percentage: 0.0975 is what
-            // arithmetic wants and 9.75% is what the sign on the wall says.
-            // Editing shows the raw value — and a number cell takes
-            // arithmetic, so "9.75/100" is a legitimate way to type it.
-            format={(v) => `${percent(Number(v))}%`}
+            // Stored as a FRACTION, shown AND TYPED as a percentage: 0.0975 is
+            // what arithmetic wants and 9.75% is what the sign on the wall
+            // says. It came here with the special order's two rate cells
+            // (Mark, 2026-09-20) because it is the same trap on the same
+            // quantity — this is the column theirs is snapshotted FROM, so
+            // leaving it in fractions would mean the two screens asking for
+            // one number in two units.
+            scale={PERCENT_SCALE}
+            format={percentLabel}
           />
         ) : (
           <span className={taxRate === null ? "text-faint" : ""}>
-            {taxRate === null ? "none" : `${percent(Number(taxRate))}%`}
+            {taxRate === null ? "none" : percentLabel(toPercent(Number(taxRate)))}
           </span>
         )}
       </dd>
@@ -90,7 +95,3 @@ export function OperationsFields({
   );
 }
 
-/** 0.0975 → "9.75", 0.1 → "10". No trailing zeros to read past. */
-function percent(fraction: number): string {
-  return String(Number((fraction * 100).toFixed(4)));
-}

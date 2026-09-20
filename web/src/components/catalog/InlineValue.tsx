@@ -491,8 +491,20 @@ export function InlineValue({
   // The draft only exists while editing — seeded on open, discarded on close —
   // so a fresh server value after router.refresh() needs no re-sync effect.
   // What the reader sees and types. Identical to `value` unless `scale` is set.
-  const shown =
-    scale && typeof value === "number" && Number.isFinite(value) ? scale.toShown(value) : value;
+  //
+  // A NUMERIC STRING COUNTS AS A NUMBER HERE, and that is not politeness — it
+  // is the `labor_rate` lesson that `lib/specialOrders`'s own `n()` was written
+  // for. PostgREST hands `numeric` back as a STRING often enough that a caller
+  // doing `row.tax_rate as number | null` (a CAST, which converts nothing) can
+  // pass "0.09750" through a prop typed `number`. Without this the scale would
+  // silently not apply, and a percentage cell would rest on "0.0975%".
+  const asNumber =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+        ? Number(value)
+        : NaN;
+  const shown = scale && Number.isFinite(asNumber) ? scale.toShown(asNumber) : value;
 
   function open() {
     setDraft(shown === null ? "" : String(shown));

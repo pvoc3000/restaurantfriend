@@ -1754,6 +1754,42 @@
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.
 
+   **A RATE IS TYPED AS A PERCENTAGE SINCE 2026-09-20** (Mark, on the Payments
+   tab: "it seems like we should enter a whole number and let the app convert it
+   to a decimal. I intuitively typed 20 for a percentage instead of .2. I think
+   others would as well"). He is right, and **the cell had been telling him so**:
+   it rested on "20%" and its editor wanted `.2` — two units in one control. 20
+   into Discount stored 20, which is a **2000% discount** and would have taken
+   the order below zero.
+   **NOTHING NEW WAS INVENTED. `InlineValue.scale` ALREADY EXISTED** and its own
+   doc describes this exact failure — "showing 0.50 at rest and putting 30 in
+   the box the moment you click it invites someone to type an hour figure into a
+   minutes column" — written for `unpaid_break_minutes` in August and never
+   applied to a rate. `lib/percent` is the fraction↔percent pair plus the label,
+   and the three cells that needed it now carry `scale` and `format` TOGETHER,
+   because either alone is a cell in two units.
+   **IT DOES NOT GUESS.** "Over 1 means a percentage" would read 20 and 0.2 as
+   the same thing, which works until somebody means half a per cent. 0.2 typed
+   here is two tenths of one per cent, and the cell then reads "0.2%" — the
+   display and the box agree, which is the whole fix.
+   **THE LOCATION'S TAX RATE CAME ALONG**, which is the one place this went
+   past the Payments tab. It is the identical trap on the same quantity, and it
+   is the column the order's rate is SNAPSHOTTED FROM — leaving it in fractions
+   would mean two screens asking for one number in two units. Its local
+   `percent()` helper is gone.
+   **AND `scale` NOW TOLERATES A NUMERIC STRING**, which is not politeness: it
+   is the `labor_rate` lesson that `lib/specialOrders`'s own `n()` exists for.
+   PostgREST hands `numeric` back as a STRING often enough, and `row.tax_rate as
+   number | null` is a CAST that converts nothing — so without it the scale
+   would silently not apply and the cell would rest on "0.0975%".
+   Rounding is deliberate at both ends: `0.07 * 100` is `7.000000000000001`, and
+   that is what would land in the edit box. Nine fixture cases, four of which go
+   red when the conversion is removed.
+   **"Discount (rate)" IS NOW "Discount (%)"** (Mark, same day), which pairs it
+   with "Discount ($)" directly above: two rows asking one question in two
+   units, each label naming its own. Tax rate keeps its name — it has no sibling
+   to be told apart from.
+
    **"NEW ORDER…" IS ON THE RECORD'S ACTIONS MENU SINCE 2026-09-20** (Mark: "add
    a 'New Order…' option to the navmenu on the special order detail page").
    **It is the LIST'S dialog, not a second one** — `NewSpecialOrder` gained

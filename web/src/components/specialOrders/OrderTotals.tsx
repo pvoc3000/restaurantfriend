@@ -9,6 +9,7 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { money, type MoneyOrder, type OrderTotals as Totals } from "@/lib/specialOrders";
+import { PERCENT_SCALE, percentLabel, toPercent } from "@/lib/percent";
 
 /**
  * The money — DERIVED, every figure of it (decision 6).
@@ -117,19 +118,26 @@ export function OrderTotals({
         {/* --------- the inputs --------- */}
         <dl className="space-y-3 text-[14px]">
           <Line label="Tax rate">
-            {/* Stored as a FRACTION (.0975), shown as one. FileMaker's own
-                convention, and the transform kept it — six spellings of a
-                percentage in one column is how a rate becomes unreadable. */}
+            {/* Stored as a FRACTION (.0975) and TYPED AS A PERCENTAGE (Mark,
+                2026-09-20) — `lib/percent` holds the pair and the reasoning.
+                The column keeps FileMaker's convention; the box in front of
+                you is in the units on the sign in the window. */}
             <Cell id={id} canWrite={canWrite} column="tax_rate" value={inputs.tax_rate} label="Tax rate"
-                  format={(v) => `${(Number(v) * 100).toFixed(3).replace(/\.?0+$/, "")}%`} />
+                  percent />
           </Line>
           <Line label="Discount ($)">
             <Cell id={id} canWrite={canWrite} column="discount_amount" value={inputs.discount_amount} label="Discount amount"
                   format={(v) => money(Number(v))} />
           </Line>
-          <Line label="Discount (rate)">
+          {/* "(%)" RATHER THAN "(RATE)" (Mark, 2026-09-20), which pairs it with
+              "Discount ($)" directly above: the two rows are one question asked
+              in two units, and the labels now say which unit each takes. It is
+              also the label agreeing with what the box finally accepts. */}
+          <Line label="Discount (%)">
+            {/* THE ONE MARK TYPED 20 INTO. It read "2000%" afterwards, which is
+                a 20× discount and would have taken the order below zero. */}
             <Cell id={id} canWrite={canWrite} column="discount_rate" value={inputs.discount_rate} label="Discount rate"
-                  format={(v) => `${(Number(v) * 100).toFixed(2).replace(/\.?0+$/, "")}%`} />
+                  percent />
           </Line>
           <Line label="Delivery charge">
             <Cell id={id} canWrite={canWrite} column="delivery_charge" value={inputs.delivery_charge} label="Delivery charge"
@@ -315,6 +323,7 @@ function Cell({
   value,
   label,
   format,
+  percent = false,
 }: {
   id: string;
   canWrite: boolean;
@@ -322,13 +331,22 @@ function Cell({
   value: number | null;
   label: string;
   format?: (v: string | number) => string;
+  /**
+   * A rate stored as a FRACTION and read and typed as a percentage — the scale
+   * and the label travel together, because either one alone is a cell in two
+   * units. See `lib/percent`.
+   */
+  percent?: boolean;
 }) {
+  const label_ = percent ? percentLabel : format;
   if (!canWrite) {
     // The same width below purchaser+, or the block reflows depending on who
-    // is looking at it.
+    // is looking at it. The read-only branch scales for itself: it never goes
+    // near `InlineValue`, so nothing else would do it.
+    const shown = percent && value !== null ? toPercent(Number(value)) : value;
     return (
       <span className={`${MONEY_FIELD} ${READ_ONLY_VALUE} text-right tabular-nums`}>
-        {value === null ? "—" : format ? format(value) : value}
+        {shown === null ? "—" : label_ ? label_(shown) : shown}
       </span>
     );
   }
@@ -344,7 +362,8 @@ function Cell({
       align="right"
       className="text-right"
       ariaLabel={label}
-      format={format}
+      scale={percent ? PERCENT_SCALE : undefined}
+      format={label_}
     />
     </span>
   );
