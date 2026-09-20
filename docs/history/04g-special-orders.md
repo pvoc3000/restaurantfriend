@@ -1754,6 +1754,29 @@
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.
 
+   **SHOW ANSWERS "WHEN", STATUS ANSWERS "WHAT STATE" — 2026-09-20** (Mark:
+   "move 'unpaid' from the show picklist to the status picklist", then "move
+   'needs attention' from show to the status picklist too, and any others that
+   aren't time based"). Show had carried Needs Attention and Unpaid beside
+   Upcoming, Tomorrow and Past on the argument — written into this file — that
+   they "answer the same question the other five options do". **They do not, and
+   the cost was a filter you could not express**: one menu holds one answer, so
+   picking Unpaid silently threw away Upcoming, and the two are questions you
+   want to ask at the same time. Status now reads Lead · Quote · Invoice ·
+   Order · Cancelled, a rule, then **Needs Attention · Unpaid** — the derived
+   pair below the stored five, with Needs Attention first because it is the
+   wider net (an unpaid order whose event has gone by is one of the things it
+   catches). Both matchers moved verbatim: `attention.has(r.id)` is decision
+   19's own map, the one the to-do column paints from, and Unpaid is
+   `countsAsOwed` + a balance, which is what both customer screens already ask.
+   **THE DESK START LINKS GAINED `view=all`, AND THAT IS A FIX.** They pointed
+   at `?view=attention`, which REPLACED the default Upcoming window and so
+   showed overdue orders. Split across two menus, `?status=attention` alone
+   would have left Show on Upcoming and hidden exactly the orders those two
+   lines count — the ones whose event has gone by unpaid or unprinted. `all`
+   also widens the SERVER window (`page.tsx`'s `showAll`), which `attention`
+   never did, so the link now reaches orders the old one could not load at all.
+
    **A RATE IS TYPED AS A PERCENTAGE SINCE 2026-09-20** (Mark, on the Payments
    tab: "it seems like we should enter a whole number and let the app convert it
    to a decimal. I intuitively typed 20 for a percentage instead of .2. I think

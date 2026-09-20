@@ -597,8 +597,17 @@ function SpecialOrdersCard({
       title="Special orders"
       href="/special-orders"
       lines={[
-        { count: flagged.length, label: "flagged", href: "/special-orders?view=attention" },
-        { count: judged.length, label: "need attention", href: "/special-orders?view=attention" },
+        /* `status=attention` SINCE 2026-09-20, when Needs Attention moved out of
+           the Show menu and into Status — Show answers WHEN and this answers
+           what state an order is in.
+           `view=all` rides with it, and that is a fix rather than plumbing: the
+           old link set Show to `attention`, which REPLACED the default Upcoming
+           window, so it showed overdue orders. Split across two menus, Show
+           would have stayed on Upcoming and hidden exactly the orders this line
+           is counting — the ones whose event has gone by unpaid or unprinted.
+           `all` also widens the SERVER window, which `attention` never did. */
+        { count: flagged.length, label: "flagged", href: "/special-orders?status=attention&view=all" },
+        { count: judged.length, label: "need attention", href: "/special-orders?status=attention&view=all" },
         { count: thisWeek.length, label: "committed orders in the next 7 days", href: "/special-orders?view=upcoming" },
       ]}
       items={items}

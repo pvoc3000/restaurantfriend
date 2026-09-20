@@ -275,11 +275,17 @@ export function SpecialOrdersList({
     return [
       {
         /**
-         * The one dimension that isn't a column — it is WHICH ORDERS, and it
-         * carries decision 19's tier. `attention` is a menu option rather than
-         * a control of its own because it answers the same question the other
-         * five options do, and a separate chip beside a menu that already says
-         * "Upcoming" is two controls arguing about scope.
+         * WHEN, AND NOTHING ELSE (Mark, 2026-09-20: "move 'needs attention'
+         * from show to the status picklist too, and any others that aren't
+         * time based").
+         *
+         * It used to carry Needs Attention and Unpaid as well, on the argument
+         * that they "answer the same question the other five options do". They
+         * do not: Upcoming, Tomorrow and Past answer WHEN, and those two answer
+         * what STATE an order is in. One menu was doing two jobs, which is why
+         * picking Unpaid silently threw away Upcoming — the two are questions
+         * you want to ask at the same time, and a single menu can only hold
+         * one answer.
          */
         key: "view",
         label: "Show",
@@ -287,10 +293,8 @@ export function SpecialOrdersList({
         // same as the explicit `all` below ON PURPOSE — see that option.
         allLabel: "All Orders",
         options: [
-          { value: "attention", label: "Needs Attention" },
           { value: "upcoming", label: "Upcoming" },
           { value: "tomorrow", label: "Tomorrow" },
-          { value: "unpaid", label: "Unpaid" },
           { value: "past", label: "Past" },
           /**
            * A REAL TOKEN FOR "NO FILTER", which a dimension with a
@@ -315,7 +319,6 @@ export function SpecialOrdersList({
         defaultValue: "upcoming",
         matches: (r, v) => {
           if (v === "all") return true;
-          if (v === "attention") return attention.has(r.id);
           // Templates and standing orders have no event date, so every
           // date-based view would hide them. They are reached through the KIND
           // menu, which is FileMaker's saved finds, and `all` shows them.
@@ -326,10 +329,6 @@ export function SpecialOrdersList({
             d.setUTCDate(d.getUTCDate() + 1);
             return r.event_date === d.toISOString().slice(0, 10);
           }
-          // Only a BILLED order can be unpaid — a lead or a quote is a price
-          // offered (`countsAsOwed`, the customer screens' rule too).
-          if (v === "unpaid")
-            return countsAsOwed(r) && r.totals.balance > 0 && r.totals.total > 0;
           if (v === "past") return !!r.event_date && r.event_date < today;
           return true;
         },
@@ -341,12 +340,43 @@ export function SpecialOrdersList({
         matches: (r, v) => matchesKindFilter(r, v),
       },
       {
+        /**
+         * THE LADDER, AND THEN UNPAID (Mark, 2026-09-20: "move 'unpaid' from
+         * the show picklist to the status picklist").
+         *
+         * It was an option under Show, beside Upcoming and Past, which made it
+         * the odd one out there: those five answer WHEN, and this answers what
+         * state the order is in — the same question the ladder answers. The
+         * menus now divide the way the questions do.
+         *
+         * THEY ARE DERIVED, WHERE THE FIVE ABOVE THEM ARE STORED, so they sit
+         * below a rule rather than at the end of the list. `status` is typed by
+         * a human; these two are read off the record. UNPAID reads the money,
+         * which is the authority (`needsAttention` makes the same argument in
+         * the same words) — and only a BILLED order can be unpaid, because a
+         * lead or a quote is a price OFFERED, which is `countsAsOwed`, the rule
+         * both customer screens already ask. NEEDS ATTENTION is decision 19's
+         * tier, the same map the to-do column paints from, so the menu and the
+         * column can never disagree about which orders those are.
+         *
+         * NEEDS ATTENTION LEADS, because it is the wider net: an unpaid order
+         * whose event has gone by is one of the things it catches.
+         */
         key: "status",
         label: "Status",
-        options: (["lead", "quote", "invoice", "order", "cancelled"] as SpecialOrderStatus[]).map(
-          (s) => ({ value: s, label: STATUS_LABEL[s] })
-        ),
-        matches: (r, v) => r.status === v,
+        options: [
+          ...(["lead", "quote", "invoice", "order", "cancelled"] as SpecialOrderStatus[]).map(
+            (s) => ({ value: s, label: STATUS_LABEL[s] })
+          ),
+          { value: "attention", label: "Needs Attention", separatorBefore: true },
+          { value: "unpaid", label: "Unpaid" },
+        ],
+        matches: (r, v) => {
+          if (v === "attention") return attention.has(r.id);
+          if (v === "unpaid")
+            return countsAsOwed(r) && r.totals.balance > 0 && r.totals.total > 0;
+          return r.status === v;
+        },
       },
       // LOCATION — the order's pickup shop, `location_id` — BEFORE Kitchen
       // (Mark, 2026-09-16: "between status and kitchen"). The key stays
