@@ -54,7 +54,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 4b. 🚧 Location module (`/locations`, shop sections, working location) — `docs/history/04b-locations.md`
 4c. 🚧 HR + app access (employees, invites, /welcome, revoke) — `docs/history/04c-hr-access.md`
 4d. 🚧 Timesheets / payroll prep (pay periods, overtime, breaks, tips, Gusto export, benefits, workday boundary) — `docs/history/04d-timesheets.md`
-4d. 🚧 Invoices (vendor bills, approval, financials lock, filing on close) — `docs/history/04d-invoices.md`
+4d. 🚧 Bills (vendor bills, approval, financials lock, filing on close) — `docs/history/04d-invoices.md` (named Invoices until 2026-09-20; see Table naming)
 4e. ✅ Employee events (`employee_events`, `/events`) — `docs/history/04e-employee-events.md`
 4f. 🚧 Production (elements, recipes, items, price grid, plans, schedules, batch logs, costing) — `docs/history/04f-production.md`
 4g. 🚧 Special orders (quotes, documents, /q approval, /inquiry, standing orders, scheduling) — `docs/history/04g-special-orders.md`
@@ -186,7 +186,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 - A pane is `overflow-x-hidden`, never `overflow-auto`
 - THE WEEKDAY PAR HAS AN EDITOR AT LAST
 - THE INVENTORY ITEM RECORD HAS THREE TABS — Info · Vendor Items · Purchase History
-- THE VENDOR RECORD HAS FOUR TABS — Info · Items · Purchase Orders · Invoices
+- THE VENDOR RECORD HAS FOUR TABS — Info · Items · Purchase Orders · Bills
 - THE VENDOR RECORD CAN ACTIVATE AND DEACTIVATE AT LAST
 - THE INVENTORY ITEM'S RECORD FOLLOWED IT (2026-09-12)
 - Vendor detail has an editable field block
@@ -237,6 +237,27 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   `po_attachments` → `purchase_order_attachments` · `reminders` →
   `purchase_reminders`. Column names were NOT renamed (`po_id`,
   `item_location_id` remain). The migration JSON files also keep old names.
+  **Migration 110, 2026-09-20 — BILLS, NOT INVOICES** (Mark: "Bills are
+  documents we have to pay. An invoice, by contrast, is a document our customers
+  have to pay"), freeing the word for a future A/R feature on Special Orders.
+  Old → new, for reading pre-110 docs and every file in `docs/history/`:
+  `vendor_invoices` → `vendor_bills` · `vendor_invoice_lines` →
+  `vendor_bill_lines` · `vendor_invoice_lines.invoice_id` → `bill_id` ·
+  `purchase_order_attachments.invoice_id` → `bill_id` ·
+  `location_tasks.vendor_invoice_id` → `vendor_bill_id` ·
+  `set_vendor_invoice_approval(p_invoice)` → `set_vendor_bill_approval(p_bill)`
+  · `record_accounting_push(p_invoice)` → `(p_bill)` · the three
+  `*_vendor_invoice_*` lock/touch functions → `*_vendor_bill_*`. In the app:
+  `/invoices` → `/bills`, `lib/invoices` → `lib/bills` (+ `billQueries`,
+  `billFilters`, `billFromExtraction`), `Invoice*` components → `Bill*`,
+  `BillInvoice` → `PushableBill`, and `invoice_id`/`invoice_ids` → `bill_id`/
+  `bill_ids` on `qbo-sync`'s wire.
+  **WHAT KEPT THE WORD, because it names the VENDOR'S PRINTED PAPER and not our
+  record:** the columns `invoice_number` and `invoice_date`; all of
+  `lib/invoiceExtraction` and `lib/invoiceMatch`; the edge function
+  `extract-invoice`; the attachment kind value `'invoice'`; and the storage key
+  segment `{org_id}/invoices/{id}/…`, which is a KEY every uploaded document was
+  written under rather than a name (018 never reads that segment).
 - Weekdays: ISO smallint, 1 = Monday … 7 = Sunday (all ordering currently
   happens Monday; don't foreground the day dimension in UI).
 - Roles: owner / admin / purchaser / **supervisor** / staff (in
@@ -272,11 +293,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   https://kltxioacvneshbyhxtaj.supabase.co, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   from Supabase Studio → Settings → API. Ask Mark to paste it; never commit it.
 - **`npm run fixtures` is the test suite** (`web/scripts/fixtures/`, added
-  2026-07-31). 66 cases over the pure modules — `lib/invoiceMatch` (the SKU
+  2026-07-31). 1,916 cases over the pure modules — `lib/invoiceMatch` (the SKU
   join, its two relaxations, the description fallback, and the real Guittard
   pair that killed Jaccard) and `lib/receiving` (the two-stage price button, the
   never-overwrite fill rule, pack labels). Before this the repo had no runnable
-  tests at all and the invoice brief told you to "re-run the 23 fixtures", which
+  tests at all and the bills brief told you to "re-run the 23 fixtures", which
   had only ever existed in an ad-hoc esbuild slice.
   It adds **no dependency**: `tsc` (already installed) compiles the modules and
   the cases to CommonJS in `.fixtures-build/` and plain Node runs them. Node

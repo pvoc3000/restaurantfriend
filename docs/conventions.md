@@ -78,7 +78,7 @@
   day:** Inventory (whose Active tabs became a captioned Show picklist, every
   filter captioned), inspection logs, equipment, shop sections, employees,
   benefits, purchase requests, special orders, customers and locations — and
-  `/invoices`, whose Check QuickBooks and New invoice left their own strip for
+  `/bills`, whose Check QuickBooks and New Bill left their own strip for
   the far right of its title row, after the three totals. The paragraph below still describes every other list; a NEW list
   follows the title-row form.
   **THE HEADER CARRIES NO COMMAND. THE CREATE BUTTON GOES IN THE FILTER ROW,
@@ -122,7 +122,7 @@
   The one surviving `note` is `/batch-logs`' two empty-window sentences; the
   plans list's "1 more plan is made at another kitchen" was kept for one commit
   and then deleted (Mark), and its prop went with it.
-  Applied 2026-09-03 to all 24 list screens. `/purchase-orders` and `/invoices`
+  Applied 2026-09-03 to all 24 list screens. `/purchase-orders` and `/bills`
   keep their own header markup because they carry a Window total beside it.
 - **A NAV LABEL AND A PAGE TITLE NEED NOT MATCH** (Mark, 2026-09-03, asking
   outright). Nothing couples them — `lib/nav.ts` holds one, the screen holds the
@@ -205,7 +205,7 @@
   variant, but nothing uses it, because against the bar's own black a white cell
   read as a different kind of object rather than as the important one.
 - **THE CLASSIC MAC LOOK IS APP-WIDE** (Mark, 2026-09-10: "apply the mac look
-  across the entire app", after an afternoon parked on `/invoices`). It breaks
+  across the entire app", after an afternoon parked on `/bills`). It breaks
   two design-system rules on purpose, **no shadows** and **no textures**.
   **Where it lives:** `web/src/styles/mac-look.css`, imported UNLAYERED in
   `globals.css` right after the design-system import — unlayered is what lets
@@ -356,7 +356,7 @@
     cue. Accepted for now; revisit before it spreads.
   **To remove it:** delete `mac-look.css`, its import in `globals.css`, and the
   `mac-control` / `mac-field` classes, `triggerClassName` and the search box's
-  `icon` in `InvoiceList.tsx`, then put its `placeholder` back. The two new
+  `icon` in `BillList.tsx`, then put its `placeholder` back. The two new
   props are opt-in and harmless to leave.
 - **A DETAIL SCREEN'S EDITABLE FIELDS WEAR A BOX — read
   `docs/detail-field-styling-brief.md` before restyling one.** Proven on
@@ -1540,9 +1540,9 @@
   both big lists; the PO list; cleanup ×3; receiving's layout control
   (`size="sm"` for its fixed-height band).
   **A ONE-OF-N GOES TO A `PickList` WHEN THE ROW CANNOT AFFORD IT**, which is
-  the only reason so far and has now been taken four times: `/invoices`' Due
+  the only reason so far and has now been taken four times: `/bills`' Due
   tabs (2026-09-08), then **the order guide's tier and grouping**, **the PO
-  list's status** and **`/invoices`' status** (all 2026-09-10, Mark). There
+  list's status** and **`/bills`' status** (all 2026-09-10, Mark). There
   are no `TabPicker`s left in any of those three filter rows.
   A TabPicker spends its width whether or not you are looking at it — the
   guide's four tiers wanted 460px and its three groupings 373 — and that band
@@ -1587,7 +1587,7 @@
   that is EVERY search box in the app** (`TextInput search`, `SEARCH_PEN`),
   dialogs and panels included; no fixed-width search remains.
   **`ui/ControlField` IS THE PART**, lifted out of the guide when the PO and
-  invoice lists became the second and third callers. Reach for it; a caption
+  bill lists became the second and third callers. Reach for it; a caption
   typed four times is a caption that drifts. A row holding one wants
   `items-end`, so an UNCAPTIONED control — a search box, a command — sits on
   the line of the fields rather than floating against their captions. A
@@ -1630,7 +1630,7 @@
   which is both cases at once. Where the row simply fits, neither is needed:
   the last item's right edge is already the row's.
   **A ROW THAT CARRIES COMMANDS GIVES THEM A STRIP OF THEIR OWN, ABOVE IT AND
-  RIGHT-ALIGNED** (Mark, 2026-09-10, on `/invoices`: "make the filter row two
+  RIGHT-ALIGNED** (Mark, 2026-09-10, on `/bills`: "make the filter row two
   rows, with the action buttons in the first row aligned to the right and the
   filter buttons on the second row aligned left"). The filter row is then
   left-aligned by construction rather than by a rule — nothing in it is pushed
@@ -1644,13 +1644,13 @@
   threshold nobody sees coming, and no mismatch between focus order and
   reading order.
   **THE TRAP THE STRIP SPRINGS: a cluster that was a flex ITEM becomes a
-  full-width BLOCK.** `NewInvoice`'s trigger carries an `ml-auto` baked in,
+  full-width BLOCK.** `NewBill`'s trigger carries an `ml-auto` baked in,
   harmless while the cluster was content-sized with no free space to give
   away — as a row of its own it ate the whole line and put the two commands at
   opposite ends of the screen. Keep the buttons in an INNER content-sized
   group and put `justify-end` on the outer row. Caught by looking at it, not
   by review.
-  Measured on `/invoices`: 1440 commands grouped at the right edge, filter row
+  Measured on `/bills`: 1440 commands grouped at the right edge, filter row
   one line from the left margin with a 661px search; 1024 the same at 245; 820
   commands still right-aligned, filters on two lines — five controls cannot
   share 757px, which is why the PO list's four can and this one's cannot.
@@ -1664,9 +1664,9 @@
   `PickList` correctly falls back to the raw column value — and a trigger
   reading a lowercase `received` under a "Current" heading is the tell. Any
   control whose options are derived from COUNTS has this hazard whether or not
-  it was ever a TabPicker: `/invoices`' Due had been a `PickList` since
+  it was ever a TabPicker: `/bills`' Due had been a `PickList` since
   2026-09-08 and carried it latent until the same pass fixed both.
-  **`/invoices`' STATUS went 478px → 160**, which took that row from two lines
+  **`/bills`' STATUS went 478px → 160**, which took that row from two lines
   to one at 1440. It is still two at 1280, because six controls is more than
   four — its fields alone are 1041px of a 1216px row — so its command cluster
   keeps the `ml-auto` and its search stays fixed, where the PO list's four fit
@@ -1882,19 +1882,21 @@
   as a `className`, and React resolves the reference on the client to the real
   string — so the rule is about the server DOING ARITHMETIC OR LOGIC with it,
   which is exactly the case that fails without a symptom.
-- **THE VENDOR RECORD HAS FOUR TABS — Info · Items · Purchase Orders · Invoices**
+- **THE VENDOR RECORD HAS FOUR TABS — Info · Items · Purchase Orders · Bills**
+  (the fourth was called Invoices until migration 110 renamed the module;
+  Mark's quote below is as he wrote it)
   (Mark, 2026-09-05: "add a 'Purchase Orders' and 'Invoices' tabs to the
   Vendor detail page", clarified: "I don't want to see the scanned invoices…
   a simplified version of the purchase order screen… a simplified version of
   the invoices screen"). `catalog/VendorPurchaseOrders` and
-  `catalog/VendorInvoices` are `DataTable`s with the WORKING taken off the two
+  `catalog/VendorBills` are `DataTable`s with the WORKING taken off the two
   lists they are read from — no date window, no filters, no selection bar, no
   row menu, no commands — each row a link into the record, with the list's own
   status chips (`PO_STATUS_CLASS`, the `billStage` ladder) so a bill reads Paid
   here exactly as it does there, and a closing `totals` row.
   Newest first, capped at the lists' own 500 with a sentence when the cap
   bites. Fetched only on their own tab (the `SKIP` idiom), and the PO link on
-  an invoice is DERIVED from its lines as `/invoices` derives it.
+  a bill is DERIVED from its lines as `/bills` derives it.
   **BOTH ARE SCOPED TO THE WORKING SHOP SINCE 2026-09-11** (Mark), which
   REVERSES how they shipped six days earlier. They were ORG-WIDE WITH A SHOP
   COLUMN, on the argument that a vendor is an org-level record whose Info tab
@@ -1923,8 +1925,8 @@
   $9,775.37 / $8,458.03 and $5,043.24. Worth knowing for scale: Dawn Foods has
   1,554 orders org-wide, so the 500 cap had been showing an interleaved half
   of a mixed history.
-  **Invoices carries a BALANCE column with its own total** (Mark, same day).
-  `balanceOwed` in `lib/invoices`: void → 0; linked and QuickBooks answered →
+  **Bills carries a BALANCE column with its own total** (Mark, same day).
+  `balanceOwed` in `lib/bills`: void → 0; linked and QuickBooks answered →
   what it said; anything else → the whole bill, because this app records no
   vendor payment (4l), so "owed in full" is exactly what the row says. A
   credit is NEGATIVE both ways so the column nets out; QuickBooks reports a
@@ -1939,7 +1941,7 @@
   this same screen: the org-wide flag, the per-shop one and the per-vendor-item
   one are three scopes of one idea and must not be three shapes.
   The word beside the TITLE stays and is not redundant — the field block is the
-  Info tab's, so on Items, Purchase Orders and Invoices that word is the only
+  Info tab's, so on Items, Purchase Orders and Bills that word is the only
   thing saying the vendor is inactive. One is the editor, the other the state.
   **The per-location table's first cell is the switch ALONE** (same day): its
   chevron and rep summary moved to the LOCATION column — the row IS the
@@ -2111,7 +2113,7 @@
   with counts and a find box, ticking BakeMark and Chefs Warehouse gave 23 of
   148 orders (13 + 10) with the other vendors' counts unmoved, and **Back from a
   PO came home with BOTH still selected** — which is the `urlFilterParams` fix
-  and would have restored one before it. The invoice list's seven vendors
+  and would have restored one before it. The bill list's seven vendors
   correctly get NO find box; the guide's ten do, and BakeMark took the walk from
   514 lines to 21 with every line reading BakeMark and the shop's own section
   bands intact.
@@ -2381,8 +2383,8 @@
   `carryQuery` in `lib/recordSet` overlays the named keys from the URL you are
   standing on onto the four published hrefs and NOTHING else: `from`/`fromLabel` stay the list's, so paging never rewrites
   where Back goes; and a key absent from the current URL is REMOVED, since the
-  default tab writes none. Fixture-pinned. Verified live: Amoretti → Invoices →
-  Next landed on BakeMark's Invoices at "4 of 29", crumb still Vendors.
+  default tab writes none. Fixture-pinned. Verified live: Amoretti → Bills →
+  Next landed on BakeMark's Bills at "4 of 29", crumb still Vendors.
   Known gap, not fixed: `ScrollMemory` keys on pathname without the query, so
   all five tabs share one scroll position — `useScrollMemoryKey` is how the
   order guide solves exactly that.

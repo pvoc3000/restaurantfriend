@@ -1,7 +1,17 @@
-# Invoices module — build brief
+# Bills module — build brief
 
-**Status: SPECCED 2026-08-04, not yet built.** Read `CLAUDE.md` first, then
-`docs/receiving-screen-brief.md` (the engine this sits on top of), then this.
+**Status: SPECCED 2026-08-04, BUILT.** Read `CLAUDE.md` first, then
+`docs/receiving-screen-brief.md` (the engine this sits on top of), then this,
+then `docs/history/04d-invoices.md` for what actually happened.
+
+> **RENAMED 2026-09-20 (migration 110): this module is BILLS.** It was called
+> Invoices until then, and Mark's quotes below are left as he wrote them. Read
+> "invoice record" as "bill". The word "invoice" still means something precise
+> in this app — the VENDOR'S PRINTED PAPER — which is why `invoice_number`,
+> `invoice_date`, `lib/invoiceExtraction`, `lib/invoiceMatch` and
+> `extract-invoice` all kept it. CLAUDE.md → Table naming has the full old → new
+> map. A customer-facing Invoices feature on Special Orders is what the word was
+> freed for; nothing of it is built.
 
 The reading half already exists and works: `extract-invoice` returns the vendor,
 the invoice number, the dates, the total and the lines, and `lib/invoiceMatch.ts`
@@ -55,7 +65,7 @@ approval ships in v1 and the sync does not.
    **Manager and Owner only**.
 4. **Many-to-many is real and regular**: one invoice covering two POs, one PO
    invoiced in two parts.
-5. **The tables are `vendor_invoices` / `vendor_invoice_lines`.** The UI label is
+5. **The tables are `vendor_bills` / `vendor_bill_lines`.** The UI label is
    "Invoices". `docs/master-plan.md`'s unbuilt Quotes & Orders module has a
    customer-facing "Quote → Invoice → Receipt" lifecycle, so a bare `invoices` is
    a name the customer side will want — the same collision `purchase_orders`
@@ -110,7 +120,7 @@ paper, which is the class of failure `invoiceDeliveryDate`'s format check exists
 to prevent.
 
 The structural guard that actually matters is better than any constraint:
-**a document row carries at most one `invoice_id`, and auto-creation fires only
+**a document row carries at most one `bill_id`, and auto-creation fires only
 when it is null.** Re-reading a filed invoice can never create a second record.
 
 ---
@@ -119,13 +129,13 @@ when it is null.** Re-reading a filed invoice can never create a second record.
 
 ### The many-to-many lives on the LINE
 
-`vendor_invoice_lines` carries **both** `purchase_order_id` and
+`vendor_bill_lines` carries **both** `purchase_order_id` and
 `purchase_order_item_id`. There is no FK on the invoice header and no
 `invoice_purchase_orders` join table. Both directions are one index:
 
 ```sql
-select distinct purchase_order_id from vendor_invoice_lines where invoice_id = $1;
-select distinct invoice_id from vendor_invoice_lines where purchase_order_id = $1;
+select distinct purchase_order_id from vendor_bill_lines where bill_id = $1;
+select distinct bill_id from vendor_bill_lines where purchase_order_id = $1;
 ```
 
 Why this and not a join table:
@@ -182,23 +192,23 @@ makes `priceAction` terminate.
 018's four `storage.objects` policies test `bucket_id` and
 `public.storage_folder_org(name)`, which is `(storage.foldername(name))[1]` —
 the **first** path segment. They say nothing about the second. **Verified:** a
-key `{org_id}/invoices/{invoice_id}/{uuid}.ext` is authorized by the existing
+key `{org_id}/bills/{bill_id}/{uuid}.ext` is authorized by the existing
 policies with no new function, policy or grant.
 
-So 026 makes `po_id` nullable and adds `invoice_id` rather than creating a second
+So 026 makes `po_id` nullable and adds `bill_id` rather than creating a second
 table. 021's separate bucket precedent does not apply, and the reason is the
 deciding test: **021 needed its own bucket because employee documents have
 different RLS.** Invoice documents want exactly the audience PO attachments have.
 
 `on delete set null`, not cascade — a document can belong to both a PO and an
 invoice, and deleting the invoice must not delete the order's paperwork. And
-deliberately **no** `check (po_id is not null or invoice_id is not null)`: with
+deliberately **no** `check (po_id is not null or bill_id is not null)`: with
 `set null` that check would make deleting an invoice fail with a raw constraint
 violation. The app removes invoice-only documents first (row then object, 018's
 order); a stray row is unreachable, which 018 already states its tolerance for.
 
 **Nothing migrates.** A file attached to a PO keeps today's key even when it
-later gains an `invoice_id` — the path is where it landed, not a claim about
+later gains an `bill_id` — the path is where it landed, not a claim about
 ownership.
 
 **`extract-invoice` needs no structural change.** It selects `po_id` and uses it
@@ -210,7 +220,7 @@ schema constant and the prompt.
 ### Approval cannot be an RLS policy
 
 The rule is "a purchaser may edit this invoice, but only a manager may set
-`approved_at`", and **RLS filters rows, not columns**. So `set_vendor_invoice_approval`
+`approved_at`", and **RLS filters rows, not columns**. So `set_vendor_bill_approval`
 is a `security definer` function naming those columns — the `set_my_member_profile`
 pattern. It re-checks what RLS would have, takes `approved_by` from `auth.uid()`
 and never from the client, refuses a void invoice, and **returns rows so the
@@ -226,14 +236,14 @@ approving.
 
 Build order is in the plan; the parts, in the order they matter:
 
-**`lib/invoices.ts`** — `INVOICE_STATUS_LABEL` / `_CLASS`, `signedTotal`,
+**`lib/bills.ts`** — `INVOICE_STATUS_LABEL` / `_CLASS`, `signedTotal`,
 `agingBucket` + `AGING_ORDER` / `AGING_LABEL`, `findPossibleDuplicates`,
 `amountReconciliation`, `approvalReadiness`, `invoiceHeaderFromExtraction`. Pure,
 fixture-tested. `agingBucket` takes `today` as a string computed once from the
 **org timezone** — a UTC host must not make a bill overdue at 4pm, the same trap
 migration 007 exists to close.
 
-**The list, `/invoices`** — clones `/purchase-orders` exactly. Default sort
+**The list, `/bills`** — clones `/purchase-orders` exactly. Default sort
 **due date ascending** (the working order for bills is soonest-first, and
 `lib/tableSort` sinks empties last in both directions). Default filter **`open`**,
 unlike the PO list's `all`, because this list exists to answer "what do I owe a
@@ -245,7 +255,7 @@ few-values-many-rows test; its bucket passes, and sorting ascending makes the
 bands contiguous by construction). **No invoice-date band**: POs batch on Monday,
 invoices arrive one per delivery.
 
-**The detail, `/invoices/[id]`** — a two-column grid, document left, that is
+**The detail, `/bills/[id]`** — a two-column grid, document left, that is
 **NOT draggable and NOT viewport-measured**. Receiving earned its
 `ResizeObserver`, `spaceBelow` and drag divider by being a single-viewport
 standing task whose lines pane scrolls inside itself; invoice detail is a desk
@@ -343,11 +353,11 @@ does not regress.** Mark started using it on 2026-08-04 and likes it.
 - `npx tsc --noEmit`, `npm run lint`, `npm run fixtures` in `web/` at every commit.
 - Migrations through the Docker harness before Mark applies them, then probe the
   hosted DB — never assume applied state:
-  `select polname, polcmd from pg_policy where polrelid = 'public.vendor_invoices'::regclass`,
+  `select polname, polcmd from pg_policy where polrelid = 'public.vendor_bills'::regclass`,
   and call the approval RPC with a bogus uuid so it raises on its first statement
   rather than doing any work.
 - Storage: upload with no PO and confirm the object lands at
-  `{org_id}/invoices/{invoice_id}/{uuid}.pdf`, that the signed URL renders, and
+  `{org_id}/bills/{bill_id}/{uuid}.pdf`, that the signed URL renders, and
   that an `anon` signed-URL request is refused (018's own check).
 - **After the last commit, re-walk the three real orders end to end and leave
   them as found:** `132-181132-02` (Chefs' Warehouse, DF02, 15 lines),
