@@ -302,6 +302,8 @@ export async function duplicateSpecialOrder(
   ]) {
     delete copy[key];
   }
+  /** What the SOURCE is, which is what the log line has to describe. */
+  const sourceKind = ((source.kind as string | null) ?? "order") as SpecialOrderKind;
   const start = startingState(kind);
   copy.number = nextNumber;
   copy.kind = kind;
@@ -340,21 +342,58 @@ export async function duplicateSpecialOrder(
   }
 
   /**
-   * A SHAPE ARRIVES WITH AN EMPTY LOG (Mark, 2026-09-21: "when converting a
-   * special order to an order template, log/history should be cleared as
-   * well"), and the clearing happens HERE, between the copy and the line that
-   * says where it came from — so the provenance survives and nothing else does.
+   * PROVENANCE BELONGS TO THE ORDER, NOT TO THE SHAPE (Mark, 2026-09-21: "a
+   * template is a fresh start. It's the beginning of an order. How we created
+   * the template doesn't matter, but how we created the order DOES").
+   *
+   * So the line describes the SOURCE and is written only when the target is an
+   * ORDER. It was the other way round for a day — a converted template carried
+   * "Order Template made from order 10034" and an order duplicated FROM a
+   * template said "Duplicated from order 10056", which names a template as an
+   * order and buries the one fact worth keeping.
+   *
+   * 099 already tells a materialized day where it came from in exactly these
+   * words ("Made from standing order 9762"); this is the same sentence for the
+   * hand-made route.
+   */
+  if (sourceKind === "order") {
+    await supabase.from("special_order_events").insert({
+      org_id: source.org_id,
+      order_id: created.id,
+      message:
+        kind === "order"
+          ? `Duplicated from order ${number}`
+          : // A shape's own log is emptied below, so this line exists only for
+            // the moment between; it is written anyway so that a failure to
+            // clear leaves a record that says what happened rather than a log
+            // of copying with no explanation at its head.
+            `${KIND_LABEL[kind]} made from order ${number}`,
+      source: "app",
+    });
+  } else if (kind === "order") {
+    await supabase.from("special_order_events").insert({
+      org_id: source.org_id,
+      order_id: created.id,
+      message: `Created from ${KIND_LABEL[sourceKind].toLowerCase()} ${number}`,
+      source: "app",
+    });
+  }
+
+  /**
+   * A SHAPE ARRIVES WITH AN EMPTY LOG (Mark, same day: "log/history should be
+   * cleared as well"). It runs LAST, so everything the copy wrote goes with it
+   * — 056's "Template created", one entry per line inserted, and the provenance
+   * line above, which belongs to the order this template will one day make and
+   * not to the template.
    *
    * WHAT IS BEING CLEARED IS NOT HISTORY. No events are copied from the source
-   * and never have been; every entry in the new record's log was written
-   * seconds ago by a trigger describing the copy — 056's "Template created" and
-   * one line per item inserted. A twenty-line order makes twenty-one of them.
+   * and never have been; every entry was written seconds ago by a trigger
+   * describing the copy. A twenty-line order makes twenty-one of them.
    *
    * BEST EFFORT, AND DELIBERATELY SO. Migration 113 adds the function; until it
-   * is applied the RPC simply is not there, and a conversion that otherwise
-   * worked must not report itself as failed because its tidying did not. The
-   * cost of it silently not running is a noisy log, which is what the command
-   * is like today.
+   * is applied the RPC is not there, and a conversion that otherwise worked
+   * must not report itself failed because its tidying did not run. The cost of
+   * silence is a noisy log, which is what the command does today.
    */
   if (kind !== "order") {
     await supabase.rpc("clear_special_order_log", {
@@ -362,24 +401,6 @@ export async function duplicateSpecialOrder(
       p_order_id: created.id,
     });
   }
-
-  // 054's trigger says "Order started as a lead"; where it CAME FROM is a fact
-  // with no watched column behind it, so it is written by hand. The wording
-  // follows the KIND, because "Duplicated from order 9469" on a standing order
-  // would leave somebody hunting for the duplicate that is not there.
-  //
-  // IT IS WRITTEN AFTER THE CLEAR, so a converted shape's log holds this one
-  // line and nothing else. Provenance is the one thing worth keeping: without
-  // it a template is a shape nobody can trace.
-  await supabase.from("special_order_events").insert({
-    org_id: source.org_id,
-    order_id: created.id,
-    message:
-      kind === "order"
-        ? `Duplicated from order ${number}`
-        : `${KIND_LABEL[kind]} made from order ${number}`,
-    source: "app",
-  });
 
   return { id: created.id as string };
 }
