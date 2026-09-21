@@ -1767,13 +1767,33 @@
    middle of the table, and an EMPTY label, which is what keeps a control column
    out of the Columns and Reorder menus: hiding it would hide the only way to
    select anything.
-   **THREE VERBS, AND THEY ARE THE ONES THAT ALREADY EXIST FOR ONE ORDER** —
-   Cancel Orders, Resolve Flags, Delete Selected…. **Duplicate is deliberately
+   **THE VERBS ARE THE ONES THAT ALREADY EXIST FOR ONE ORDER** — Set Status ▸,
+   Mark Paid, Resolve Flags, Delete Selected…. **Duplicate is deliberately
    absent**: in bulk it would make a dozen leads and leave you on the list
    looking at them, which reads as an accident rather than a command, and the
    thing it is for ("same as last year") is one order at a time. Flag-with-a-
    reason is not here either, because a reason shared across a selection is a
    question nobody has asked yet.
+   **SET STATUS IS THE LADDER AS A SUBMENU** (Mark, hours after the column: "I'd
+   like to have the ability to change the status of selected special orders, and
+   to be able to mark them all paid"). **Cancelled is ON it**, routed to the
+   cancel path so it keeps the warning that cancelling does NOT unschedule
+   anything — it stopped being a command of its own the moment the submenu
+   existed, because somebody looking for "cancelled" looks under the statuses,
+   and two doors with different words for one write is the drift this module
+   keeps out. It keeps `danger`, so the one rung you cannot simply undo still
+   reads that way. Each rung counts the orders that would actually MOVE, so a
+   rung everything is already on reads "(0)" rather than promising a write that
+   does nothing.
+   **MARK PAID IS THE `invoice_paid_at` STAMP** — the same word the list's Paid
+   column, the ladder's rung and the record's green chip all mean, stamped with
+   the ORG's calendar day. **IT DOES NOT TOUCH THE MONEY**, and that is a
+   decision: the record's own flow offers to record a settling payment when you
+   stamp that date, as a tick you choose, and doing it from a menu row would
+   write a dozen financial records — money received, from nobody, on a day
+   nobody named — on one click. Both the confirm and the report say how many
+   still carry a balance and what it comes to, and point at the record, which is
+   where the offer built the day before lives.
    **EVERY COMMAND COUNTS WHAT IT WILL ACT ON IN ITS OWN LABEL** — "Cancel
    Orders (4)" — and says what it will SKIP before it writes. A selection is a
    mixed bag, and **decision 3's biconditional decides who can be cancelled**:

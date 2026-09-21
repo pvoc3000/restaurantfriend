@@ -7,6 +7,13 @@ import { createClient } from "@/lib/supabase/client";
 import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { deleteBlock, type DeleteBlock } from "@/lib/specialOrderWrites";
+import {
+  STATUS_LABEL,
+  STATUS_ORDER,
+  countsAsOwed,
+  money,
+  type SpecialOrderStatus,
+} from "@/lib/specialOrders";
 import type { SpecialOrderRow } from "./SpecialOrdersList";
 
 /**
@@ -34,20 +41,35 @@ import type { SpecialOrderRow } from "./SpecialOrdersList";
  * sentence that reports it.
  *
  * ---------------------------------------------------------------------------
- * DUPLICATE IS DELIBERATELY NOT HERE
+ * WHAT IS HERE, AND WHAT IS DELIBERATELY NOT
  * ---------------------------------------------------------------------------
- * It is on the row menu and on the record, where it copies ONE order and lands
- * you on the copy. In bulk it would make a dozen leads and leave you on the
- * list looking at them, which reads as an accident rather than a command — and
- * the thing it is actually for, "same as last year", is one order at a time.
+ * Set Status ▸ (the ladder, Cancelled included), Mark Paid, Resolve Flags,
+ * Delete Selected. Every one of them exists for a single order somewhere else,
+ * and each is the SAME rule applied to more rows rather than a second reading
+ * of it.
+ *
+ * **Duplicate** is not. It is on the row menu and the record, where it copies
+ * ONE order and lands you on the copy; in bulk it would make a dozen leads and
+ * leave you on the list looking at them, which reads as an accident rather than
+ * a command — and the thing it is for, "same as last year", is one at a time.
+ *
+ * **Mark Paid does not touch the money.** The record's own flow offers to
+ * record a settling payment when you stamp that date, as a tick you choose.
+ * Doing it from a menu row would write a dozen financial records — money
+ * received, from nobody, on a day nobody named — on one click. The confirm and
+ * the report both say what is left owing and where to settle it.
  */
 export function SpecialOrderBatchActions({
   selected,
+  today,
   canWrite,
   onReport,
   children,
 }: {
   selected: SpecialOrderRow[];
+  /** The ORG's calendar day (`lib/today`) — what Mark Paid stamps. Never
+   *  `new Date()`: a browser in another zone must not date the books. */
+  today: string;
   /** purchaser+ — the same gate the row menu and the record's commands use. */
   canWrite: boolean;
   /**
@@ -63,7 +85,9 @@ export function SpecialOrderBatchActions({
 }) {
   const supabase = createClient();
   const router = useRouter();
-  const [busy, setBusy] = useState<"cancel" | "flags" | "delete" | null>(null);
+  const [busy, setBusy] = useState<"status" | "cancel" | "flags" | "paid" | "delete" | null>(
+    null
+  );
 
   /**
    * DECISION 3's BICONDITIONAL DECIDES WHO CAN BE CANCELLED. Migration 051's
@@ -75,9 +99,131 @@ export function SpecialOrderBatchActions({
   const cancellable = selected.filter((r) => r.kind === "order" && r.status !== "cancelled");
   const flagged = selected.filter((r) => r.flag_reason);
 
+  /**
+   * WHO WOULD ACTUALLY MOVE, for a given rung. The same biconditional, plus
+   * the rows already there — a count that included them would promise a write
+   * that does nothing, and the report would then disagree with the label.
+   */
+  const movable = (to: SpecialOrderStatus) =>
+    selected.filter((r) => r.kind === "order" && r.status !== to);
+
+  /**
+   * MARK PAID IS THE `invoice_paid_at` STAMP, which is what the list's Paid
+   * column, the ladder's "Invoice paid" rung and the record's green chip all
+   * mean by the word. Already-stamped rows are skipped, and so is anything that
+   * is not an order: a template has no invoice to have been paid.
+   */
+  const markable = selected.filter((r) => r.kind === "order" && !r.invoice_paid_at);
+
+  /**
+   * IT DOES NOT TOUCH THE MONEY, and that is a decision rather than an
+   * omission. The record's own flow OFFERS to record a settling payment when
+   * you stamp this date, as a tick you choose; doing it from a menu row would
+   * write a dozen financial records — money received, from nobody, on a day
+   * nobody named — on one click. These are counted so the confirm can say what
+   * is left owing and where to settle it.
+   */
+  const stillOwing = markable.filter((r) => countsAsOwed(r) && r.totals.balance > 0);
+
   const plural = (n: number, one: string, many = `${one}s`) =>
     `${n} ${n === 1 ? one : many}`;
 
+  /**
+   * A RUNG, FOR EVERY TICKED ORDER THAT IS NOT ON IT.
+   *
+   * `cancelled` is NOT handled here — it routes to `cancelOrders`, which has
+   * its own warning about the kitchen still holding a scheduled order. One
+   * write, one confirm, reached from the one submenu: two doors with different
+   * words for the same write is the drift this module keeps out.
+   */
+  async function setStatus(to: Exclude<SpecialOrderStatus, "cancelled">) {
+    const rows = movable(to);
+    const skipped = selected.length - rows.length;
+    if (
+      !(await confirmDialog({
+        ...splitConfirmMessage(
+          `Move ${plural(rows.length, "order")} to ${STATUS_LABEL[to]}?\n\n` +
+            (skipped
+              ? `${plural(skipped, "of the selected rows is", "of the selected rows are")} ` +
+                `already there, or ${skipped === 1 ? "is" : "are"} a template or standing order ` +
+                `with no status to set, and will be left alone. `
+              : "") +
+            "The status is what somebody typed, not what the dates say — nothing else about " +
+            "these orders changes, and the stage dates keep their own record."
+        ),
+        confirmLabel: `Move to ${STATUS_LABEL[to]}`,
+      }))
+    ) {
+      return;
+    }
+    setBusy("status");
+    const { data, error } = await supabase
+      .from("special_orders")
+      .update({ status: to })
+      .in("id", rows.map((r) => r.id))
+      .select("id");
+    setBusy(null);
+    if (error) return onReport(error.message, "error");
+    if (!data?.length) {
+      return onReport("Nothing was moved — the database refused it and said nothing.", "error");
+    }
+    router.refresh();
+    onReport(
+      `Moved ${plural(data.length, "order")} to ${STATUS_LABEL[to]}.` +
+        (skipped ? ` ${plural(skipped, "row")} left alone.` : ""),
+      "done"
+    );
+  }
+
+  async function markPaid() {
+    const skipped = selected.length - markable.length;
+    const owed = stillOwing.reduce((a, r) => a + r.totals.balance, 0);
+    if (
+      !(await confirmDialog({
+        ...splitConfirmMessage(
+          `Mark ${plural(markable.length, "order")} paid?\n\n` +
+            (skipped
+              ? `${plural(skipped, "row")} already carr${skipped === 1 ? "ies" : "y"} a paid ` +
+                `date, or ${skipped === 1 ? "is" : "are"} a template or standing order, and ` +
+                `will be left alone. `
+              : "") +
+            `This stamps the invoice-paid date as ${today}. It does NOT record payments` +
+            (stillOwing.length
+              ? `, and ${plural(stillOwing.length, "of them", "of them")} still ${
+                  stillOwing.length === 1 ? "carries" : "carry"
+                } a balance — ${money(owed)} in all. Open each one to settle it; the record ` +
+                `offers to record the payment for you.`
+              : ".")
+        ),
+        confirmLabel: "Mark them paid",
+      }))
+    ) {
+      return;
+    }
+    setBusy("paid");
+    const { data, error } = await supabase
+      .from("special_orders")
+      .update({ invoice_paid_at: today })
+      .in("id", markable.map((r) => r.id))
+      .select("id");
+    setBusy(null);
+    if (error) return onReport(error.message, "error");
+    if (!data?.length) {
+      return onReport("Nothing was marked — the database refused it and said nothing.", "error");
+    }
+    router.refresh();
+    onReport(
+      `Marked ${plural(data.length, "order")} paid.` +
+        (stillOwing.length
+          ? ` ${plural(stillOwing.length, "of them", "of them")} still ${
+              stillOwing.length === 1 ? "owes" : "owe"
+            } ${money(owed)} — no payments were recorded.`
+          : ""),
+      "done"
+    );
+  }
+
+  /** Reached from Set Status ▸ Cancelled — see that submenu's note. */
   async function cancelOrders() {
     const skipped = selected.length - cancellable.length;
     if (
@@ -231,11 +377,45 @@ export function SpecialOrderBatchActions({
   const items: ActionMenuItem[] = canWrite
     ? [
         {
-          label: busy === "cancel" ? "Cancelling…" : `Cancel Orders (${cancellable.length})`,
-          onSelect: () => void cancelOrders(),
-          danger: true,
-          disabled: busy !== null || cancellable.length === 0,
+          /**
+           * THE LADDER AS A SUBMENU (Mark, 2026-09-20: "I'd like to have the
+           * ability to change the status of selected special orders").
+           *
+           * CANCELLED IS ON IT, and it is the same row it always was: it routes
+           * to `cancelOrders`, which carries the warning that cancelling does
+           * not unschedule anything. It stopped being a command of its own the
+           * moment this submenu existed — somebody looking for "cancelled" will
+           * look under the statuses, and two doors with different words for one
+           * write is the drift this module keeps out. It keeps `danger`, so the
+           * one rung you cannot simply undo still reads as the one rung you
+           * cannot simply undo.
+           *
+           * Each rung counts the orders that would actually MOVE, so a rung
+           * everything is already on reads "(0)" rather than promising a write
+           * that does nothing.
+           */
+          label: busy === "status" || busy === "cancel" ? "Moving…" : "Set Status",
+          disabled: busy !== null || selected.length === 0,
           separatorBefore: true,
+          items: STATUS_ORDER.map((to) =>
+            to === "cancelled"
+              ? {
+                  label: `${STATUS_LABEL[to]} (${cancellable.length})`,
+                  onSelect: () => void cancelOrders(),
+                  danger: true,
+                  disabled: busy !== null || cancellable.length === 0,
+                }
+              : {
+                  label: `${STATUS_LABEL[to]} (${movable(to).length})`,
+                  onSelect: () => void setStatus(to as Exclude<SpecialOrderStatus, "cancelled">),
+                  disabled: busy !== null || movable(to).length === 0,
+                }
+          ),
+        },
+        {
+          label: busy === "paid" ? "Marking…" : `Mark Paid (${markable.length})`,
+          onSelect: () => void markPaid(),
+          disabled: busy !== null || markable.length === 0,
         },
         {
           label: busy === "flags" ? "Resolving…" : `Resolve Flags (${flagged.length})`,
