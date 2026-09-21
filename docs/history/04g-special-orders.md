@@ -1903,37 +1903,45 @@
    somebody chose, the verb is the named one with the balance warning attached,
    and it was asked for by name.
 
-   **A CONVERTED SHAPE ARRIVES WITH AN EMPTY LOG — migration 113, WRITTEN
-   2026-09-21 AND NOT YET APPLIED** (Mark: "when converting a special order to
-   an order template, log/history should be cleared as well").
-   **WHAT IS BEING CLEARED IS NOT HISTORY**, which is the whole argument for
-   touching a table 051 deliberately gave no DELETE policy ("the log is the
-   record of what was done, and an entry removed is a thing that happened with
-   no trace"). No events are copied from the source and never have been; every
-   line in a converted template's log was written seconds earlier by a TRIGGER
-   describing the copy — 056's "Template created", plus one entry per item the
-   copy inserted. A twenty-line order makes twenty-one of them, recording that a
-   computer copied some rows.
-   **THE GUARD IS THE KIND.** `clear_special_order_log` refuses on `kind =
-   'order'`: a real order's log is exactly what 051 was protecting, and nobody
-   may remove any of it. Only a PROTOTYPE can be cleared, because only a
-   prototype is not a thing that happened. Definer, so it re-checks what RLS
-   would have — purchaser+, the org, and the kind — and returns a COUNT rather
-   than raising, so a caller aimed at an order simply learns nothing was
-   cleared.
-   **WHAT IT STILL ALLOWS, STATED RATHER THAN HIDDEN**: purchaser+ can clear a
-   STANDING ORDER's log later, and that log does record real edits — a price, a
-   weekday — which affect days not yet made. It is the cost of not building a
-   one-shot token, and it is accepted rather than overlooked. The days are
-   untouched; each carries its own log and its own "Made from standing order N".
-   **THE PROVENANCE LINE SURVIVES.** The clear runs BETWEEN the copy and the
-   line that says where it came from, so a converted shape's log holds exactly
-   one entry — "Order Template made from order 10034" — and nothing else.
-   Without it a template is a shape nobody can trace.
-   **BEST EFFORT IN THE APP.** Until 113 is applied the RPC is not there, and a
-   conversion that otherwise worked must not report itself failed because its
-   tidying did not run. The cost of silence is a noisy log, which is exactly
-   what the command does today.
+   **A COPY CARRIES ONE LINE OF HISTORY — migration 113, WRITTEN 2026-09-21 AND
+   NOT YET APPLIED** (Mark: "do not copy the history when copying an order that
+   will be converted into a template. Just include a line on the new template
+   specifying which order the template came from", and the same the other way
+   for a template copied into an order. "That way history we care about is
+   retained. No history is removed — it just stays where it matters, and isn't
+   duplicated anywhere.")
+   **NOTHING WAS EVER COPIED; THE COPY WAS WRITING ITS OWN.**
+   `duplicateSpecialOrder` has never touched `special_order_events`. What a
+   converted template's log held was written FRESH by 054's item trigger — one
+   "Added 12 × Glazed" per line the copy inserted, under 056's "Template
+   created". The same words as the source's log, generated independently, which
+   is why it reads as duplicated history and for this purpose IS that. So there
+   is nothing to stop copying; there is something to stop WRITING.
+   **NO LOG ENTRY IS EVER DELETED and 051's no-DELETE rule stands untouched** —
+   which is the second thing this replaced. The first 113 added a
+   `clear_special_order_log` at purchaser+, i.e. exactly the "anyone can clear a
+   log later" Mark then ruled out; the second draft tried to scope it with a
+   two-minute window, which is a guess dressed as a rule. Both are gone.
+   **THE COPY IS NOW ONE TRANSACTION THAT KNOWS IT IS A COPY.** The app did it
+   as three calls — row, lines, provenance — and a trigger cannot tell one of
+   those inserts from an edit somebody made by hand. `copy_special_order` raises
+   `rf.suppress_order_log` with `set_config(..., TRUE)`, which is what makes it
+   TRANSACTION-local rather than leaking to the next request on the pooled
+   connection, and `log_special_order_event` returns early while it is set.
+   **Guarding that ONE helper covers all three of 054's triggers** — the order,
+   its items and its payments all log through it.
+   **THE PROVENANCE LINE IS A PLAIN INSERT**, not a call to the helper, so the
+   suppression cannot silence the one thing the function exists to say:
+   "Duplicated from order 10034" when an order is duplicated, "Created from
+   order 10034" on a template, "Created from template 10056" on an order made
+   from one — the source and what kind of thing it was.
+   **THE COPY ITSELF IS `to_jsonb` MINUS SOME KEYS**, deliberately not a column
+   list: a column added to `special_orders` next year travels on its own, where
+   a list would silently stop copying it. It is the app's own shape, moved.
+   **THE CLIENT-SIDE COPY SURVIVES AS A FALLBACK** and is marked for deletion —
+   it runs only while 113 is unapplied, and what it costs is the noisy log this
+   migration is about. Both paths write the same single provenance line, because
+   two doors must not produce records anybody can tell apart.
 
    **THE KIND MENU SWITCHES THE DATE WINDOW OFF — 2026-09-21** (Mark: "since
    templates do not carry dates, selecting them in the Kind filter requires also

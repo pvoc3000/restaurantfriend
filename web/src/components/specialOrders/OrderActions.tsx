@@ -37,6 +37,7 @@ import {
  * orders and "same as last year" are all copy-this-order.
  */
 export function OrderActions({
+  orgId,
   id,
   number,
   kind,
@@ -49,6 +50,9 @@ export function OrderActions({
 }: {
   id: string;
   number: string;
+  /** For 113's `copy_special_order`, which does the copy in one quiet
+   *  transaction — see `duplicateSpecialOrder`. */
+  orgId: string;
   kind: SpecialOrderKind;
   status: SpecialOrderStatus | null;
   flagReason: string | null;
@@ -185,7 +189,7 @@ export function OrderActions({
   function duplicate(as: SpecialOrderKind = "order") {
     setError(null);
     start(async () => {
-      const result = await duplicateSpecialOrder(supabase, id, number, as);
+      const result = await duplicateSpecialOrder(supabase, id, number, as, orgId);
       if ("error" in result) {
         setError(result.error);
         return;

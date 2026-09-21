@@ -22,7 +22,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { startingState } from "./createSpecialOrder";
-import { KIND_LABEL, type SpecialOrderKind } from "./specialOrders";
+import type { SpecialOrderKind } from "./specialOrders";
 
 /**
  * Everything the guards and the confirm need, in one read.
@@ -273,8 +273,38 @@ export async function duplicateSpecialOrder(
   id: string,
   number: string,
   /** What the COPY is. Defaults to an order, which is what Duplicate means. */
-  kind: SpecialOrderKind = "order"
+  kind: SpecialOrderKind = "order",
+  /** The org, for the RPC. Omitted, the copy runs the old client-side way. */
+  orgId?: string
 ): Promise<{ id: string } | { error: string }> {
+  /**
+   * MIGRATION 113 DOES THIS IN ONE TRANSACTION, and that is the only way the
+   * copy can arrive with a clean log: the app's three calls — row, lines,
+   * provenance — look to the database like three unrelated inserts, and a
+   * trigger cannot tell one of them from an edit somebody made by hand.
+   * `copy_special_order` raises a transaction-local flag that
+   * `log_special_order_event` reads, so the copy writes exactly one line
+   * naming where it came from.
+   *
+   * THE CLIENT-SIDE COPY BELOW IS THE FALLBACK, not a second implementation to
+   * keep in step: it is what runs only while 113 is unapplied, and what it
+   * costs is the noisy log this feature is about. When the function has been
+   * live for a while, delete everything under this block.
+   */
+  if (orgId) {
+    const { data, error } = await supabase.rpc("copy_special_order", {
+      p_org_id: orgId,
+      p_order_id: id,
+      p_kind: kind,
+    });
+    if (!error && typeof data === "string") return { id: data };
+    // A refusal the function raised itself is a real answer and is reported;
+    // anything else means 113 is not applied yet, so fall through.
+    if (error && /permission|does not exist, or is not yours|Unknown kind/i.test(error.message)) {
+      return { error: error.message };
+    }
+  }
+
   const { data: source, error: readError } = await supabase
     .from("special_orders")
     .select("*")
@@ -342,65 +372,25 @@ export async function duplicateSpecialOrder(
   }
 
   /**
-   * PROVENANCE BELONGS TO THE ORDER, NOT TO THE SHAPE (Mark, 2026-09-21: "a
-   * template is a fresh start. It's the beginning of an order. How we created
-   * the template doesn't matter, but how we created the order DOES").
+   * ONE LINE, NAMING THE SOURCE (Mark, 2026-09-21: "just include a line on the
+   * new template specifying which order the template came from", and the same
+   * the other way). It is what 113's function writes too — the two must agree,
+   * because the fallback and the RPC produce records nobody can tell apart.
    *
-   * So the line describes the SOURCE and is written only when the target is an
-   * ORDER. It was the other way round for a day — a converted template carried
-   * "Order Template made from order 10034" and an order duplicated FROM a
-   * template said "Duplicated from order 10056", which names a template as an
-   * order and buries the one fact worth keeping.
-   *
-   * 099 already tells a materialized day where it came from in exactly these
-   * words ("Made from standing order 9762"); this is the same sentence for the
-   * hand-made route.
+   * WHAT THIS PATH CANNOT DO is stop the triggers writing the rest, which is
+   * the whole reason 113 exists. Until it is applied, the copy still carries an
+   * "Added 12 × Glazed" for every line it inserted, under this line.
    */
-  if (sourceKind === "order") {
-    await supabase.from("special_order_events").insert({
-      org_id: source.org_id,
-      order_id: created.id,
-      message:
-        kind === "order"
-          ? `Duplicated from order ${number}`
-          : // A shape's own log is emptied below, so this line exists only for
-            // the moment between; it is written anyway so that a failure to
-            // clear leaves a record that says what happened rather than a log
-            // of copying with no explanation at its head.
-            `${KIND_LABEL[kind]} made from order ${number}`,
-      source: "app",
-    });
-  } else if (kind === "order") {
-    await supabase.from("special_order_events").insert({
-      org_id: source.org_id,
-      order_id: created.id,
-      message: `Created from ${KIND_LABEL[sourceKind].toLowerCase()} ${number}`,
-      source: "app",
-    });
-  }
-
-  /**
-   * A SHAPE ARRIVES WITH AN EMPTY LOG (Mark, same day: "log/history should be
-   * cleared as well"). It runs LAST, so everything the copy wrote goes with it
-   * — 056's "Template created", one entry per line inserted, and the provenance
-   * line above, which belongs to the order this template will one day make and
-   * not to the template.
-   *
-   * WHAT IS BEING CLEARED IS NOT HISTORY. No events are copied from the source
-   * and never have been; every entry was written seconds ago by a trigger
-   * describing the copy. A twenty-line order makes twenty-one of them.
-   *
-   * BEST EFFORT, AND DELIBERATELY SO. Migration 113 adds the function; until it
-   * is applied the RPC is not there, and a conversion that otherwise worked
-   * must not report itself failed because its tidying did not run. The cost of
-   * silence is a noisy log, which is what the command does today.
-   */
-  if (kind !== "order") {
-    await supabase.rpc("clear_special_order_log", {
-      p_org_id: source.org_id,
-      p_order_id: created.id,
-    });
-  }
+  const sourceLabel = sourceKind === "standing_order" ? "standing order" : sourceKind;
+  await supabase.from("special_order_events").insert({
+    org_id: source.org_id,
+    order_id: created.id,
+    message:
+      sourceKind === "order" && kind === "order"
+        ? `Duplicated from order ${number}`
+        : `Created from ${sourceLabel} ${number}`,
+    source: "app",
+  });
 
   return { id: created.id as string };
 }

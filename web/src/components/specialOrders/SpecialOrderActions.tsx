@@ -34,10 +34,13 @@ import { RowMenu } from "@/components/ui/RowMenu";
  */
 export function SpecialOrderActions({
   id,
+  orgId,
   number,
   onChanged,
 }: {
   id: string;
+  /** For 113's `copy_special_order` — see `duplicateSpecialOrder`. */
+  orgId: string;
   number: string;
   /**
    * Called after a successful delete. The LIST refreshes in place; the record
@@ -54,7 +57,7 @@ export function SpecialOrderActions({
   function duplicate() {
     setBusy("duplicate");
     start(async () => {
-      const result = await duplicateSpecialOrder(supabase, id, number);
+      const result = await duplicateSpecialOrder(supabase, id, number, "order", orgId);
       setBusy(null);
       if ("error" in result) {
         void alertDialog({

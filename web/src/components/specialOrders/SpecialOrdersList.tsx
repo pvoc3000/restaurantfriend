@@ -911,7 +911,7 @@ export function SpecialOrdersList({
             width: 74,
             render: (r: SpecialOrderRow) => (
               <span className="flex justify-end">
-                <SpecialOrderActions id={r.id} number={r.number} />
+                <SpecialOrderActions id={r.id} orgId={orgId} number={r.number} />
               </span>
             ),
           } satisfies DataColumn<SpecialOrderRow>,
