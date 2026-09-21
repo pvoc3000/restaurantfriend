@@ -66,7 +66,25 @@ export default async function PurchaseOrdersPage({
   // would otherwise start hiding this afternoon's orders (see lib/today).
   const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
   const bounds = poRangeBounds(filters.range, today);
-  if (bounds) query = query.gte("order_date", bounds.from).lte("order_date", bounds.to);
+  if (bounds) {
+    query = query.gte("order_date", bounds.from);
+    // A PRESET HAS NO UPPER BOUND (Mark, 2026-09-21) — a PO SCHEDULED for next
+    // week must not fall off the list for being ahead of today.
+    //
+    // Every preset runs `from` back to `to: today`, which reads as a window
+    // with two ends and is really one: the reason a window exists here at all
+    // is that 16.8k POs exist and the working set is the recent past. That is
+    // a claim about VOLUME IN THE PAST. Ahead of today there is a handful of
+    // rows and there never will be more, so the forward end was bounding
+    // nothing and hiding the one record you had just made.
+    //
+    // A PAIR TAPPED ON THE CALENDAR KEEPS ITS `to`, because that end is an
+    // answer rather than an artifact: the picker's face says "09/01/26 –
+    // 09/10/26", and a row dated later showing up under it would be the
+    // control lying about what it is doing. The presets' faces say "7 days",
+    // which only ever described the lookback.
+    if (typeof filters.range !== "string") query = query.lte("order_date", bounds.to);
+  }
 
   const { data: orders, error } = await query;
 
