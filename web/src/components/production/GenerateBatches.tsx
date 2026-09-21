@@ -8,7 +8,7 @@ import { DateField } from "@/components/ui/DateField";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
-import { currentOperatorId } from "@/components/production/currentOperator";
+import { myEmployeeId } from "@/lib/myEmployee";
 
 /**
  * "Generate a batch log" — migration 045.
@@ -169,7 +169,7 @@ export function GenerateBatches({
       // rename the people who made the batches already on it. Soft: a login
       // with no HR record, or a refused write, leaves the field for the record.
       const numbers = ((data as Receipt | null)?.created ?? []).map((c) => c.batch_number);
-      const operatorId = numbers.length > 0 ? await currentOperatorId(supabase, orgId) : null;
+      const operatorId = numbers.length > 0 ? await myEmployeeId(supabase, orgId) : null;
       if (operatorId) {
         await supabase
           .from("production_batches")

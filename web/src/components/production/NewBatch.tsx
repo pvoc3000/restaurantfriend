@@ -10,7 +10,7 @@ import { PickList } from "@/components/ui/PickList";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { BAR_CELL } from "@/components/tablet/barCell";
 import { BarLabel, ICON_ADD } from "@/components/tablet/BarLabel";
-import { currentOperatorId } from "@/components/production/currentOperator";
+import { myEmployeeId } from "@/lib/myEmployee";
 
 /**
  * Log a batch that isn't on the weekly round.
@@ -109,7 +109,7 @@ export function NewBatch({
       // by `authenticated`, which is the same arrangement 006 made for POs.
       const [{ data: number, error: numberError }, operatorId] = await Promise.all([
         supabase.rpc("next_batch_number", { p_location_id: locationId }),
-        currentOperatorId(supabase, orgId),
+        myEmployeeId(supabase, orgId),
       ]);
       if (numberError) {
         setFailed(numberError.message);

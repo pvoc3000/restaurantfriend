@@ -12,6 +12,43 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-21 — A NEW ORDER IS TAKEN BY WHOEVER IS SIGNED IN, AS AN
+   EMPLOYEE** (Mark: "when creating a new special order, the user signed in
+   should be set as the 'taken by' person"). The create path already wrote the
+   member's display NAME into `taken_by` — FileMaker's text column — and never
+   wrote 053's `taken_by_employee_id`, the LINK. So every order the app made
+   said who took it in the one way nothing else can follow: no employee record
+   to open, no way to count a person's orders, and a name that goes stale the
+   day that employee's is corrected.
+   **NOTHING NEW WAS NEEDED TO DO IT.** 080's `my_employee_id` has existed since
+   2026-09-01 and its own header says this in as many words — "`special_orders.
+   taken_by` can seed itself from the same call whenever that is picked up" —
+   answering "which employee am I?" through a definer because `employees` READ
+   is owner/admin (020) and a supervisor cannot look themselves up. Probed live
+   before writing any of this: it returns Mark's employee uuid, against a
+   deliberate typo that 404s as the control.
+   **THE TEXT IS CLEARED WHEN THERE IS A LINK** (`takenByFields`), which is the
+   rule the record's own `TakenBy` cell already enforces when you pick a name
+   (`alsoUpdate`). Two columns saying who took the order, one of them a stale
+   copy, is the drift this module exists to prevent — and the cell renders the
+   link where it has one, so the text would be invisible as well as wrong.
+   **THE NAME IS THE FALLBACK, not a belt-and-braces**: `employees.user_id` is
+   nullable, so an owner or a bookkeeper with a login and no HR record has no
+   employee to be, and the typed name is then the only true answer. A null from
+   the definer — including its soft null on error — lands in the same branch.
+   Resolved inside `createSpecialOrder` rather than at each door, which is what
+   that module is for: all THREE doors (the list, the record's Actions menu and
+   "New order for them" on a customer) got it in one edit.
+   `currentOperatorId` moved out of `components/production/` to
+   **`lib/myEmployee.ts`** as `myEmployeeId` with the three batch callers
+   repointed — it has two modules reading it now, and a second copy of a definer
+   call is how these drift.
+   Fixture-tested (`takenByFields`, four cases, checked by making the link
+   branch keep the text and watching it go red). **NOT verified end to end**:
+   the pane hit the shared-device lock, which wants a PIN, and a live create
+   would take a number off `special_order_number_seq` for good — worth Mark's
+   nod rather than a silent gap in the numbering.
+
    **Shipped 2026-09-21 — LINKING A CUSTOMER IS A DIALOG** (Mark: "instead of
    doing it inline, let's pop up a dialogue box instead… the sizing and
    placement of the controls in the inline version are bad. Use a fresh take

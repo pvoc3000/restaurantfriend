@@ -6,7 +6,7 @@
 // address has no Delivery tab to display that address on.
 
 import { test, eq } from "./harness";
-import { deliveryFields, startingState } from "../../src/lib/createSpecialOrder";
+import { deliveryFields, startingState, takenByFields } from "../../src/lib/createSpecialOrder";
 import { STANDING_STATUS_OPTIONS } from "../../src/lib/specialOrders";
 
 test("a delivery keeps its address", () => {
@@ -76,4 +76,42 @@ test("the standing-order default is one the record's own picker offers", () => {
   // state it was created in.
   const offered = STANDING_STATUS_OPTIONS.map((o) => o.value);
   eq(offered.includes(startingState("standing_order").status ?? ""), true, offered.join("/"));
+});
+
+/* -------------------------------------------------------------------------
+ * Who took the order (2026-09-21)
+ *
+ * Two columns say who took an order and only one of them can be right: 053's
+ * link, and FileMaker's text. The record's own cell clears the text when you
+ * pick a name; the create path has to make the same trade, or an order is born
+ * in the state the cell exists to prevent.
+ * ---------------------------------------------------------------------- */
+
+test("the signed-in member's EMPLOYEE is linked, and the text is cleared", () => {
+  eq(takenByFields("emp-1", "Mark Trombino"), {
+    taken_by_employee_id: "emp-1",
+    // Not "Mark Trombino" as well: `TakenBy` renders the link where it has
+    // one, so a second copy of the name would be invisible AND able to go
+    // stale the day that employee's name is corrected.
+    taken_by: null,
+  });
+});
+
+test("no employee to link keeps the typed NAME, which is then the only answer", () => {
+  // `employees.user_id` is nullable — an owner or a bookkeeper with an app
+  // login and no HR record has no employee to be.
+  eq(takenByFields(null, "Mark Trombino"), {
+    taken_by_employee_id: null,
+    taken_by: "Mark Trombino",
+  });
+});
+
+test("neither, rather than an empty string, when there is nobody to name", () => {
+  eq(takenByFields(null, null), { taken_by_employee_id: null, taken_by: null });
+  eq(takenByFields(null, "   "), { taken_by_employee_id: null, taken_by: null });
+  eq(takenByFields(null, undefined), { taken_by_employee_id: null, taken_by: null });
+});
+
+test("a name is trimmed on the way in", () => {
+  eq(takenByFields(null, "  Traci  ").taken_by, "Traci");
 });

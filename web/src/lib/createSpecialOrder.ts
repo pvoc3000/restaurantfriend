@@ -28,6 +28,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { myEmployeeId } from "./myEmployee";
 import type { SpecialOrderKind } from "./specialOrders";
 import {
   contactNameFor,
@@ -92,9 +93,13 @@ export type NewSpecialOrderInput = {
    * IT IS A SNAPSHOT OF A NAME, not a link to a user, and that is the column
    * this schema already has: FileMaker's `taken_by` holds "Traci", and 8,330
    * migrated orders carry names of people who mostly no longer work here.
-   * Seeding it from the person creating the order is what makes it true
-   * without anybody typing it, and it stays free text because the order taken
-   * over the phone by somebody who then hands it to you is a real thing.
+   * It stays free text because the order taken over the phone by somebody who
+   * then hands it to you is a real thing.
+   *
+   * SINCE 2026-09-21 IT IS THE FALLBACK, not the answer — see `takenByFields`.
+   * The creator resolves the signed-in member to their EMPLOYEE row and links
+   * that instead; this name is what an order gets when there is no employee to
+   * link, which is a login with no HR record.
    */
   takenBy?: string | null;
   /**
@@ -252,6 +257,41 @@ function contactFrom(
   };
 }
 
+/**
+ * WHO TOOK THE ORDER, ACROSS THE TWO COLUMNS THAT SAY SO — one or the other,
+ * never both.
+ *
+ * Mark, 2026-09-21: "when creating a new special order, the user signed in
+ * should be set as the 'taken by' person". The create path already wrote the
+ * member's display NAME into `taken_by`, which is FileMaker's text column; what
+ * it never wrote was 053's `taken_by_employee_id`, the LINK — so every order
+ * the app made said who took it in the one way nothing else can follow. The
+ * record's own cell has linked since 053 and the definer that answers "which
+ * employee am I?" has existed since 080, whose header says in as many words
+ * that this path should pick it up. This is that.
+ *
+ * **THE TEXT IS CLEARED WHEN THERE IS A LINK**, which is not tidiness: it is
+ * the rule the record's `TakenBy` cell already enforces when you pick a name
+ * (`alsoUpdate`). Two columns saying who took the order, one of them a stale
+ * copy of a name that can be edited on the employee record, is precisely the
+ * drift this module exists to prevent — and the component renders the link
+ * where it has one, so the text would be invisible as well as wrong.
+ *
+ * **AND THE NAME IS THE FALLBACK, not a belt-and-braces.** `employees.user_id`
+ * is nullable: an owner or a bookkeeper who has an app login and no HR record
+ * has no employee to be, and for them the typed name is the only true answer
+ * available. That is also what `my_employee_id` returning null means, so the
+ * two cases collapse into one branch.
+ */
+export function takenByFields(
+  employeeId: string | null,
+  name: string | null | undefined
+): { taken_by_employee_id: string | null; taken_by: string | null } {
+  return employeeId
+    ? { taken_by_employee_id: employeeId, taken_by: null }
+    : { taken_by_employee_id: null, taken_by: orNull(name) };
+}
+
 export async function createSpecialOrder(
   supabase: SupabaseClient,
   input: NewSpecialOrderInput
@@ -269,6 +309,13 @@ export async function createSpecialOrder(
 
   const locationId = orNull(input.locationId);
   const taxRate = await pickupTaxRate(supabase, locationId);
+
+  // WHO IS SIGNED IN, AS AN EMPLOYEE — resolved here rather than at each door,
+  // for the reason this module exists: both doors write the same row, and a
+  // seed remembered in one and forgotten in the other is how the three bugs in
+  // the header survived. Soft by design (see `myEmployeeId`): a null is a login
+  // with no HR record, and the order still gets the typed name.
+  const takenBy = takenByFields(await myEmployeeId(supabase, input.orgId), input.takenBy);
 
   // The customer FIRST, because the order carries its id. A failure here stops
   // the whole thing rather than quietly producing an order with nobody on it,
@@ -345,7 +392,7 @@ export async function createSpecialOrder(
       // a blank where all 8,330 migrated ones carry FileMaker's `Date_Created`.
       // Editable afterwards, for an order taken on the phone yesterday.
       date_initiated: input.today ?? null,
-      taken_by: orNull(input.takenBy),
+      ...takenBy,
       todo: startingState(input.kind).todo,
       source: "app",
     })

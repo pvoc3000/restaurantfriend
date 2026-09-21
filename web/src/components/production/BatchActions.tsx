@@ -9,7 +9,7 @@ import { BAR_CELL } from "@/components/tablet/barCell";
 import { BarLabel, ICON_TRASH } from "@/components/tablet/BarLabel";
 import { BATCH_PHOTO_BUCKET } from "@/lib/batchPhotos";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
-import { currentOperatorId } from "@/components/production/currentOperator";
+import { myEmployeeId } from "@/lib/myEmployee";
 
 /**
  * The command on one batch: delete it.
@@ -155,7 +155,7 @@ export function BatchActions({
       is_generated: false,
       status: "to_do",
       // Whoever is duplicating it, not whoever made the original.
-      operator_employee_id: await currentOperatorId(supabase, row.org_id as string),
+      operator_employee_id: await myEmployeeId(supabase, row.org_id as string),
       on_hand_count: null,
       on_hand_size: null,
       on_hand_unit: null,

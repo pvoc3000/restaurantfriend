@@ -80,7 +80,8 @@ export function NewSpecialOrder({
   /** Today in the ORG's timezone — the order's `date_initiated`. Computed on
    *  the server (`lib/today`), never from the browser's clock. */
   today: string;
-  /** The signed-in member's display name — the order's `taken_by`. */
+  /** The signed-in member's display name — the order's `taken_by` when the
+   *  login has no employee row to link instead (`takenByFields`). */
   takenBy: string;
 }) {
   const router = useRouter();

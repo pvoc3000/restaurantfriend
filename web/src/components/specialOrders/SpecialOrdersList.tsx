@@ -250,7 +250,8 @@ export function SpecialOrdersList({
   kitchens: { id: string; code: string }[];
   /** The shop you are standing in — a new order's pickup shop by default. */
   defaultLocationId: string | null;
-  /** The signed-in member's display name — a new order's `taken_by`. */
+  /** The signed-in member's display name — a new order's `taken_by` when the
+   *  login has no employee row to link instead (`takenByFields`). */
   takenBy: string;
   initialFilters?: RawSearchParams;
   initialSearch?: string;
