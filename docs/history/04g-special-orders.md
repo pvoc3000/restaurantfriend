@@ -12,6 +12,50 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-21 — LINKING A CUSTOMER IS A DIALOG** (Mark: "instead of
+   doing it inline, let's pop up a dialogue box instead… the sizing and
+   placement of the controls in the inline version are bad. Use a fresh take
+   when creating the new panel"). `LinkCustomer` unfolded a search box, a result
+   list and a create button INSIDE the Customer row of a `dl` — a cell sized for
+   a name — so the list was pinned to a hand-typed `w-80`, the three little
+   bordered buttons were a size nothing else in the app uses, and opening it
+   shoved the whole Customer block down the page. **Choosing a customer is a
+   TASK, not a field edit**, which is what `ui/Dialog` is for: the search pins
+   in the toolbar, only the list scrolls, and the record's own layout is left
+   alone. The row keeps ONE command at the app's button size (`BUTTON_CLASS`),
+   reading "Link a customer" or "Change customer"; **Unlink moved into the
+   dialog's footer**, because everything that decides the link now lives in one
+   place, and a row carrying a name and two little buttons was the placement
+   complaint.
+   **THE HAND-COPIED SEARCH IS GONE.** This screen still built its own `or()`
+   clauses from before `lib/customerSearch` was extracted for `CustomerPicker` —
+   the same five columns and the same digit-run phone rule, in a second copy,
+   which is the drift the module keeps warning about. It now calls
+   `searchCustomers`, and the create path `draftToRow`. The search fires from
+   TYPING rather than an effect, last-request-wins through a ref, so a slow "sm"
+   landing after "smith" cannot flicker the right answer away.
+   **THE ONE-SHOT CREATE BUTTON BECAME A FORM.** "New customer from this order's
+   contact" made a customer out of the contact details exactly as typed — right
+   for the common case and useless the moment the caller gives a company or
+   spells the name a second way. The four boxes open SEEDED from the contact, so
+   the common case is still one press. Unlike `CustomerPicker` this one really
+   does write: there is already an order to hang the customer on.
+   **THE PANEL'S HEIGHT IS PER HALF.** The list gets a definite `h-[60vh]`
+   because it grows and shrinks with every keystroke and a shrink-wrapped panel
+   would jump under the pointer; the form takes the cap, since 70vh of white
+   under a name and a phone number is a panel pretending to have more to say.
+   **AND IT SAYS WHO IS LINKED NOW**, because the search opens seeded with the
+   order's CONTACT, who is often not the customer — without the line a linked
+   order opened reading "Nobody matches" with nothing on screen naming the
+   person it was about to replace.
+   Verified in the pane against the live DB on #10055: link wrote and the row
+   redrew as "Change customer", Unlink cleared it and the order is back as it
+   was; #10046 shows the Linked-now line. **Left alone, and worth a look:** the
+   shared search matches a WHOLE term against each column, so a contact named
+   "Tanvi Shah" finds no customer named Tanvi Shah — first name and last name
+   are separate columns. Pre-existing and shared with the create dialog, so it
+   is a change to `lib/customerSearch` and its fixtures, not to this screen.
+
    **Shipped 2026-09-08 — THE LIST'S ROWS HAVE THEIR OWN ⋯** (Mark: "add a
    'more options' button column to the special order list screen with
    'duplicate' and 'delete' options to start"). `ProductionItemsList`'s shape,

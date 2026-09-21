@@ -853,6 +853,7 @@ export async function SpecialOrderDetail({
                           orderId={id}
                           orgId={row.org_id as string}
                           currentCustomerId={(row.customer_id as string | null) ?? null}
+                          currentCustomerLabel={customer ? customerLabel(customer) : null}
                           contact={{
                             name: row.contact_name as string | null,
                             phone: row.contact_phone as string | null,
