@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TextInput } from "@/components/ui/TextInput";
 import { ControlField } from "@/components/ui/ControlField";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
+import { SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
 import { customerLabel } from "@/lib/specialOrders";
 import {
   EMPTY_DRAFT,
@@ -196,10 +197,17 @@ export function CustomerPicker({
           search
           icon={<SearchGlyph />}
         />
+        {/* A SMALL BUTTON, not the text link the other two branches use
+            (Mark, 2026-09-21). It is the one of the three that sits beside a
+            FIELD rather than beside a sentence, and a bordered box is what
+            reads as pressable next to another bordered box. The other two —
+            "Change" and "Find an existing one instead" — are each in a
+            mutually exclusive branch of this component, so only ever one of
+            the three is on screen and nothing looks mismatched. */}
         <button
           type="button"
           disabled={disabled}
-          className={link}
+          className={SMALL_BUTTON_CLASS}
           onClick={() =>
             onChange({
               kind: "new",

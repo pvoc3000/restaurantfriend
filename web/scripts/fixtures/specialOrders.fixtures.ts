@@ -15,6 +15,10 @@
 
 import { eq, no, ok, test } from "./harness";
 import {
+  KIND_COMMAND_NOUN,
+  KIND_LABEL,
+  contactCopyPlan,
+  customerContactName,
   DEFAULT_ATTENTION,
   DEFAULT_RUSH_TERMS,
   STAGES,
@@ -799,5 +803,102 @@ test("the kind filter tells a standing order from the days it makes", () => {
   // Every order matches exactly one option, or the four cannot sum to the list.
   for (const r of [day, oneOff, recurrence, { kind: "template" }]) {
     eq(ORDER_KIND_FILTERS.filter((f) => matchesKindFilter(r, f.value)).length, 1);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// "Copy to contact" — the customer's details onto the order's day-of contact.
+//
+// Each case here was checked by BREAKING the rule it covers:
+//   · dropping the non-empty guard blanks a typed contact email whenever the
+//     customer record has none — a delete wearing a copy's label;
+//   · comparing untrimmed makes " Jane" vs "Jane" a permanent "change", so the
+//     confirm asks about a field it would not move;
+//   · counting an EMPTY target as a replacement puts a dialog in front of the
+//     commonest case, a fresh order with nothing typed yet.
+
+const CUST = { name: "Jane Doe", phone: "555-0100", email: "jane@example.com" };
+const EMPTY_CONTACT = { name: null, phone: null, email: null };
+
+test("copy: an empty contact takes all three and asks nothing", () => {
+  const p = contactCopyPlan(CUST, EMPTY_CONTACT);
+  eq(p.wanted, {
+    contact_name: "Jane Doe",
+    contact_phone: "555-0100",
+    contact_email: "jane@example.com",
+  });
+  eq(p.changing.length, 3, "all three change");
+  eq(p.replacing.length, 0, "filling empties is not replacing");
+});
+
+test("copy: a customer's MISSING field never blanks a typed one", () => {
+  const p = contactCopyPlan(
+    { name: "Jane Doe", phone: null, email: "   " },
+    { name: null, phone: "555-0199", email: "someone@example.com" },
+  );
+  no("contact_phone" in p.wanted, "a null phone must not travel");
+  no("contact_email" in p.wanted, "a blank email must not travel");
+  eq(p.wanted, { contact_name: "Jane Doe" });
+});
+
+test("copy: pressing it twice is a no-op", () => {
+  const p = contactCopyPlan(CUST, {
+    name: "Jane Doe",
+    phone: "555-0100",
+    email: "jane@example.com",
+  });
+  eq(p.changing.length, 0, "nothing differs");
+  eq(p.replacing.length, 0, "so nothing is replaced");
+});
+
+test("copy: whitespace is not a difference", () => {
+  const p = contactCopyPlan({ name: "Jane Doe", phone: null, email: null }, {
+    name: "  Jane Doe  ",
+    phone: null,
+    email: null,
+  });
+  eq(p.changing.length, 0, "a trimmed match is a match");
+});
+
+test("copy: only the fields that really move are offered for confirming", () => {
+  const p = contactCopyPlan(CUST, {
+    name: "Bob Other",        // differs, non-empty -> replacing
+    phone: "555-0100",        // identical         -> neither
+    email: null,              // empty             -> changing, not replacing
+  });
+  eq(p.changing.sort(), ["contact_email", "contact_name"]);
+  eq(p.replacing, ["contact_name"]);
+});
+
+test("copy: nothing linked means nothing to do", () => {
+  const p = contactCopyPlan(null, EMPTY_CONTACT);
+  eq(p.wanted, {});
+  eq(p.changing.length, 0);
+});
+
+test("contact name is the PERSON, with company only as a fallback", () => {
+  eq(customerContactName({ first_name: "Jane", last_name: "Doe", company: "Acme" }), "Jane Doe");
+  eq(customerContactName({ first_name: null, last_name: null, company: "Acme" }), "Acme");
+  eq(customerContactName({ first_name: null, last_name: null, company: null }), "");
+  eq(customerContactName(null), "");
+});
+
+// The command menu's Title Case noun and the record screens' sentence-case one
+// are two maps of the same fact. Adding a kind to one and not the other should
+// fail here, not ship a menu row reading "Duplicate undefined".
+test("every order kind has a command noun, and it matches KIND_LABEL's words", () => {
+  const kinds = Object.keys(KIND_LABEL) as (keyof typeof KIND_LABEL)[];
+  eq(Object.keys(KIND_COMMAND_NOUN).sort(), kinds.slice().sort(), "same kinds");
+  for (const k of kinds) {
+    eq(
+      KIND_COMMAND_NOUN[k].toLowerCase(),
+      KIND_LABEL[k].toLowerCase(),
+      `${k}: the two maps must differ only in CASE`,
+    );
+    // Title Case is the menu's convention — every word starts capitalised.
+    ok(
+      KIND_COMMAND_NOUN[k].split(" ").every((w) => w[0] === w[0].toUpperCase()),
+      `${k}: "${KIND_COMMAND_NOUN[k]}" should be Title Case`,
+    );
   }
 });

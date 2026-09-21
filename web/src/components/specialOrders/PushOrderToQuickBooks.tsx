@@ -287,7 +287,7 @@ export function PushOrderToQuickBooks({
     const items: ActionMenuItem[] = canWrite
       ? [
           {
-            label: busy ? "Sending…" : already ? "Update in QuickBooks" : "Send to QuickBooks",
+            label: busy ? "Sending…" : already ? "Update Order in QuickBooks" : "Send Order to QuickBooks",
             disabled: busy,
             onSelect: () =>
               void (refusals.length > 0

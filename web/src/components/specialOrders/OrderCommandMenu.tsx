@@ -3,6 +3,7 @@
 import type { ComponentProps, ReactNode } from "react";
 
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
+import { LinkCustomer } from "./LinkCustomer";
 import { NewSpecialOrder } from "./NewSpecialOrder";
 import { OrderActions } from "./OrderActions";
 import { PushOrderToQuickBooks } from "./PushOrderToQuickBooks";
@@ -14,6 +15,7 @@ type QuickBooksProps = Omit<ComponentProps<typeof PushOrderToQuickBooks>, "child
 type ScheduleProps = Omit<ComponentProps<typeof ScheduleProduction>, "children">;
 type OrderProps = Omit<ComponentProps<typeof OrderActions>, "children" | "schedule">;
 type CreateProps = Omit<ComponentProps<typeof NewSpecialOrder>, "children">;
+type CustomerProps = Omit<ComponentProps<typeof LinkCustomer>, "children">;
 
 /** The first row of a group carries the rule above it. */
 function group(items: ActionMenuItem[]): ActionMenuItem[] {
@@ -43,6 +45,7 @@ export function OrderCommandMenu({
   quickbooks,
   schedule,
   create,
+  customer,
   actions,
 }: {
   /** Null on a template or standing order — there is no document to send. */
@@ -55,6 +58,9 @@ export function OrderCommandMenu({
   /** Null below the role that may create one. Every KIND offers it — a new
    *  order is not about the record you are standing on. */
   create: CreateProps | null;
+  /** Nullable like its neighbours, but never null today: the Customer row
+   *  on the Info tab is not kind-gated, so a template can be linked too. */
+  customer: CustomerProps | null;
   actions: OrderProps;
 }) {
   const withSchedule = (render: (items: ActionMenuItem[]) => ReactNode) =>
@@ -65,11 +71,14 @@ export function OrderCommandMenu({
     send ? <SendDocument {...send}>{render}</SendDocument> : render([]);
   const withCreate = (render: (items: ActionMenuItem[]) => ReactNode) =>
     create ? <NewSpecialOrder {...create}>{render}</NewSpecialOrder> : render([]);
+  const withCustomer = (render: (items: ActionMenuItem[]) => ReactNode) =>
+    customer ? <LinkCustomer {...customer}>{render}</LinkCustomer> : render([]);
 
   return withSchedule((scheduleItems) =>
     withQuickBooks((quickbooksItems) =>
       withDocuments((documentItems) =>
-        withCreate((createItems) => (
+        withCreate((createItems) =>
+          withCustomer((customerItems) => (
           <OrderActions {...actions}>
             {({ edit, destructive }) => {
               /**
@@ -95,6 +104,16 @@ export function OrderCommandMenu({
                */
               const groups = [
                 createItems,
+                // THE CUSTOMER ROWS COME SECOND, right under New Order (Mark,
+                // 2026-09-21). They sat after Duplicate/Convert/Flag for an
+                // hour on my reading that they belong with the other rows that
+                // change what the order SAYS. Mark's order is better and the
+                // menu explains why once you see it listed: everything below
+                // this point acts on the order as it STANDS — print it, send
+                // it, copy it, schedule it, cancel it — and who the order is
+                // FOR is the thing you settle before any of that is worth
+                // doing.
+                customerItems,
                 documentItems,
                 quickbooksItems,
                 edit,
@@ -109,7 +128,8 @@ export function OrderCommandMenu({
               );
             }}
           </OrderActions>
-        ))
+          ))
+        )
       )
     )
   );

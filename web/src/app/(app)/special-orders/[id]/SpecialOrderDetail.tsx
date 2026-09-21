@@ -26,6 +26,7 @@ import {
   FULFILLMENT_OPTIONS,
   type SpecialOrderKind,
   type SpecialOrderStatus,
+  customerContactName,
 } from "@/lib/specialOrders";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
@@ -45,7 +46,6 @@ import { OrderCommandMenu } from "@/components/specialOrders/OrderCommandMenu";
 import { OrderDelivery } from "@/components/specialOrders/OrderDelivery";
 import { TimeCell } from "@/components/specialOrders/TimeCell";
 import { StandingOrderBlock } from "@/components/specialOrders/StandingOrderBlock";
-import { LinkCustomer } from "@/components/specialOrders/LinkCustomer";
 import { OrderInfoLayout, OrderSplitLayout } from "@/components/specialOrders/OrderInfoLayout";
 import { OrderDocuments } from "@/components/specialOrders/OrderDocuments";
 import { TakenBy } from "@/components/specialOrders/TakenBy";
@@ -632,6 +632,30 @@ export async function SpecialOrderDetail({
                     }
                   : null
               }
+              /* EVERY KIND, templates included — the Customer row is not
+                 kind-gated on the Info tab and never has been, so gating the
+                 commands would quietly take linking away from templates. */
+              customer={
+                {
+                      orderId: id,
+                      orgId: row.org_id as string,
+                      currentCustomerId: (row.customer_id as string | null) ?? null,
+                      currentCustomerLabel: customer ? customerLabel(customer) : null,
+                      linkedCustomer: customer
+                        ? {
+                            name: customerContactName(customer),
+                            phone: customer.phone,
+                            email: customer.email,
+                          }
+                        : null,
+                      contact: {
+                        name: row.contact_name as string | null,
+                        phone: row.contact_phone as string | null,
+                        email: row.contact_email as string | null,
+                      },
+                      canWrite,
+                }
+              }
               create={
                 /* "New Order…" — the list's own dialog, reached from the
                    record (Mark, 2026-09-20). Every kind offers it: a new order
@@ -849,18 +873,6 @@ export async function SpecialOrderDetail({
                         ) : (
                           <span className={`${READ_ONLY_VALUE} text-faint`}>None linked</span>
                         )}
-                        <LinkCustomer
-                          orderId={id}
-                          orgId={row.org_id as string}
-                          currentCustomerId={(row.customer_id as string | null) ?? null}
-                          currentCustomerLabel={customer ? customerLabel(customer) : null}
-                          contact={{
-                            name: row.contact_name as string | null,
-                            phone: row.contact_phone as string | null,
-                            email: row.contact_email as string | null,
-                          }}
-                          canWrite={canWrite}
-                        />
                       </span>
                     </Row>
                     <Row label="Their phone">

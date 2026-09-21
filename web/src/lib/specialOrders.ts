@@ -197,6 +197,26 @@ export const DEFAULT_PAYMENT_TYPE = "Square Invoice";
  * An ORDER has no entry here: its chip is its STATUS, which is a state a shape
  * does not have.
  */
+/**
+ * THE RECORD'S OWN NOUN, AS A MENU ROW SAYS IT (Mark, 2026-09-21, on the
+ * command menu reading "Duplicate Order" while standing on a template).
+ *
+ * `KIND_LABEL` IS THE SAME WORDS IN THE WRONG CASE for this job — it is
+ * sentence case for record screens and pickers, where "Standing order" is
+ * right, and the command menu is Title Case throughout ("Cancel Order",
+ * "Schedule Production…"). "Duplicate Standing order" reads like a bug.
+ *
+ * Kept beside `KIND_LABEL` rather than derived from it: title-casing a string
+ * is a guess about words this app already knows the spelling of. A fixture
+ * asserts the two carry the same kinds and the same words, so adding a fourth
+ * kind to one and not the other fails the suite rather than shipping.
+ */
+export const KIND_COMMAND_NOUN: Record<SpecialOrderKind, string> = {
+  order: "Order",
+  template: "Template",
+  standing_order: "Standing Order",
+};
+
 export const KIND_CHIP_LABEL: Partial<Record<SpecialOrderKind, string>> = {
   template: "Template",
   standing_order: "Standing Order Template",
@@ -1134,6 +1154,70 @@ export function customerLabel(c: CustomerName | null | undefined): string {
   if (company && person) return `${company} (${person})`;
   return company || person || "—";
 }
+
+/**
+ * The customer's own name as a PERSON, for copying into an order's day-of
+ * contact — not `customerLabel`, which composes "Company (Person)" for a
+ * reader and would put a company's name in a field labelled "Day-of contact
+ * name". Company is the FALLBACK rather than the lead: a company-only customer
+ * has no person to name, and the company is better than nothing.
+ */
+export function customerContactName(c: CustomerName | null | undefined): string {
+  if (!c) return "";
+  const person = [c.first_name, c.last_name].filter(Boolean).join(" ").trim();
+  return person || (c.company ?? "").trim();
+}
+
+/**
+ * WHAT "COPY TO CONTACT" WOULD DO, decided here rather than in the component so
+ * its edge cases can be asserted (`scripts/fixtures/specialOrders.fixtures.ts`).
+ *
+ * Three rules, each of which is a bug if you get it backwards:
+ *   · ONLY NON-EMPTY SOURCE VALUES TRAVEL. A customer with no email must not
+ *     blank an email somebody typed on the order — copying an absence is a
+ *     delete wearing a copy's label.
+ *   · `changing` DROPS VALUES THAT ALREADY MATCH, so pressing the button twice
+ *     is a no-op and the confirm never asks about a field it would not touch.
+ *     Compared trimmed, or " Jane" vs "Jane" reads as a change forever.
+ *   · `replacing` IS THE SUBSET THAT OVERWRITES SOMETHING. Filling an EMPTY
+ *     field is not a replacement and must not raise a confirm, or the common
+ *     case — a fresh order with nothing typed yet — costs a dialog for nothing.
+ */
+export type ContactCopyPlan = {
+  /** The columns to write, already trimmed. Empty when there is nothing to do. */
+  wanted: { contact_name?: string; contact_phone?: string; contact_email?: string };
+  /** The keys of `wanted` whose current value differs. */
+  changing: string[];
+  /** The subset of `changing` that would overwrite a non-empty value. */
+  replacing: string[];
+};
+
+export function contactCopyPlan(
+  from: { name: string; phone: string | null; email: string | null } | null,
+  onto: { name: string | null; phone: string | null; email: string | null },
+): ContactCopyPlan {
+  const wanted: Record<string, string> = {};
+  if (from?.name?.trim()) wanted.contact_name = from.name.trim();
+  if (from?.phone?.trim()) wanted.contact_phone = from.phone.trim();
+  if (from?.email?.trim()) wanted.contact_email = from.email.trim();
+
+  const current: Record<string, string> = {
+    contact_name: (onto.name ?? "").trim(),
+    contact_phone: (onto.phone ?? "").trim(),
+    contact_email: (onto.email ?? "").trim(),
+  };
+
+  const changing = Object.keys(wanted).filter((k) => current[k] !== wanted[k]);
+  const replacing = changing.filter((k) => current[k] !== "");
+  return { wanted, changing, replacing };
+}
+
+/** What the confirm calls each field — the labels the detail screen shows. */
+export const CONTACT_FIELD_LABEL: Record<string, string> = {
+  contact_name: "Day-of contact",
+  contact_phone: "Contact phone",
+  contact_email: "Contact email",
+};
 
 /** Sortable, and the way a roster is read: last name first. */
 export function customerSortKey(c: CustomerName | null | undefined): string {

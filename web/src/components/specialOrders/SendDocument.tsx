@@ -319,9 +319,9 @@ export function SendDocument({
       disabled: busy !== null,
     }));
   const documentItems: ActionMenuItem[] = [
-    { label: "Preview", items: submenu(preview) },
-    { label: "Download", items: submenu(download) },
-    { label: "Email…", items: submenu(openCompose) },
+    { label: "Preview Order", items: submenu(preview) },
+    { label: "Download Order", items: submenu(download) },
+    { label: "Email Order…", items: submenu(openCompose) },
   ];
 
   return (

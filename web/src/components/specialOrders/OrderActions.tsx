@@ -9,7 +9,12 @@ import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { TextInput } from "@/components/ui/TextInput";
-import { FLAG_TODO, type SpecialOrderKind, type SpecialOrderStatus } from "@/lib/specialOrders";
+import {
+  FLAG_TODO,
+  KIND_COMMAND_NOUN,
+  type SpecialOrderKind,
+  type SpecialOrderStatus,
+} from "@/lib/specialOrders";
 import {
   deleteConfirmMessage,
   deleteRefusal,
@@ -284,7 +289,11 @@ export function OrderActions({
 
   if (children) {
     const edit: ActionMenuItem[] = [
-      { label: "Duplicate", onSelect: () => duplicate("order"), disabled: pending },
+      {
+        label: `Duplicate ${KIND_COMMAND_NOUN[kind]}`,
+        onSelect: () => duplicate("order"),
+        disabled: pending,
+      },
       /**
        * THE TWO CONVERSIONS SIT UNDER DUPLICATE (Mark, 2026-09-20: "it would be
        * nice to be able to turn a regular order into a template… selecting
@@ -299,7 +308,7 @@ export function OrderActions({
       ...(kind !== "template"
         ? [
             {
-              label: "Convert into an Order Template",
+              label: `Convert ${KIND_COMMAND_NOUN[kind]} to Template`,
               onSelect: () => duplicate("template"),
               disabled: pending,
             },
@@ -308,7 +317,7 @@ export function OrderActions({
       ...(kind !== "standing_order"
         ? [
             {
-              label: "Convert into a Standing Order",
+              label: `Convert ${KIND_COMMAND_NOUN[kind]} to Standing`,
               onSelect: () => duplicate("standing_order"),
               disabled: pending,
             },
@@ -316,13 +325,16 @@ export function OrderActions({
         : []),
       flagReason
         ? { label: "Resolve Flag", onSelect: resolve, disabled: pending }
-        : { label: "Flag…", onSelect: () => setFlagging(true), disabled: pending },
+        : { label: `Flag ${KIND_COMMAND_NOUN[kind]}…`, onSelect: () => setFlagging(true), disabled: pending },
     ];
     const destructive: ActionMenuItem[] = [
+      // LITERAL, unlike its neighbours: this row is gated to `kind === "order"`
+      // two lines down, so its noun can only ever be "Order" and interpolating
+      // it would suggest a variation that cannot happen.
       ...(kind === "order" && status !== "cancelled"
         ? [{ label: "Cancel Order", onSelect: () => void cancel(), danger: true, disabled: pending }]
         : []),
-      { label: "Delete", onSelect: remove, danger: true, disabled: pending },
+      { label: `Delete ${KIND_COMMAND_NOUN[kind]}`, onSelect: remove, danger: true, disabled: pending },
     ];
     return (
       <>

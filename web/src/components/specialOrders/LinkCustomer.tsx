@@ -1,15 +1,21 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
+import { confirmDialog } from "@/lib/confirm";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
-import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { ControlField } from "@/components/ui/ControlField";
-import { customerLabel } from "@/lib/specialOrders";
+import {
+  CONTACT_FIELD_LABEL,
+  contactCopyPlan,
+  customerLabel,
+} from "@/lib/specialOrders";
 import {
   EMPTY_DRAFT,
   MIN_SEARCH,
@@ -64,18 +70,28 @@ export function LinkCustomer({
   orgId,
   currentCustomerId,
   currentCustomerLabel,
+  linkedCustomer,
   /** The order's day-of contact — the best search term, and the makings of the
    *  customer record when nobody matches. */
   contact,
   canWrite,
+  children,
 }: {
   orderId: string;
   orgId: string;
   currentCustomerId: string | null;
   /** Who is linked now, for the line the dialog opens on. */
   currentCustomerLabel: string | null;
+  /** The linked customer's OWN details, for "Copy to contact". Null when
+   *  nothing is linked. */
+  linkedCustomer: { name: string; phone: string | null; email: string | null } | null;
   contact: { name: string | null; phone: string | null; email: string | null };
   canWrite: boolean;
+  /** The menu's rows, handed back the way every other owner in
+   *  `OrderCommandMenu` does it. REQUIRED — there is no button-row fallback,
+   *  because the row of buttons this replaced is gone and a second way to draw
+   *  these commands is the drift that menu was built to end. */
+  children: (items: ActionMenuItem[]) => ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -84,6 +100,8 @@ export function LinkCustomer({
   /** Which half of the dialog is on screen. Never both. */
   const [mode, setMode] = useState<"find" | "new">("find");
   const [term, setTerm] = useState("");
+  /** What to search for when the dialog opens — see the effect below. */
+  const [seed, setSeed] = useState("");
   const [hits, setHits] = useState<CustomerHit[]>([]);
   const [draft, setDraft] = useState<CustomerDraft>(EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
@@ -101,12 +119,15 @@ export function LinkCustomer({
    * flickering back.
    */
   const latest = useRef(0);
-  async function runSearch(next: string) {
-    setTerm(next);
-    if (next.trim().length < MIN_SEARCH) {
-      setHits([]);
-      return;
-    }
+
+  /**
+   * THE FETCH HALF, split out so an EFFECT can call it. Everything here that
+   * touches state happens after the `await`; `runSearch` below keeps the two
+   * SYNCHRONOUS writes (`setTerm`, and clearing for a too-short term), which
+   * `react-hooks/set-state-in-effect` refuses in an effect body and which an
+   * event handler is the right place for.
+   */
+  async function fetchHits(next: string) {
     const mine = ++latest.current;
     const { hits: found, error: e } = await searchCustomers(supabase, next);
     if (mine !== latest.current) return;
@@ -114,10 +135,19 @@ export function LinkCustomer({
     setHits(found);
   }
 
+  async function runSearch(next: string) {
+    setTerm(next);
+    if (next.trim().length < MIN_SEARCH) {
+      setHits([]);
+      return;
+    }
+    await fetchHits(next);
+  }
+
   function openDialog() {
     // Seeded on OPEN, so a search you cleared and abandoned does not come back
     // empty next time, and a contact typed since the last look is picked up.
-    const seed = (contact.name ?? contact.email ?? contact.phone ?? "").trim();
+    const next = (contact.name ?? contact.email ?? contact.phone ?? "").trim();
     setMode("find");
     setDraft({
       ...EMPTY_DRAFT,
@@ -127,9 +157,39 @@ export function LinkCustomer({
     });
     setHits([]);
     setError(null);
+    // The box shows the seed immediately; the SEARCH for it happens in the
+    // effect below. Setting `term` here too keeps the field from rendering
+    // once with the last visit's words before the effect catches up.
+    setTerm(next);
+    setSeed(next);
     setOpen(true);
-    void runSearch(seed);
   }
+
+  /**
+   * THE SEEDED SEARCH RUNS FROM AN EFFECT, and that is a lint rule with a real
+   * point behind it rather than a workaround. `runSearch` reads
+   * `latest.current` — the stale-response guard above — and the moment "Link a
+   * Customer…" became a MENU ROW instead of a button, `openDialog` became
+   * reachable from the `items` array that `children(items)` consumes DURING
+   * RENDER. `react-hooks/refs` refuses a ref on that path, and it is right to:
+   * a value read while rendering is a value React has not promised is current.
+   *
+   * So OPENING is state now, and searching is a consequence of it. Typing in
+   * the box still calls `runSearch` directly, from an event handler, where a
+   * ref is exactly the right tool and nothing objects.
+   */
+  useEffect(() => {
+    if (!open) return;
+    // `openDialog` has already put the seed in the box and emptied the list, so
+    // a seed too short to search needs NOTHING here — which is also what keeps
+    // this effect free of a synchronous `setState`.
+    if (seed.trim().length < MIN_SEARCH) return;
+    void fetchHits(seed);
+    // `seed` is what changes when the dialog opens; `fetchHits` is redefined
+    // every render, so naming it here would re-run the search on every
+    // keystroke — the very thing the guard above exists to stop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, seed]);
 
   /**
    * `.select("id")` AND a row count, never a bare update: an update matching no
@@ -157,6 +217,68 @@ export function LinkCustomer({
     router.refresh();
   }
 
+  /** Which column currently holds what, for the confirm's "old → new" lines. */
+  function contactNow(key: string) {
+    if (key === "contact_name") return (contact.name ?? "").trim();
+    if (key === "contact_phone") return (contact.phone ?? "").trim();
+    return (contact.email ?? "").trim();
+  }
+
+  /**
+   * COPY THE CUSTOMER'S DETAILS ONTO THE ORDER'S DAY-OF CONTACT (Mark,
+   * 2026-09-21). The two are different fields on purpose — the contact is
+   * "often not the customer", filled on 7,735 of 8,330 real orders — but when
+   * they ARE the same person, typing it twice is the kind of work this app
+   * exists to remove.
+   *
+   * WHAT it would write is `contactCopyPlan` in `lib/specialOrders`, which is
+   * where the three rules that matter live and where they are asserted. This
+   * function is only the ASKING and the WRITING.
+   *
+   * IT ASKS FIRST WHEN IT WOULD REPLACE SOMETHING, naming each old → new.
+   * Overwriting is the point so it never refuses — but 93% of real orders
+   * already carry a contact name, which makes silent replacement the common
+   * case rather than the rare one. Filling empties just writes.
+   *
+   * `.select("id")` and a row count for the reason `link` spells out above:
+   * under RLS an update matching nothing is NOT an error.
+   */
+  async function copyToContact() {
+    const { wanted, changing, replacing } = contactCopyPlan(linkedCustomer, contact);
+    if (changing.length === 0) return;
+
+    if (replacing.length > 0) {
+      const lines = replacing
+        .map((k) => `· ${CONTACT_FIELD_LABEL[k]}: ${contactNow(k)} → ${wanted[k as keyof typeof wanted]}`)
+        .join("\n");
+      const ok = await confirmDialog({
+        title:
+          replacing.length === 1 ? "Replace the contact detail?" : "Replace the contact details?",
+        body: `The day-of contact is often not the customer, so check this is what you want.\n\n${lines}`,
+        confirmLabel: "Copy to contact",
+      });
+      if (!ok) return;
+    }
+
+    setBusy(true);
+    setError(null);
+    const { data, error: e } = await supabase
+      .from("special_orders")
+      .update(wanted)
+      .eq("id", orderId)
+      .select("id");
+    setBusy(false);
+    if (e) {
+      setError(e.message);
+      return;
+    }
+    if (!data?.length) {
+      setError("Not allowed — you need supervisor access to change this.");
+      return;
+    }
+    router.refresh();
+  }
+
   /** Write the described customer, then point the order at it. */
   async function createAndLink() {
     if (!draftIsUsable(draft)) return;
@@ -176,15 +298,60 @@ export function LinkCustomer({
     await link(data.id as string);
   }
 
-  if (!canWrite) return null;
+  if (!canWrite) return <>{children([])}</>;
 
   const setField = (patch: Partial<CustomerDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
+  /**
+   * THE ROWS, not buttons (Mark, 2026-09-21: "let's add 'Unlink Customer' and
+   * 'Copy Customer to Contact' actions to the action menu instead of having
+   * buttons next to the customer name"). They were a pair of small buttons in
+   * the Customer row for about an hour; the menu is where this record's other
+   * commands already live, and the argument that put them there — "they are
+   * all different sizes and colors, and it looks disorganized" — applies to
+   * two more buttons in a detail row just as well.
+   *
+   * LINKING MOVED TOO, though it was not named. Leaving "Link a customer" as
+   * the one command still drawn beside the field would mean linking and
+   * unlinking — the same decision in two directions — living in two different
+   * places, which is worse than either arrangement on its own.
+   *
+   * UNLINK IS NOT `danger`. Red in this menu is Cancel Order and Delete, both
+   * irreversible. Unlinking loses nothing: both records survive and re-linking
+   * is two clicks.
+   *
+   * COPY IS DISABLED RATHER THAN HIDDEN when it would do nothing — the
+   * customer has no details, or the contact already holds them all. A menu
+   * keeps its shape; a row that vanishes is harder to find again than one
+   * greyed out, which is the opposite of the call a BUTTON in a row would
+   * make.
+   */
+  const copy = contactCopyPlan(linkedCustomer, contact);
+  const items: ActionMenuItem[] = currentCustomerId
+    ? [
+        {
+          label: "Copy Customer to Contact…",
+          onSelect: () => void copyToContact(),
+          disabled: busy || copy.changing.length === 0,
+        },
+        { label: "Unlink Customer", onSelect: () => void link(null), disabled: busy },
+      ]
+    : [{ label: "Link to Customer…", onSelect: openDialog }];
+
   return (
     <>
-      <button type="button" className={BUTTON_CLASS} onClick={openDialog}>
-        {currentCustomerId ? "Change customer" : "Link a customer"}
-      </button>
+      {children(items)}
+
+      {/* A FAILURE FROM A MENU ROW HAS NOWHERE ELSE TO GO. `link` and
+          `copyToContact` report through `error`, which is otherwise rendered
+          inside the dialog — fine while every call came from in there, and
+          silent now that both fire from a menu that has already closed. The
+          one that matters is real: both turn a zero-row update into "you need
+          supervisor access", which a supervisor WILL hit. Placed and dressed
+          like `OrderActions`' line, since they now sit in the same menu. */}
+      {!open && error ? (
+        <p className="max-w-sm text-right text-[13px] text-accent">{error}</p>
+      ) : null}
 
       {open && (
         <Dialog
@@ -241,19 +408,6 @@ export function LinkCustomer({
           }
           footer={
             <>
-              {mode === "find" && currentCustomerId ? (
-                // `mr-auto` puts it at the far left of a footer that is
-                // otherwise right-aligned: it is neither the commit nor the way
-                // out, and it should not sit next to either.
-                <button
-                  type="button"
-                  className={`${DANGER_BUTTON_CLASS} mr-auto`}
-                  disabled={busy}
-                  onClick={() => link(null)}
-                >
-                  Unlink
-                </button>
-              ) : null}
               <button
                 type="button"
                 className={DIALOG_CANCEL_CLASS}
@@ -283,7 +437,16 @@ export function LinkCustomer({
                   seeded with the order's CONTACT, who is often not the
                   customer — so on a linked order the dialog would otherwise
                   open reading "Nobody matches" with nothing on screen naming
-                  the person it is about to replace. */}
+                  the person it is about to replace.
+
+                  CURRENTLY UNREACHABLE, and kept deliberately: since the
+                  trigger became Unlink / Link-a-customer (2026-09-21) this
+                  dialog only opens with NOTHING linked, so the label is always
+                  null and this never renders. Same for the "Linked now" tag on
+                  a hit below. Both are correct code that costs nothing and
+                  would come straight back to life if a one-step Change ever
+                  returns — which is the likelier direction than them being
+                  wrong. Delete them if that stops being true. */}
               {currentCustomerLabel && (
                 <p className="mb-4 text-[13px] text-muted">
                   Linked now: <span className="text-ink">{currentCustomerLabel}</span>
