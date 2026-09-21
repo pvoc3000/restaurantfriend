@@ -88,16 +88,20 @@ export const DANGER_BUTTON_CLASS =
 // hover rule can't force its ground white and wipe the fill) and `mac-stop`,
 // which re-earns the 2px edge and keeps the red while held.
 //
-// THE PRIMARY ONE IS A BLUE INNER GLOW ON WHITE since 2026-09-21 (Mark), which
-// is `mac-primary` — darkest at the border, fading to white under the type.
-// It was filled light grey from 2026-09-11 until then. It keeps
-// `mac-own-hover` so the plain rules can't paint grey over the blue.
+// THE PRIMARY ONE IS A PALE BLUE FILL since 2026-09-21 (Mark) — `bg-commit-fill`
+// (#e3edfb) under black type, with `mac-primary` giving it the fields' 2px edge
+// on hover; held, it keeps the blue and drops. Light grey from 2026-09-11 until
+// then. A soft blue inner GLOW shipped in between and lasted one commit;
+// `mac-look.css` explains it at length, because WHY it was reversed is the
+// useful part. It keeps `mac-own-hover` so the plain rules can't paint grey
+// over the blue.
 //
-// THE TWO NO LONGER MATCH, deliberately and temporarily (Mark: "leave the
-// danger button alone for a while"): one filled command glows and the other is
-// a flat wash. Settle it before assuming either is wrong.
+// THE TWO FILLED COMMANDS NOW AGREE: a pale wash under black type — blue for
+// the one command a screen is pointing at, red for the one that destroys
+// something. The same sentence in two colours, which is what the glow could
+// never quite say while its neighbour stayed flat.
 export const PRIMARY_BUTTON_CLASS =
-  "mac-control mac-own-hover mac-primary inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink disabled:opacity-35";
+  "mac-control mac-own-hover mac-primary inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-commit-fill px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink disabled:opacity-35";
 
 export const BUTTON_CLASS =
   "mac-control inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";

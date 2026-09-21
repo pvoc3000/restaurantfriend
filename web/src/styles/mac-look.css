@@ -150,48 +150,50 @@
    is gone rather than left behind as a class that still works and means
    nothing. */
 
-/* THE COMMIT: A BLUE INNER GLOW ON WHITE (Mark, 2026-09-21) —
-   `PRIMARY_BUTTON_CLASS` and `DIALOG_COMMIT_CLASS`, which share this dress.
-   Darkest at the edge, fading to clean white under the type, with BLACK type
-   throughout. `--rf-action-primary-glow` holds the colour and the 55%.
+/* THE COMMIT: A PALE BLUE FILL (Mark, 2026-09-21) — `PRIMARY_BUTTON_CLASS`
+   and `DIALOG_COMMIT_CLASS`, which share this dress. `--rf-blue-100`
+   (#e3edfb) under BLACK type, 17.8:1.
 
-   IT IS THE FIRST BLURRED THING IN THE APP, and that is a real departure
-   rather than a tweak: this file already breaks the design system's "no
-   shadows" and "no textures" rules, but every exception until now has been a
-   hard-edged 3px block. Mark asked for it by name after three flat blues were
-   too heavy ("too blue, or too dark blue, for my tastes"), and after a softer
-   version was tried and found too faint.
+   A SOFT BLUE INNER GLOW SHIPPED FIRST AND LASTED ONE COMMIT, and the reason
+   is worth keeping. It won on mockups — it was picked over four flat blues and
+   three softer glows, all rendered side by side — and Mark reversed it within
+   the hour of seeing it on a real screen: "okay seeing it in the app changes my
+   opinion". The mockups were honest but they were shown ZOOMED and in
+   ISOLATION, which flatters an effect that is mostly visible at 2x on a white
+   page with nothing else competing. THE LESSON, for the next time this file is
+   restyled: judge a control at 1x, in a real screen, among the things it
+   actually sits beside. A specimen page is for confirming a decision, not for
+   making one.
 
-   IT WAS GREY, #c0c0c0, from 2026-09-11 until this — and `bg-neutral-600` with
-   white type for an hour before that. The class now carries `bg-white`.
+   Two smaller things died with the glow, both deliberately rather than by
+   neglect: `--rf-blue-500`/`--rf-action-primary-glow`, which had no callers
+   left, and the glow's width dependence — an inset shadow's strength varies
+   with the button's width, so `OK` read bluer than `Close pay period…` from
+   the one class. A flat fill has no such behaviour; every primary button is
+   now the same colour at every label length.
 
-   KNOWN AND ACCEPTED: an inset glow's strength depends on the button's WIDTH,
-   because the glow from each edge overlaps on a short one. `OK` reads bluer
-   than `Close pay period…` from the same class. A top-and-bottom-only form was
-   built and measured and is width-stable; Mark chose this one anyway, having
-   seen both. Don't "fix" it without asking.
+   IT WAS GREY, #c0c0c0, from 2026-09-11 until that day, and `bg-neutral-600`
+   with white type for an hour before that.
 
-   THE DESTRUCTIVE BUTTON DELIBERATELY DID NOT FOLLOW (Mark: "leave the danger
-   button alone for a while"). So the app currently has one filled command that
-   glows and one that is flat — `.mac-stop` above — which is a KNOWN temporary
-   mismatch and not an oversight. If the glow stays, that is the next thing to
-   settle. */
+   Hover is the fields' 2px edge rather than a fill, and held it drops into its
+   shadow and KEEPS the blue — the light grey every other held button shows
+   would put mud over it.
+
+   THE DESTRUCTIVE BUTTON IS A DIFFERENT WASH ON PURPOSE — `.mac-stop` above,
+   black on red. Both are now pale fills under black type, so the two read as
+   one system, which the glow never quite managed. */
 .mac-control.mac-primary {
-  box-shadow: 3px 3px 0 0 #000, inset 0 0 10px 0 var(--rf-action-primary-glow);
+  background-color: var(--rf-action-primary-fill);
 }
 
 .mac-primary:not(:disabled):hover {
-  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000,
-    inset 0 0 10px 0 var(--rf-action-primary-glow);
+  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000;
 }
 
-/* Held, it drops into its shadow (`.mac-control:active`) and keeps both the
-   2px edge and the glow — the grey fill every other held button shows would
-   put mud over the blue. */
 .mac-control.mac-primary:not(:disabled):active {
+  background-color: var(--rf-action-primary-fill);
   color: #000;
-  box-shadow: inset 0 0 0 1px #000,
-    inset 0 0 10px 0 var(--rf-action-primary-glow);
+  box-shadow: inset 0 0 0 1px #000;
 }
 
 .mac-primary:not(:disabled):active * {

@@ -7,8 +7,9 @@
         that record. Three fills exist — go, stop, attention — and they only
         ever appear inside a control or a cell, never across a whole screen.
    Blue was deliberately absent until 2026-09-21, when the PRIMARY COMMAND
-   gained a soft inner glow (Mark, after rejecting three flat blues: "too blue,
-   or too dark blue, for my tastes"). The part of the rule that carried the
+   gained a pale blue fill (Mark, after rejecting three saturated blues: "too
+   blue, or too dark blue, for my tastes"). A soft inner GLOW shipped first and
+   lasted one commit — see the note on `.mac-primary` in mac-look.css. The part of the rule that carried the
    weight is untouched: LINKS ARE STILL BLACK AND UNDERLINED, the way the
    original printed guide read. Blue is not a link colour here and must not
    become one — it means "this is the command", on at most one control per
@@ -59,10 +60,14 @@
   --rf-yellow-700: #a88a00;
   --rf-yellow-800: #6b5800;
 
-  /* Blue — the primary command's inner glow, and nothing else. One shade,
+  /* Blue — the primary command's fill, and nothing else. One shade,
      deliberately: a second would invite blue as a decoration, which rule 2 at
-     the top of this file forbids. See `.mac-primary` in styles/mac-look.css. */
-  --rf-blue-500: #3366cc;
+     the top of this file forbids. A "100" rather than a "200" because that is
+     where it measures — 17.8:1 under black, beside green-100's 17.9 — and the
+     200-level fills are all STATE (go, stop, mark). This is a COMMAND, so it
+     deliberately sits a step lighter than any of them and cannot be mistaken
+     for one. See `.mac-primary` in styles/mac-look.css. */
+  --rf-blue-100: #e3edfb;
 
   /* Orange — the invoice status ladder's "Submitted" rung (Mark, 2026-09-03):
      pushed to QuickBooks, waiting on payment. It sits between Approved's
@@ -102,9 +107,7 @@
   --rf-action-primary-bg-hover: var(--rf-neutral-800);
   --rf-action-primary-bg-disabled: var(--rf-neutral-300);
   --rf-action-primary-fg: var(--rf-white);
-  /* The glow itself, so the 55% lives in ONE place. `color-mix` with
-     transparent is Safari 16.2+, inside the 16.4 floor CLAUDE.md sets. */
-  --rf-action-primary-glow: color-mix(in srgb, var(--rf-blue-500) 55%, transparent);
+  --rf-action-primary-fill: var(--rf-blue-100);
   --rf-action-danger-fg: var(--rf-red-500);
   --rf-action-danger-border: var(--rf-red-500);
   --rf-action-danger-bg-hover: var(--rf-red-50);

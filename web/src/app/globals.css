@@ -30,6 +30,11 @@
   --color-accent: var(--rf-red-500);
   --color-mark: var(--rf-yellow-500);
   --color-mark-fill: var(--rf-yellow-200);
+  /* The primary command's ground. Named for the JOB, not the hue: the other
+     fills here are STATE (go/stop/mark) and this one is the one command a
+     screen is pointing at. `PRIMARY_BUTTON_CLASS` was a raw `bg-[#c0c0c0]`
+     before this, which is why nothing could find it. */
+  --color-commit-fill: var(--rf-blue-100);
   --font-sans: var(--rf-font-sans);
   --radius-*: initial; /* kill Tailwind's radii — the system is square */
   --shadow-*: initial; /* kill Tailwind's shadows */
