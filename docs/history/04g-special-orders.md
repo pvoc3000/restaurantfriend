@@ -1804,6 +1804,32 @@
    and a note to whoever picks this up next reads the same on a template as on
    an order. The only rows skipped are the ones already saying it.
 
+   **SET COMPLETION DATE IS A DIALOG, WHERE EVERY OTHER COMMAND IS A MENU ROW**
+   (Mark, same day: "add the ability to batch set the various completion dates
+   for selected special orders"). It takes TWO answers — which of the nine, and
+   what it should say — and a submenu could ask the first while assuming the
+   second is today, which is right for the batch you have just printed and wrong
+   for the batch you printed yesterday. Backfilling is most of why anybody
+   reaches for this.
+   **AN EMPTY DATE CLEARS, AND THE COMMIT BUTTON SAYS WHICH** — "Clear on 6"
+   against "Set on 6". A button labelled Set that unsets nine orders is the kind
+   of surprise a confirm exists to prevent, so the label carries it instead of a
+   second dialog. The record's own cells clear the same way, and "unset the
+   printed date on these six" is a real correction.
+   **NO "ALREADY SAYS IT" SKIP**, unlike the status and the to-do. Those are one
+   value out of a short vocabulary, where a row already on the rung is plainly
+   not moving; a date reading the 14th and being set to the 20th IS moving, and
+   a row whose date happens to match is a coincidence rather than a state.
+   **`COMPLETION_DATES` IS NOW SHARED** with the record's own block, which had
+   held the nine and their order since Mark arranged them on 2026-09-16. A
+   second copy is how one door quietly starts offering a date the other does
+   not. The LAYOUT stayed behind — `newRow`, which starts the first pair on a
+   fresh row — because that is the block's business and not the vocabulary's.
+   **`Mark Paid` STAYS, and Invoice paid is on the dialog's list too.** Two
+   doors to one COLUMN, not two implementations: the dialog writes a date
+   somebody chose, the verb is the named one with the balance warning attached,
+   and it was asked for by name.
+
    **MARK PAID IS THE `invoice_paid_at` STAMP** — the same word the list's Paid
    column, the ladder's rung and the record's green chip all mean, stamped with
    the ORG's calendar day. **IT DOES NOT TOUCH THE MONEY**, and that is a

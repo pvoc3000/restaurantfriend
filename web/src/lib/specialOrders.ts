@@ -134,6 +134,30 @@ export const TODO_OPTIONS: PickOption[] = [
   { value: "Invoice Overdue!", label: "Invoice Overdue!" },
 ];
 
+/**
+ * THE NINE COMPLETION DATES, in Mark's own arrangement (2026-09-16) — Order
+ * initiated alone, then the pairs: quote sent · approved, invoice sent · paid,
+ * delivery scheduled · receipt sent, order printed · order scheduled.
+ *
+ * ONE LIST, TWO SCREENS. The record's block has read this order since it was
+ * arranged; the list's batch command offers the same nine (2026-09-20), and a
+ * second copy is how one door quietly starts offering a date the other does
+ * not. It is NOT `STAGES`, which is the list's seven stage COLUMNS and carries
+ * its own short labels for a narrow grid — this one is the record's wording,
+ * read beside a field.
+ */
+export const COMPLETION_DATES: { column: string; label: string }[] = [
+  { column: "date_initiated", label: "Order initiated" },
+  { column: "quote_sent_at", label: "Quote sent" },
+  { column: "quote_returned_at", label: "Quote approved" },
+  { column: "invoice_sent_at", label: "Invoice sent" },
+  { column: "invoice_paid_at", label: "Invoice paid" },
+  { column: "delivery_scheduled_at", label: "Delivery scheduled" },
+  { column: "receipt_sent_at", label: "Receipt sent" },
+  { column: "order_printed_at", label: "Order printed" },
+  { column: "order_scheduled_at", label: "Order scheduled" },
+];
+
 /** Decision 4: flagging an order sets this todo, and resolving clears both. */
 export const FLAG_TODO = "Resolve Issue";
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { COMPLETION_DATES } from "@/lib/specialOrders";
 import { createClient } from "@/lib/supabase/client";
 import { WorkflowOffer } from "./WorkflowOffer";
 import {
@@ -79,20 +80,18 @@ export function CompletionDates({
 
   // MARK'S ARRANGEMENT (2026-09-16): Order initiated alone, then the pairs —
   // quote sent · approved, invoice sent · paid, delivery scheduled · receipt
-  // sent (swapped the same day), order printed · order scheduled. `newRow`
-  // starts the first pair on a fresh row, which leaves Initiated half width
-  // and alone above it.
-  const rows: { label: string; column: string; aria: string; newRow?: boolean }[] = [
-    { label: "Order initiated", column: "date_initiated", aria: "Order initiated" },
-    { label: "Quote sent", column: "quote_sent_at", aria: "Quote sent", newRow: true },
-    { label: "Quote approved", column: "quote_returned_at", aria: "Quote approved" },
-    { label: "Invoice sent", column: "invoice_sent_at", aria: "Invoice sent" },
-    { label: "Invoice paid", column: "invoice_paid_at", aria: "Invoice paid" },
-    { label: "Delivery scheduled", column: "delivery_scheduled_at", aria: "Delivery scheduled" },
-    { label: "Receipt sent", column: "receipt_sent_at", aria: "Receipt sent" },
-    { label: "Order printed", column: "order_printed_at", aria: "Order printed" },
-    { label: "Order scheduled", column: "order_scheduled_at", aria: "Order scheduled" },
-  ];
+  // sent (swapped the same day), order printed · order scheduled.
+  //
+  // THE LIST IS `COMPLETION_DATES` SINCE 2026-09-20, shared with the batch
+  // command that offers the same nine: a second copy is how one door quietly
+  // starts offering a date the other does not. What stays HERE is the layout —
+  // `newRow` starts the first pair on a fresh row, leaving Initiated half width
+  // and alone above it, which is this block's business and not the vocabulary's.
+  const rows = COMPLETION_DATES.map((d) => ({
+    ...d,
+    aria: d.label,
+    newRow: d.column === "quote_sent_at",
+  }));
 
   // A PICKUP HAS NO DELIVERY TO SCHEDULE (Mark, 2026-09-16), so that date is
   // greyed there — kept in its slot, box and all, so the pairs stay put. A

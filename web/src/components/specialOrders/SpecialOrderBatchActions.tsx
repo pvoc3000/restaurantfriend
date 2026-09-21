@@ -8,6 +8,7 @@ import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { deleteBlock, type DeleteBlock } from "@/lib/specialOrderWrites";
 import {
+  COMPLETION_DATES,
   STATUS_LABEL,
   STATUS_ORDER,
   TODO_OPTIONS,
@@ -15,6 +16,9 @@ import {
   money,
   type SpecialOrderStatus,
 } from "@/lib/specialOrders";
+import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
+import { DateField } from "@/components/ui/DateField";
+import { PickList } from "@/components/ui/PickList";
 import type { SpecialOrderRow } from "./SpecialOrdersList";
 
 /**
@@ -45,7 +49,8 @@ import type { SpecialOrderRow } from "./SpecialOrdersList";
  * WHAT IS HERE, AND WHAT IS DELIBERATELY NOT
  * ---------------------------------------------------------------------------
  * Set Status ▸ (the ladder, Cancelled included), Set To-do ▸ (the vocabulary,
- * and Clear), Mark Paid, Resolve Flags, Delete Selected. Every one of them
+ * and Clear), Set Completion Date… (the record's own nine, any date, or
+ * cleared), Mark Paid, Resolve Flags, Delete Selected. Every one of them
  * exists for a single order somewhere else,
  * and each is the SAME rule applied to more rows rather than a second reading
  * of it.
@@ -88,8 +93,23 @@ export function SpecialOrderBatchActions({
   const supabase = createClient();
   const router = useRouter();
   const [busy, setBusy] = useState<
-    "status" | "cancel" | "flags" | "paid" | "todo" | "delete" | null
+    "status" | "cancel" | "flags" | "paid" | "todo" | "dates" | "delete" | null
   >(null);
+
+  /**
+   * THE COMPLETION-DATE DIALOG's state (Mark, 2026-09-20: "add the ability to
+   * batch set the various completion dates for selected special orders").
+   *
+   * A DIALOG, WHERE EVERY OTHER COMMAND HERE IS A MENU ROW, because this one
+   * takes two answers: WHICH of the nine dates, and WHAT it should say. A
+   * submenu could ask the first and would have to assume the second is today —
+   * which is right for the batch you have just printed and wrong for the batch
+   * you printed yesterday, and backfilling is most of why somebody reaches for
+   * this at all.
+   */
+  const [dating, setDating] = useState(false);
+  const [dateColumn, setDateColumn] = useState("");
+  const [dateValue, setDateValue] = useState<string | null>(today);
 
   /**
    * DECISION 3's BICONDITIONAL DECIDES WHO CAN BE CANCELLED. Migration 051's
@@ -230,6 +250,46 @@ export function SpecialOrderBatchActions({
               stillOwing.length === 1 ? "owes" : "owe"
             } ${money(owed)} — no payments were recorded.`
           : ""),
+      "done"
+    );
+  }
+
+  /**
+   * THE CHOSEN DATE, ON EVERY TICKED ROW.
+   *
+   * NO "ALREADY SAYS IT" SKIP, unlike the status and the to-do. Those two are
+   * one value out of a short vocabulary, where a row already on the rung is
+   * plainly not moving; a DATE that already reads 2026-09-14 and is being set
+   * to 2026-09-20 IS moving, and a row whose date happens to match is a
+   * coincidence rather than a state. The write covers the selection, and the
+   * report counts what the database actually changed.
+   *
+   * AN EMPTY DATE CLEARS, and the commit button says so rather than the dialog
+   * needing a second control — the record's own cells clear the same way, and
+   * "unset the printed date on these six" is a real correction.
+   */
+  async function setCompletionDate() {
+    const label = COMPLETION_DATES.find((d) => d.column === dateColumn)?.label ?? dateColumn;
+    setBusy("dates");
+    const { data, error } = await supabase
+      .from("special_orders")
+      .update({ [dateColumn]: dateValue })
+      .in("id", selected.map((r) => r.id))
+      .select("id");
+    setBusy(null);
+    // THE DIALOG CLOSES WHATEVER HAPPENS, and that is not tidiness: `onReport`
+    // clears the selection, so a dialog left open would be offering "Set on 0"
+    // over a message it was covering up.
+    setDating(false);
+    if (error) return onReport(error.message, "error");
+    if (!data?.length) {
+      return onReport("Nothing was changed — the database refused it and said nothing.", "error");
+    }
+    router.refresh();
+    onReport(
+      dateValue === null
+        ? `Cleared ${label} on ${plural(data.length, "order")}.`
+        : `Set ${label} to ${dateValue} on ${plural(data.length, "order")}.`,
       "done"
     );
   }
@@ -513,6 +573,27 @@ export function SpecialOrderBatchActions({
           ],
         },
         {
+          /**
+           * THE ELLIPSIS MEANS A DIALOG FOLLOWS, as it does everywhere else in
+           * this app. It asks which date and what it should say — see the
+           * dialog's own note.
+           *
+           * INVOICE PAID IS ON THE LIST HERE TOO, and `Mark Paid` below stays
+           * where it is. That is two doors to one COLUMN and not two
+           * implementations: this one writes a date somebody chose, that one is
+           * the named verb with the balance warning attached, and Mark asked
+           * for it by name. Deleting it to tidy the menu would take away the
+           * thing he uses to take away the thing he might.
+           */
+          label: busy === "dates" ? "Setting…" : `Set Completion Date… (${selected.length})`,
+          onSelect: () => {
+            setDateColumn("");
+            setDateValue(today);
+            setDating(true);
+          },
+          disabled: busy !== null || selected.length === 0,
+        },
+        {
           label: busy === "paid" ? "Marking…" : `Mark Paid (${markable.length})`,
           onSelect: () => void markPaid(),
           disabled: busy !== null || markable.length === 0,
@@ -531,5 +612,95 @@ export function SpecialOrderBatchActions({
       ]
     : [];
 
-  return <>{children(items)}</>;
+  return (
+    <>
+      {children(items)}
+
+      {dating && (
+        <Dialog
+          title="Set a completion date"
+          onClose={() => {
+            if (busy === null) setDating(false);
+          }}
+          busy={busy === "dates"}
+          width="max-w-md"
+          /* ENTER COMMITS, because this dialog is a form — the app's rule, and
+             it is opt-in, so it is stated here. */
+          onSubmit={() => {
+            if (dateColumn && busy === null) void setCompletionDate();
+          }}
+          footer={
+            <div className="flex items-center justify-end gap-4">
+              <button
+                type="button"
+                className={DIALOG_CANCEL_CLASS}
+                onClick={() => setDating(false)}
+                disabled={busy !== null}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={DIALOG_COMMIT_CLASS}
+                onClick={() => void setCompletionDate()}
+                disabled={!dateColumn || busy !== null}
+              >
+                {/* THE BUTTON SAYS WHICH OF THE TWO THINGS IT IS ABOUT TO DO.
+                    An empty date clears rather than writes, and a commit
+                    labelled "Set" that unsets nine orders is the kind of
+                    surprise a confirm exists to prevent — so the label carries
+                    it instead of a second dialog. */}
+                {busy === "dates"
+                  ? "Saving…"
+                  : dateValue === null
+                    ? `Clear on ${selected.length}`
+                    : `Set on ${selected.length}`}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-5">
+            <label className="block space-y-1.5">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                Which date
+                <span className="text-accent"> *</span>
+              </span>
+              {/* The record's own nine, in the record's own order — one list,
+                  shared, so the two doors cannot drift. */}
+              <PickList
+                value={dateColumn}
+                onPick={setDateColumn}
+                variant="field"
+                placeholder="Choose one"
+                ariaLabel="Which completion date"
+                options={COMPLETION_DATES.map((d) => ({ value: d.column, label: d.label }))}
+                className="w-full"
+              />
+            </label>
+
+            <label className="block space-y-1.5">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                Date
+              </span>
+              {/* `ui/DateField`, never a bare date input: it carries the Safari
+                  empty-date apparatus, and this box can legitimately be emptied,
+                  which is exactly where that bug bites. */}
+              <DateField
+                value={dateValue}
+                onChange={setDateValue}
+                ariaLabel="The date to set"
+                boxed
+              />
+            </label>
+
+            <p className="text-[13px] text-muted">
+              {dateValue === null
+                ? "Empty — this clears the date."
+                : "This writes the same date to every selected order, whatever each one says now."}
+            </p>
+          </div>
+        </Dialog>
+      )}
+    </>
+  );
 }
