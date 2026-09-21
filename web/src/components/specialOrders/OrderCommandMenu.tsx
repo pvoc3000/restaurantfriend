@@ -35,8 +35,8 @@ function group(items: ActionMenuItem[]): ActionMenuItem[] {
  * A CLIENT component because render props are functions, and the record screen
  * that places it is a server component.
  *
- * Grouped: the documents, then QuickBooks, then Duplicate and Flag, then
- * scheduling, then Cancel and Delete.
+ * Grouped: New Order, then the documents, then QuickBooks, then Duplicate and
+ * Flag, then scheduling, then Cancel and Delete.
  */
 export function OrderCommandMenu({
   send,
@@ -72,30 +72,39 @@ export function OrderCommandMenu({
         withCreate((createItems) => (
           <OrderActions {...actions}>
             {({ edit, destructive }) => {
-              const leading = [...documentItems, ...group(quickbooksItems)];
-              // NEW ORDER SITS DIRECTLY ABOVE DUPLICATE, in a group of its own.
-              // Those two are the only rows here that end with a DIFFERENT
-              // order on screen — one from this shape, one from nothing — while
-              // everything above them acts on the record you are standing on.
-              // It gets its own rule because it is the one command on this menu
-              // that is not about this order at all.
-              //
-              // A GROUP ONLY WEARS ITS RULE WHEN SOMETHING IS ABOVE IT. On a
-              // template there are no documents and no QuickBooks row, so the
-              // first group would otherwise open the menu with a line across
-              // the top of nothing.
-              const createGroup = leading.length ? group(createItems) : createItems;
-              const above = leading.length > 0 || createGroup.length > 0;
+              /**
+               * THE GROUPS, IN READING ORDER — and the rules fall out of the
+               * list rather than being reasoned about one at a time.
+               *
+               * NEW ORDER LEADS (Mark, 2026-09-20: "'new order…' should appear
+               * at the top of the actionmenu"). It sat above Duplicate for a
+               * day, on the argument that those two are the pair that end with
+               * a DIFFERENT order on screen. The top is better and for the
+               * same reason read the other way round: it is the one row here
+               * that is not about this order at all, so it belongs before the
+               * menu starts talking about this one — and it is the row you
+               * reach for while the last order is still open, which is to say
+               * without reading the menu.
+               *
+               * A RULE ABOVE EVERY GROUP BUT THE FIRST, with the empty ones
+               * dropped BEFORE that is decided. This replaces three hand-made
+               * conditionals that each had to know what might be above them —
+               * on a template there are no documents and no QuickBooks row, and
+               * the menu would otherwise have opened with a line drawn across
+               * the top of nothing.
+               */
+              const groups = [
+                createItems,
+                documentItems,
+                quickbooksItems,
+                edit,
+                scheduleItems,
+                destructive,
+              ].filter((g) => g.length > 0);
               return (
                 <ActionMenu
                   ariaLabel={`Actions for order ${actions.number}`}
-                  items={[
-                    ...leading,
-                    ...createGroup,
-                    ...(above ? group(edit) : edit),
-                    ...group(scheduleItems),
-                    ...group(destructive),
-                  ]}
+                  items={groups.flatMap((g, i) => (i === 0 ? g : group(g)))}
                 />
               );
             }}

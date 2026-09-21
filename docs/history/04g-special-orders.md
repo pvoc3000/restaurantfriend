@@ -1870,16 +1870,18 @@
    button. A create form written again on the record is exactly the "second
    version that never behaves quite like the first" the conventions warn about,
    and this one would have had to learn pickup/delivery twice.
-   **IT SITS IN ITS OWN GROUP, DIRECTLY ABOVE DUPLICATE.** Those two are the
-   only rows on the menu that end with a DIFFERENT order on screen — one from
-   this shape, one from nothing — where everything above them acts on the record
-   you are standing on. Its own rule, because it is the one command here that is
-   not about this order at all.
-   **A GROUP ONLY WEARS ITS RULE WHEN SOMETHING IS ABOVE IT.** On a template
-   there are no documents and no QuickBooks row, so the first group would have
-   opened the menu with a line drawn across the top of nothing — the condition
-   the edit group already carried, now reckoning with a second optional group
-   before it.
+   **IT LEADS THE MENU** (Mark, same day: "'new order…' should appear at the top
+   of the actionmenu"). It sat above Duplicate for a few hours, on the argument
+   that those two are the pair that end with a DIFFERENT order on screen. The
+   top is better, and for the same reason read the other way round: it is the
+   one row here that is not about this order at all, so it belongs before the
+   menu starts talking about this one — and it is the row you reach for while
+   the last order is still open, which is to say without reading the menu.
+   **THE RULES NOW FALL OUT OF A LIST OF GROUPS**, empties dropped first and a
+   rule above every group but the first. That replaced three hand-made
+   conditionals, each of which had to know what might be above it: on a template
+   there are no documents and no QuickBooks row, so the first group would
+   otherwise open the menu with a line drawn across the top of nothing.
    **The two labels differ on purpose**: the list's button says "New special
    order" beside a heading reading SPECIAL ORDERS, where the word would be said
    twice; the menu row says "New Order…" above "Duplicate", where it has to name
