@@ -135,7 +135,6 @@ export function AddTemplateItem({
                 onValueChange={setPrompt}
                 fullWidth
                 autoFocus
-                placeholder="Walk-in temperature"
                 aria-label="Task"
               />
             </label>

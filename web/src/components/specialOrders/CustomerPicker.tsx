@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 import { TextInput } from "@/components/ui/TextInput";
+import { ControlField } from "@/components/ui/ControlField";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { customerLabel } from "@/lib/specialOrders";
 import {
@@ -122,36 +123,45 @@ export function CustomerPicker({
           </button>
         </div>
 
+        {/* CAPTIONED, NOT HINTED (Mark, 2026-09-21, sweeping the app's
+            placeholders): these four boxes wore their own names as placeholder
+            text, which is the one use of it a blank field cannot give up — so
+            the name moved ABOVE the box, where the rest of the app puts it, and
+            the box starts empty like every other. */}
         <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-          <TextInput
-            value={d.name}
-            onValueChange={(v) => set({ name: v })}
-            placeholder="Their name"
-            aria-label="Customer name"
-            fullWidth
-            autoFocus
-          />
-          <TextInput
-            value={d.company}
-            onValueChange={(v) => set({ company: v })}
-            placeholder="Company"
-            aria-label="Customer company"
-            fullWidth
-          />
-          <TextInput
-            value={d.phone}
-            onValueChange={(v) => set({ phone: v })}
-            placeholder="Phone"
-            aria-label="Customer phone"
-            fullWidth
-          />
-          <TextInput
-            value={d.email}
-            onValueChange={(v) => set({ email: v })}
-            placeholder="Email"
-            aria-label="Customer email"
-            fullWidth
-          />
+          <ControlField label="Name">
+            <TextInput
+              value={d.name}
+              onValueChange={(v) => set({ name: v })}
+              aria-label="Customer name"
+              fullWidth
+              autoFocus
+            />
+          </ControlField>
+          <ControlField label="Company">
+            <TextInput
+              value={d.company}
+              onValueChange={(v) => set({ company: v })}
+              aria-label="Customer company"
+              fullWidth
+            />
+          </ControlField>
+          <ControlField label="Phone">
+            <TextInput
+              value={d.phone}
+              onValueChange={(v) => set({ phone: v })}
+              aria-label="Customer phone"
+              fullWidth
+            />
+          </ControlField>
+          <ControlField label="Email">
+            <TextInput
+              value={d.email}
+              onValueChange={(v) => set({ email: v })}
+              aria-label="Customer email"
+              fullWidth
+            />
+          </ControlField>
         </div>
 
         {/* Says what it needs BEFORE the commit refuses, since the Create

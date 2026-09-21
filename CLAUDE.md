@@ -137,6 +137,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 - `InlineValue`'s `className` REACHES ITS RESTING BUTTON ONLY, so a width passed to it does not survive the click
 - EVERY LIST SCREEN'S HEADER IS `ui/PageHeading`. THIS IS THE DEFAULT — a new page uses it without being asked
 - A NAV LABEL AND A PAGE TITLE NEED NOT MATCH
+- A FIELD STARTS EMPTY. A PLACEHOLDER IS EITHER A FORMAT OR IT IS GONE
 - THE SCREEN EXPLAINS ITSELF. STOP WRITING HINTS
 - IT IS A PAY PERIOD, NEVER A "FORTNIGHT"
 - The look is the `restaurantfriend-design` skill

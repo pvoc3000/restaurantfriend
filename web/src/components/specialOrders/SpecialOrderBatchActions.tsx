@@ -823,7 +823,6 @@ export function SpecialOrderBatchActions({
                   <TextInput
                     value={payAmount}
                     onValueChange={setPayAmount}
-                    placeholder="50.00"
                     aria-label="Amount received on each order"
                     fullWidth
                     autoFocus

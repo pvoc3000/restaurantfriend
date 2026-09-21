@@ -1750,7 +1750,6 @@ function NewTrayDialog({
           <TextInput
             value={trayNumber}
             onValueChange={setTrayNumber}
-            placeholder="01"
             aria-label="Tray number"
             // The pick lists beside it fill the track; the text box must say so
             // twice (wrapper and input) or it shrink-wraps — see ui/TextInput.
@@ -1874,7 +1873,6 @@ function EditTrayDialog({
           <TextInput
             value={trayNumber}
             onValueChange={setTrayNumber}
-            placeholder="01"
             aria-label="Tray number"
             // The pick lists beside it fill the track; the text box must say so
             // twice (wrapper and input) or it shrink-wraps — see ui/TextInput.

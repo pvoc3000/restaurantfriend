@@ -621,7 +621,6 @@ function AddOverride({
           <TextInput
             value={note}
             onValueChange={setNote}
-            placeholder="July 4, walk-in order…"
             aria-label="Why this override"
             className="w-full"
           />

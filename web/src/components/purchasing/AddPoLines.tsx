@@ -635,6 +635,21 @@ export function AddPoLines({
                     : "Nothing matches that search."}
                 </p>
               ) : (
+                <>
+                {/* COLUMN LABELS OVER THE ROWS (Mark, 2026-09-21, sweeping the
+                    app's placeholders). The price and quantity boxes carried
+                    the words "price" and "qty" as placeholder text, which is a
+                    label written inside the box — so it is a label now, said
+                    once above the list instead of a hundred times inside it.
+                    The widths mirror the row's own `w-24` / `w-32` / `w-16`. */}
+                <div className="flex flex-wrap items-end gap-x-4 px-4 pb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  <span className="min-w-0 flex-1">Item</span>
+                  <span className="w-24 shrink-0 text-right">Price</span>
+                  <span className="w-32 shrink-0 text-right">On order</span>
+                  <span className="w-16 shrink-0 text-center">Qty</span>
+                  {/* The button's column — see its own note. */}
+                  <span className="w-32 shrink-0" />
+                </div>
                 <ul className="divide-y divide-hairline border border-ink">
                   {filtered.map((vi) => {
                     const existingLines = onOrder.get(vi.id) ?? [];
@@ -701,7 +716,6 @@ export function AddPoLines({
                             aria-label={`Unit price for ${
                               vi.inventory_items?.name ?? orderedAs
                             }`}
-                            placeholder="price"
                             className={`h-9 w-full border px-1 text-right tabular-nums ${
                               // The only cue the panel gives that this row is
                               // not at the catalog price — colour means record
@@ -747,18 +761,25 @@ export function AddPoLines({
                           aria-label={`Order amount for ${
                             vi.inventory_items?.name ?? orderedAs
                           }`}
-                          placeholder="qty"
                           className="h-9 w-16 shrink-0 border border-ink px-1 text-center tabular-nums"
                         />
                         <button
                           type="button"
                           onClick={() => void add(vi)}
                           disabled={addingId === vi.id}
+                          // ONE WIDTH FOR EVERY ROW, so the columns beside it
+                          // land on one line down the list — the button says
+                          // "Add to PO", "Add to line" or "New line" depending
+                          // on the row, and at its natural width each of those
+                          // shifted that row's price and quantity boxes by a
+                          // few pixels. Nothing noticed while the boxes named
+                          // themselves; with the names in a header strip above,
+                          // a column that wanders is a column that lies.
                           className={`${
                             (drafts[vi.id] ?? "").trim() === ""
                               ? BUTTON_CLASS
                               : PRIMARY_BUTTON_CLASS
-                          } shrink-0`}
+                          } w-32 shrink-0`}
                         >
                           {addingId === vi.id
                             ? "Adding…"
@@ -772,6 +793,7 @@ export function AddPoLines({
                     );
                   })}
                 </ul>
+                </>
               )}
         </Dialog>
       )}
@@ -829,7 +851,6 @@ function OneOffForm({
             autoFocus
             value={draft.description}
             onChange={(e) => onDraft({ description: e.target.value })}
-            placeholder="What to send us — this is what the vendor reads"
             className={`${field} mt-1`}
           />
         </label>
@@ -848,7 +869,6 @@ function OneOffForm({
           <input
             value={draft.productId}
             onChange={(e) => onDraft({ productId: e.target.value })}
-            placeholder="Their SKU, if you have it"
             className={`${field} mt-1`}
           />
         </label>
@@ -875,7 +895,6 @@ function OneOffForm({
             {...calcField}
             value={draft.price}
             onChange={(e) => onDraft({ price: e.target.value })}
-            placeholder="leave empty if you don't know"
             className={`${field} mt-1 tabular-nums`}
           />
         </label>
@@ -885,7 +904,6 @@ function OneOffForm({
           <input
             value={draft.notes}
             onChange={(e) => onDraft({ notes: e.target.value })}
-            placeholder="Prints on the order, under the line"
             className={`${field} mt-1`}
           />
         </label>
@@ -904,7 +922,6 @@ function OneOffForm({
             }
           }}
           aria-label="Order amount"
-          placeholder="qty"
           className="h-9 w-20 border border-ink px-1 text-center tabular-nums"
         />
         <button

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PickList } from "@/components/ui/PickList";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { TextInput } from "@/components/ui/TextInput";
+import { ControlField } from "@/components/ui/ControlField";
 import { MEAL_CODE_LABEL, type BreakFinding } from "@/lib/breakRules";
 import { effectiveExclusion } from "@/lib/timesheets";
 import { formatCents, formatRate, parseDollarsToCents, type PoolResult } from "@/lib/tipPool";
@@ -380,16 +381,22 @@ export function ShiftTips({
       </dl>
 
       {editable && locationId && (
-        <div className="flex flex-wrap items-center gap-2">
-          <TextInput
-            size="sm"
-            value={entry}
-            onValueChange={setEntry}
-            placeholder={effective === null ? "Card tips, e.g. 423.50" : "Replace the figure"}
-            aria-label={`Pooled tips for ${locationCode ?? "this shop"} on ${businessDate}`}
-            clearLabel="Clear"
-            className="w-44"
-          />
+        <div className="flex flex-wrap items-end gap-2">
+          {/* CAPTIONED, NOT HINTED (Mark, 2026-09-21): the box said "Card
+              tips, e.g. 423.50" inside itself, which is a label and an example
+              in the one place a blank field cannot keep them. The label is
+              above it now; the format, when it is got wrong, is stated by the
+              refusal line below. */}
+          <ControlField label="Card tips">
+            <TextInput
+              size="sm"
+              value={entry}
+              onValueChange={setEntry}
+              aria-label={`Pooled tips for ${locationCode ?? "this shop"} on ${businessDate}`}
+              clearLabel="Clear"
+              className="w-44"
+            />
+          </ControlField>
           <button type="button" disabled={!ready} onClick={report} className={BUTTON}>
             {pending ? "Saving…" : "Report"}
           </button>

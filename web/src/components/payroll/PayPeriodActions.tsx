@@ -208,7 +208,6 @@ export function PayPeriodActions({
               <TextInput
                 value={reason}
                 onValueChange={setReason}
-                placeholder="Homebase re-sent the period with three corrected shifts"
                 aria-label="Reason for reopening"
                 clearLabel="Clear the reason"
                 className="w-full"

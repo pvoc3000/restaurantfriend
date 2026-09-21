@@ -400,7 +400,7 @@ export function NewTimesheet({
                   <TextInput
                     value={inTime}
                     onValueChange={setInTime}
-                    placeholder="6:00am"
+                    placeholder="hh:mm"
                     aria-label="Clock in"
                     clearLabel="Clear"
                     className="w-32"
@@ -413,7 +413,7 @@ export function NewTimesheet({
                   <TextInput
                     value={outTime}
                     onValueChange={setOutTime}
-                    placeholder="2:30pm"
+                    placeholder="hh:mm"
                     aria-label="Clock out"
                     clearLabel="Clear"
                     className="w-32"
@@ -426,7 +426,6 @@ export function NewTimesheet({
                   <TextInput
                     value={breakHours}
                     onValueChange={setBreakHours}
-                    placeholder="0.50"
                     aria-label="Unpaid break in hours"
                     clearLabel="Clear"
                     className="w-28"
@@ -481,7 +480,6 @@ export function NewTimesheet({
                   <TextInput
                     value={hours}
                     onValueChange={setHours}
-                    placeholder="8.00"
                     aria-label="Hours"
                     clearLabel="Clear"
                     className="w-28"
@@ -504,7 +502,6 @@ export function NewTimesheet({
               <TextInput
                 value={note}
                 onValueChange={setNote}
-                placeholder="Forgot to clock in; confirmed with the closing manager"
                 aria-label="Reason"
                 clearLabel="Clear the reason"
                 className="w-full"

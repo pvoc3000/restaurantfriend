@@ -230,7 +230,6 @@ export function NewSpecialOrder({
               <TextInput
                 value={title}
                 onValueChange={setTitle}
-                placeholder="Ruiz wedding, 8/30"
                 aria-label="What the order is for"
                 autoFocus
                 fullWidth
@@ -388,7 +387,6 @@ export function NewSpecialOrder({
                 <TextInput
                   value={address}
                   onValueChange={setAddress}
-                  placeholder="1638 Colorado Blvd, Los Angeles, CA 90041"
                   aria-label="Delivery address"
                   autoComplete="street-address"
                   fullWidth

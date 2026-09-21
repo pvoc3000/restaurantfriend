@@ -324,7 +324,6 @@ export function NewBill({
                   value={invoiceNumber}
                   onValueChange={setInvoiceNumber}
                   aria-label="Invoice number"
-                  placeholder="Rent has none"
                   className="w-full"
                 />
               </Field>

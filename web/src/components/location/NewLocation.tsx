@@ -130,7 +130,6 @@ export function NewLocation({ orgId, existingCodes }: { orgId: string; existingC
               <TextInput
                 value={code}
                 onValueChange={(next) => setCode(next.toUpperCase())}
-                placeholder="DF06"
                 aria-label="Location code"
                 autoFocus
               />
@@ -147,7 +146,6 @@ export function NewLocation({ orgId, existingCodes }: { orgId: string; existingC
               <TextInput
                 value={name}
                 onValueChange={setName}
-                placeholder="Donut Friend 06 Pasadena"
                 aria-label="Location name"
               />
             </Field>

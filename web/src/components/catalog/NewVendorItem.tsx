@@ -286,7 +286,6 @@ export function NewVendorItem({
                 <TextInput
                   value={productId}
                   onValueChange={setProductId}
-                  placeholder="08843"
                   aria-label="Product ID"
                   fullWidth
                 />
@@ -295,7 +294,6 @@ export function NewVendorItem({
                 <TextInput
                   value={brand}
                   onValueChange={setBrand}
-                  placeholder="Bakemark"
                   aria-label="Brand"
                   fullWidth
                 />
@@ -306,7 +304,6 @@ export function NewVendorItem({
               <TextInput
                 value={description}
                 onValueChange={setDescription}
-                placeholder="All Purpose Flour"
                 aria-label="Vendor's description"
                 fullWidth
               />
@@ -327,7 +324,6 @@ export function NewVendorItem({
                   <TextInput
                     value={packSize}
                     onValueChange={setPackSize}
-                    placeholder="50"
                     aria-label="Package size"
                     fullWidth
                   />
@@ -367,7 +363,6 @@ export function NewVendorItem({
                 <TextInput
                   value={price}
                   onValueChange={setPrice}
-                  placeholder="22.50"
                   aria-label="Price"
                   fullWidth
                 />

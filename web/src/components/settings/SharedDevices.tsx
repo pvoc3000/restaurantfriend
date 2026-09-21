@@ -230,7 +230,6 @@ export function SharedDevices({
               <TextInput
                 value={name}
                 onValueChange={setName}
-                placeholder="DF01 counter iPad"
                 aria-label="Device name"
                 fullWidth
                 autoFocus

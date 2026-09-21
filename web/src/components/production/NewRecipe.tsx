@@ -160,7 +160,6 @@ export function NewRecipe({
               <TextInput
                 value={name}
                 onValueChange={setName}
-                placeholder="Banana Cake Donut"
                 aria-label="Recipe name"
                 autoFocus
               />

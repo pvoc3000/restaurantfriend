@@ -125,7 +125,6 @@ export function AddPayrollBenefit({ orgId }: { orgId: string }) {
                 value={name}
                 onValueChange={setName}
                 aria-label="Benefit name"
-                placeholder="Overnight differential"
                 autoFocus
                 className="w-full"
               />
@@ -138,7 +137,6 @@ export function AddPayrollBenefit({ orgId }: { orgId: string }) {
                   onValueChange={setAmount}
                   inputMode="decimal"
                   aria-label="Default amount"
-                  placeholder="12.00"
                   className="w-28"
                 />
               </Field>

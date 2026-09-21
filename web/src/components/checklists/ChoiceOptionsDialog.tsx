@@ -90,7 +90,6 @@ export function ChoiceOptionsDialog({
             value={raw}
             onValueChange={setRaw}
             fullWidth
-            placeholder="Clean, Needs attention, Broken"
             aria-label={`Answers for ${row.prompt}`}
           />
         </label>

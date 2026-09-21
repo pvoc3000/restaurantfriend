@@ -96,7 +96,6 @@ export function OrderLog({
             <TextInput
               value={message}
               onValueChange={setMessage}
-              placeholder="Called to confirm the pickup time"
               aria-label="What happened"
               className="w-full max-w-[42rem]"
               autoFocus

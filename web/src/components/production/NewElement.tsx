@@ -123,7 +123,6 @@ export function NewElement({ orgId, types }: { orgId: string; types: string[] })
               <TextInput
                 value={name}
                 onValueChange={setName}
-                placeholder="Strawberry Glaze"
                 aria-label="Element name"
                 autoFocus
               />

@@ -258,7 +258,6 @@ function ReminderDialog({
             value={message}
             disabled={busy}
             onValueChange={onMessage}
-            placeholder="Ask about the short case from last week"
             clearLabel="Clear the reminder"
             // A definite width, not `w-full`: TextInput's wrapper is
             // `inline-flex` and shrink-wraps, so a percentage on the input

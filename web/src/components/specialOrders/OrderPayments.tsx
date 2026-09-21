@@ -236,7 +236,7 @@ export function OrderPayments({
               <TextInput
                 value={amount}
                 onValueChange={setAmount}
-                placeholder={balance > 0 ? balance.toFixed(2) : "0.00"}
+                placeholder={balance > 0 ? balance.toFixed(2) : ""}
                 aria-label="Amount received"
                 className="w-32"
                 autoFocus
@@ -262,7 +262,7 @@ export function OrderPayments({
               />
             </Field>
             <Field label="Note">
-              <TextInput value={note} onValueChange={setNote} placeholder="10% deposit" aria-label="Payment note" className="w-56" />
+              <TextInput value={note} onValueChange={setNote} aria-label="Payment note" className="w-56" />
             </Field>
             <button type="button" className={BUTTON_CLASS} onClick={take} disabled={pending || !amount.trim()}>
               {pending ? "Recording…" : "Record"}

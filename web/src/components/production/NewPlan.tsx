@@ -128,7 +128,6 @@ export function NewPlan({
               <TextInput
                 value={title}
                 onValueChange={setTitle}
-                placeholder="October"
                 aria-label="Plan title"
                 autoFocus
               />

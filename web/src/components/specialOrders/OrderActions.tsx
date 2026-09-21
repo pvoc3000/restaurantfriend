@@ -274,7 +274,6 @@ export function OrderActions({
         <TextInput
           value={reason}
           onValueChange={setReason}
-          placeholder="Customer disputes the flavour"
           aria-label="What is wrong"
           className="w-full"
           autoFocus

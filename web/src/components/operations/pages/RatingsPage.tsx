@@ -221,7 +221,6 @@ export function RatingsPage({
               value={row.note}
               onCommit={(next) => patch(row.id, { note: next })}
               disabled={!editable}
-              placeholder="How did they do?"
               ariaLabel={`Note, ${row.employeeName}`}
             />
           </div>
@@ -283,7 +282,6 @@ export function RatingsPage({
                   value={row.breakReason}
                   onCommit={(next) => patch(row.id, { break_reason: next })}
                   disabled={!editable}
-                  placeholder="Why was the break missed?"
                   ariaLabel={`Reason the break was missed, ${row.employeeName}`}
                 />
                 {(row.breakReason ?? "").trim() === "" ? (

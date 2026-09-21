@@ -131,7 +131,6 @@ export function NewVendor({
               <TextInput
                 value={name}
                 onValueChange={setName}
-                placeholder="Chefs Warehouse"
                 aria-label="Vendor name"
                 autoFocus
               />

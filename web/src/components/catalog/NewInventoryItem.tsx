@@ -139,7 +139,6 @@ export function NewInventoryItem({
               <TextInput
                 value={name}
                 onValueChange={setName}
-                placeholder="Flour, All Purpose"
                 aria-label="Item name"
                 autoFocus
               />

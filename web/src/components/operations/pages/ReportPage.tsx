@@ -54,7 +54,6 @@ export function ReportPage({
         onCommit={save}
         disabled={!editable}
         ariaLabel="How was the shift"
-        placeholder="What happened today?"
       />
     </div>
   );

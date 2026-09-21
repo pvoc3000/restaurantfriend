@@ -130,6 +130,39 @@
   short label earns its place, a title is where the full name reads. Hence
   **Maintenance** in the band over **Maintenance Requests** on the page. The
   SLUG is a third thing again and must not move: `rf.nav` stores it.
+- **A FIELD STARTS EMPTY. A PLACEHOLDER IS EITHER A FORMAT OR IT IS GONE**
+  (Mark, 2026-09-21: "remove any placeholder text except for text that
+  demonstrates how an entry needs to be formatted (i.e. date's 'mm/dd/yyyy'),
+  or text that I specifically asked for"). The second half of a sweep the
+  detail-field pass had started — that one took ~25 `placeholder="none"` out of
+  boxed cells and left the create dialogs alone, so "Flour, All Purpose",
+  "Chefs Warehouse", "Ruiz wedding, 8/30", "Angry Samoa" and forty more were
+  still sitting in empty boxes. **Example text is not instruction**: it names
+  one plausible value, in grey, in the place the real value goes, and the
+  reader has to work out that it is not there.
+  **FORMAT IS THE ONE THING THAT STAYS, AND IT IS WRITTEN ABSTRACTLY** (Mark,
+  same day): `mm/dd/yyyy` on a date, **`hh:mm` on a time** — which is what the
+  time boxes now say, where they had "6:00am" and "9:30 PM", concrete times
+  pretending to be a format. **There is no abstraction for money, so money has
+  none**: "22.50" and "50.00" demonstrate only that a number is a number, and
+  they went. A LIVE figure is not example text and stays — the payment box
+  still rests at the order's outstanding balance, the benefit box at the plan's
+  default.
+  **WHAT ELSE STAYS, because it is not hint text in an empty box:**
+  a collapsed `PickList`'s FACE ("All time", "Choose a vendor") and an empty
+  inline cell's resting word ("—", "No section") are what the control DISPLAYS,
+  not a hint about what to type; the find box inside a picker panel keeps
+  "Find…" (the search-box rule already says so); and a placeholder that states
+  whether an entry is REQUIRED — "Optional" on a pay period's note, "Why
+  (required)" on a shift decision — states a fact about the commit that the
+  screen does not otherwise show.
+  **WHERE THE PLACEHOLDER WAS THE ONLY LABEL, THE LABEL MOVED ABOVE THE BOX**
+  rather than being deleted: `ui/ControlField` over the create dialog's customer
+  block (Name · Company · Phone · Email) and over the pooled-tips box, and a
+  column strip over the PO add-line list, whose per-row boxes each said "price"
+  and "qty" a hundred times inside themselves. **That is the test for any
+  future one** — if deleting the words leaves a box nobody can name, it was a
+  label, and a label goes above.
 - **THE SCREEN EXPLAINS ITSELF. STOP WRITING HINTS** (Mark, 2026-09-03: "stop
   adding extra comments and hints, or make them super terse at the very least.
   Most of them have been unnecessary"). Said after a run of removals that were

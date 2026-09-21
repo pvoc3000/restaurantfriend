@@ -156,7 +156,7 @@ export function NewCustomer({
               </Field>
             </div>
             <Field label="Company">
-              <TextInput value={company} onValueChange={setCompany} placeholder="Cafe Knotted" aria-label="Company" className="w-full" />
+              <TextInput value={company} onValueChange={setCompany} aria-label="Company" className="w-full" />
             </Field>
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
               <Field label="Phone">

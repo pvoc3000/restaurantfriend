@@ -506,7 +506,7 @@ function TypingBlock() {
           />
         </Specimen>
         <Specimen name="TextInput · fullWidth">
-          <TextInput fullWidth value={full} onValueChange={setFull} aria-label="Subject" placeholder="Subject" />
+          <TextInput fullWidth value={full} onValueChange={setFull} aria-label="Subject" />
         </Specimen>
         <Specimen name='TextInput · size="sm"'>
           <TextInput size="sm" value={small} onValueChange={setSmall} aria-label="Dense" className="w-48" />

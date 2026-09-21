@@ -310,7 +310,7 @@ export function TimePicker({
                     }}
                     aria-label={`Type ${ariaLabel}`}
                     aria-invalid={typedBad}
-                    placeholder="9:30 PM"
+                    placeholder="hh:mm"
                     autoComplete="off"
                     className={`h-9 min-w-0 flex-1 border bg-white px-2 text-[16px] tabular-nums outline-none placeholder:text-faint hover:shadow-[inset_0_0_0_1px_#000] focus:shadow-[inset_0_0_0_1px_#000] any-pointer-coarse:h-11 ${
                       typedBad ? "border-accent" : "border-ink"

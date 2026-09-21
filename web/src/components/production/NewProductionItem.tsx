@@ -159,7 +159,6 @@ export function NewProductionItem({
               <TextInput
                 value={name}
                 onValueChange={setName}
-                placeholder="Angry Samoa"
                 aria-label="Item name"
                 autoFocus
               />

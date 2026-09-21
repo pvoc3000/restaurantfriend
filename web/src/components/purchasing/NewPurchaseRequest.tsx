@@ -192,7 +192,6 @@ export function NewPurchaseRequest({
                 autoFocus
                 disabled={pending}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="The big rainbow sprinkles"
                 className={FORM_TEXTAREA}
               />
             </Field>
@@ -208,7 +207,6 @@ export function NewPurchaseRequest({
                 rows={4}
                 disabled={pending}
                 onChange={(e) => setDetails(e.target.value)}
-                placeholder="The ones we use on the Bacon Maple, not the little ones. Saturday is busy."
                 className={FORM_TEXTAREA}
               />
             </Field>

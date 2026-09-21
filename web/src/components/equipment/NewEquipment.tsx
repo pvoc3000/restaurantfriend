@@ -131,7 +131,6 @@ export function NewEquipment({
                 onValueChange={setName}
                 fullWidth
                 autoFocus
-                placeholder="Walk-in 1"
                 aria-label="Name"
               />
               {duplicate && (
