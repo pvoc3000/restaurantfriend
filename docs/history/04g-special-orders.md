@@ -1941,6 +1941,20 @@
    beside it, and both made the choice look like a separate question from the
    figure it governs when it is the same question asked one step earlier (Mark:
    "a picklist labeled 'Amount' with two options").
+   **FOUR FIELDS, ONE GRID, ONE WIDTH** (Mark, 2026-09-20: "make the width of
+   the fields on the record payment dialog the same"). Amount's two controls had
+   been a flex row of their own at `w-44` and `w-32`, which put three widths in
+   a dialog four fields tall; sharing the `grid-cols-2` makes every field the
+   width of a column and nobody has to pick a number. The amount box takes the
+   second cell of the first row, captioned **Per order** — its own caption, so
+   the two controls sit on one baseline and because "per order" is the thing the
+   sentence below otherwise carries alone.
+   **AND AN EMPTY CELL STANDS IN ITS PLACE UNDER PAID IN FULL.** Absent
+   entirely, Date flows up beside Amount and How drops to a row of its own, so
+   the whole dialog rearranges itself when you touch the picker — the very thing
+   hiding the box was meant to avoid. **Caught by looking at it**, in the first
+   pass through the unlocked pane; measured after the fix at 186px across all
+   four fields on two clean rows.
    **THE BOX IS ABSENT UNDER "PAID IN FULL"**, not greyed. It shipped greyed on
    the argument that a control which vanishes takes what you typed with it;
    seeing it, Mark asked for it hidden, and he is right — a disabled box still

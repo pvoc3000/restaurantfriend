@@ -778,11 +778,25 @@ export function SpecialOrderBatchActions({
                 does not change height when it goes — and `autoFocus` puts the
                 cursor in it the moment Other is picked, which a permanently
                 mounted box could not do. */}
-            <div className="space-y-1.5">
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                Amount
-              </span>
-              <div className="flex items-center gap-3">
+            {/* FOUR FIELDS, ONE GRID, ONE WIDTH (Mark, 2026-09-20: "make the
+                width of the fields on the record payment dialog the same").
+                Amount's two controls used to be a flex row of their own at w-44
+                and w-32, which put three different widths in a dialog four
+                fields tall. Sharing the grid makes every field the width of a
+                column and nobody has to pick a number.
+
+                THE AMOUNT BOX IS THE SECOND CELL OF THE FIRST ROW, and under
+                Paid in Full an EMPTY CELL STANDS IN ITS PLACE. Not nothing: a
+                cell that simply disappears lets Date flow up beside Amount and
+                pushes How onto a row of its own, so the whole dialog
+                rearranges itself when you touch the picker — which is the
+                thing hiding the box was supposed to avoid. Caught by looking
+                at it, not by reading it. */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <label className="block space-y-1.5">
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Amount
+                </span>
                 <PickList
                   value={payFull ? "full" : "other"}
                   onPick={(next) => setPayFull(next !== "other")}
@@ -792,22 +806,30 @@ export function SpecialOrderBatchActions({
                     { value: "full", label: "Paid in Full", hint: "each order's own balance" },
                     { value: "other", label: "Other", hint: "the same figure against each" },
                   ]}
-                  className="w-44"
+                  className="w-full"
                 />
-                {!payFull && (
+              </label>
+              {payFull ? (
+                <div aria-hidden />
+              ) : (
+                <label className="block space-y-1.5">
+                  {/* ITS OWN CAPTION, so the two controls sit on one baseline —
+                      a cell with no caption starts a caption's height higher —
+                      and because "per order" is the thing the sentence below
+                      otherwise has to carry alone. */}
+                  <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                    Per order
+                  </span>
                   <TextInput
                     value={payAmount}
                     onValueChange={setPayAmount}
                     placeholder="50.00"
                     aria-label="Amount received on each order"
-                    className="w-32"
+                    fullWidth
                     autoFocus
                   />
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                </label>
+              )}
               <label className="block space-y-1.5">
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                   Date
