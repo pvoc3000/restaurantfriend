@@ -908,54 +908,68 @@ export function SpecialOrdersList({
         // had been the filter bar's `rowAction`.
         action={
           canWrite ? (
-            /* ACTIONS FIRST, THEN THE CREATE BUTTON. The menu acts on rows you
-               have already ticked, so it reads left-to-right as "these rows,
-               this command"; New is the one control here that is about no row
-               at all, and it keeps the outside edge it has had since it moved
-               into the title row. */
-            <div className="flex items-start gap-3">
-              <SpecialOrderBatchActions
-                selected={visible.filter((r) => checked.has(r.id))}
-                canWrite={canWrite}
-                onReport={(message, tone) => {
-                  setBatchReport({ message, tone });
-                  setChecked(new Set());
-                }}
-              >
-                {(batchRows) => (
-                  <ActionMenu
-                    label="Actions"
-                    /* ALWAYS RENDERED AND ALWAYS LIVE, the counts in the rows
-                       doing the explaining — the PO list's rule. A trigger that
-                       greys out with nothing ticked cannot say why. */
-                    ariaLabel={
-                      checked.size === 0
-                        ? "Actions — select orders first"
-                        : `Actions for ${checked.size} selected orders`
-                    }
-                    minWidth={230}
-                    items={[
-                      {
-                        label: "Clear Selection",
-                        disabled: checked.size === 0,
-                        onSelect: () => {
-                          setBatchReport(null);
-                          setChecked(new Set());
+            /* ONE MENU FOR THE SCREEN (Mark, 2026-09-20: "move 'new special
+               order' button into the new actionmenu you created. first
+               position"). The button had ridden in the title row since
+               2026-09-10; it is now the first row of the menu that stands
+               there instead, which is where the bill list and the PO list both
+               ended up the day they grew a selection.
+
+               NEW ORDER LEADS, as it does on the record's own menu and for the
+               same reason: it is the one row here that is about no ticked row
+               at all, so it belongs before the menu starts talking about them.
+
+               THE TWO COMPONENTS THAT OWN THEIR COMMANDS KEEP OWNING THEM —
+               `NewSpecialOrder` its dialog, `SpecialOrderBatchActions` its
+               confirms and its skip counts — and hand their rows out through a
+               render prop. */
+            <NewSpecialOrder
+              orgId={orgId}
+              kitchens={kitchens}
+              defaultLocationId={defaultLocationId}
+              today={today}
+              takenBy={takenBy}
+            >
+              {(createRows) => (
+                <SpecialOrderBatchActions
+                  selected={visible.filter((r) => checked.has(r.id))}
+                  canWrite={canWrite}
+                  onReport={(message, tone) => {
+                    setBatchReport({ message, tone });
+                    setChecked(new Set());
+                  }}
+                >
+                  {(batchRows) => (
+                    <ActionMenu
+                      label="Actions"
+                      /* ALWAYS RENDERED AND ALWAYS LIVE, the counts in the rows
+                         doing the explaining — the PO list's rule. A trigger
+                         that greys out with nothing ticked cannot say why, and
+                         this one also holds the create command, which never
+                         needs a selection. */
+                      ariaLabel={
+                        checked.size === 0
+                          ? "Actions — select orders first"
+                          : `Actions for ${checked.size} selected orders`
+                      }
+                      minWidth={230}
+                      items={[
+                        ...createRows,
+                        ...batchRows,
+                        {
+                          label: "Clear Selection",
+                          disabled: checked.size === 0,
+                          onSelect: () => {
+                            setBatchReport(null);
+                            setChecked(new Set());
+                          },
                         },
-                      },
-                      ...batchRows,
-                    ]}
-                  />
-                )}
-              </SpecialOrderBatchActions>
-              <NewSpecialOrder
-                orgId={orgId}
-                kitchens={kitchens}
-                defaultLocationId={defaultLocationId}
-                today={today}
-                takenBy={takenBy}
-              />
-            </div>
+                      ]}
+                    />
+                  )}
+                </SpecialOrderBatchActions>
+              )}
+            </NewSpecialOrder>
           ) : null
         }
       />

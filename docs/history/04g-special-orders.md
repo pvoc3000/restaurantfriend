@@ -1800,6 +1800,21 @@
    command: reporting clears the selection, and a message owned by something
    that clearing re-renders past is a message nobody reads. `BillBatchActions`
    paid for that with a bulk approve that worked and said nothing.
+   **AND THE CREATE BUTTON WENT INTO THAT MENU, FIRST ROW** (Mark, hours later:
+   "move 'new special order' button into the new actionmenu you created. first
+   position"). It had ridden in the title row since 2026-09-10; it is now the
+   first row of the menu that stands there instead — which is where the bill
+   list and the PO list both ended up the day they grew a selection. New Order
+   leads for the record menu's reason, read again: it is the one row that is
+   about no ticked row at all.
+   **`NewSpecialOrder`'s BUTTON BRANCH IS GONE WITH IT** and `children` is now
+   REQUIRED. The component drew its own button until the record grew a "New
+   Order…" row that morning and the list moved its create command into a menu
+   that afternoon, at which point the branch had no callers — one dialog, two
+   menus, and no third dress to keep in step. The label is "New Order…" in both:
+   "New special order" was right beside a heading already reading SPECIAL
+   ORDERS, where the word was said twice, and wrong in a menu, where the row has
+   to name the noun it makes.
 
    **AND SHOW IS A RANGEPICKER — 2026-09-20** (Mark: "convert the show picklist
    to a rangepicker"). With the two non-time options gone to Status, what was
