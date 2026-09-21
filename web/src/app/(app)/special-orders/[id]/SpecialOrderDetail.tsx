@@ -9,6 +9,7 @@ import type { RawSearchParams } from "@/lib/filterMenus";
 import {
   KIND_LABEL,
   ORDER_TAB_LABEL,
+  STANDING_STATUS_OPTIONS,
   STATUS_LABEL,
   STATUS_OPTIONS,
   TODO_OPTIONS,
@@ -440,7 +441,12 @@ export async function SpecialOrderDetail({
             <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
               {(row.title as string) || `Order ${row.number as string}`}
             </h1>
-            {status ? (
+            {/* AN ORDER'S CHIP, NOT A STANDING ORDER'S. Since 112 a standing
+                order carries a status too, but it is the one its DAYS start
+                with rather than a state this record is in — and a yellow
+                INVOICE beside a title whose own line reads "Standing order"
+                would be answering a question nobody asked. */}
+            {kind === "order" && status ? (
               <span className={`${CHIP} border-ink bg-[var(--rf-yellow-200)] text-ink`}>
                 {STATUS_LABEL[status]}
               </span>
@@ -675,12 +681,29 @@ export async function SpecialOrderDetail({
                               them. Absent when there is nothing to say. */}
                           <StatusCatchUp id={id} order={row as never} canWrite={canWrite} />
                         </>
+                      ) : kind === "standing_order" ? (
+                        /* A STANDING ORDER CARRIES THE STATUS ITS DAYS START
+                           WITH (migration 112). It is the same column and the
+                           same cell; what differs is the VOCABULARY, because
+                           only two rungs mean anything to a day that has not
+                           been made yet — see `STANDING_STATUS_OPTIONS`.
+
+                           NOT RELABELLED. Every field on this record is what
+                           its days inherit — the title, the event time, the tax
+                           rate — so calling this one "Days start as" would
+                           imply the others are not. And no `StatusCatchUp`:
+                           that reads stage dates, and this record has none. */
+                        <Cell table="special_orders" id={id} column="status" kind="pick"
+                              options={STANDING_STATUS_OPTIONS} value={status} canWrite={canWrite}
+                              ariaLabel="What its days start as" />
                       ) : (
-                        /* Decision 3: status exists exactly when kind is
-                           `order`, and the database enforces the
-                           biconditional. Offering the picker here would offer a
-                           write a CHECK refuses — the one refusal an
-                           InlineValue cannot explain. */
+                        /* A TEMPLATE STILL HAS NONE, and the database still
+                           enforces it: 112 widened decision 3's biconditional
+                           to standing orders and stopped there, because a
+                           template is DUPLICATED rather than instantiated on a
+                           schedule — it has no days to prototype. Offering the
+                           picker here would offer a write a CHECK refuses, which
+                           is the one refusal an InlineValue cannot explain. */
                         <span className={READ_ONLY_VALUE}>{KIND_LABEL[kind]}</span>
                       )}
                     </Row>

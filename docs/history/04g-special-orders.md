@@ -1754,30 +1754,70 @@
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.
 
-   **A MATERIALIZED STANDING DAY ARRIVES AS AN INVOICE — migration 112,
-   WRITTEN 2026-09-20 AND NOT YET APPLIED** (Mark: "when a standing order is
-   instantiated, the status should be 'Invoice' and the to do should be set to
-   'Send Invoice' going forward"). 099 wrote `status = 'order'`, `todo = 'Print
-   Order'`; 112 writes `'invoice'`, `'Send Invoice'`, and is otherwise 099's
-   function verbatim because `create or replace` takes the whole definition.
-   **It is right for the reason decision 13 already states**: a wholesale day is
-   billed weekly in arrears, so `order` — the rung this module glosses as "paid
-   — printing and scheduling remain" — claimed something about Friday's donuts
-   that was not true on Friday.
-   **GOING FORWARD MEANS EXACTLY THAT.** No backfill, and none is wanted: an
-   order that has been made, delivered and eaten is not waiting for an invoice.
-   **TWO READERS OF `status = 'order'` STOP FIRING FOR THESE DAYS, and neither
-   is changed by the migration.** `pullReadiness` (`lib/specialOrderSchedule`)
-   offers only `order` to the production-schedule generator, so a materialized
-   day is now WITHHELD — counted, with the reason "still an Invoice", never
-   silently absent. And `needsAttention` stops saying "Paid and unprinted, and
-   the event is close" for them. The first is the consequential one: it is the
-   wholesale account that production schedules exist for. That rule was itself a
-   measurement (2026-08-27, eleven real orders) and changing it is a decision
-   about what "ready to make" means, not plumbing — **asked, and open.** The fix
-   if it is wanted is one condition: a standing DAY is ready at `invoice`.
+   **A STANDING ORDER CARRIES THE STATUS AND TO-DO ITS DAYS START WITH —
+   migration 112, WRITTEN 2026-09-20 AND NOT YET APPLIED.**
+   It began as "when a standing order is instantiated, the status should be
+   'Invoice' and the to do should be set to 'Send Invoice' going forward"
+   (Mark), which 112 first did with two literals. **That version was wrong and
+   the argument that replaced it was his**: "the most simple solution, to me, is
+   to allow the user to set the status of a standing order, and copy it when
+   instantiating it."
+   **HE WAS RIGHT AND THE FIRST OBJECTION WAS OVERSTATED.** `status` and `todo`
+   were the ONLY two fields 099's insert hardcoded — every other value on a day
+   comes from `s.something`, because a standing order is a PROTOTYPE and its
+   days inherit it. Those two being literals was the anomaly. A separate
+   `standing_day_status` column, which was proposed first, would have been a
+   second way to say what this table already says.
+   **THE CLAIM THAT THE BICONDITIONAL WAS LOAD-BEARING DID NOT SURVIVE READING
+   THE CALLERS.** `isAdvanceable`, `pullReadiness`, `countsAsOwed` and
+   `matchesKindFilter` all gate on KIND; nothing infers a kind from a status
+   being null. The constraint is data integrity, not an inference.
+   **SO IT IS WIDENED, NOT DROPPED** — `(kind in ('order','standing_order')) =
+   (status is not null)`. A TEMPLATE still may not hold one, and that is not
+   timidity: a template is duplicated rather than instantiated on a schedule, so
+   it has no days to prototype. 051 proved this constraint by breaking it in
+   both directions on the Docker harness and both of those claims still hold.
+   **ORDER MATTERS INSIDE THE FILE.** The two existing standing orders held
+   NULL, which the wider constraint forbids, so it drops the old one, sets the
+   rows (`status = 'invoice'`, `todo = 'Send Invoice'`, Mark's instruction, and
+   `where status is null` so a rerun cannot stamp over a later edit), and only
+   then adds the new one. Adding it first fails on the rows it is being added
+   for.
+   **WHY IT IS WANTED, IN HIS WORDS:** Cafe Knotted pays in ADVANCE, so a day
+   materialized on Monday for Friday is not paid for and must not reach a
+   kitchen night; an account billed in arrears wants the opposite. One literal
+   cannot be right for both. `pullReadiness` is UNCHANGED and still offers only
+   `status = 'order'` — which is now the thing each template decides for itself,
+   which is the whole point.
+   **NOTE THE UNRESOLVED CONTRADICTION**: this file and decision 13 say Cafe
+   Knotted is billed weekly in ARREARS, which is why `ignore_balance` exists.
+   Mark says they pay in advance. Both cannot be true, and if the second is,
+   `ignore_balance` is suppressing an unpaid queue that ought to be chasing
+   them. Asked, not yet answered.
+   **FOUR THINGS IN THE APP MOVED WITH IT, and one of them was a latent bug.**
+   `createSpecialOrder` wrote `status: kind === "order" ? "lead" : null`, which
+   the widened constraint REFUSES for a new standing order — the New special
+   order dialog would have stopped being able to make one. It and the to-do are
+   now `startingState(kind)`, one pure function with fixtures, defaulting a new
+   standing order to `invoice` / "Send Invoice" because that is the safe one of
+   the two: the other way round, a half-configured wholesale account quietly
+   puts donuts on a schedule. The record offers the status on a standing order
+   through `STANDING_STATUS_OPTIONS` — **two rungs, not five**, because `lead`
+   and `quote` describe a conversation this arrangement finished long ago and
+   `cancelled` is what `paused` says better. The list's status GROUP BAND and
+   the column's `sortValue` both read kind first now, where `status ?? kind`
+   would have banded the two templates in among the invoices. And the Status
+   FILTER stays an order's: a standing order's status is the rung its days start
+   at, not a state this record is in, which is the distinction that moved Unpaid
+   and Needs Attention out of the Show menu earlier the same day.
+   **The record's chip stays an order's too**, for the same reason — a yellow
+   INVOICE beside a title whose own line reads "Standing order" answers a
+   question nobody asked. The fields are NOT relabelled: every field on that
+   record is what its days inherit, so calling one of them "Days start as" would
+   imply the others are not.
 
-   **THE LIST SELECTS AND ACTS IN BULK — 2026-09-20**   **THE LIST SELECTS AND ACTS IN BULK — 2026-09-20** (Mark: "add a column to
+
+**THE LIST SELECTS AND ACTS IN BULK — 2026-09-20** (Mark: "add a column to
    the first position on the special order list so we can 'select' multiple
    special orders and perform actions on them"). `BillList`'s arrangement, which
    is where every rule here was already paid for: a tick column, one **Actions**

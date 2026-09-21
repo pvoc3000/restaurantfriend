@@ -173,6 +173,37 @@ export function deliveryFields(
   };
 }
 
+/**
+ * WHAT A NEW RECORD STARTS AS, by kind — the pair, because they belong
+ * together and were drifting apart in one ternary each.
+ *
+ * DECISION 3'S BICONDITIONAL, WIDENED BY 112: an order has a status and a
+ * standing order has the one its DAYS start with. A template has neither — it
+ * is duplicated rather than instantiated, so it has no days to prototype. Get
+ * this wrong for a standing order and the INSERT is refused by a CHECK, which
+ * is the one refusal the app cannot put into words.
+ *
+ * A NEW STANDING ORDER STARTS AT `invoice` / "Send Invoice", which is the safe
+ * one of the two: its days arrive unpaid and wait for the money before they can
+ * reach a kitchen night. `order` is the deliberate choice for an account billed
+ * in arrears, and deliberate is what it should be — the other way round, a
+ * half-configured wholesale account quietly puts donuts on a schedule.
+ *
+ * THE TO-DO IS DECISION 4'S STATED EXCEPTION, not a breach of it: the app
+ * suggests a to-do and never writes one, except where the to-do is not a guess
+ * about a workflow but what the act itself produced. A new lead has been
+ * responded to by nobody; a new standing order's days have been invoiced by
+ * nobody. 099's materializer makes the same argument in the same words.
+ */
+export function startingState(kind: SpecialOrderKind): {
+  status: string | null;
+  todo: string | null;
+} {
+  if (kind === "order") return { status: "lead", todo: "Respond to Email/Call" };
+  if (kind === "standing_order") return { status: "invoice", todo: "Send Invoice" };
+  return { status: null, todo: null };
+}
+
 /** The three `contact_*` values, as they are stored. */
 type Contact = { name: string | null; phone: string | null; email: string | null };
 
@@ -293,9 +324,9 @@ export async function createSpecialOrder(
       org_id: input.orgId,
       number,
       kind: input.kind,
-      // Decision 3's biconditional: status exists exactly when kind is
-      // `order`. The database enforces it; this is the app agreeing.
-      status: input.kind === "order" ? "lead" : null,
+      // Decision 3's biconditional and decision 4's exception, both in
+      // `startingState` — see its note.
+      status: startingState(input.kind).status,
       title: input.title.trim(),
       event_date: input.eventDate ?? null,
       event_time: input.eventTime ?? null,
@@ -315,10 +346,7 @@ export async function createSpecialOrder(
       // Editable afterwards, for an order taken on the phone yesterday.
       date_initiated: input.today ?? null,
       taken_by: orNull(input.takenBy),
-      // Decision 4: the app suggests and never writes the to-do. This is the
-      // exception that proves it — a brand-new lead's to-do is not a guess
-      // about a workflow, it is what the button just created.
-      todo: input.kind === "order" ? "Respond to Email/Call" : null,
+      todo: startingState(input.kind).todo,
       source: "app",
     })
     .select("id")

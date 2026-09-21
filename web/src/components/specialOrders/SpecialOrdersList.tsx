@@ -373,7 +373,14 @@ export function SpecialOrdersList({
           if (v === "attention") return attention.has(r.id);
           if (v === "unpaid")
             return countsAsOwed(r) && r.totals.balance > 0 && r.totals.total > 0;
-          return r.status === v;
+          /* AN ORDER'S STATUS, NOT A STANDING ORDER'S (2026-09-20, migration
+             112). A standing order now carries one, but it is the rung its DAYS
+             start at rather than a state this record is in — and this menu
+             answers "what state is it in", which is the whole reason Unpaid and
+             Needs Attention left the Show menu. Filtering Invoice and finding
+             two templates among the invoices would undo that in one line.
+             The Kind menu is where a standing order is found. */
+          return r.kind === "order" && r.status === v;
         },
       },
       // LOCATION — the order's pickup shop, `location_id` — BEFORE Kitchen
@@ -650,7 +657,12 @@ export function SpecialOrdersList({
       key: "status",
       label: "Status",
       width: 116,
-      sortValue: (r) => r.status ?? r.kind,
+      /* KIND FIRST, NOT "status ?? kind" (2026-09-20). Since 112 a standing
+         order HAS a status, so falling back on its absence would sort the two
+         templates in among the invoices — under the word the column does not
+         print for them. The cell below has always read kind first; this had
+         not, and nothing noticed while only one of them could be true. */
+      sortValue: (r) => (r.kind === "order" ? (r.status ?? "") : r.kind),
       sortTiebreaks: [(r) => r.number],
       render: (r) =>
         r.kind === "order" ? (
@@ -889,7 +901,14 @@ export function SpecialOrdersList({
    */
   const groups: DataGroup<SpecialOrderRow>[] = [
     { sortKey: "date", label: (r) => dayBand(r.event_date) },
-    { sortKey: "status", label: (r) => (r.status ? STATUS_LABEL[r.status] : KIND_LABEL[r.kind]) },
+    /* And the band over those rows, for the same reason: a standing order is
+       banded as a standing order, not under the status its days will start
+       with. */
+    {
+      sortKey: "status",
+      label: (r) =>
+        r.kind === "order" ? (r.status ? STATUS_LABEL[r.status] : "—") : KIND_LABEL[r.kind],
+    },
     { sortKey: "kitchen", label: (r) => r.kitchen_code ?? "No kitchen" },
   ];
 

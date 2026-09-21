@@ -135,6 +135,35 @@ export const TODO_OPTIONS: PickOption[] = [
 ];
 
 /**
+ * WHAT A STANDING ORDER'S DAYS START AS (migration 112, 2026-09-20).
+ *
+ * Two rungs, not five. A standing order is a PROTOTYPE, and its status is the
+ * one its days inherit — so the only answers that mean anything are the two a
+ * materialized day can sensibly arrive at: **Invoice**, for an account that
+ * pays before the donuts are made (Cafe Knotted), and **Order**, for one billed
+ * in arrears whose days should reach the kitchen without waiting.
+ *
+ * `lead` and `quote` would describe a conversation this arrangement finished
+ * long ago. `cancelled` would be a standing order configured to manufacture
+ * cancelled days, which is what `paused` is for and says better. The database
+ * does not forbid those three here — the widened constraint only says a
+ * standing order HAS a status — so this list is the guard, which is why the
+ * record's picker reads it rather than `STATUS_OPTIONS`.
+ */
+export const STANDING_STATUS_OPTIONS: PickOption[] = [
+  {
+    value: "invoice",
+    label: STATUS_LABEL.invoice,
+    hint: "days arrive unpaid — they wait for the money before production",
+  },
+  {
+    value: "order",
+    label: STATUS_LABEL.order,
+    hint: "days arrive committed and can be scheduled straight away",
+  },
+];
+
+/**
  * THE NINE COMPLETION DATES, in Mark's own arrangement (2026-09-16) — Order
  * initiated alone, then the pairs: quote sent · approved, invoice sent · paid,
  * delivery scheduled · receipt sent, order printed · order scheduled.

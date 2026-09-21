@@ -1,39 +1,72 @@
 -- ============================================================================
--- 112 — A MATERIALIZED STANDING DAY ARRIVES AS AN INVOICE
+-- 112 — A STANDING ORDER CARRIES THE STATUS AND TO-DO ITS DAYS START WITH
 --
--- Mark, 2026-09-20: "when a standing order is instantiated, the status should
--- be 'Invoice' and the to do should be set to 'Send Invoice' going forward."
+-- Mark, 2026-09-20: "the most simple solution, to me, is to allow the user to
+-- set the status of a standing order, and copy it when instantiating it."
 --
--- ONE LINE CHANGES. 099 wrote `status = 'order'` and `todo = 'Print Order'`;
--- this writes `'invoice'` and `'Send Invoice'`. Everything else below is 099's
--- function verbatim, because `create or replace` takes the whole definition —
--- read the diff against 099, not this file end to end.
+-- He is right, and the argument is one line long: `status` and `todo` were the
+-- ONLY two fields 099's insert hardcoded. Every other value on a day —title,
+-- event time, tax rate, `ignore_balance`, the notes, the address — is there
+-- because a standing order is a PROTOTYPE and its days inherit it. Those two
+-- being literals was the anomaly, not the design, and a separate
+-- `standing_day_status` column would have been a second way to say what this
+-- table already says.
 --
--- GOING FORWARD means exactly that: days already made keep what they have.
--- There is no backfill here and none is wanted — an order that has been made,
--- delivered and eaten is not waiting for an invoice.
+-- WHY IT IS WANTED: Cafe Knotted pays in advance, so a day materialized on
+-- Monday for Friday is not paid for and must not reach a kitchen night. Another
+-- wholesale account billed in arrears wants the opposite. One literal cannot be
+-- right for both; a field on each template is.
 --
--- WHY IT IS RIGHT: a wholesale day is billed weekly in arrears (decision 13),
--- so `order` — the rung this module glosses as "paid — printing and scheduling
--- remain" — claimed something about Friday's donuts that was not true on
--- Friday. `invoice` is where they actually sit, and the to-do says what is owed
--- next.
+-- ----------------------------------------------------------------------------
+-- THE CONSTRAINT IS WIDENED, NOT DROPPED
+-- ----------------------------------------------------------------------------
+-- 051 proved `special_orders_status_iff_order` by BREAKING it on the Docker
+-- harness, in both directions, and that is worth keeping. So it stays a
+-- biconditional and gains one kind:
 --
--- TWO THINGS READ `status = 'order'` AND WILL STOP FIRING FOR THESE DAYS, both
--- named here so whoever reads this later is not surprised by them:
---   · `pullReadiness` (`lib/specialOrderSchedule`) offers only `order` to the
---     production-schedule generator, so a materialized day is now WITHHELD,
---     counted, with the reason "still an Invoice". That rule was itself a
---     measurement (2026-08-27) and is not changed here.
---   · `needsAttention` stops saying "Paid and unprinted, and the event is
---     close" for them, for the same reason.
--- Neither is silent, and neither is changed by this migration. If wholesale
--- should still reach the kitchen, the fix is one condition in `pullReadiness`
--- — a standing DAY is ready at `invoice` — and it belongs in the app, not here.
+--     (kind in ('order','standing_order')) = (status is not null)
 --
--- Run in the Supabase SQL editor. RERUNNABLE (`create or replace`).
+-- A `template` still may not hold one, and that is not timidity — a template is
+-- DUPLICATED, not instantiated on a schedule, so it has no days to prototype
+-- and nothing to say. The two claims below are still refused, and are still
+-- worth proving by hand after this runs:
+--
+--     insert ... (kind, status) values ('template', 'lead')  -> refused
+--     insert ... (kind, status) values ('order', null)       -> refused
+--
+-- ORDER MATTERS IN THIS FILE. The two existing standing orders hold NULL, which
+-- the WIDER constraint forbids — so the old one is dropped, the rows are set,
+-- and only then is the new one added. Adding it first fails on the rows it is
+-- being added for.
+--
+-- WHAT IS NOT DONE HERE: nothing is backfilled onto days already made. A day
+-- that has been made, delivered and eaten is not waiting for an invoice.
+--
+-- Run in the Supabase SQL editor. RERUNNABLE.
 -- THE SQL STARTS ON THE LINE AFTER THIS ONE.
 -- ============================================================================
+
+alter table special_orders
+  drop constraint if exists special_orders_status_iff_order;
+
+-- Mark's instruction, 2026-09-20: "set the two existing standing order status'
+-- to 'Invoice' and the to do to 'Send Invoice'". `where status is null` so a
+-- rerun cannot stamp over a template somebody has since changed.
+update special_orders
+   set status = 'invoice',
+       todo   = coalesce(todo, 'Send Invoice')
+ where kind = 'standing_order'
+   and status is null;
+
+alter table special_orders
+  add constraint special_orders_status_iff_order
+  check ((kind in ('order', 'standing_order')) = (status is not null));
+
+comment on constraint special_orders_status_iff_order on special_orders is
+  'Decision 3, widened by 112: an ORDER has a status and a STANDING ORDER has '
+  'the status its days start with. A template has neither - it is duplicated, '
+  'not instantiated, so it has no days to prototype.';
+
 
 create or replace function public.ensure_standing_orders_materialized(
   p_org_id   uuid,
@@ -174,8 +207,15 @@ begin
         date_initiated, standing_order_id, source, created_by
       )
       select
-        -- CHANGED BY 112 (Mark, 2026-09-20). Was 'order', 'Print Order'.
-        s.org_id, v_number, 'order', 'invoice', 'Send Invoice',
+        -- COPIED, NOT HARDCODED, SINCE 112 (Mark, 2026-09-20). 099 wrote
+        -- 'order' and 'Print Order' here. They were the only two fields on this
+        -- insert that did not come from the template — everything else in this
+        -- select is `s.something` — and that was the anomaly rather than the
+        -- design. `coalesce` is belt: the widened constraint makes a null
+        -- status impossible on a standing order, and a migration that trusts a
+        -- constraint it just wrote is a migration that fails on the one row
+        -- nobody checked.
+        s.org_id, v_number, 'order', coalesce(s.status, 'order'), s.todo,
         s.customer_id, s.contact_name, s.contact_phone, s.contact_email, s.allergen_info,
         s.title, v_date, s.event_time, s.ready_by_time,
         s.location_id, s.kitchen_location_id, s.fulfillment,
