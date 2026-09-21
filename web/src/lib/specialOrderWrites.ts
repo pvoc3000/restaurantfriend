@@ -21,6 +21,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { startingState } from "./createSpecialOrder";
+import { KIND_LABEL, type SpecialOrderKind } from "./specialOrders";
+
 /**
  * Everything the guards and the confirm need, in one read.
  *
@@ -231,17 +234,46 @@ export async function deleteSpecialOrder(
 
 /**
  * Decision 13's one mechanism: a template, a standing order and an ordinary
- * order are all duplicated by this, and the copy is always a real ORDER
- * starting as a LEAD.
+ * order are all duplicated by this — and since 2026-09-20 the copy's KIND is
+ * the caller's, which is what turns "duplicate" into "convert into".
  *
  * It arrives with no dates and no payments — a duplicate of a paid order that
  * claimed to be paid would be a fiction, and the stage dates belong to the
  * event that happened.
+ *
+ * ---------------------------------------------------------------------------
+ * CONVERTING COPIES; THE ORIGINAL IS NOT TOUCHED
+ * ---------------------------------------------------------------------------
+ * Mark, 2026-09-20: "say you made a complicated order that turned out really
+ * nice and you'd like to be able to redo it later on repeatedly. Selecting
+ * 'Convert into an Order Template' would copy it and set it up as a standing
+ * order for later use." The command reads as a conversion and behaves as a
+ * copy, which is the right way round: a finished order is HISTORY — it was
+ * invoiced, made and eaten — and turning that row into a shape would delete
+ * the record of a thing that happened.
+ *
+ * WHAT THE KIND DECIDES, beyond the column itself:
+ *   · **status and to-do** come from `startingState`, which is decision 3's
+ *     biconditional as widened by 112 — a template has neither, a standing
+ *     order has the rung its days will start at.
+ *   · **the event date goes** for anything that is not an order. A shape has no
+ *     single day, the list's whole date window assumes so (`inOrderRange`: "a
+ *     record with NO event date — every template and every standing order"),
+ *     and a template carrying last August's date would surface in a range that
+ *     has nothing to do with it. The event TIME stays: 099 copies it onto every
+ *     day a standing order makes, so it is the usual delivery hour rather than
+ *     a fact about one event.
+ *   · **the recurrence stays empty** even for a standing order. It is made with
+ *     no weekdays, so it makes nothing until somebody sets them — which is the
+ *     materializer's own "a misconfigured standing order is NAMED, never
+ *     guessed at", reached from the other side.
  */
 export async function duplicateSpecialOrder(
   supabase: SupabaseClient,
   id: string,
-  number: string
+  number: string,
+  /** What the COPY is. Defaults to an order, which is what Duplicate means. */
+  kind: SpecialOrderKind = "order"
 ): Promise<{ id: string } | { error: string }> {
   const { data: source, error: readError } = await supabase
     .from("special_orders")
@@ -270,15 +302,18 @@ export async function duplicateSpecialOrder(
   ]) {
     delete copy[key];
   }
+  const start = startingState(kind);
   copy.number = nextNumber;
-  copy.kind = "order";
-  copy.status = "lead";
+  copy.kind = kind;
+  copy.status = start.status;
+  copy.todo = start.todo;
+  // A SHAPE HAS NO DAY — see the header.
+  if (kind !== "order") copy.event_date = null;
   copy.standing_days = null;
   copy.starts_on = null;
   copy.ends_on = null;
   copy.paused = false;
   copy.source = "app";
-  copy.todo = "Respond to Email/Call";
 
   const { data: created, error: insertError } = await supabase
     .from("special_orders")
@@ -305,11 +340,16 @@ export async function duplicateSpecialOrder(
   }
 
   // 054's trigger says "Order started as a lead"; where it CAME FROM is a fact
-  // with no watched column behind it, so it is written by hand.
+  // with no watched column behind it, so it is written by hand. The wording
+  // follows the KIND, because "Duplicated from order 9469" on a standing order
+  // would leave somebody hunting for the duplicate that is not there.
   await supabase.from("special_order_events").insert({
     org_id: source.org_id,
     order_id: created.id,
-    message: `Duplicated from order ${number}`,
+    message:
+      kind === "order"
+        ? `Duplicated from order ${number}`
+        : `${KIND_LABEL[kind]} made from order ${number}`,
     source: "app",
   });
 

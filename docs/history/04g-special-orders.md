@@ -1903,6 +1903,45 @@
    somebody chose, the verb is the named one with the balance warning attached,
    and it was asked for by name.
 
+   **CONVERT INTO AN ORDER TEMPLATE / A STANDING ORDER — 2026-09-20** (Mark:
+   "say you made a complicated order that turned out really nice and you'd like
+   to be able to redo it later on repeatedly. Selecting 'Convert into an Order
+   Template' would copy it and set it up as a standing order for later use. Same
+   with standing order templates").
+   **IT READS AS A CONVERSION AND BEHAVES AS A COPY**, which is his own
+   description and the right way round: a finished order is HISTORY — invoiced,
+   made and eaten — and turning that row into a shape would delete the record of
+   a thing that happened. You land on the copy, which is what makes the command
+   feel like it did something.
+   **ONE FUNCTION, ONE NEW ARGUMENT.** `duplicateSpecialOrder` already stripped
+   identity, stage dates, the schedule link and the payments, and copied the
+   lines; it now takes the copy's KIND. Duplicate passes `order` and is
+   unchanged. What the kind decides beyond the column: **status and to-do** come
+   from `startingState` (decision 3 as widened by 112 — a template has neither,
+   a standing order has the rung its days start at); **the event date goes** for
+   anything that is not an order, because `inOrderRange` already assumes a shape
+   has none and a template carrying last August's date would surface in a range
+   that has nothing to do with it; the event TIME stays, since 099 copies it
+   onto every day a standing order makes; and **the recurrence stays empty**, so
+   a converted standing order makes nothing until somebody sets its weekdays —
+   the materializer's "a misconfigured standing order is NAMED, never guessed
+   at", reached from the other side. The log line follows the kind too:
+   "Order Template made from order 10034", not "Duplicated from".
+   **NEITHER ROW IS OFFERED ON A RECORD THAT IS ALREADY THAT KIND** — converting
+   a template into a template is Duplicate with a longer name.
+   **VERIFIED BY RUNNING ONE**, against the live database: order 10034 →
+   template 10056, `kind=template`, `status=null`, `todo=null`,
+   `event_date=null`, `event_time` kept, stage dates cleared, both lines copied,
+   and the constraint accepted it. The template was deleted afterwards; the
+   number it spent is a gap, which this schema already treats as the ordinary
+   cost of being correct (099 says so about its own race guard).
+   **AND IT EXPOSED "$1,125.00 DUE" ON A SHAPE.** A template carries lines and
+   no payments, so the arithmetic produces a balance, and the identity line
+   printed it in red — the same falsehood as the progress wash, and invisible
+   until this command made templates easy to create. Gated on `kind` rather than
+   `countsAsOwed`, which would also silence a lead or a quote; those are orders,
+   and what their balance means is a separate argument.
+
    **A SHAPE HAS NO PROGRESS BAR — 2026-09-20** (Mark: "suppress the special
    order row progress bar backgrounds for both standing order and regular order
    templates"). **A regression 112 introduced, and worth naming as one.** A

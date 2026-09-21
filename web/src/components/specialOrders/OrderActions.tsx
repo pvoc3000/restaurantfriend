@@ -173,10 +173,19 @@ export function OrderActions({
    * callers. What used to be ninety lines here is the same ninety lines there,
    * where the row menu can reach them.
    */
-  function duplicate() {
+  /**
+   * DUPLICATE AND THE TWO CONVERSIONS ARE ONE FUNCTION, because they are one
+   * act with a different answer to "what is the copy?" — `lib/specialOrderWrites`
+   * holds the rest (what does not travel, what the kind decides, the log line).
+   *
+   * IT LANDS YOU ON THE COPY either way. That is what makes a conversion read
+   * as having happened: you asked for a template and there is a template on
+   * screen, with the order you started from still where you left it.
+   */
+  function duplicate(as: SpecialOrderKind = "order") {
     setError(null);
     start(async () => {
-      const result = await duplicateSpecialOrder(supabase, id, number);
+      const result = await duplicateSpecialOrder(supabase, id, number, as);
       if ("error" in result) {
         setError(result.error);
         return;
@@ -272,7 +281,36 @@ export function OrderActions({
 
   if (children) {
     const edit: ActionMenuItem[] = [
-      { label: "Duplicate", onSelect: duplicate, disabled: pending },
+      { label: "Duplicate", onSelect: () => duplicate("order"), disabled: pending },
+      /**
+       * THE TWO CONVERSIONS SIT UNDER DUPLICATE (Mark, 2026-09-20: "it would be
+       * nice to be able to turn a regular order into a template… selecting
+       * 'Convert into an Order Template' would copy it"). They are the same act
+       * asked of a different kind, so they belong in the same group and in his
+       * own words.
+       *
+       * NOT OFFERED ON A RECORD THAT IS ALREADY THAT KIND. Converting a
+       * template into a template is Duplicate with a longer name, and the row
+       * would be a second door to a thing the one above it already does.
+       */
+      ...(kind !== "template"
+        ? [
+            {
+              label: "Convert into an Order Template",
+              onSelect: () => duplicate("template"),
+              disabled: pending,
+            },
+          ]
+        : []),
+      ...(kind !== "standing_order"
+        ? [
+            {
+              label: "Convert into a Standing Order",
+              onSelect: () => duplicate("standing_order"),
+              disabled: pending,
+            },
+          ]
+        : []),
       flagReason
         ? { label: "Resolve Flag", onSelect: resolve, disabled: pending }
         : { label: "Flag…", onSelect: () => setFlagging(true), disabled: pending },
@@ -301,7 +339,15 @@ export function OrderActions({
         {/* LEADS THE ROW: scheduling is a thing you do WITH an order, where
             everything after it is done TO the record. */}
         {schedule}
-        <button type="button" className={BUTTON_CLASS} onClick={duplicate} disabled={pending}>
+        {/* WRAPPED, not passed straight in: `duplicate` takes a kind, and an
+            `onClick` handed the function itself would pass it the MouseEvent.
+            The compiler caught that the moment the parameter was added. */}
+        <button
+          type="button"
+          className={BUTTON_CLASS}
+          onClick={() => duplicate("order")}
+          disabled={pending}
+        >
           Duplicate
         </button>
         {flagReason ? (

@@ -475,7 +475,15 @@ export async function SpecialOrderDetail({
             )}
             {" · "}
             <span className="tabular-nums">{money(totals.total)}</span>
-            {totals.balance > 0 && !moneyInputs.ignore_balance ? (
+            {/* A SHAPE OWES NOTHING (2026-09-20). A template and a standing
+                order carry lines and no payments, so the arithmetic produces a
+                balance — and until Convert into an Order Template existed
+                almost nobody had one to notice. "$1,125.00 due" in red on a
+                record that is a PROTOTYPE is the same falsehood as the progress
+                wash it lost this morning. `kind` rather than `countsAsOwed`,
+                which would also silence a lead or a quote — those are orders,
+                and what their balance means is a separate argument. */}
+            {kind === "order" && totals.balance > 0 && !moneyInputs.ignore_balance ? (
               <span className="text-accent"> · {money(totals.balance)} due</span>
             ) : null}
           </p>
