@@ -1934,12 +1934,28 @@
    needs and a row cannot — how much, when, and how it arrived. The date is
    still reachable in bulk through Set Completion Date ▸ Invoice paid, so
    nothing was lost.
-   **TWO MODES, AND THE SECOND IS THE ONE THAT NEEDS SAYING OUT LOUD.** "Paid in
-   full" asks each order what IT is owed and writes that; "Same amount each"
-   writes one figure against every selected order. One figure times six orders
-   is six hundred dollars, and nobody should learn that from the report — so the
-   sentence under the fields states it before you commit ("$50.00 on each of 6
-   orders — $300.00 in all") and the button reads `Record $300.00`.
+   **AN AMOUNT FIELD AND A "PAID IN FULL" BOX BESIDE IT** (Mark, hours later —
+   it shipped as a `TabPicker` between "Paid in full" and "Same amount each" and
+   that lasted an afternoon). The box says the same thing in less space, and the
+   FIELD STAYS ON SCREEN while you tick it, which is what makes the override
+   legible rather than a mode you have to remember you are in. Disabled, not
+   cleared: untick it and what you typed is still there. **Either an amount
+   above zero or the box ticked**, which is Mark's rule verbatim and is the
+   whole of `payReady`.
+   **A TYPED AMOUNT MUST BE POSITIVE**, where the record's own Payments table
+   still takes a negative one — a refund or a correction is a real row. Against
+   a SELECTION it would be a credit applied to orders chosen for some other
+   reason, which is not a thing anybody means to do in bulk.
+   **ONE FIGURE TIMES SIX ORDERS IS SIX HUNDRED DOLLARS**, and nobody should
+   learn that from the report — so the sentence under the fields states it
+   before you commit ("$50.00 on each of 6 orders — $300.00 in all") and the
+   button reads `Record $300.00`.
+   **AND THE DIALOG SHIPPED WITH A CHECKBOX NOBODY COULD READ.** `ui/Checkbox`
+   takes `label` as the ACCESSIBLE name and `children` as the visible one; the
+   invoice-paid-date box had the first and not the second, so it rendered as a
+   bare square that appeared to do nothing (Mark: "there's currently a checkbox
+   on the dialogue that is unlabeled and doesn't seem to do anything"). It was
+   doing exactly what it said — silently. Both boxes here now carry children.
    **PAID IN FULL SKIPS THE ALREADY-SETTLED**, because their amount would be
    zero or a credit and a $0.00 payment row is a record of nothing the balance
    then has to be read around. A TYPED amount has no such test: "put $50 against

@@ -20,7 +20,6 @@ import {
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
-import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
 import { Checkbox } from "@/components/ui/Checkbox";
 import type { SpecialOrderRow } from "./SpecialOrdersList";
@@ -120,8 +119,13 @@ export function SpecialOrderBatchActions({
    * nothing was lost.
    */
   const [paying, setPaying] = useState(false);
-  /** "full" takes each order's OWN balance; "same" takes one figure for all. */
-  const [payMode, setPayMode] = useState<"full" | "same">("full");
+  /**
+   * PAID IN FULL takes each order's OWN balance; otherwise the typed figure
+   * goes against every selected order (Mark, 2026-09-20 — it was a `TabPicker`
+   * between the two for a few hours, and a box beside the field it overrides
+   * says the same thing in less space and with less ceremony).
+   */
+  const [payFull, setPayFull] = useState(true);
   const [payAmount, setPayAmount] = useState("");
   const [payOn, setPayOn] = useState<string | null>(today);
   const [payType, setPayType] = useState(DEFAULT_PAYMENT_TYPE);
@@ -179,20 +183,26 @@ export function SpecialOrderBatchActions({
    */
   const payable = selected.filter((r) => r.kind === "order");
   const inFull = payable.filter((r) => r.totals.balance > 0.005);
-  const payRows = payMode === "full" ? inFull : payable;
+  const payRows = payFull ? inFull : payable;
 
+  /**
+   * A TYPED AMOUNT MUST BE POSITIVE (Mark's rule: "either amount needs to be >
+   * 0 or paid in full needs to be true to continue"). The record's own Payments
+   * table still takes a negative one — a refund or a correction is a real row —
+   * but against a SELECTION it would be a credit applied to orders chosen for
+   * some other reason, which is not a thing anybody means to do in bulk.
+   */
   const typedAmount = Number(payAmount);
-  const typedOk = Number.isFinite(typedAmount) && typedAmount !== 0;
-  /** May the dialog commit? */
-  const payReady = payMode === "full" ? inFull.length > 0 : typedOk && payable.length > 0;
+  const typedOk = Number.isFinite(typedAmount) && typedAmount > 0;
+  /** May the dialog commit? Mark's rule, in one line. */
+  const payReady = payFull ? inFull.length > 0 : typedOk && payable.length > 0;
 
   /** What this dialog is about to record, all in. */
-  const payTotal =
-    payMode === "full"
-      ? inFull.reduce((a, r) => a + r.totals.balance, 0)
-      : typedOk
-        ? typedAmount * payable.length
-        : 0;
+  const payTotal = payFull
+    ? inFull.reduce((a, r) => a + r.totals.balance, 0)
+    : typedOk
+      ? typedAmount * payable.length
+      : 0;
 
   /**
    * WHO WOULD ACTUALLY MOVE, for a to-do. No kind test, unlike the status:
@@ -269,7 +279,7 @@ export function SpecialOrderBatchActions({
    */
   async function recordPayment() {
     const amountFor = (r: SpecialOrderRow) =>
-      payMode === "full" ? Math.round(r.totals.balance * 100) / 100 : typedAmount;
+      payFull ? Math.round(r.totals.balance * 100) / 100 : typedAmount;
 
     setBusy("paid");
     const { data, error } = await supabase
@@ -695,7 +705,7 @@ export function SpecialOrderBatchActions({
            */
           label: busy === "paid" ? "Recording…" : `Record Payment… (${payable.length})`,
           onSelect: () => {
-            setPayMode("full");
+            setPayFull(true);
             setPayAmount("");
             setPayOn(today);
             setPayType(DEFAULT_PAYMENT_TYPE);
@@ -755,31 +765,23 @@ export function SpecialOrderBatchActions({
           }
         >
           <div className="space-y-5">
-            {/* EVERY ONE-OF-N CHOICE IS A `ui/TabPicker`. The two are genuinely
-                different questions about the same act: Paid in full asks each
-                order what it is owed, an amount says one figure for all of
-                them — and the second is the one that needs saying out loud,
-                which the sentence under the fields does. */}
-            <div className="space-y-1.5">
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                How much
-              </span>
-              <TabPicker
-                value={payMode}
-                onChange={(next) => setPayMode(next as "full" | "same")}
-                ariaLabel="How much to record"
-                options={[
-                  { key: "full", label: "Paid in full", count: inFull.length },
-                  { key: "same", label: "Same amount each", count: payable.length },
-                ]}
-              />
-            </div>
+            {/* THE FIELD AND THE BOX THAT OVERRIDES IT, side by side (Mark,
+                2026-09-20). It was a `TabPicker` between "Paid in full" and
+                "Same amount each" for a few hours; a box beside the field says
+                the same thing in less space, and the field STAYS ON SCREEN
+                while you tick it, which is what makes the override legible
+                rather than a mode you have to remember you are in.
 
-            {payMode === "same" && (
+                THE FIELD IS DISABLED, NOT CLEARED, while the box is ticked —
+                untick it and what you typed is still there. It is also why the
+                box carries a visible label rather than only an accessible one:
+                `ui/Checkbox`'s `label` is the ACCESSIBLE name and `children` is
+                what a reader sees, and a box with the first and not the second
+                renders bare (which this dialog shipped with for an afternoon). */}
+            <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
               <label className="block space-y-1.5">
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                   Amount
-                  <span className="text-accent"> *</span>
                 </span>
                 <TextInput
                   value={payAmount}
@@ -787,10 +789,20 @@ export function SpecialOrderBatchActions({
                   placeholder="50.00"
                   aria-label="Amount received on each order"
                   className="w-32"
+                  disabled={payFull}
                   autoFocus
                 />
               </label>
-            )}
+              <div className="pb-2">
+                <Checkbox
+                  checked={payFull}
+                  onChange={setPayFull}
+                  label="Record each order's whole outstanding balance"
+                >
+                  Paid in Full
+                </Checkbox>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
               <label className="block space-y-1.5">
@@ -817,18 +829,19 @@ export function SpecialOrderBatchActions({
               </label>
             </div>
 
-            <Checkbox
-              checked={payStamp}
-              onChange={setPayStamp}
-              label="Set the invoice-paid date on any order this settles"
-            />
+            {/* VISIBLE LABEL AS `children`. It had only `label`, which is the
+                ACCESSIBLE name, so it rendered as a bare box that appeared to
+                do nothing — Mark, 2026-09-20. */}
+            <Checkbox checked={payStamp} onChange={setPayStamp}>
+              Set the invoice-paid date on any order this settles
+            </Checkbox>
 
             {/* WHAT IS ABOUT TO HAPPEN, IN ONE SENTENCE, because the two modes
                 differ in a way a total alone would hide: one figure times six
                 orders is six hundred dollars, and nobody should learn that from
                 the report. */}
             <p className="text-[13px] text-muted">
-              {payMode === "full"
+              {payFull
                 ? inFull.length === 0
                   ? "None of the selected orders has a balance outstanding."
                   : `${money(payTotal)} across ${plural(inFull.length, "order")}, each one its own balance.` +
