@@ -1922,8 +1922,43 @@
    two facts. **And the PAID chip is now an order's too**: a shape has no
    invoice to have been paid, since the conversion strips the stage dates.
 
-   **A COPY CARRIES ONE LINE OF HISTORY — migration 113, APPLIED 2026-09-21
-   (by Mark)** (Mark: "do not copy the history when copying an order that
+   **A COPY CARRIES ONE LINE OF HISTORY — migration 113, APPLIED 2026-09-21 AND
+   BROKEN; FIXED BY 114 THE SAME DAY.**
+   **113 NEVER RAN.** Mark, having applied it and made a template: "adding item
+   log entries are still being recorded between 'Created from Order N' and
+   'Template Created'." Three entries where there should be one — which is the
+   app's client-side FALLBACK exactly, and therefore proof that the function had
+   failed and the fallback had swallowed it. Confirmed on the record itself:
+   template 10060, HISTORY 20 — eighteen "Added …" lines between the two.
+   **A STRIPPED KEY IS AN EXPLICIT NULL.** 113 built the copy as
+   `to_jsonb(source)` minus the keys that must not travel, then
+   `insert … select * from jsonb_populate_record(…)`. A key REMOVED comes back
+   out as NULL, and a NULL in an INSERT is not an absent column — it OVERRIDES
+   the DEFAULT. So it died on `null value in column "id"`, with `legacy_seq`,
+   `created_at`, `updated_at` and `external_ref` queued behind it. **The columns
+   113 most wanted to leave behind were precisely the ones that cannot be.**
+   114 separates the two ideas that were being conflated — "do not copy this"
+   and "this may be null" — replacing the five and dropping the rest.
+   **THE LIST CAME FROM THE DATABASE, NOT FROM READING IT.** The first draft of
+   114 fixed four of the five and shipped the same bug a second time
+   (`external_ref jsonb not null default '{}'`). A throwaway Postgres loaded
+   with 051's real DDL found it in a second; two passes of careful reading had
+   not. `information_schema` then gave the full list, and every NOT NULL column
+   on both tables is now either carried through or replaced.
+   **114 WAS RUN BEFORE IT WAS HANDED OVER**, on that same container: an
+   18-line order copied into a template gives 18 lines, 18 distinct ids, and a
+   log of ONE entry — "Created from order 9999", authored. Into a standing
+   order, one entry. A template back into an order, one entry, "Created from
+   template 17790", `status = lead`, the to-do seeded, the event date kept where
+   the template's was dropped. The source's own 19 entries were untouched
+   throughout. The standing-order case failed first against a stub built from
+   051's ORIGINAL constraint, which is 112 not being in the harness rather than
+   a fault in 114 — proven by applying 112's constraint and re-running.
+   **AND THE FALLBACK NO LONGER HIDES A FAILURE.** It read "anything that is not
+   a refusal means the migration is missing"; it now falls through on `PGRST202`
+   alone — PostgREST saying the function is not in the schema cache — and
+   reports everything else. A fallback that hides the thing it stands in for is
+   worse than no fallback. (Mark: "do not copy the history when copying an order that
    will be converted into a template. Just include a line on the new template
    specifying which order the template came from", and the same the other way
    for a template copied into an order. "That way history we care about is

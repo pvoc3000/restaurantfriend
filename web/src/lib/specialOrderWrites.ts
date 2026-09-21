@@ -298,11 +298,20 @@ export async function duplicateSpecialOrder(
       p_kind: kind,
     });
     if (!error && typeof data === "string") return { id: data };
-    // A refusal the function raised itself is a real answer and is reported;
-    // anything else means 113 is not applied yet, so fall through.
-    if (error && /permission|does not exist, or is not yours|Unknown kind/i.test(error.message)) {
-      return { error: error.message };
-    }
+    /**
+     * ONLY A MISSING FUNCTION FALLS THROUGH. `PGRST202` is PostgREST saying it
+     * cannot find `copy_special_order` in the schema cache, which means the
+     * migration is not applied — the one case the fallback is for.
+     *
+     * EVERY OTHER ERROR IS REPORTED, and that is a lesson rather than a
+     * preference. This first read "anything that is not a refusal means the
+     * migration is missing", so when 113 failed on its very first insert
+     * (`null value in column "id"` — see 114) the fallback caught it, quietly
+     * did the copy the old way, and reported success. Mark found it by reading
+     * a log that still had three entries in it. A fallback that hides the
+     * thing it is standing in for is worse than no fallback.
+     */
+    if (error && error.code !== "PGRST202") return { error: error.message };
   }
 
   const { data: source, error: readError } = await supabase
