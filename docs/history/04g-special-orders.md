@@ -1903,8 +1903,27 @@
    somebody chose, the verb is the named one with the balance warning attached,
    and it was asked for by name.
 
-   **A COPY CARRIES ONE LINE OF HISTORY — migration 113, WRITTEN 2026-09-21 AND
-   NOT YET APPLIED** (Mark: "do not copy the history when copying an order that
+   **A SHAPE WEARS A CHIP SAYING WHAT IT IS — 2026-09-21** (Mark: "add a yellow
+   chip next to the page title on the special order detail screen for templates.
+   'Template' for regular order templates, and 'Standing Order Template' for
+   standing order templates"). An ORDER wears its status; a shape wears the one
+   fact that changes how everything else on the screen reads — that this is not
+   a live order.
+   **BOTH ARE YELLOW, which is the design system applying rather than being
+   bent**: yellow is this app's "worth your eye" mark, and being a template is
+   exactly that. Green stays spoken for by Paid.
+   **A THIRD SPELLING, AND IT EARNS ITS PLACE.** `KIND_LABEL` is the schema's
+   vocabulary — "Standing order" — right in a `dl` beside the word Kind and
+   wrong on a badge; `ORDER_KIND_FILTERS` says "Standing Order Templates"
+   because a menu names a SET. `KIND_CHIP_LABEL` is the singular of the filter's
+   words, and has no entry for an order, whose chip is its status.
+   **THE KIND LEFT THE LINE BELOW**, the same move the status made when it
+   became a chip and for the same reason — the word twice, 20px apart, reads as
+   two facts. **And the PAID chip is now an order's too**: a shape has no
+   invoice to have been paid, since the conversion strips the stage dates.
+
+   **A COPY CARRIES ONE LINE OF HISTORY — migration 113, APPLIED 2026-09-21
+   (by Mark)** (Mark: "do not copy the history when copying an order that
    will be converted into a template. Just include a line on the new template
    specifying which order the template came from", and the same the other way
    for a template copied into an order. "That way history we care about is

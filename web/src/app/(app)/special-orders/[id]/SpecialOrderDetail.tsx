@@ -9,6 +9,7 @@ import type { RawSearchParams } from "@/lib/filterMenus";
 import {
   KIND_LABEL,
   ORDER_TAB_LABEL,
+  KIND_CHIP_LABEL,
   STANDING_STATUS_OPTIONS,
   STATUS_LABEL,
   STATUS_OPTIONS,
@@ -441,23 +442,42 @@ export async function SpecialOrderDetail({
             <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
               {(row.title as string) || `Order ${row.number as string}`}
             </h1>
-            {/* AN ORDER'S CHIP, NOT A STANDING ORDER'S. Since 112 a standing
-                order carries a status too, but it is the one its DAYS start
-                with rather than a state this record is in — and a yellow
-                INVOICE beside a title whose own line reads "Standing order"
-                would be answering a question nobody asked. */}
-            {kind === "order" && status ? (
+            {/* AN ORDER WEARS ITS STATUS; A SHAPE WEARS WHAT IT IS.
+                Since 112 a standing order carries a status too, but it is the
+                rung its DAYS start at rather than a state this record is in, so
+                putting INVOICE on its badge would answer a question nobody
+                asked. What a reader of a template needs from a badge is the one
+                thing that changes how they read everything else on the screen —
+                that this is not a live order (Mark, 2026-09-21).
+
+                BOTH ARE YELLOW, and that is the design system applying rather
+                than being bent: yellow is this app's "worth your eye" mark, and
+                being a template is exactly that. Green stays spoken for by
+                Paid. */}
+            {kind === "order" ? (
+              status ? (
+                <span className={`${CHIP} border-ink bg-[var(--rf-yellow-200)] text-ink`}>
+                  {STATUS_LABEL[status]}
+                </span>
+              ) : null
+            ) : (
               <span className={`${CHIP} border-ink bg-[var(--rf-yellow-200)] text-ink`}>
-                {STATUS_LABEL[status]}
+                {KIND_CHIP_LABEL[kind] ?? KIND_LABEL[kind]}
               </span>
-            ) : null}
-            {row.invoice_paid_at ? (
+            )}
+            {/* PAID IS AN ORDER'S TOO. A shape has no invoice to have been
+                paid — the conversion strips the stage dates — and the one way
+                it could carry that date is somebody setting it by hand on a
+                record where it means nothing. */}
+            {kind === "order" && row.invoice_paid_at ? (
               <span className={`${CHIP} border-ink bg-[var(--rf-green-200)] text-ink`}>Paid</span>
             ) : null}
           </div>
           <p className="text-sm text-muted">
             <span className="tabular-nums">#{row.number as string}</span>
-            {kind === "order" ? "" : ` · ${KIND_LABEL[kind]}`}
+            {/* THE KIND LEFT THIS LINE when it became a chip (2026-09-21) —
+                the same move the status made when IT became one, and for the
+                same reason: the word twice, 20px apart, reads as two facts. */}
             {row.event_date ? ` · ${row.event_date as string}` : ""}
             {" · "}
             {customer ? (

@@ -182,6 +182,27 @@ export const PAYMENT_TYPE_OPTIONS: PickOption[] = [
 export const DEFAULT_PAYMENT_TYPE = "Square Invoice";
 
 /**
+ * WHAT A SHAPE'S CHIP SAYS (Mark, 2026-09-21: "add a yellow chip next to the
+ * page title on the special order detail screen for templates. 'Template' for
+ * regular order templates, and 'Standing Order Template' for standing order
+ * templates").
+ *
+ * A THIRD SPELLING, AND IT EARNS ITS PLACE. `KIND_LABEL` is the schema's
+ * vocabulary — "Standing order" — which is right in a `dl` beside the word
+ * Kind and wrong on a badge, where the one thing the reader has to take away is
+ * that this is not a live order. `ORDER_KIND_FILTERS` says "Standing Order
+ * Templates" because a menu names a SET; a chip names one record, so it is the
+ * singular of that.
+ *
+ * An ORDER has no entry here: its chip is its STATUS, which is a state a shape
+ * does not have.
+ */
+export const KIND_CHIP_LABEL: Partial<Record<SpecialOrderKind, string>> = {
+  template: "Template",
+  standing_order: "Standing Order Template",
+};
+
+/**
  * WHAT A STANDING ORDER'S DAYS START AS (migration 112, 2026-09-20).
  *
  * Two rungs, not five. A standing order is a PROTOTYPE, and its status is the
