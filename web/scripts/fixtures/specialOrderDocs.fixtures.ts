@@ -522,14 +522,64 @@ test("a name is not treated as a phone, and two digits are not either", () => {
 });
 
 test("commas and parentheses can never break out of the or() list", () => {
-  // Each clause is one `column.op.value` — a stray comma would split it into
-  // two filters and change what the query means.
-  for (const clause of customerSearchClauses("a,b)c( 999")) {
-    const value = clause.slice(clause.indexOf(".ilike.") + 7);
-    no(value.includes(","), `no comma in ${clause}`);
-    no(value.includes("("), `no paren in ${clause}`);
-    no(value.includes(")"), `no paren in ${clause}`);
+  // A stray comma or paren in a VALUE would split a filter in two and change
+  // what the query means. The `and(…)` pair has parens and a comma of its own,
+  // which are PostgREST's syntax — so the test reads the values rather than the
+  // whole clause: everything between `.ilike.` and the next delimiter.
+  const values = (term: string) =>
+    customerSearchClauses(term).flatMap((clause) =>
+      [...clause.matchAll(/\.ilike\.([^,)]*)/g)].map((m) => m[1])
+    );
+  for (const value of values("a,b)c( 999")) {
+    no(value.includes(","), `no comma in ${value}`);
+    no(value.includes("("), `no paren in ${value}`);
+    no(value.includes(")"), `no paren in ${value}`);
   }
+  // And the pair is still well formed after the stripping — one `and(`, one
+  // `)`, one comma between two filters.
+  for (const clause of customerSearchClauses("a,b)c( 999")) {
+    if (!clause.startsWith("and(")) continue;
+    ok(/^and\([a-z_]+\.ilike\.[^,()]*,[a-z_]+\.ilike\.[^,()]*\)$/.test(clause), clause);
+  }
+});
+
+test("A FULL NAME IS MATCHED ACROSS THE TWO NAME COLUMNS", () => {
+  // Mark, 2026-09-21: "the app doesn't find 'Alyssa Rosario' even though they
+  // exist". Every other clause puts the whole term against ONE column, and a
+  // person's name lives in two — so the most natural thing to type was the one
+  // thing that could not match, and the box said the customer did not exist.
+  const pairs = (term: string) =>
+    customerSearchClauses(term).filter((c) => c.startsWith("and("));
+
+  eq(pairs("Alyssa Rosario"), [
+    "and(first_name.ilike.%Alyssa%,last_name.ilike.%Rosario%)",
+    // Reversed too: a list sorted by surname trains people to type it that way.
+    "and(first_name.ilike.%Rosario%,last_name.ilike.%Alyssa%)",
+  ]);
+
+  // FIRST AND LAST WORD, not `splitName`'s last-space cut: the columns hold
+  // whatever was typed into them, so "Mary Jo Alvarez" has to find a
+  // `first_name` of either "Mary" or "Mary Jo" — and `%Mary%` finds both.
+  eq(pairs("Mary Jo Alvarez"), [
+    "and(first_name.ilike.%Mary%,last_name.ilike.%Alvarez%)",
+    "and(first_name.ilike.%Alvarez%,last_name.ilike.%Mary%)",
+  ]);
+
+  // One word is not a pair — "Alyssa" already finds every Alyssa through the
+  // whole-term clauses, and pairing it with itself would demand a surname too.
+  eq(pairs("Alyssa"), []);
+  eq(pairs("   "), []);
+
+  // A dot or a colon ENDS A VALUE inside a logic tree, so they come out of the
+  // words: "St. John Smith" must still parse.
+  eq(pairs("St. John Smith"), [
+    "and(first_name.ilike.%St%,last_name.ilike.%Smith%)",
+    "and(first_name.ilike.%Smith%,last_name.ilike.%St%)",
+  ]);
+
+  // The whole-term clauses are untouched — this ADDS a way to match, it does
+  // not replace one. A company is one column and "Cafe Knotted" still finds it.
+  ok(customerSearchClauses("Cafe Knotted").includes("company.ilike.%Cafe Knotted%"));
 });
 
 test("a name splits on the LAST space, and a lone word is a SURNAME", () => {

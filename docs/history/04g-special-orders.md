@@ -50,11 +50,38 @@
    person it was about to replace.
    Verified in the pane against the live DB on #10055: link wrote and the row
    redrew as "Change customer", Unlink cleared it and the order is back as it
-   was; #10046 shows the Linked-now line. **Left alone, and worth a look:** the
-   shared search matches a WHOLE term against each column, so a contact named
-   "Tanvi Shah" finds no customer named Tanvi Shah — first name and last name
-   are separate columns. Pre-existing and shared with the create dialog, so it
-   is a change to `lib/customerSearch` and its fixtures, not to this screen.
+   was; #10046 shows the Linked-now line.
+
+   **AND THE SEARCH NOW MATCHES A FULL NAME — same day, and it is the same
+   bug the dialog made visible.** Mark, on the seeded box: "the app doesn't find
+   'Alyssa Rosario' even though they exist. just 'Alyssa' finds all alyssas, but
+   'Alyssa Rosario' finds nothing." Every clause in `customerSearchClauses` put
+   the WHOLE term against ONE column and a person's name lives in TWO, so the
+   most natural thing to type — their name as you would say it — was the one
+   thing that could not match. **It read as the customer not existing**, which
+   is the worst lie this box can tell: the next move is New customer, and you
+   have made a duplicate of somebody already on file. (Measured while fixing it:
+   "tanvi shah" now returns TWO Tanvi Shahs, which is what that failure looks
+   like after the fact.)
+   A term of two words or more now also asks for the PAIR — the first word
+   against `first_name` AND the last against `last_name`, `and(…)` nested inside
+   the `or(…)` — **and the same pair reversed**, since a list sorted by surname
+   trains people to type "Rosario Alyssa". First-and-last word rather than
+   `splitName`'s last-space cut, because the columns hold whatever was typed
+   into them: "Mary Jo Alvarez" has to find a `first_name` of either "Mary" or
+   "Mary Jo", and `%Mary%` finds both. Dots and colons come out of the words —
+   inside a logic tree they END a value, so "St. John Smith" would otherwise
+   stop parsing.
+   In `lib/customerSearch`, so the create dialog gained it in the same edit, and
+   fixture-tested (checked by deleting the reversed clause and watching the case
+   go red). Verified live: "Alyssa Rosario" and "Rosario Alyssa" both find her,
+   "Cafe Knotted" still finds the company on the whole-term clause, "Alyssa"
+   still finds all six, and "337-7966" still finds Alexandra David on the
+   digit-run phone clause.
+   **This is why the seeded box stays.** Seeding the search with the order's
+   contact was what surfaced the bug; with the pair clause the seed does what it
+   was for — you open the dialog on a repeat customer and they are already on
+   screen.
 
    **Shipped 2026-09-08 — THE LIST'S ROWS HAVE THEIR OWN ⋯** (Mark: "add a
    'more options' button column to the special order list screen with

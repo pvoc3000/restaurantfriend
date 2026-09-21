@@ -39,6 +39,24 @@ export const MIN_SEARCH = 2;
  * used. The real data needs that: it holds `3233833742`, `310.721.5994` and
  * `323) 485-2621`.
  *
+ * **A FULL NAME IS MATCHED ACROSS THE TWO NAME COLUMNS** (Mark, 2026-09-21:
+ * "the app doesn't find 'Alyssa Rosario' even though they exist. just 'Alyssa'
+ * finds all alyssas, but 'Alyssa Rosario' finds nothing"). Every clause above
+ * puts the WHOLE term against ONE column, and a person's name lives in two —
+ * so the most natural thing to type, their name as you would say it, was the
+ * one thing that could not match. It read as the customer not existing, which
+ * is the worst possible lie for this box to tell: the next move is to create a
+ * duplicate of somebody who is already on file.
+ *
+ * So a term of two words or more also asks for the pair: the FIRST word against
+ * `first_name` AND the LAST against `last_name`, `and(…)` nested inside the
+ * `or(…)`. First-and-last rather than `splitName`'s last-space cut because the
+ * columns hold whatever was typed into them — "Mary Jo Alvarez" has to find a
+ * `first_name` of either "Mary" or "Mary Jo", and `ilike %Mary%` finds both.
+ * **And the same pair REVERSED**, since a list sorted by surname trains people
+ * to type "Rosario Alyssa", and half the phone orders in the FMP history were
+ * written down that way.
+ *
  * Returned as an array rather than a string so the fixtures can read it.
  */
 export function customerSearchClauses(term: string): string[] {
@@ -50,6 +68,18 @@ export function customerSearchClauses(term: string): string[] {
     `company.ilike.%${safe}%`,
     `email.ilike.%${safe}%`,
   ];
+
+  // The words of the term, with the characters PostgREST reserves INSIDE a
+  // logic tree taken out — a dot or a colon there ends the value early, which
+  // would turn "St. John" into a filter that no longer parses.
+  const words = safe.split(/\s+/).map((w) => w.replace(/[.:"]/g, "")).filter(Boolean);
+  if (words.length >= 2) {
+    const first = words[0];
+    const last = words[words.length - 1];
+    clauses.push(`and(first_name.ilike.%${first}%,last_name.ilike.%${last}%)`);
+    clauses.push(`and(first_name.ilike.%${last}%,last_name.ilike.%${first}%)`);
+  }
+
   const runs = term.match(/\d+/g) ?? [];
   // Three digits is the shortest thing worth treating as a number; below that a
   // "phone match" is every customer whose number contains a 7.
