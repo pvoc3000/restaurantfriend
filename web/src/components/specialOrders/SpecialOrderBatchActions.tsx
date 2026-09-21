@@ -10,6 +10,7 @@ import { deleteBlock, type DeleteBlock } from "@/lib/specialOrderWrites";
 import {
   STATUS_LABEL,
   STATUS_ORDER,
+  TODO_OPTIONS,
   countsAsOwed,
   money,
   type SpecialOrderStatus,
@@ -43,8 +44,9 @@ import type { SpecialOrderRow } from "./SpecialOrdersList";
  * ---------------------------------------------------------------------------
  * WHAT IS HERE, AND WHAT IS DELIBERATELY NOT
  * ---------------------------------------------------------------------------
- * Set Status ▸ (the ladder, Cancelled included), Mark Paid, Resolve Flags,
- * Delete Selected. Every one of them exists for a single order somewhere else,
+ * Set Status ▸ (the ladder, Cancelled included), Set To-do ▸ (the vocabulary,
+ * and Clear), Mark Paid, Resolve Flags, Delete Selected. Every one of them
+ * exists for a single order somewhere else,
  * and each is the SAME rule applied to more rows rather than a second reading
  * of it.
  *
@@ -85,9 +87,9 @@ export function SpecialOrderBatchActions({
 }) {
   const supabase = createClient();
   const router = useRouter();
-  const [busy, setBusy] = useState<"status" | "cancel" | "flags" | "paid" | "delete" | null>(
-    null
-  );
+  const [busy, setBusy] = useState<
+    "status" | "cancel" | "flags" | "paid" | "todo" | "delete" | null
+  >(null);
 
   /**
    * DECISION 3's BICONDITIONAL DECIDES WHO CAN BE CANCELLED. Migration 051's
@@ -124,6 +126,15 @@ export function SpecialOrderBatchActions({
    * is left owing and where to settle it.
    */
   const stillOwing = markable.filter((r) => countsAsOwed(r) && r.totals.balance > 0);
+
+  /**
+   * WHO WOULD ACTUALLY MOVE, for a to-do. No kind test, unlike the status:
+   * `todo` is a plain column with no constraint behind it, and a note to
+   * whoever picks this up next reads the same on a template as on an order.
+   * The only rows skipped are the ones already saying it.
+   */
+  const retodoable = (to: string | null) =>
+    selected.filter((r) => (r.todo ?? null) !== to);
 
   const plural = (n: number, one: string, many = `${one}s`) =>
     `${n} ${n === 1 ? one : many}`;
@@ -219,6 +230,61 @@ export function SpecialOrderBatchActions({
               stillOwing.length === 1 ? "owes" : "owe"
             } ${money(owed)} — no payments were recorded.`
           : ""),
+      "done"
+    );
+  }
+
+  /**
+   * THE TO-DO, ON EVERY TICKED ROW THAT IS NOT ALREADY SAYING IT (Mark,
+   * 2026-09-20: "add the ability to batch change the to do on selected special
+   * orders").
+   *
+   * DECISION 4 SURVIVES THIS INTACT. The rule is that the app SUGGESTS a to-do
+   * and never writes one — `WorkflowOffer`'s ticks, the catch-up's `→`. A human
+   * picking a row off a menu is the human writing it, which is the same act as
+   * typing it into the cell, done to twenty rows at once.
+   *
+   * `null` CLEARS IT, and that is a real choice rather than the absence of one:
+   * the record's own cell is `clearable`, and "nothing to do here" is the most
+   * common state in the data — 8,233 of 8,334 migrated orders.
+   */
+  async function setTodo(to: string | null) {
+    const rows = retodoable(to);
+    const already = selected.length - rows.length;
+    const what = to === null ? "Clear the to-do on" : `Set the to-do to ${to} on`;
+    if (
+      !(await confirmDialog({
+        ...splitConfirmMessage(
+          `${what} ${plural(rows.length, "order")}?\n\n` +
+            (already
+              ? `${plural(already, "row")} already say${already === 1 ? "s" : ""} that, and will ` +
+                `be left alone. `
+              : "") +
+            "A to-do is a note to whoever picks this up next. Nothing else about these orders " +
+            "changes — the app never writes one by itself, which is why this is a menu and not " +
+            "a rule."
+        ),
+        confirmLabel: to === null ? "Clear it" : "Set it",
+      }))
+    ) {
+      return;
+    }
+    setBusy("todo");
+    const { data, error } = await supabase
+      .from("special_orders")
+      .update({ todo: to })
+      .in("id", rows.map((r) => r.id))
+      .select("id");
+    setBusy(null);
+    if (error) return onReport(error.message, "error");
+    if (!data?.length) {
+      return onReport("Nothing was changed — the database refused it and said nothing.", "error");
+    }
+    router.refresh();
+    onReport(
+      to === null
+        ? `Cleared the to-do on ${plural(data.length, "order")}.`
+        : `Set ${plural(data.length, "order")} to ${to}.`,
       "done"
     );
   }
@@ -411,6 +477,40 @@ export function SpecialOrderBatchActions({
                   disabled: busy !== null || movable(to).length === 0,
                 }
           ),
+        },
+        {
+          /**
+           * THE VOCABULARY AS A SUBMENU, with CLEAR at the foot under its own
+           * rule (Mark, 2026-09-20, "including clearing them" — the record's
+           * own cell is `clearable`, and an empty to-do is the commonest state
+           * in the data).
+           *
+           * FileMaker's ten values, and only those. The record's cell is
+           * `allowNew` because a quarter of the real data is free text ("ON
+           * HOLD", "Adjust time to 9am or later"), and a menu cannot offer
+           * typing — so the one-off wording stays where it has always been
+           * written, on the record. What a SELECTION wants is the shared
+           * vocabulary, which is CLAUDE.md's rule for a known one: chosen,
+           * never typed.
+           *
+           * Counts per rung, as Set Status has them: a rung reading "(0)" is
+           * what stops a command promising a write that does nothing.
+           */
+          label: busy === "todo" ? "Setting…" : "Set To-do",
+          disabled: busy !== null || selected.length === 0,
+          items: [
+            ...TODO_OPTIONS.map((o) => ({
+              label: `${o.label} (${retodoable(o.value).length})`,
+              onSelect: () => void setTodo(o.value),
+              disabled: busy !== null || retodoable(o.value).length === 0,
+            })),
+            {
+              label: `Clear To-do (${retodoable(null).length})`,
+              onSelect: () => void setTodo(null),
+              disabled: busy !== null || retodoable(null).length === 0,
+              separatorBefore: true,
+            },
+          ],
         },
         {
           label: busy === "paid" ? "Marking…" : `Mark Paid (${markable.length})`,

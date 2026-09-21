@@ -1785,6 +1785,25 @@
    reads that way. Each rung counts the orders that would actually MOVE, so a
    rung everything is already on reads "(0)" rather than promising a write that
    does nothing.
+   **SET TO-DO IS THE SAME SHAPE, WITH CLEAR AT ITS FOOT** (Mark, same day:
+   "add the ability to batch change the to do on selected special orders",
+   then "including clearing them" — `null` is a rung under its own rule, which
+   the record's `clearable` cell has always offered and which is the COMMONEST
+   state in the data: 8,233 of 8,334 migrated orders have no to-do).
+   **DECISION 4 SURVIVES IT INTACT.** The rule is that the app SUGGESTS a to-do
+   and never writes one; a human picking a row off a menu is the human writing
+   it, which is the same act as typing it into the cell, done to twenty rows at
+   once.
+   **FILEMAKER'S TEN VALUES, AND ONLY THOSE.** The record's cell is `allowNew`
+   because a quarter of the real data is free text ("ON HOLD", "Adjust time to
+   9am or later"), and a menu cannot offer typing — so one-off wording stays
+   where it has always been written, on the record. What a SELECTION wants is
+   the shared vocabulary, which is the rule for a known one: chosen, never
+   typed.
+   **NO KIND TEST HERE**, unlike the status: `todo` has no constraint behind it,
+   and a note to whoever picks this up next reads the same on a template as on
+   an order. The only rows skipped are the ones already saying it.
+
    **MARK PAID IS THE `invoice_paid_at` STAMP** — the same word the list's Paid
    column, the ladder's rung and the record's green chip all mean, stamped with
    the ORG's calendar day. **IT DOES NOT TOUCH THE MONEY**, and that is a
