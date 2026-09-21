@@ -769,12 +769,15 @@ export function SpecialOrderBatchActions({
                 like a separate question from the figure it governs, when it is
                 the same question asked one step earlier.
 
-                THE BOX STAYS ON SCREEN AND GOES GREY, rather than appearing
-                when Other is picked. A control that vanishes takes what you
-                typed with it, and a dialog that changes height under the
-                pointer is the thing `RevealPanel` exists to avoid. Disabled
-                rather than emptied, so picking Paid in Full and changing your
-                mind gives back the figure you had typed. */}
+                THE BOX IS ABSENT UNDER "PAID IN FULL", not greyed (Mark,
+                2026-09-20, having seen it greyed: "hide the amount field when
+                the amount picklist is set to 'Paid in full'"). A disabled box
+                still asks to be read, and there is nothing to read: the picker
+                two inches to its left has already said the figure is each
+                order's own balance. The pair sits on ONE ROW, so the dialog
+                does not change height when it goes — and `autoFocus` puts the
+                cursor in it the moment Other is picked, which a permanently
+                mounted box could not do. */}
             <div className="space-y-1.5">
               <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                 Amount
@@ -791,14 +794,16 @@ export function SpecialOrderBatchActions({
                   ]}
                   className="w-44"
                 />
-                <TextInput
-                  value={payAmount}
-                  onValueChange={setPayAmount}
-                  placeholder="50.00"
-                  aria-label="Amount received on each order"
-                  className="w-32"
-                  disabled={payFull}
-                />
+                {!payFull && (
+                  <TextInput
+                    value={payAmount}
+                    onValueChange={setPayAmount}
+                    placeholder="50.00"
+                    aria-label="Amount received on each order"
+                    className="w-32"
+                    autoFocus
+                  />
+                )}
               </div>
             </div>
 

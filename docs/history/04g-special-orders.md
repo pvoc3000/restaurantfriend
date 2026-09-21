@@ -1941,9 +1941,14 @@
    beside it, and both made the choice look like a separate question from the
    figure it governs when it is the same question asked one step earlier (Mark:
    "a picklist labeled 'Amount' with two options").
-   **THE BOX STAYS ON SCREEN AND GOES GREY** rather than appearing when Other is
-   picked: a control that vanishes takes what you typed with it, and a dialog
-   that changes height under the pointer is what `RevealPanel` exists to avoid.
+   **THE BOX IS ABSENT UNDER "PAID IN FULL"**, not greyed. It shipped greyed on
+   the argument that a control which vanishes takes what you typed with it;
+   seeing it, Mark asked for it hidden, and he is right — a disabled box still
+   asks to be read and there is nothing to read, because the picker two inches
+   to its left has already said the figure is each order's own balance. The pair
+   sits on ONE ROW, so the dialog does not change height when it goes, and
+   `autoFocus` now puts the cursor in it the moment Other is picked — which a
+   permanently mounted box could not do.
    **Either an amount above zero or Paid in Full**, which is Mark's rule
    verbatim and the whole of `payReady`.
    **A TYPED AMOUNT MUST BE POSITIVE**, where the record's own Payments table
