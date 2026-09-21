@@ -8,6 +8,7 @@
 
 import { eq, no, ok, test } from "./harness";
 import {
+  deleteBlock,
   deleteConfirmMessage,
   deleteRefusal,
   type DeleteContext,
@@ -32,6 +33,48 @@ function ctx(over: Partial<DeleteContext> = {}): DeleteContext {
     ...over,
   };
 }
+
+/* --------------------------------------------------------------------------
+ * THE BLOCK — one TEST, two vocabularies (2026-09-20)
+ *
+ * The list's batch delete asks the same question of twenty rows and then GROUPS
+ * them, where the row menu asks about one and names its parent. Two copies of
+ * the test is how a batch quietly starts deleting something the row menu
+ * refuses, so these cases exist to hold the two together.
+ * -------------------------------------------------------------------------- */
+
+test("the block and the refusal always agree", () => {
+  // The property that matters. If this ever fails, one door is deleting orders
+  // the other one protects.
+  for (const over of [
+    {},
+    { scheduled: true },
+    { fromStanding: "9762" },
+    { fromStanding: "9762", scheduled: true },
+    { kind: "template" },
+    { kind: "standing_order", madeCount: 14 },
+  ] as Partial<DeleteContext>[]) {
+    const c = ctx(over);
+    eq(deleteBlock(c) !== null, deleteRefusal(c) !== null, JSON.stringify(over));
+  }
+});
+
+test("a standing DAY blocks ahead of a schedule, so the advice is the useful one", () => {
+  // Both true is a real row: a materialized day that has been scheduled. The
+  // standing-order reason wins, because unscheduling would not stop 099 making
+  // the day again — it is the refusal you cannot click through.
+  eq(deleteBlock({ fromStanding: "9762", scheduled: true }), "standing_day");
+  eq(deleteBlock({ fromStanding: null, scheduled: true }), "scheduled");
+  eq(deleteBlock({ fromStanding: null, scheduled: false }), null);
+});
+
+test("the block reads an ID as happily as a number", () => {
+  // The batch passes `standing_order_id` straight off the list's row, because
+  // it only asks WHETHER; the row menu pays a round trip for the parent's
+  // number, because its sentence names it.
+  eq(deleteBlock({ fromStanding: "0b2f1e44-1f3e-4f0a-9f9e-5c2d3a1b7c88", scheduled: false }), "standing_day");
+  eq(deleteBlock({ fromStanding: "", scheduled: false }), null, "no parent is no parent");
+});
 
 /* --------------------------------------------------------------------------
  * THE REFUSALS

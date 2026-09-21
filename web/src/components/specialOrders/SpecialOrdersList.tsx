@@ -21,6 +21,9 @@ import {
 } from "@/lib/specialOrderView";
 import { SpecialOrderActions } from "@/components/specialOrders/SpecialOrderActions";
 import { FilterMenus } from "@/components/ui/FilterMenus";
+import { ActionMenu } from "@/components/ui/ActionMenu";
+import { Checkbox } from "@/components/ui/Checkbox";
+import { SpecialOrderBatchActions } from "@/components/specialOrders/SpecialOrderBatchActions";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { SEARCH_PEN } from "@/components/ui/fieldMetrics";
@@ -502,6 +505,57 @@ export function SpecialOrdersList({
   );
 
   /**
+   * THE TICKED ROWS (Mark, 2026-09-20: "add a column to the first position on
+   * the special order list so we can select multiple special orders and
+   * perform actions on them"). `BillList`'s arrangement, which is where every
+   * rule below was paid for.
+   *
+   * IDS, NOT ROWS, so a refresh that re-reads the list keeps your selection
+   * pointing at the same orders rather than at stale copies of them.
+   */
+  const [checked, setChecked] = useState<ReadonlySet<string>>(new Set());
+
+  /**
+   * What the last bulk command did. Held HERE and not in the component that ran
+   * it: reporting clears the selection, and a message owned by something that
+   * clearing re-renders past is a message nobody reads — `BillBatchActions`
+   * paid for that with a bulk approve that worked and said nothing.
+   */
+  const [batchReport, setBatchReport] = useState<{
+    message: string;
+    tone: "done" | "error";
+  } | null>(null);
+
+  /**
+   * "SELECT ALL SHOWN" IS OVER `visible`, NOT `sorted`. Sorting changes the
+   * ORDER and never the set, and `sorted` is derived from `columns`, which this
+   * checkbox lives inside — so asking it here would be a circle.
+   */
+  const allVisibleChecked = visible.length > 0 && visible.every((r) => checked.has(r.id));
+
+  /** Touching the selection retires the last report — `BillList`'s rule, and
+   *  stated at the source so the message can render whenever it exists. */
+  function toggleAllVisible() {
+    setBatchReport(null);
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (allVisibleChecked) visible.forEach((r) => next.delete(r.id));
+      else visible.forEach((r) => next.add(r.id));
+      return next;
+    });
+  }
+
+  function toggleOne(id: string) {
+    setBatchReport(null);
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  /**
    * Each row's progress, computed once and read twice — the wash and the strip.
    * Deriving it in both places would let the bar and the ticks disagree about
    * the same order, which is the class of bug this list has already had once.
@@ -517,6 +571,49 @@ export function SpecialOrdersList({
     withFrom(`/special-orders/${id}`, { href: listHref, label: "Special Orders" });
 
   const columns: DataColumn<SpecialOrderRow>[] = [
+    /**
+     * THE TICK BOX IS THE FIRST COLUMN (Mark, 2026-09-20), ahead even of the
+     * number — it is not a field, it is how you address the row, so it sits
+     * where your hand goes before you have read anything.
+     *
+     * `pinned`, like the number beside it, so `applyColumnOrder` gives it its
+     * declared index and a dragged layout cannot put the boxes in the middle of
+     * the table. An EMPTY label is what keeps it out of the Columns and Reorder
+     * menus — `DataTable`'s own rule for a control column, which has no name to
+     * offer and must not be hideable, because hiding it would hide the only way
+     * to select anything.
+     *
+     * IT SHOWS FOR EVERY ROLE THAT CAN ACT, which today is purchaser+ (the gate
+     * the row menu already uses). Below that the menu it feeds would be empty,
+     * and boxes to tick with nothing to press are worse than no boxes — the
+     * bill list's reasoning, where a READ command later earned them back for
+     * everybody. If a read-only batch command ever lands here, this gate is the
+     * line to revisit.
+     */
+    ...(canWrite
+      ? [
+          {
+            key: "select",
+            label: "",
+            width: 44,
+            pinned: true,
+            header: (
+              <Checkbox
+                checked={allVisibleChecked}
+                onChange={toggleAllVisible}
+                label="Select all shown"
+              />
+            ),
+            render: (r: SpecialOrderRow) => (
+              <Checkbox
+                checked={checked.has(r.id)}
+                onChange={() => toggleOne(r.id)}
+                label={`select order ${r.number}`}
+              />
+            ),
+          } satisfies DataColumn<SpecialOrderRow>,
+        ]
+      : []),
     // THE ORDER NUMBER LEADS (Mark, 2026-08-20). It is the row's identity — the
     // thing a customer says on the phone and the thing every document prints —
     // so it is what `pinned` means here, and a pinned column belongs at the
@@ -811,13 +908,54 @@ export function SpecialOrdersList({
         // had been the filter bar's `rowAction`.
         action={
           canWrite ? (
-            <NewSpecialOrder
-              orgId={orgId}
-              kitchens={kitchens}
-              defaultLocationId={defaultLocationId}
-              today={today}
-              takenBy={takenBy}
-            />
+            /* ACTIONS FIRST, THEN THE CREATE BUTTON. The menu acts on rows you
+               have already ticked, so it reads left-to-right as "these rows,
+               this command"; New is the one control here that is about no row
+               at all, and it keeps the outside edge it has had since it moved
+               into the title row. */
+            <div className="flex items-start gap-3">
+              <SpecialOrderBatchActions
+                selected={visible.filter((r) => checked.has(r.id))}
+                canWrite={canWrite}
+                onReport={(message, tone) => {
+                  setBatchReport({ message, tone });
+                  setChecked(new Set());
+                }}
+              >
+                {(batchRows) => (
+                  <ActionMenu
+                    label="Actions"
+                    /* ALWAYS RENDERED AND ALWAYS LIVE, the counts in the rows
+                       doing the explaining — the PO list's rule. A trigger that
+                       greys out with nothing ticked cannot say why. */
+                    ariaLabel={
+                      checked.size === 0
+                        ? "Actions — select orders first"
+                        : `Actions for ${checked.size} selected orders`
+                    }
+                    minWidth={230}
+                    items={[
+                      {
+                        label: "Clear Selection",
+                        disabled: checked.size === 0,
+                        onSelect: () => {
+                          setBatchReport(null);
+                          setChecked(new Set());
+                        },
+                      },
+                      ...batchRows,
+                    ]}
+                  />
+                )}
+              </SpecialOrderBatchActions>
+              <NewSpecialOrder
+                orgId={orgId}
+                kitchens={kitchens}
+                defaultLocationId={defaultLocationId}
+                today={today}
+                takenBy={takenBy}
+              />
+            </div>
           ) : null
         }
       />
@@ -875,6 +1013,17 @@ export function SpecialOrdersList({
           // `PageHeading` states the count now — see `showCount`.
           showCount={false}
         />
+        {batchReport ? (
+          /* The bill list's own line, and its dress: a boxed yellow band, with
+             the WORDS turning red when the report is a failure. */
+          <p
+            className={`border border-ink bg-mark-fill px-4 py-3 text-sm ${
+              batchReport.tone === "error" ? "text-accent" : "text-ink"
+            }`}
+          >
+            {batchReport.message}
+          </p>
+        ) : null}
         {capped ? (
           /* A FILL, not `text-mark`: yellow-500 on white measures 1.43:1, which
              is not a legibility complaint but text you cannot read. Fixed here

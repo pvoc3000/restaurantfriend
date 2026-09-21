@@ -1754,6 +1754,53 @@
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.
 
+   **THE LIST SELECTS AND ACTS IN BULK — 2026-09-20** (Mark: "add a column to
+   the first position on the special order list so we can 'select' multiple
+   special orders and perform actions on them"). `BillList`'s arrangement, which
+   is where every rule here was already paid for: a tick column, one **Actions**
+   menu beside the create button, and a `SpecialOrderBatchActions` that hands
+   its rows OUT through a render prop so the menu owns where they sit while it
+   owns what they do.
+   **THE TICK BOX IS FIRST, AHEAD EVEN OF THE NUMBER** — it is not a field, it
+   is how you ADDRESS the row, so it sits where your hand goes before you have
+   read anything. `pinned`, so a dragged layout cannot put the boxes in the
+   middle of the table, and an EMPTY label, which is what keeps a control column
+   out of the Columns and Reorder menus: hiding it would hide the only way to
+   select anything.
+   **THREE VERBS, AND THEY ARE THE ONES THAT ALREADY EXIST FOR ONE ORDER** —
+   Cancel Orders, Resolve Flags, Delete Selected…. **Duplicate is deliberately
+   absent**: in bulk it would make a dozen leads and leave you on the list
+   looking at them, which reads as an accident rather than a command, and the
+   thing it is for ("same as last year") is one order at a time. Flag-with-a-
+   reason is not here either, because a reason shared across a selection is a
+   question nobody has asked yet.
+   **EVERY COMMAND COUNTS WHAT IT WILL ACT ON IN ITS OWN LABEL** — "Cancel
+   Orders (4)" — and says what it will SKIP before it writes. A selection is a
+   mixed bag, and **decision 3's biconditional decides who can be cancelled**:
+   051's `special_orders_status_iff_order` makes `status` null exactly when
+   `kind` is not `order`, so cancelling a template is asking the database for a
+   row it will refuse, and a check-constraint refusal is the one failure this
+   app cannot put into words. Templates, standing orders and the already-
+   cancelled are skipped, and the confirm says how many.
+   **ONE STATEMENT PER COMMAND, NOT ONE PER ROW.** Twenty round trips are
+   twenty chances to half-finish, and a selection half-cancelled is worse than
+   one nobody touched. Each `.select()`s its rows, because an update matching no
+   policy changes nothing and PostgREST returns no error — and here the count is
+   also what the report sentence is made of.
+   **`deleteBlock` SPLITS THE TEST FROM ITS PROSE.** The row menu's refusal
+   names the parent standing order in a sentence; a selection wants "3 were made
+   by a standing order" instead. Two copies of the TEST is how a batch quietly
+   starts deleting what the row menu refuses, so there is now one predicate and
+   two vocabularies on top of it, with a fixture asserting the two doors always
+   agree. The batch reads `production_schedule_id` for the TICKED ids when the
+   command is pressed rather than carrying it on all 500 rows — the row menu's
+   own argument, and the reason Delete's label cannot state a refusal count the
+   way Cancel's does; the confirm states it, before anything is written.
+   **THE REPORT IS HELD BY THE LIST**, not by the component that ran the
+   command: reporting clears the selection, and a message owned by something
+   that clearing re-renders past is a message nobody reads. `BillBatchActions`
+   paid for that with a bulk approve that worked and said nothing.
+
    **AND SHOW IS A RANGEPICKER — 2026-09-20** (Mark: "convert the show picklist
    to a rangepicker"). With the two non-time options gone to Status, what was
    left of that menu was four words for date windows, and the app already has a

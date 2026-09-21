@@ -47,6 +47,32 @@ export type DeleteContext = {
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /**
+ * WHICH refusal applies, as a key rather than a sentence.
+ *
+ * Split out of `deleteRefusal` for the LIST's batch delete (2026-09-20), which
+ * asks the same question of twenty rows at once and then groups them: "3 were
+ * made by a standing order" is the sentence a selection wants, where
+ * `deleteRefusal` writes the one a single order wants, naming its parent. Two
+ * copies of the TEST is how a batch quietly starts deleting something the row
+ * menu refuses, so there is one test and two vocabularies on top of it.
+ *
+ * It takes only the two fields it reads, so a caller holding a list row — which
+ * has `standing_order_id` and `production_schedule_id` and no counts — can ask
+ * without the four round trips `readDeleteContext` costs.
+ */
+export type DeleteBlock = "standing_day" | "scheduled" | null;
+
+export function deleteBlock(ctx: {
+  /** Truthy when this day was MADE by a standing order. */
+  fromStanding: string | null;
+  scheduled: boolean;
+}): DeleteBlock {
+  if (ctx.fromStanding) return "standing_day";
+  if (ctx.scheduled) return "scheduled";
+  return null;
+}
+
+/**
  * Why this order must NOT be deleted, or null.
  *
  * Both of these are refusals rather than confirms, and each for its own reason
@@ -54,6 +80,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
  * what `deleteConfirmMessage` is for.
  */
 export function deleteRefusal(ctx: DeleteContext): string | null {
+  const block = deleteBlock(ctx);
   /**
    * THE ONE THAT STOPS THE APP UNDOING ITSELF. 051's
    * `special_orders_standing_day` is unique on `(standing_order_id,
@@ -66,7 +93,7 @@ export function deleteRefusal(ctx: DeleteContext): string | null {
    * wrong happens minutes later on somebody else's screen, so the reader cannot
    * know something the app does not.
    */
-  if (ctx.fromStanding) {
+  if (block === "standing_day") {
     return (
       `This day was made from standing order ${ctx.fromStanding}, so deleting it would only ` +
       `make it again the next time anybody opens the list. Cancel it instead — that is what ` +
@@ -80,7 +107,7 @@ export function deleteRefusal(ctx: DeleteContext): string | null {
    * pointing at a uuid that is gone — a kitchen document with a dead backlink
    * and nothing to explain it. Unscheduling first is one click.
    */
-  if (ctx.scheduled) {
+  if (block === "scheduled") {
     return (
       "This order's production is scheduled. Unschedule it first — deleting now would leave " +
       "the kitchen holding a schedule with nothing behind it."
