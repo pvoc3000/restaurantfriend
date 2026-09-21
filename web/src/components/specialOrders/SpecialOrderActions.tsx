@@ -57,7 +57,7 @@ export function SpecialOrderActions({
   function duplicate() {
     setBusy("duplicate");
     start(async () => {
-      const result = await duplicateSpecialOrder(supabase, id, number, "order", orgId);
+      const result = await duplicateSpecialOrder(supabase, orgId, id);
       setBusy(null);
       if ("error" in result) {
         void alertDialog({

@@ -21,7 +21,6 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { startingState } from "./createSpecialOrder";
 import type { SpecialOrderKind } from "./specialOrders";
 
 /**
@@ -233,173 +232,52 @@ export async function deleteSpecialOrder(
 }
 
 /**
- * Decision 13's one mechanism: a template, a standing order and an ordinary
- * order are all duplicated by this — and since 2026-09-20 the copy's KIND is
- * the caller's, which is what turns "duplicate" into "convert into".
- *
- * It arrives with no dates and no payments — a duplicate of a paid order that
- * claimed to be paid would be a fiction, and the stage dates belong to the
- * event that happened.
+ * Decision 13's one mechanism, and since 114 it is ONE CALL: a template, a
+ * standing order and an ordinary order are all copied by
+ * `copy_special_order`, and the copy's KIND is the caller's — which is what
+ * turns "duplicate" into "convert into".
  *
  * ---------------------------------------------------------------------------
- * CONVERTING COPIES; THE ORIGINAL IS NOT TOUCHED
+ * IT IS A WRAPPER, AND THAT IS THE POINT
  * ---------------------------------------------------------------------------
- * Mark, 2026-09-20: "say you made a complicated order that turned out really
- * nice and you'd like to be able to redo it later on repeatedly. Selecting
- * 'Convert into an Order Template' would copy it and set it up as a standing
- * order for later use." The command reads as a conversion and behaves as a
- * copy, which is the right way round: a finished order is HISTORY — it was
- * invoiced, made and eaten — and turning that row into a shape would delete
- * the record of a thing that happened.
+ * Everything this used to do in the browser — strip identity and the stage
+ * dates, decide the status and to-do from the kind, drop the event date for a
+ * shape, copy the lines, write where it came from — is in the function, because
+ * only the database can do it in ONE TRANSACTION. That is not tidiness: the
+ * app's three calls looked to Postgres like three unrelated inserts, so a
+ * trigger logged "Added 12 × Glazed" for every line the copy made and a
+ * converted template arrived carrying a re-enactment of the order's history.
+ * `copy_special_order` raises a transaction-local flag that
+ * `log_special_order_event` reads, and writes a single line naming the source.
  *
- * WHAT THE KIND DECIDES, beyond the column itself:
- *   · **status and to-do** come from `startingState`, which is decision 3's
- *     biconditional as widened by 112 — a template has neither, a standing
- *     order has the rung its days will start at.
- *   · **the event date goes** for anything that is not an order. A shape has no
- *     single day, the list's whole date window assumes so (`inOrderRange`: "a
- *     record with NO event date — every template and every standing order"),
- *     and a template carrying last August's date would surface in a range that
- *     has nothing to do with it. The event TIME stays: 099 copies it onto every
- *     day a standing order makes, so it is the usual delivery hour rather than
- *     a fact about one event.
- *   · **the recurrence stays empty** even for a standing order. It is made with
- *     no weekdays, so it makes nothing until somebody sets them — which is the
- *     materializer's own "a misconfigured standing order is NAMED, never
- *     guessed at", reached from the other side.
+ * THE CLIENT-SIDE COPY THAT STOOD HERE IS GONE (2026-09-21, once 114 and 115
+ * were applied and a real conversion was read back: template 10061, one log
+ * entry). It was a fallback for the window before the migration landed, and it
+ * had already earned its keep in the wrong direction — it caught 113's failure
+ * and quietly did the copy the old way, reporting success, which is how a
+ * broken migration looked like a working feature for a day.
+ *
+ * CONVERTING COPIES; THE ORIGINAL IS NOT TOUCHED. A finished order is HISTORY —
+ * invoiced, made and eaten — and turning that row into a shape would delete the
+ * record of a thing that happened.
  */
 export async function duplicateSpecialOrder(
   supabase: SupabaseClient,
+  orgId: string,
   id: string,
-  number: string,
   /** What the COPY is. Defaults to an order, which is what Duplicate means. */
-  kind: SpecialOrderKind = "order",
-  /** The org, for the RPC. Omitted, the copy runs the old client-side way. */
-  orgId?: string
+  kind: SpecialOrderKind = "order"
 ): Promise<{ id: string } | { error: string }> {
-  /**
-   * MIGRATION 113 DOES THIS IN ONE TRANSACTION, and that is the only way the
-   * copy can arrive with a clean log: the app's three calls — row, lines,
-   * provenance — look to the database like three unrelated inserts, and a
-   * trigger cannot tell one of them from an edit somebody made by hand.
-   * `copy_special_order` raises a transaction-local flag that
-   * `log_special_order_event` reads, so the copy writes exactly one line
-   * naming where it came from.
-   *
-   * THE CLIENT-SIDE COPY BELOW IS THE FALLBACK, not a second implementation to
-   * keep in step: it is what runs only while 113 is unapplied, and what it
-   * costs is the noisy log this feature is about. When the function has been
-   * live for a while, delete everything under this block.
-   */
-  if (orgId) {
-    const { data, error } = await supabase.rpc("copy_special_order", {
-      p_org_id: orgId,
-      p_order_id: id,
-      p_kind: kind,
-    });
-    if (!error && typeof data === "string") return { id: data };
-    /**
-     * ONLY A MISSING FUNCTION FALLS THROUGH. `PGRST202` is PostgREST saying it
-     * cannot find `copy_special_order` in the schema cache, which means the
-     * migration is not applied — the one case the fallback is for.
-     *
-     * EVERY OTHER ERROR IS REPORTED, and that is a lesson rather than a
-     * preference. This first read "anything that is not a refusal means the
-     * migration is missing", so when 113 failed on its very first insert
-     * (`null value in column "id"` — see 114) the fallback caught it, quietly
-     * did the copy the old way, and reported success. Mark found it by reading
-     * a log that still had three entries in it. A fallback that hides the
-     * thing it is standing in for is worse than no fallback.
-     */
-    if (error && error.code !== "PGRST202") return { error: error.message };
-  }
-
-  const { data: source, error: readError } = await supabase
-    .from("special_orders")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (readError || !source) return { error: readError?.message ?? "Could not read this order." };
-
-  const { data: nextNumber, error: numberError } = await supabase.rpc("next_special_order_number", {
-    p_org_id: source.org_id,
+  const { data, error } = await supabase.rpc("copy_special_order", {
+    p_org_id: orgId,
+    p_order_id: id,
+    p_kind: kind,
   });
-  if (numberError || !nextNumber) {
-    return { error: numberError?.message ?? "Could not allocate an order number." };
+  if (error) return { error: error.message };
+  // The function returns the new uuid. Anything else means it ran and told us
+  // nothing, which is not a copy anybody should be sent to look at.
+  if (typeof data !== "string") {
+    return { error: "The copy was not created, and the database said nothing." };
   }
-
-  const copy = { ...(source as Record<string, unknown>) };
-  // Identity and history do not travel.
-  for (const key of [
-    "id", "number", "legacy_id", "legacy_seq", "created_at", "updated_at",
-    "created_by", "updated_by", "date_initiated", "quote_sent_at",
-    "quote_returned_at", "invoice_sent_at", "invoice_paid_at",
-    "receipt_sent_at", "delivery_scheduled_at", "order_printed_at",
-    "order_scheduled_at", "production_schedule_id", "standing_order_id",
-    "inbound_subject", "inbound_message_id", "flag_reason",
-    "source_payload", "external_ref",
-  ]) {
-    delete copy[key];
-  }
-  /** What the SOURCE is, which is what the log line has to describe. */
-  const sourceKind = ((source.kind as string | null) ?? "order") as SpecialOrderKind;
-  const start = startingState(kind);
-  copy.number = nextNumber;
-  copy.kind = kind;
-  copy.status = start.status;
-  copy.todo = start.todo;
-  // A SHAPE HAS NO DAY — see the header.
-  if (kind !== "order") copy.event_date = null;
-  copy.standing_days = null;
-  copy.starts_on = null;
-  copy.ends_on = null;
-  copy.paused = false;
-  copy.source = "app";
-
-  const { data: created, error: insertError } = await supabase
-    .from("special_orders")
-    .insert(copy)
-    .select("id")
-    .single();
-  if (insertError || !created) {
-    return { error: insertError?.message ?? "The copy could not be created." };
-  }
-
-  // The lines travel; the payments emphatically do not.
-  const { data: lines } = await supabase.from("special_order_items").select("*").eq("order_id", id);
-  if (lines?.length) {
-    const copies = lines.map((l) => {
-      const line = { ...(l as Record<string, unknown>) };
-      for (const key of ["id", "created_at", "updated_at", "legacy_key"]) delete line[key];
-      line.order_id = created.id;
-      return line;
-    });
-    const { error: lineError } = await supabase.from("special_order_items").insert(copies);
-    if (lineError) {
-      return { error: `The order was copied but its lines were not: ${lineError.message}` };
-    }
-  }
-
-  /**
-   * ONE LINE, NAMING THE SOURCE (Mark, 2026-09-21: "just include a line on the
-   * new template specifying which order the template came from", and the same
-   * the other way). It is what 113's function writes too — the two must agree,
-   * because the fallback and the RPC produce records nobody can tell apart.
-   *
-   * WHAT THIS PATH CANNOT DO is stop the triggers writing the rest, which is
-   * the whole reason 113 exists. Until it is applied, the copy still carries an
-   * "Added 12 × Glazed" for every line it inserted, under this line.
-   */
-  const sourceLabel = sourceKind === "standing_order" ? "standing order" : sourceKind;
-  await supabase.from("special_order_events").insert({
-    org_id: source.org_id,
-    order_id: created.id,
-    message:
-      sourceKind === "order" && kind === "order"
-        ? `Duplicated from order ${number}`
-        : `Created from ${sourceLabel} ${number}`,
-    source: "app",
-  });
-
-  return { id: created.id as string };
+  return { id: data };
 }

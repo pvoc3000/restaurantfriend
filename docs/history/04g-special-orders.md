@@ -1922,6 +1922,26 @@
    two facts. **And the PAID chip is now an order's too**: a shape has no
    invoice to have been paid, since the conversion strips the stage dates.
 
+   **THE CLIENT-SIDE COPY IS GONE — 2026-09-21** (Mark, once 114 and 115 were
+   applied: "remove the client-side copy fallback"). `duplicateSpecialOrder` is
+   now fifteen lines around `copy_special_order`; 160 lines of stripping,
+   kind rules, line copying and provenance came out, because only the database
+   can do that in ONE transaction and the whole point of 113–115 was that it
+   must be one.
+   **IT HAD ALREADY EARNED ITS KEEP IN THE WRONG DIRECTION.** The fallback
+   caught 113's failure, quietly did the copy the old way and reported success —
+   which is how a broken migration looked like a working feature for a day, and
+   why the narrowing to `PGRST202` went in before the removal did. Both are now
+   moot.
+   **`number` LEFT THE SIGNATURE WITH IT**: the provenance sentence is built in
+   SQL from the source row, so the caller no longer has to hand over a value the
+   function already has. `(supabase, orgId, id, kind)` — the org first, because
+   it is the one argument design rule 1 is about.
+   **VERIFIED AFTER THE REMOVAL, on the live database**: template 10061
+   duplicated into order 10062, chipped LEAD, one log entry — "Created from
+   template 10061" — and then deleted, which also exercised 115's guard on a
+   13-line record. The template it came from is untouched.
+
    **AND 113 SILENTLY REVERTED 100 — migration 115, 2026-09-21.** Mark,
    deleting the template he had just made: "insert or update on table
    'special_order_events' violates foreign key constraint

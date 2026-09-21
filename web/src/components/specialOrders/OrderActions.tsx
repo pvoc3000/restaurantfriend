@@ -189,7 +189,7 @@ export function OrderActions({
   function duplicate(as: SpecialOrderKind = "order") {
     setError(null);
     start(async () => {
-      const result = await duplicateSpecialOrder(supabase, id, number, as, orgId);
+      const result = await duplicateSpecialOrder(supabase, orgId, id, as);
       if ("error" in result) {
         setError(result.error);
         return;
