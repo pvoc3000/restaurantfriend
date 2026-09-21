@@ -112,10 +112,11 @@ export type Consequence = ColumnConsequence | PaymentConsequence;
  * Just enough of the money to know whether the order is settled.
  *
  * `balance` is `OrderTotals.balance` — total minus payments — and
- * `ignore_balance` is decision 13's weekly-statement escape hatch, which is why
- * this takes the WHOLE question rather than a number: a wholesale day billed in
- * arrears has a balance and is not owed, and `lib/specialOrders`'s `isSettled`
- * says so in one place.
+ * `ignore_balance` keeps an order out of the unpaid queue, which is why this
+ * takes the WHOLE question rather than a number: an order carrying that flag
+ * has a balance and is not chased, and `lib/specialOrders`'s `isSettled` says
+ * so in one place. (The "billed in arrears" reading of the flag was retracted
+ * by Mark on 2026-09-20 — see `isSettled`.)
  */
 export type OrderMoney = {
   balance: number;
@@ -199,9 +200,10 @@ const DATE_IMPLIES: Partial<
  *   · **No money passed.** Only the caller that knows the balance can ask, and
  *     `afterPaymentSettled` deliberately does not — a payment just landed
  *     there, so proposing another is proposing to take the money twice.
- *   · **`ignore_balance`.** Decision 13's wholesale account is billed weekly in
- *     arrears; its balance is a statement waiting to go out, not an unpaid
- *     invoice, and `isSettled` has said so since the queue was built.
+ *   · **`ignore_balance`.** The flag keeps an order out of the unpaid queue,
+ *     and `isSettled` has treated it as settled since the queue was built — so
+ *     offering to clear a balance nobody is chasing is offering to solve a
+ *     problem the flag says is not one.
  *   · **Nothing outstanding.** Including a CREDIT — an overpayment leaves a
  *     negative balance, and "record a -$4 payment" is not a thing to offer.
  */

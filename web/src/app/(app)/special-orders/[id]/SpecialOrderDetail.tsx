@@ -433,8 +433,8 @@ export async function SpecialOrderDetail({
               PAID IS THE `invoice_paid_at` STAMP — what the list's Paid column
               and the progress ladder's "Invoice paid" rung both mean by that
               word. Deliberately NOT `isSettled`, which counts `ignore_balance`
-              (decision 13's weekly-statement escape hatch) as settled: a
-              wholesale order that has not been billed yet is not a paid one.
+              (which keeps an order out of the unpaid queue) as settled: an
+              order carrying that flag is not a paid one.
               The money still speaks for itself on the line below, where an
               outstanding balance prints as "$X due". */}
           <div className="flex flex-wrap items-center gap-4">

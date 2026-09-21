@@ -470,3 +470,40 @@ test("both boxes carry the text variation selector", () => {
   ok(all.includes("\u2611\uFE0E"), "checked");
   ok(all.includes("\u2610\uFE0E"), "empty");
 });
+
+/* -------------------------------------------------------------------------
+ * A SHAPE HAS NO PROGRESS (Mark, 2026-09-20)
+ *
+ * Migration 112 gave a standing order the status its days start at, and
+ * `STATUS_FLOOR.invoice` is 4 — so overnight two templates wore a wash most of
+ * the way across the row, claiming a quote sent and an invoice raised for an
+ * arrangement that has never been either. These pin the kind rule that fixed
+ * it, and the second one is the case that would come back.
+ * ---------------------------------------------------------------------- */
+
+test("a standing order has no progress, whatever status 112 gave it", () => {
+  const p = order({ kind: "standing_order", status: "invoice" });
+  eq(p.tone, "none");
+  eq(progressRowStyle(p), null, "no wash");
+});
+
+test("…and the floor is exactly why it would have had one", () => {
+  // The same row as an ORDER: status `invoice` fills four rungs and draws a
+  // bar. That is correct for an order and a lie about a shape.
+  const asOrder = order({ kind: "order", status: "invoice" });
+  eq(asOrder.done, 4);
+  ok(progressRowStyle(asOrder) !== null, "an order at invoice does draw one");
+});
+
+test("a template has none either, even flagged", () => {
+  // `none` beats `flagged`, where for an order a flag beats everything: a
+  // shape is not an open problem, it is not a problem at all.
+  const p = order({ kind: "template", status: null, flag_reason: "check the price" });
+  eq(p.tone, "none");
+  eq(progressRowStyle(p), null);
+});
+
+test("an ordinary order still draws, and cancelled still does not", () => {
+  ok(progressRowStyle(order({ status: "order" })) !== null);
+  eq(order({ status: "cancelled" }).tone, "none");
+});

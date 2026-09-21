@@ -338,10 +338,12 @@ export function orderTotals(
 /**
  * Is this order settled?
  *
- * `ignore_balance` is decision 13's escape hatch: a wholesale day is production
- * and record-keeping, billed weekly in arrears, and without this every one of
- * Cafe Knotted's seven orders a week would sit in the unpaid queue until the
- * statement went out.
+ * `ignore_balance` KEEPS AN ORDER OUT OF THE UNPAID QUEUE, which is what its
+ * own checkbox says and all this module may rely on. **It is NOT "billed in
+ * arrears"** — that reading was written here in August and retracted by Mark on
+ * 2026-09-20 ("disregard what you think you know about ignore_balance: it
+ * doesn't exist for orders paid in arrears"). What it IS for is not recorded
+ * anywhere yet; until it is, read the flag and not a story about it.
  *
  * A CREDIT BALANCE COUNTS AS PAID — `<= 0`, not `=== 0`. An overpayment or a
  * post-hoc discount leaves a negative balance, and "we owe them $4" is not an

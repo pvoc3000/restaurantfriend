@@ -1755,7 +1755,7 @@
    overwriting a day-of contact somebody has already typed is not.
 
    **A STANDING ORDER CARRIES THE STATUS AND TO-DO ITS DAYS START WITH —
-   migration 112, WRITTEN 2026-09-20 AND NOT YET APPLIED.**
+   migration 112, APPLIED 2026-09-20 (by Mark).**
    It began as "when a standing order is instantiated, the status should be
    'Invoice' and the to do should be set to 'Send Invoice' going forward"
    (Mark), which 112 first did with two literals. **That version was wrong and
@@ -1789,11 +1789,21 @@
    cannot be right for both. `pullReadiness` is UNCHANGED and still offers only
    `status = 'order'` — which is now the thing each template decides for itself,
    which is the whole point.
-   **NOTE THE UNRESOLVED CONTRADICTION**: this file and decision 13 say Cafe
-   Knotted is billed weekly in ARREARS, which is why `ignore_balance` exists.
-   Mark says they pay in advance. Both cannot be true, and if the second is,
-   `ignore_balance` is suppressing an unpaid queue that ought to be chasing
-   them. Asked, not yet answered.
+   **AND `ignore_balance` IS NOT WHAT THIS FILE SAID IT WAS.** Asked about the
+   contradiction — everything written here in August says Cafe Knotted is billed
+   weekly in ARREARS and that the flag exists for it — Mark answered plainly
+   (2026-09-20): "disregard what you think you know about ignore_balance: it
+   doesn't exist for orders paid in arrears."
+   **So the arrears story is RETRACTED and nothing replaces it yet.** What the
+   flag DOES is unchanged and is all any code may lean on: it keeps an order out
+   of the unpaid queue, which is what its own checkbox says. `isSettled`,
+   `settlingPayment` and the record's Paid chip all still behave exactly as they
+   did — only the sentence explaining WHY was wrong, and it has been removed
+   from all three code comments that carried it rather than rewritten into a
+   second guess. **The paragraphs further down this file still tell the old
+   story**; they are left standing as the record of what was believed, and this
+   note is why they are not to be trusted. One sentence from Mark on what the
+   flag is actually for would close it.
    **FOUR THINGS IN THE APP MOVED WITH IT, and one of them was a latent bug.**
    `createSpecialOrder` wrote `status: kind === "order" ? "lead" : null`, which
    the widened constraint REFUSES for a new standing order — the New special
@@ -1892,6 +1902,27 @@
    doors to one COLUMN, not two implementations: the dialog writes a date
    somebody chose, the verb is the named one with the balance warning attached,
    and it was asked for by name.
+
+   **A SHAPE HAS NO PROGRESS BAR — 2026-09-20** (Mark: "suppress the special
+   order row progress bar backgrounds for both standing order and regular order
+   templates"). **A regression 112 introduced, and worth naming as one.** A
+   standing order's status was NULL until that morning, so `STATUS_FLOOR` fell
+   through to 1 and `progressRowStyle`'s "the lead rung draws nothing" rule kept
+   the row clean BY ACCIDENT. Give it `invoice` — the rung its days now start at
+   — and the floor is 4: two templates woke up wearing a wash most of the way
+   across the row, claiming a quote sent and an invoice raised for an
+   arrangement that has never been either.
+   **SO THE RULE IS ABOUT KIND**, not about the accident of a null status —
+   `orderProgress` sets `tone: "none"` for anything that is not an order. A
+   template and a standing order are SHAPES: the ladder is a thing an order
+   climbs, and their stage dates are deliberately not copied to the days they
+   make.
+   **`none` TAKES THE STRIP WITH IT**, which is one size smaller than the thing
+   asked for and the same falsehood: a strip reading four of six would be the
+   wash's claim in miniature. The column already renders "—" for a cancelled
+   order, so those rows read the way cancelled ones have always read.
+   Four fixtures, two of which go red when the kind test is removed — including
+   one that pins the floor as the reason it would come back.
 
    **MARK PAID LASTED AN AFTERNOON AND BECAME `Record Payment…`** (Mark,
    2026-09-20: "instead of 'mark paid'… let's instead go deeper and do 'Record

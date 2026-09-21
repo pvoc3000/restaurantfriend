@@ -227,11 +227,36 @@ export function orderProgress(
   const done = ticks.filter((t) => t.state === "done").length;
   const total = LADDER.length;
 
-  // Cancelled beats flagged: an order called off is not an open problem, and
-  // 705 of the real orders are cancelled while a flag is cleared as soon as it
-  // is dealt with.
+  /**
+   * NOTHING BUT AN ORDER HAS PROGRESS (Mark, 2026-09-20: "suppress the special
+   * order row progress bar backgrounds for both standing order and regular
+   * order templates").
+   *
+   * A REGRESSION MIGRATION 112 INTRODUCED, and worth naming as one. A standing
+   * order's status was NULL until that morning, so `STATUS_FLOOR` fell through
+   * to 1 and `progressRowStyle`'s "the lead rung draws nothing" rule kept the
+   * row clean by accident. Give it `invoice` — which is now the rung its DAYS
+   * start at — and the floor is 4: two templates suddenly wore a wash most of
+   * the way across the row, claiming a quote had been sent and an invoice
+   * raised for an arrangement that has never been either.
+   *
+   * SO THE RULE IS ABOUT KIND, not about the accident of a null status. A
+   * template and a standing order are SHAPES: the ladder is a thing an order
+   * climbs, their stage dates are deliberately not copied to the days they
+   * make, and there is no progress to report. `none` takes the strip with it,
+   * which is the same falsehood one size smaller — a strip reading four of six
+   * would be the wash's claim in miniature.
+   *
+   * Cancelled beats flagged, and both are beaten by this: an order called off
+   * is not an open problem (705 of the real orders are cancelled while a flag
+   * is cleared as soon as it is dealt with), and a shape is neither.
+   */
   const tone: OrderProgress["tone"] =
-    order.status === "cancelled" ? "none" : order.flag_reason ? "flagged" : "progress";
+    order.kind !== "order" || order.status === "cancelled"
+      ? "none"
+      : order.flag_reason
+        ? "flagged"
+        : "progress";
 
   const drawn = total - 2;
   return {
