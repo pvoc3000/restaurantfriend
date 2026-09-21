@@ -135,6 +135,32 @@ export const TODO_OPTIONS: PickOption[] = [
 ];
 
 /**
+ * HOW THE MONEY ARRIVED — decision 2's vocabulary, kept as it is in the data:
+ * `Square Invoice` on 1,188 of the 1,190 real payments, `Square Online` on one,
+ * `comp` on one, plus the `legacy` type the migration synthesizes for the 5,267
+ * pre-2022 orders whose payment was a calc field rather than a row.
+ *
+ * `allowNew` wherever it is offered, because payment methods are a business
+ * fact and not a schema one: the day Donut Friend takes a bank transfer, nobody
+ * should need a migration.
+ *
+ * SHARED, since the list's Record Payment dialog started offering the same list
+ * (2026-09-20). It lived in `OrderPayments`; two copies is how one door starts
+ * offering a method the other cannot show.
+ */
+export const PAYMENT_TYPE_OPTIONS: PickOption[] = [
+  { value: "Square Invoice", label: "Square Invoice", hint: "the usual" },
+  { value: "Square Online", label: "Square Online" },
+  { value: "cash", label: "Cash" },
+  { value: "check", label: "Check" },
+  { value: "comp", label: "Comp" },
+  { value: "legacy", label: "Legacy", hint: "migrated from FileMaker's paid total" },
+];
+
+/** What a new payment offers before anybody chooses — 1,188 of 1,190. */
+export const DEFAULT_PAYMENT_TYPE = "Square Invoice";
+
+/**
  * WHAT A STANDING ORDER'S DAYS START AS (migration 112, 2026-09-20).
  *
  * Two rungs, not five. A standing order is a PROTOTYPE, and its status is the

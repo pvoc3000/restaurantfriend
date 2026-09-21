@@ -1893,15 +1893,42 @@
    somebody chose, the verb is the named one with the balance warning attached,
    and it was asked for by name.
 
-   **MARK PAID IS THE `invoice_paid_at` STAMP** — the same word the list's Paid
-   column, the ladder's rung and the record's green chip all mean, stamped with
-   the ORG's calendar day. **IT DOES NOT TOUCH THE MONEY**, and that is a
-   decision: the record's own flow offers to record a settling payment when you
-   stamp that date, as a tick you choose, and doing it from a menu row would
-   write a dozen financial records — money received, from nobody, on a day
-   nobody named — on one click. Both the confirm and the report say how many
-   still carry a balance and what it comes to, and point at the record, which is
-   where the offer built the day before lives.
+   **MARK PAID LASTED AN AFTERNOON AND BECAME `Record Payment…`** (Mark,
+   2026-09-20: "instead of 'mark paid'… let's instead go deeper and do 'Record
+   Payment' — which brings up a dialogue box and allows the user to specify a
+   dollar amount or 'Paid in full'… the date, and the payment source"). The
+   first version stamped `invoice_paid_at` and said, in its own confirm, that it
+   was NOT recording the money. That was the right thing for a menu ROW to do
+   and the wrong place to leave it: a dialog can ask the three things a payment
+   needs and a row cannot — how much, when, and how it arrived. The date is
+   still reachable in bulk through Set Completion Date ▸ Invoice paid, so
+   nothing was lost.
+   **TWO MODES, AND THE SECOND IS THE ONE THAT NEEDS SAYING OUT LOUD.** "Paid in
+   full" asks each order what IT is owed and writes that; "Same amount each"
+   writes one figure against every selected order. One figure times six orders
+   is six hundred dollars, and nobody should learn that from the report — so the
+   sentence under the fields states it before you commit ("$50.00 on each of 6
+   orders — $300.00 in all") and the button reads `Record $300.00`.
+   **PAID IN FULL SKIPS THE ALREADY-SETTLED**, because their amount would be
+   zero or a credit and a $0.00 payment row is a record of nothing the balance
+   then has to be read around. A TYPED amount has no such test: "put $50 against
+   each of these" is a legitimate thing to say about an order already part-paid.
+   **ONE INSERT, NOT ONE PER ORDER.** PostgREST takes an array, so the amounts
+   differ per row and the write is still a single statement — and a
+   half-recorded batch of PAYMENTS is the worst version of a half-finished
+   write, because you cannot tell by looking which half landed.
+   **THE DATE FOLLOWS THE MONEY, AS A PRE-TICKED BOX.** On the record,
+   `afterPaymentSettled` offers the invoice-paid date when a payment settles the
+   balance; a selection cannot be asked order by order, so it is asked once in
+   the dialog. It stamps only the orders this payment actually settled and only
+   where there is no date already, which is that function's own rule. It is a
+   SECOND statement and it is allowed to fail on its own: a paid order with no
+   paid date is a discrepancy the record can fix, where a date with no payment
+   is a lie about the books.
+   **`payment_type` IS ASKED FOR HERE**, where Mark Paid could not ask and so
+   wrote nothing — the difference between stamping a date and recording money.
+   The vocabulary moved to `lib/specialOrders` as `PAYMENT_TYPE_OPTIONS`, shared
+   with the record's own cell, `allowNew` in both.
    **EVERY COMMAND COUNTS WHAT IT WILL ACT ON IN ITS OWN LABEL** — "Cancel
    Orders (4)" — and says what it will SKIP before it writes. A selection is a
    mixed bag, and **decision 3's biconditional decides who can be cancelled**:

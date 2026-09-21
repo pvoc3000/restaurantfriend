@@ -9,16 +9,20 @@ import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { deleteBlock, type DeleteBlock } from "@/lib/specialOrderWrites";
 import {
   COMPLETION_DATES,
+  DEFAULT_PAYMENT_TYPE,
+  PAYMENT_TYPE_OPTIONS,
   STATUS_LABEL,
   STATUS_ORDER,
   TODO_OPTIONS,
-  countsAsOwed,
   money,
   type SpecialOrderStatus,
 } from "@/lib/specialOrders";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
+import { TabPicker } from "@/components/ui/TabPicker";
+import { TextInput } from "@/components/ui/TextInput";
+import { Checkbox } from "@/components/ui/Checkbox";
 import type { SpecialOrderRow } from "./SpecialOrdersList";
 
 /**
@@ -50,7 +54,7 @@ import type { SpecialOrderRow } from "./SpecialOrdersList";
  * ---------------------------------------------------------------------------
  * Set Status ▸ (the ladder, Cancelled included), Set To-do ▸ (the vocabulary,
  * and Clear), Set Completion Date… (the record's own nine, any date, or
- * cleared), Mark Paid, Resolve Flags, Delete Selected. Every one of them
+ * cleared), Record Payment…, Resolve Flags, Delete Selected. Every one of them
  * exists for a single order somewhere else,
  * and each is the SAME rule applied to more rows rather than a second reading
  * of it.
@@ -60,20 +64,27 @@ import type { SpecialOrderRow } from "./SpecialOrdersList";
  * leave you on the list looking at them, which reads as an accident rather than
  * a command — and the thing it is for, "same as last year", is one at a time.
  *
- * **Mark Paid does not touch the money.** The record's own flow offers to
- * record a settling payment when you stamp that date, as a tick you choose.
- * Doing it from a menu row would write a dozen financial records — money
- * received, from nobody, on a day nobody named — on one click. The confirm and
- * the report both say what is left owing and where to settle it.
+ * **Record Payment replaced Mark Paid** (2026-09-20). That row stamped a DATE
+ * and said, in its own confirm, that it was not recording the money — which was
+ * the right thing for a menu ROW to do and the wrong place to leave it. A
+ * dialog can ask the three things a payment needs and a menu row cannot: how
+ * much, when, and how it arrived. The date is still reachable in bulk through
+ * Set Completion Date ▸ Invoice paid, so nothing was lost, and the dialog
+ * carries the record's own consequence — the invoice-paid date follows the
+ * money on the orders it settles — as a pre-ticked box rather than a silent
+ * write.
  */
 export function SpecialOrderBatchActions({
   selected,
+  orgId,
   today,
   canWrite,
   onReport,
   children,
 }: {
   selected: SpecialOrderRow[];
+  /** Design rule 1: recording a payment INSERTS, and an insert says its org. */
+  orgId: string;
   /** The ORG's calendar day (`lib/today`) — what Mark Paid stamps. Never
    *  `new Date()`: a browser in another zone must not date the books. */
   today: string;
@@ -95,6 +106,33 @@ export function SpecialOrderBatchActions({
   const [busy, setBusy] = useState<
     "status" | "cancel" | "flags" | "paid" | "todo" | "dates" | "delete" | null
   >(null);
+
+  /**
+   * THE RECORD-PAYMENT DIALOG's state (Mark, 2026-09-20: "instead of 'mark
+   * paid'… do 'Record Payment' — which brings up a dialogue box and allows the
+   * user to specify a dollar amount or 'Paid in full'… the date, and the
+   * payment source").
+   *
+   * It replaces Mark Paid outright. That command stamped a DATE and said, in
+   * its own confirm, that it was not recording the money — which was the right
+   * thing for a menu row to do and the wrong place to leave it. The date is
+   * still reachable in bulk through Set Completion Date ▸ Invoice paid;
+   * nothing was lost.
+   */
+  const [paying, setPaying] = useState(false);
+  /** "full" takes each order's OWN balance; "same" takes one figure for all. */
+  const [payMode, setPayMode] = useState<"full" | "same">("full");
+  const [payAmount, setPayAmount] = useState("");
+  const [payOn, setPayOn] = useState<string | null>(today);
+  const [payType, setPayType] = useState(DEFAULT_PAYMENT_TYPE);
+  /**
+   * The record's own consequence, as a tick rather than a second dialog: on the
+   * record, recording a settling payment OFFERS to set the invoice-paid date
+   * (`afterPaymentSettled`, 2026-08-21). A selection cannot be asked
+   * order-by-order, so it is asked once, here, pre-ticked — `WorkflowOffer`'s
+   * rule, which keeps the human the author while saving them the typing.
+   */
+  const [payStamp, setPayStamp] = useState(true);
 
   /**
    * THE COMPLETION-DATE DIALOG's state (Mark, 2026-09-20: "add the ability to
@@ -130,22 +168,31 @@ export function SpecialOrderBatchActions({
     selected.filter((r) => r.kind === "order" && r.status !== to);
 
   /**
-   * MARK PAID IS THE `invoice_paid_at` STAMP, which is what the list's Paid
-   * column, the ladder's "Invoice paid" rung and the record's green chip all
-   * mean by the word. Already-stamped rows are skipped, and so is anything that
-   * is not an order: a template has no invoice to have been paid.
+   * WHO CAN TAKE A PAYMENT. Orders only — a template and a standing order are
+   * shapes, and money against a shape is money against nothing.
+   *
+   * IN "PAID IN FULL" MODE, an order with nothing outstanding is skipped as
+   * well: its amount would be zero or a credit, and a $0.00 payment row is a
+   * record of nothing that the balance then has to be read around. A typed
+   * amount has no such test — "put $50 against each of these" is a legitimate
+   * thing to say about an order already part-paid.
    */
-  const markable = selected.filter((r) => r.kind === "order" && !r.invoice_paid_at);
+  const payable = selected.filter((r) => r.kind === "order");
+  const inFull = payable.filter((r) => r.totals.balance > 0.005);
+  const payRows = payMode === "full" ? inFull : payable;
 
-  /**
-   * IT DOES NOT TOUCH THE MONEY, and that is a decision rather than an
-   * omission. The record's own flow OFFERS to record a settling payment when
-   * you stamp this date, as a tick you choose; doing it from a menu row would
-   * write a dozen financial records — money received, from nobody, on a day
-   * nobody named — on one click. These are counted so the confirm can say what
-   * is left owing and where to settle it.
-   */
-  const stillOwing = markable.filter((r) => countsAsOwed(r) && r.totals.balance > 0);
+  const typedAmount = Number(payAmount);
+  const typedOk = Number.isFinite(typedAmount) && typedAmount !== 0;
+  /** May the dialog commit? */
+  const payReady = payMode === "full" ? inFull.length > 0 : typedOk && payable.length > 0;
+
+  /** What this dialog is about to record, all in. */
+  const payTotal =
+    payMode === "full"
+      ? inFull.reduce((a, r) => a + r.totals.balance, 0)
+      : typedOk
+        ? typedAmount * payable.length
+        : 0;
 
   /**
    * WHO WOULD ACTUALLY MOVE, for a to-do. No kind test, unlike the status:
@@ -206,51 +253,92 @@ export function SpecialOrderBatchActions({
     );
   }
 
-  async function markPaid() {
-    const skipped = selected.length - markable.length;
-    const owed = stillOwing.reduce((a, r) => a + r.totals.balance, 0);
-    if (
-      !(await confirmDialog({
-        ...splitConfirmMessage(
-          `Mark ${plural(markable.length, "order")} paid?\n\n` +
-            (skipped
-              ? `${plural(skipped, "row")} already carr${skipped === 1 ? "ies" : "y"} a paid ` +
-                `date, or ${skipped === 1 ? "is" : "are"} a template or standing order, and ` +
-                `will be left alone. `
-              : "") +
-            `This stamps the invoice-paid date as ${today}. It does NOT record payments` +
-            (stillOwing.length
-              ? `, and ${plural(stillOwing.length, "of them", "of them")} still ${
-                  stillOwing.length === 1 ? "carries" : "carry"
-                } a balance — ${money(owed)} in all. Open each one to settle it; the record ` +
-                `offers to record the payment for you.`
-              : ".")
-        ),
-        confirmLabel: "Mark them paid",
-      }))
-    ) {
-      return;
-    }
+  /**
+   * THE PAYMENTS, AS ROWS — decision 2's whole point, applied to a selection.
+   *
+   * ONE INSERT, NOT ONE PER ORDER. PostgREST takes an array, so the amounts can
+   * differ per row and the write is still a single statement: twenty round
+   * trips are twenty chances to half-finish, and a half-recorded batch of
+   * PAYMENTS is the worst version of that — you cannot tell by looking which
+   * half landed.
+   *
+   * `payment_type` IS ASKED FOR HERE, where `Mark Paid` could not ask and so
+   * wrote nothing. That is the difference between stamping a date and recording
+   * money: the app knows what is owed and when, and only a human knows how it
+   * arrived.
+   */
+  async function recordPayment() {
+    const amountFor = (r: SpecialOrderRow) =>
+      payMode === "full" ? Math.round(r.totals.balance * 100) / 100 : typedAmount;
+
     setBusy("paid");
     const { data, error } = await supabase
-      .from("special_orders")
-      .update({ invoice_paid_at: today })
-      .in("id", markable.map((r) => r.id))
-      .select("id");
-    setBusy(null);
-    if (error) return onReport(error.message, "error");
-    if (!data?.length) {
-      return onReport("Nothing was marked — the database refused it and said nothing.", "error");
+      .from("special_order_payments")
+      .insert(
+        payRows.map((r) => ({
+          // Explicit — design rule 1.
+          org_id: orgId,
+          order_id: r.id,
+          amount: amountFor(r),
+          paid_on: payOn,
+          payment_type: payType || null,
+        }))
+      )
+      .select("order_id");
+
+    if (error) {
+      setBusy(null);
+      setPaying(false);
+      return onReport(error.message, "error");
     }
+    if (!data?.length) {
+      setBusy(null);
+      setPaying(false);
+      return onReport(
+        "Nothing was recorded — the database refused it and said nothing.",
+        "error"
+      );
+    }
+
+    /**
+     * THE DATE FOLLOWS THE MONEY, on the orders this actually settled and only
+     * where there is no date already. `afterPaymentSettled`'s rule, which reads
+     * the balance rather than the payment: a deposit is not the moment an
+     * invoice is paid.
+     *
+     * A SECOND STATEMENT, and it is allowed to fail on its own: the money is
+     * recorded either way, and a paid order with no paid date is a discrepancy
+     * the record can fix, where a date with no payment is a lie about the
+     * books. Order matters more than atomicity here.
+     */
+    let stamped = 0;
+    let stampError: string | null = null;
+    if (payStamp) {
+      const settled = payRows.filter(
+        (r) => !r.invoice_paid_at && r.totals.balance - amountFor(r) <= 0.005
+      );
+      if (settled.length > 0) {
+        const { data: dated, error: dateError } = await supabase
+          .from("special_orders")
+          .update({ invoice_paid_at: payOn })
+          .in("id", settled.map((r) => r.id))
+          .select("id");
+        if (dateError) stampError = dateError.message;
+        else stamped = dated?.length ?? 0;
+      }
+    }
+
+    setBusy(null);
+    setPaying(false);
     router.refresh();
+
+    const skipped = selected.length - payRows.length;
     onReport(
-      `Marked ${plural(data.length, "order")} paid.` +
-        (stillOwing.length
-          ? ` ${plural(stillOwing.length, "of them", "of them")} still ${
-              stillOwing.length === 1 ? "owes" : "owe"
-            } ${money(owed)} — no payments were recorded.`
-          : ""),
-      "done"
+      `Recorded ${plural(data.length, "payment")}, ${money(payTotal)} in all.` +
+        (stamped ? ` ${plural(stamped, "of them")} settled and now carr${stamped === 1 ? "ies" : "y"} a paid date.` : "") +
+        (skipped ? ` ${plural(skipped, "row")} skipped.` : "") +
+        (stampError ? ` The paid dates were NOT set: ${stampError}` : ""),
+      stampError ? "error" : "done"
     );
   }
 
@@ -594,9 +682,27 @@ export function SpecialOrderBatchActions({
           disabled: busy !== null || selected.length === 0,
         },
         {
-          label: busy === "paid" ? "Marking…" : `Mark Paid (${markable.length})`,
-          onSelect: () => void markPaid(),
-          disabled: busy !== null || markable.length === 0,
+          /**
+           * IT REPLACED `Mark Paid` (Mark, 2026-09-20). That row stamped a DATE
+           * and said in its own confirm that it was not recording the money,
+           * which was the right thing for a menu row to do and the wrong place
+           * to leave it. The date is still reachable in bulk — Set Completion
+           * Date ▸ Invoice paid — so nothing was lost.
+           *
+           * The count is the ORDERS in the selection: how many of them a
+           * payment will actually be written against depends on the mode, and
+           * the dialog says so once you are in it.
+           */
+          label: busy === "paid" ? "Recording…" : `Record Payment… (${payable.length})`,
+          onSelect: () => {
+            setPayMode("full");
+            setPayAmount("");
+            setPayOn(today);
+            setPayType(DEFAULT_PAYMENT_TYPE);
+            setPayStamp(true);
+            setPaying(true);
+          },
+          disabled: busy !== null || payable.length === 0,
         },
         {
           label: busy === "flags" ? "Resolving…" : `Resolve Flags (${flagged.length})`,
@@ -615,6 +721,127 @@ export function SpecialOrderBatchActions({
   return (
     <>
       {children(items)}
+
+      {paying && (
+        <Dialog
+          title="Record a payment"
+          onClose={() => {
+            if (busy === null) setPaying(false);
+          }}
+          busy={busy === "paid"}
+          width="max-w-md"
+          onSubmit={() => {
+            if (payReady && busy === null) void recordPayment();
+          }}
+          footer={
+            <div className="flex items-center justify-end gap-4">
+              <button
+                type="button"
+                className={DIALOG_CANCEL_CLASS}
+                onClick={() => setPaying(false)}
+                disabled={busy !== null}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={DIALOG_COMMIT_CLASS}
+                onClick={() => void recordPayment()}
+                disabled={!payReady || busy !== null}
+              >
+                {busy === "paid" ? "Recording…" : `Record ${money(payTotal)}`}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-5">
+            {/* EVERY ONE-OF-N CHOICE IS A `ui/TabPicker`. The two are genuinely
+                different questions about the same act: Paid in full asks each
+                order what it is owed, an amount says one figure for all of
+                them — and the second is the one that needs saying out loud,
+                which the sentence under the fields does. */}
+            <div className="space-y-1.5">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                How much
+              </span>
+              <TabPicker
+                value={payMode}
+                onChange={(next) => setPayMode(next as "full" | "same")}
+                ariaLabel="How much to record"
+                options={[
+                  { key: "full", label: "Paid in full", count: inFull.length },
+                  { key: "same", label: "Same amount each", count: payable.length },
+                ]}
+              />
+            </div>
+
+            {payMode === "same" && (
+              <label className="block space-y-1.5">
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Amount
+                  <span className="text-accent"> *</span>
+                </span>
+                <TextInput
+                  value={payAmount}
+                  onValueChange={setPayAmount}
+                  placeholder="50.00"
+                  aria-label="Amount received on each order"
+                  className="w-32"
+                  autoFocus
+                />
+              </label>
+            )}
+
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <label className="block space-y-1.5">
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Date
+                </span>
+                <DateField value={payOn} onChange={setPayOn} ariaLabel="Payment date" boxed />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  How
+                </span>
+                {/* `allowNew`, as the record's own cell has it: payment methods
+                    are a business fact and not a schema one. */}
+                <PickList
+                  value={payType}
+                  onPick={setPayType}
+                  variant="field"
+                  allowNew
+                  ariaLabel="How it was paid"
+                  options={PAYMENT_TYPE_OPTIONS}
+                  className="w-full"
+                />
+              </label>
+            </div>
+
+            <Checkbox
+              checked={payStamp}
+              onChange={setPayStamp}
+              label="Set the invoice-paid date on any order this settles"
+            />
+
+            {/* WHAT IS ABOUT TO HAPPEN, IN ONE SENTENCE, because the two modes
+                differ in a way a total alone would hide: one figure times six
+                orders is six hundred dollars, and nobody should learn that from
+                the report. */}
+            <p className="text-[13px] text-muted">
+              {payMode === "full"
+                ? inFull.length === 0
+                  ? "None of the selected orders has a balance outstanding."
+                  : `${money(payTotal)} across ${plural(inFull.length, "order")}, each one its own balance.` +
+                    (payable.length > inFull.length
+                      ? ` ${plural(payable.length - inFull.length, "order")} already settled and will be skipped.`
+                      : "")
+                : typedOk
+                  ? `${money(typedAmount)} on each of ${plural(payable.length, "order")} — ${money(payTotal)} in all.`
+                  : "Type an amount to record against every selected order."}
+            </p>
+          </div>
+        </Dialog>
+      )}
 
       {dating && (
         <Dialog

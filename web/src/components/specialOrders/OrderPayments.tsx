@@ -19,7 +19,11 @@ import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { PickList } from "@/components/ui/PickList";
 import { TextInput } from "@/components/ui/TextInput";
 import { DateField } from "@/components/ui/DateField";
-import { money } from "@/lib/specialOrders";
+import {
+  DEFAULT_PAYMENT_TYPE,
+  PAYMENT_TYPE_OPTIONS as PAYMENT_TYPES,
+  money,
+} from "@/lib/specialOrders";
 
 export type PaymentRow = {
   id: string;
@@ -29,24 +33,6 @@ export type PaymentRow = {
   note: string | null;
   external_ref: string | null;
 };
-
-/**
- * Decision 2's vocabulary, kept as it is in the data: `Square Invoice` on 1,188
- * of the 1,190 real payments, `Square Online` on one, `comp` on one — plus the
- * `legacy` type the migration synthesizes for the 5,267 pre-2022 orders whose
- * payment was a calc field rather than a row.
- *
- * `allowNew`, because payment methods are a business fact and not a schema one:
- * the day Donut Friend takes a bank transfer, nobody should need a migration.
- */
-const PAYMENT_TYPES = [
-  { value: "Square Invoice", label: "Square Invoice", hint: "the usual" },
-  { value: "Square Online", label: "Square Online" },
-  { value: "cash", label: "Cash" },
-  { value: "check", label: "Check" },
-  { value: "comp", label: "Comp" },
-  { value: "legacy", label: "Legacy", hint: "migrated from FileMaker's paid total" },
-];
 
 /**
  * Payments as ROWS, which is decision 2's whole point.
@@ -86,13 +72,13 @@ export function OrderPayments({
   const [adding, setAdding] = useState(false);
   const [amount, setAmount] = useState("");
   const [paidOn, setPaidOn] = useState<string | null>(today);
-  const [type, setType] = useState("Square Invoice");
+  const [type, setType] = useState(DEFAULT_PAYMENT_TYPE);
   const [note, setNote] = useState("");
 
   function reset() {
     setAmount("");
     setPaidOn(today);
-    setType("Square Invoice");
+    setType(DEFAULT_PAYMENT_TYPE);
     setNote("");
   }
 

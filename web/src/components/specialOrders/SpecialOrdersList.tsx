@@ -952,6 +952,7 @@ export function SpecialOrdersList({
               {(createRows) => (
                 <SpecialOrderBatchActions
                   selected={visible.filter((r) => checked.has(r.id))}
+                  orgId={orgId}
                   today={today}
                   canWrite={canWrite}
                   onReport={(message, tone) => {
