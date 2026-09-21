@@ -11,6 +11,7 @@ import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
+import { SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
 import { packetDate } from "@/lib/productionSchedule";
 
 export type DayRow = {
@@ -506,7 +507,7 @@ function OverrideCell({
           setDraft("");
         }}
         disabled={busy || draft.trim() === ""}
-        className="h-8 border border-ink bg-white px-2 text-[11px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
+        className={SMALL_BUTTON_CLASS}
       >
         Set
       </button>

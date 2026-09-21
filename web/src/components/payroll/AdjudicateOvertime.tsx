@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { TextInput } from "@/components/ui/TextInput";
+import { SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
 import { REASON_LABEL, splitTotal, type ShiftProposal, type Split } from "@/lib/overtime";
 
-const BUTTON =
-  "inline-flex h-8 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
+// `shrink-0` at the call site, per `ui/buttons`.
+const BUTTON = `${SMALL_BUTTON_CLASS} shrink-0`;
 
 /**
  * Decision 2 made operable: the machine proposes, a human decides, and the

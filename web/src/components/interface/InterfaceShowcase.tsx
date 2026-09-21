@@ -25,6 +25,7 @@ import {
   BUTTON_CLASS,
   DANGER_BUTTON_CLASS,
   PRIMARY_BUTTON_CLASS,
+  SMALL_BUTTON_CLASS,
 } from "@/components/ui/buttons";
 import { useCalcField } from "@/components/ui/CalcPad";
 import { CalendarGrid } from "@/components/ui/CalendarGrid";
@@ -278,6 +279,21 @@ function ButtonsBlock() {
             </button>
             <button type="button" className={BUTTON_CLASS} disabled>
               Disabled
+            </button>
+          </div>
+        </Specimen>
+        <Specimen name="SMALL_BUTTON_CLASS">
+          {/* Shown BESIDE the full-size one, because the only thing to look at
+              here is the difference between them. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" className={SMALL_BUTTON_CLASS} onClick={press("Small")}>
+              Owed
+            </button>
+            <button type="button" className={SMALL_BUTTON_CLASS} disabled>
+              Disabled
+            </button>
+            <button type="button" className={BUTTON_CLASS} onClick={press("Button")}>
+              Full size
             </button>
           </div>
         </Specimen>

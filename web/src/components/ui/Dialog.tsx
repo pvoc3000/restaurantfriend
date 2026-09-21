@@ -219,11 +219,21 @@ export const DIALOG_CANCEL_CLASS =
 // app-wide, `styles/mac-look.css`): the shadow and the press. Cancel is text and
 // gets neither. Since 2026-09-11 (Mark, reviewing /interface) the commit is
 // filled LIGHT GREY with black type and a black border, and `mac-primary` gives
-// it a 2px edge on hover; the danger one wears `mac-danger`, a red shadow under
-// its red border.
+// it a 2px edge on hover. The danger one wore `mac-danger`, a red shadow under
+// its red border, until 2026-09-21 put it on the same black-on-red-wash dress
+// as `DANGER_BUTTON_CLASS`; it now shares `mac-stop` with it.
 export const DIALOG_COMMIT_CLASS =
-  "mac-control mac-own-hover mac-primary inline-flex h-9 items-center border border-ink bg-[#c0c0c0] px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink disabled:opacity-35";
+  "mac-control mac-own-hover mac-primary inline-flex h-9 items-center border border-ink bg-white px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink disabled:opacity-35";
 
-/** A destructive commit — the accent edge, filled on hover, as everywhere else. */
+/**
+ * A destructive commit — black type on the `stop` wash, following
+ * `DANGER_BUTTON_CLASS` (Mark, 2026-09-21). It followed on the same day rather
+ * than later: the two are deliberately separate strings, but they are the same
+ * COLOUR STATEMENT, and an app with two different reds both meaning "this
+ * destroys something" is the drift `ui/buttons` keeps warning about.
+ *
+ * Still `px-5` and still not merged with it — a footer's decision gets the
+ * roomier padding, which is the whole reason they are two strings.
+ */
 export const DIALOG_DANGER_CLASS =
-  "mac-control mac-own-hover mac-danger inline-flex h-9 items-center border border-accent bg-white px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent hover:bg-accent hover:text-white disabled:opacity-35";
+  "mac-control mac-own-hover mac-stop inline-flex h-9 items-center border border-ink bg-stop px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink disabled:opacity-35";

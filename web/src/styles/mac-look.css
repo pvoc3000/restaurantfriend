@@ -5,7 +5,9 @@
  * STILL TWO CLASSES, but they now ride on the SHARED PARTS rather than on one
  * screen's call sites, so a control gets the look by being built from them:
  *   - `mac-control` — `BUTTON_CLASS`, `PRIMARY_BUTTON_CLASS`,
- *     `DANGER_BUTTON_CLASS`, `DIALOG_COMMIT_CLASS`, `DIALOG_DANGER_CLASS`, a
+ *     `DANGER_BUTTON_CLASS`, `SMALL_BUTTON_CLASS` (plus `mac-small`, a
+ *     2px shadow for a 20px button), `DIALOG_COMMIT_CLASS`, `DIALOG_DANGER_CLASS` (both now
+ *     `mac-stop`, black on a red wash), a
  *     `PickList variant="field"` trigger, and the filter-row (unboxed) dress of
  *     `PickSet` and `RangePicker`, the order guide's day (`DateField
  *     variant="title"`); plus the hand-rolled copies of the plain
@@ -87,6 +89,34 @@
   box-shadow: inset 0 0 0 1px #000;
 }
 
+/* A SMALL BUTTON GETS A 2px SHADOW — `SMALL_BUTTON_CLASS`, which is 20px tall.
+   `.mac-day` already reached this conclusion at 26px ("3px of shadow on a 26px
+   square is a ninth of the button"), and a small command button is the same
+   object at the same scale — and by 20px a 3px shadow would be a seventh of
+   the button, so this only gets truer as that class shrinks. It drops 2px too, or it would drop further than
+   its own shadow and leave a gap under it.
+
+   Every other part of the grammar is `.mac-control`'s, inherited: the white
+   ground and 2px edge on hover, the grey fill while held. Only the DEPTH
+   changes with the size. */
+.mac-control.mac-small {
+  box-shadow: 2px 2px 0 0 #000;
+}
+
+.mac-control.mac-small:not(.mac-own-hover):not(:disabled):hover {
+  box-shadow: 2px 2px 0 0 #000, inset 0 0 0 1px #000;
+}
+
+.mac-control.mac-small:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+.mac-control.mac-small:not(.mac-own-hover):not(:disabled):active {
+  background-color: #c0c0c0;
+  box-shadow: inset 0 0 0 1px #000;
+}
+
 /* A PICKER DOES NOT FILL GREY — every `rf-press`, on every screen since
    2026-09-11 (Mark, reviewing /interface: "All fields with a border should not
    fill with a solid color on hover, but the border should be 2px on hover").
@@ -113,31 +143,92 @@
   box-shadow: inset 0 0 0 1px #000;
 }
 
-/* DANGER: THE SHADOW IS RED (Mark, 2026-09-11), on `DANGER_BUTTON_CLASS` and
-   `DIALOG_DANGER_CLASS` alike, matching the red border it hangs from. Not while
-   held, or the press would keep a shadow it has dropped into. */
-.mac-control.mac-danger:not(:active) {
-  box-shadow: 3px 3px 0 0 var(--color-accent);
+/* `.mac-danger` WAS HERE — a red shadow on `DANGER_BUTTON_CLASS` and
+   `DIALOG_DANGER_CLASS` (Mark, 2026-09-11), matching the red border it hung
+   from. Both went black-on-a-red-wash on 2026-09-21 (`.mac-stop` below), there
+   is no red border left for it to match, and it had no other callers — so it
+   is gone rather than left behind as a class that still works and means
+   nothing. */
+
+/* THE COMMIT: A BLUE INNER GLOW ON WHITE (Mark, 2026-09-21) —
+   `PRIMARY_BUTTON_CLASS` and `DIALOG_COMMIT_CLASS`, which share this dress.
+   Darkest at the edge, fading to clean white under the type, with BLACK type
+   throughout. `--rf-action-primary-glow` holds the colour and the 55%.
+
+   IT IS THE FIRST BLURRED THING IN THE APP, and that is a real departure
+   rather than a tweak: this file already breaks the design system's "no
+   shadows" and "no textures" rules, but every exception until now has been a
+   hard-edged 3px block. Mark asked for it by name after three flat blues were
+   too heavy ("too blue, or too dark blue, for my tastes"), and after a softer
+   version was tried and found too faint.
+
+   IT WAS GREY, #c0c0c0, from 2026-09-11 until this — and `bg-neutral-600` with
+   white type for an hour before that. The class now carries `bg-white`.
+
+   KNOWN AND ACCEPTED: an inset glow's strength depends on the button's WIDTH,
+   because the glow from each edge overlaps on a short one. `OK` reads bluer
+   than `Close pay period…` from the same class. A top-and-bottom-only form was
+   built and measured and is width-stable; Mark chose this one anyway, having
+   seen both. Don't "fix" it without asking.
+
+   THE DESTRUCTIVE BUTTON DELIBERATELY DID NOT FOLLOW (Mark: "leave the danger
+   button alone for a while"). So the app currently has one filled command that
+   glows and one that is flat — `.mac-stop` above — which is a KNOWN temporary
+   mismatch and not an oversight. If the glow stays, that is the next thing to
+   settle. */
+.mac-control.mac-primary {
+  box-shadow: 3px 3px 0 0 #000, inset 0 0 10px 0 var(--rf-action-primary-glow);
 }
 
-/* THE COMMIT: GREY, NOT BLACK (Mark, 2026-09-11) — `PRIMARY_BUTTON_CLASS`
-   and `DIALOG_COMMIT_CLASS`. The fill is the class's own `bg-[#c0c0c0]` with
-   BLACK type; this is its hover and its press. It was `bg-neutral-600` and
-   white type for the first hour, which is the name this comment kept saying
-   until 2026-09-12 — a class the button had long since stopped using. Hover is the fields' 2px edge rather than a fill,
-   and held it drops into its shadow and fills the light grey every other held
-   button shows, with black type — white on #c0c0c0 would not read. */
 .mac-primary:not(:disabled):hover {
+  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000,
+    inset 0 0 10px 0 var(--rf-action-primary-glow);
+}
+
+/* Held, it drops into its shadow (`.mac-control:active`) and keeps both the
+   2px edge and the glow — the grey fill every other held button shows would
+   put mud over the blue. */
+.mac-control.mac-primary:not(:disabled):active {
+  color: #000;
+  box-shadow: inset 0 0 0 1px #000,
+    inset 0 0 10px 0 var(--rf-action-primary-glow);
+}
+
+.mac-primary:not(:disabled):active * {
+  color: #000;
+}
+
+/* THE DESTRUCTIVE COMMAND: BLACK, ON A RED GROUND (Mark, 2026-09-21: "let's
+   make it black with a red fill"). `DANGER_BUTTON_CLASS` only — the dialog
+   footer's `DIALOG_DANGER_CLASS` still wears the all-red edge.
+
+   THE RED IS `stop` (#ffcfc9), NOT `accent` (#d20000), and that is forced
+   rather than chosen: black on the accent measures 3.74:1, under AA for 12px
+   type, while black on `stop` is 15:1. It is also the grammar the app already
+   has — `bg-mark-fill` under black ink, and `lib/receiving`'s zeroed box,
+   which is `border-ink bg-stop` exactly. A fill is a fill and an ink is an ink;
+   the accent stays the ink it has always been.
+
+   THE SHADOW GOES BLACK WITH THE BORDER. `mac-danger`'s red shadow matched the
+   red EDGE it hung from, and there is no red edge here any more, so the class
+   comes off and `.mac-control`'s own black shadow applies.
+
+   STRUCTURALLY THIS IS `.mac-primary` WITH A DIFFERENT GROUND, and the
+   duplication is deliberate: `.mac-primary`'s rules name #c0c0c0 outright, so
+   sharing them would mean a filled button flashing grey on press. Both keep
+   `mac-own-hover` for the same reason — the plain hover rule forces the ground
+   WHITE, which would wipe the fill — and then re-earn the 2px edge here. */
+.mac-stop:not(:disabled):hover {
   box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000;
 }
 
-.mac-primary:not(:disabled):active {
-  background-color: #c0c0c0;
+.mac-stop:not(:disabled):active {
+  background-color: var(--color-stop);
   color: #000;
   box-shadow: inset 0 0 0 1px #000;
 }
 
-.mac-primary:not(:disabled):active * {
+.mac-stop:not(:disabled):active * {
   color: #000;
 }
 

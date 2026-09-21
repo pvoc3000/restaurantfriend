@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PickList } from "@/components/ui/PickList";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { TextInput } from "@/components/ui/TextInput";
+import { SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
 import { ControlField } from "@/components/ui/ControlField";
 import { MEAL_CODE_LABEL, type BreakFinding } from "@/lib/breakRules";
 import { effectiveExclusion } from "@/lib/timesheets";
@@ -37,8 +38,8 @@ import { formatCents, formatRate, parseDollarsToCents, type PoolResult } from "@
  * shift — which is the thing the law caps.
  */
 
-const BUTTON =
-  "inline-flex h-8 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
+// `shrink-0` at the call site, per `ui/buttons`.
+const BUTTON = `${SMALL_BUTTON_CLASS} shrink-0`;
 
 const DECISION_OPTIONS = [
   { value: "owed", label: "Owed", hint: "an hour of premium pay is due" },

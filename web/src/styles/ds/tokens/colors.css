@@ -6,8 +6,13 @@
      2. COLOUR IS STATE, never decoration. A fill means something happened to
         that record. Three fills exist — go, stop, attention — and they only
         ever appear inside a control or a cell, never across a whole screen.
-   Blue is deliberately absent: links are black and underlined, the way the
-   original printed guide read. */
+   Blue was deliberately absent until 2026-09-21, when the PRIMARY COMMAND
+   gained a soft inner glow (Mark, after rejecting three flat blues: "too blue,
+   or too dark blue, for my tastes"). The part of the rule that carried the
+   weight is untouched: LINKS ARE STILL BLACK AND UNDERLINED, the way the
+   original printed guide read. Blue is not a link colour here and must not
+   become one — it means "this is the command", on at most one control per
+   screen, and it appears nowhere else in the app. */
 :root {
   /* Ink — true black to true white */
   --rf-white: #ffffff;
@@ -54,6 +59,11 @@
   --rf-yellow-700: #a88a00;
   --rf-yellow-800: #6b5800;
 
+  /* Blue — the primary command's inner glow, and nothing else. One shade,
+     deliberately: a second would invite blue as a decoration, which rule 2 at
+     the top of this file forbids. See `.mac-primary` in styles/mac-look.css. */
+  --rf-blue-500: #3366cc;
+
   /* Orange — the invoice status ladder's "Submitted" rung (Mark, 2026-09-03):
      pushed to QuickBooks, waiting on payment. It sits between Approved's
      green and Paid's white on the same ladder, so it needs its own hue —
@@ -92,6 +102,9 @@
   --rf-action-primary-bg-hover: var(--rf-neutral-800);
   --rf-action-primary-bg-disabled: var(--rf-neutral-300);
   --rf-action-primary-fg: var(--rf-white);
+  /* The glow itself, so the 55% lives in ONE place. `color-mix` with
+     transparent is Safari 16.2+, inside the 16.4 floor CLAUDE.md sets. */
+  --rf-action-primary-glow: color-mix(in srgb, var(--rf-blue-500) 55%, transparent);
   --rf-action-danger-fg: var(--rf-red-500);
   --rf-action-danger-border: var(--rf-red-500);
   --rf-action-danger-bg-hover: var(--rf-red-50);
