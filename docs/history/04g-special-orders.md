@@ -1754,7 +1754,30 @@
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.
 
-   **THE LIST SELECTS AND ACTS IN BULK — 2026-09-20** (Mark: "add a column to
+   **A MATERIALIZED STANDING DAY ARRIVES AS AN INVOICE — migration 112,
+   WRITTEN 2026-09-20 AND NOT YET APPLIED** (Mark: "when a standing order is
+   instantiated, the status should be 'Invoice' and the to do should be set to
+   'Send Invoice' going forward"). 099 wrote `status = 'order'`, `todo = 'Print
+   Order'`; 112 writes `'invoice'`, `'Send Invoice'`, and is otherwise 099's
+   function verbatim because `create or replace` takes the whole definition.
+   **It is right for the reason decision 13 already states**: a wholesale day is
+   billed weekly in arrears, so `order` — the rung this module glosses as "paid
+   — printing and scheduling remain" — claimed something about Friday's donuts
+   that was not true on Friday.
+   **GOING FORWARD MEANS EXACTLY THAT.** No backfill, and none is wanted: an
+   order that has been made, delivered and eaten is not waiting for an invoice.
+   **TWO READERS OF `status = 'order'` STOP FIRING FOR THESE DAYS, and neither
+   is changed by the migration.** `pullReadiness` (`lib/specialOrderSchedule`)
+   offers only `order` to the production-schedule generator, so a materialized
+   day is now WITHHELD — counted, with the reason "still an Invoice", never
+   silently absent. And `needsAttention` stops saying "Paid and unprinted, and
+   the event is close" for them. The first is the consequential one: it is the
+   wholesale account that production schedules exist for. That rule was itself a
+   measurement (2026-08-27, eleven real orders) and changing it is a decision
+   about what "ready to make" means, not plumbing — **asked, and open.** The fix
+   if it is wanted is one condition: a standing DAY is ready at `invoice`.
+
+   **THE LIST SELECTS AND ACTS IN BULK — 2026-09-20**   **THE LIST SELECTS AND ACTS IN BULK — 2026-09-20** (Mark: "add a column to
    the first position on the special order list so we can 'select' multiple
    special orders and perform actions on them"). `BillList`'s arrangement, which
    is where every rule here was already paid for: a tick column, one **Actions**
