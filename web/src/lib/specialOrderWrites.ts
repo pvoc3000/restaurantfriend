@@ -339,10 +339,38 @@ export async function duplicateSpecialOrder(
     }
   }
 
+  /**
+   * A SHAPE ARRIVES WITH AN EMPTY LOG (Mark, 2026-09-21: "when converting a
+   * special order to an order template, log/history should be cleared as
+   * well"), and the clearing happens HERE, between the copy and the line that
+   * says where it came from — so the provenance survives and nothing else does.
+   *
+   * WHAT IS BEING CLEARED IS NOT HISTORY. No events are copied from the source
+   * and never have been; every entry in the new record's log was written
+   * seconds ago by a trigger describing the copy — 056's "Template created" and
+   * one line per item inserted. A twenty-line order makes twenty-one of them.
+   *
+   * BEST EFFORT, AND DELIBERATELY SO. Migration 113 adds the function; until it
+   * is applied the RPC simply is not there, and a conversion that otherwise
+   * worked must not report itself as failed because its tidying did not. The
+   * cost of it silently not running is a noisy log, which is what the command
+   * is like today.
+   */
+  if (kind !== "order") {
+    await supabase.rpc("clear_special_order_log", {
+      p_org_id: source.org_id,
+      p_order_id: created.id,
+    });
+  }
+
   // 054's trigger says "Order started as a lead"; where it CAME FROM is a fact
   // with no watched column behind it, so it is written by hand. The wording
   // follows the KIND, because "Duplicated from order 9469" on a standing order
   // would leave somebody hunting for the duplicate that is not there.
+  //
+  // IT IS WRITTEN AFTER THE CLEAR, so a converted shape's log holds this one
+  // line and nothing else. Provenance is the one thing worth keeping: without
+  // it a template is a shape nobody can trace.
   await supabase.from("special_order_events").insert({
     org_id: source.org_id,
     order_id: created.id,

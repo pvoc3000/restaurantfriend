@@ -1903,6 +1903,38 @@
    somebody chose, the verb is the named one with the balance warning attached,
    and it was asked for by name.
 
+   **A CONVERTED SHAPE ARRIVES WITH AN EMPTY LOG — migration 113, WRITTEN
+   2026-09-21 AND NOT YET APPLIED** (Mark: "when converting a special order to
+   an order template, log/history should be cleared as well").
+   **WHAT IS BEING CLEARED IS NOT HISTORY**, which is the whole argument for
+   touching a table 051 deliberately gave no DELETE policy ("the log is the
+   record of what was done, and an entry removed is a thing that happened with
+   no trace"). No events are copied from the source and never have been; every
+   line in a converted template's log was written seconds earlier by a TRIGGER
+   describing the copy — 056's "Template created", plus one entry per item the
+   copy inserted. A twenty-line order makes twenty-one of them, recording that a
+   computer copied some rows.
+   **THE GUARD IS THE KIND.** `clear_special_order_log` refuses on `kind =
+   'order'`: a real order's log is exactly what 051 was protecting, and nobody
+   may remove any of it. Only a PROTOTYPE can be cleared, because only a
+   prototype is not a thing that happened. Definer, so it re-checks what RLS
+   would have — purchaser+, the org, and the kind — and returns a COUNT rather
+   than raising, so a caller aimed at an order simply learns nothing was
+   cleared.
+   **WHAT IT STILL ALLOWS, STATED RATHER THAN HIDDEN**: purchaser+ can clear a
+   STANDING ORDER's log later, and that log does record real edits — a price, a
+   weekday — which affect days not yet made. It is the cost of not building a
+   one-shot token, and it is accepted rather than overlooked. The days are
+   untouched; each carries its own log and its own "Made from standing order N".
+   **THE PROVENANCE LINE SURVIVES.** The clear runs BETWEEN the copy and the
+   line that says where it came from, so a converted shape's log holds exactly
+   one entry — "Order Template made from order 10034" — and nothing else.
+   Without it a template is a shape nobody can trace.
+   **BEST EFFORT IN THE APP.** Until 113 is applied the RPC is not there, and a
+   conversion that otherwise worked must not report itself failed because its
+   tidying did not run. The cost of silence is a noisy log, which is exactly
+   what the command does today.
+
    **THE KIND MENU SWITCHES THE DATE WINDOW OFF — 2026-09-21** (Mark: "since
    templates do not carry dates, selecting them in the Kind filter requires also
    changing the 'show' filter to all time. Can the all time filter be inactive
