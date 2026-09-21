@@ -21,7 +21,6 @@ import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/u
 import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
 import { TextInput } from "@/components/ui/TextInput";
-import { Checkbox } from "@/components/ui/Checkbox";
 import type { SpecialOrderRow } from "./SpecialOrdersList";
 
 /**
@@ -129,14 +128,6 @@ export function SpecialOrderBatchActions({
   const [payAmount, setPayAmount] = useState("");
   const [payOn, setPayOn] = useState<string | null>(today);
   const [payType, setPayType] = useState(DEFAULT_PAYMENT_TYPE);
-  /**
-   * The record's own consequence, as a tick rather than a second dialog: on the
-   * record, recording a settling payment OFFERS to set the invoice-paid date
-   * (`afterPaymentSettled`, 2026-08-21). A selection cannot be asked
-   * order-by-order, so it is asked once, here, pre-ticked — `WorkflowOffer`'s
-   * rule, which keeps the human the author while saving them the typing.
-   */
-  const [payStamp, setPayStamp] = useState(true);
 
   /**
    * THE COMPLETION-DATE DIALOG's state (Mark, 2026-09-20: "add the ability to
@@ -311,10 +302,18 @@ export function SpecialOrderBatchActions({
     }
 
     /**
-     * THE DATE FOLLOWS THE MONEY, on the orders this actually settled and only
-     * where there is no date already. `afterPaymentSettled`'s rule, which reads
-     * the balance rather than the payment: a deposit is not the moment an
-     * invoice is paid.
+     * THE DATE FOLLOWS THE MONEY. No longer a tick (Mark, 2026-09-20: "I don't
+     * understand the need for the 'set the invoice-paid date…' checkbox. That
+     * should just be what happens when recording a payment") — and he is right
+     * that it was a choice nobody wants to make twice. What it is NOT is "every
+     * payment stamps a date": `afterPaymentSettled`'s rule still holds, which
+     * reads the BALANCE rather than the payment, because a deposit on a wedding
+     * order is not the moment an invoice is paid. So it stamps the orders this
+     * payment actually settled, and only where there is no date already.
+     *
+     * NOTHING ANNOUNCES IT IN THE DIALOG. The report says what happened — "4 of
+     * them settled and now carry a paid date" — which is this app's idiom and
+     * cheaper than a sentence predicting it.
      *
      * A SECOND STATEMENT, and it is allowed to fail on its own: the money is
      * recorded either way, and a paid order with no paid date is a discrepancy
@@ -323,19 +322,17 @@ export function SpecialOrderBatchActions({
      */
     let stamped = 0;
     let stampError: string | null = null;
-    if (payStamp) {
-      const settled = payRows.filter(
-        (r) => !r.invoice_paid_at && r.totals.balance - amountFor(r) <= 0.005
-      );
-      if (settled.length > 0) {
-        const { data: dated, error: dateError } = await supabase
-          .from("special_orders")
-          .update({ invoice_paid_at: payOn })
-          .in("id", settled.map((r) => r.id))
-          .select("id");
-        if (dateError) stampError = dateError.message;
-        else stamped = dated?.length ?? 0;
-      }
+    const settled = payRows.filter(
+      (r) => !r.invoice_paid_at && r.totals.balance - amountFor(r) <= 0.005
+    );
+    if (settled.length > 0) {
+      const { data: dated, error: dateError } = await supabase
+        .from("special_orders")
+        .update({ invoice_paid_at: payOn })
+        .in("id", settled.map((r) => r.id))
+        .select("id");
+      if (dateError) stampError = dateError.message;
+      else stamped = dated?.length ?? 0;
     }
 
     setBusy(null);
@@ -709,8 +706,7 @@ export function SpecialOrderBatchActions({
             setPayAmount("");
             setPayOn(today);
             setPayType(DEFAULT_PAYMENT_TYPE);
-            setPayStamp(true);
-            setPaying(true);
+                    setPaying(true);
           },
           disabled: busy !== null || payable.length === 0,
         },
@@ -765,24 +761,36 @@ export function SpecialOrderBatchActions({
           }
         >
           <div className="space-y-5">
-            {/* THE FIELD AND THE BOX THAT OVERRIDES IT, side by side (Mark,
-                2026-09-20). It was a `TabPicker` between "Paid in full" and
-                "Same amount each" for a few hours; a box beside the field says
-                the same thing in less space, and the field STAYS ON SCREEN
-                while you tick it, which is what makes the override legible
-                rather than a mode you have to remember you are in.
+            {/* ONE FIELD CALLED "AMOUNT", IN TWO PARTS (Mark, 2026-09-20 —
+                third arrangement and the one that reads): a picker that says
+                WHICH amount, and a box that holds it when the answer is a
+                number. It was a `TabPicker` between two modes, then a field
+                with a "Paid in Full" box beside it; both made the choice look
+                like a separate question from the figure it governs, when it is
+                the same question asked one step earlier.
 
-                THE FIELD IS DISABLED, NOT CLEARED, while the box is ticked —
-                untick it and what you typed is still there. It is also why the
-                box carries a visible label rather than only an accessible one:
-                `ui/Checkbox`'s `label` is the ACCESSIBLE name and `children` is
-                what a reader sees, and a box with the first and not the second
-                renders bare (which this dialog shipped with for an afternoon). */}
-            <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-              <label className="block space-y-1.5">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                  Amount
-                </span>
+                THE BOX STAYS ON SCREEN AND GOES GREY, rather than appearing
+                when Other is picked. A control that vanishes takes what you
+                typed with it, and a dialog that changes height under the
+                pointer is the thing `RevealPanel` exists to avoid. Disabled
+                rather than emptied, so picking Paid in Full and changing your
+                mind gives back the figure you had typed. */}
+            <div className="space-y-1.5">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                Amount
+              </span>
+              <div className="flex items-center gap-3">
+                <PickList
+                  value={payFull ? "full" : "other"}
+                  onPick={(next) => setPayFull(next !== "other")}
+                  variant="field"
+                  ariaLabel="How much to record"
+                  options={[
+                    { value: "full", label: "Paid in Full", hint: "each order's own balance" },
+                    { value: "other", label: "Other", hint: "the same figure against each" },
+                  ]}
+                  className="w-44"
+                />
                 <TextInput
                   value={payAmount}
                   onValueChange={setPayAmount}
@@ -790,17 +798,7 @@ export function SpecialOrderBatchActions({
                   aria-label="Amount received on each order"
                   className="w-32"
                   disabled={payFull}
-                  autoFocus
                 />
-              </label>
-              <div className="pb-2">
-                <Checkbox
-                  checked={payFull}
-                  onChange={setPayFull}
-                  label="Record each order's whole outstanding balance"
-                >
-                  Paid in Full
-                </Checkbox>
               </div>
             </div>
 
@@ -828,13 +826,6 @@ export function SpecialOrderBatchActions({
                 />
               </label>
             </div>
-
-            {/* VISIBLE LABEL AS `children`. It had only `label`, which is the
-                ACCESSIBLE name, so it rendered as a bare box that appeared to
-                do nothing — Mark, 2026-09-20. */}
-            <Checkbox checked={payStamp} onChange={setPayStamp}>
-              Set the invoice-paid date on any order this settles
-            </Checkbox>
 
             {/* WHAT IS ABOUT TO HAPPEN, IN ONE SENTENCE, because the two modes
                 differ in a way a total alone would hide: one figure times six

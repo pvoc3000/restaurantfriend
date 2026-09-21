@@ -1934,14 +1934,18 @@
    needs and a row cannot — how much, when, and how it arrived. The date is
    still reachable in bulk through Set Completion Date ▸ Invoice paid, so
    nothing was lost.
-   **AN AMOUNT FIELD AND A "PAID IN FULL" BOX BESIDE IT** (Mark, hours later —
-   it shipped as a `TabPicker` between "Paid in full" and "Same amount each" and
-   that lasted an afternoon). The box says the same thing in less space, and the
-   FIELD STAYS ON SCREEN while you tick it, which is what makes the override
-   legible rather than a mode you have to remember you are in. Disabled, not
-   cleared: untick it and what you typed is still there. **Either an amount
-   above zero or the box ticked**, which is Mark's rule verbatim and is the
-   whole of `payReady`.
+   **"AMOUNT" IS ONE FIELD IN TWO PARTS** — a picker saying WHICH amount (Paid
+   in Full, the default, or Other) and a box holding it when the answer is a
+   number. Third arrangement in a day and the one that reads: it shipped as a
+   `TabPicker` between two modes, then as a field with a "Paid in Full" checkbox
+   beside it, and both made the choice look like a separate question from the
+   figure it governs when it is the same question asked one step earlier (Mark:
+   "a picklist labeled 'Amount' with two options").
+   **THE BOX STAYS ON SCREEN AND GOES GREY** rather than appearing when Other is
+   picked: a control that vanishes takes what you typed with it, and a dialog
+   that changes height under the pointer is what `RevealPanel` exists to avoid.
+   **Either an amount above zero or Paid in Full**, which is Mark's rule
+   verbatim and the whole of `payReady`.
    **A TYPED AMOUNT MUST BE POSITIVE**, where the record's own Payments table
    still takes a negative one — a refund or a correction is a real row. Against
    a SELECTION it would be a credit applied to orders chosen for some other
@@ -1964,14 +1968,21 @@
    differ per row and the write is still a single statement — and a
    half-recorded batch of PAYMENTS is the worst version of a half-finished
    write, because you cannot tell by looking which half landed.
-   **THE DATE FOLLOWS THE MONEY, AS A PRE-TICKED BOX.** On the record,
-   `afterPaymentSettled` offers the invoice-paid date when a payment settles the
-   balance; a selection cannot be asked order by order, so it is asked once in
-   the dialog. It stamps only the orders this payment actually settled and only
-   where there is no date already, which is that function's own rule. It is a
-   SECOND statement and it is allowed to fail on its own: a paid order with no
-   paid date is a discrepancy the record can fix, where a date with no payment
-   is a lie about the books.
+   **THE DATE FOLLOWS THE MONEY, AND IS NOT ASKED ABOUT.** It was a pre-ticked
+   box for an afternoon — the record's `afterPaymentSettled` offer, asked once
+   instead of order by order — and Mark cut it: "I don't understand the need for
+   the 'set the invoice-paid date…' checkbox. That should just be what happens
+   when recording a payment." He is right; it was a choice nobody wants to make
+   twice.
+   **WHAT IT IS NOT is "every payment stamps a date".** `afterPaymentSettled`'s
+   rule still holds and reads the BALANCE rather than the payment, because a
+   deposit on a wedding order is not the moment an invoice is paid — so it
+   stamps the orders this payment actually settled, and only where there is no
+   date already. **Nothing announces it in the dialog**: the report says what
+   happened ("4 of them settled and now carry a paid date"), which is this app's
+   idiom and cheaper than a sentence predicting it. It is a SECOND statement and
+   allowed to fail on its own: a paid order with no paid date is a discrepancy
+   the record can fix, where a date with no payment is a lie about the books.
    **`payment_type` IS ASKED FOR HERE**, where Mark Paid could not ask and so
    wrote nothing — the difference between stamping a date and recording money.
    The vocabulary moved to `lib/specialOrders` as `PAYMENT_TYPE_OPTIONS`, shared
