@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RangePicker } from "@/components/ui/RangePicker";
 import type { DateRange } from "@/lib/dateRange";
+import { kindFilterIsDateless } from "@/lib/specialOrders";
 import {
   DEFAULT_ORDER_RANGE,
   ORDER_RANGE_PRESETS,
@@ -329,6 +330,13 @@ export function SpecialOrdersList({
          * unpicked. Show answers WHEN; a cancelled order still happens on its
          * day, and Status is where you say you do not want to see it.
          */
+        /**
+         * PURELY A DATE TEST, and it stays that way: the Kind menu switches the
+         * whole dimension OFF rather than this closure learning about a second
+         * control — see `visible`. A `FilterDimension` that reads another
+         * dimension's value cannot exist here anyway, because `filters` is
+         * parsed FROM `dimensions` and the two would define each other.
+         */
         matches: (r, v) => inOrderRange(r.event_date, orderRangeBounds(v, today)),
       },
       {
@@ -506,9 +514,31 @@ export function SpecialOrdersList({
     );
   }, [rows, search]);
 
+  /**
+   * THE KIND MENU CAN SWITCH THE DATE WINDOW OFF (Mark, 2026-09-21: "since
+   * templates do not carry dates, selecting them in the Kind filter requires
+   * also changing the 'show' filter to all time. Can the all time filter be
+   * inactive when kind is a standing order or regular order template?").
+   *
+   * A template and a standing order have no `event_date` by design, so asking
+   * for them by name and being shown nothing was the list obeying two controls
+   * that cannot both be satisfied. The DATE gives way, because the Kind menu is
+   * the more specific answer — you asked for the shapes by name.
+   *
+   * DROPPING THE DIMENSION, not changing its value: `filters.view` is left
+   * exactly as it was, so it still travels in the URL and in the view cookie,
+   * and switching Kind back restores the window you were looking at. The
+   * control says so for itself — it reads "All Time" and goes disabled.
+   */
+  const dateless = kindFilterIsDateless(filters.kind ?? "");
   const visible = useMemo(
-    () => applyListFilters(searched, dimensions, filters),
-    [searched, dimensions, filters]
+    () =>
+      applyListFilters(
+        searched,
+        dateless ? dimensions.filter((d) => d.key !== "view") : dimensions,
+        filters
+      ),
+    [searched, dimensions, filters, dateless]
   );
 
   /**
@@ -1035,10 +1065,20 @@ export function SpecialOrdersList({
                   Show
                 </span>
                 <RangePicker
-                  value={orderRangeBounds(filters.view ?? DEFAULT_ORDER_RANGE, today)}
+                  /* "All Time" WHILE IT IS OFF, not the window it would apply.
+                     A disabled control still reading "Upcoming" over a list of
+                     templates would be the screen contradicting itself; null
+                     matches the `all` preset, so the face says what is actually
+                     in force. The STORED value is untouched underneath. */
+                  value={
+                    dateless
+                      ? null
+                      : orderRangeBounds(filters.view ?? DEFAULT_ORDER_RANGE, today)
+                  }
                   onChange={changeRange}
                   presets={ORDER_RANGE_PRESETS}
                   today={today}
+                  disabled={dateless}
                   ariaLabel="Which orders to show"
                   className="w-full"
                 />

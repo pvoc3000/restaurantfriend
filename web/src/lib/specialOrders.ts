@@ -66,6 +66,27 @@ export const ORDER_KIND_FILTERS: {
   { value: "standing_order", label: "Standing Order Templates" },
 ];
 
+/**
+ * DOES THIS KIND FILTER SELECT RECORDS THAT HAVE NO DATE? (Mark, 2026-09-21:
+ * "since templates do not carry dates, selecting them in the Kind filter
+ * requires also changing the 'show' filter to all time. Can the all time filter
+ * be inactive when kind is a standing order or regular order template?")
+ *
+ * Yes, and the fix belongs here rather than in the range: a template and a
+ * standing order have no `event_date` by design — 112's conversion strips it,
+ * and `inOrderRange` has always said "a record with NO event date… is OUT of
+ * every window and IN all time". So asking for them through the Kind menu and
+ * then being shown nothing was the list obeying two controls that cannot both
+ * be satisfied. The one that gives way is the DATE, because the Kind menu is
+ * the more specific answer — you asked for the shapes by name.
+ *
+ * The other two values stay date-bound: `order` and `standing_day` are real
+ * orders and every one of them has a day.
+ */
+export function kindFilterIsDateless(value: string): boolean {
+  return value === "template" || value === "standing_order";
+}
+
 export function matchesKindFilter(
   order: { kind: string; standing_order_id?: string | null },
   value: string

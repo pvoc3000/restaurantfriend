@@ -1903,6 +1903,29 @@
    somebody chose, the verb is the named one with the balance warning attached,
    and it was asked for by name.
 
+   **THE KIND MENU SWITCHES THE DATE WINDOW OFF — 2026-09-21** (Mark: "since
+   templates do not carry dates, selecting them in the Kind filter requires also
+   changing the 'show' filter to all time. Can the all time filter be inactive
+   when kind is a standing order or regular order template?").
+   Yes. A template and a standing order have no `event_date` by design — the
+   conversion strips it and `inOrderRange` has always said a record with none is
+   "OUT of every window and IN all time" — so asking for the shapes by name and
+   being shown nothing was the list obeying two controls that cannot both be
+   satisfied. **The date gives way, because the Kind menu is the more specific
+   answer**: you asked for them by name.
+   **THE DIMENSION IS DROPPED, NOT ITS VALUE CHANGED.** `filters.view` stays
+   exactly as it was, so it still travels in the URL and the view cookie and
+   switching Kind back restores the window you were looking at. The control says
+   so for itself: it reads **All Time** and goes disabled, because a disabled
+   picker still reading "Upcoming" over a list of templates would be the screen
+   contradicting itself.
+   **IT COULD NOT BE A `matches` TEST.** A `FilterDimension` reading another
+   dimension's value cannot exist in this list — `filters` is parsed FROM
+   `dimensions`, so the two would define each other, which the compiler said in
+   as many words. The override lives where the filters are APPLIED instead, and
+   if a second dimension ever wants this, `lib/filterMenus` should grow a way to
+   say it rather than that closure growing a second special case.
+
    **CONVERT INTO AN ORDER TEMPLATE / A STANDING ORDER — 2026-09-20** (Mark:
    "say you made a complicated order that turned out really nice and you'd like
    to be able to redo it later on repeatedly. Selecting 'Convert into an Order
