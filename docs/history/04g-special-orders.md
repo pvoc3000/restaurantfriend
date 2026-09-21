@@ -1922,6 +1922,37 @@
    two facts. **And the PAID chip is now an order's too**: a shape has no
    invoice to have been paid, since the conversion strips the stage dates.
 
+   **AND 113 SILENTLY REVERTED 100 — migration 115, 2026-09-21.** Mark,
+   deleting the template he had just made: "insert or update on table
+   'special_order_events' violates foreign key constraint
+   'special_order_events_order_id_fkey'". Word for word the error 100 exists to
+   kill.
+   **100 PUT A `where exists` GUARD INSIDE `log_special_order_event`**: deleting
+   an order cascades to its lines, each line's AFTER DELETE trigger logs
+   "Removed 12 × Donut", and that insert references an order already gone — so
+   the statement rolls back and the delete fails. Every special order carrying a
+   line was undeletable between 054 and 100.
+   **113 NEEDED A SECOND GUARD IN THE SAME FUNCTION** — a copy suppresses the
+   log for one transaction — and restated the function to add it, FROM 054's
+   TEXT, which predates 100. The `exists` check went with it.
+   **100's OWN HEADER NAMES THIS**: "a migration that restates a function it
+   does not mean to change is how one gets silently reverted". It was written
+   about the two triggers 100 chose not to touch, and it applied to 100 itself.
+   The lesson for next time is narrower than "be careful": before restating any
+   function, `grep` the migrations for its name and start from the LAST
+   definition, not the one the comments send you to.
+   **115 KEEPS BOTH GUARDS**, in the order suppressed → nothing to say → no
+   order to say it about; each is "a state this function knows how to handle",
+   which is 100's argument for putting the check here, and it is why a third one
+   fits without the shape changing. The revoke is restated for the reason 100
+   restated it.
+   **REPRODUCED AND FIXED ON THE HARNESS**, not reasoned about: the stub built
+   from 051's DDL with 100's logger, 112's constraint and 114's copy gave the
+   error verbatim on `delete from special_orders where kind='template'` with 113
+   loaded, and `templates_left = 1`. With 115 loaded the same delete leaves
+   `templates_left = 0`, the copy still logs exactly one entry, and the
+   19-entry, 18-line source order deletes too.
+
    **A COPY CARRIES ONE LINE OF HISTORY — migration 113, APPLIED 2026-09-21 AND
    BROKEN; FIXED BY 114 THE SAME DAY.**
    **113 NEVER RAN.** Mark, having applied it and made a template: "adding item
