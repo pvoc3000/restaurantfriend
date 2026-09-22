@@ -23,6 +23,8 @@ import { test, eq, ok, no } from "./harness";
 import {
   buildDocumentEmail,
   cutoffClause,
+  fillFulfillmentNote,
+  fulfillmentNote,
   documentCc,
   documentFileName,
   documentRecipient,
@@ -36,6 +38,7 @@ import {
   templateVars,
   threadHeaders,
   usDate,
+  usLongDate,
   usTime,
   usWeekday,
   type DocumentLine,
@@ -106,6 +109,10 @@ function order(over: Partial<OrderDocData> = {}): OrderDocData {
     delivery_address: null,
     delivery_tracking: null,
     delivery_boxes: null,
+    delivery_company: null,
+    delivery_company_phone: null,
+    delivery_window_start: null,
+    delivery_window_end: null,
     customer: {
       first_name: "Alexandra",
       last_name: "David",
@@ -358,6 +365,139 @@ test("the DAY-OF CONTACT is cc'd, but only when they are somebody else", () => {
   eq(documentCc(order({ contact_email: null }), "orders@example.com"),
      "orders@example.com");
   eq(documentCc(order({ contact_email: null }), ""), "");
+});
+
+test("usLongDate is FileMaker's wording, and does not slip a day", () => {
+  eq(usLongDate("2026-09-22"), "Tuesday September 22, 2026");
+  eq(usLongDate("2026-09-26"), "Saturday September 26, 2026");
+  // No leading zero on the day, no comma after the weekday, one before the year.
+  eq(usLongDate("2026-01-05"), "Monday January 5, 2026");
+  // The trap this arithmetic exists for: parsed in local time west of
+  // Greenwich, a wall-clock date lands on the day before.
+  eq(usLongDate("2026-03-01"), "Sunday March 1, 2026");
+  eq(usLongDate(null), "");
+  eq(usLongDate("nonsense"), "");
+});
+
+test("{fulfillment_note}: PICKUP, word for word from FileMaker", () => {
+  eq(
+    fulfillmentNote(order({ fulfillment: "pickup", event_date: "2026-09-22", event_time: "09:00:00" }), {},
+      templateVars(order({ fulfillment: "pickup", event_date: "2026-09-22", event_time: "09:00:00" }))),
+    "You have chosen to pick up your order. It will be ready for you anytime " +
+      "after 9:00 AM on Tuesday September 22, 2026."
+  );
+});
+
+test("{fulfillment_note}: DELIVERY, word for word, tracking and all", () => {
+  const o = order({
+    fulfillment: "delivery",
+    event_date: "2026-09-26",
+    delivery_company: "DeliverLA",
+    delivery_company_phone: "(310) 478-8000",
+    delivery_window_start: "16:30:00",
+    delivery_window_end: "18:30:00",
+    delivery_tracking: "1696665",
+  });
+  eq(
+    fulfillmentNote(o, {}, templateVars(o)),
+    "You have chosen to have your order delivered by our delivery partner " +
+      "DeliverLA. It will arrive between 4:30 PM and 6:30 PM on Saturday " +
+      "September 26, 2026. Should you encounter any issues with delivery " +
+      "please call DeliverLA at (310) 478-8000.\n" +
+      "You can reference tracking number 1696665 when you call."
+  );
+});
+
+test("the tracking line DISAPPEARS when there is no tracking number", () => {
+  // 72 of 157 real deliveries since 2025 have none, which is why the line is a
+  // line rather than a clause.
+  const o = order({
+    fulfillment: "delivery",
+    event_date: "2026-09-26",
+    delivery_company: "DeliverLA",
+    delivery_company_phone: "(310) 478-8000",
+    delivery_window_start: "16:30:00",
+    delivery_window_end: "18:30:00",
+    delivery_tracking: null,
+  });
+  const note = fulfillmentNote(o, {}, templateVars(o));
+  no(note.includes("tracking"), "no dangling tracking sentence");
+  ok(note.endsWith("(310) 478-8000."), "and it ends cleanly on the sentence before");
+});
+
+test("a half-known delivery window still reads as a sentence", () => {
+  const win = (from: string | null, to: string | null) => {
+    const o = order({
+      fulfillment: "delivery", event_date: "2026-09-26",
+      delivery_company: "DeliverLA", delivery_company_phone: "(310) 478-8000",
+      delivery_window_start: from, delivery_window_end: to, delivery_tracking: null,
+    });
+    return fulfillmentNote(o, {}, templateVars(o));
+  };
+  ok(win("16:30:00", "18:30:00").includes("between 4:30 PM and 6:30 PM"));
+  ok(win("16:30:00", null).includes("after 4:30 PM"));
+  ok(win(null, "18:30:00").includes("by 6:30 PM"));
+  // Neither end: the line keeps its other value and still reads.
+  ok(win(null, null).includes("It will arrive on Saturday September 26, 2026."),
+     "no double space, no dangling preposition");
+});
+
+test("fillFulfillmentNote drops only the hollow lines", () => {
+  const vars = { a: "A", empty: "" };
+  eq(fillFulfillmentNote("one {a}\ntwo {empty}\nthree", vars), "one A\nthree");
+  // Prose with no placeholders always survives.
+  eq(fillFulfillmentNote("just words", vars), "just words");
+  // A line survives when ANYTHING in it filled, and the hole closes up.
+  eq(fillFulfillmentNote("{a} and {empty}", vars), "A and");
+  // …but a line whose ONLY placeholder is empty is hollow, so it goes entirely
+  // rather than leaving "x  y" behind.
+  eq(fillFulfillmentNote("x {empty} y", vars), "");
+  eq(fillFulfillmentNote("x {a} {empty} y", vars), "x A y");
+  eq(fillFulfillmentNote("ends {a} {empty}.", vars), "ends A.");
+});
+
+test("an org can replace either note, and a blank one falls back", () => {
+  const o = order({ fulfillment: "pickup", event_date: "2026-09-22", event_time: "09:00:00" });
+  eq(
+    fulfillmentNote(o, { special_orders: { fulfillment_note: { pickup: "Come and get it on {event_day}." } } },
+      templateVars(o)),
+    "Come and get it on Tuesday September 22, 2026."
+  );
+  ok(
+    fulfillmentNote(o, { special_orders: { fulfillment_note: { pickup: "   " } } }, templateVars(o))
+      .startsWith("You have chosen to pick up"),
+    "blank means the default, as everywhere else on that screen"
+  );
+});
+
+test("{fulfillment_note} cannot recurse into itself", () => {
+  const o = order({ fulfillment: "pickup", event_date: "2026-09-22", event_time: "09:00:00" });
+  // It is not in the map the note is filled from, so it resolves EMPTY rather
+  // than expanding — and a line whose only placeholder is empty is then
+  // dropped, which is a better thing to send a customer than a raw token.
+  eq(
+    fulfillmentNote(o, { special_orders: { fulfillment_note: { pickup: "x {fulfillment_note} y" } } },
+      templateVars(o)),
+    ""
+  );
+  // Beside real content the line survives, with the hole closed up.
+  eq(
+    fulfillmentNote(o, { special_orders: { fulfillment_note: { pickup: "on {event_day} {fulfillment_note}" } } },
+      templateVars(o)),
+    "on Tuesday September 22, 2026"
+  );
+});
+
+test("{fulfillment_note} reaches a receipt template", () => {
+  const o = order({ fulfillment: "pickup", event_date: "2026-09-22", event_time: "09:00:00" });
+  const email = buildDocumentEmail("receipt", o, {
+    special_orders: { email: { receipt: { body: "Thanks!\n\n{fulfillment_note}" } } },
+  });
+  eq(
+    email.body,
+    "Thanks!\n\nYou have chosen to pick up your order. It will be ready for you " +
+      "anytime after 9:00 AM on Tuesday September 22, 2026."
+  );
 });
 
 test("{employee_name} is the FIRST name of whoever took the order", () => {

@@ -2,7 +2,7 @@ import { Fragment } from "react";
 
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { DEFAULT_TEMPLATES } from "@/lib/specialOrderDocs";
+import { DEFAULT_FULFILLMENT_NOTES, DEFAULT_TEMPLATES } from "@/lib/specialOrderDocs";
 
 /**
  * Everything this module SAYS, in one place a person can edit (Mark,
@@ -65,6 +65,13 @@ const VAR_EXAMPLE: Record<string, string> = {
   first_name: "Alexandra, or “there”",
   full_name: "Alexandra David",
   employee_name: "Traci — whoever took the order, or nothing",
+  fulfillment_note: "the pickup or delivery paragraph below",
+  event_day: "Saturday September 26, 2026",
+  ready_time: "9:00 AM",
+  delivery_company: "DeliverLA",
+  delivery_phone: "(310) 478-8000",
+  delivery_window: "between 4:30 PM and 6:30 PM",
+  tracking: "1696665, or nothing",
   org: "Donut Friend",
   event_date: "8/16/2026",
   event_time: "10:00 AM",
@@ -101,19 +108,19 @@ const TEMPLATES: {
     key: "quote",
     label: "Quote",
     when: "Sent with the quote PDF. {approve_line} is the approval link, and only appears when there is one.",
-    vars: ["number", "title", "title_suffix", "first_name", "full_name", "event_date", "event_time", "event_time_clause", "cutoff_clause", "location", "total", "employee_name", "approve_line"],
+    vars: ["number", "title", "title_suffix", "first_name", "full_name", "event_date", "event_time", "event_time_clause", "cutoff_clause", "location", "total", "employee_name", "fulfillment_note", "approve_line"],
   },
   {
     key: "invoice",
     label: "Invoice",
     when: "Sent with the invoice PDF.",
-    vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "cutoff_clause", "total", "balance", "employee_name"],
+    vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "cutoff_clause", "total", "balance", "employee_name", "fulfillment_note"],
   },
   {
     key: "receipt",
     label: "Receipt",
     when: "Sent with the receipt PDF, once an order is settled.",
-    vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "paid", "employee_name"],
+    vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "paid", "employee_name", "fulfillment_note"],
   },
   {
     key: "order",
@@ -151,6 +158,7 @@ export function SpecialOrderSettings({
   const so = (settings.special_orders ?? {}) as Record<string, unknown>;
   const provider = (so.email_provider ?? {}) as Record<string, unknown>;
   const emails = (so.email ?? {}) as Record<string, { subject?: string; body?: string }>;
+  const fulfillmentNotes = (so.fulfillment_note ?? {}) as Record<string, unknown>;
 
   /** Every cell on this screen writes one key inside `orgs.settings`. */
   const cell = (
@@ -306,6 +314,63 @@ export function SpecialOrderSettings({
             </div>
           );
         })}
+
+        {/* THE TWO PARAGRAPHS `{fulfillment_note}` CHOOSES BETWEEN. They sit
+            with the messages rather than under "What the documents say"
+            because they are message wording, and they are settings rather than
+            a composed token so the words stay where every other word a
+            customer reads is edited. */}
+        <div className="max-w-5xl space-y-2 border-t border-hairline pt-5">
+          <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em]">
+            What {"{fulfillment_note}"} says
+          </h3>
+          <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
+            One of these, depending on the order. A line whose values are all
+            empty is dropped, so an order with no tracking number simply does
+            not get that sentence.
+          </p>
+          <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:gap-10">
+            <dl className="min-w-0 max-w-2xl flex-1 space-y-3">
+              {([
+                ["pickup", "Pickup"] as const,
+                ["delivery", "Delivery"] as const,
+              ]).map(([key, label]) => (
+                <div key={key} className="space-y-1">
+                  <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+                    {label}
+                  </dt>
+                  <dd>
+                    {editable
+                      ? cell(
+                          ["special_orders", "fulfillment_note", key],
+                          text(fulfillmentNotes[key]) ?? DEFAULT_FULFILLMENT_NOTES[key],
+                          { ariaLabel: `${label} note`, multiline: true, boxed: true }
+                        )
+                      : (
+                        <span className="block whitespace-pre-wrap border border-hairline px-1 py-0.5 text-[13px]">
+                          {text(fulfillmentNotes[key]) ?? DEFAULT_FULFILLMENT_NOTES[key]}
+                        </span>
+                      )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <div className="shrink-0 space-y-1 xl:w-72">
+              <p className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+                Field token keys
+              </p>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
+                {["event_day", "ready_time", "delivery_company", "delivery_phone",
+                  "delivery_window", "tracking"].map((v) => (
+                  <Fragment key={v}>
+                    <dt className="whitespace-nowrap text-muted">{`{${v}}`}</dt>
+                    <dd className="text-subtle">{VAR_EXAMPLE[v] ?? ""}</dd>
+                  </Fragment>
+                ))}
+              </dl>
+            </div>
+          </div>
+        </div>
 
         <div className="max-w-2xl space-y-1 border-t border-hairline pt-5">
           <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">

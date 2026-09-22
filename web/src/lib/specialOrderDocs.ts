@@ -132,6 +132,31 @@ export function usWeekday(iso: string | null | undefined): string {
   return WEEKDAY_NAMES[(d.getUTCDay() + 6) % 7];
 }
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/**
+ * `2026-09-26` → `Saturday September 26, 2026` — the form a customer reads in
+ * a sentence, where `9/26/2026` is the form they read in a table.
+ *
+ * FileMaker's own wording, kept to the character: no comma after the weekday,
+ * one before the year. The UTC arithmetic is `usWeekday`'s and for its reason —
+ * a wall-clock date parsed in local time lands on the 25th for everyone west of
+ * Greenwich, which would tell a customer the wrong day.
+ */
+export function usLongDate(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return "";
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (Number.isNaN(d.getTime())) return "";
+  const weekday = WEEKDAY_NAMES[(d.getUTCDay() + 6) % 7];
+  const title = weekday.charAt(0) + weekday.slice(1).toLowerCase();
+  return `${title} ${MONTH_NAMES[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}`;
+}
+
 /** `10:00:00` → `10:00 AM`. A `time` column reads back with seconds. */
 export function usTime(value: string | null | undefined): string {
   if (!value) return "";
@@ -288,6 +313,14 @@ export type OrderDocData = {
   delivery_address: string | null;
   delivery_tracking: string | null;
   delivery_boxes: number | null;
+  /** The courier and its window — what `{fulfillment_note}` reads. Measured
+   *  over 157 deliveries since 2025: company 156, phone 155, both window ends
+   *  155, and TRACKING ONLY 85. That last number is why the note drops a line
+   *  whose values are all empty. */
+  delivery_company: string | null;
+  delivery_company_phone: string | null;
+  delivery_window_start: string | null;
+  delivery_window_end: string | null;
   customer: CustomerName & { phone: string | null; email: string | null } | null;
   location_code: string | null;
   location_name: string | null;
@@ -388,6 +421,8 @@ export async function fetchOrderDocData(
            date_initiated,
            contact_name, contact_phone, contact_email,
            delivery_address, delivery_tracking, delivery_boxes,
+           delivery_company, delivery_company_phone,
+           delivery_window_start, delivery_window_end,
            location_id, kitchen_location_id,
            tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee,
            ignore_balance,
@@ -535,6 +570,10 @@ export async function fetchOrderDocData(
       delivery_address: row.delivery_address as string | null,
       delivery_tracking: row.delivery_tracking as string | null,
       delivery_boxes: row.delivery_boxes as number | null,
+      delivery_company: row.delivery_company as string | null,
+      delivery_company_phone: row.delivery_company_phone as string | null,
+      delivery_window_start: row.delivery_window_start as string | null,
+      delivery_window_end: row.delivery_window_end as string | null,
       customer: row.customers ?? null,
       location_code: pickup?.code ?? null,
       location_name: pickup?.name ?? null,
@@ -832,11 +871,117 @@ export function cutoffClause(
   return cutoff <= today ? "5pm TODAY" : `5pm on ${usDate(cutoff)}`;
 }
 
+/**
+ * `between 4:00 PM and 6:00 PM`, or `after 4:00 PM`, or nothing.
+ *
+ * The connecting words are here rather than in the note so the note reads the
+ * same however much of the window is known — "It will arrive {delivery_window}
+ * on {event_day}" is a sentence with all three shapes, including the empty one.
+ * 155 of 157 real deliveries carry both ends, so the other two branches are
+ * about the two that do not rather than about a common case.
+ */
+function deliveryWindow(order: OrderDocData): string {
+  const from = usTime(order.delivery_window_start);
+  const to = usTime(order.delivery_window_end);
+  if (from && to) return `between ${from} and ${to}`;
+  if (from) return `after ${from}`;
+  if (to) return `by ${to}`;
+  return "";
+}
+
 /** The first word of a name — the given name, or the nickname where the roster
  *  leads with one. Shared so the customer's greeting and the employee's
  *  sign-off cannot come to different conclusions about what a first name is. */
 function firstNameOf(name: string | null | undefined): string {
   return (name ?? "").trim().split(/\s+/)[0] ?? "";
+}
+
+/**
+ * THE TWO FULFILMENT NOTES — the paragraph that reiterates what the customer
+ * chose (Mark, 2026-09-22, with FileMaker's own two messages).
+ *
+ * WHY THESE ARE SETTINGS AND NOT A COMPOSED TOKEN. A flat token cannot BRANCH,
+ * and one receipt template has to say two different things — so the obvious
+ * shortcut is a `{fulfillment_note}` whose wording lives in this file. That
+ * would put a paragraph a customer reads beyond the reach of the screen built
+ * for editing paragraphs customers read, three days after Mark started writing
+ * his own. These are templates like the six above, defaulted to FileMaker's
+ * wording to the character, and overridable in `orgs.settings`.
+ *
+ * A LINE WHOSE PLACEHOLDERS ARE ALL EMPTY IS DROPPED, and only here. The
+ * measurement is the reason: 85 of 157 deliveries since 2025 carry a tracking
+ * number, so a fixed paragraph would tell 46% of customers they can quote
+ * tracking number "" when they call. Putting that sentence on its own line
+ * lets it disappear. The rule is deliberately NOT in `fillTemplate` — a body
+ * losing a line because a figure came out blank is a surprise nobody asked
+ * for, and these two notes are short enough to read the rule off.
+ */
+export const DEFAULT_FULFILLMENT_NOTES: { pickup: string; delivery: string } = {
+  pickup:
+    "You have chosen to pick up your order. It will be ready for you anytime " +
+    "after {ready_time} on {event_day}.",
+  delivery:
+    "You have chosen to have your order delivered by our delivery partner " +
+    "{delivery_company}. It will arrive {delivery_window} on {event_day}. " +
+    "Should you encounter any issues with delivery please call " +
+    "{delivery_company} at {delivery_phone}.\n" +
+    "You can reference tracking number {tracking} when you call.",
+};
+
+/**
+ * Fill one of the notes and drop the lines that came out hollow.
+ *
+ * A line is dropped when it HELD placeholders and every one of them resolved
+ * empty. A line with no placeholders at all is prose and always survives, and
+ * so does a line where anything filled.
+ *
+ * AND THE GAP AN EMPTY ONE LEAVES IS CLOSED. "It will arrive {delivery_window}
+ * on {event_day}" has a space either side of the token, so a delivery with no
+ * window read "It will arrive  on Saturday…" — two spaces, which is the sort
+ * of thing a customer notices and nobody can explain. Runs of spaces collapse
+ * to one and a space before a full stop or comma goes. The cost is that a
+ * deliberate double space inside a note is normalised too; these are assembled
+ * sentences, so that is the right way round.
+ */
+export function fillFulfillmentNote(
+  template: string,
+  vars: Record<string, string>
+): string {
+  return template
+    .split("\n")
+    .filter((line) => {
+      const used = line.match(/\{(\w+)\}/g);
+      if (!used) return true;
+      return used.some((token) => (vars[token.slice(1, -1)] ?? "") !== "");
+    })
+    .map((line) =>
+      fillTemplate(line, vars)
+        .replace(/[ \t]{2,}/g, " ")
+        .replace(/ ([.,;:!?])/g, "$1")
+        .trim()
+    )
+    .join("\n")
+    .trim();
+}
+
+/**
+ * WHICH NOTE THIS ORDER GETS. Anything that is not a delivery is a pickup,
+ * which is the rule the quote's own masthead already prints by.
+ */
+export function fulfillmentNote(
+  order: OrderDocData,
+  orgSettings: Record<string, unknown>,
+  vars: Record<string, string>
+): string {
+  const so = (orgSettings?.special_orders ?? {}) as Record<string, unknown>;
+  const configured = (so.fulfillment_note ?? {}) as Record<string, unknown>;
+  const which = order.fulfillment === "delivery" ? "delivery" : "pickup";
+  const chosen = configured[which];
+  const template =
+    typeof chosen === "string" && chosen.trim() !== ""
+      ? chosen
+      : DEFAULT_FULFILLMENT_NOTES[which];
+  return fillFulfillmentNote(template, vars);
 }
 
 /** The variables every special-order template can use.
@@ -870,6 +1015,18 @@ export function templateVars(
     event_date: usDate(order.event_date),
     event_time: usTime(order.event_time),
     event_time_clause: order.event_time ? ` at ${usTime(order.event_time)}` : "",
+    // The parts the two fulfilment notes are written from. Available in the
+    // ordinary templates too — they are just values.
+    event_day: usLongDate(order.event_date),
+    ready_time: usTime(order.event_time),
+    delivery_company: order.delivery_company ?? "",
+    delivery_phone: order.delivery_company_phone ?? "",
+    delivery_window: deliveryWindow(order),
+    tracking: order.delivery_tracking ?? "",
+    // Filled by `buildDocumentEmail`, which needs the rest of this map to
+    // build it — see there. Empty here so `templateVars` stays a pure read of
+    // the order and can never recurse into itself.
+    fulfillment_note: "",
     cutoff_clause: cutoffClause(order.event_date, today),
     location: order.location_name ?? order.location_code ?? "",
     total: m(order.totals.total),
@@ -948,7 +1105,13 @@ export function buildDocumentEmail(
   const templates = (so.email ?? {}) as Record<string, { subject?: string; body?: string }>;
   const fallback = DEFAULT_TEMPLATES[kind];
   const configured = templates[kind] ?? {};
-  const vars = templateVars(order, extras, today);
+  // TWO PASSES, and the order is the point. The note is itself a template, so
+  // it is filled from the ordinary variables FIRST and only then becomes one —
+  // which is also what makes recursion impossible: `{fulfillment_note}` is not
+  // in the map the note is filled from, so a note containing it prints it
+  // literally rather than eating itself.
+  const base = templateVars(order, extras, today);
+  const vars = { ...base, fulfillment_note: fulfillmentNote(order, orgSettings, base) };
   // BLANK MEANS "USE THE DEFAULT", and it has to mean that here rather than
   // only on the settings screen. That screen has always RENDERED
   // `configured || fallback`, while this read was `configured ?? fallback` —

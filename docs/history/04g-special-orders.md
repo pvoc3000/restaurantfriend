@@ -12,6 +12,44 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-22 — `{fulfillment_note}`, THE PARAGRAPH THAT REITERATES
+   PICKUP OR DELIVERY** (Mark, with FileMaker's own two messages).
+   **A FLAT TOKEN CANNOT BRANCH, and one receipt template has to say two
+   different things.** The shortcut is a token whose wording lives in code —
+   which would put a paragraph a customer reads beyond the reach of the screen
+   built for editing paragraphs customers read, three days after Mark started
+   writing his own. So the two notes are TEMPLATES like the six above, in
+   `orgs.settings.special_orders.fulfillment_note`, defaulted to FileMaker's
+   wording to the character and editable beside the messages.
+   **TWO PASSES, AND THE ORDER IS THE POINT.** The note is itself a template,
+   so it is filled from the ordinary variables FIRST and only then becomes one.
+   That is also what makes recursion impossible: `{fulfillment_note}` is not in
+   the map the note is filled from, so a note naming it resolves empty rather
+   than eating itself — asserted.
+   **A LINE WHOSE PLACEHOLDERS ARE ALL EMPTY IS DROPPED, and the measurement is
+   why.** Of 157 deliveries since 2025, 156 carry a company, 155 a phone and
+   both window ends, and **only 85 a tracking number** — so a fixed paragraph
+   would tell 46% of customers they can quote tracking number "" when they
+   call. That sentence is its own line and disappears. The rule is deliberately
+   NOT in `fillTemplate`: a body losing a line because a figure came out blank
+   is a surprise nobody asked for, and these two notes are short enough to read
+   the rule off.
+   **AND THE GAP AN EMPTY TOKEN LEAVES IS CLOSED**, which the fixtures caught
+   rather than a person: "It will arrive {delivery_window} on {event_day}" has
+   a space either side, so a delivery with no window read "It will arrive  on
+   Saturday…". Runs of spaces collapse and a space before a full stop goes. The
+   cost — a deliberate double space inside a note is normalised — is the right
+   way round for an assembled sentence.
+   `{delivery_window}` carries its own connecting words for the same reason
+   (`between … and …`, `after …`, `by …`, or nothing), so the sentence reads in
+   all four shapes.
+   **`usLongDate` IS UTC ARITHMETIC**, `usWeekday`'s rule: a wall-clock date
+   parsed in local time lands on the day before for everyone west of Greenwich,
+   which here would tell a customer the wrong day for their order.
+   **VERIFIED BY RENDERING, not only by unit test**: both of Mark's messages
+   reproduced word for word through the shipped module (esbuild + Node), plus
+   the no-tracking case ending cleanly on the sentence before.
+
    **Shipped 2026-09-22 — `{employee_name}`, THE FIRST NAME OF WHOEVER IS
    HANDLING THE ORDER** (Mark). The first name only, because a sign-off reads
    "— Traci" and not "— Traci Smith", and the roster leads with the NICKNAME
