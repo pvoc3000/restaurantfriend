@@ -270,6 +270,17 @@ export type OrderDocData = {
   fulfillment: string;
   allergen_info: string | null;
   taken_by: string | null;
+  /**
+   * WHO TO SIGN THE MESSAGE — the linked employee's name where there is one,
+   * FileMaker's text where there is not, and null when the order says neither.
+   *
+   * Two columns and both are right (053): 7,944 migrated orders carry only the
+   * text, and an app-made order carries only the link, because `takenByFields`
+   * clears the text when it has one. A token reading `taken_by` alone would
+   * therefore be empty on every order the app itself created, which is every
+   * order anyone is sending a quote for.
+   */
+  taken_by_name: string | null;
   date_initiated: string | null;
   contact_name: string | null;
   contact_phone: string | null;
@@ -373,7 +384,8 @@ export async function fetchOrderDocData(
         .from("special_orders")
         .select(
           `id, org_id, number, kind, status, title, event_date, event_time,
-           ready_by_time, fulfillment, allergen_info, taken_by, date_initiated,
+           ready_by_time, fulfillment, allergen_info, taken_by, taken_by_employee_id,
+           date_initiated,
            contact_name, contact_phone, contact_email,
            delivery_address, delivery_tracking, delivery_boxes,
            location_id, kitchen_location_id,
@@ -402,7 +414,20 @@ export async function fetchOrderDocData(
     ),
   ];
 
-  const [{ data: lineRows, error: lineError }, { data: payRows }, { data: locRows }] =
+  /**
+   * WHO TOOK IT, THROUGH THE DEFINER — `employees` is owner/admin (020) and
+   * special orders are supervisor+, so the person sending the quote usually
+   * CANNOT read the table that knows the name. `special_order_takers` is
+   * 053's answer and `TakenBy` already uses it: id and name, nothing else.
+   *
+   * Only asked for when some order actually carries a link, so the common
+   * document render costs nothing extra.
+   */
+  const takerIds = [
+    ...new Set(rows.map((r) => r.taken_by_employee_id).filter(Boolean) as string[]),
+  ];
+
+  const [{ data: lineRows, error: lineError }, { data: payRows }, { data: locRows }, takers] =
     await Promise.all([
       supabase
         .from("special_order_items")
@@ -420,8 +445,18 @@ export async function fetchOrderDocData(
       locationIds.length
         ? supabase.from("locations").select("id, code, name").in("id", locationIds)
         : Promise.resolve({ data: [] as { id: string; code: string; name: string }[] }),
+      // NOT `throw`n on failure, unlike its neighbours. Everything else here is
+      // the document; this is one word in a greeting, and refusing to render a
+      // quote because a roster lookup failed would be the wrong trade.
+      takerIds.length
+        ? supabase.rpc("special_order_takers", { p_org_id: rows[0].org_id as string })
+        : Promise.resolve({ data: [] as { id: string; name: string }[] }),
     ]);
   if (lineError) throw new Error(lineError.message);
+
+  const takerNames = new Map(
+    ((takers.data ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name])
+  );
 
   const locations = new Map(
     ((locRows ?? []) as { id: string; code: string; name: string }[]).map((l) => [l.id, l])
@@ -488,6 +523,11 @@ export async function fetchOrderDocData(
       fulfillment: (row.fulfillment as string) ?? "pickup",
       allergen_info: row.allergen_info as string | null,
       taken_by: row.taken_by as string | null,
+      taken_by_name:
+        (row.taken_by_employee_id
+          ? takerNames.get(row.taken_by_employee_id as string)
+          : null) ??
+        (row.taken_by as string | null),
       date_initiated: row.date_initiated as string | null,
       contact_name: row.contact_name as string | null,
       contact_phone: row.contact_phone as string | null,
@@ -792,6 +832,13 @@ export function cutoffClause(
   return cutoff <= today ? "5pm TODAY" : `5pm on ${usDate(cutoff)}`;
 }
 
+/** The first word of a name — the given name, or the nickname where the roster
+ *  leads with one. Shared so the customer's greeting and the employee's
+ *  sign-off cannot come to different conclusions about what a first name is. */
+function firstNameOf(name: string | null | undefined): string {
+  return (name ?? "").trim().split(/\s+/)[0] ?? "";
+}
+
 /** The variables every special-order template can use.
  *
  *  `{full_name}` and `{first_name}` NAME THE RECIPIENT, so they follow
@@ -808,14 +855,18 @@ export function templateVars(
   today?: string | null
 ): Record<string, string> {
   const name = customerContactName(order.customer) || order.contact_name || "";
-  const first = (name || "").trim().split(/\s+/)[0] ?? "";
   const m = (v: number) => `$${v.toFixed(2)}`;
   return {
     number: order.number,
     title: order.title ?? "",
     title_suffix: order.title ? ` — ${order.title}` : "",
-    first_name: first || "there",
+    first_name: firstNameOf(name) || "there",
     full_name: name,
+    // WHO IS HANDLING IT, for signing off (Mark, 2026-09-22). The FIRST name
+    // only: a signature reads "— Traci", not "— Traci Smith", and the roster
+    // leads with the nickname where an employee has one, so somebody who goes
+    // by Bee is Bee here too.
+    employee_name: firstNameOf(order.taken_by_name),
     event_date: usDate(order.event_date),
     event_time: usTime(order.event_time),
     event_time_clause: order.event_time ? ` at ${usTime(order.event_time)}` : "",

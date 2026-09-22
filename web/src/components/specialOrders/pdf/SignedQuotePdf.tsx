@@ -37,6 +37,9 @@ function asDocData(quote: QuoteSnapshot): OrderDocData {
     fulfillment: quote.fulfillment,
     allergen_info: null,
     taken_by: null,
+    // The snapshot is what the CUSTOMER was shown (see `QuoteSnapshot`), and
+    // who took the order was never on it. Nothing in this document reads it.
+    taken_by_name: null,
     date_initiated: null,
     contact_name: quote.contact_name,
     contact_phone: null,

@@ -12,6 +12,43 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-22 — `{employee_name}`, THE FIRST NAME OF WHOEVER IS
+   HANDLING THE ORDER** (Mark). The first name only, because a sign-off reads
+   "— Traci" and not "— Traci Smith", and the roster leads with the NICKNAME
+   where an employee has one, so somebody who goes by Bee is Bee here too.
+   `firstNameOf` is now shared with the customer's greeting, so the two cannot
+   reach different conclusions about what a first name is.
+   **READING `taken_by` WOULD HAVE BEEN EMPTY ON EVERY ORDER THE APP MADE.**
+   053 keeps two columns and both are right — 7,944 migrated orders carry only
+   FileMaker's TEXT, and since 2026-09-21 an app-made order carries only the
+   LINK, because `takenByFields` clears the text when it has one. Confirmed on
+   the live data before writing it: all three linked orders have `taken_by`
+   null. So `OrderDocData` gains `taken_by_name`, which is the linked
+   employee's name where there is one and the text where there is not.
+   **THE NAME COMES THROUGH THE DEFINER, NOT THE TABLE.** `employees` is
+   owner/admin (020) and special orders are supervisor+, so the person sending
+   the quote usually CANNOT read the table that knows the name —
+   `special_order_takers` is 053's answer to exactly this and `TakenBy` already
+   uses it. Asked for only when some order carries a link, and **not thrown on
+   failure**, unlike every other fetch there: the rest is the document, this is
+   one word in a greeting, and refusing to render a quote because a roster
+   lookup failed is the wrong trade.
+   **MEASURED, AND ONE CASE IS WORTH KNOWING: A WEBSITE INQUIRY HAS NO TAKER.**
+   Of 384 orders initiated in 2026, 3 are linked, 376 carry text, and **5 have
+   neither — among them the two live inquiries**, because nobody TOOK an order
+   that arrived by itself. So a quote template signing off with
+   `— {employee_name}` signs off with nothing on precisely the orders the form
+   creates, until somebody sets Taken by. Left empty rather than papered over
+   (the key says "or nothing"); the obvious fallback is the SENDER, who is a
+   signed-in member with a display name and is usually the same person — but
+   that is a different fact from the one Mark asked for, so it is his call.
+   No employee on the roster was inactive, so the roster's active-only rule
+   costs nothing today.
+   **NOT SEEN END TO END** — the pane idle-locked before the compose card could
+   be opened on a linked order. Types, lint and 1,971 fixtures pass, the five
+   token cases included, and the RPC is the same call `TakenBy` already makes
+   on that screen for that role.
+
    **Shipped 2026-09-22 — THE MESSAGE FIELDS HOLD THE DEFAULTS, AND NOTHING
    JUMPS WHEN YOU CLICK INTO ONE.** Two reports, one screen, and they turned
    out to be two separate bugs.

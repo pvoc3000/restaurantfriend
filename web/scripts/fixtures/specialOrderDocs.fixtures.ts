@@ -99,6 +99,7 @@ function order(over: Partial<OrderDocData> = {}): OrderDocData {
     allergen_info: null,
     taken_by: "Traci",
     date_initiated: "2026-08-13",
+    taken_by_name: "Traci Nguyen",
     contact_name: "Alexandra David",
     contact_phone: "(323) 337-7966",
     contact_email: "alexlandayan@gmail.com",
@@ -357,6 +358,19 @@ test("the DAY-OF CONTACT is cc'd, but only when they are somebody else", () => {
   eq(documentCc(order({ contact_email: null }), "orders@example.com"),
      "orders@example.com");
   eq(documentCc(order({ contact_email: null }), ""), "");
+});
+
+test("{employee_name} is the FIRST name of whoever took the order", () => {
+  // The roster leads with the nickname where there is one, so this follows it.
+  eq(templateVars(order()).employee_name, "Traci");
+  eq(templateVars(order({ taken_by_name: "Bee Ferrer" })).employee_name, "Bee");
+  // A one-word name — FileMaker's text is often just this.
+  eq(templateVars(order({ taken_by_name: "Vilma" })).employee_name, "Vilma");
+  // Nobody recorded: empty, which is the honest answer and is what the key
+  // warns about. It does NOT fall back to the customer or the org.
+  eq(templateVars(order({ taken_by_name: null })).employee_name, "");
+  // And it never borrows the customer's first name by accident.
+  no(templateVars(order({ taken_by_name: null })).employee_name === "Alexandra");
 });
 
 test("{cutoff_clause}: 5pm two days before, and never in the past", () => {

@@ -64,6 +64,7 @@ const VAR_EXAMPLE: Record<string, string> = {
   title_suffix: " — Birthday, or nothing",
   first_name: "Alexandra, or “there”",
   full_name: "Alexandra David",
+  employee_name: "Traci — whoever took the order, or nothing",
   org: "Donut Friend",
   event_date: "8/16/2026",
   event_time: "10:00 AM",
@@ -94,25 +95,25 @@ const TEMPLATES: {
       "Sent the moment somebody submits the public form. It also starts the " +
       "email thread — every quote, invoice and receipt for that order replies " +
       "onto this message.",
-    vars: ["number", "first_name", "full_name", "org"],
+    vars: ["number", "first_name", "full_name", "employee_name", "org"],
   },
   {
     key: "quote",
     label: "Quote",
     when: "Sent with the quote PDF. {approve_line} is the approval link, and only appears when there is one.",
-    vars: ["number", "title", "title_suffix", "first_name", "full_name", "event_date", "event_time", "event_time_clause", "cutoff_clause", "location", "total", "approve_line"],
+    vars: ["number", "title", "title_suffix", "first_name", "full_name", "event_date", "event_time", "event_time_clause", "cutoff_clause", "location", "total", "employee_name", "approve_line"],
   },
   {
     key: "invoice",
     label: "Invoice",
     when: "Sent with the invoice PDF.",
-    vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "cutoff_clause", "total", "balance"],
+    vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "cutoff_clause", "total", "balance", "employee_name"],
   },
   {
     key: "receipt",
     label: "Receipt",
     when: "Sent with the receipt PDF, once an order is settled.",
-    vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "paid"],
+    vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "paid", "employee_name"],
   },
   {
     key: "order",
