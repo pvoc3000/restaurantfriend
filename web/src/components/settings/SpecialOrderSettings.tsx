@@ -213,13 +213,28 @@ export function SpecialOrderSettings({
           const fallback = DEFAULT_TEMPLATES[t.key];
           const configured = emails[t.key] ?? {};
           return (
-            <div key={t.key} className="max-w-2xl space-y-2 border-t border-hairline pt-5">
+            /* WIDER THAN EVERY OTHER BLOCK ON THE PAGE, because it is the
+               only one with two columns (Mark, 2026-09-22: "move the token keys
+               to beside the message fields"). The rule spans the block, so it
+               spans the wider block — a hairline stopping short of its own
+               content reads as a mistake. `max-w-5xl` is exactly what the pair
+               needs: the fields keep their 2xl reading width, 40px of gap, and
+               a 288px key. The prose above keeps `max-w-2xl` regardless, since
+               a sentence does not want the extra width. */
+            <div key={t.key} className="max-w-5xl space-y-2 border-t border-hairline pt-5">
               <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em]">
                 {t.label}
               </h3>
-              <p className="text-[13px] leading-relaxed text-muted">{t.when}</p>
+              <p className="max-w-2xl text-[13px] leading-relaxed text-muted">{t.when}</p>
 
-              <dl className="space-y-3">
+              {/* SIDE BY SIDE ONLY WHERE THERE IS ROOM FOR BOTH AT FULL SIZE.
+                  672 + 40 + 288 = 1000, and `xl` with the page's own 48px
+                  gutters leaves 1184 — so nothing is squeezed to achieve it.
+                  Below that it stacks back to exactly what it was, key under
+                  fields, because the alternative is a paragraph field narrowed
+                  to make room for a legend. */}
+              <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:gap-10">
+              <dl className="min-w-0 max-w-2xl flex-1 space-y-3">
                 <div className="space-y-1">
                   <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
                     Subject
@@ -268,7 +283,7 @@ export function SpecialOrderSettings({
                   half-remember and read across; it had them the other way round
                   for one commit, which made the thing you are looking for the
                   faintest text in the block. */}
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
+              <dl className="grid shrink-0 grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px] xl:w-72">
                 {t.vars.map((v) => (
                   <Fragment key={v}>
                     <dt className="whitespace-nowrap text-muted">{`{${v}}`}</dt>
@@ -276,6 +291,7 @@ export function SpecialOrderSettings({
                   </Fragment>
                 ))}
               </dl>
+              </div>
             </div>
           );
         })}

@@ -67,6 +67,19 @@
    **THE TOKEN IS THE DARKER OF THE TWO GREYS** (`muted` 600 for the name,
    `subtle` 500 for the example). It shipped the other way round for one commit,
    which made the column you scan the faintest text in the block.
+   **AND THE KEY SITS BESIDE THE FIELDS, NOT UNDER THEM** (Mark, same day).
+   Under them it was below the fold of the box you were typing in, which is the
+   one place it cannot help. The template block is therefore the only one on the
+   page WIDER than `max-w-2xl` — `max-w-5xl`, which is exactly what the pair
+   needs: 672 of field, 40 of gap, 288 of key. **Its hairline rule widens with
+   it**, because a rule that stops short of its own content reads as a mistake,
+   and the prose above keeps the 2xl reading width regardless.
+   **SIDE BY SIDE ONLY AT `xl`, where both fit at FULL SIZE** — 1000 needed
+   against 1184 available with the page's own gutters, so nothing is squeezed to
+   achieve it. Below that it stacks back to exactly what it was. Measured both:
+   at 1440 the field ends at 912 and the key runs 952–1240 with no page
+   overflow; at 1100 the key sits 8px under the field, the old spacing to the
+   pixel.
    **`{cutoff_clause}` IS FOR "paid in full by {cutoff_clause} for it to be
    placed into our production queue!"** — 5pm two days before the event. Mark
    named two cases; TWO MORE fall out of the same rule and would read as a bug
