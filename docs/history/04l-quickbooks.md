@@ -248,5 +248,20 @@
    `special_order_payments` already owns. The live question there is **ACH on
    wholesale** — Cafe Knotted's ~$1,700 weekly balance costs ~$50 a week in card
    fees — and that belongs with Square, not Intuit.
-
-
+   **`Balance` CANNOT BE NAMED IN A SELECT LIST ON A `VendorCredit`, AND THE
+   FIELD IS NOT MISSING** (2026-09-22, the first credit ever pushed). Check
+   QuickBooks on `/bills` calls `refresh_status` with no ids — over EVERY linked
+   bill at once — so the single credit in the set took the whole sweep down:
+   *"QueryValidationError: Property Balance not found for Entity VendorCredit
+   (fault 4001)"*. QuickBooks' QUERY schema and its RESPONSE schema disagree for
+   this entity. Measured against the real books that day: `select * from
+   VendorCredit` comes back WITH `Balance`, carrying exactly the meaning
+   `balanceOwed` relies on — 38.23 on an unapplied credit, 0 on two applied ones
+   — while naming that same column in a select list is refused. So
+   `refresh_status` asks for a credit WHOLE and keeps the narrow column list for
+   a `Bill`, which is nearly all of the set and would otherwise drag every
+   `Line` back with it. `find_bills` never hit this because it had always used
+   `select *`, which is why LINKING a credit worked and CHECKING one did not —
+   and why the failure waited for the first credit to be adopted.
+   **The general trap: a property QuickBooks RETURNS on a document is not
+   therefore QUERYABLE.** Probe with the `query` mode before naming a column.

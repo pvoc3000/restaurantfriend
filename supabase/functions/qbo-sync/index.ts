@@ -831,7 +831,21 @@ Deno.serve(async (req) => {
             .slice(i, i + 100)
             .map((r) => qboQuote(String(r.external_ref!.qbo!.id)))
             .join(",");
-          const sql = `select Id, DocNumber, TotalAmt, Balance from ${entity} where Id in (${ids}) maxresults 1000`;
+          // `Balance` CANNOT BE NAMED IN A SELECT LIST ON A VendorCredit, and
+          // the failure is a refused query rather than a missing field:
+          // "QueryValidationError: Property Balance not found for Entity
+          // VendorCredit (fault 4001)" (2026-09-22, the first credit ever
+          // pushed — Check QuickBooks on `/bills` re-checks EVERY linked bill
+          // at once, so one credit in the set broke the whole sweep).
+          // QuickBooks' query schema and its response schema disagree here:
+          // `select *` returns Balance on a VendorCredit and returns it with
+          // the meaning `balanceOwed` relies on — measured against the live
+          // books, 38.23 on an unapplied credit and 0 on two applied ones.
+          // So a credit is asked for whole. A Bill keeps the narrow list
+          // because it is nearly all of the set and `select *` drags every
+          // Line back with it.
+          const cols = entity === "VendorCredit" ? "*" : "Id, DocNumber, TotalAmt, Balance";
+          const sql = `select ${cols} from ${entity} where Id in (${ids}) maxresults 1000`;
           const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(sql)}`)) as {
             QueryResponse?: Record<string, Record<string, unknown>[]>;
           };
