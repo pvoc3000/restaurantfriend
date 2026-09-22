@@ -675,7 +675,6 @@ export async function SpecialOrderDetail({
               }
               actions={{
                 scheduled,
-                lineCount: lines.length,
                 id,
                 orgId: row.org_id as string,
                 number: row.number as string,

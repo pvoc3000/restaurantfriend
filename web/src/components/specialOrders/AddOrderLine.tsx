@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
@@ -76,12 +76,15 @@ export function AddOrderLine({
   orgId,
   existing,
   menu,
+  beside,
 }: {
   orderId: string;
   orgId: string;
   existing: OrderLineRow[];
   /** Priced on the server — see `MenuItem`. */
   menu: MenuItem[];
+  /** Drawn right after the Add item button — `OrderLines`' Clear Items. */
+  beside?: ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -282,6 +285,7 @@ export function AddOrderLine({
         >
           Add item
         </button>
+        {beside}
         <button
           type="button"
           className="text-[13px] text-muted underline underline-offset-2 hover:text-ink disabled:opacity-35"

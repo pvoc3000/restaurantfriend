@@ -17,6 +17,7 @@ import { StickyFooter } from "@/components/ui/StickyFooter";
 import { STICKY_HEAD_ROW, useOverflowOnlyWhenNeeded } from "@/lib/tableHead";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { RowMenu } from "@/components/ui/RowMenu";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { AddOrderLine, type MenuItem } from "./AddOrderLine";
 import { isProductionLine, lineTotal, money } from "@/lib/specialOrders";
 import {
@@ -269,6 +270,43 @@ export function OrderLines({
         return;
       }
       router.refresh();
+    });
+  }
+
+  /**
+   * CLEAR ITEMS (Mark, 2026-09-22: "removes all items in a special order"),
+   * beside Add item in the footer — it was on the record's Actions menu for an
+   * hour, and moved here to sit with the command it undoes.
+   *
+   * `remove`, applied to every line in ONE delete, so a refusal leaves the
+   * order as it was rather than half-cleared. Payments, documents and the rest
+   * of the record stay. Not offered once the order is scheduled, because
+   * `canWrite` here is already the record's `canEditItems` (decision 9's lock).
+   * No log line from here — 054's trigger writes "Removed N × …" for each.
+   */
+  async function clearAll() {
+    const n = rows.length;
+    if (
+      !(await confirmDialog({
+        ...splitConfirmMessage(
+          `Remove all ${n} ${n === 1 ? "item" : "items"} from this order?\n\nThe totals recompute without them. Payments, documents and the rest of the order are not touched, and nothing in the catalog is.`
+        ),
+        confirmLabel: "Clear Items",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
+    setError(null);
+    start(async () => {
+      const { data, error: e } = await supabase
+        .from("special_order_items")
+        .delete()
+        .eq("order_id", orderId)
+        .select("id");
+      if (e) setError(e.message);
+      else if (!data?.length) setError("Nothing was removed — the database refused it and said nothing.");
+      else router.refresh();
     });
   }
 
@@ -691,7 +729,24 @@ export function OrderLines({
                   <tr>
                     <td colSpan={canWrite ? 5 : 4} className="py-2 pr-3">
                       {canWrite ? (
-                        <AddOrderLine orderId={orderId} orgId={orgId} existing={ordered} menu={menu} />
+                        <AddOrderLine
+                          orderId={orderId}
+                          orgId={orgId}
+                          existing={ordered}
+                          menu={menu}
+                          beside={
+                            rows.length > 0 ? (
+                              <button
+                                type="button"
+                                className={BUTTON_CLASS}
+                                onClick={() => void clearAll()}
+                                disabled={pending}
+                              >
+                                Clear items
+                              </button>
+                            ) : null
+                          }
+                        />
                       ) : null}
                     </td>
                     <td className="px-3 py-2 text-right align-top font-semibold">Items</td>

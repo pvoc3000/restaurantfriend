@@ -52,7 +52,6 @@ export function OrderActions({
   todo,
   canWrite,
   scheduled,
-  lineCount,
   schedule,
   children,
 }: {
@@ -83,9 +82,6 @@ export function OrderActions({
    * question of the same data rather than of whatever each happened to hold.
    */
   scheduled: boolean;
-  /** How many lines the order has — read by CLEAR ITEMS, which is not offered
-   *  on an order with none, and counts them in its confirm. */
-  lineCount: number;
   /**
    * `<ScheduleProduction>`, composed upstream — `ScheduleDetail` passes
    * `print={<PrintPacket/>}` into `ScheduleActions` the same way. Used only by
@@ -229,43 +225,6 @@ export function OrderActions({
   }
 
   /**
-   * CLEAR ITEMS (Mark, 2026-09-22: "removes all items in a special order") —
-   * the row's own ✕, applied to every line in ONE delete, so a refusal leaves
-   * the order as it was rather than half-cleared. Payments, documents and the
-   * rest of the record stay; the totals recompute from nothing.
-   *
-   * NOT OFFERED ONCE THE ORDER IS SCHEDULED, which is decision 9's lock on the
-   * items read from the other end: the Items tab stops editing them, so a menu
-   * row that emptied them would be a way round it. The history needs no entry
-   * from here — 054's trigger writes "Removed N × …" for each line.
-   */
-  async function clearItems() {
-    const noun = lineCount === 1 ? "item" : "items";
-    if (
-      !(await confirmDialog({
-        ...splitConfirmMessage(
-          `Remove all ${lineCount} ${noun} from ${KIND_COMMAND_NOUN[kind].toLowerCase()} ${number}?\n\nThe totals recompute without them. Payments, documents and the rest of the order are not touched, and nothing in the catalog is.`
-        ),
-        confirmLabel: "Clear Items",
-        tone: "danger",
-      }))
-    ) {
-      return;
-    }
-    setError(null);
-    start(async () => {
-      const { data, error: e } = await supabase
-        .from("special_order_items")
-        .delete()
-        .eq("order_id", id)
-        .select("id");
-      if (e) setError(e.message);
-      else if (!data?.length) setError("Nothing was removed — the database refused it and said nothing.");
-      else router.refresh();
-    });
-  }
-
-  /**
    * THE GUARDS AND THE CONFIRM ARE `lib/specialOrderWrites`', not this
    * component's, and that is the point of the module: the list's `⋯` deletes
    * the same rows, and a delete on this table has three refusals and a message
@@ -393,11 +352,6 @@ export function OrderActions({
         : { label: `Flag ${KIND_COMMAND_NOUN[kind]}…`, onSelect: () => setFlagging(true), disabled: pending },
     ];
     const destructive: ActionMenuItem[] = [
-      // Least to most drastic: the lines, then the order's standing, then the
-      // order itself.
-      ...(!scheduled && lineCount > 0
-        ? [{ label: "Clear Items", onSelect: () => void clearItems(), danger: true, disabled: pending }]
-        : []),
       // LITERAL, unlike its neighbours: this row is gated to `kind === "order"`
       // two lines down, so its noun can only ever be "Order" and interpolating
       // it would suggest a variation that cannot happen.
