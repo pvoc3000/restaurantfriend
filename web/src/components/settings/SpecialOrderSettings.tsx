@@ -1,3 +1,5 @@
+import { Fragment } from "react";
+
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DEFAULT_TEMPLATES } from "@/lib/specialOrderDocs";
@@ -40,6 +42,42 @@ import { DEFAULT_TEMPLATES } from "@/lib/specialOrderDocs";
 
 type Settings = Record<string, unknown>;
 
+/**
+ * WHAT EACH TOKEN PUTS ON THE PAGE (Mark, 2026-09-22: "a key next to the
+ * messages fields would be useful"), having had to ask what
+ * `{event_time_clause}` was — the screen listed the names and said nothing
+ * about any of them.
+ *
+ * AN EXAMPLE, NOT A DESCRIPTION. "The event time with 'at' in front of it, or
+ * nothing when there isn't one" is a sentence you have to parse; ` at 10:00 AM`
+ * is the answer. It is also the shortest the line can be, which is what the
+ * no-hints rule asks for where a line does earn its place — and these earn it,
+ * because what a token produces is the one fact the name cannot show.
+ *
+ * The CLAUSE tokens are the ones worth reading twice: each carries its own
+ * leading space and connecting word so it can vanish completely, which is why
+ * the templates butt them straight against what comes before.
+ */
+const VAR_EXAMPLE: Record<string, string> = {
+  number: "9885",
+  title: "Birthday",
+  title_suffix: " — Birthday, or nothing",
+  first_name: "Alexandra, or “there”",
+  full_name: "Alexandra David",
+  org: "Donut Friend",
+  event_date: "8/16/2026",
+  event_time: "10:00 AM",
+  event_time_clause: " at 10:00 AM, or nothing",
+  cutoff_clause: "5pm on 8/14/2026, or “5pm TODAY”",
+  location: "DONUT FRIEND 01 HIGHLAND PARK",
+  total: "$248.00",
+  subtotal: "$230.00",
+  balance: "$124.00",
+  paid: "$248.00",
+  period: "Sep 14 – Sep 20",
+  approve_line: "the approval link, as its own paragraph — only on a quote that has one",
+};
+
 /** The six messages this module can send, in the order somebody meets them. */
 const TEMPLATES: {
   key: keyof typeof DEFAULT_TEMPLATES;
@@ -62,13 +100,13 @@ const TEMPLATES: {
     key: "quote",
     label: "Quote",
     when: "Sent with the quote PDF. {approve_line} is the approval link, and only appears when there is one.",
-    vars: ["number", "title", "title_suffix", "first_name", "full_name", "event_date", "event_time", "event_time_clause", "location", "total", "approve_line"],
+    vars: ["number", "title", "title_suffix", "first_name", "full_name", "event_date", "event_time", "event_time_clause", "cutoff_clause", "location", "total", "approve_line"],
   },
   {
     key: "invoice",
     label: "Invoice",
     when: "Sent with the invoice PDF.",
-    vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "total", "balance"],
+    vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "cutoff_clause", "total", "balance"],
   },
   {
     key: "receipt",
@@ -199,9 +237,24 @@ export function SpecialOrderSettings({
                 </div>
               </dl>
 
-              <p className="text-[12px] text-subtle">
-                {t.vars.map((v) => `{${v}}`).join(" · ")}
-              </p>
+              {/* The key. A two-track grid rather than a table: the rows are
+                  short, and a `DataTable` here would dress a legend as a list
+                  you can sort. The grid's default stretch already puts a
+                  wrapped example's first line level with its token.
+
+                  THE TOKEN IS THE DARKER OF THE TWO (`muted` is neutral-600,
+                  `subtle` neutral-500). You scan this column for the name you
+                  half-remember and read across; it had them the other way round
+                  for one commit, which made the thing you are looking for the
+                  faintest text in the block. */}
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
+                {t.vars.map((v) => (
+                  <Fragment key={v}>
+                    <dt className="whitespace-nowrap text-muted">{`{${v}}`}</dt>
+                    <dd className="text-subtle">{VAR_EXAMPLE[v] ?? ""}</dd>
+                  </Fragment>
+                ))}
+              </dl>
             </div>
           );
         })}

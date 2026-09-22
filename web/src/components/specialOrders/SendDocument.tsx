@@ -229,15 +229,23 @@ export function SendDocument({
       }
       setSentNote(null);
       setCompose(
-        buildDocumentEmail(k, order, orgSettings, {
-          approve_url: link,
-          // The whole paragraph, so a template that omits `{approve_line}`
-          // simply doesn't offer the link rather than printing a bare URL in
-          // the middle of a sentence.
-          approve_line: link
-            ? `\nYou can review and approve it here — no printing or scanning needed:\n${link}\n`
-            : "",
-        })
+        buildDocumentEmail(
+          k,
+          order,
+          orgSettings,
+          {
+            approve_url: link,
+            // The whole paragraph, so a template that omits `{approve_line}`
+            // simply doesn't offer the link rather than printing a bare URL in
+            // the middle of a sentence.
+            approve_line: link
+              ? `\nYou can review and approve it here — no printing or scanning needed:\n${link}\n`
+              : "",
+          },
+          // `{cutoff_clause}` is the only token that needs to know what day it
+          // is, and this is the org's day rather than the browser's.
+          today
+        )
       );
       setPending({
         order,

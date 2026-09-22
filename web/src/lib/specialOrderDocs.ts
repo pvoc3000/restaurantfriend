@@ -22,6 +22,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  addDays,
   customerContactName,
   isProductionLine,
   orderTotals,
@@ -752,6 +753,45 @@ export function fillTemplate(template: string, vars: Record<string, string>): st
   return template.replace(/\{(\w+)\}/g, (m, key) => (key in vars ? vars[key] : m));
 }
 
+/**
+ * WHEN THE MONEY HAS TO BE IN, as a phrase rather than a date (Mark,
+ * 2026-09-22, for "The order needs to be paid in full by {cutoff_clause} for it
+ * to be placed into our production queue!").
+ *
+ * The cutoff is 5pm TWO DAYS before the event. Two of the four cases Mark named
+ * outright; the other two fall out of the same rule and would read as a bug
+ * without it:
+ *
+ *   · event in 5 days  → "5pm on 9/25/2026"
+ *   · event TOMORROW   → the cutoff was yesterday, so "5pm TODAY"
+ *   · event in 2 days  → the cutoff IS today, so "5pm TODAY" — printing today's
+ *                        own date here is technically true and reads as a
+ *                        machine talking
+ *   · event today, or past → "5pm TODAY", for the same reason as tomorrow
+ *
+ * So the rule is ONE line: the cutoff is never in the past. A date already gone
+ * is not a deadline you can offer somebody.
+ *
+ * NO DATE, NO TODAY → "5pm two days before your event", which is not a fallback
+ * so much as the same sentence with the specifics left out. `{event_time_clause}`
+ * can expand to nothing because it sits at the END of a line; this one sits in
+ * the MIDDLE of Mark's sentence, and an empty expansion would leave "paid in
+ * full by  for it to be placed". An order with no event date is a real state —
+ * every template and standing order, and any lead created before the date was
+ * made compulsory.
+ *
+ * `today` is the ORG's day, passed in (`lib/today`): a browser clock is the
+ * browser's timezone, and this one decides whether a customer is told TODAY.
+ */
+export function cutoffClause(
+  eventDate: string | null | undefined,
+  today?: string | null
+): string {
+  if (!eventDate || !today) return "5pm two days before your event";
+  const cutoff = addDays(eventDate, -2);
+  return cutoff <= today ? "5pm TODAY" : `5pm on ${usDate(cutoff)}`;
+}
+
 /** The variables every special-order template can use.
  *
  *  `{full_name}` and `{first_name}` NAME THE RECIPIENT, so they follow
@@ -762,7 +802,10 @@ export function fillTemplate(template: string, vars: Record<string, string>): st
  *  "Cafe" and is not how you open a letter. */
 export function templateVars(
   order: OrderDocData,
-  extras: Record<string, string> = {}
+  extras: Record<string, string> = {},
+  /** The org's calendar day. Only `{cutoff_clause}` reads it, and without it
+   *  that token says the same thing without the specifics. */
+  today?: string | null
 ): Record<string, string> {
   const name = customerContactName(order.customer) || order.contact_name || "";
   const first = (name || "").trim().split(/\s+/)[0] ?? "";
@@ -776,6 +819,7 @@ export function templateVars(
     event_date: usDate(order.event_date),
     event_time: usTime(order.event_time),
     event_time_clause: order.event_time ? ` at ${usTime(order.event_time)}` : "",
+    cutoff_clause: cutoffClause(order.event_date, today),
     location: order.location_name ?? order.location_code ?? "",
     total: m(order.totals.total),
     balance: m(order.totals.balance),
@@ -845,13 +889,15 @@ export function buildDocumentEmail(
   kind: DocumentKind | "statement",
   order: OrderDocData,
   orgSettings: Record<string, unknown>,
-  extras: Record<string, string> = {}
+  extras: Record<string, string> = {},
+  /** The org's day, for `{cutoff_clause}`. See `templateVars`. */
+  today?: string | null
 ): EmailParts {
   const so = (orgSettings?.special_orders ?? {}) as Record<string, unknown>;
   const templates = (so.email ?? {}) as Record<string, { subject?: string; body?: string }>;
   const fallback = DEFAULT_TEMPLATES[kind];
   const configured = templates[kind] ?? {};
-  const vars = templateVars(order, extras);
+  const vars = templateVars(order, extras, today);
   return {
     to: documentRecipient(order),
     cc: documentCc(order, typeof so.email_cc === "string" ? so.email_cc : ""),

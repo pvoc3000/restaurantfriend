@@ -12,6 +12,49 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-22 — `{cutoff_clause}`, AND THE TEMPLATE TOKENS GET A KEY**
+   (Mark, writing the default customer emails, first asking "what is the
+   {event_time_clause} token?" and then "a key next to the messages fields would
+   be useful").
+   **THE QUESTION WAS THE BUG REPORT.** `/settings` listed the tokens as bare
+   names — `{number} · {title} · {first_name} · …` — and said nothing about any
+   of them, so the one fact a name cannot carry (what it PUTS ON THE PAGE) was
+   the one thing missing. Now each template's list is a two-track `dl` giving
+   **an example, not a description**: `{event_time_clause}` reads
+   ` at 10:00 AM, or nothing`, which is shorter than the sentence explaining it
+   and answers faster. That is the no-hints rule being satisfied rather than
+   bent — "ship a line ONLY if it states a fact the reader cannot see".
+   **THE TOKEN IS THE DARKER OF THE TWO GREYS** (`muted` 600 for the name,
+   `subtle` 500 for the example). It shipped the other way round for one commit,
+   which made the column you scan the faintest text in the block.
+   **`{cutoff_clause}` IS FOR "paid in full by {cutoff_clause} for it to be
+   placed into our production queue!"** — 5pm two days before the event. Mark
+   named two cases; TWO MORE fall out of the same rule and would read as a bug
+   without it, so the implementation is one line — **the cutoff is never in the
+   past**:
+   event in 5 days → "5pm on 9/25/2026" · event TOMORROW → the cutoff was
+   yesterday, so "5pm TODAY" · **event in 2 days → the cutoff IS today, so "5pm
+   TODAY"**, because printing today's own date there is true and reads as a
+   machine talking · event today or past → "5pm TODAY" likewise.
+   **NO EVENT DATE GIVES "5pm two days before your event", which is not a
+   fallback so much as the same sentence with the specifics left out.**
+   `{event_time_clause}` may expand to nothing because it sits at the END of a
+   line; this one sits in the MIDDLE of Mark's, and an empty expansion leaves
+   "paid in full by  for it to be placed". An order with no event date is a real
+   state — every template and standing order, and any lead from before the date
+   was made compulsory.
+   **`today` IS PASSED IN, never read from the clock** (`lib/today`'s rule, and
+   the one token that needs it): a browser's idea of today is the browser's
+   timezone, and this decides whether a customer is told TODAY. `SendDocument`
+   already held it. Absent, the token says the sentence without the date rather
+   than guessing.
+   Fixtures cover both of Mark's cases, both of the derived ones, the month,
+   leap-year and year boundaries (the arithmetic is `addDays`, string-based
+   UTC), and the whole sentence rendered three ways; checked by removing the
+   never-in-the-past clause and watching two go red.
+   **NOT SEEN RENDERED** — the browser pane was PIN-locked at the time, so the
+   key is verified by types, lint and reading, not by eye.
+
    **Shipped 2026-09-21, MIGRATION 117 APPLIED (Mark, 2026-09-22) — A FINISHED
    STAGE CLEARS THE NOTE IT WAS ABOUT** (Mark, answering the question 116 left open:
    "'Respond to Email/Call' should be cleared (along with any flag) if we send
