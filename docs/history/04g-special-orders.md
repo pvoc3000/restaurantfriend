@@ -58,10 +58,16 @@
    different total from the one beside it, which is the drift this file keeps
    warning about.
    **THE SETTINGS FIELD IS A PERCENTAGE NOW** ("Rush fee rate (%)", typed and
-   read as 35 and stored as .35 through `PERCENT_SCALE`), where it said "a
+   read as 30 and stored as .30 through `PERCENT_SCALE`), where it said "a
    fraction — .30 is 30%". All three terms were already editable; only the unit
-   was wrong. **Mark still has to set 30 → 35 himself**, since the value is his
-   policy and not the code's.
+   was wrong.
+   **THE RATE STAYS 30, and the 35 in this module's record is an example rather
+   than a number** (Mark, 2026-09-22: "30 was right. I was wrong earlier"). He
+   said 35% twice while describing the SHAPE he wanted — a percentage floored at
+   $25 — and nothing was ever changed on the strength of it, because the value
+   is org settings and this was always his to type. Read the 35s above as the
+   worked example they were. The fixtures deliberately keep 35% as their test
+   rate: a test that used the live 30 could pass on a default it never set.
    **054's WATCH LIST LEARNED IT**, 055's function reproduced in full with one
    row added — without which a rate change would be the only money edit on the
    record writing no history. Verified in the harness: the column lands, a rate
