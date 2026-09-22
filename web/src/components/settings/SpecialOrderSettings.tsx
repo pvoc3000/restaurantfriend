@@ -389,6 +389,26 @@ export function SpecialOrderSettings({
             is already in the specialorders@ mailbox either way.
           </p>
         </div>
+
+        {/* A SECOND ADDRESS, because it is a different message (Mark,
+            2026-09-22). The one above is Cc'd on documents somebody here
+            chooses to send; this one rides the confirmation the APPROVAL PAGE
+            sends by itself, which nobody is standing over. Empty is not
+            "nobody" here — it is the mailbox the message went out from, which
+            is why the resting word says so. */}
+        <div className="max-w-2xl space-y-1 border-t border-hairline pt-5">
+          <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+            Copy quote approvals to
+          </dt>
+          <dd>
+            {editable
+              ? cell(["special_orders", "approval_cc"], text(so.approval_cc), {
+                  placeholder: "the sending mailbox",
+                  ariaLabel: "Cc on quote approvals",
+                })
+              : <span>{text(so.approval_cc) ?? "the sending mailbox"}</span>}
+          </dd>
+        </div>
       </section>
       {/* ---- the public form ---------------------------------------- */}
       <section className="space-y-4">

@@ -45,6 +45,21 @@ function json(status: number, body: unknown): Response {
   });
 }
 
+/**
+ * `Donut Friend <specialorders@donutfriend.com>` -> `specialorders@donutfriend.com`.
+ *
+ * The display name is dropped rather than carried, and not only for tidiness:
+ * the Resend path splits a Cc field on COMMAS, so a sender ever configured as
+ * `Donut Friend, Inc. <…>` would arrive as two addresses, both malformed. A
+ * bare address cannot be torn in half.
+ */
+function bareAddress(from: string | null | undefined): string | null {
+  const value = (from ?? "").trim();
+  if (!value) return null;
+  const angled = value.match(/<([^>]+)>/);
+  return (angled ? angled[1] : value).trim() || null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -186,9 +201,20 @@ Deno.serve(async (req) => {
       // on Cc. That is what makes it land in the same conversation for both of
       // them, and it means a customer replying "actually, can we make it 11am"
       // reaches somebody rather than an unmonitored no-reply.
+      //
+      // THE MODULE'S OWN MAILBOX BEFORE THE BILLING ONE (Mark, 2026-09-22: "it
+      // should cc specialorders@donutfriend.com"). It was falling all the way
+      // through to `billing.email` — measured on the live org, where
+      // `approval_cc` and `reply_to` are both unset and billing is
+      // info@donutfriend.com — so a quote approval was copied to accounts
+      // while the message it was answering had gone out FROM specialorders@.
+      // The sending mailbox is the one that should see the reply to its own
+      // letter, and reading it off the transport keeps the address in settings
+      // where design rule 2 wants it rather than in this file.
       const internal =
         orgSettings.special_orders?.approval_cc ??
         orgSettings.special_orders?.reply_to ??
+        bareAddress(transport.cfg.from) ??
         orgSettings.billing?.email ??
         null;
 

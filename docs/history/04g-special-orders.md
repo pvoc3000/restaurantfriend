@@ -12,6 +12,32 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-22, NEEDS A REDEPLOY — A QUOTE APPROVAL IS COPIED TO THE
+   MAILBOX IT WAS SENT FROM** (Mark: "it should cc
+   specialorders@donutfriend.com").
+   **THE MECHANISM WAS ALREADY THERE AND THE CONFIGURATION WAS NOT.**
+   `approve-quote` has always sent ONE message — the customer's confirmation
+   with the shop on Cc — resolving that address
+   `approval_cc ?? reply_to ?? billing.email`. Probed the live org before
+   touching anything: **`approval_cc`, `reply_to` and `email_cc` are all
+   unset**, `billing.email` is info@donutfriend.com, and the provider sends as
+   `Donut Friend <specialorders@donutfriend.com>`. So every approval was copied
+   to ACCOUNTS while the letter it answered had gone out from specialorders@.
+   **THE FIX IS A FALLBACK, NOT AN ADDRESS.** The transport's own `from` now
+   comes before the billing address, so the mailbox that wrote the letter sees
+   the reply to it — and the address stays in settings where design rule 2
+   wants it rather than being typed into an edge function. Nothing had to be
+   configured for Donut Friend to get what Mark asked for.
+   **THE DISPLAY NAME IS STRIPPED**, which is not tidiness: `_shared/email.ts`
+   splits a Cc field on COMMAS for the Resend path (as of the same day's cc
+   work), so a sender ever configured as `Donut Friend, Inc. <…>` would have
+   arrived as two malformed addresses. A bare address cannot be torn in half.
+   **AND IT IS EDITABLE NOW** — "Copy quote approvals to" sits beside "Copy
+   every customer message to", because they are different messages: the first
+   rides documents somebody here chose to send, this one rides a confirmation
+   the approval page sends by itself with nobody standing over it. Empty means
+   the sending mailbox, and the resting word says so.
+
    **Shipped 2026-09-22 — `{fulfillment_note}`, THE PARAGRAPH THAT REITERATES
    PICKUP OR DELIVERY** (Mark, with FileMaker's own two messages).
    **A FLAT TOKEN CANNOT BRANCH, and one receipt template has to say two
