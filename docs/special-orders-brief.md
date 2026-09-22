@@ -513,6 +513,14 @@ invoice/payment-link creation), but it is the reason decision 2's
 it later touches the approval page and an edge function — no schema
 surgery, no rework of the money model.
 
+**Amended 2026-09-22 (Mark): the payment half is being built, and on the
+INVOICE, not the approval page.** Square collects, on our own `/pay/[token]`
+page through Square's Web Payments SDK — not a Square invoice or payment
+link, because Square will not let the API pay an invoice it hosts, and the
+invoice is ours. It adds one token table (the quote-token pattern) and no
+change to the money model: a payment is still a `special_order_payments`
+row. See CLAUDE.md's customer-invoices thread and the 04g history.
+
 ### 21. Weekly wholesale statements are one command
 
 Mark bills Cafe Knotted every week for the previous week's orders, by hand.
@@ -1133,16 +1141,18 @@ platform's wheel picker beats a portalled panel.
 
 ## What NOT to build (settled during design)
 
-- **Square API / webhooks** — the invoice is made on Square by hand, v1
+- ~~**Square API / webhooks** — the invoice is made on Square by hand, v1
   records dates. Seam only; approve-and-pay (decision 20) is the named
-  first use of it, post-v1.
+  first use of it, post-v1.~~ **Lifted 2026-09-22** — the pay link (decision
+  20, amended) uses the Payments API now, and a webhook arrives with ACH.
 - **QBO sync** — future; the `external_ref` columns and rows-not-blobs money
   are the preparation.
-- **A customer portal** — no accounts, no order history, no payment page.
-  The customer-facing surface is exactly TWO pages, each doing one thing:
-  the inquiry form (decision 18, open) and the quote-approval page
-  (decision 17, a capability URL). Anything more is a portal, and a portal
-  is not this module.
+- **A customer portal** — no accounts, no order history. ~~no payment page.~~
+  The customer-facing surface is exactly ~~TWO~~ THREE pages, each doing one
+  thing: the inquiry form (decision 18, open), the quote-approval page
+  (decision 17, a capability URL) and, since 2026-09-22, the pay page — the
+  same kind of capability URL, for one invoice. Anything more is a portal, and
+  a portal is not this module.
 - **Delivery-carrier integration** — DeliverLA request/schedule stay links or
   manual; distance stays a hand-entered pair (FMP's Google link can survive
   as a plain href).

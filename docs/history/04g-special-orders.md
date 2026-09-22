@@ -12,6 +12,27 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Decided 2026-09-22 — THE PAY LINK: SQUARE COLLECTS, ON OUR OWN PAGE.**
+   The decision itself is in CLAUDE.md's customer-invoices thread; this is the
+   build plan. Phase 1: the invoice email carries `{pay_line}` → `/pay/[token]`,
+   a public page (the `/q` pattern: token table, anon definer RPCs, an edge
+   function gated through the anon key before it touches service_role) that
+   charges the BALANCE DUE — the customer cannot change the amount — with
+   Square's Web Payments SDK (card, Apple Pay, Google Pay, Square gift card).
+   Edge function `square-pay` computes the amount itself, claims the token for
+   two minutes so two tabs cannot both charge, calls `POST /v2/payments` into
+   the DEDICATED invoiced-sales Square location (`orgs.settings.square_payments`,
+   no `locations` row, so the sales sync never reads it), and records a
+   `special_order_payments` row (`Square Online`, `external_ref` = the Square
+   payment id, unique) through a service_role-only function. Balance = the
+   invoice total snapshotted at send − live Σ payments, so a payment recorded
+   by hand afterwards shrinks what the link charges; re-sending the invoice
+   supersedes the old link, as with quotes. Later phases, in order: ACH + a
+   signed webhook, loyalty (needs a Square Order), a QBO Payment push against
+   the pushed invoice, `customer_invoices`, wholesale autopay from a card or
+   bank on file. This reverses brief decision 20's "NOT BUILT" and the brief's
+   kill-list lines on the Square API and a payment page, both amended there.
+
    **Shipped 2026-09-22, MIGRATION 118 APPLIED (Mark, same day) — A RUSH ORDER
    ARRIVES CARRYING ITS RATE** (Mark: "if you notice the initiated date is less than two
    business days from the event date, automatically apply the rush fee", then,
