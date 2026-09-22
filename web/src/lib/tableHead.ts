@@ -455,7 +455,15 @@ export function useExactViewportHeight(
      */
     const measure = () => {
       const rect = el.getBoundingClientRect();
-      const target = Math.max(minHeight, window.innerHeight - rect.top - spaceBelow(el));
+      // THE TOP IS A DOCUMENT COORDINATE, not a viewport one. `rect.top` falls
+      // as the page scrolls, so a resize measured halfway down a scrolled page
+      // — which on iOS is every swipe, since the URL bar collapsing IS a
+      // resize — would hand back a frame taller than the window by however far
+      // you had scrolled. Unnoticed while every caller fitted the window and
+      // the page never scrolled; `OrderInfoLayout`'s floor makes that a normal
+      // state. Identical arithmetic at the top of the page.
+      const top = rect.top + window.scrollY;
+      const target = Math.max(minHeight, window.innerHeight - top - spaceBelow(el));
       if (Math.abs(parseFloat(el.style.height || "0") - target) > 1) {
         el.style.height = `${target}px`;
       }

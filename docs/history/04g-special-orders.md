@@ -12,6 +12,60 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-21 — THE INFO TAB'S FRAME STOPS PROMISING A HEIGHT IT
+   HASN'T GOT** (Mark: on a small screen "the completion dates are truncated
+   but scrollable, but the 'also that day' section is below the bottom of the
+   screen and unreachable. I think it's the scroll view's fault"). He was
+   right, and the measurement is worth keeping because a flat 420px floor looks
+   like it already covers a short window.
+   **REPRODUCED AT 1400×620 on order #9885 before touching anything.** The
+   frame took its 420px floor; the LEFT column's head — Details, a `shrink-0`
+   grid of sixteen fields — measured **528px on its own**. `flex-1 min-h-0`
+   then resolves the pane under it to **ZERO**, and a zero-height
+   `overflow-y-auto` box does not spill, it CLIPS: "Also that day" was laid out
+   at y=860 in a document 796px tall, so scrolling to the very bottom of the
+   page still could not reach it. The right column's head is 228px, so
+   Completion dates got 128px of its 367px — the truncated-but-scrollable half
+   of the same fault. Two symptoms, one cause, and the page had no extra height
+   to scroll BECAUSE the content was clipped inside the pane rather than
+   overflowing it.
+   **THE FLOOR IS NOW MEASURED FROM THE COLUMNS** (`useColumnFloor`): each
+   column's non-growing children, their gaps, and a pane worth reading. The
+   frame then overflows the window and the PAGE scrolls — which is what this
+   layout already does below `xl`, and is the same promise it makes there:
+   nothing hidden, no pane too short to read. Same case after the fix: frame
+   677.5px, both panes unclipped, "Also that day" fully on screen at the bottom
+   of a 358px scroll.
+   **IT ASKS FOR CONTENT, NOT FOR A CONSTANT, which is what keeps it from
+   putting a scrollbar on screens that never needed one.** A pane's demand is
+   `min(scrollHeight, 160)`, and `scrollHeight` reads the CONTENT while the box
+   is smaller and the BOX once the box is bigger — so the empty "Nothing else
+   is booked" pane asks for its 86px rather than 160, and a pane that already
+   has room asks for exactly what it has. That second half is also why the
+   recurrence settles instead of oscillating: asking for the box you already
+   hold changes nothing. Verified at 1400×620, 1400×420 (the extreme: frame
+   751.5px, the left pane held at the 160 floor, nothing clipped), 1600×1100
+   (frame 799.5px — the available height, NOT the floor, so a tall window is
+   untouched) and 900×620 (stacked, no inline height, panes at their natural
+   size).
+   **THE OBSERVERS WATCH THE CHILDREN, NOT THE COLUMNS.** A column's own height
+   is pinned by the frame, so it does not change when Details grows a line —
+   which is precisely when the floor has to be recomputed, and an inline edit
+   does it.
+   **AND `useExactViewportHeight` NOW MEASURES FROM A DOCUMENT COORDINATE**
+   (`rect.top + scrollY`). `rect.top` falls as you scroll, so a resize fired
+   halfway down a scrolled page returned a frame taller than the window by
+   however far you had scrolled — and on iOS the URL bar collapsing IS a
+   resize. Harmless while every caller fitted the window and the page never
+   scrolled; this change makes page-scrolling a normal state at `xl`, so it had
+   to go. Identical arithmetic at the top of the page. Proved by firing a
+   `resize` at scrollY 358 and watching the height not move.
+   **CHECKED AND NOT CHANGED:** the Notes tab (`OrderSplitLayout`) has no fixed
+   head, so its panes cannot be squeezed to nothing — at 1400×620 they are a
+   real 420px with their own scrollbars, which is the design working. The
+   recipe record, whose two-column frame is this one's ancestor, clips nothing
+   at the same size.
+
    **Shipped 2026-09-21 — A DOCUMENT EMAIL GOES TO THE CUSTOMER, NOT TO THE
    DAY-OF CONTACT** (Mark: "the app is using the day of contact name and info
    rather than the customer name and info. I think the email should go to the

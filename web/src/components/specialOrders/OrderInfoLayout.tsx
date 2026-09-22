@@ -1,6 +1,12 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { useExactViewportHeight, useViewportAtLeast } from "@/lib/tableHead";
 
 /**
@@ -35,6 +41,9 @@ import { useExactViewportHeight, useViewportAtLeast } from "@/lib/tableHead";
  * title and the attention sentence run. Below `xl` the columns stack and the
  * page scrolls, which is the recipe record's rule and the receiving screen's:
  * nothing hidden, and no pane too short to read.
+ *
+ * AND THE SAME PROMISE HOLDS ON A SHORT WINDOW — see `useColumnFloor`, which
+ * is the rest of "nothing hidden" and was missing until 2026-09-21.
  */
 export function OrderInfoLayout({
   topLeft,
@@ -48,13 +57,17 @@ export function OrderInfoLayout({
   bottomRight: ReactNode;
 }) {
   const frame = useRef<HTMLDivElement>(null);
+  const leftColumn = useRef<HTMLDivElement>(null);
+  const rightColumn = useRef<HTMLDivElement>(null);
   // Gated on WIDTH, at the breakpoint the two columns appear. Stacked, a
   // measured height either clips the panes or hands an iPad four short boxes
   // inside a page that scrolls anyway.
   const wide = useViewportAtLeast(1280);
-  // 420, not the 320 default: four panes sharing one screen, and below this the
-  // page scrolling is the honest failure.
-  useExactViewportHeight(frame, wide, 420);
+  // The floor is MEASURED FROM THE COLUMNS, not the 420 constant it used to be
+  // — see `useColumnFloor`. Below this the page scrolling is the honest
+  // failure; above it, nothing changes at all.
+  const floor = useColumnFloor(leftColumn, rightColumn, wide);
+  useExactViewportHeight(frame, wide, floor);
 
   return (
     <div
@@ -79,7 +92,7 @@ export function OrderInfoLayout({
       // loses about 8px and the grouping becomes legible.
       className="flex min-h-0 flex-col gap-10 xl:flex-row xl:gap-24"
     >
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-10 xl:gap-16">
+      <div ref={leftColumn} className="flex min-h-0 min-w-0 flex-1 flex-col gap-10 xl:gap-16">
         <div className="shrink-0">{topLeft}</div>
         <GrowingPane>{bottomLeft}</GrowingPane>
       </div>
@@ -87,12 +100,107 @@ export function OrderInfoLayout({
       {/* 64px between the top and bottom blocks of both columns (Mark,
           2026-09-16: first Customer and Completion dates, then Details and
           Also that day to match). */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-10 xl:gap-16">
+      <div ref={rightColumn} className="flex min-h-0 min-w-0 flex-1 flex-col gap-10 xl:gap-16">
         <div className="shrink-0">{topRight}</div>
         <GrowingPane>{bottomRight}</GrowingPane>
       </div>
     </div>
   );
+}
+
+/** The shortest a growing pane is worth having: a heading and about three
+ *  rows. Under this it shows a heading and a sliver, which is the state that
+ *  reads as a broken screen rather than a full one. */
+const MIN_PANE = 160;
+
+/** What the frame asked for before any of this — four panes on one screen. The
+ *  floor never goes BELOW it, so a tall window behaves exactly as it did. */
+const FRAME_MIN = 420;
+
+/**
+ * HOW SHORT THE FRAME MAY BE, MEASURED FROM THE COLUMNS (Mark, 2026-09-21: on
+ * a small screen "the completion dates are truncated but scrollable, and the
+ * 'also that day' section is below the bottom of the screen and unreachable.
+ * I think it's the scroll view's fault").
+ *
+ * He was right, and the mechanism is worth writing down because a flat 420
+ * looks like it already handles a short window.
+ *
+ * MEASURED on the real record at 1400×620: the frame took its 420px floor, and
+ * the LEFT column's head — Details, a `shrink-0` grid of sixteen fields — was
+ * **528px on its own**. `flex-1 min-h-0` then resolves the pane below it to
+ * **zero**, and a zero-height `overflow-y-auto` box does not spill: it CLIPS.
+ * The content was laid out at y=860 in a document 796px tall, so scrolling to
+ * the very bottom of the page still could not reach it. The right column's
+ * head was 228px, so Completion dates got 128px of its 367px and showed the
+ * truncated-but-scrollable half of the same bug. Two panes, one cause: the
+ * frame promised a height it did not have to give.
+ *
+ * A measured frame is only honest while the fixed parts FIT IN IT, so the
+ * floor is now what the columns actually need: each column's non-growing
+ * children, their gaps, and a pane worth reading. The frame then overflows the
+ * window and THE PAGE SCROLLS — which is what this layout already does below
+ * `xl`, and is the same promise: nothing hidden, no pane too short to read.
+ *
+ * `scrollHeight` RATHER THAN A FLAT `MIN_PANE`, which is what keeps this from
+ * forcing a scrollbar onto screens that never needed one. It reads the pane's
+ * CONTENT while the box is the smaller of the two, and the box once the box is
+ * bigger — so a pane asks for what it holds ("Nothing else is booked" is 86px,
+ * not 160), capped at `MIN_PANE` when it holds more. That second case is also
+ * why this converges rather than oscillating: once a pane is taller than its
+ * content, `scrollHeight` is the box, and asking for the box you already have
+ * changes nothing. Checked against every shape on the tab, including the empty
+ * pane and the 367px date list.
+ *
+ * The observers watch the CHILDREN, not the columns. A column's own height is
+ * pinned by the frame, so it does not change when Details grows a line — which
+ * is exactly when the floor must be recomputed, and an inline edit does it.
+ */
+function useColumnFloor(
+  left: RefObject<HTMLDivElement | null>,
+  right: RefObject<HTMLDivElement | null>,
+  enabled: boolean
+): number {
+  const [measured, setMeasured] = useState(FRAME_MIN);
+
+  useLayoutEffect(() => {
+    if (!enabled) return;
+    const columns = [left.current, right.current].filter(Boolean) as HTMLElement[];
+
+    const measure = () => {
+      let needed = FRAME_MIN;
+      for (const column of columns) {
+        const children = Array.from(column.children) as HTMLElement[];
+        const pane = children.pop();
+        if (!pane) continue;
+        const gap = parseFloat(getComputedStyle(column).rowGap) || 0;
+        const fixed = children.reduce(
+          (total, child) => total + child.getBoundingClientRect().height + gap,
+          0
+        );
+        needed = Math.max(needed, fixed + Math.min(pane.scrollHeight, MIN_PANE));
+      }
+      // The >1px guard the measured height uses, and for its reason: a
+      // sub-pixel difference is the observer reading its own write.
+      setMeasured((was) => (Math.abs(was - needed) > 1 ? needed : was));
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    for (const column of columns) {
+      for (const child of Array.from(column.children)) observer.observe(child);
+    }
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [left, right, enabled]);
+
+  // Not reset in the effect: a stale measurement is simply not returned while
+  // the columns are stacked, and writing state from an effect body to say so
+  // is the cascading render the lint rule is about.
+  return enabled ? measured : FRAME_MIN;
 }
 
 /**
