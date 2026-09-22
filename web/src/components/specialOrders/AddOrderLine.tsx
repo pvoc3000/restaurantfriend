@@ -291,9 +291,6 @@ export function AddOrderLine({
           Add Line
         </button>
         {beside}
-        <span className="text-[12px] text-muted">
-          A hand-typed line carries no production item, so it cannot be scheduled.
-        </span>
         {error && !open ? <p className="w-full text-[13px] text-accent">{error}</p> : null}
       </div>
 
