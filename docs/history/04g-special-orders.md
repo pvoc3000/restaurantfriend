@@ -12,6 +12,16 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-22 — THE PAY PAGE SHOWS ONE LINE, NOT THE ITEMS.** Mark:
+   "we don't need individual line items. let's do one line item with the order
+   number, name, and date." `/pay/{token}` now reads "Order #10070 · Birthday ·
+   9/26/2026" against the invoice TOTAL, then Paid and Amount due; the
+   subtotal/discount/tax/delivery/rush rows and the event block went with the
+   items. "Name" read as the ORDER's title, falling back to the customer's name
+   when there is none — say so if he meant the customer. The attached PDF and
+   the snapshot are unchanged (the snapshot still carries the lines, so going
+   back is a render change only).
+
    **Shipped 2026-09-22, MIGRATION 121 WRITTEN, NOT YET APPLIED — AN INVOICE
    PAID ONLINE MAKES THE ORDER AN ORDER.** Mark, seeing #10070 left at Invoice
    with its paid date stamped: "shouldn't the special order status be set to

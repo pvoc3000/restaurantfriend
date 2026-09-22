@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/specialOrders";
-import { usDate, usTime } from "@/lib/specialOrderDocs";
+import { usDate } from "@/lib/specialOrderDocs";
 import {
   payStateMessage,
   squareScriptUrl,
@@ -328,44 +328,17 @@ export function PayInvoice({ token }: { token: string }) {
         <p className="text-[13px] text-muted">{invoice.org.contactLine}</p>
       </header>
 
-      <section className="space-y-1 border-y-2 border-ink py-4">
-        <p className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-          Invoice #{invoice.number}
-        </p>
-        {invoice.title && <p className="text-[17px] font-semibold">{invoice.title}</p>}
-        <p className="text-[15px]">
-          {usDate(invoice.event_date)}
-          {invoice.event_time ? ` · ${usTime(invoice.event_time)}` : ""}
-        </p>
-        <p className="text-[15px] text-muted">
-          {invoice.fulfillment === "delivery" ? "Delivery" : "Pickup"}
-          {invoice.location_name ? ` · ${invoice.location_name}` : ""}
-        </p>
-      </section>
-
-      <section className="space-y-3">
-        {invoice.lines.map((line, i) => (
-          <div key={i} className="flex items-baseline justify-between gap-4 border-b border-hairline pb-2">
-            <div className="min-w-0">
-              <p className="text-[15px]">{line.name}</p>
-              {line.notes && <p className="text-[13px] text-muted">{line.notes}</p>}
-            </div>
-            <p className="shrink-0 text-[15px] tabular-nums">
-              {line.qty} × {money(line.unit_price)}
-            </p>
-          </div>
-        ))}
-      </section>
-
+      {/* ONE LINE, not the itemisation (Mark, 2026-09-22: "we don't need
+          individual line items. let's do one line item with the order number,
+          name, and date"). The attached PDF still itemises; this page's job is
+          to say WHICH order is being paid and how much, and a customer paying
+          on a phone checks the order, not the dozen donuts. The line carries
+          the invoice TOTAL, so tax, delivery and discounts are inside it. */}
       <section className="space-y-1 text-[15px] tabular-nums">
-        <Total label="Subtotal" value={invoice.totals.subtotal} />
-        {invoice.totals.discount !== 0 && <Total label="Discount" value={-invoice.totals.discount} />}
-        {invoice.totals.tax !== 0 && <Total label="Tax" value={invoice.totals.tax} />}
-        {invoice.totals.deliveryCharge !== 0 && (
-          <Total label="Delivery" value={invoice.totals.deliveryCharge} />
-        )}
-        {invoice.totals.rushFee !== 0 && <Total label="Rush fee" value={invoice.totals.rushFee} />}
-        <Total label="Total" value={state.total} />
+        <div className="flex items-baseline justify-between gap-4 border-y-2 border-ink py-3">
+          <span className="min-w-0">{orderLine(invoice)}</span>
+          <span className="shrink-0">{money(state.total)}</span>
+        </div>
         {state.paid !== 0 && <Total label="Paid" value={-state.paid} />}
         <div className="flex items-baseline justify-between gap-4 border-t-2 border-ink pt-2 text-[19px] font-bold">
           <span>Amount due</span>
@@ -444,6 +417,15 @@ export function PayInvoice({ token }: { token: string }) {
       </section>
     </Shell>
   );
+}
+
+/** "Order #10070 · Birthday · 9/26/2026". The order's own name, or the
+ *  customer's when the order has none; the date is the EVENT's, which is the
+ *  one the customer knows the order by. Parts that are empty drop out. */
+function orderLine(invoice: { number: string; title: string | null; customer_name: string; event_date: string | null }): string {
+  return [`Order #${invoice.number}`, invoice.title || invoice.customer_name, usDate(invoice.event_date)]
+    .filter((part) => part && part.trim() !== "")
+    .join(" · ");
 }
 
 function Total({ label, value }: { label: string; value: number }) {
