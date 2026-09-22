@@ -8,43 +8,28 @@ charged through Square and recorded on the order automatically: a
 id as its reference, and the paid date stamped when the balance reaches zero.
 
 Why it is built this way is in CLAUDE.md's customer-invoices thread (decided
-2026-09-22). In short: Square collects, on our own page, into a Square
-location of its own, so invoiced sales never appear in a shop's daily figures.
+2026-09-22). In short: Square collects, on our own page, and **the money lands
+at the Square location of the shop that makes the order** (migration 120) — the
+order's kitchen, or its pickup shop if the kitchen has no Square location. It
+therefore shows in that shop's Square sales and the nightly journal entry,
+exactly as a hand-sent Square invoice's payment does, so **do not also push a
+pay-link order to QuickBooks as an invoice** — that books it twice.
 
-**Nothing changes until Step 5.** An invoice carries a pay link only once both
-Square ids are filled in on the settings screen.
+**Nothing changes until Step 4.** An invoice carries a pay link only once the
+Square application id is filled in on the settings screen.
 
 ---
 
-## Step 1 — apply migration 119
+## Step 1 — apply migrations 119 and 120
 
-Paste `supabase/migrations/119_pay_link.sql` into the Supabase SQL editor and
-run it. The SQL starts at line 75; everything above that is comment.
+119 is applied. Paste `supabase/migrations/120_pay_link_follows_the_kitchen.sql`
+into the Supabase SQL editor and run it; the SQL starts at line 40.
 
-Check it by running these in the SQL editor:
+Nothing in Square needs creating: DF01 and DF02 already carry their Square
+location ids (each shop's Operations tab on `/locations`), and those are where
+the payments go.
 
-```sql
-select public.pay_by_token('nope');   -- {"state": "unknown"}
-```
-
-## Step 2 — make a Square location for invoiced sales
-
-In the Square dashboard: **Settings → Account & Settings → Business →
-Locations → Create location**. Name it something like `Orders`. Every pay-link
-payment lands here and nowhere else.
-
-**Do not add it to any shop on `/locations`.** `sync-square-sales` only reads
-the Square locations that a shop's Operations tab names, and this one staying
-unnamed is exactly what keeps a $2,000 wedding order out of DF01's Tuesday.
-
-Optionally, point this location's payouts at their own bank account (Square:
-**Balance → Transfers**, per location). That is only needed if you want its
-deposits kept apart as well as its reports.
-
-Copy its **Location ID** (Developer dashboard → your application → Locations,
-or the dashboard's location page). It looks like `L8Y2…`.
-
-## Step 3 — test in the Sandbox first
+## Step 2 — test in the Sandbox first
 
 The `restaurantfriend` application from `docs/square-setup.md` already exists.
 Open it at [developer.squareup.com](https://developer.squareup.com), and with
@@ -52,8 +37,9 @@ the environment toggle on **Sandbox**:
 
 1. Copy the **Sandbox Application ID** (it starts `sandbox-sq0idb-`) and the
    **Sandbox Access token**.
-2. Under **Locations**, copy the sandbox's default location id. The sandbox has
-   its own locations, separate from your real ones.
+2. Under **Locations**, copy the sandbox's default location id. The sandbox is
+   a separate Square account with its own locations, so while the environment
+   is Sandbox every test payment goes there, whichever shop makes the order.
 
 Set the function's secrets. These are separate from `sync-square-sales`'s
 `SQUARE_ACCESS_TOKEN` on purpose: a sandbox token there would silently empty
@@ -80,14 +66,14 @@ npx supabase functions deploy send-special-order-email --project-ref kltxioacvne
 
 Then go to **Settings → General → Online payment (Square)**
 and fill in: Environment **Sandbox**, the sandbox Application ID, and the
-sandbox location id.
+**Sandbox location ID**.
 
 Send yourself an invoice on a test order and pay it with Square's test card:
 **4111 1111 1111 1111**, any future expiry, CVV 111, any ZIP. Square's full
 list of test cards and test gift cards is under "Sandbox payments" in their
 developer docs.
 
-## Step 4 — switch to production
+## Step 3 — switch to production
 
 1. In the application, switch the toggle to **Production** and copy the
    Production Application ID (`sq0idp-…`).
@@ -103,13 +89,14 @@ npx supabase secrets set --project-ref kltxioacvneshbyhxtaj SQUARE_PAY_ENV=produ
 npx supabase secrets set --project-ref kltxioacvneshbyhxtaj SQUARE_PAY_ACCESS_TOKEN='EAAA…'
 ```
 
-   On the settings screen: Environment **Production**, the production
-   Application ID, and the **Orders** location id from Step 2.
+   On the settings screen: Environment **Production** and the production
+   Application ID. The sandbox location id can stay; it is ignored in
+   production.
 
 The environment on the settings screen and `SQUARE_PAY_ENV` must match. A
 sandbox card token sent to production (or the other way round) is declined.
 
-## Step 5 — put the link in the invoice email
+## Step 4 — put the link in the invoice email
 
 **Your saved invoice template does not have the link yet.** It still says
 "You have been sent an online invoice from Square". A saved template takes
@@ -119,7 +106,7 @@ with `{pay_line}`, on its own line. It becomes a short paragraph with the link.
 On an order with nothing owed, or before online payment is set up, it
 disappears.
 
-## Step 6 — Apple Pay (optional; the other methods work without it)
+## Step 5 — Apple Pay (optional; the other methods work without it)
 
 Apple Pay only appears in Safari, and only after the domain is verified:
 
@@ -153,10 +140,12 @@ Google Pay needs no setup.
 
 ## When it goes wrong
 
-- **"Online payment isn't available"** on the page → a Square id is missing on
-  the settings screen, or Square's script could not load.
-- **"This link isn't valid"** on every link → migration 119 is not applied (the
-  browser console says `pay_by_token failed`).
+- **"Online payment isn't available"** on the page → the application id is
+  missing on the settings screen; or the order's kitchen and pickup shop both
+  lack a Square location id (or, in Sandbox, the sandbox location id is
+  empty); or Square's script could not load.
+- **"This link isn't valid"** on every link → the pay link's migrations are not
+  applied (the browser console says `pay_by_token failed`).
 - **The payment went through but the order shows no payment** → the order's
   history has a line starting "Paid online, but…" naming the Square payment
   id. Record that payment by hand with the type `Square Online` and the id as

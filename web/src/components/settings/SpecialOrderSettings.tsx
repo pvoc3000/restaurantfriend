@@ -545,12 +545,16 @@ export function SpecialOrderSettings({
           <Num label="Inquiries accepted per hour, in total" path={["special_orders", "inquiry_max_per_hour"]} v={num(so.inquiry_max_per_hour)} {...{ cell, editable }} />
         </dl>
       </section>
-      {/* ---- the pay link (migration 119) -------------------------------
+      {/* ---- the pay link (migrations 119, 120) --------------------------
           `orgs.settings.square_payments`, outside `special_orders` because
           wholesale invoices will read it too. The ids are PUBLIC by Square's
           design (they sit in every Square checkout's page source); the access
           token is not, and lives only in the `square-pay` function's secrets.
-          Until both ids are filled, no invoice carries a pay link. */}
+          There is NO location here for real payments: since 120 a payment
+          lands at the Square location of the shop that makes the order (Mark,
+          2026-09-22). The sandbox one exists because the sandbox is a
+          separate Square account where DF01's real id does not exist.
+          Until the application id is filled, no invoice carries a pay link. */}
       <section className="space-y-4">
         <SectionHeading>Online payment (Square)</SectionHeading>
         <dl className="grid max-w-2xl grid-cols-[14rem_1fr] gap-x-6 gap-y-1 text-sm">
@@ -575,13 +579,13 @@ export function SpecialOrderSettings({
                 })
               : <span>{text(squarePay.application_id) ?? "—"}</span>}
           </dd>
-          <dt className="py-0.5 text-subtle">Location ID for invoiced sales</dt>
+          <dt className="py-0.5 text-subtle">Sandbox location ID</dt>
           <dd className="py-0.5">
             {editable
-              ? cell(["square_payments", "location_id"], text(squarePay.location_id), {
-                  ariaLabel: "Square location ID for invoiced sales",
+              ? cell(["square_payments", "sandbox_location_id"], text(squarePay.sandbox_location_id), {
+                  ariaLabel: "Square sandbox location ID",
                 })
-              : <span>{text(squarePay.location_id) ?? "—"}</span>}
+              : <span>{text(squarePay.sandbox_location_id) ?? "—"}</span>}
           </dd>
         </dl>
       </section>

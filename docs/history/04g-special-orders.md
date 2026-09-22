@@ -12,7 +12,28 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Shipped 2026-09-22, MIGRATION 119 NOT YET APPLIED, `square-pay` NOT YET
+   **Shipped 2026-09-22, MIGRATION 120 WRITTEN, NOT YET APPLIED — THE PAYMENT
+   LANDS AT THE SHOP THAT MAKES THE ORDER.** Mark, the same day, once 119 was
+   applied: "I don't want to create an 'Orders' location. I think sales should
+   stay with the location that makes the donuts." 120 redefines `pay_by_token`
+   and `claim_pay_token` (in full, arguments unchanged, so 119's grants stand)
+   to charge into `pay_link_square_location(order)`: the KITCHEN's
+   `square_location_id`, then the pickup shop's, else `square: null` and no
+   online payment. Measured over 2026's 386 orders: 380 name a kitchen, 4 of
+   the rest a pickup shop, 2 neither. In SANDBOX every payment goes to
+   `square_payments.sandbox_location_id` instead, since DF01's real id does not
+   exist in Square's sandbox account. `square_payments.location_id` is no longer
+   read and the settings field for it became "Sandbox location ID". Consequence,
+   accepted: these payments are in the kitchen's Square sales, so the nightly
+   journal entry posts them and a pay-link order must NOT be pushed to QBO as an
+   invoice (CLAUDE.md, "What NOT to build"). Verified on a throwaway Postgres
+   with 119 + 120: kitchen DF02 / pickup DF01 → DF02's id; a kitchen with no id
+   → the pickup's; neither → `square: null` and a null claim location (which
+   `square-pay` refuses); sandbox → the sandbox id for every order; the helper
+   refused to anon; still exactly one `pay_by_token` and one `claim_pay_token`.
+   The edge function is unchanged — it already charged `claim.location_id`.
+
+   **Shipped 2026-09-22, MIGRATION 119 APPLIED (Mark, same day), `square-pay` NOT YET
    DEPLOYED, `send-special-order-email` NEEDS A REDEPLOY — THE PAY LINK: SQUARE
    COLLECTS, ON OUR OWN PAGE.** Setup is `docs/square-payments-setup.md`; nothing
    changes for a customer until both Square ids are on Settings → General AND
@@ -34,7 +55,8 @@
    Edge function `square-pay` computes the amount itself, claims the token for
    two minutes so two tabs cannot both charge, calls `POST /v2/payments` into
    the DEDICATED invoiced-sales Square location (`orgs.settings.square_payments`,
-   no `locations` row, so the sales sync never reads it), and records a
+   no `locations` row, so the sales sync never reads it — WITHDRAWN by 120,
+   above), and records a
    `special_order_payments` row (`Square Online`, `external_ref` = the Square
    payment id, unique) through a service_role-only function. Balance = the
    invoice total snapshotted at send − live Σ payments, so a payment recorded

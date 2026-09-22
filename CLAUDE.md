@@ -434,16 +434,23 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   use Square APIs such as PayOrder or CreatePayment to process a payment for an
   order that is associated with an invoice", so a Square invoice can only be
   paid on Square's hosted page. We build the invoice, so the page is ours.
-  (3) **THE SPLIT IS BY REPORTING, NOT BY PROCESSOR.** Invoiced revenue is
-  collected in a DEDICATED SQUARE LOCATION that has no `locations` row, so
-  `sync-square-sales` never reads it and a large special order never inflates a
-  shop's day. Shop sales stay in DF01/DF02. Splitting special orders onto QBO
-  and wholesale onto Square was considered and rejected: both are invoiced, both
-  have due dates and deposits, and one customer buying both would meet two pay
-  pages from one bakery.
+  (3) **THE MONEY LANDS AT THE SHOP THAT MAKES THE ORDER** (Mark, same day,
+  after 119 was applied: "I don't want to create an 'Orders' location. I think
+  sales should stay with the location that makes the donuts"). Migration 120:
+  the order's KITCHEN's `square_location_id`, then its pickup shop's, else no
+  online payment. ~~A dedicated Square location for invoiced sales that the
+  sync never reads~~ was the first plan and is withdrawn — so a pay-link payment
+  IS in that shop's Square sales, `sync-square-sales` reads it and the nightly
+  journal entry posts it, exactly where a hand-sent Square invoice's payment
+  lands today. A large special order now shows in its kitchen's day, on purpose.
+  Splitting special orders onto QBO and wholesale onto Square was considered and
+  rejected: both are invoiced, both have due dates and deposits, and one
+  customer buying both would meet two pay pages from one bakery.
   (4) **Double-counting is set aside, not solved** — Mark: "we'll make sure that
-  doesn't happen". Whatever books this location's revenue in QBO (the planned
-  QBO Payment push against a pushed invoice) must be the ONLY thing that does.
+  doesn't happen". Since (3), the nightly journal entry ALREADY books a
+  pay-link payment as that shop's sales, so the "Square invoice → DO NOT PUSH"
+  rule under "What NOT to build" applies to pay-link orders too: pushing one to
+  QBO as an invoice books its revenue twice.
   Phase 1 is a pay link on today's per-order invoice (balance due; card, Apple
   Pay, Google Pay, gift card); ACH + webhook, loyalty, the QBO Payment push and
   `customer_invoices` follow. Plan: `docs/history/04g-special-orders.md`.
@@ -660,11 +667,10 @@ Bill.com works and `push_invoice` is already the mechanism) → the app's push
 books the revenue, so PUSH. Square invoice → Square's nightly sync books it, so
 DO NOT PUSH. Collected directly by cheque or cash → PUSH. `ignore_balance` is
 the nearest thing to that field today and it only says "by statement".
-**SUPERSEDED 2026-09-22 for new work:** collection moves to Square through the
-app's own pay page, into a Square location the sales sync never reads, so there
-is no "Square's nightly sync books it" for these payments — the app books them.
-The rule above still describes orders collected by a hand-sent Square invoice
-until that habit stops.
+**Since 2026-09-22 the pay link collects through Square too** (migrations 119,
+120), into the Square location of the shop that makes the order — so the nightly
+sync books it exactly as it books a hand-sent Square invoice, and the rule above
+holds for it: DO NOT PUSH a pay-link order to QBO as an invoice.
 **TWO THINGS TO KNOW BEFORE SENDING FROM ANYWHERE BUT THIS APP:**
 `buildInvoicePayload` sends TWO SUMMARY LINES (a tax split, because QBO computes
 the tax and delivery is not taxed), not the itemisation a wholesale customer

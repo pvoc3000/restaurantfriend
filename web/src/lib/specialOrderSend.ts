@@ -219,7 +219,8 @@ export async function bindQuoteSnapshot(
 
 /**
  * Whether an invoice composed now should carry a pay link: online payment is
- * configured (both Square ids), and there is something to pay. An invoice on a
+ * configured (the Square application id — the LOCATION is the kitchen's own,
+ * resolved on the server since migration 120), and there is something to pay. An invoice on a
  * settled or statement-billed order gets no link rather than one that opens on
  * "nothing to pay".
  */
@@ -229,8 +230,7 @@ export function offersPayLink(
 ): boolean {
   const sq = (orgSettings.square_payments ?? {}) as Record<string, unknown>;
   const configured =
-    typeof sq.application_id === "string" && sq.application_id.trim() !== "" &&
-    typeof sq.location_id === "string" && sq.location_id.trim() !== "";
+    typeof sq.application_id === "string" && sq.application_id.trim() !== "";
   return configured && !order.money.ignore_balance && order.totals.balance > 0;
 }
 
