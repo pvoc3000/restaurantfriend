@@ -50,6 +50,21 @@
   escape, with `w-full` passed down — rather than a width class on the
   component. Verified by measuring: editing the low box leaves the input at
   47px and the two beside it exactly where they were.
+- **`InlineValue`'s `scale` AND `format` ARE FUNCTIONS, SO A SERVER COMPONENT
+  CANNOT PASS THEM** (Mark, 2026-09-22, opening org settings after the rush-fee
+  rate became percent-facing: "Functions cannot be passed directly to Client
+  Components unless you explicitly expose it by marking it with 'use server'").
+  Every other caller had always been a `"use client"` file — `OrderTotals` has
+  `scale={PERCENT_SCALE}` and always worked — so the boundary had never been
+  crossed and nothing said it existed. **`tsc` cannot see this and the dev build
+  compiles**; it arrives as a runtime error on the page, which is why it reached
+  Mark rather than the terminal.
+  **The fix is a named client component, not a "use client" on the page**: put
+  the functions on the far side of the line and let only serialisable props
+  cross (`settings/PercentSetting`). Swept the app afterwards — every other file
+  rendering `InlineValue` with `scale`/`format` is already a client component,
+  and the one server-side hit was a different component taking a NUMBER called
+  `scale`.
 - **A CELL IS THE SAME SIZE BEFORE AND AFTER YOU CLICK IT, IN BOTH DIRECTIONS**
   (Mark, 2026-09-22: "clicking into a message to edit it [shouldn't] change the
   size of the field. It's annoying when things jump around"). `InlineValue`

@@ -1,6 +1,8 @@
 import { Fragment } from "react";
 
-import { PERCENT_SCALE, percentLabel, toPercent } from "@/lib/percent";
+import { percentLabel, toPercent } from "@/lib/percent";
+
+import { PercentSetting } from "./PercentSetting";
 
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -531,7 +533,8 @@ export function SpecialOrderSettings({
         <dl className="grid max-w-2xl grid-cols-[1fr_6rem] gap-x-6 gap-y-1 text-sm">
           <Num label="Rush fee applies within (business days)" path={["special_orders", "rush_cutoff_business_days"]} v={num(so.rush_cutoff_business_days)} {...{ cell, editable }} />
           <Num label="Rush fee minimum ($)" path={["special_orders", "rush_minimum"]} v={num(so.rush_minimum)} {...{ cell, editable }} />
-          <Num label="Rush fee rate (%)" path={["special_orders", "rush_rate"]} v={num(so.rush_rate)} percent {...{ cell, editable }} />
+          <Num label="Rush fee rate (%)" path={["special_orders", "rush_rate"]} v={num(so.rush_rate)} percent
+               orgId={orgId} settings={settings} {...{ cell, editable }} />
           <Num label="Chase a quote after (days)" path={["special_orders", "attention_quote_unanswered_days"]} v={num(so.attention_quote_unanswered_days)} {...{ cell, editable }} />
           <Num label="Flag unpaid within (days of the event)" path={["special_orders", "attention_unpaid_within_days"]} v={num(so.attention_unpaid_within_days)} {...{ cell, editable }} />
           <Num label="Flag unprinted within (days of the event)" path={["special_orders", "attention_print_within_days"]} v={num(so.attention_print_within_days)} {...{ cell, editable }} />
@@ -554,6 +557,8 @@ function Num({
   cell,
   editable,
   percent = false,
+  orgId,
+  settings,
 }: {
   label: string;
   path: string[];
@@ -565,19 +570,25 @@ function Num({
    *  same `PERCENT_SCALE` the order's own rate cells use, so the number means
    *  one thing in both places. */
   percent?: boolean;
+  /** Only the percent branch needs these: it renders its own client component
+   *  rather than going through `cell`, because `cell` cannot carry a function
+   *  across the server boundary. See `PercentSetting`. */
+  orgId?: string;
+  settings?: Record<string, unknown>;
 }) {
   return (
     <div className="contents">
       <dt className="py-0.5 text-subtle">{label}</dt>
       <dd className="py-0.5">
-        {editable
-          ? cell(path, v, {
-              kind: "number",
-              align: "right",
-              ariaLabel: label,
-              ...(percent ? { scale: PERCENT_SCALE, format: percentLabel } : {}),
-            })
-          : <span className="tabular-nums">{percent ? percentLabel(toPercent(v ?? 0)) : v ?? "—"}</span>}
+        {!editable ? (
+          <span className="tabular-nums">
+            {percent ? percentLabel(toPercent(v ?? 0)) : (v ?? "—")}
+          </span>
+        ) : percent && orgId && settings ? (
+          <PercentSetting orgId={orgId} path={path} value={v} settings={settings} label={label} />
+        ) : (
+          cell(path, v, { kind: "number", align: "right", ariaLabel: label })
+        )}
       </dd>
     </div>
   );

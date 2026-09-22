@@ -135,6 +135,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 - A CREATE DIALOG ASKS FOR THE FIELDS THE REST OF THE APP READS, AND STOPS
 - A FIXED px WIDTH INSIDE A `DataTable` CELL WILL BE CLIPPED, AND SILENTLY
 - `InlineValue`'s `className` REACHES ITS RESTING BUTTON ONLY, so a width passed to it does not survive the click
+- `InlineValue`'s `scale` AND `format` ARE FUNCTIONS, SO A SERVER COMPONENT CANNOT PASS THEM — `tsc` cannot see it and the page fails at runtime
 - A CELL IS THE SAME SIZE BEFORE AND AFTER YOU CLICK IT, IN BOTH DIRECTIONS — whatever the resting button wears, the Sizer wears
 - EVERY LIST SCREEN'S HEADER IS `ui/PageHeading`. THIS IS THE DEFAULT — a new page uses it without being asked
 - A NAV LABEL AND A PAGE TITLE NEED NOT MATCH
