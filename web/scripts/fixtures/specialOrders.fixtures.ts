@@ -58,6 +58,7 @@ const noMoney: MoneyOrder = {
   tax_rate: null,
   discount_amount: null,
   discount_rate: null,
+  rush_rate: null,
   delivery_charge: null,
   rush_fee: null,
 };

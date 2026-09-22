@@ -66,6 +66,27 @@
    row added — without which a rate change would be the only money edit on the
    record writing no history. Verified in the harness: the column lands, a rate
    change logs "Rush fee (%) set to 0.35", and the whole file re-runs clean.
+   **AND THEN THE FIRST REAL RUSH ORDER SHOWED TWO BLANK BOXES** (Mark, the
+   same day: "I created a new special order for tomorrow, which should have
+   triggered the auto rush fee, but it didn't. The fields are blank").
+   **THE RATE HAD BEEN WRITTEN.** Order 10070, read straight from the table:
+   `date_initiated 2026-09-22`, `event_date 2026-09-23`, **`rush_rate 0.3`**.
+   The creation rule worked on its first real use; the DISPLAY was the bug, and
+   looking at the row rather than the code is what said so in one step.
+   **FIVE HAND-BUILT MONEY OBJECTS HAD NOT BEEN TAUGHT THE COLUMN.** Every
+   SELECT was updated; what was not was the object literals the selects feed —
+   `moneyInputs` on the record, the list's `money`, the document loader's, the
+   list row type, the signed-quote reconstruction. So the record read a rate of
+   `undefined`, `resolveRushFee` fell through to `rush_fee` (null), and both
+   boxes went blank. **This is design rule 1's lesson in a second place**: the
+   rule warns about a copied column LIST, and these are copied column list's
+   younger sibling.
+   **THE REAL FAULT WAS `rush_rate?:`.** It shipped OPTIONAL, reasoned as "so
+   rows written before 118 mean what they meant" — and optional is exactly why
+   `tsc` could not see five omissions. `null` already says "no rate", so the
+   only thing optionality bought was silence. It is REQUIRED now, and the type
+   was checked by deleting one of the five lines again and watching the compiler
+   name both call sites.
    **PROBED LIVE AFTER APPLYING.** The app's own money select — all six columns
    plus `rush_rate` — answers, so no screen is reading a column that is not
    there; 0 orders carry a rate; and the 60-line logger reproduction, which was

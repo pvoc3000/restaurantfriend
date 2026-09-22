@@ -85,6 +85,7 @@ function asDocData(quote: QuoteSnapshot): OrderDocData {
       discount_rate: null,
       delivery_charge: null,
       rush_fee: null,
+      rush_rate: null,
     },
     // The totals travel WHOLE rather than being recomputed. The customer signed
     // these figures; re-deriving them here would mean the artifact could

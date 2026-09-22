@@ -214,6 +214,7 @@ export default async function SpecialOrdersPage({
       discount_rate: raw.discount_rate as number | null,
       delivery_charge: raw.delivery_charge as number | null,
       rush_fee: raw.rush_fee as number | null,
+      rush_rate: raw.rush_rate as number | null,
       ignore_balance: raw.ignore_balance as boolean,
     };
     return {

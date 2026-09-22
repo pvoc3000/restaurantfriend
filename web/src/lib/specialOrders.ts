@@ -343,10 +343,18 @@ export type MoneyOrder = {
    * `rush_fee` is the fee. Mark's rule, 2026-09-22: "either the user facing
    * percentage, or $25, whichever is greater".
    *
-   * Optional, so the 8,167 rows written before 118 — and every fixture and
-   * snapshot built from them — mean exactly what they meant.
+   * REQUIRED, not optional, and that is the whole lesson of 2026-09-22. It
+   * shipped optional "so rows written before 118 mean what they meant" — and
+   * optional meant the compiler could not see that FIVE hand-built money
+   * objects had not been taught the column. The selects all read it; the
+   * literals downstream dropped it; the first real rush order showed two blank
+   * boxes. `null` already says "no rate" perfectly well, so the only thing
+   * optionality bought was silence.
+   *
+   * Design rule 1's lesson in a second place: a value every construction site
+   * must remember is one the type should demand.
    */
-  rush_rate?: number | null;
+  rush_rate: number | null;
   ignore_balance?: boolean | null;
 };
 

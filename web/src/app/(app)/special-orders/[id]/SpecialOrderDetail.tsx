@@ -292,6 +292,7 @@ export async function SpecialOrderDetail({
     discount_rate: row.discount_rate as number | null,
     delivery_charge: row.delivery_charge as number | null,
     rush_fee: row.rush_fee as number | null,
+    rush_rate: row.rush_rate as number | null,
     ignore_balance: Boolean(row.ignore_balance),
   };
   const totals = orderTotals(moneyInputs, lines, payments, settings.rush);

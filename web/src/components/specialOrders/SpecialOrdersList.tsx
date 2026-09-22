@@ -105,6 +105,7 @@ export type SpecialOrderRow = {
   discount_rate: number | null;
   delivery_charge: number | null;
   rush_fee: number | null;
+  rush_rate: number | null;
   ignore_balance: boolean;
 };
 

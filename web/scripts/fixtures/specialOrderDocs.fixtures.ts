@@ -87,6 +87,7 @@ function order(over: Partial<OrderDocData> = {}): OrderDocData {
     discount_rate: null,
     delivery_charge: null,
     rush_fee: null,
+    rush_rate: null,
   };
   return {
     id: "o1",
