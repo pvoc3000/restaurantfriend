@@ -2935,6 +2935,20 @@
    ORDERS, where the word was said twice, and wrong in a menu, where the row has
    to name the noun it makes.
 
+   **A LETTER BOX TAKES SEVERAL LETTERS SINCE 2026-09-22** (Mark: "instead of
+   adding an H, then adding an A, then adding a P… we could instead enter
+   H, A, P"). `parseLetters` in `lib/specialOrderLines`, read by the chooser's
+   row box AND its "Something else" box. **COMMAS SEPARATE AND NOTHING ELSE
+   DOES** — offered splitting `HAPPY` letter by letter, Mark chose "consistency
+   over convenience", so a comma-free entry is one character exactly as before
+   and `OP`, `AB` and `<3` never change meaning. No character in the set is a
+   comma. One line per letter in the order typed, repeats kept (a second P is a
+   second line, the word's sequence being the point), consecutive `sort`
+   numbers, the qty box applied to each, and ONE insert for the whole list so a
+   refusal adds none of the word rather than half. The row box lost its
+   3-character cap and widened to `w-40`. Fixtures cover the space-is-not-a-
+   separator rule and were checked by splitting on whitespace too (one red).
+
    **AND SHOW IS A RANGEPICKER — 2026-09-20** (Mark: "convert the show picklist
    to a rangepicker"). With the two non-time options gone to Status, what was
    left of that menu was four words for date windows, and the app already has a
