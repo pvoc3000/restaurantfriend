@@ -180,13 +180,35 @@ export function SpecialOrderSettings({
       <section className="space-y-6">
         <SectionHeading count={TEMPLATES.length}>Messages we send</SectionHeading>
         <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
-          Each box shows the wording that is used when you have not set your
-          own. <strong>Clear a box to go back to it.</strong> Anything in curly
-          braces is filled in when the message is sent; a name we do not
+          Each box holds the wording that will be sent.{" "}
+          <strong>Clear one to go back to our default.</strong> Anything in
+          curly braces is filled in when the message is sent; a name we do not
           recognise is left on the page as you typed it, so a typo is visible
           rather than swallowed.
         </p>
 
+        {/* THE FIELD HOLDS THE DEFAULT, IT DOES NOT HINT AT IT (Mark,
+            2026-09-22: "These placeholder texts are almost indistinguishable
+            from actual text, so the impulse is to be able to click into the
+            field and edit it, but when we do the text disappears since it's
+            just placeholder").
+            He is describing the failure exactly. A grey nine-line paragraph
+            that reads like the message IS the message as far as anyone can
+            tell, so clicking it is the obvious move — and clicking emptied the
+            box, which is both a shock and a nine-line-to-two-line jump.
+            It is also the placeholder convention being applied rather than
+            bent: a default that will really be sent is a LIVE value, like the
+            payment box resting at the outstanding balance, not example text.
+            Live values belong in the field.
+            NOTHING IS WRITTEN BY LOOKING. `InlineValue.write` returns early
+            when the draft matches the value it was given, so clicking in and
+            out of an untouched default saves nothing and the org stays on the
+            default — including any later improvement to it. Only typing pins
+            the wording to this org.
+            AND CLEARING IS THE WAY BACK. An emptied cell writes null, the
+            fallback resolves again, and the default reappears — which is the
+            honest answer, since a template with no words is not a thing that
+            can be sent. */}
         {TEMPLATES.map((t) => {
           const fallback = DEFAULT_TEMPLATES[t.key];
           const configured = emails[t.key] ?? {};
@@ -204,11 +226,11 @@ export function SpecialOrderSettings({
                   </dt>
                   <dd>
                     {editable
-                      ? cell(["special_orders", "email", t.key, "subject"], text(configured.subject), {
-                          placeholder: fallback.subject,
-                          ariaLabel: `${t.label} subject`,
-                          boxed: true,
-                        })
+                      ? cell(
+                          ["special_orders", "email", t.key, "subject"],
+                          text(configured.subject) ?? fallback.subject,
+                          { ariaLabel: `${t.label} subject`, boxed: true }
+                        )
                       : (
                         <span className="block whitespace-pre-wrap border border-hairline px-1 py-0.5 text-[13px]">
                           {configured.subject || fallback.subject}
@@ -222,12 +244,11 @@ export function SpecialOrderSettings({
                   </dt>
                   <dd>
                     {editable
-                      ? cell(["special_orders", "email", t.key, "body"], text(configured.body), {
-                          placeholder: fallback.body,
-                          ariaLabel: `${t.label} body`,
-                          multiline: true,
-                          boxed: true,
-                        })
+                      ? cell(
+                          ["special_orders", "email", t.key, "body"],
+                          text(configured.body) ?? fallback.body,
+                          { ariaLabel: `${t.label} body`, multiline: true, boxed: true }
+                        )
                       : (
                         <span className="block min-h-16 whitespace-pre-wrap border border-hairline px-1 py-0.5 text-[13px]">
                           {configured.body || fallback.body}

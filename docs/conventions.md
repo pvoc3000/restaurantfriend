@@ -50,6 +50,22 @@
   escape, with `w-full` passed down — rather than a width class on the
   component. Verified by measuring: editing the low box leaves the input at
   47px and the two beside it exactly where they were.
+- **A CELL IS THE SAME SIZE BEFORE AND AFTER YOU CLICK IT, IN BOTH DIRECTIONS**
+  (Mark, 2026-09-22: "clicking into a message to edit it [shouldn't] change the
+  size of the field. It's annoying when things jump around"). `InlineValue`
+  knows this — its `Sizer` exists for it and says so — but it has now been
+  broken twice, once per axis, and both times by the editing state wearing
+  something the resting button does not. Width, 2026-09-03: `className` reaches
+  the resting button only. **Height, 2026-09-22: the Sizer was
+  `whitespace-pre` while the button was `whitespace-pre-wrap`**, so it laid a
+  paragraph out as one unwrapped line and counted the newlines but none of the
+  wrapping. Measured on the quote template at 410px wide: **546px at rest,
+  321px editing — a 225px collapse** the moment you clicked in. Every long note
+  in the app had it; a short one has no wrapping to lose, which is why it sat
+  there. **The rule to apply when touching either state: whatever the resting
+  button wears, the Sizer wears** — box, min-height, alignment AND whitespace.
+  Verified by measuring both states of all eight message fields and the order
+  record's five notes: 0px on both axes.
 - **EVERY LIST SCREEN'S HEADER IS `ui/PageHeading`. THIS IS THE DEFAULT — a new
   page uses it without being asked** (Mark, 2026-09-03: "I like this the best
   and think we should copy it to the other sections of the app", then "make a

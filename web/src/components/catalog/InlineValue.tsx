@@ -252,7 +252,23 @@ function Sizer({
   return (
     <span
       aria-hidden
-      className={`invisible whitespace-pre ${INLINE_BOX} ${
+      // `whitespace-pre-wrap` FOR A NOTE, `pre` FOR A LINE — the resting button's
+      // own rule (Mark, 2026-09-22: "clicking into a message to edit it
+      // [shouldn't] change the size of the field. It's annoying when things
+      // jump around").
+      //
+      // `pre` alone was the last thing left differing between the two states,
+      // and it only shows on text that WRAPS: the sizer laid each paragraph out
+      // as one unwrapped line, so it counted the newlines and none of the
+      // wrapping. Measured on the quote template, 410px wide — resting 546px,
+      // editing 321px, a 225px collapse the moment you clicked in. Every long
+      // note in the app had it, not just this screen; a short one has no
+      // wrapping to lose, which is why it went unnoticed.
+      //
+      // The WIDTH fallback the editing branch depends on is unharmed: with no
+      // definite width to resolve against, a max-content measurement does not
+      // wrap, so `pre-wrap` is `pre` exactly where that matters.
+      className={`invisible ${multiline ? "whitespace-pre-wrap" : "whitespace-pre"} ${INLINE_BOX} ${
         boxed && !multiline ? "" : "block"
       } ${restLook(boxed, multiline, align, rows)} ${
         align === "right" ? "text-right tabular-nums" : "text-left"

@@ -441,6 +441,24 @@ test("a configured template overrides the generic one, per document", () => {
   );
 });
 
+test("a BLANK stored template falls back to the default, never sends empty", () => {
+  // The settings screen has always rendered `configured || fallback`; this read
+  // was `??`, so a stored "" showed the default and sent nothing. Since the
+  // fields hold the defaults, clearing one IS the way back to them — so the two
+  // reads have to agree.
+  const blank = { special_orders: { email: { quote: { subject: "", body: "   " } } } };
+  const email = buildDocumentEmail("quote", order(), blank);
+  eq(email.subject, "Your quote #9885 — Pregnanacy Revela 8/16/2026");
+  ok(email.body.includes("Thanks for your order!"), "the default body came back");
+  // A real override still wins, including one that is only whitespace-padded.
+  eq(
+    buildDocumentEmail("quote", order(), {
+      special_orders: { email: { quote: { subject: " Hello " } } },
+    }).subject,
+    " Hello "
+  );
+});
+
 test("threading headers exist only where there is something to thread onto", () => {
   eq(threadHeaders({ inbound_message_id: null }), null);
   eq(threadHeaders({}), null);

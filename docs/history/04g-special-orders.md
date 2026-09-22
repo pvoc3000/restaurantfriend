@@ -12,6 +12,46 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-22 — THE MESSAGE FIELDS HOLD THE DEFAULTS, AND NOTHING
+   JUMPS WHEN YOU CLICK INTO ONE.** Two reports, one screen, and they turned
+   out to be two separate bugs.
+   **(a) THE PLACEHOLDER WAS INDISTINGUISHABLE FROM THE MESSAGE** (Mark: "the
+   impulse is to be able to click into the field and edit it, but when we do
+   the text disappears since it's just placeholder"). A grey nine-line
+   paragraph that reads like the message IS the message as far as anyone can
+   tell. The fields now HOLD the default — `text(configured) ?? fallback` — and
+   that is the placeholder convention applying rather than bending: a default
+   that will really be sent is a LIVE value, like the payment box resting at
+   the outstanding balance, not example text.
+   **NOTHING IS WRITTEN BY LOOKING**, which is what makes it safe:
+   `InlineValue.write` returns early when the draft matches the value it was
+   given, so clicking in and out of an untouched default saves nothing and the
+   org stays ON the default, later improvements included. Only typing pins the
+   wording. **CLEARING IS THE WAY BACK** — an emptied cell writes null and the
+   fallback resolves again.
+   **WHICH MADE AN OLD MISMATCH LOAD-BEARING.** The settings screen has always
+   rendered `configured || fallback`; `buildDocumentEmail` read
+   `configured ?? fallback`. A stored empty string therefore showed the default
+   on screen and would have sent a mail with NO SUBJECT. Nothing writes one
+   today (an emptied cell becomes null), which is why it never happened — but
+   once clearing is the documented way back to a default, the two reads have to
+   agree. They do now.
+   **(b) THE FIELD COLLAPSED ON CLICK, AND IT WAS NOT THIS SCREEN'S FAULT**
+   (Mark: "It's annoying when things jump around"). Measured before touching
+   anything: the quote body at 410px wide was **546px at rest and 321px
+   editing**. `InlineValue`'s `Sizer` exists precisely to stop this and carries
+   a comment saying so — but it was `whitespace-pre` while the resting button
+   is `whitespace-pre-wrap`, so it laid each paragraph out as ONE UNWRAPPED
+   LINE and counted the newlines and none of the wrapping. **Every long note in
+   the app had it**; a short one has no wrapping to lose, which is why it sat
+   there unnoticed. One word fixed it, and the width fallback the editing
+   branch depends on is unharmed — a max-content measurement does not wrap, so
+   `pre-wrap` is `pre` exactly where that matters.
+   **Verified by measuring both states**: all eight message fields and the
+   order record's five notes, 0px on both axes. It is now a convention, because
+   it has been broken once per axis: whatever the resting button wears, the
+   Sizer wears.
+
    **Shipped 2026-09-22 — `{cutoff_clause}`, AND THE TEMPLATE TOKENS GET A KEY**
    (Mark, writing the default customer emails, first asking "what is the
    {event_time_clause} token?" and then "a key next to the messages fields would

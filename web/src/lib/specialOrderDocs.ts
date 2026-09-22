@@ -898,11 +898,21 @@ export function buildDocumentEmail(
   const fallback = DEFAULT_TEMPLATES[kind];
   const configured = templates[kind] ?? {};
   const vars = templateVars(order, extras, today);
+  // BLANK MEANS "USE THE DEFAULT", and it has to mean that here rather than
+  // only on the settings screen. That screen has always RENDERED
+  // `configured || fallback`, while this read was `configured ?? fallback` —
+  // so a stored empty string showed the default in settings and sent a mail
+  // with no subject at all. Nothing writes one today (`InlineValue` turns an
+  // emptied cell into null), which is why it has never happened; it became
+  // worth closing on 2026-09-22, when the fields started holding the defaults
+  // and CLEARING ONE became the way back to them. The two reads now agree.
+  const orDefault = (v: string | undefined, fallbackText: string) =>
+    typeof v === "string" && v.trim() !== "" ? v : fallbackText;
   return {
     to: documentRecipient(order),
     cc: documentCc(order, typeof so.email_cc === "string" ? so.email_cc : ""),
-    subject: fillTemplate(configured.subject ?? fallback.subject, vars),
-    body: fillTemplate(configured.body ?? fallback.body, vars),
+    subject: fillTemplate(orDefault(configured.subject, fallback.subject), vars),
+    body: fillTemplate(orDefault(configured.body, fallback.body), vars),
   };
 }
 
