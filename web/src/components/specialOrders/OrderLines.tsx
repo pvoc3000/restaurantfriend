@@ -17,7 +17,7 @@ import { StickyFooter } from "@/components/ui/StickyFooter";
 import { STICKY_HEAD_ROW, useOverflowOnlyWhenNeeded } from "@/lib/tableHead";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { RowMenu } from "@/components/ui/RowMenu";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
 import { AddOrderLine, type MenuItem } from "./AddOrderLine";
 import { isProductionLine, lineTotal, money } from "@/lib/specialOrders";
 import {
@@ -738,7 +738,7 @@ export function OrderLines({
                             rows.length > 0 ? (
                               <button
                                 type="button"
-                                className={BUTTON_CLASS}
+                                className={SMALL_BUTTON_CLASS}
                                 onClick={() => void clearAll()}
                                 disabled={pending}
                               >

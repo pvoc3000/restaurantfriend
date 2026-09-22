@@ -2946,6 +2946,9 @@
    danger tone. **HIDDEN ONCE SCHEDULED** for free — the footer's `canWrite` is
    already `canEditItems`, decision 9's lock — and on an order with no lines.
    No log line written here: 054's trigger records "Removed N × …" per line.
+   **THEN THE FOOTER WAS REARRANGED** (Mark, same day): Add item · Add Line ·
+   Clear items, the last two `SMALL_BUTTON_CLASS`. "Add a line by hand", an
+   underlined link after both, became the small **Add Line** between them.
 
    **A LETTER BOX TAKES SEVERAL LETTERS SINCE 2026-09-22** (Mark: "instead of
    adding an H, then adding an A, then adding a P… we could instead enter

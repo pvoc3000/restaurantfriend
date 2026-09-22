@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS, SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
@@ -83,7 +83,7 @@ export function AddOrderLine({
   existing: OrderLineRow[];
   /** Priced on the server — see `MenuItem`. */
   menu: MenuItem[];
-  /** Drawn right after the Add item button — `OrderLines`' Clear Items. */
+  /** Drawn after Add item and Add Line — `OrderLines`' Clear items. */
   beside?: ReactNode;
 }) {
   const router = useRouter();
@@ -285,15 +285,12 @@ export function AddOrderLine({
         >
           Add item
         </button>
-        {beside}
-        <button
-          type="button"
-          className="text-[13px] text-muted underline underline-offset-2 hover:text-ink disabled:opacity-35"
-          onClick={addBlank}
-          disabled={pending}
-        >
-          Add a line by hand
+        {/* SMALL, between Add item and Clear items (Mark, 2026-09-22) — it
+            was an underlined "Add a line by hand" after both. */}
+        <button type="button" className={SMALL_BUTTON_CLASS} onClick={addBlank} disabled={pending}>
+          Add Line
         </button>
+        {beside}
         <span className="text-[12px] text-muted">
           A hand-typed line carries no production item, so it cannot be scheduled.
         </span>
