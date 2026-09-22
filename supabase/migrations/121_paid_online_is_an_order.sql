@@ -1,7 +1,7 @@
 -- ============================================================================
 -- 121 — AN INVOICE PAID ONLINE MAKES THE ORDER AN ORDER
 --
--- SQL STARTS AT LINE 46. Everything above it is comment.
+-- SQL STARTS AT LINE 45. Everything above it is comment.
 --
 -- Mark, 2026-09-22, after the first sandbox payment left test order #10070 at
 -- "Invoice" with its paid date stamped: "shouldn't the special order status be
