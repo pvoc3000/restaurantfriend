@@ -1,5 +1,7 @@
 import { Fragment } from "react";
 
+import { PERCENT_SCALE, percentLabel, toPercent } from "@/lib/percent";
+
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DEFAULT_FULFILLMENT_NOTES, DEFAULT_TEMPLATES } from "@/lib/specialOrderDocs";
@@ -529,7 +531,7 @@ export function SpecialOrderSettings({
         <dl className="grid max-w-2xl grid-cols-[1fr_6rem] gap-x-6 gap-y-1 text-sm">
           <Num label="Rush fee applies within (business days)" path={["special_orders", "rush_cutoff_business_days"]} v={num(so.rush_cutoff_business_days)} {...{ cell, editable }} />
           <Num label="Rush fee minimum ($)" path={["special_orders", "rush_minimum"]} v={num(so.rush_minimum)} {...{ cell, editable }} />
-          <Num label="Rush fee rate (a fraction — .30 is 30%)" path={["special_orders", "rush_rate"]} v={num(so.rush_rate)} {...{ cell, editable }} />
+          <Num label="Rush fee rate (%)" path={["special_orders", "rush_rate"]} v={num(so.rush_rate)} percent {...{ cell, editable }} />
           <Num label="Chase a quote after (days)" path={["special_orders", "attention_quote_unanswered_days"]} v={num(so.attention_quote_unanswered_days)} {...{ cell, editable }} />
           <Num label="Flag unpaid within (days of the event)" path={["special_orders", "attention_unpaid_within_days"]} v={num(so.attention_unpaid_within_days)} {...{ cell, editable }} />
           <Num label="Flag unprinted within (days of the event)" path={["special_orders", "attention_print_within_days"]} v={num(so.attention_print_within_days)} {...{ cell, editable }} />
@@ -551,20 +553,31 @@ function Num({
   v,
   cell,
   editable,
+  percent = false,
 }: {
   label: string;
   path: string[];
   v: number | null;
   cell: (p: string[], value: string | number | null, extra?: Record<string, unknown>) => React.ReactNode;
   editable: boolean;
+  /** TYPED AND READ AS A PERCENTAGE, stored as a fraction (Mark, 2026-09-22:
+   *  "the user facing rush fee field should be a percentage, i.e. 35%"). The
+   *  same `PERCENT_SCALE` the order's own rate cells use, so the number means
+   *  one thing in both places. */
+  percent?: boolean;
 }) {
   return (
     <div className="contents">
       <dt className="py-0.5 text-subtle">{label}</dt>
       <dd className="py-0.5">
         {editable
-          ? cell(path, v, { kind: "number", align: "right", ariaLabel: label })
-          : <span className="tabular-nums">{v ?? "—"}</span>}
+          ? cell(path, v, {
+              kind: "number",
+              align: "right",
+              ariaLabel: label,
+              ...(percent ? { scale: PERCENT_SCALE, format: percentLabel } : {}),
+            })
+          : <span className="tabular-nums">{percent ? percentLabel(toPercent(v ?? 0)) : v ?? "—"}</span>}
       </dd>
     </div>
   );

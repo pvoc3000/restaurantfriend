@@ -12,6 +12,61 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-22, MIGRATION 118 NOT YET APPLIED — A RUSH ORDER ARRIVES
+   CARRYING ITS RATE** (Mark: "if you notice the initiated date is less than two
+   business days from the event date, automatically apply the rush fee", then,
+   asked which of three shapes: "the user facing rush fee field should be a
+   percentage, i.e. 35%, but when applied to the order it should be either the
+   user facing percentage, or $25, whichever is greater").
+   **THIS REVERSES DECISION 22, KNOWINGLY.** That decision was "suggest, never
+   write", and the measurement behind it still stands: of 8,167 orders carrying
+   both dates, **1,448 were initiated inside the two-business-day window and
+   only 442 of those (31%) ever carried a rush fee** — 8% outside it. Mark was
+   shown the 31% and asked for the write anyway, which is a policy change
+   rather than a misreading: the old number measures what FileMaker made easy,
+   not what anybody decided. The `→` suggestion stays for orders that have no
+   rate.
+   **THE RATE IS WRITTEN, NOT THE MONEY, and that is the whole design.** A new
+   order has NO LINES, so 35% of its subtotal is nothing and the only figure
+   writable at creation is the $25 floor — which would then sit there while
+   somebody added $800 of donuts around it. So `special_orders.rush_rate`
+   mirrors `discount_rate`, and the money is derived wherever money is derived.
+   **THE ARITHMETIC IS NOT THE DISCOUNT PAIR'S, and the comment says so at both
+   ends**: a discount's two fields ADD (82 real orders carry a rate and 8,145 an
+   amount), where a rush rate RESOLVES — `max(subtotal × rate, minimum)`, and an
+   amount beside it is not added. So while a rate is set the dollar box on the
+   record is READ-ONLY and shows what the rate came to; leaving it editable
+   would offer a box that accepts a number and ignores it. **Zero is a rate**
+   and means no fee, never the floor — or saying "no rush fee on this one" would
+   charge $25 for saying it.
+   **THE WHOLESALE TRAP WAS THE REASON THIS IS NOT A TRIGGER.** `OrderTotals`
+   has carried the warning since decision 22: an automatic fee "would charge a
+   wholesale customer a rush fee every Friday, quietly". Cafe Knotted's days are
+   real orders one or two days out. They are safe because the rule lives in
+   `lib/createSpecialOrder` — the three doors a PERSON creates through — and
+   099's `ensure_standing_orders_materialized` makes standing days in SQL and
+   never calls it. A trigger on `special_orders` would have caught precisely the
+   rows that must not be caught. `kind = 'order'` only, for the same reason and
+   because neither a template nor a standing order has one event date.
+   **THE WINDOW IS BUSINESS DAYS, which the weekend makes visible**: exercised
+   through the shipped predicate, **Friday → Monday is 1 day and gets the rate;
+   Friday → Tuesday is 2 and does not.** A past event never does.
+   **EVERY READER OF THE MONEY HAD TO LEARN THE COLUMN.** `orderTotals` gained
+   the terms (defaulted, and the default IS the org's 25 today, so nothing moved
+   under anybody), and all six selects that read the money block now read
+   `rush_rate` beside `rush_fee` — a select that missed it would have shown a
+   different total from the one beside it, which is the drift this file keeps
+   warning about.
+   **THE SETTINGS FIELD IS A PERCENTAGE NOW** ("Rush fee rate (%)", typed and
+   read as 35 and stored as .35 through `PERCENT_SCALE`), where it said "a
+   fraction — .30 is 30%". All three terms were already editable; only the unit
+   was wrong. **Mark still has to set 30 → 35 himself**, since the value is his
+   policy and not the code's.
+   **054's WATCH LIST LEARNED IT**, 055's function reproduced in full with one
+   row added — without which a rate change would be the only money edit on the
+   record writing no history. Verified in the harness: the column lands, a rate
+   change logs "Rush fee (%) set to 0.35", and the whole file re-runs clean.
+
    **Shipped 2026-09-22, NEEDS A REDEPLOY — A QUOTE APPROVAL IS COPIED TO THE
    MAILBOX IT WAS SENT FROM** (Mark: "it should cc
    specialorders@donutfriend.com").

@@ -80,7 +80,7 @@ const ORDER_COLUMNS = `
   delivery_address, delivery_distance, delivery_cost, delivery_company,
   delivery_company_phone, delivery_tracking, delivery_window_start,
   delivery_window_end, delivery_boxes, delivery_weight_lbs,
-  tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee,
+  tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
   ignore_balance, taken_by, taken_by_employee_id,
   notes_general, notes_quote, notes_production, notes_invoice, notes_receipt,
   standing_days, starts_on, ends_on, paused, standing_order_id,
@@ -294,7 +294,7 @@ export async function SpecialOrderDetail({
     rush_fee: row.rush_fee as number | null,
     ignore_balance: Boolean(row.ignore_balance),
   };
-  const totals = orderTotals(moneyInputs, lines, payments);
+  const totals = orderTotals(moneyInputs, lines, payments, settings.rush);
 
   const attention = needsAttention(row as never, today, totals, settings.attention);
 

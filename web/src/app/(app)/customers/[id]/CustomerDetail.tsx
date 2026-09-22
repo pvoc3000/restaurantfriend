@@ -12,6 +12,7 @@ import {
   money,
   orderTotals,
   type SpecialOrderStatus,
+  readSettings,
 } from "@/lib/specialOrders";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
@@ -61,7 +62,7 @@ export async function CustomerDetail({
       .from("special_orders")
       .select(
         `id, number, kind, status, title, event_date, ignore_balance,
-         tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee`
+         tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate`
       )
       .eq("customer_id", id)
       .order("event_date", { ascending: false, nullsFirst: false })
@@ -114,7 +115,7 @@ export async function CustomerDetail({
     title: o.title as string | null,
     event_date: o.event_date as string | null,
     ignore_balance: Boolean(o.ignore_balance),
-    totals: orderTotals(o as never, lines.get(o.id as string) ?? [], payments.get(o.id as string) ?? []),
+    totals: orderTotals(o as never, lines.get(o.id as string) ?? [], payments.get(o.id as string) ?? [], readSettings(session.orgSettings).rush),
   }));
 
   /**

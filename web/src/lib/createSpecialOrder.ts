@@ -29,7 +29,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { myEmployeeId } from "./myEmployee";
-import type { SpecialOrderKind } from "./specialOrders";
+import { businessDaysUntil, readSettings, type SpecialOrderKind } from "./specialOrders";
 import {
   contactNameFor,
   draftIsUsable,
@@ -179,6 +179,60 @@ export function deliveryFields(
 }
 
 /**
+ * THE RATE A RUSH ORDER ARRIVES CARRYING, or null (Mark, 2026-09-22: "if you
+ * notice the initiated date is less than two business days from the event date,
+ * automatically apply the rush fee").
+ *
+ * THE MONEY IS NOT WRITTEN, THE RATE IS — see migration 118. A new order has no
+ * lines, so 35% of its subtotal is nothing and the only figure that could be
+ * written at creation is the $25 floor, which would then sit there while
+ * somebody added $800 of donuts around it.
+ *
+ * THREE THINGS IT REFUSES, and the first is the one that matters:
+ *
+ * **ONLY `kind = 'order'`.** A template has no event date and a standing order
+ * has no single one, so the window cannot be measured against either. This is
+ * also the guard that keeps the module's oldest warning true — `OrderTotals`
+ * says an automatic fee "would charge a wholesale customer a rush fee every
+ * Friday, quietly", and Cafe Knotted's days are real orders a day or two out.
+ * They are safe because 099's `ensure_standing_orders_materialized` makes them
+ * in SQL and never calls this module; had this been a trigger on the table it
+ * would have caught precisely the rows that must not be caught.
+ *
+ * **A DATE AT BOTH ENDS.** No event date, or no org day passed, and there is no
+ * window to be inside.
+ *
+ * **A PAST EVENT IS NOT A RUSH**, which `suggestedRushFee` already refuses for
+ * the same reason: it is history, not short notice.
+ *
+ * Soft on failure. If the settings read fails the order is still created,
+ * without a rate — the `→` suggestion on the record is the backstop it has
+ * always been, and refusing to take an order because a fee could not be priced
+ * would be the wrong way round.
+ */
+async function rushRateFor(
+  supabase: SupabaseClient,
+  orgId: string,
+  kind: SpecialOrderKind,
+  eventDate: string | null | undefined,
+  today: string | null | undefined
+): Promise<number | null> {
+  if (kind !== "order" || !eventDate || !today) return null;
+
+  const { data, error } = await supabase
+    .from("orgs")
+    .select("settings")
+    .eq("id", orgId)
+    .maybeSingle();
+  if (error || !data) return null;
+
+  const terms = readSettings((data.settings ?? {}) as Record<string, unknown>).rush;
+  const days = businessDaysUntil(today, eventDate);
+  if (days < 0 || days >= terms.cutoffBusinessDays) return null;
+  return terms.rate > 0 ? terms.rate : null;
+}
+
+/**
  * WHAT A NEW RECORD STARTS AS, by kind — the pair, because they belong
  * together and were drifting apart in one ternary each.
  *
@@ -310,6 +364,11 @@ export async function createSpecialOrder(
   const locationId = orNull(input.locationId);
   const taxRate = await pickupTaxRate(supabase, locationId);
 
+  // IS THIS A RUSH? Read here rather than threaded from three dialogs, for the
+  // reason this module exists at all — a seed remembered at one door and
+  // forgotten at another is the class of bug it was written to end.
+  const rushRate = await rushRateFor(supabase, input.orgId, input.kind, input.eventDate, input.today);
+
   // WHO IS SIGNED IN, AS AN EMPLOYEE — resolved here rather than at each door,
   // for the reason this module exists: both doors write the same row, and a
   // seed remembered in one and forgotten in the other is how the three bugs in
@@ -381,6 +440,7 @@ export async function createSpecialOrder(
       kitchen_location_id: orNull(input.kitchenLocationId),
       ...deliveryFields(input.fulfillment, input.deliveryAddress),
       tax_rate: taxRate,
+      rush_rate: rushRate,
       customer_id: customerId,
       contact_name: contact.name,
       contact_phone: contact.phone,

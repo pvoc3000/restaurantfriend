@@ -124,7 +124,7 @@ export default async function SpecialOrdersPage({
     .select(
       `id, number, kind, status, todo, flag_reason, flag_source, title, event_date, event_time,
        fulfillment, standing_days, standing_order_id, ignore_balance,
-       tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee,
+       tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
        quote_sent_at, quote_returned_at, invoice_sent_at, invoice_paid_at,
        receipt_sent_at, delivery_scheduled_at, order_printed_at, order_scheduled_at,
        location_id, kitchen_location_id,
@@ -223,7 +223,7 @@ export default async function SpecialOrdersPage({
       location_code: codeOf(raw.location_id as string | null),
       kitchen_code: codeOf(raw.kitchen_location_id as string | null),
       customer: (raw.customers as SpecialOrderRow["customer"]) ?? null,
-      totals: orderTotals(money, lines.get(o.id as string) ?? [], payments.get(o.id as string) ?? []),
+      totals: orderTotals(money, lines.get(o.id as string) ?? [], payments.get(o.id as string) ?? [], settings.rush),
     };
   });
 

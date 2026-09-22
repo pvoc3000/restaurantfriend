@@ -335,6 +335,18 @@ export type MoneyOrder = {
   discount_rate: number | null;
   delivery_charge: number | null;
   rush_fee: number | null;
+  /**
+   * The rush fee as a FRACTION of the subtotal (migration 118), mirroring
+   * `discount_rate` — but NOT mirroring its arithmetic. Where a discount's two
+   * fields ADD, a rate here RESOLVES: set, the fee is
+   * `max(subtotal × rate, minimum)` and `rush_fee` is not added to it; null,
+   * `rush_fee` is the fee. Mark's rule, 2026-09-22: "either the user facing
+   * percentage, or $25, whichever is greater".
+   *
+   * Optional, so the 8,167 rows written before 118 — and every fixture and
+   * snapshot built from them — mean exactly what they meant.
+   */
+  rush_rate?: number | null;
   ignore_balance?: boolean | null;
 };
 
@@ -371,6 +383,37 @@ export function lineTotal(line: MoneyLine): number {
 }
 
 /**
+ * WHAT THE RUSH FEE COMES TO (migration 118).
+ *
+ * A RATE RESOLVES, IT DOES NOT ADD — the one place this pair differs from
+ * `discount_amount` / `discount_rate` above. Mark's rule, 2026-09-22: "either
+ * the user facing percentage, or $25, whichever is greater". So a rate means
+ * the typed amount is not part of the answer; clearing the rate gives it back.
+ *
+ * That asymmetry is deliberate and is why the record shows the resolved figure
+ * beside the two boxes rather than leaving somebody to add them up: two fields
+ * that ADD are two contributions, two fields where one WINS need the winner
+ * shown.
+ *
+ * ZERO IS A RATE. `rush_rate = 0` is somebody saying "no rush fee on this one"
+ * and must not fall through to the amount — hence a null check rather than a
+ * truthiness one. A zero rate still floors at the minimum only if you ask it
+ * to; it does not, because `max(0 × subtotal, minimum)` would charge $25 for
+ * saying no. The floor applies to a rate ABOVE zero.
+ */
+export function resolveRushFee(
+  order: Pick<MoneyOrder, "rush_fee" | "rush_rate">,
+  subtotal: number,
+  rush: RushTerms = DEFAULT_RUSH_TERMS
+): number {
+  const rate = order.rush_rate;
+  if (rate === null || rate === undefined) return cents(n(order.rush_fee));
+  const asNumber = n(rate);
+  if (asNumber <= 0) return 0;
+  return cents(Math.max(subtotal * asNumber, rush.minimum));
+}
+
+/**
  * The whole of the order's money, from the inputs and nothing else.
  *
  * TWO ARITHMETIC DECISIONS worth stating, because a rewrite could plausibly go
@@ -393,7 +436,14 @@ export function lineTotal(line: MoneyLine): number {
 export function orderTotals(
   order: MoneyOrder,
   lines: MoneyLine[],
-  payments: MoneyPayment[] = []
+  payments: MoneyPayment[] = [],
+  /**
+   * The org's rush terms, for the floor under a rate (118). Defaulted rather
+   * than required so that adding it could not silently change a total anywhere
+   * it was not passed — and the default IS the org's value today, measured:
+   * `rush_minimum` is 25, which is `DEFAULT_RUSH_TERMS.minimum`.
+   */
+  rush: RushTerms = DEFAULT_RUSH_TERMS
 ): OrderTotals {
   const subtotal = cents(lines.reduce((a, l) => a + n(l.qty) * n(l.unit_price), 0));
   const taxableSubtotal = cents(
@@ -407,7 +457,7 @@ export function orderTotals(
   const tax = cents(taxableSubtotal * keptFraction * n(order.tax_rate));
 
   const deliveryCharge = cents(n(order.delivery_charge));
-  const rushFee = cents(n(order.rush_fee));
+  const rushFee = resolveRushFee(order, subtotal, rush);
   const total = cents(subtotal - discount + deliveryCharge + rushFee + tax);
   const paid = cents(payments.reduce((a, p) => a + n(p.amount), 0));
 

@@ -74,10 +74,20 @@ export function OrderTotals({
     });
   }
 
+  // A RATE IS SET — `null` is no rate, and 0 is somebody saying "no rush fee on
+  // this one", which is a rate and must keep the dollar box out of the answer.
+  const hasRushRate = inputs.rush_rate !== null && inputs.rush_rate !== undefined;
+
   const currentRush = Number(inputs.rush_fee ?? 0);
   // Only while it would actually change something, and only until dismissed.
+  // NOT OFFERED WHERE A RATE ALREADY DECIDES IT (118): the `→` writes a dollar
+  // amount, which a rate would then ignore — an offer whose effect is nothing
+  // is worse than no offer. A rush order created since 118 therefore arrives
+  // priced rather than asked about, and the tap is still there for the ones
+  // that did not.
   const offerRush =
-    canWrite && rushSuggestion !== null && !dismissed && Math.abs(currentRush - rushSuggestion) > 0.005;
+    canWrite && !hasRushRate && rushSuggestion !== null && !dismissed &&
+    Math.abs(currentRush - rushSuggestion) > 0.005;
 
   return (
     <section className="space-y-2">
@@ -181,8 +191,25 @@ export function OrderTotals({
               ) : null
             }
           >
-            <Cell id={id} canWrite={canWrite} column="rush_fee" value={inputs.rush_fee} label="Rush fee"
+            <Cell id={id} canWrite={canWrite && !hasRushRate} column="rush_fee"
+                  value={hasRushRate ? totals.rushFee : inputs.rush_fee} label="Rush fee"
                   format={(v) => money(Number(v))} />
+          </Line>
+          {/* THE RATE, BESIDE THE AMOUNT — `discount_amount` / `discount_rate`'s
+              own pair, one row lower (migration 118). The two rows are one
+              question asked in two units, which is the wording decision the
+              discount labels already made.
+
+              WHERE THE RUSH PAIR DIFFERS FROM THE DISCOUNT PAIR: a discount's
+              two fields ADD, a rush rate WINS. So while a rate is set the
+              dollar box is READ-ONLY and shows what the rate came to —
+              `max(subtotal × rate, the minimum)`. Leaving it editable would
+              offer a box that accepts a number and then ignores it, which is
+              the trap this screen has spent three passes removing. Clear the
+              rate and the box is yours again. */}
+          <Line label="Rush fee (%)">
+            <Cell id={id} canWrite={canWrite} column="rush_rate" value={inputs.rush_rate ?? null}
+                  label="Rush fee rate" percent />
           </Line>
           {/* NO EXPLANATORY SENTENCE BESIDE THE SWITCH (Mark, 2026-08-19:
               "remove the note"). It read "Wholesale days are billed weekly, not

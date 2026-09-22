@@ -161,7 +161,7 @@ export async function DeskStart({ session }: { session: AppSession }) {
         {bills && <BillsCard result={bills} today={today} />}
         {pos && <PurchaseOrdersCard result={pos} today={today} />}
         {orders && (
-          <SpecialOrdersCard result={orders} today={today} thresholds={settings.attention} />
+          <SpecialOrdersCard result={orders} today={today} thresholds={settings.attention} rush={settings.rush} />
         )}
         {reports && <ShiftReportsCard result={reports} />}
         {paperwork && <PaperworkCard result={paperwork} today={today} />}
@@ -492,7 +492,7 @@ async function loadSpecialOrders(
     .from("special_orders")
     .select(
       `id, number, kind, status, todo, flag_reason, flag_source, title, event_date, fulfillment,
-       ignore_balance, tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee,
+       ignore_balance, tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
        quote_sent_at, quote_returned_at, invoice_sent_at, invoice_paid_at,
        receipt_sent_at, delivery_scheduled_at, order_printed_at, order_scheduled_at,
        location_id, kitchen_location_id,
@@ -568,16 +568,20 @@ function SpecialOrdersCard({
   result,
   today,
   thresholds,
+  rush,
 }: {
   result: Result<OrderRow[]>;
   today: string;
   thresholds: ReturnType<typeof readSettings>["attention"];
+  /** 118: a rate needs the org's floor to resolve to money. Passed beside the
+   *  thresholds because it comes from the same `readSettings` call. */
+  rush: ReturnType<typeof readSettings>["rush"];
 }) {
   if (result.data === null) {
     return <StartCard title="Special orders" href="/special-orders" lines={[]} error={result.error} />;
   }
   const judged = result.data
-    .map((o) => ({ o, reason: needsAttention(o, today, orderTotals(o, o.lines, o.payments), thresholds) }))
+    .map((o) => ({ o, reason: needsAttention(o, today, orderTotals(o, o.lines, o.payments, rush), thresholds) }))
     .filter((x): x is { o: OrderRow; reason: string } => x.reason !== null);
   // Flagged first — a human asked for eyes — then by event date.
   const flagged = judged.filter((x) => x.o.flag_reason);

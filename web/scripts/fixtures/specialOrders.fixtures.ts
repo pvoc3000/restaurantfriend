@@ -40,6 +40,7 @@ import {
   stageState,
   materializationSummary,
   standingMaterializationDates,
+  resolveRushFee,
   suggestedRushFee,
   topUpWindow,
   isPersonFlag,
@@ -501,6 +502,51 @@ test("suggestedTodo walks the ladder", () => {
     ),
     null
   );
+});
+
+test("a rush RATE resolves to the greater of the percentage and the floor", () => {
+  // Mark's rule, 2026-09-22: "either the user facing percentage (i.e. 35%), or
+  // $25, whichever is greater". Terms: 35% with a $25 minimum.
+  const terms = { cutoffBusinessDays: 2, minimum: 25, rate: 0.35 };
+  const fee = (o: Partial<typeof noMoney> & { rush_rate?: number | null }, subtotal: number) =>
+    resolveRushFee({ rush_fee: null, ...o } as never, subtotal, terms);
+
+  eq(fee({ rush_rate: 0.35 }, 800), 280, "35% of 800 beats the floor");
+  eq(fee({ rush_rate: 0.35 }, 50), 25, "35% of 50 is 17.50, so the floor wins");
+  // The crossover, both sides: 25 / 0.35 = 71.43.
+  eq(fee({ rush_rate: 0.35 }, 71), 25);
+  eq(fee({ rush_rate: 0.35 }, 72), 25.2);
+
+  // NO RATE: the typed amount is the fee, exactly as before 118.
+  eq(resolveRushFee({ rush_fee: 40, rush_rate: null }, 800, terms), 40);
+  eq(resolveRushFee({ rush_fee: 40 } as never, 800, terms), 40, "absent reads as null");
+
+  // A RATE WINS — it does not add to the amount, which is where this pair
+  // differs from discount_amount/discount_rate.
+  eq(resolveRushFee({ rush_fee: 40, rush_rate: 0.35 }, 800, terms), 280);
+
+  // ZERO IS A RATE, and it means no fee — never the floor, or saying "no rush
+  // fee on this one" would charge $25 for saying it.
+  eq(resolveRushFee({ rush_fee: 40, rush_rate: 0 }, 800, terms), 0);
+
+  // A lead with no lines: the floor, which is what a rate can mean before
+  // anybody has priced anything.
+  eq(fee({ rush_rate: 0.35 }, 0), 25);
+});
+
+test("the rush rate reaches the TOTAL, and is not taxed", () => {
+  const terms = { cutoffBusinessDays: 2, minimum: 25, rate: 0.35 };
+  // $100 of taxable donuts at 10% tax, 35% rush.
+  const t = orderTotals(
+    { ...noMoney, tax_rate: 0.1, rush_rate: 0.35 },
+    [line(10, 10)],
+    [],
+    terms
+  );
+  eq(t.subtotal, 100);
+  eq(t.rushFee, 35);
+  eq(t.tax, 10, "tax is on the goods alone — delivery and rush are services");
+  eq(t.total, 145);
 });
 
 test("a flagged order's suggestion is Resolve Issue", () => {

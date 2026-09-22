@@ -43,7 +43,7 @@ export default async function CustomersPage({
       supabase
         .from("special_orders")
         .select(
-          "id, customer_id, event_date, status, kind, ignore_balance, tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee",
+          "id, customer_id, event_date, status, kind, ignore_balance, tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate",
           { count: "exact" }
         )
         .eq("org_id", orgId)

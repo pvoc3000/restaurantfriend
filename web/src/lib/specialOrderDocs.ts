@@ -424,7 +424,7 @@ export async function fetchOrderDocData(
            delivery_company, delivery_company_phone,
            delivery_window_start, delivery_window_end,
            location_id, kitchen_location_id,
-           tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee,
+           tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
            ignore_balance,
            notes_quote, notes_production, notes_invoice, notes_receipt,
            customers ( id, first_name, last_name, company, phone, email )`
@@ -672,7 +672,7 @@ export async function fetchStatementData(
       .from("special_orders")
       .select(
         `id, number, title, event_date,
-         tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee,
+         tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
          ignore_balance`
       )
       .eq("customer_id", customerId)
