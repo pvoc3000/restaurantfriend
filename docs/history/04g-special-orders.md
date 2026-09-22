@@ -12,12 +12,20 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Written 2026-09-21, MIGRATION 117 NOT YET APPLIED — A FINISHED STAGE
-   CLEARS THE NOTE IT WAS ABOUT** (Mark, answering the question 116 left open:
+   **Shipped 2026-09-21, MIGRATION 117 APPLIED (Mark, 2026-09-22) — A FINISHED
+   STAGE CLEARS THE NOTE IT WAS ABOUT** (Mark, answering the question 116 left open:
    "'Respond to Email/Call' should be cleared (along with any flag) if we send
-   a quote, invoice, receipt, print or schedule the order"). **116 IS APPLIED**
-   — probed, both flagged orders backfilled to 'system' and no row breaks the
-   pairing.
+   a quote, invoice, receipt, print or schedule the order").
+   **BOTH PROBED LIVE, 2026-09-22.** 116 has a surface to read: both flagged
+   orders backfilled to 'system' and no row breaks the pairing. **117 HAS NONE**
+   — no column, no callable function, so the only honest test is a write. Done
+   on a scratch record built to leave nothing behind: a TEMPLATE (invisible to
+   the attention queue) numbered `ZZZ-117-PROBE` BY HAND, so
+   `special_order_number_seq` is untouched and no gap appears in the real
+   numbering. Stamping `quote_sent_at` cleared the to-do and the flag; the row
+   was deleted and its events cascaded. Counts either side: **8,362 orders and
+   114,876 events, unchanged.** That insert also re-proved 116's derivation
+   live — written with no session, it came out 'system'.
    116 deliberately left `todo` alone because an edit is not proof a customer
    was answered. The five acts named here are not edits: each is a RUNG
    COMPLETING, and each is the answer to the note — you cannot send a quote
@@ -63,9 +71,9 @@
    fixtures caught this rather than a person**: two went red the moment the
    consequences were removed.
 
-   **Written 2026-09-21, MIGRATION 116 NOT YET APPLIED — THE FLAG SAYS WHO
-   RAISED IT, CLEARS ITSELF WHEN THE TEAM ARRIVES, AND COMES BACK WHEN THE
-   CUSTOMER ACTS** (Mark: a website order "needs to be cleared by hand, which
+   **Shipped 2026-09-21, MIGRATION 116 APPLIED (Mark, 2026-09-22) — THE FLAG
+   SAYS WHO RAISED IT, CLEARS ITSELF WHEN THE TEAM ARRIVES, AND COMES BACK WHEN
+   THE CUSTOMER ACTS** (Mark: a website order "needs to be cleared by hand, which
    isn't intuitive. Any activity on the record… should really clear the flag
    automatically… when a customer approves a quote, it would be nice if it were
    flagged again… Anything that happens to a record that isn't done by a member
