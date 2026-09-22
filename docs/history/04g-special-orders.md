@@ -12,6 +12,25 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-22, MIGRATION 121 WRITTEN, NOT YET APPLIED — AN INVOICE
+   PAID ONLINE MAKES THE ORDER AN ORDER.** Mark, seeing #10070 left at Invoice
+   with its paid date stamped: "shouldn't the special order status be set to
+   Order when it's paid?" Yes — `DATE_IMPLIES.invoice_paid_at` already says paid
+   means Order + Print Order, and a hand-recorded payment OFFERS both. 119 had
+   borrowed 052's "a person decides" line, which fits an approved quote (a
+   judgement remains) and not a settled invoice (the ladder defines Order as
+   paid), and a pay-link payment has nobody at the desk to accept an offer. 121
+   redefines `record_pay_link_payment` in full: on the payment that clears the
+   balance, `status` → order only from lead/quote/invoice and only on
+   `kind = 'order'`; `todo` → Print Order only when empty or one the payment
+   answers (Send Invoice, Invoice Overdue!, Respond to Email/Call) — a typed
+   note stays, 117's rule. A deposit moves nothing. Verified on a throwaway
+   Postgres with 119–121: deposit → unchanged; final payment → order + Print
+   Order + stamped; a custom to-do kept while the status moves; an order
+   already at Order untouched; a standing order untouched; Invoice Overdue! →
+   Print Order; still service_role-only and one overload. #10070 not
+   backfilled — its screen's catch-up offer proposes the move.
+
    **Verified 2026-09-22 — THE FIRST SANDBOX PAYMENT, END TO END.** 120
    applied, `square-pay` deployed (its first compile — no Deno here, and it
    compiled), sandbox settings filled. Mark sent himself test order #10070's
