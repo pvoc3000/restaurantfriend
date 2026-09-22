@@ -11,6 +11,7 @@ import {
   LETTER_CHARACTERS,
   addedLineName,
   needsLetterChoice,
+  parseLetters,
   cutLetter,
   cutOptions,
   donutOptions,
@@ -211,4 +212,27 @@ test("needsLetterChoice: only a bare Letter cut asks", () => {
   no(needsLetterChoice('Letter "<3"'), "the heart names its character");
   no(needsLetterChoice("Promise Ring"), "not a letter");
   no(needsLetterChoice(null), "no cut");
+});
+
+/* -- several letters in one box (Mark, 2026-09-22) ------------------------- */
+
+test("parseLetters: commas separate, in the order typed, repeats kept", () => {
+  eq(parseLetters("H, A, P, P, Y"), ["H", "A", "P", "P", "Y"]);
+  eq(parseLetters("h,a"), ["H", "A"]);
+});
+
+test("parseLetters: nothing but a comma separates", () => {
+  eq(parseLetters("HAPPY"), ["HAPPY"], "no commas is one character, as before");
+  eq(parseLetters("OP"), ["OP"]);
+  eq(parseLetters("H A"), ["H A"], "a space is not a separator");
+});
+
+test("parseLetters: the heart and the punctuation survive whole", () => {
+  eq(parseLetters("<3, !, -, &"), ["<3", "!", "-", "&"]);
+});
+
+test("parseLetters: blanks are dropped, and nothing typed is an empty list", () => {
+  eq(parseLetters("H,,A,"), ["H", "A"]);
+  eq(parseLetters(""), []);
+  eq(parseLetters(" , "), []);
 });

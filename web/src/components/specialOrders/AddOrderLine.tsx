@@ -19,6 +19,7 @@ import {
   addedLineName,
   letterCut,
   needsLetterChoice,
+  parseLetters,
 } from "@/lib/specialOrderLines";
 import type { OrderLineRow } from "./OrderLines";
 
@@ -31,14 +32,6 @@ import type { OrderLineRow } from "./OrderLines";
  * `production_item_locations`, not on the item, so a client that selected the
  * item alone would find no price column and quietly offer every donut at zero.
  */
-/** What a typed letter is stored as: trimmed and upper-cased — the box shows
- *  capitals, and every real character is upper case ("A", "OP"); `<3` and the
- *  punctuation are unchanged by it. */
-function normalizeLetter(raw: string): string | null {
-  const c = raw.trim();
-  return c === "" ? null : c.toUpperCase();
-}
-
 /** A column label: the app's small caps, with room above the first row. */
 const HEAD = "pb-2 pt-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted";
 
@@ -106,7 +99,8 @@ export function AddOrderLine({
   const [asking, setAsking] = useState<{ item: MenuItem; amount: number } | null>(null);
   const [otherLetter, setOtherLetter] = useState("");
   /** A letter typed on the row itself (Mark, 2026-09-16), which skips the
-   *  "Which letter?" box. Blank still asks. */
+   *  "Which letter?" box. Blank still asks. Several, comma-separated, add a
+   *  line each (2026-09-22) — `parseLetters`. */
   const [rowLetter, setRowLetter] = useState<Record<string, string>>({});
 
   const items = menu;
@@ -179,37 +173,41 @@ export function AddOrderLine({
     // `Letter` cut; nothing is written until the character is chosen, so
     // Cancel means nothing was added.
     if (needsLetterChoice(item.subtype)) {
-      const typedLetter = normalizeLetter(rowLetter[item.id] ?? "");
-      if (typedLetter) {
-        insert(item, amount, typedLetter);
+      const typedLetters = parseLetters(rowLetter[item.id] ?? "");
+      if (typedLetters.length > 0) {
+        insert(item, amount, typedLetters);
         return;
       }
       setOtherLetter("");
       setAsking({ item, amount });
       return;
     }
-    insert(item, amount, null);
+    insert(item, amount, [null]);
   }
 
-  function chooseLetter(character: string) {
-    const letter = normalizeLetter(character);
-    if (!asking || !letter) return;
+  function chooseLetter(typed: string) {
+    const letters = parseLetters(typed);
+    if (!asking || letters.length === 0) return;
     const { item, amount } = asking;
     setAsking(null);
-    insert(item, amount, letter);
+    insert(item, amount, letters);
   }
 
-  function insert(item: MenuItem, amount: number, character: string | null) {
+  /** One line per character, in the order given — `[null]` is one line with
+   *  no letter. ONE insert for all of them, so a refusal adds none of the word
+   *  rather than half of it. */
+  function insert(item: MenuItem, amount: number, characters: (string | null)[]) {
     setError(null);
     start(async () => {
       const { data, error: e } = await supabase
         .from("special_order_items")
-        .insert({
+        .insert(characters.map((character, i) => ({
           // Explicit, always — design rule 1. Omitting it reports an RLS
           // violation, which sends you looking at roles.
           org_id: orgId,
           order_id: orderId,
-          sort: nextSort,
+          // Consecutive, so the lines keep the word's sequence.
+          sort: nextSort + i,
           production_item_id: item.id,
           // The SNAPSHOT. Every one of these is editable on the row afterwards,
           // which is the whole of decision 5. The NAME carries a Mini or Giant
@@ -229,13 +227,13 @@ export function AddOrderLine({
           // is how FileMaker's letter lines have always carried it, and the
           // note is what travels onto the production schedule line (069).
           ...(character ? { notes: `"${character}"` } : {}),
-        })
+        })))
         .select("id");
       if (e) {
         setError(e.message);
         return;
       }
-      if (!data?.length) {
+      if ((data?.length ?? 0) < characters.length) {
         setError("Nothing was added — the database refused the insert and said nothing.");
         return;
       }
@@ -372,7 +370,7 @@ export function AddOrderLine({
                     <th className={`${HEAD} pr-3 text-left`}>Item</th>
                     <th className={`${HEAD} pr-3 text-right`}>Price</th>
                     <th className={`${HEAD} pr-2 text-right`}>Qty</th>
-                    <th className={`${HEAD} pr-2 text-center`}>Letter</th>
+                    <th className={`${HEAD} pr-2 text-left`}>Letter</th>
                     <th className={HEAD}>
                       <span className="sr-only">Add</span>
                     </th>
@@ -410,7 +408,7 @@ export function AddOrderLine({
                             className="rf-typed h-9 w-full border border-ink bg-white px-2 text-right text-[14px] tabular-nums focus:outline-none"
                           />
                         </td>
-                        <td className="w-16 py-2 pr-2">
+                        <td className="w-40 py-2 pr-2">
                           {/* THE LETTER, on letter-cut rows only; the cell is
                               kept on every row so the columns line up. */}
                           {needsLetterChoice(item.subtype) ? (
@@ -426,11 +424,10 @@ export function AddOrderLine({
                                   add(item);
                                 }
                               }}
-                              maxLength={3}
                               autoCapitalize="characters"
                               autoComplete="off"
                               aria-label={`Letter for ${item.name}`}
-                              className="rf-typed h-9 w-full border border-ink bg-white px-2 text-center text-[16px] font-semibold uppercase focus:outline-none"
+                              className="rf-typed h-9 w-full border border-ink bg-white px-2 text-[16px] font-semibold uppercase focus:outline-none"
                             />
                           ) : null}
                         </td>
@@ -469,7 +466,8 @@ export function AddOrderLine({
 
       {/* WHICH LETTER — a sibling of the panel, not nested inside it, so it
           paints over it and takes Escape alone (`ui/Dialog`'s stack). One tap
-          on a character adds the line; the box is for the rare ones ("OP"). */}
+          on a character adds the line; the box is for the rare ones ("OP"),
+          and takes a comma-separated list like the row's own box. */}
       {asking ? createPortal(
         <Dialog
           title="Which letter?"
