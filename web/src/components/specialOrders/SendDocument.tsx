@@ -21,12 +21,17 @@ import {
 } from "@/lib/specialOrderDocs";
 import {
   approvalUrl,
+  bindPaySnapshot,
   bindQuoteSnapshot,
+  invoiceSnapshot,
+  mintPayToken,
   mintQuoteToken,
+  offersPayLink,
   quoteSnapshot,
   resolveAppBase,
   sendSpecialOrderEmail,
 } from "@/lib/specialOrderSend";
+import { payLine, payUrl } from "@/lib/payLink";
 import { downloadBlob, openWindowNow, showBlob } from "@/lib/poProcessing";
 import {
   DOCUMENT_STAMPS,
@@ -118,6 +123,9 @@ export function SendDocument({
     url: string;
     filename: string;
     token: string | null;
+    /** The invoice's pay link (migration 119) — minted beside nothing else,
+     *  since a quote never carries one and an invoice never an approval. */
+    payToken: string | null;
   } | null>(null);
   const [offer, setOffer] = useState<Consequence[] | null>(null);
 
@@ -227,6 +235,16 @@ export function SendDocument({
         token = await mintQuoteToken(supabase, { orderId, orgId });
         link = approvalUrl(token, resolved.base);
       }
+      // The pay link, on the same terms: resolved before minting, and only
+      // when online payment is configured and there is a balance to pay.
+      let payToken: string | null = null;
+      let pay = "";
+      if (k === "invoice" && offersPayLink(orgSettings, order)) {
+        const resolved = resolveAppBase(window.location.origin);
+        if ("error" in resolved) throw new Error(resolved.error);
+        payToken = await mintPayToken(supabase, { orderId, orgId });
+        pay = payUrl(payToken, resolved.base);
+      }
       setSentNote(null);
       setCompose(
         buildDocumentEmail(
@@ -241,6 +259,8 @@ export function SendDocument({
             approve_line: link
               ? `\nYou can review and approve it here — no printing or scanning needed:\n${link}\n`
               : "",
+            pay_url: pay,
+            pay_line: payLine(pay),
           },
           // `{cutoff_clause}` is the only token that needs to know what day it
           // is, and this is the org's day rather than the browser's.
@@ -254,6 +274,7 @@ export function SendDocument({
         url: URL.createObjectURL(blob),
         filename: documentFileName(k, order.number, order.event_date ?? today),
         token,
+        payToken,
       });
     });
 
@@ -271,6 +292,13 @@ export function SendDocument({
           quoteSnapshot(pending.order, pending.org, today)
         );
       }
+      if (pending.payToken) {
+        await bindPaySnapshot(
+          supabase,
+          pending.payToken,
+          invoiceSnapshot(pending.order, pending.org, today)
+        );
+      }
 
       const { warning } = await sendSpecialOrderEmail(supabase, {
         orderId,
@@ -282,6 +310,7 @@ export function SendDocument({
         blob: pending.blob,
         filename: pending.filename,
         quoteToken: pending.token,
+        payToken: pending.payToken,
       });
       const to = compose.to;
       closeCompose();

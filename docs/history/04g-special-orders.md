@@ -12,9 +12,21 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Decided 2026-09-22 — THE PAY LINK: SQUARE COLLECTS, ON OUR OWN PAGE.**
-   The decision itself is in CLAUDE.md's customer-invoices thread; this is the
-   build plan. Phase 1: the invoice email carries `{pay_line}` → `/pay/[token]`,
+   **Shipped 2026-09-22, MIGRATION 119 NOT YET APPLIED, `square-pay` NOT YET
+   DEPLOYED, `send-special-order-email` NEEDS A REDEPLOY — THE PAY LINK: SQUARE
+   COLLECTS, ON OUR OWN PAGE.** Setup is `docs/square-payments-setup.md`; nothing
+   changes for a customer until both Square ids are on Settings → General AND
+   the saved invoice template carries `{pay_line}` (the live one still says
+   "You have been sent an online invoice from Square", and a saved template
+   overrides the default that carries the link). The decision itself is in
+   CLAUDE.md's customer-invoices thread. Verified: 119 on a throwaway Postgres
+   (states, anon refusals, a second claim reads `busy`, a retried record is a
+   no-op, a partial payment leaves `invoice_paid_at` alone and the final one
+   stamps it); `/pay/…` loads SIGNED OUT in the pane (the proxy exemption) and
+   reads "This link isn't valid" while 119 is unapplied; tsc, lint, 1,993
+   fixtures. NOT verified: a real sandbox charge (needs 119, the deploy and the
+   sandbox keys), Apple Pay (Safari + a verified domain), and `square-pay` has
+   not been through `deno check` — there is no Deno on this Mac. Phase 1: the invoice email carries `{pay_line}` → `/pay/[token]`,
    a public page (the `/q` pattern: token table, anon definer RPCs, an edge
    function gated through the anon key before it touches service_role) that
    charges the BALANCE DUE — the customer cannot change the amount — with

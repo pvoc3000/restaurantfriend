@@ -88,6 +88,7 @@ const VAR_EXAMPLE: Record<string, string> = {
   paid: "$248.00",
   period: "Sep 14 – Sep 20",
   approve_line: "the approval link, as its own paragraph — only on a quote that has one",
+  pay_line: "the pay link, as its own paragraph — only on an invoice with a balance, once online payment is set up",
 };
 
 /** The six messages this module can send, in the order somebody meets them. */
@@ -117,8 +118,8 @@ const TEMPLATES: {
   {
     key: "invoice",
     label: "Invoice",
-    when: "Sent with the invoice PDF.",
-    vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "cutoff_clause", "total", "balance", "employee_name", "fulfillment_note"],
+    when: "Sent with the invoice PDF. {pay_line} is the pay link, and only appears when there is one.",
+    vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "cutoff_clause", "total", "balance", "employee_name", "fulfillment_note", "pay_line"],
   },
   {
     key: "receipt",
@@ -163,6 +164,7 @@ export function SpecialOrderSettings({
   const provider = (so.email_provider ?? {}) as Record<string, unknown>;
   const emails = (so.email ?? {}) as Record<string, { subject?: string; body?: string }>;
   const fulfillmentNotes = (so.fulfillment_note ?? {}) as Record<string, unknown>;
+  const squarePay = (settings.square_payments ?? {}) as Record<string, unknown>;
 
   /** Every cell on this screen writes one key inside `orgs.settings`. */
   const cell = (
@@ -541,6 +543,46 @@ export function SpecialOrderSettings({
           <Num label="Standing orders made this far ahead (days)" path={["special_orders", "horizon_days"]} v={num(so.horizon_days)} {...{ cell, editable }} />
           <Num label="Inquiries accepted per hour, per email" path={["special_orders", "inquiry_max_per_email_per_hour"]} v={num(so.inquiry_max_per_email_per_hour)} {...{ cell, editable }} />
           <Num label="Inquiries accepted per hour, in total" path={["special_orders", "inquiry_max_per_hour"]} v={num(so.inquiry_max_per_hour)} {...{ cell, editable }} />
+        </dl>
+      </section>
+      {/* ---- the pay link (migration 119) -------------------------------
+          `orgs.settings.square_payments`, outside `special_orders` because
+          wholesale invoices will read it too. The ids are PUBLIC by Square's
+          design (they sit in every Square checkout's page source); the access
+          token is not, and lives only in the `square-pay` function's secrets.
+          Until both ids are filled, no invoice carries a pay link. */}
+      <section className="space-y-4">
+        <SectionHeading>Online payment (Square)</SectionHeading>
+        <dl className="grid max-w-2xl grid-cols-[14rem_1fr] gap-x-6 gap-y-1 text-sm">
+          <dt className="py-0.5 text-subtle">Environment</dt>
+          <dd className="py-0.5">
+            {editable
+              ? cell(["square_payments", "environment"], text(squarePay.environment), {
+                  kind: "pick",
+                  options: [
+                    { value: "production", label: "Production" },
+                    { value: "sandbox", label: "Sandbox (testing)" },
+                  ],
+                  ariaLabel: "Square environment",
+                })
+              : <span>{text(squarePay.environment) ?? "—"}</span>}
+          </dd>
+          <dt className="py-0.5 text-subtle">Application ID</dt>
+          <dd className="py-0.5">
+            {editable
+              ? cell(["square_payments", "application_id"], text(squarePay.application_id), {
+                  ariaLabel: "Square application ID",
+                })
+              : <span>{text(squarePay.application_id) ?? "—"}</span>}
+          </dd>
+          <dt className="py-0.5 text-subtle">Location ID for invoiced sales</dt>
+          <dd className="py-0.5">
+            {editable
+              ? cell(["square_payments", "location_id"], text(squarePay.location_id), {
+                  ariaLabel: "Square location ID for invoiced sales",
+                })
+              : <span>{text(squarePay.location_id) ?? "—"}</span>}
+          </dd>
         </dl>
       </section>
         </>

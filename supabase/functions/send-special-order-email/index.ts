@@ -95,7 +95,9 @@ const FILED_KIND: Record<string, string | null> = {
  * human is free to delete the paragraph.
  */
 function checkApprovalLink(body: string): string | null {
-  const found = body.match(/https?:\/\/[^\s<>"')]+\/q\/[A-Za-z0-9_-]{16,}/);
+  // `/q/` is the quote's approval link; `/pay/` the invoice's pay link
+  // (migration 119). Both are the customer's one click, so both are checked.
+  const found = body.match(/https?:\/\/[^\s<>"')]+\/(?:q|pay)\/[A-Za-z0-9_-]{16,}/);
   if (!found) return null;
 
   const appUrl = Deno.env.get("APP_URL");
@@ -146,6 +148,8 @@ Deno.serve(async (req) => {
        *  is real and editable. Binding it to the document is this function's
        *  job — see below. */
       quote_token,
+      /** The invoice's pay link token (migration 119), minted the same way. */
+      pay_token,
     } = await req.json();
 
     if (!order_id || !kind || !to || !subject || !pdf_base64 || !filename) {
@@ -327,6 +331,22 @@ Deno.serve(async (req) => {
         warnings.push(
           "the approval link has no document behind it, so it will tell the customer the quote is not ready"
         );
+      }
+    }
+
+    // MIGRATION 119: an invoice going out retires every earlier pay link for
+    // the order, so a customer holding last week's invoice reads "this invoice
+    // has been updated" rather than paying a figure that has since changed.
+    // Its snapshot and total were bound by the browser before the send.
+    if (kind === "invoice" && pay_token) {
+      const { error: supersedeError } = await supabase
+        .from("special_order_pay_tokens")
+        .update({ superseded_at: new Date().toISOString() })
+        .eq("order_id", order_id)
+        .neq("token", pay_token)
+        .is("superseded_at", null);
+      if (supersedeError) {
+        warnings.push(`earlier pay links were not retired: ${supersedeError.message}`);
       }
     }
 

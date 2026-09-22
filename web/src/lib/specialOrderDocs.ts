@@ -768,8 +768,9 @@ export const DEFAULT_TEMPLATES: Record<
     subject: "Your invoice #{number}{title_suffix}",
     body:
       "Hi {first_name},\n\n" +
-      "Your invoice is attached.\n\n" +
-      "Event: {event_date}{event_time_clause}\n" +
+      "Your invoice is attached.\n" +
+      "{pay_line}" +
+      "\nEvent: {event_date}{event_time_clause}\n" +
       "Total: {total}\n" +
       "Balance due: {balance}\n\n" +
       "Thank you!",
@@ -1038,6 +1039,11 @@ export function templateVars(
     // an empty string is the honest value everywhere else, and the template's
     // own newline handling means the paragraph simply isn't there.
     approve_line: "",
+    // The pay link (migration 119), the same way: filled only when an invoice
+    // is composed with a live link, so a template carrying `{pay_line}` on an
+    // order that cannot be paid online simply has no paragraph there.
+    pay_url: "",
+    pay_line: "",
     ...extras,
   };
 }

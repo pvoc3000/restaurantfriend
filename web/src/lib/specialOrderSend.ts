@@ -214,6 +214,76 @@ export async function bindQuoteSnapshot(
 }
 
 /* ==========================================================================
+ * THE PAY TOKEN (migration 119) — the approval token's twin, for an invoice
+ * ========================================================================== */
+
+/**
+ * Whether an invoice composed now should carry a pay link: online payment is
+ * configured (both Square ids), and there is something to pay. An invoice on a
+ * settled or statement-billed order gets no link rather than one that opens on
+ * "nothing to pay".
+ */
+export function offersPayLink(
+  orgSettings: Record<string, unknown>,
+  order: Pick<OrderDocData, "totals" | "money">
+): boolean {
+  const sq = (orgSettings.square_payments ?? {}) as Record<string, unknown>;
+  const configured =
+    typeof sq.application_id === "string" && sq.application_id.trim() !== "" &&
+    typeof sq.location_id === "string" && sq.location_id.trim() !== "";
+  return configured && !order.money.ignore_balance && order.totals.balance > 0;
+}
+
+/** The invoice's snapshot is the quote's shape with the INVOICE's note — the
+ *  page renders one field for "what the paper said underneath". */
+export function invoiceSnapshot(
+  order: OrderDocData,
+  org: { name: string; addressLine: string; contactLine: string; terms: string },
+  today: string
+): QuoteSnapshot {
+  return { ...quoteSnapshot(order, org, today), notes_quote: order.notes_invoice };
+}
+
+/** Minted when the invoice's compose card opens, WITHOUT a snapshot, so a
+ *  card opened and cancelled leaves a link that reads as unknown. See
+ *  `mintQuoteToken`, whose reasoning this repeats exactly. */
+export async function mintPayToken(
+  supabase: SupabaseClient,
+  args: { orderId: string; orgId: string }
+): Promise<string> {
+  const token = mintTokenValue();
+  const { data, error } = await supabase
+    .from("special_order_pay_tokens")
+    .insert({ org_id: args.orgId, order_id: args.orderId, token })
+    .select("token")
+    .single();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("The pay link could not be created.");
+  return token;
+}
+
+/**
+ * The invoice as sent, and its TOTAL as its own column — the figure the pay
+ * link charges against, less whatever has been paid since. Written BEFORE the
+ * send, for `bindQuoteSnapshot`'s reason.
+ */
+export async function bindPaySnapshot(
+  supabase: SupabaseClient,
+  token: string,
+  snapshot: QuoteSnapshot
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("special_order_pay_tokens")
+    .update({ document_snapshot: snapshot, total: snapshot.totals.total })
+    .eq("token", token)
+    .select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) {
+    throw new Error("The pay link could not be prepared — nothing was updated.");
+  }
+}
+
+/* ==========================================================================
  * THE SEND
  * ========================================================================== */
 
@@ -239,6 +309,7 @@ export async function sendSpecialOrderEmail(
     blob: Blob;
     filename: string;
     quoteToken?: string | null;
+    payToken?: string | null;
   }
 ): Promise<{ warning?: string }> {
   const { data, error } = await supabase.functions.invoke("send-special-order-email", {
@@ -252,6 +323,7 @@ export async function sendSpecialOrderEmail(
       pdf_base64: await blobToBase64(args.blob),
       filename: args.filename,
       quote_token: args.quoteToken ?? undefined,
+      pay_token: args.payToken ?? undefined,
     },
   });
   if (error) {

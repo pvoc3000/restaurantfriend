@@ -47,6 +47,10 @@ export default async function proxy(request: NextRequest) {
   // token row and write one approval, and nothing else in the schema. See that
   // migration's header for the full argument.
   const isQuotePage = request.nextUrl.pathname.startsWith("/q/");
+  // The pay link (migration 119) — the approval page's twin, for an invoice.
+  // Same argument: it reaches three definer RPCs that read one token and claim
+  // it, and the charge itself happens in `square-pay`, gated on the same token.
+  const isPayPage = request.nextUrl.pathname.startsWith("/pay/");
   // Decision 18: the inquiry form is the front door, so it is public by
   // definition — a customer filling it in has never heard of this app. Note NO
   // trailing slash, unlike `/q/`, so the bare `/inquiry` matches.
@@ -76,6 +80,7 @@ export default async function proxy(request: NextRequest) {
     !isLoginPage &&
     !isWelcomePage &&
     !isQuotePage &&
+    !isPayPage &&
     !isInquiryPage &&
     !isLegalPage &&
     !isLockPage &&
