@@ -67,7 +67,11 @@
    **THE TOKEN IS THE DARKER OF THE TWO GREYS** (`muted` 600 for the name,
    `subtle` 500 for the example). It shipped the other way round for one commit,
    which made the column you scan the faintest text in the block.
-   **AND THE KEY SITS BESIDE THE FIELDS, NOT UNDER THEM** (Mark, same day).
+   **AND THE KEY SITS BESIDE THE FIELDS, NOT UNDER THEM, UNDER ITS OWN
+   HEADING** (Mark, same day; "Field Token Keys"). The heading wears the
+   SUBJECT/BODY dress — 11px, uppercase, `subtle` — so the two columns start on
+   one line (measured: both tops at 445) and read as peers rather than as a
+   field with an afterthought beside it.
    Under them it was below the fold of the box you were typing in, which is the
    one place it cannot help. The template block is therefore the only one on the
    page WIDER than `max-w-2xl` — `max-w-5xl`, which is exactly what the pair

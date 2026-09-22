@@ -283,14 +283,24 @@ export function SpecialOrderSettings({
                   half-remember and read across; it had them the other way round
                   for one commit, which made the thing you are looking for the
                   faintest text in the block. */}
-              <dl className="grid shrink-0 grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px] xl:w-72">
-                {t.vars.map((v) => (
-                  <Fragment key={v}>
-                    <dt className="whitespace-nowrap text-muted">{`{${v}}`}</dt>
-                    <dd className="text-subtle">{VAR_EXAMPLE[v] ?? ""}</dd>
-                  </Fragment>
-                ))}
-              </dl>
+              {/* The heading wears the SUBJECT/BODY dress (Mark, 2026-09-22),
+                  so the two columns start on one line and read as peers rather
+                  than as a field and an afterthought beside it. Sentence case
+                  in the source like every other label here — `uppercase` is
+                  what puts it on the page as FIELD TOKEN KEYS. */}
+              <div className="shrink-0 space-y-1 xl:w-72">
+                <p className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+                  Field token keys
+                </p>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
+                  {t.vars.map((v) => (
+                    <Fragment key={v}>
+                      <dt className="whitespace-nowrap text-muted">{`{${v}}`}</dt>
+                      <dd className="text-subtle">{VAR_EXAMPLE[v] ?? ""}</dd>
+                    </Fragment>
+                  ))}
+                </dl>
+              </div>
               </div>
             </div>
           );
