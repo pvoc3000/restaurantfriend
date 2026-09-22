@@ -358,12 +358,16 @@ export function SendDocument({
   // THE VERB ALONE (Mark, 2026-09-22). Each of these opens a submenu naming the
   // document — Preview ▸ Quote — so the noun was said twice, and "Preview
   // Order ▸ Kitchen Order" was said twice and disagreed with itself. The
-  // ellipsis stays on Email: it is the app's mark for a command that opens
+  // ellipsis stays on Send: it is the app's mark for a command that opens
   // something rather than acting on the spot.
+  //
+  // SEND, NOT EMAIL (Mark, 2026-09-22): "it works better with this new
+  // workflow" — since the pay link, sending an invoice is how a customer gets
+  // asked to pay, not only how a PDF reaches their inbox.
   const documentItems: ActionMenuItem[] = [
     { label: "Preview", items: submenu(preview) },
     { label: "Download", items: submenu(download) },
-    { label: "Email…", items: submenu(openCompose) },
+    { label: "Send…", items: submenu(openCompose) },
   ];
 
   return (
@@ -404,8 +408,8 @@ export function SendDocument({
           items={menu(download)}
         />
         <MenuButton
-          label="Email which document"
-          trigger={busy === "compose" ? "Loading…" : "Email…"}
+          label="Send which document"
+          trigger={busy === "compose" ? "Loading…" : "Send…"}
           triggerClassName={BUTTON_CLASS}
           caret
           disabled={busy !== null}

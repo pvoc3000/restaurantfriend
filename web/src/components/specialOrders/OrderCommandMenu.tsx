@@ -25,7 +25,7 @@ function group(items: ActionMenuItem[]): ActionMenuItem[] {
 /**
  * THE SPECIAL ORDER RECORD'S COMMANDS, AS ONE "ACTIONS" MENU (Mark, 2026-09-11:
  * "what if, instead, we had a single button, labeled Actions"). It replaces a
- * row of Preview · Download · Email… menus, Send to QuickBooks, Schedule
+ * row of Preview · Download · Send… menus (Email… until 2026-09-22), Send to QuickBooks, Schedule
  * production, Duplicate, Flag, Cancel and Delete buttons in four sizes and
  * three colours.
  *
