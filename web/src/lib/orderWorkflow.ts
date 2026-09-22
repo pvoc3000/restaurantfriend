@@ -49,6 +49,7 @@ import {
   STATUS_ORDER,
   STATUS_LABEL,
   money,
+  paidTodo,
   type SpecialOrderStatus,
 } from "./specialOrders";
 
@@ -142,6 +143,9 @@ export type WorkflowOrder = {
   order_printed_at: string | null;
   order_scheduled_at: string | null;
   delivery_scheduled_at: string | null;
+  /** Pickup or delivery — decides which to-do a paid order gets (`paidTodo`).
+   *  Optional so a caller that never selected it keeps the pickup behaviour. */
+  fulfillment?: string | null;
 };
 
 /** Where a status sits on the ladder. `cancelled` is off it — see the header. */
@@ -177,7 +181,8 @@ const DATE_IMPLIES: Partial<
   invoice_paid_at: (o, m) => [
     ...settlingPayment(o.invoice_paid_at, m),
     status("order"),
-    todo("Print Order"),
+    // A delivery not yet booked books first (Mark, 2026-09-22) — `paidTodo`.
+    todo(paidTodo(o)),
   ],
   // NO CONSEQUENCE ANY MORE — migration 117 does it, unasked.
   //

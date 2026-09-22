@@ -66,6 +66,28 @@ test("invoice paid date set → move to Order AND set the Print Order to-do", ()
   );
 });
 
+test("a DELIVERY paid in full → Schedule Delivery, unless it is already booked (2026-09-22)", () => {
+  eq(
+    cols(afterDateSet(order({ status: "invoice", invoice_paid_at: TODAY, fulfillment: "delivery" }), "invoice_paid_at")),
+    [["status", "order"], ["todo", "Schedule Delivery"]]
+  );
+  eq(
+    cols(
+      afterDateSet(
+        order({ status: "invoice", invoice_paid_at: TODAY, fulfillment: "delivery", delivery_scheduled_at: TODAY }),
+        "invoice_paid_at"
+      )
+    ),
+    [["status", "order"], ["todo", "Print Order"]],
+    "courier already booked"
+  );
+  eq(
+    cols(afterDateSet(order({ status: "invoice", invoice_paid_at: TODAY, fulfillment: "pickup" }), "invoice_paid_at")),
+    [["status", "order"], ["todo", "Print Order"]],
+    "pickup"
+  );
+});
+
 test("printing OFFERS NOTHING about the to-do — 117 does it (2026-09-21)", () => {
   // The rule did not go away, it moved into the database: migration 117 clears
   // the to-do a finished stage ANSWERS, so 'Print Order' goes and "call about

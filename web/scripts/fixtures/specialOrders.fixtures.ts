@@ -483,6 +483,22 @@ test("without a date the chase never fires, which is quiet rather than wrong", (
   );
 });
 
+test("suggestedTodo: a delivery books its courier before it is printed (2026-09-22)", () => {
+  eq(suggestedTodo(order({ status: "invoice", invoice_paid_at: "2026-08-01", fulfillment: "delivery" })), "Schedule Delivery");
+  eq(suggestedTodo(order({ status: "order", fulfillment: "delivery" })), "Schedule Delivery");
+  eq(
+    suggestedTodo(order({ status: "order", fulfillment: "delivery", delivery_scheduled_at: "2026-08-01" })),
+    "Print Order",
+    "booked → the printer is next"
+  );
+  eq(
+    suggestedTodo(order({ status: "order", fulfillment: "delivery", order_printed_at: "2026-08-01" })),
+    "Schedule Production",
+    "an order already printed is not sent back for its courier"
+  );
+  eq(suggestedTodo(order({ status: "order", fulfillment: "pickup" })), "Print Order");
+});
+
 test("suggestedTodo walks the ladder", () => {
   eq(suggestedTodo(order({ status: "lead" })), "Send Quote");
   eq(suggestedTodo(order({ status: "quote", quote_returned_at: "2026-08-01" })), "Send Invoice");

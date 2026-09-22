@@ -12,6 +12,26 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-22, MIGRATION 122 WRITTEN, NOT YET APPLIED — A DELIVERY
+   PAID IN FULL BOOKS ITS COURIER FIRST.** Mark: "if the order is set for
+   delivery, when it's paid in full, the to do should be set to 'schedule
+   delivery'". One rule, `paidTodo` in `lib/specialOrders` — delivery with no
+   `delivery_scheduled_at` → Schedule Delivery, else Print Order — read by the
+   hand-recorded payment's offer (`DATE_IMPLIES.invoice_paid_at`), by
+   `suggestedTodo` (paid invoice, and an unprinted Order: a delivery books its
+   courier before printing; an order already printed is NOT sent back for its
+   courier, so old printed deliveries don't change), and copied into SQL by 122
+   for the pay link. 122 also adds `delivery_scheduled_at` to 117's trigger —
+   the "one line to add if he wants it" — so booking the courier clears
+   'Schedule Delivery' / 'Respond to Email/Call' and the suggestion moves on to
+   Print Order. TO-DO ONLY: it does not clear a system flag, which 117 reserved
+   for Mark's five named acts. Verified: fixtures (1,995; the two new ones go red
+   when `paidTodo` is forced to Print Order), and 119–122 on a throwaway
+   Postgres — delivery unbooked → Schedule Delivery, booked → Print Order,
+   pickup → Print Order; booking clears it and leaves a system flag; a typed
+   note survives; a corrected (second) stamp clears nothing; 117's printing
+   still clears Print Order and the flag.
+
    **Shipped 2026-09-22 — THE PAY PAGE SHOWS ONE LINE, NOT THE ITEMS.** Mark:
    "we don't need individual line items. let's do one line item with the order
    number, name, and date." `/pay/{token}` now reads "Order #10070 · Birthday ·

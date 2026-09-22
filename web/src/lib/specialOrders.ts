@@ -793,6 +793,25 @@ export function needsAttention(
  * always overrides this on display, which is why the caller shows one or the
  * other rather than both.
  */
+/**
+ * THE TO-DO A PAID ORDER GETS (Mark, 2026-09-22): "if the order is set for
+ * delivery, when it's paid in full, the to do should be set to 'schedule
+ * delivery'". A delivery order whose courier is not booked yet books it first;
+ * everything else — and a delivery already booked — goes to the printer.
+ *
+ * One function, because three places say it and must agree: the offer after a
+ * hand-recorded payment (`lib/orderWorkflow`), the derived suggestion below,
+ * and migration 122's pay-link payment, which is the SQL copy of this rule.
+ */
+export function paidTodo(order: {
+  fulfillment?: string | null;
+  delivery_scheduled_at: string | null;
+}): "Schedule Delivery" | "Print Order" {
+  return order.fulfillment === "delivery" && !order.delivery_scheduled_at
+    ? "Schedule Delivery"
+    : "Print Order";
+}
+
 export function suggestedTodo(
   order: AttentionOrder,
   /** Today in the org's timezone. Optional: without it the two "chase them"
@@ -836,14 +855,16 @@ export function suggestedTodo(
       if (!order.quote_sent_at) return "Send Quote";
       return null; // Out, unanswered — theirs.
     case "invoice":
-      if (order.invoice_paid_at) return "Print Order";
+      if (order.invoice_paid_at) return paidTodo(order);
       if (!order.invoice_sent_at) return "Send Invoice";
       // FileMaker's own word for an invoice that has gone out and not come
       // back. Only once the event has passed — before that it is simply
       // outstanding.
       return late ? "Invoice Overdue!" : null;
     case "order":
-      if (!order.order_printed_at) return "Print Order";
+      // A delivery waiting on its courier books that before printing; once
+      // `delivery_scheduled_at` is set, `paidTodo` answers Print Order.
+      if (!order.order_printed_at) return paidTodo(order);
       if (!order.order_scheduled_at) return "Schedule Production";
       if (!order.receipt_sent_at) return "Send Receipt";
       return null;
