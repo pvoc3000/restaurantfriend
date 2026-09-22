@@ -179,10 +179,16 @@ const DATE_IMPLIES: Partial<
     status("order"),
     todo("Print Order"),
   ],
-  // CLEARED ONLY IF IT IS STILL THE PRINT TO-DO. Somebody who has typed
-  // "call about the balloons" in there is not asking for it to be thrown away
-  // because a sheet came off the printer.
-  order_printed_at: (o) => (o.todo === "Print Order" ? [clearTodo("Print Order")] : []),
+  // NO CONSEQUENCE ANY MORE — migration 117 does it, unasked.
+  //
+  // This used to OFFER to clear the to-do "only if it is still the print
+  // to-do", on the reasoning that somebody who has typed "call about the
+  // balloons" in there is not asking for it to be thrown away because a sheet
+  // came off the printer. That reasoning is intact and is now the trigger's:
+  // 117 clears the to-do a stage ANSWERS and leaves every other value alone,
+  // which is why it clears 'Print Order' and not 'Adjust time to 9am or later'.
+  // Offering to do what the database has already done is a dialog that changes
+  // nothing, and on a stale client it offers it about a value that is gone.
   // WHICHEVER HALF OF THE SIXTH RUNG IS STILL MISSING. `suggestedTodo` already
   // sequences Print Order before Schedule Production, and scheduling is now a
   // COMMAND rather than only a date somebody types — so the order can reach this
@@ -190,7 +196,7 @@ const DATE_IMPLIES: Partial<
   // the ladder is done and the next thing is the receipt.
   order_scheduled_at: (o) =>
     o.order_printed_at ? [todo("Send Receipt")] : [todo("Print Order")],
-  receipt_sent_at: (o) => (o.todo === "Send Receipt" ? [clearTodo("Send Receipt")] : []),
+  // Likewise 117's, for the same to-do-answers-the-stage reason.
 };
 
 /**
@@ -232,10 +238,6 @@ function status(next: SpecialOrderStatus): ColumnConsequence {
 
 function todo(next: string): ColumnConsequence {
   return { column: "todo", value: next, label: `Set the to-do to ${next}` };
-}
-
-function clearTodo(was: string): ColumnConsequence {
-  return { column: "todo", value: null, label: `Clear the ${was} to-do` };
 }
 
 const DATE_LABEL: Record<StageColumn, string> = {

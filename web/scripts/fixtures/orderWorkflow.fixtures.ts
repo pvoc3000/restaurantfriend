@@ -66,23 +66,31 @@ test("invoice paid date set → move to Order AND set the Print Order to-do", ()
   );
 });
 
-test("order printed date set → clear the Print Order to-do", () => {
+test("printing OFFERS NOTHING about the to-do — 117 does it (2026-09-21)", () => {
+  // The rule did not go away, it moved into the database: migration 117 clears
+  // the to-do a finished stage ANSWERS, so 'Print Order' goes and "call about
+  // the balloons" stays. Offering to do what the trigger has already done is a
+  // dialog that changes nothing — and on a client holding a pre-refresh copy of
+  // the order it offers it about a value that is already gone.
   eq(
-    cols(afterDateSet(
+    afterDateSet(
       order({ status: "order", todo: "Print Order", order_printed_at: TODAY }),
       "order_printed_at"
-    )),
-    [["todo", null]]
+    ),
+    []
   );
-});
-
-test("…but NOT somebody else's to-do", () => {
-  // "call about the balloons" is a note to themselves and is not thrown away
-  // because a sheet came off the printer.
   eq(
     afterDateSet(
       order({ status: "order", todo: "call about the balloons", order_printed_at: TODAY }),
       "order_printed_at"
+    ),
+    []
+  );
+  // And the receipt, which paired with 'Send Receipt' the same way.
+  eq(
+    afterDateSet(
+      order({ status: "order", todo: "Send Receipt", receipt_sent_at: TODAY }),
+      "receipt_sent_at"
     ),
     []
   );
@@ -93,10 +101,8 @@ test("a document going out proposes what its date implies", () => {
   // WILL be — without that it would see the date already set and say nothing.
   eq(cols(afterDocumentSent(order(), "quote", TODAY)), [["status", "quote"]]);
   eq(cols(afterDocumentSent(order({ status: "quote" }), "invoice", TODAY)), [["status", "invoice"]]);
-  eq(
-    cols(afterDocumentSent(order({ status: "order", todo: "Print Order" }), "order", TODAY)),
-    [["todo", null]]
-  );
+  // The kitchen sheet implies nothing to propose since 117 — see above.
+  eq(afterDocumentSent(order({ status: "order", todo: "Print Order" }), "order", TODAY), []);
 });
 
 /* -------------------------------------------------------------------------

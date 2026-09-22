@@ -12,6 +12,57 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Written 2026-09-21, MIGRATION 117 NOT YET APPLIED — A FINISHED STAGE
+   CLEARS THE NOTE IT WAS ABOUT** (Mark, answering the question 116 left open:
+   "'Respond to Email/Call' should be cleared (along with any flag) if we send
+   a quote, invoice, receipt, print or schedule the order"). **116 IS APPLIED**
+   — probed, both flagged orders backfilled to 'system' and no row breaks the
+   pairing.
+   116 deliberately left `todo` alone because an edit is not proof a customer
+   was answered. The five acts named here are not edits: each is a RUNG
+   COMPLETING, and each is the answer to the note — you cannot send a quote
+   without having dealt with the enquiry that asked for one. So 116's rule is
+   "somebody is here" and 117's is "the thing the note asked for is DONE".
+   **THE FIRST DRAFT CLEARED THE TO-DO WHATEVER IT SAID, AND THE REPO ALREADY
+   SAID WHY THAT IS WRONG.** `lib/orderWorkflow` had the sentence, about this
+   exact act: "CLEARED ONLY IF IT IS STILL THE PRINT TO-DO. Somebody who has
+   typed 'call about the balloons' in there is not asking for it to be thrown
+   away because a sheet came off the printer." And the column really holds such
+   sentences — `TODO_OPTIONS` is `allowNew` BECAUSE the measured export carries
+   "ON HOLD", "HOLIDAY", "*" and "Adjust time to 9am or later", so a trigger
+   that blanked the field would have deleted a quarter of the real values. The
+   argument for the broad version (decision 4 lets a stale to-do override the
+   right suggestion) was real and still lost.
+   **SO EACH STAGE CLEARS THE TO-DO IT ANSWERS AND NOTHING ELSE**:
+   'Respond to Email/Call' on all five — Mark's sentence exactly — plus the one
+   that names the very thing that just happened ('Send Quote', 'Send Invoice',
+   'Send Receipt', 'Print Order', 'Schedule Production'). **'Post Event
+   Followup' is deliberately absent**: it is an instruction for AFTER the
+   receipt, so a receipt going out is not an answer to it.
+   **THE FLAG CLEARS ON ANY OF THE FIVE, AND ONLY IF THE APP RAISED IT.** Asked
+   again, because "any flag" could have meant either and one reading destroys
+   something; Mark chose SYSTEM ONLY, consistent with 116. Printing an order
+   does not resolve "customer disputes the flavour".
+   **`delivery_scheduled_at` IS NOT ONE OF THE FIVE.** "Schedule the order" is
+   `order_scheduled_at`, the production schedule; booking a courier is a
+   different act nobody named, and it is one line to add.
+   **ONLY THE FIRST STAMP FIRES IT** (`old is null and new is not null`), so
+   correcting the date a quote went out never clears a note written since —
+   verified, along with the balloons case and the Post Event Followup case.
+   **THE TRIGGER ORDER IS LOAD-BEARING AND WAS ASSERTED.** Postgres fires BEFORE
+   triggers in NAME order, so `…_flag_source` runs before `…_stage_clears`; had
+   this one nulled `flag_reason` alone, 116's derivation would already have run
+   and `flag_source` would survive — tripping the paired CHECK on a statement
+   that looks nothing to do with flags. It nulls both.
+   **AND `orderWorkflow` LOST TWO OFFERS.** `order_printed_at` and
+   `receipt_sent_at` each offered to clear their own to-do; the trigger does it
+   unasked, and an offer to do what the database has already done is a dialog
+   that changes nothing — worse on a client still holding the pre-refresh copy,
+   where it offers it about a value that is gone. The reasoning did not go away,
+   it moved into 117. `clearTodo` had no other caller and went with them. **The
+   fixtures caught this rather than a person**: two went red the moment the
+   consequences were removed.
+
    **Written 2026-09-21, MIGRATION 116 NOT YET APPLIED — THE FLAG SAYS WHO
    RAISED IT, CLEARS ITSELF WHEN THE TEAM ARRIVES, AND COMES BACK WHEN THE
    CUSTOMER ACTS** (Mark: a website order "needs to be cleared by hand, which
