@@ -12,8 +12,8 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Shipped 2026-09-22, MIGRATION 118 NOT YET APPLIED — A RUSH ORDER ARRIVES
-   CARRYING ITS RATE** (Mark: "if you notice the initiated date is less than two
+   **Shipped 2026-09-22, MIGRATION 118 APPLIED (Mark, same day) — A RUSH ORDER
+   ARRIVES CARRYING ITS RATE** (Mark: "if you notice the initiated date is less than two
    business days from the event date, automatically apply the rush fee", then,
    asked which of three shapes: "the user facing rush fee field should be a
    percentage, i.e. 35%, but when applied to the order it should be either the
@@ -66,6 +66,16 @@
    row added — without which a rate change would be the only money edit on the
    record writing no history. Verified in the harness: the column lands, a rate
    change logs "Rush fee (%) set to 0.35", and the whole file re-runs clean.
+   **PROBED LIVE AFTER APPLYING.** The app's own money select — all six columns
+   plus `rush_rate` — answers, so no screen is reading a column that is not
+   there; 0 orders carry a rate; and the 60-line logger reproduction, which was
+   the risky part of the file, landed: setting a rate on a scratch TEMPLATE
+   (numbered `ZZZ-118-PROBE` by hand, so the order-number sequence is untouched)
+   logged **"Rush fee (%) set to 0.35"**. Deleted after, events 114,889 either
+   side.
+   **STILL TO DO, AND IT IS MARK'S**: the settings rate is 30, and he asked for
+   35. The field is percent-facing now, so it is one number on the Messages
+   tab's neighbour — but it is a policy figure, not a code one.
 
    **Shipped 2026-09-22, NEEDS A REDEPLOY — A QUOTE APPROVAL IS COPIED TO THE
    MAILBOX IT WAS SENT FROM** (Mark: "it should cc
