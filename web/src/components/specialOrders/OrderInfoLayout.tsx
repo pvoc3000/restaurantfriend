@@ -138,9 +138,18 @@ const FRAME_MIN = 420;
  *
  * A measured frame is only honest while the fixed parts FIT IN IT, so the
  * floor is now what the columns actually need: each column's non-growing
- * children, their gaps, and a pane worth reading. The frame then overflows the
- * window and THE PAGE SCROLLS — which is what this layout already does below
- * `xl`, and is the same promise: nothing hidden, no pane too short to read.
+ * children in FULL, their gaps, and a pane worth reading. The frame then
+ * overflows the window and THE PAGE SCROLLS — which is what this layout
+ * already does below `xl`, and is the same promise: nothing hidden, no pane
+ * too short to read.
+ *
+ * WHICH CHILD IS THE PANE IS ASKED OF THE DOM (`overflow-y`), not assumed to
+ * be the last one. That is what lets the Notes tab put a scroll view on ONE
+ * side (Mark, 2026-09-21: "the history area needs to be in a scroll view but
+ * the rest of the tab does not") — its notes column is a plain block and
+ * counts for its whole height, its log column is a pane and counts for
+ * `MIN_PANE`. One rule, both tabs, and neither layout has to describe its
+ * shape twice.
  *
  * `scrollHeight` RATHER THAN A FLAT `MIN_PANE`, which is what keeps this from
  * forcing a scrollbar onto screens that never needed one. It reads the pane's
@@ -171,14 +180,16 @@ function useColumnFloor(
       let needed = FRAME_MIN;
       for (const column of columns) {
         const children = Array.from(column.children) as HTMLElement[];
-        const pane = children.pop();
-        if (!pane) continue;
+        if (!children.length) continue;
         const gap = parseFloat(getComputedStyle(column).rowGap) || 0;
-        const fixed = children.reduce(
-          (total, child) => total + child.getBoundingClientRect().height + gap,
-          0
-        );
-        needed = Math.max(needed, fixed + Math.min(pane.scrollHeight, MIN_PANE));
+        let wants = gap * (children.length - 1);
+        for (const child of children) {
+          const scrolls = /auto|scroll/.test(getComputedStyle(child).overflowY);
+          wants += scrolls
+            ? Math.min(child.scrollHeight, MIN_PANE)
+            : child.getBoundingClientRect().height;
+        }
+        needed = Math.max(needed, wants);
       }
       // The >1px guard the measured height uses, and for its reason: a
       // sub-pixel difference is the observer reading its own write.
@@ -226,12 +237,29 @@ function GrowingPane({ children }: { children: ReactNode }) {
 
 
 /**
- * TWO PANES SIDE BY SIDE — the Notes tab: the document notes beside the log.
+ * TWO COLUMNS SIDE BY SIDE — the Notes tab: the document notes beside the log.
  *
  * The same measured frame as the quadrants, and the same reason for pairing
  * these two: notes want WIDTH (they are paragraphs) and the log wants HEIGHT
  * (a twelve-year order carries two hundred entries). Neither fits under the
- * other, and both scroll their own rows rather than the page.
+ * other.
+ *
+ * ONLY THE LOG SCROLLS (Mark, 2026-09-21: "the history area needs to be in a
+ * scroll view but the rest of the tab does not"). Both sides were panes until
+ * then, and the two are not the same kind of thing at all. The log is a LIST
+ * whose length is a fact about the order's age — nobody reads to the bottom of
+ * it, and letting it size the page would bury everything under two hundred
+ * entries, which is the arrangement this layout exists to replace. The notes
+ * are FIVE FIELDS YOU TYPE IN: a box that scrolls them is a box that hides one
+ * of five things you came here to edit, and it hides it behind a scrollbar
+ * INSIDE a page that scrolls too.
+ *
+ * So the notes column is a plain block at its natural height and the frame
+ * grows to hold it — `useColumnFloor` reads that straight off the DOM, because
+ * it asks which children scroll rather than assuming. Measured on a real order
+ * at 1400×620: the five fields are 615px, the frame was 420px, and 195px of
+ * them sat behind an inner scrollbar. Now the frame is 615px, every field is
+ * on the page, and the log beside them is 615px of scroll view.
  */
 export function OrderSplitLayout({
   left,
@@ -241,15 +269,21 @@ export function OrderSplitLayout({
   right: ReactNode;
 }) {
   const frame = useRef<HTMLDivElement>(null);
+  const leftColumn = useRef<HTMLDivElement>(null);
+  const rightColumn = useRef<HTMLDivElement>(null);
   const wide = useViewportAtLeast(1280);
-  useExactViewportHeight(frame, wide, 420);
+  const floor = useColumnFloor(leftColumn, rightColumn, wide);
+  useExactViewportHeight(frame, wide, floor);
 
   return (
     <div ref={frame} className="flex min-h-0 flex-col gap-10 xl:flex-row xl:gap-16">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <GrowingPane>{left}</GrowingPane>
+      <div ref={leftColumn} className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {/* `shrink-0`, like the quadrants' heads: it states that this column
+            reports its real height to the floor and never gives way to the
+            frame — which is the whole difference between it and a pane. */}
+        <div className="shrink-0">{left}</div>
       </div>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div ref={rightColumn} className="flex min-h-0 min-w-0 flex-1 flex-col">
         <GrowingPane>{right}</GrowingPane>
       </div>
     </div>

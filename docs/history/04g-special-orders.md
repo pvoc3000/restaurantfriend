@@ -12,6 +12,31 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-21 — ON THE NOTES TAB ONLY THE HISTORY SCROLLS** (Mark,
+   the same afternoon: "the history area needs to be in a scroll view but the
+   rest of the tab does not"). Both sides were `GrowingPane`s, and the two are
+   not the same kind of thing at all. The log is a LIST whose length is a fact
+   about the order's age — nobody reads to the bottom of it, and letting it
+   size the page would bury everything under two hundred entries, which is the
+   arrangement this layout exists to replace. The notes are FIVE FIELDS YOU
+   TYPE IN, and a box that scrolls them hides one of five things you came here
+   to edit, behind a scrollbar INSIDE a page that scrolls too. Measured at
+   1400×620 before the change: the five fields are 615px, the frame was 420px,
+   so 195px of them sat behind that inner scrollbar.
+   **THE FLOOR ALREADY KNEW HOW TO DO THIS**, once it stopped assuming. It now
+   asks the DOM which of a column's children scroll (`overflow-y`) instead of
+   taking the last one: a scrolling child counts for `min(scrollHeight, 160)`,
+   anything else counts IN FULL. So the notes column reports its real 615px and
+   the frame grows to it, the log column reports 160 and never stretches the
+   page — one rule, both tabs, and neither layout describes its shape twice.
+   After: frame 615px, every field on the page, 615px of scroll view beside
+   them. **Proved the log still can't push the page around** by injecting 200
+   entries into the pane: content 4,799px, box 615px, frame and document
+   unchanged.
+   The notes column is `shrink-0`, like the quadrants' heads — which is exactly
+   what makes it a column rather than a pane: it reports its real height to the
+   floor and never gives way to the frame.
+
    **Shipped 2026-09-21 — THE INFO TAB'S FRAME STOPS PROMISING A HEIGHT IT
    HASN'T GOT** (Mark: on a small screen "the completion dates are truncated
    but scrollable, but the 'also that day' section is below the bottom of the
