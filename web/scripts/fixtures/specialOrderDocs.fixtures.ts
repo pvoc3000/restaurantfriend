@@ -31,6 +31,7 @@ import {
   replySubject,
   sizeClassGroups,
   taxonomyLine,
+  templateVars,
   threadHeaders,
   usDate,
   usTime,
@@ -278,12 +279,56 @@ test("an unknown placeholder is LEFT ALONE, never blanked", () => {
   eq(fillTemplate("a{gap}b", { gap: "" }), "ab");
 });
 
-test("the DAY-OF CONTACT is preferred over the customer's own address", () => {
-  // Filled on 7,735 of the 8,330 real orders, and on a corporate order it is
-  // the person who placed it while the customer record is accounts payable.
-  eq(documentRecipient(order()), "alexlandayan@gmail.com");
-  eq(documentRecipient(order({ contact_email: null })), "customer@example.com");
+test("the CUSTOMER is preferred over the order's day-of contact", () => {
+  // Mark, 2026-09-21. The papers belong to whoever the order belongs to; the
+  // contact is who to ring on the day. It was the other way round until then.
+  eq(documentRecipient(order()), "customer@example.com");
+  // The fallback is the whole reason the contact is still read: a lead has no
+  // customer linked, and its contact address is the only one it holds.
+  eq(documentRecipient(order({ customer: null })), "alexlandayan@gmail.com");
+  eq(
+    documentRecipient(order({ customer: { ...order().customer!, email: null } })),
+    "alexlandayan@gmail.com"
+  );
   eq(documentRecipient(order({ contact_email: null, customer: null })), "");
+});
+
+test("the greeting names the customer, and never the list label", () => {
+  // `{first_name}` off `customerLabel` would read "Cafe" here.
+  const corporate = order({
+    customer: {
+      first_name: "Ji-Yeon",
+      last_name: "Kim",
+      company: "Cafe Knotted",
+      phone: null,
+      email: "jiyeon@example.com",
+    },
+    contact_name: "Traci at the venue",
+  });
+  eq(templateVars(corporate).full_name, "Ji-Yeon Kim");
+  eq(templateVars(corporate).first_name, "Ji-Yeon");
+  // Company-only customer: the company is the name there is.
+  eq(
+    templateVars(
+      order({
+        customer: {
+          first_name: null,
+          last_name: null,
+          company: "Yeastie Boys",
+          phone: null,
+          email: "hi@example.com",
+        },
+      })
+    ).full_name,
+    "Yeastie Boys"
+  );
+  // No customer at all falls back to the day-of contact, like the address does.
+  eq(templateVars(order({ customer: null })).full_name, "Alexandra David");
+  // And with neither, the greeting stays a sentence rather than an em dash.
+  eq(
+    templateVars(order({ customer: null, contact_name: null })).first_name,
+    "there"
+  );
 });
 
 test("the quote email carries the totals and the approval paragraph", () => {

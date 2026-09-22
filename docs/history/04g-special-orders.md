@@ -12,6 +12,41 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-21 — A DOCUMENT EMAIL GOES TO THE CUSTOMER, NOT TO THE
+   DAY-OF CONTACT** (Mark: "the app is using the day of contact name and info
+   rather than the customer name and info. I think the email should go to the
+   customer"). `documentRecipient` had preferred `contact_email` since the
+   compose card was built, on the reasoning written into its own header — the
+   contact is filled on 7,735 of the 8,330 migrated orders, and on a corporate
+   order it is the person who actually placed it. That reasoning collapsed the
+   distinction (n) drew on purpose: **`customers` is who the order BELONGS TO
+   and who is billed; `contact_*` is who to ring ON THE DAY**, which on a
+   wedding is the planner and on a corporate order is whoever is running the
+   party. A quote, an invoice and a receipt are the customer's papers.
+   **THE GREETING MOVED WITH THE ADDRESS, which is the half that would have
+   been easy to miss.** `templateVars` derived `{full_name}`/`{first_name}`
+   from `contact_name` too, so leaving it would have addressed one person by
+   name in an email sent to another — worse than the bug being fixed. It now
+   uses **`customerContactName`, never `customerLabel`**: the label composes
+   "Cafe Knotted (Ji-Yeon Kim)" for a LIST, so `{first_name}` off it reads
+   "Cafe". The old line also fell back to `customerLabel(null)`, which returns
+   an em dash — a greeting of "Hi —," on an order with neither.
+   **THE CONTACT IS STILL READ, as the FALLBACK on both**: an order with no
+   customer linked — every lead, and every phone order until somebody presses
+   Link customer — holds no other address, and the alternative is a compose
+   card with an empty To field. Order of preference is the only thing that
+   changed. The To field is editable, so sending a quote to the planner instead
+   is one edit, and the compose card is where a human reviews it either way.
+   **THE PDFs WERE ALREADY RIGHT and were left alone.** The quote/invoice
+   masthead prints CUSTOMER and CONTACT as two separate bands (both facts, both
+   labelled), and the KITCHEN SHEET's CONTACT INFO leads with the day-of
+   contact — which is correct there and for the same reason: that sheet is read
+   by somebody who may need to ring about the order on the day.
+   Fixtures updated and checked by reverting the preference order, which turns
+   the recipient case red; four new greeting cases cover the corporate
+   customer, the company-only customer, the contactless lead and the order with
+   neither (`{first_name}` stays "there").
+
    **Shipped 2026-09-21 — A NEW ORDER IS TAKEN BY WHOEVER IS SIGNED IN, AS AN
    EMPLOYEE** (Mark: "when creating a new special order, the user signed in
    should be set as the 'taken by' person"). The create path already wrote the

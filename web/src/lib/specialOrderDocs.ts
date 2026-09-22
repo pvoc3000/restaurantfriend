@@ -22,7 +22,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
-  customerLabel,
+  customerContactName,
   isProductionLine,
   orderTotals,
   type CustomerName,
@@ -752,12 +752,19 @@ export function fillTemplate(template: string, vars: Record<string, string>): st
   return template.replace(/\{(\w+)\}/g, (m, key) => (key in vars ? vars[key] : m));
 }
 
-/** The variables every special-order template can use. */
+/** The variables every special-order template can use.
+ *
+ *  `{full_name}` and `{first_name}` NAME THE RECIPIENT, so they follow
+ *  `documentRecipient` — the customer, falling back to the day-of contact —
+ *  or the greeting addresses one person while the email goes to another.
+ *  `customerContactName`, never `customerLabel`: the label composes
+ *  "Cafe Knotted (Ji-Yeon Kim)" for a list, which makes `{first_name}` read
+ *  "Cafe" and is not how you open a letter. */
 export function templateVars(
   order: OrderDocData,
   extras: Record<string, string> = {}
 ): Record<string, string> {
-  const name = order.contact_name || customerLabel(order.customer);
+  const name = customerContactName(order.customer) || order.contact_name || "";
   const first = (name || "").trim().split(/\s+/)[0] ?? "";
   const m = (v: number) => `$${v.toFixed(2)}`;
   return {
@@ -783,15 +790,25 @@ export function templateVars(
 }
 
 /**
- * Who the document goes TO, and it is deliberately not just the customer.
+ * Who the document goes TO: THE CUSTOMER (Mark, 2026-09-21).
  *
- * The DAY-OF CONTACT is preferred where there is one — filled on 7,735 of the
- * 8,330 real orders, and on a corporate order it is the person who actually
- * placed it, while the customer record may be an accounts address. The
- * customer's own email is the fallback, which is what a walk-in order has.
+ * It was the other way round until then — the day-of contact first, on the
+ * reasoning that they are filled on 7,735 of the 8,330 real orders and are the
+ * person who actually placed a corporate order. That reasoning confuses two
+ * facts the record deliberately keeps apart: `customers` is who the order
+ * BELONGS TO and who is billed for it, `contact_*` is who to ring ON THE DAY,
+ * which on a wedding is routinely the planner and on a corporate order is
+ * whoever is running the party. A quote, an invoice and a receipt are the
+ * customer's papers, so they go to the customer.
+ *
+ * The day-of contact is the FALLBACK, not a competitor: an order that has no
+ * customer linked — every lead and every phone order until somebody links one
+ * — would otherwise have no recipient at all, and its contact address is the
+ * only one it holds. The compose card shows this in an editable To field, so
+ * sending a quote to the planner instead stays one edit away.
  */
 export function documentRecipient(order: OrderDocData): string {
-  return (order.contact_email ?? order.customer?.email ?? "").trim();
+  return (order.customer?.email ?? order.contact_email ?? "").trim();
 }
 
 export function buildDocumentEmail(
