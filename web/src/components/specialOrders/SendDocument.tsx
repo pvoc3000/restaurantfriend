@@ -326,10 +326,15 @@ export function SendDocument({
       onSelect: () => act(d.kind),
       disabled: busy !== null,
     }));
+  // THE VERB ALONE (Mark, 2026-09-22). Each of these opens a submenu naming the
+  // document — Preview ▸ Quote — so the noun was said twice, and "Preview
+  // Order ▸ Kitchen Order" was said twice and disagreed with itself. The
+  // ellipsis stays on Email: it is the app's mark for a command that opens
+  // something rather than acting on the spot.
   const documentItems: ActionMenuItem[] = [
-    { label: "Preview Order", items: submenu(preview) },
-    { label: "Download Order", items: submenu(download) },
-    { label: "Email Order…", items: submenu(openCompose) },
+    { label: "Preview", items: submenu(preview) },
+    { label: "Download", items: submenu(download) },
+    { label: "Email…", items: submenu(openCompose) },
   ];
 
   return (
