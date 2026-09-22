@@ -2935,6 +2935,15 @@
    ORDERS, where the word was said twice, and wrong in a menu, where the row has
    to name the noun it makes.
 
+   **"CLEAR ITEMS" IS ON THE RECORD'S ACTIONS MENU SINCE 2026-09-22** (Mark:
+   "removes all items in a special order"). `OrderActions.clearItems`, first row
+   of the destructive group — least to most drastic: the lines, Cancel Order,
+   Delete. A confirm that counts the lines, then ONE delete by `order_id`, so a
+   refusal leaves the order whole. Payments, documents and the record stay.
+   **HIDDEN ONCE SCHEDULED** (decision 9's lock on the items, which a menu row
+   must not route round) and on an order with no lines. No log line written
+   here: 054's trigger records "Removed N × …" per line.
+
    **A LETTER BOX TAKES SEVERAL LETTERS SINCE 2026-09-22** (Mark: "instead of
    adding an H, then adding an A, then adding a P… we could instead enter
    H, A, P"). `parseLetters` in `lib/specialOrderLines`, read by the chooser's
