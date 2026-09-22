@@ -811,6 +811,36 @@ export function documentRecipient(order: OrderDocData): string {
   return (order.customer?.email ?? order.contact_email ?? "").trim();
 }
 
+/**
+ * WHO ELSE SEES IT: the standing Cc, plus the day-of contact when they are a
+ * different person from the recipient (Mark, 2026-09-21).
+ *
+ * The other half of moving the To address to the customer. On a corporate
+ * order the contact is the one who placed it and is chasing it, so an invoice
+ * that goes only to accounts payable is one they never see — but they are not
+ * who it is addressed to, which is what a Cc says exactly.
+ *
+ * A DIFFERENT ADDRESS, not a different record. Comparison is on the trimmed,
+ * lowercased address, because (n) seeds `contact_*` FROM the customer on nine
+ * orders in ten: the same person reached twice would be the ordinary case
+ * rather than the exception, and a Cc to yourself reads like a mistake in the
+ * app. The same comparison drops a contact who is already in the configured
+ * Cc, and an order with no customer — where the contact IS the recipient —
+ * falls out of it for free.
+ *
+ * COMMA-SEPARATED, which is what the compose card shows and what both
+ * transports send. `email_cc` leads because it is the standing setting and was
+ * the whole of this field before today; the contact is appended.
+ */
+export function documentCc(order: OrderDocData, configuredCc: string): string {
+  const split = (v: string) => v.split(",").map((a) => a.trim()).filter(Boolean);
+  const out = split(configuredCc);
+  const taken = new Set([documentRecipient(order), ...out].map((a) => a.toLowerCase()));
+  const contact = (order.contact_email ?? "").trim();
+  if (contact && !taken.has(contact.toLowerCase())) out.push(contact);
+  return out.join(", ");
+}
+
 export function buildDocumentEmail(
   kind: DocumentKind | "statement",
   order: OrderDocData,
@@ -824,7 +854,7 @@ export function buildDocumentEmail(
   const vars = templateVars(order, extras);
   return {
     to: documentRecipient(order),
-    cc: typeof so.email_cc === "string" ? so.email_cc : "",
+    cc: documentCc(order, typeof so.email_cc === "string" ? so.email_cc : ""),
     subject: fillTemplate(configured.subject ?? fallback.subject, vars),
     body: fillTemplate(configured.body ?? fallback.body, vars),
   };

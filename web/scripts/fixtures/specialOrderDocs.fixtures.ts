@@ -22,6 +22,7 @@
 import { test, eq, ok, no } from "./harness";
 import {
   buildDocumentEmail,
+  documentCc,
   documentFileName,
   documentRecipient,
   fillTemplate,
@@ -331,6 +332,32 @@ test("the greeting names the customer, and never the list label", () => {
   );
 });
 
+test("the DAY-OF CONTACT is cc'd, but only when they are somebody else", () => {
+  // The base order's contact was seeded from the customer and kept their own
+  // address, which is the corporate shape: the customer is billed, the contact
+  // is chasing it.
+  eq(documentCc(order(), ""), "alexlandayan@gmail.com");
+  eq(documentCc(order(), "orders@example.com"),
+     "orders@example.com, alexlandayan@gmail.com");
+
+  // SAME ADDRESS, NO SECOND COPY — (n) seeds the contact from the customer, so
+  // this is the common case and a Cc to the recipient reads as a bug.
+  const same = order({ contact_email: "customer@example.com" });
+  eq(documentCc(same, ""), "");
+  eq(documentCc(same, "orders@example.com"), "orders@example.com");
+  // Case and surrounding space are not a different person.
+  eq(documentCc(order({ contact_email: "  Customer@Example.COM " }), ""), "");
+  eq(documentCc(order(), " orders@example.com , ALEXLANDAYAN@gmail.com "),
+     "orders@example.com, ALEXLANDAYAN@gmail.com");
+
+  // An order with no customer sends TO the contact, so there is nobody to add.
+  eq(documentCc(order({ customer: null }), ""), "");
+  // No contact at all leaves the configured Cc exactly as it was.
+  eq(documentCc(order({ contact_email: null }), "orders@example.com"),
+     "orders@example.com");
+  eq(documentCc(order({ contact_email: null }), ""), "");
+});
+
 test("the quote email carries the totals and the approval paragraph", () => {
   const email = buildDocumentEmail("quote", order(), {}, {
     approve_line: "\nApprove here: https://example.com/q/abc\n",
@@ -355,7 +382,7 @@ test("a configured template overrides the generic one, per document", () => {
   };
   const quote = buildDocumentEmail("quote", order(), settings);
   eq(quote.subject, "Quote 9885 for Alexandra David");
-  eq(quote.cc, "orders@example.com");
+  eq(quote.cc, "orders@example.com, alexlandayan@gmail.com");
   // The INVOICE keeps the built-in template — overriding one document must not
   // silently change the others.
   eq(

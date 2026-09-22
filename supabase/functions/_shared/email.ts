@@ -38,6 +38,12 @@ export type Mail = {
    *  message's. */
   from?: string;
   to: string;
+  /** One address or several, comma-separated — which is what a compose card's
+   *  Cc field holds and what `orgs.settings.special_orders.email_cc` may. The
+   *  Gmail path writes it into a `Cc:` header verbatim, where the separator is
+   *  already the spec's; the Resend path SPLITS it, because that API wants an
+   *  array and one element holding "a@x, b@y" is one address as far as it is
+   *  concerned. */
   cc?: string;
   replyTo?: string;
   subject: string;
@@ -115,6 +121,13 @@ function resendHeaders(mail: Mail): Record<string, string> | undefined {
   return Object.keys(headers).length ? headers : undefined;
 }
 
+/** See `Mail.cc`: Resend takes an ARRAY, so a comma-separated field has to be
+ *  split rather than handed over whole. */
+function ccList(cc?: string): string[] | undefined {
+  const parts = (cc ?? "").split(",").map((a) => a.trim()).filter(Boolean);
+  return parts.length ? parts : undefined;
+}
+
 async function sendViaResend(
   creds: { api_key?: string },
   mail: Mail & { from: string }
@@ -129,7 +142,7 @@ async function sendViaResend(
     body: JSON.stringify({
       from: mail.from,
       to: [mail.to],
-      cc: mail.cc ? [mail.cc] : undefined,
+      cc: ccList(mail.cc),
       reply_to: mail.replyTo ?? undefined,
       subject: mail.subject,
       text: mail.text,

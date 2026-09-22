@@ -31,7 +31,29 @@
    "Cafe Knotted (Ji-Yeon Kim)" for a LIST, so `{first_name}` off it reads
    "Cafe". The old line also fell back to `customerLabel(null)`, which returns
    an em dash — a greeting of "Hi —," on an order with neither.
-   **THE CONTACT IS STILL READ, as the FALLBACK on both**: an order with no
+   **AND THE DAY-OF CONTACT IS CC'D WHEN THEY ARE SOMEBODY ELSE** (Mark, same
+   day, on being offered it). The other half of the move: on a corporate order
+   the contact is the person chasing the thing, so an invoice that reaches only
+   accounts payable is one they never see — and a Cc says exactly what is true,
+   that they are not who it is addressed to. `documentCc` compares TRIMMED,
+   LOWERCASED addresses rather than records, because (n) seeds `contact_*` from
+   the customer on nine orders in ten: the same human reached twice would be
+   the ordinary case, not the exception, and a Cc to the recipient reads as a
+   bug in the app. The same comparison drops a contact already sitting in the
+   configured `email_cc`, and an order with no customer — where the contact IS
+   the To — falls out of it for nothing. `email_cc` leads the list because it
+   is the standing setting and was the whole of the field until today.
+   **IT ALSO EXPOSED A LATENT BUG IN THE RESEND TRANSPORT.** `_shared/email.ts`
+   sent `cc: [mail.cc]` — the WHOLE comma-separated field as ONE array element,
+   which Resend reads as a single address. Nothing had caught it because
+   `email_cc` has only ever held one address; the moment this feature appends a
+   second, a Resend send would have silently dropped both. Split there now
+   (`ccList`); the Gmail path was always right, since a `Cc:` header's
+   separator is the comma. **Special orders send through GMAIL, so the deployed
+   behaviour was never wrong** — but `send-po-email` and `send-shift-report`
+   share that module, so the fix belongs to all three. **The three functions
+   need a redeploy to pick it up**; nothing else in them changed.
+      **THE CONTACT IS STILL READ, as the FALLBACK on both**: an order with no
    customer linked — every lead, and every phone order until somebody presses
    Link customer — holds no other address, and the alternative is a compose
    card with an empty To field. Order of preference is the only thing that
