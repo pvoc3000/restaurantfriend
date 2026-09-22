@@ -12,7 +12,26 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Shipped 2026-09-22, MIGRATION 120 WRITTEN, NOT YET APPLIED — THE PAYMENT
+   **Verified 2026-09-22 — THE FIRST SANDBOX PAYMENT, END TO END.** 120
+   applied, `square-pay` deployed (its first compile — no Deno here, and it
+   compiled), sandbox settings filled. Mark sent himself test order #10070's
+   invoice ($0.42, pickup DF01, no kitchen) and paid it with Square's test Visa.
+   Read back: ONE pay token, bound, total 0.42, claim released; a
+   `special_order_payments` row of 0.42, `Square Online`, note "Pay link · visa
+   ending 1111", `external_ref` = the Square payment id, `created_by` null;
+   `invoice_paid_at` stamped the same day; status left at `invoice` (by
+   design); the 054 trigger's "Payment of $0.42 recorded · Square Online" in the
+   log and NO "Paid online, but…" event, so recording and the confirmation send
+   both succeeded; `pay_by_token` now answers `paid`. Two things found on the
+   way: the settings cells can overwrite each other (each writes the WHOLE
+   `orgs.settings` from its render-time snapshot — the first three Square
+   fields vanished, re-entering one at a time with reloads kept them; spun off
+   as its own task), and `{pay_line}` went into the saved invoice template while
+   still in sandbox, harmless only because nobody else sends invoices yet.
+   NOT yet exercised: a decline, a gift card, two tabs at once, a superseded
+   link, Apple/Google Pay, production.
+
+   **Shipped 2026-09-22, MIGRATION 120 APPLIED (Mark, same day) — THE PAYMENT
    LANDS AT THE SHOP THAT MAKES THE ORDER.** Mark, the same day, once 119 was
    applied: "I don't want to create an 'Orders' location. I think sales should
    stay with the location that makes the donuts." 120 redefines `pay_by_token`
