@@ -42,6 +42,7 @@ import {
   standingMaterializationDates,
   suggestedRushFee,
   topUpWindow,
+  isPersonFlag,
   suggestedTodo,
   type AttentionOrder,
   type MoneyOrder,
@@ -504,6 +505,39 @@ test("suggestedTodo walks the ladder", () => {
 
 test("a flagged order's suggestion is Resolve Issue", () => {
   eq(suggestedTodo(order({ flag_reason: "wrong date" })), "Resolve Issue");
+  // Absent `flag_source` reads as a person's flag, which is what keeps every
+  // caller that has not been taught to select it on pre-116 behaviour.
+  eq(suggestedTodo(order({ flag_reason: "wrong date", flag_source: "person" })), "Resolve Issue");
+});
+
+test("a SYSTEM flag is news, so the ladder keeps suggesting (116)", () => {
+  // "Resolve Issue" over "Quote approved online by Jane Doe" calls good news a
+  // problem. The suggestion is the step that news unlocks.
+  eq(
+    suggestedTodo(
+      order({
+        status: "quote",
+        quote_returned_at: "2026-08-01",
+        flag_reason: "Quote approved online by Jane Doe",
+        flag_source: "system",
+      })
+    ),
+    "Send Invoice"
+  );
+  // A new inquiry, likewise: still a lead with no quote out.
+  eq(
+    suggestedTodo(order({ status: "lead", flag_reason: "New Inquiry", flag_source: "system" })),
+    "Send Quote"
+  );
+});
+
+test("isPersonFlag: the two columns, and what absent means", () => {
+  ok(isPersonFlag({ flag_reason: "wrong date" }), "no source is a person's flag");
+  ok(isPersonFlag({ flag_reason: "wrong date", flag_source: "person" }));
+  no(isPersonFlag({ flag_reason: "New Inquiry", flag_source: "system" }));
+  // No flag at all is not a person's flag — it is no flag.
+  no(isPersonFlag({ flag_reason: null, flag_source: null }));
+  no(isPersonFlag({ flag_reason: null, flag_source: "person" }));
 });
 
 /* ==========================================================================

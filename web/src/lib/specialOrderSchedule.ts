@@ -33,7 +33,7 @@
  * HAPPY has two P's, and two lines of one letter are two donuts.
  */
 
-import { isProductionLine, unschedulableLines } from "./specialOrders";
+import { isPersonFlag, isProductionLine, unschedulableLines } from "./specialOrders";
 import { cutLetter, isLetterCut, letterCut } from "./specialOrderLines";
 
 /** A line, reduced to what scheduling needs. Structural, like `MoneyLine`. */
@@ -225,6 +225,8 @@ export type PullCandidate = {
   status: string | null;
   event_date: string | null;
   flag_reason: string | null;
+  /** Migration 116 — see `isPersonFlag`. Absent reads as a person's flag. */
+  flag_source?: string | null;
   kitchen_location_id: string | null;
   location_id: string | null;
   production_schedule_id: string | null;
@@ -319,7 +321,11 @@ export function pullReadiness(
   if (order.status !== "order") {
     return { state: "not_ready", reason: `still a ${statusLabel(order.status ?? "")}` };
   }
-  if (order.flag_reason) return { state: "hold", reason: order.flag_reason };
+  // A HOLD IS SOMEBODY SAYING "not yet" — so only a flag somebody TYPED holds
+  // a schedule (116). The two flags the app raises itself are a new inquiry and
+  // a customer approving the quote, and neither is a reason to keep an order
+  // off the day's production: the approval is the opposite of one.
+  if (isPersonFlag(order)) return { state: "hold", reason: order.flag_reason! };
   return { state: "ready" };
 }
 

@@ -278,6 +278,33 @@ export const COMPLETION_DATES: { column: string; label: string }[] = [
 /** Decision 4: flagging an order sets this todo, and resolving clears both. */
 export const FLAG_TODO = "Resolve Issue";
 
+/**
+ * WAS THIS FLAG TYPED BY ONE OF US? (migration 116)
+ *
+ * The column carries two different facts and always did. A PERSON's flag is a
+ * problem somebody chose to record — it outlives an unrelated edit and is
+ * cleared on purpose. A SYSTEM flag is a notice that something reached the
+ * order from outside — a new inquiry, a customer approving a quote — and it
+ * clears itself the moment anyone here touches the record.
+ *
+ * Only the two places where the difference CHANGES AN ANSWER ask: the to-do
+ * suggestion (news is not an issue to resolve) and production readiness (news
+ * is not a reason to hold a schedule). Everything that just wants "does this
+ * row want a human" — `needsAttention`, the red row, the progress tone, the
+ * start page's ordering — reads `flag_reason` and is right to, because both
+ * kinds mean exactly that.
+ *
+ * ABSENT READS AS `person`, which is deliberate: a query that has not been
+ * taught to select `flag_source` keeps pre-116 behaviour, and pre-116
+ * behaviour is the half that hides nothing.
+ */
+export function isPersonFlag(order: {
+  flag_reason: string | null;
+  flag_source?: string | null;
+}): boolean {
+  return Boolean(order.flag_reason) && order.flag_source !== "system";
+}
+
 /* ==========================================================================
  * 2. THE MONEY (decision 6)
  * ========================================================================== */
@@ -600,6 +627,10 @@ export type AttentionOrder = MoneyOrder & {
   receipt_sent_at: string | null;
   todo: string | null;
   flag_reason: string | null;
+  /** Migration 116. OPTIONAL, and absent means 'person' everywhere it is read:
+   *  a caller that has not been taught to select it gets the behaviour that
+   *  was there before 116, which is the safe half — a flag that stays put. */
+  flag_source?: string | null;
 };
 
 /**
@@ -711,7 +742,12 @@ export function suggestedTodo(
   today?: string
 ): string | null {
   if (order.kind !== "order" || order.status === "cancelled") return null;
-  if (order.flag_reason) return FLAG_TODO;
+  // A PERSON'S FLAG NAMES A PROBLEM, so resolving it IS the next action.
+  // A SYSTEM flag (116) does not: "Quote approved online by Jane Doe" is news,
+  // and the next action is the one the ladder was already going to suggest —
+  // send the invoice. Answering "Resolve Issue" to good news is what made the
+  // flag feel like a chore rather than a notice.
+  if (isPersonFlag(order)) return FLAG_TODO;
 
   /**
    * EACH CASE ASKS WHETHER ITS OWN DOCUMENT HAS GONE OUT (Mark, 2026-08-20,

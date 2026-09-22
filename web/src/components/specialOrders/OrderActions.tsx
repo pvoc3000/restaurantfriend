@@ -48,6 +48,8 @@ export function OrderActions({
   kind,
   status,
   flagReason,
+  flagSource,
+  todo,
   canWrite,
   scheduled,
   schedule,
@@ -61,6 +63,14 @@ export function OrderActions({
   kind: SpecialOrderKind;
   status: SpecialOrderStatus | null;
   flagReason: string | null;
+  /** Migration 116. 'system' means the app raised it — a new inquiry, a
+   *  customer approving a quote — so the command ACKNOWLEDGES rather than
+   *  resolves. Null or 'person' is somebody's own flag and keeps the old
+   *  wording, which is also what an unmigrated caller gets. */
+  flagSource: string | null;
+  /** The record's current to-do, read only by `resolve` — see the comment
+   *  there for why clearing the flag does not always clear it. */
+  todo: string | null;
   canWrite: boolean;
   /**
    * True once a production schedule exists for this order — read by CANCEL,
@@ -120,10 +130,20 @@ export function OrderActions({
   function resolve() {
     setError(null);
     start(async () => {
-      // …and resolving clears BOTH, for the mirror reason.
+      // …and resolving clears the to-do IT SET, which since 116 is not always
+      // both columns. Decision 4 pairs "Resolve Issue" with a flag somebody
+      // raised, so clearing one clears the other. A SYSTEM flag's companion
+      // to-do is a different sentence — a new inquiry carries "Respond to
+      // Email/Call" (058) — and that is a real instruction about the customer,
+      // not bookkeeping about the flag. Wiping it because somebody dismissed a
+      // notice would throw away the one line saying what still has to happen.
+      const clears =
+        todo === FLAG_TODO
+          ? { flag_reason: null, todo: null }
+          : { flag_reason: null };
       const { data, error: e } = await supabase
         .from("special_orders")
-        .update({ flag_reason: null, todo: null })
+        .update(clears)
         .eq("id", id)
         .select("id");
       if (e) setError(e.message);
@@ -324,7 +344,11 @@ export function OrderActions({
           ]
         : []),
       flagReason
-        ? { label: "Resolve Flag", onSelect: resolve, disabled: pending }
+        ? {
+            label: flagSource === "system" ? "Dismiss Notice" : "Resolve Flag",
+            onSelect: resolve,
+            disabled: pending,
+          }
         : { label: `Flag ${KIND_COMMAND_NOUN[kind]}…`, onSelect: () => setFlagging(true), disabled: pending },
     ];
     const destructive: ActionMenuItem[] = [
@@ -372,7 +396,10 @@ export function OrderActions({
              the exception in full. Unflagged, the same slot holds "Flag an
              issue", which is an ordinary command. */
           <button type="button" className={PRIMARY_BUTTON_CLASS} onClick={resolve} disabled={pending}>
-            Resolve the issue
+            {/* 116: THE VERB FOLLOWS WHO RAISED IT. "Resolve the issue" over
+                "Quote approved online by Jane Doe" calls good news a problem,
+                on the most prominent command the record has. */}
+            {flagSource === "system" ? "Mark as seen" : "Resolve the issue"}
           </button>
         ) : (
           <button type="button" className={BUTTON_CLASS} onClick={() => setFlagging(true)} disabled={pending}>

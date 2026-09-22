@@ -328,6 +328,26 @@ test("pullReadiness: a FLAGGED order is offered, unticked, with its flag", () =>
   );
 });
 
+test("pullReadiness: a SYSTEM flag does not hold a schedule (116)", () => {
+  // A hold is somebody saying "not yet". The two flags the app raises itself
+  // are a new inquiry and a customer APPROVING the quote — the second is the
+  // opposite of a reason to keep the order off the day's production.
+  eq(
+    pullReadiness(
+      candidate({ flag_reason: "Quote approved online by Jane Doe", flag_source: "system" }),
+      5
+    ),
+    { state: "ready" },
+    "ready"
+  );
+  // And a person's own flag still holds, with or without the column set.
+  eq(
+    pullReadiness(candidate({ flag_reason: "Customer changing the count", flag_source: "person" }), 5),
+    { state: "hold", reason: "Customer changing the count" },
+    "held"
+  );
+});
+
 test("pullReadiness: the disqualifiers, each by name", () => {
   const why = (o: Partial<PullCandidate>, lines = 5) => {
     const r = pullReadiness(candidate(o), lines);

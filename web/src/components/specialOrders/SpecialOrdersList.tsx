@@ -76,6 +76,8 @@ export type SpecialOrderRow = {
   status: SpecialOrderStatus | null;
   todo: string | null;
   flag_reason: string | null;
+  /** Migration 116 — the to-do hint below reads it through `isPersonFlag`. */
+  flag_source: string | null;
   title: string | null;
   event_date: string | null;
   event_time: string | null;

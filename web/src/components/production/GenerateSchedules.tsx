@@ -318,7 +318,7 @@ export function GenerateSchedules({
     const { data: orders, error: e } = await supabase
       .from("special_orders")
       .select(
-        `id, number, title, kind, status, event_date, flag_reason,
+        `id, number, title, kind, status, event_date, flag_reason, flag_source,
          kitchen_location_id, location_id, production_schedule_id`
       )
       .eq("kind", "order")
@@ -372,6 +372,7 @@ export function GenerateSchedules({
         status: (raw.status ?? null) as string | null,
         event_date: (raw.event_date ?? null) as string | null,
         flag_reason: (raw.flag_reason ?? null) as string | null,
+        flag_source: (raw.flag_source ?? null) as string | null,
         kitchen_location_id: (raw.kitchen_location_id ?? null) as string | null,
         location_id: (raw.location_id ?? null) as string | null,
         production_schedule_id: (raw.production_schedule_id ?? null) as string | null,

@@ -12,6 +12,90 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Written 2026-09-21, MIGRATION 116 NOT YET APPLIED — THE FLAG SAYS WHO
+   RAISED IT, CLEARS ITSELF WHEN THE TEAM ARRIVES, AND COMES BACK WHEN THE
+   CUSTOMER ACTS** (Mark: a website order "needs to be cleared by hand, which
+   isn't intuitive. Any activity on the record… should really clear the flag
+   automatically… when a customer approves a quote, it would be nice if it were
+   flagged again… Anything that happens to a record that isn't done by a member
+   of the team should be highlighted").
+   *Probe, don't read that line.* **The app breaks against a database without
+   116** — four screens now select `flag_source` and PostgREST answers
+   `42703 column special_orders.flag_source does not exist`, which was measured
+   against the hosted DB rather than assumed.
+   **THE COLUMN WAS ALWAYS DOING TWO JOBS.** A flag somebody TYPES is a
+   problem: "Resolve Issue" is its to-do and clearing it is a decision. A flag
+   the APP raises is a notice: something reached the order from outside and
+   nobody here has seen it. Opposite lifecycles — a notice should die when a
+   human engages, a problem should outlive an unrelated edit — which is why one
+   auto-clear rule for both would have been wrong. Asked; Mark chose SYSTEM
+   FLAGS ONLY.
+   **`flag_source` IS DERIVED FROM `auth.uid()`, SO NO WRITER HAS TO REMEMBER.**
+   A flag written with nobody signed in came from outside (the inquiry form and
+   the approval page both reach the table through a definer as `anon`); one
+   written while signed in was typed. A BEFORE trigger decides, which is design
+   rule 1's lesson turned into a mechanism — `NewPayPeriod` shipped without
+   `org_id` because every insert had to remember. The payoff is concrete:
+   `OrderActions.flag` was not touched and still gets 'person', and
+   `create_inquiry` — 200 lines that 058's own rule would have made us
+   reproduce in full to add one literal — was not touched at all and still gets
+   'system'.
+   **"ANY ACTIVITY" IS A ROW THAT ALREADY EXISTED.** 054 logs every watched
+   field, every line, every payment, and 115's logger stamps `auth.uid()` on
+   each. So the rule lives on `special_order_events`: an entry with an author
+   clears a system flag, an entry with `source = 'customer'` raises one carrying
+   its own sentence. The three things Mark named are all covered without naming
+   any of them — responding writes a note, adding items fires the items trigger,
+   sending a quote logs from the edge function.
+   **THE LOOP QUESTION, ANSWERED IN THE HARNESS RATHER THAN IN PROSE.** Both
+   branches update `flag_reason`, which 054 watches, so each writes another
+   event and re-enters the trigger. Clearing is `where flag_source = 'system'`,
+   so the second pass matches nothing; setting logs through the stamped logger
+   with `auth.uid()` null on both anon paths, so the second pass is neither
+   'customer' nor authored. Measured: **7 events on the order that went through
+   the whole cycle, 4 on the other** — bounded, and the working-the-lead case
+   wrote exactly three.
+   **PROVED BOTH WAYS ON A THROWAWAY PG15** (the condensed-prelude method:
+   ~170 lines naming only what 116 names, copied from 051/052/054/055/115).
+   Before 116: working the lead left "New Inquiry" standing and the approval
+   changed no flag — Mark's two complaints, reproduced. After: backfill →
+   'system'; a hand-raised flag → 'person' and survives a team edit; a system
+   flag clears on one; the approval re-raises it as "Quote approved online by
+   Jane Doe"; the next team touch clears that too; a customer event does NOT
+   overwrite a person's flag; the paired invariant holds; and the whole file
+   re-runs clean (exit 0) for the paste-it-twice case.
+   **THE CONSTRAINT IS DROPPED BY WHAT IT SAYS, NOT BY WHAT IT IS PROBABLY
+   CALLED**, and this is the trap worth remembering. 051 wrote the `source`
+   check INLINE, so its name is Postgres's invention. A `drop … if exists` on a
+   guessed name that does not match drops NOTHING, the new constraint is added
+   beside the old one, and the old one still refuses 'customer' — the first
+   symptom being a customer unable to approve a quote. So a `do` block drops
+   every check on that table mentioning `source`, and a second one RAISES if any
+   survivor still lacks 'customer'. Verified by planting a constraint called
+   `some_other_name` and watching the loop take it.
+   **THREE CONSUMERS HAD TO LEARN THE DIFFERENCE, and only three.**
+   `suggestedTodo` stops answering "Resolve Issue" to good news and lets the
+   ladder speak (an approved quote suggests Send Invoice). `pullReadiness`
+   stops HOLDING a production schedule for a system flag — an approval is the
+   opposite of a reason to keep an order off the day. `OrderActions` words its
+   command for what it is: "Mark as seen" over "Quote approved online by Jane
+   Doe", where "Resolve the issue" called good news a problem on the most
+   prominent control the record has. Everything that only asks "does this want a
+   human" — `needsAttention`, the red row, the progress tone, `/start`'s
+   ordering — still reads `flag_reason` and is right to.
+   **`isPersonFlag` TREATS AN ABSENT COLUMN AS A PERSON'S FLAG**, so a query
+   that has not been taught to select it keeps pre-116 behaviour — the half that
+   hides nothing.
+   **AND RESOLVING NO LONGER ALWAYS CLEARS THE TO-DO.** Decision 4 pairs
+   "Resolve Issue" with a hand-raised flag, so clearing one clears the other;
+   but a new inquiry's companion to-do is "Respond to Email/Call" (058), which
+   is a real instruction about a customer rather than bookkeeping about a flag.
+   `resolve` now clears the to-do only when it IS `FLAG_TODO`.
+   **KNOWN AND LEFT: the auto-clear does not touch `todo` either**, so a lead
+   worked on loses its red row and keeps "Respond to Email/Call" until somebody
+   changes it. That is the honest reading — an edit is not proof the customer
+   was answered — but it is a judgement Mark has not been asked about.
+
    **Shipped 2026-09-21 — ON THE NOTES TAB ONLY THE HISTORY SCROLLS** (Mark,
    the same afternoon: "the history area needs to be in a scroll view but the
    rest of the tab does not"). Both sides were `GrowingPane`s, and the two are
