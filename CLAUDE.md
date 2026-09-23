@@ -457,6 +457,26 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   Read `docs/history/04g-special-orders.md` and `docs/bill-rename-sweep.md` first.
 
 
+- **A PAY-LINK REFUND BOOKS TO THE WRONG ACCOUNTS — LEFT AS IS FOR NOW (Mark,
+  2026-09-22: "3 for now, but make a note that this is something we should
+  figure out down the line. maybe there's another payment solution that would
+  work better").** The Refund… command (`square-refund`) works, but Square's
+  API can only refund BY AMOUNT — "the Refunds API doesn't support itemized
+  refunds", itemized returns are dashboard/app only (Square staff, forums
+  2024-02 and 2025-01). A refund by amount is a CUSTOM_AMOUNT return on
+  UNCATEGORIZED, tax included, so the nightly journal entry reverses a
+  Special Orders + sales tax + delivery sale into Uncategorized Income:
+  balanced, wrong accounts, tax never reversed. Refunds are rare, so for now
+  whoever does the books reclassifies by hand. **Options when this comes
+  back:** (1) the 4r journal-entry builder spots a refund whose id is on a
+  `Square Refund` payment row and splits it by the pay token's `breakdown`,
+  mirroring the sale — the in-app fix, no new vendor; (2) refund in Square's
+  dashboard, choosing the items, and record the negative payment by hand;
+  (3) a different processor whose API refunds line items — which reopens the
+  2026-09-22 Square decision (gift cards, loyalty, one merchant account) and
+  should be weighed against those, not just this. See
+  `docs/history/04g-special-orders.md`.
+
 - **`InlineValue`'s OPEN EDITOR CARRIES NO `aria-label`, where its resting
   button does** (found 2026-09-03 while testing the checklist template's unit
   cell). A screen reader names the field until you click it and then loses the

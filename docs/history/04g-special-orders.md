@@ -23,7 +23,12 @@
    reversal sit in different accounts and the tax is never reversed. Open: an
    itemized refund (returning the original order's lines) if Square's API
    allows it on an online payment, else teach the journal-entry builder to map
-   a pay-link refund back by its refund id. Not decided.
+   a pay-link refund back by its refund id. **Checked the same day: Square's API
+   CANNOT** — "the Refunds API doesn't support itemized refunds" (Refunds and
+   Exchanges doc), dashboard/app only (Square staff, forums 2024-02, 2025-01).
+   **Mark chose to LEAVE IT for now** — refunds are rare, the books are
+   reclassified by hand — and pinned it in CLAUDE.md's open threads with the
+   three ways out, including "maybe there's another payment solution".
 
    **Shipped 2026-09-22, `square-refund` DEPLOYED (Mark, same day) — REFUND A PAY-LINK
    PAYMENT FROM THE ORDER.** Mark, after the first real payment (#10072, $1.10
