@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
 
     const { data: row, error: rowError } = await supabase
       .from("special_order_payments")
-      .select("id, org_id, order_id, amount, payment_type, note, external_ref")
+      .select("id, org_id, order_id, customer_invoice_id, amount, payment_type, note, external_ref")
       .eq("id", payment_id)
       .maybeSingle();
     if (rowError) return json(400, { error: rowError.message });
@@ -142,8 +142,23 @@ Deno.serve(async (req) => {
         error: `Square could not find this payment (${payBody.errors?.[0]?.detail ?? payRes.status}). A payment taken in sandbox cannot be refunded in production, or the other way round.`,
       });
     }
-    const left =
+    let left =
       (payBody.payment.amount_money?.amount ?? 0) - (payBody.payment.refunded_money?.amount ?? 0);
+
+    // 124: ONE Square payment for a customer invoice is split across its
+    // orders, one row each, so Square's own "left to refund" is the whole
+    // invoice's. A refund from this row may take only this ORDER's share, less
+    // what has already been refunded against the order on this invoice.
+    if (row.customer_invoice_id) {
+      const { data: refunds } = await supabase
+        .from("special_order_payments")
+        .select("amount")
+        .eq("order_id", row.order_id)
+        .eq("customer_invoice_id", row.customer_invoice_id)
+        .eq("payment_type", "Square Refund");
+      const refunded = (refunds ?? []).reduce((a, r) => a - Math.round(Number(r.amount) * 100), 0);
+      left = Math.min(left, Math.round(Number(row.amount) * 100) - refunded);
+    }
     if (cents > left) {
       return json(400, {
         error:
@@ -197,6 +212,7 @@ Deno.serve(async (req) => {
       .insert({
         org_id: row.org_id,
         order_id: row.order_id,
+        customer_invoice_id: row.customer_invoice_id ?? null,
         paid_on: today,
         amount: -cents / 100,
         payment_type: "Square Refund",

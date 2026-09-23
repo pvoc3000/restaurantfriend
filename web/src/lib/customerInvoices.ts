@@ -1,0 +1,291 @@
+/**
+ * CUSTOMER INVOICES (migration 124) — the pure half.
+ *
+ * One invoice, one line per order, one pay link. Cafe Knotted's week is the
+ * first user: seven standing-order days billed once, sent Sunday, due
+ * Thursday. Weekly is Knotted's arrangement rather than a rule, and regular
+ * special orders are meant to move onto this record later — a one-order
+ * invoice is simply one line — so nothing here assumes a week.
+ *
+ * Fixture-tested; imports nothing that talks to a server.
+ */
+
+import { usDate } from "./specialOrderDocs";
+
+/* ==========================================================================
+ * THE RECORD
+ * ========================================================================== */
+
+export type CustomerInvoice = {
+  id: string;
+  number: number;
+  customer_id: string | null;
+  issued_on: string;
+  due_on: string | null;
+  notes: string | null;
+  sent_at: string | null;
+  paid_at: string | null;
+  voided_at: string | null;
+  document_path: string | null;
+};
+
+export type CustomerInvoiceLine = {
+  id: string;
+  special_order_id: string;
+  description: string;
+  amount: number;
+  sort: number | null;
+};
+
+export type InvoiceStatus = "draft" | "sent" | "overdue" | "paid" | "void";
+
+export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
+  draft: "Draft",
+  sent: "Sent",
+  overdue: "Overdue",
+  paid: "Paid",
+  void: "Void",
+};
+
+/**
+ * DERIVED, never stored — 124 keeps only the invoice's own dates. Void wins
+ * over everything (a voided invoice that was paid is a refund to make, which
+ * the screen says separately); paid over sent; overdue is a sent invoice past
+ * its due date. Dates are ISO strings, so they compare as text.
+ */
+export function invoiceStatus(
+  inv: Pick<CustomerInvoice, "sent_at" | "paid_at" | "voided_at" | "due_on">,
+  today: string
+): InvoiceStatus {
+  if (inv.voided_at) return "void";
+  if (inv.paid_at) return "paid";
+  if (!inv.sent_at) return "draft";
+  if (inv.due_on && inv.due_on < today) return "overdue";
+  return "sent";
+}
+
+const cents = (v: number) => Math.round(v * 100) / 100;
+
+export function invoiceTotal(lines: Pick<CustomerInvoiceLine, "amount">[]): number {
+  return cents(lines.reduce((a, l) => a + Number(l.amount || 0), 0));
+}
+
+/** Payments TAGGED WITH THIS INVOICE only — an order's other payments (a
+ *  deposit taken before it was invoiced) were netted out of its line when the
+ *  line was written. Refunds are negative rows and count. */
+export function invoiceBalance(
+  lines: Pick<CustomerInvoiceLine, "amount">[],
+  payments: { amount: number | null }[]
+): { total: number; paid: number; balance: number } {
+  const total = invoiceTotal(lines);
+  const paid = cents(payments.reduce((a, p) => a + Number(p.amount || 0), 0));
+  return { total, paid, balance: cents(total - paid) };
+}
+
+/* ==========================================================================
+ * THE LINE
+ * ========================================================================== */
+
+/**
+ * "Order #10070 · Birthday · 9/26/2026" — Mark's wording for an order on one
+ * line (2026-09-22, the pay page; 2026-09-23, the invoice). The order's own
+ * name, else the customer's; the date is the EVENT's, the one the customer
+ * knows the order by. Empty parts drop out.
+ */
+export function orderLineDescription(o: {
+  number: string;
+  title: string | null;
+  customer_name?: string | null;
+  event_date: string | null;
+}): string {
+  return [`Order #${o.number}`, o.title || o.customer_name || "", usDate(o.event_date)]
+    .filter((part) => part && part.trim() !== "")
+    .join(" · ");
+}
+
+/**
+ * Whether a line's frozen amount no longer matches what its order now owes
+ * — a day's quantity changed after the invoice was written. Said on the
+ * screen, never corrected silently: a sent invoice is paper the customer has.
+ * `owed` is the order's balance today PLUS whatever this invoice has already
+ * collected on it, so a paid line does not read as drifted.
+ */
+export function lineDrift(amount: number, owed: number): number | null {
+  const d = cents(owed - amount);
+  return Math.abs(d) >= 0.01 ? d : null;
+}
+
+/* ==========================================================================
+ * CREATING ONE
+ * ========================================================================== */
+
+/** The slice of a list row the create command needs. */
+export type InvoiceCandidate = {
+  id: string;
+  number: string;
+  kind: string;
+  status: string | null;
+  title: string | null;
+  event_date: string | null;
+  customer_id: string | null;
+  customer_name: string;
+  /** Where the money lands (120): the kitchen, else the pickup shop. */
+  shop: string | null;
+  balance: number;
+};
+
+/**
+ * Why a selection cannot become one invoice, in words — or an empty list.
+ * The SAME rules `create_customer_invoice` enforces, said before the dialog
+ * opens rather than as a Postgres error after it commits. Orders already on
+ * an invoice are the database's to refuse; the list does not know.
+ */
+export function createRefusals(rows: InvoiceCandidate[]): string[] {
+  const out: string[] = [];
+  if (rows.length === 0) return ["Select the orders to invoice."];
+  const notOrders = rows.filter((r) => r.kind !== "order");
+  if (notOrders.length) {
+    out.push(`${plural(notOrders.length, "row is", "rows are")} a template or a standing order, not a day.`);
+  }
+  const cancelled = rows.filter((r) => r.kind === "order" && r.status === "cancelled");
+  if (cancelled.length) out.push(`${plural(cancelled.length, "order is", "orders are")} cancelled.`);
+  const customers = new Set(rows.map((r) => r.customer_id ?? ""));
+  if (customers.has("")) out.push("An order with no customer cannot be invoiced.");
+  else if (customers.size > 1) out.push("An invoice is for one customer — these are for several.");
+  const shops = new Set(rows.map((r) => r.shop ?? ""));
+  if (shops.size > 1) {
+    out.push("These orders are made at different shops, so one payment cannot cover them.");
+  }
+  const settled = rows.filter((r) => r.kind === "order" && r.balance <= 0.005);
+  if (settled.length) out.push(`${plural(settled.length, "order has", "orders have")} nothing owed.`);
+  return out;
+}
+
+/**
+ * The lines, oldest event first, each for what the order still OWES — its
+ * balance, not its total, so an order with a deposit already taken is not
+ * billed for it twice. For Knotted's days, which carry no payments until the
+ * invoice is paid, balance and total are the same figure.
+ */
+export function invoiceLinesFor(
+  rows: InvoiceCandidate[]
+): { order_id: string; description: string; amount: number }[] {
+  return [...rows]
+    .sort(
+      (a, b) =>
+        (a.event_date ?? "9999").localeCompare(b.event_date ?? "9999") ||
+        a.number.localeCompare(b.number, undefined, { numeric: true })
+    )
+    .map((r) => ({
+      order_id: r.id,
+      description: orderLineDescription(r),
+      amount: cents(r.balance),
+    }));
+}
+
+/* ==========================================================================
+ * TERMS AND NAMES — `orgs.settings.customer_invoices`, design rule 2
+ * ========================================================================== */
+
+export type InvoiceTerms = { termsDays: number; prefix: string };
+
+export const DEFAULT_INVOICE_TERMS: InvoiceTerms = { termsDays: 4, prefix: "" };
+
+export function readInvoiceTerms(orgSettings: Record<string, unknown> | null | undefined): InvoiceTerms {
+  const ci = ((orgSettings ?? {}).customer_invoices ?? {}) as Record<string, unknown>;
+  const days = Number(ci.terms_days);
+  return {
+    termsDays: Number.isFinite(days) && days >= 0 ? Math.floor(days) : DEFAULT_INVOICE_TERMS.termsDays,
+    prefix: typeof ci.prefix === "string" ? ci.prefix : DEFAULT_INVOICE_TERMS.prefix,
+  };
+}
+
+/** `issued` + `days`, as an ISO date. Calendar days, in UTC arithmetic so a
+ *  daylight-saving night cannot move the answer. */
+export function addDays(issued: string, days: number): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(issued);
+  if (!m) return issued;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** "1001", or "DF-1001" with a prefix. What the paper and the email print. */
+export function invoiceNumberText(number: number, terms: Pick<InvoiceTerms, "prefix">): string {
+  return `${terms.prefix}${number}`;
+}
+
+export function invoiceFileName(numberText: string, date: string): string {
+  const dotted = /^\d{4}-\d{2}-\d{2}/.test(date) ? date.slice(0, 10).replace(/-/g, ".") : date;
+  return `INVOICE#${numberText}_${dotted}.pdf`;
+}
+
+/* ==========================================================================
+ * THE SNAPSHOT — what `/pay/{token}` shows for an invoice
+ * ========================================================================== */
+
+/**
+ * The invoice AS SENT, the pay token's `document_snapshot` (124). Its own
+ * shape rather than the order's `QuoteSnapshot`: it has lines of its own, one
+ * per order, and no event, fulfillment or itemisation — the attached PDF is
+ * the paper. `kind` is what tells the page which it is holding.
+ */
+export type CustomerInvoiceSnapshot = {
+  kind: "customer_invoice";
+  /** With the org's prefix — what the paper prints. */
+  number: string;
+  /** The customer, which is what Square's line and the page's heading say. */
+  title: string;
+  customer_name: string;
+  issued_on: string;
+  due_on: string | null;
+  lines: { description: string; amount: number }[];
+  totals: { total: number };
+  notes_quote: string | null;
+  org: { name: string; addressLine: string; contactLine: string; terms: string };
+  sent_on: string;
+};
+
+export function isCustomerInvoiceSnapshot(s: unknown): s is CustomerInvoiceSnapshot {
+  return !!s && typeof s === "object" && (s as { kind?: unknown }).kind === "customer_invoice";
+}
+
+/* ==========================================================================
+ * THE PAY LINK'S BREAKDOWN — one invoice, several orders
+ * ========================================================================== */
+
+export type PayBreakdownParts = {
+  taxable_net: number;
+  other_net: number;
+  delivery: number;
+  tax: number;
+  tax_rate: number;
+  total: number;
+};
+
+/**
+ * The orders' breakdowns summed into one, for the single Square order behind
+ * an invoice payment (`_shared/squareOrder`). Square applies ONE tax rate per
+ * line, so orders taxed at different rates cannot share a taxable line: that
+ * returns null, and `buildSquareOrder` falls back to one line for the whole
+ * amount — the payment still goes through, it is only less itemised.
+ */
+export function sumBreakdowns(parts: PayBreakdownParts[]): PayBreakdownParts | null {
+  if (parts.length === 0) return null;
+  const taxed = parts.filter((p) => p.taxable_net > 0);
+  const rates = new Set(taxed.map((p) => p.tax_rate));
+  if (rates.size > 1) return null;
+  const sum = (k: keyof PayBreakdownParts) => cents(parts.reduce((a, p) => a + Number(p[k] || 0), 0));
+  return {
+    taxable_net: sum("taxable_net"),
+    other_net: sum("other_net"),
+    delivery: sum("delivery"),
+    tax: sum("tax"),
+    tax_rate: taxed[0]?.tax_rate ?? 0,
+    total: sum("total"),
+  };
+}
+
+function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}

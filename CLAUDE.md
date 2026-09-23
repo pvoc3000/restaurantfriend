@@ -57,7 +57,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 4d. 🚧 Bills (vendor bills, approval, financials lock, filing on close) — `docs/history/04d-invoices.md` (named Invoices until 2026-09-20; see Table naming)
 4e. ✅ Employee events (`employee_events`, `/events`) — `docs/history/04e-employee-events.md`
 4f. 🚧 Production (elements, recipes, items, price grid, plans, schedules, batch logs, costing) — `docs/history/04f-production.md`
-4g. 🚧 Special orders (quotes, documents, /q approval, /inquiry, standing orders, scheduling, /pay link via Square) — `docs/history/04g-special-orders.md`
+4g. 🚧 Special orders (quotes, documents, /q approval, /inquiry, standing orders, scheduling, /pay link via Square, customer invoices — 124 written) — `docs/history/04g-special-orders.md`
 4h. ✅ Supervisor shift report (runner, email, reopen) — `docs/history/04h-shift-report.md`
 4i. ✅ Which shops a member may work at (migration 073) — `docs/history/04i-location-access.md`
 4j. ✅ Password reset (migration 074 + `request-password-reset`) — `docs/history/04j-password-reset.md`
@@ -454,6 +454,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   Phase 1 is a pay link on today's per-order invoice (balance due; card, Apple
   Pay, Google Pay, gift card); ACH + webhook, loyalty, the QBO Payment push and
   `customer_invoices` follow. Plan: `docs/history/04g-special-orders.md`.
+  **`customer_invoices` IS BUILT (2026-09-23, migration 124 — written, not yet
+  applied; three edge functions need a redeploy after it).** The open questions
+  above are answered: Knotted is NOT taxable (resale certificate; their orders
+  already carry `tax_rate = 0`), and an invoice carries ONE LINE PER ORDER
+  (Mark), delivery inside each order's amount — so not fourteen lines and not
+  the QBO push's two. The stage collision is settled by WRITING THROUGH: the
+  order keeps `status` / `invoice_sent_at` / `invoice_paid_at`, and the invoice
+  stamps them (sent) and settles each order its payment covers, through
+  `settle_special_order_paid` — the same function the per-order link uses.
+  Mark's direction for what comes next: regular special orders move onto this
+  record too, "so we have one workflow for everything" — a one-order invoice
+  is one line, and nothing in 124 assumes a week. Don't build that move
+  without asking.
   Read `docs/history/04g-special-orders.md` and `docs/bill-rename-sweep.md` first.
 
 

@@ -135,6 +135,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
+    const payload = await req.json();
+    // 124: a customer invoice is its own send — one invoice, many orders.
+    if (payload.customer_invoice_id) return await sendCustomerInvoice(req, payload);
+
     const {
       order_id,
       kind,
@@ -150,7 +154,7 @@ Deno.serve(async (req) => {
       quote_token,
       /** The invoice's pay link token (migration 119), minted the same way. */
       pay_token,
-    } = await req.json();
+    } = payload;
 
     if (!order_id || !kind || !to || !subject || !pdf_base64 || !filename) {
       return json(400, {
@@ -244,7 +248,9 @@ Deno.serve(async (req) => {
     /* ---- from here down, nothing may turn a sent email into a failure ---- */
 
     const warnings: string[] = [];
-    const today = new Date().toISOString().slice(0, 10);
+    // The ORG's calendar day. `toISOString` was the UTC date, which stamped a
+    // send after 5pm Pacific as tomorrow (found 2026-09-23 building 124).
+    const today = orgToday((org?.settings as { timezone?: string } | null)?.timezone);
 
     const { error: stampError } = await supabase
       .from("special_orders")
@@ -359,3 +365,146 @@ Deno.serve(async (req) => {
     return json(500, { error: e instanceof Error ? e.message : String(e) });
   }
 });
+
+/** Today in the org's timezone, as YYYY-MM-DD. `en-CA` formats that way. */
+function orgToday(timezone: string | undefined): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: timezone || "America/Los_Angeles" }).format(
+      new Date()
+    );
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+/**
+ * THE CUSTOMER INVOICE'S SEND (migration 124) — one invoice covering several
+ * orders, so none of the per-order steps above apply as written. Same gates
+ * (signed in, supervisor+, a link a customer can open), then:
+ *
+ *   - the PDF is filed under the INVOICE (`{org}/customer-invoices/{id}/…`,
+ *     the bucket's org-folder policy reads only the first segment);
+ *   - `mark_customer_invoice_sent` stamps the invoice and writes through to
+ *     every order on it — sent date, lead/quote → invoice, a log line each —
+ *     in one transaction;
+ *   - older pay links for the invoice are retired, as a re-sent order's are.
+ *
+ * Nothing after the send may turn a sent email into a failure, as above.
+ */
+async function sendCustomerInvoice(
+  req: Request,
+  payload: {
+    customer_invoice_id: string;
+    to?: string;
+    cc?: string;
+    subject?: string;
+    body?: string;
+    pdf_base64?: string;
+    filename?: string;
+    pay_token?: string;
+  }
+): Promise<Response> {
+  const { customer_invoice_id, to, cc, subject, body, pdf_base64, filename, pay_token } = payload;
+  if (!to || !subject || !pdf_base64 || !filename) {
+    return json(400, { error: "missing to, subject, pdf_base64 or filename" });
+  }
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: req.headers.get("Authorization")! } } }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return json(401, { error: "not signed in" });
+
+  const { data: invoice, error: invoiceError } = await supabase
+    .from("customer_invoices")
+    .select("id, org_id, number, voided_at")
+    .eq("id", customer_invoice_id)
+    .maybeSingle();
+  if (invoiceError) return json(400, { error: invoiceError.message });
+  if (!invoice) return json(404, { error: "invoice not found" });
+  if (invoice.voided_at) return json(400, { error: "this invoice is void" });
+
+  const { data: member } = await supabase
+    .from("org_members")
+    .select("role, display_name")
+    .eq("user_id", user.id)
+    .eq("org_id", invoice.org_id)
+    .maybeSingle();
+  if (!member || !ROLES.includes(member.role)) {
+    return json(403, { error: "supervisor role required to send invoices" });
+  }
+
+  const linkProblem = checkApprovalLink(body ?? "");
+  if (linkProblem) return json(400, { error: linkProblem });
+
+  const { data: org } = await supabase
+    .from("orgs")
+    .select("name, settings")
+    .eq("id", invoice.org_id)
+    .maybeSingle();
+  const orgSettings = (org?.settings ?? {}) as {
+    email_provider?: ProviderConfig;
+    special_orders?: { email_provider?: ProviderConfig; reply_to?: string };
+    billing?: { email?: string };
+  };
+
+  const transport = resolveTransport({
+    explicit: orgSettings.special_orders?.email_provider,
+    orgProvider: orgSettings.email_provider,
+    orgName: org?.name ?? "Orders",
+    replyToFallbacks: [orgSettings.special_orders?.reply_to, orgSettings.billing?.email],
+  });
+
+  const providerId = await sendMail(transport, {
+    to,
+    cc: cc || undefined,
+    subject,
+    text: body ?? "",
+    attachment: { filename, base64: pdf_base64 },
+  });
+
+  /* ---- from here down, nothing may turn a sent email into a failure ---- */
+
+  const warnings: string[] = [];
+
+  let documentPath: string | null =
+    `${invoice.org_id}/customer-invoices/${invoice.id}/${crypto.randomUUID()}.pdf`;
+  const bytes = Uint8Array.from(atob(pdf_base64), (c) => c.charCodeAt(0));
+  const { error: uploadError } = await supabase.storage
+    .from("special-order-attachments")
+    .upload(documentPath, bytes, { contentType: "application/pdf" });
+  if (uploadError) {
+    warnings.push(`the sent invoice was not filed: ${uploadError.message}`);
+    documentPath = null;
+  }
+
+  const { error: markError } = await supabase.rpc("mark_customer_invoice_sent", {
+    p_invoice: invoice.id,
+    p_document_path: documentPath,
+  });
+  if (markError) {
+    warnings.push(`the invoice and its orders were not marked sent: ${markError.message}`);
+  }
+
+  if (pay_token) {
+    const { error: supersedeError } = await supabase
+      .from("special_order_pay_tokens")
+      .update({ superseded_at: new Date().toISOString() })
+      .eq("customer_invoice_id", invoice.id)
+      .neq("token", pay_token)
+      .is("superseded_at", null);
+    if (supersedeError) {
+      warnings.push(`earlier pay links were not retired: ${supersedeError.message}`);
+    }
+  }
+
+  return json(200, {
+    id: providerId,
+    warning: warnings.length ? `sent, but ${warnings.join("; ")}` : undefined,
+  });
+}

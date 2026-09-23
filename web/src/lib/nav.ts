@@ -347,6 +347,13 @@ export const SECTIONS: NavSection[] = [
         href: "/customers",
         built: true,
       },
+      {
+        // Migration 124 (2026-09-23): one invoice, many orders, one pay link.
+        slug: "invoices",
+        label: "Invoices",
+        href: "/customer-invoices",
+        built: true,
+      },
     ],
   },
 ];

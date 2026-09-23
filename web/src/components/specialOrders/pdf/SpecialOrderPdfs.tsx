@@ -832,6 +832,101 @@ export function StatementPdf({
   );
 }
 
+/**
+ * THE CUSTOMER INVOICE (migration 124) — one invoice, one row per ORDER, the
+ * statement's grain. Mark, 2026-09-23: one line for each special order, worded
+ * like the pay page ("Order #10057 · Cafe Knotted · 10/5/2026"), and delivery
+ * NOT its own line — it is inside each order's amount, as on a regular order.
+ * The amounts are the invoice's own frozen lines, never re-derived here: this
+ * is the paper the customer was sent.
+ */
+export type CustomerInvoiceDoc = {
+  number: string;
+  issued_on: string;
+  due_on: string | null;
+  notes: string | null;
+  customer: { name: string; phone: string | null; email: string | null };
+  lines: { description: string; amount: number }[];
+  total: number;
+  paid: number;
+  balance: number;
+};
+
+export function CustomerInvoicePdf({ invoice, org }: { invoice: CustomerInvoiceDoc; org: DocOrg }) {
+  return (
+    <Document>
+      <Page size="LETTER" style={styles.page}>
+        <View style={styles.masthead} fixed>
+          <View>
+            <Text style={styles.orgName}>{org.name}</Text>
+            <Text style={styles.orgLine}>{org.addressLine}</Text>
+            <Text style={styles.orgLine}>{org.contactLine}</Text>
+          </View>
+          <View>
+            <Text style={styles.docTitle}>INVOICE #{invoice.number}</Text>
+            <Text
+              style={styles.docPage}
+              render={({ pageNumber, totalPages }) => `p ${pageNumber} OF ${totalPages}`}
+            />
+          </View>
+        </View>
+
+        <View style={styles.bandRow}>
+          <View style={styles.bandBlock}>
+            <Text style={styles.band}>BILL TO</Text>
+            <Meta label="Name" value={invoice.customer.name} />
+            <Meta label="Phone" value={invoice.customer.phone ?? ""} />
+            <Meta label="Email" value={invoice.customer.email ?? ""} />
+          </View>
+          <View style={styles.bandBlock}>
+            <Text style={styles.band}>INVOICE</Text>
+            <Meta label="Number" value={invoice.number} />
+            <Meta label="Date" value={usDate(invoice.issued_on)} />
+            <Meta label="Due" value={usDate(invoice.due_on)} />
+          </View>
+        </View>
+
+        <View style={styles.itemsHead} fixed>
+          <Text style={[styles.colNotes, styles.headCell, { paddingLeft: 0 }]}>Order</Text>
+          <Text style={[styles.colCost, styles.headCell, { width: 72 }]}>Amount</Text>
+        </View>
+
+        {invoice.lines.map((l, i) => (
+          <View key={i} style={styles.row} wrap={false}>
+            <Text style={[styles.colNotes, { paddingLeft: 0 }]}>{l.description}</Text>
+            <Text style={[styles.colCost, { width: 72 }]}>{money(l.amount)}</Text>
+          </View>
+        ))}
+
+        <View style={styles.footRow}>
+          <View style={styles.footCol}>
+            {invoice.notes ? <Text style={styles.note}>{invoice.notes}</Text> : null}
+          </View>
+          <View style={styles.footCol}>
+            <Text style={styles.band}>TOTALS</Text>
+            <TotalRow label="TOTAL:" value={invoice.total} />
+            {invoice.paid !== 0 ? <TotalRow label="PAYMENTS:" value={invoice.paid} /> : null}
+            <View style={styles.totalLine}>
+              <Text style={styles.grandLabel}>AMOUNT DUE:</Text>
+              <Text style={styles.grandValue}>{money(invoice.balance)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {org.invoiceFooter ? <Text style={styles.note}>{org.invoiceFooter}</Text> : null}
+
+        <Text
+          style={styles.footer}
+          render={({ pageNumber, totalPages }) =>
+            `INVOICE #${invoice.number} · ${pageNumber} / ${totalPages}`
+          }
+          fixed
+        />
+      </Page>
+    </Document>
+  );
+}
+
 /** Convenience for the callers that pick a renderer by kind. */
 export function documentElement(
   kind: DocumentKind,

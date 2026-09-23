@@ -751,7 +751,7 @@ export type EmailParts = { to: string; cc: string; subject: string; body: string
  * FileMaker hardcoded "The Donut Friend Team" into a script. We don't.
  */
 export const DEFAULT_TEMPLATES: Record<
-  DocumentKind | "statement" | "inquiry" | "payment",
+  DocumentKind | "statement" | "inquiry" | "payment" | "customer_invoice" | "invoice_payment",
   { subject: string; body: string }
 > = {
   quote: {
@@ -835,6 +835,35 @@ export const DEFAULT_TEMPLATES: Record<
     body:
       "Hi {first_name},\n\n" +
       "Thank you — we received your payment of {amount} for order #{number} ({method}).\n" +
+      "{balance_line}" +
+      "{receipt_line}" +
+      "\nIf anything needs changing, just reply to this message.\n",
+  },
+  /**
+   * THE CUSTOMER INVOICE (migration 124) — one invoice covering several
+   * orders, Cafe Knotted's week. Filled in the browser by
+   * `SendCustomerInvoice`, with its own small set of tokens: an invoice has no
+   * event, no fulfillment and no taker, and `{orders}` is its lines.
+   */
+  customer_invoice: {
+    subject: "Invoice #{number}",
+    body:
+      "Hi {first_name},\n\n" +
+      "Invoice #{number} is attached — {total}, due {due_on}:\n\n" +
+      "{orders}\n" +
+      "{pay_line}" +
+      "\nThank you!",
+  },
+  /**
+   * PAYMENT RECEIVED ON A CUSTOMER INVOICE — `payment`'s twin, sent by
+   * `square-pay` (124), so again a MIRROR of that function's
+   * `INVOICE_PAYMENT_TEMPLATE`, kept in step by hand.
+   */
+  invoice_payment: {
+    subject: "Payment received — invoice #{number}",
+    body:
+      "Hi {first_name},\n\n" +
+      "Thank you — we received your payment of {amount} for invoice #{number} ({method}).\n" +
       "{balance_line}" +
       "{receipt_line}" +
       "\nIf anything needs changing, just reply to this message.\n",

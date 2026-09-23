@@ -250,12 +250,18 @@ export function invoiceSnapshot(
  *  `mintQuoteToken`, whose reasoning this repeats exactly. */
 export async function mintPayToken(
   supabase: SupabaseClient,
-  args: { orderId: string; orgId: string }
+  /** One order, or (124) one customer invoice — never both; the table's
+   *  check says so too. */
+  args: { orderId: string; orgId: string } | { customerInvoiceId: string; orgId: string }
 ): Promise<string> {
   const token = mintTokenValue();
+  const target =
+    "customerInvoiceId" in args
+      ? { customer_invoice_id: args.customerInvoiceId }
+      : { order_id: args.orderId };
   const { data, error } = await supabase
     .from("special_order_pay_tokens")
-    .insert({ org_id: args.orgId, order_id: args.orderId, token })
+    .insert({ org_id: args.orgId, ...target, token })
     .select("token")
     .single();
   if (error) throw new Error(error.message);
@@ -273,15 +279,22 @@ export async function mintPayToken(
  * same trust level.
  */
 export function payBreakdown(order: OrderDocData) {
-  const { taxableNet, nonTaxableNet } = invoiceSplit(order.totals);
+  return breakdownFromTotals(order.totals, order.money.tax_rate);
+}
+
+/** The same split from an order's totals alone — what a customer invoice
+ *  (124) sums across its orders, which it holds as list rows rather than as
+ *  documents. */
+export function breakdownFromTotals(totals: OrderDocData["totals"], taxRate: number | null) {
+  const { taxableNet, nonTaxableNet } = invoiceSplit(totals);
   const round2 = (v: number) => Math.round(v * 100) / 100;
   return {
     taxable_net: taxableNet,
-    other_net: round2(nonTaxableNet - order.totals.deliveryCharge),
-    delivery: order.totals.deliveryCharge,
-    tax: order.totals.tax,
-    tax_rate: Number(order.money.tax_rate ?? 0),
-    total: order.totals.total,
+    other_net: round2(nonTaxableNet - totals.deliveryCharge),
+    delivery: totals.deliveryCharge,
+    tax: totals.tax,
+    tax_rate: Number(taxRate ?? 0),
+    total: totals.total,
   };
 }
 
@@ -293,8 +306,10 @@ export function payBreakdown(order: OrderDocData) {
 export async function bindPaySnapshot(
   supabase: SupabaseClient,
   token: string,
-  snapshot: QuoteSnapshot,
-  breakdown: ReturnType<typeof payBreakdown>
+  /** An order's `QuoteSnapshot` or a customer invoice's snapshot (124) —
+   *  anything that says its total. */
+  snapshot: { totals: { total: number } },
+  breakdown: ReturnType<typeof payBreakdown> | null
 ): Promise<void> {
   const { data, error } = await supabase
     .from("special_order_pay_tokens")

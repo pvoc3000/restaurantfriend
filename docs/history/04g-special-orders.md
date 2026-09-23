@@ -12,6 +12,85 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-23, MIGRATION 124 WRITTEN, NOT YET APPLIED — CUSTOMER
+   INVOICES: ONE INVOICE, MANY ORDERS, ONE PAY LINK.** Mark: "what's the next
+   step … to get closer to our customer invoices page?", then, answering the
+   open questions: Knotted has a RESALE CERTIFICATE (no tax); **one line per
+   special order**, worded like the pay page ("Order #n · title · event date"),
+   delivery NOT its own line ("we don't do it that way with our regular special
+   orders"); the order's own stage fields "go with your instinct"; and weekly
+   billing is Knotted's arrangement, not a rule — "we should also be planning
+   on integrating our customer_invoices with regular orders eventually so we
+   have one workflow for everything".
+   **Probed first (read-only):** Knotted's standing orders #9762/#9763 and
+   every materialized day carry `tax_rate = 0`, so no tax whatever the lines'
+   taxable flags — no data fix. `ignore_balance` is FALSE on all of them, and
+   their days are already paid one row per order ("Square Invoice", by hand).
+   The first real week to invoice is Oct 5–11 (10057, 10068, 10074 … at Send
+   Invoice).
+   **The shape (124):** `customer_invoices` (number per org from 1001, issued,
+   due, notes, sent/paid/voided dates, `document_path`) + `customer_invoice_lines`
+   (`special_order_id` on the LINE, restrict, no unique — 025's A/P shape, so a
+   deposit invoice + balance invoice for one order is two invoices later).
+   Status is DERIVED in `lib/customerInvoices` (draft · sent · overdue · paid ·
+   void). A line's amount is the order's BALANCE at creation, snapshotted
+   because `orderTotals` lives in TS; a trigger FREEZES the lines once the
+   invoice is sent (void and invoice again). **The order keeps its stage fields
+   and the invoice writes through them** — my call, because production
+   (`pullReadiness` wants status `order`), the stage wash, the progress ladder
+   and the to-do suggestions all read them: `mark_customer_invoice_sent` stamps
+   each order's `invoice_sent_at` (lead/quote → invoice) and logs "Invoice 1001
+   sent"; a payment that meets an order's share calls
+   `settle_special_order_paid` — 121/122's rule lifted into ONE function that the
+   per-order pay link now calls too. **A payment stays per order, tagged**:
+   `special_order_payments.customer_invoice_id`; one Square payment becomes one
+   row per order sharing its id, split oldest event first, any excess on the
+   last line; 119's unique index widened to `(org_id, external_ref, order_id)`.
+   **One invoice, one Square location** — the create function refuses orders
+   whose `pay_link_square_location` differ (120's rule: money lands at the shop
+   that makes it). Pay tokens point at an order OR an invoice
+   (`num_nonnulls = 1`); `pay_token_state` / `pay_by_token` / `claim_pay_token`
+   / `record_pay_link_payment` branch on it, the `ignore_balance` shortcut
+   applying to ORDER tokens only. Signed-in RPCs: `create_customer_invoice`,
+   `mark_customer_invoice_sent`, `record_customer_invoice_payment` (refuses
+   more than is owed); everything else revoked from anon/authenticated.
+   **The app:** Special Orders ▸ Actions ▸ **Create Invoice…** (refusals said in
+   the dialog before the database says them; due date from
+   `orgs.settings.customer_invoices.terms_days`, default 4 — Sunday → Thursday;
+   `prefix` for the printed number) lands on **`/customer-invoices/[id]`**:
+   details, lines with a "now $x" flag when an order changed since, payments,
+   notes, and Preview · Download · Send… · Record Payment… · Update Amounts
+   (draft) · Void… · Delete (unsent, unpaid). **`/customer-invoices`** is the
+   list (menu: Special Orders ▸ Invoices; page access staff none, supervisor+
+   write — the table read is membership-wide, the screen is not). The customer
+   record gained an Invoices section. `CustomerInvoicePdf` is the statement's
+   one-row-per-order layout. Two new templates on Settings → Messages:
+   `customer_invoice` ({orders}, {due_on}, {pay_line}) and `invoice_payment`.
+   `/pay` shows one row per order for an invoice token.
+   **Edge functions (all three NEED A REDEPLOY once 124 is applied):**
+   `send-special-order-email` takes `customer_invoice_id` (files the PDF under
+   `{org}/customer-invoices/{id}/`, calls `mark_customer_invoice_sent`, retires
+   older links) — and its order path now stamps the ORG's date, where
+   `toISOString()` had stamped a send after 5pm Pacific as tomorrow;
+   `square-pay` labels the Square order "Invoice #n — customer" and sends the
+   `invoice_payment` confirmation; `square-refund` caps a refund at the row's
+   own share (one Square payment now spans rows) and tags the refund row.
+   **Verified:** 124 on a throwaway Postgres (condensed prelude of 119/120/123)
+   — 7-order invoice 1001 at $760; each refusal by name (already invoiced, two
+   customers, two shops, cancelled, staff, anon); sent → 7 orders stamped + 7
+   log lines; frozen lines refuse an edit; anon reads/claims the link at the
+   right location; paying $760 → 7 tagged rows, each order Order + Print Order
+   (the delivery Schedule Delivery, a typed to-do kept), invoice paid, link
+   reads paid; a retried record adds nothing; a $250 hand payment on 3×$100
+   settles the two oldest and refuses $60 against $50 owed; void → link reads
+   cancelled and the orders re-invoice; the ORDER token path unchanged and
+   `ignore_balance` still reads paid; one overload each; staff read, cannot
+   write; reruns clean. 17 new fixtures (2,019), three rules broken to see them
+   go red. tsc, lint, and — a first — `deno check` on all three functions (via
+   `npx deno`). `/pay/…` loads in the pane. NOT verified: any signed-in screen
+   in the pane (it sits at the PIN screen), a real send, a real sandbox payment
+   against an invoice — all need 124 applied and the redeploys.
+
    **Verified live 2026-09-22 — A PRODUCTION DELIVERY ORDER, PAID WITH APPLE
    PAY.** #10073 (delivery from DF02, $1.00 taxable item at 9.75%, $1.00
    delivery): breakdown taxable 1.00 / other 0 / delivery 1.00; Square charged

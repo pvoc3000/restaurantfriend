@@ -23,6 +23,14 @@ import { CustomerActions } from "@/components/specialOrders/CustomerActions";
 import { CustomerAccounting } from "@/components/specialOrders/CustomerAccounting";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { canEditPage } from "@/lib/pageAccess";
+import {
+  INVOICE_STATUS_LABEL,
+  invoiceBalance,
+  invoiceNumberText,
+  invoiceStatus,
+  readInvoiceTerms,
+} from "@/lib/customerInvoices";
+import { usDate } from "@/lib/specialOrderDocs";
 
 const CUSTOMERS_CRUMB = { href: "/customers", label: "Customers" };
 
@@ -140,6 +148,33 @@ export async function CustomerDetail({
   // Payments are payments whatever the record's kind — a template has none.
   const spent = withMoney.reduce((a, o) => a + o.totals.paid, 0);
 
+  // Their customer invoices (124). A failed read — 124 not applied yet —
+  // hides the section rather than breaking the record.
+  const { data: invoiceRows } = await supabase
+    .from("customer_invoices")
+    .select("id, number, issued_on, due_on, sent_at, paid_at, voided_at, customer_invoice_lines ( amount )")
+    .eq("customer_id", id)
+    .order("number", { ascending: false });
+  const invoiceIds = (invoiceRows ?? []).map((r) => r.id as string);
+  const { data: invoicePays } = invoiceIds.length
+    ? await supabase
+        .from("special_order_payments")
+        .select("customer_invoice_id, amount")
+        .in("customer_invoice_id", invoiceIds)
+    : { data: [] };
+  const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
+  const invoiceTerms = readInvoiceTerms(session.orgSettings as Record<string, unknown>);
+  const invoices = (invoiceRows ?? []).map((r) => ({
+    id: r.id as string,
+    number: invoiceNumberText(r.number as number, invoiceTerms),
+    issued_on: r.issued_on as string,
+    status: invoiceStatus(r as never, today),
+    ...invoiceBalance(
+      (r.customer_invoice_lines ?? []) as { amount: number }[],
+      (invoicePays ?? []).filter((p) => p.customer_invoice_id === r.id) as { amount: number }[]
+    ),
+  }));
+
   const trail = parseTrail(rawParams, CUSTOMERS_CRUMB);
   const address = (customer.address ?? {}) as Record<string, unknown>;
 
@@ -236,13 +271,52 @@ export async function CustomerDetail({
         </>
       )}
 
+      {invoices.length > 0 ? (
+        <section className="space-y-2">
+          <SectionHeading count={invoices.length}>Invoices</SectionHeading>
+          <table className="w-full max-w-[60rem] border-collapse text-[14px]">
+            <thead>
+              <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
+                <th className="w-28 px-3 py-2 text-left">Invoice</th>
+                <th className="w-32 px-3 py-2 text-left">Issued</th>
+                <th className="px-3 py-2 text-left">Status</th>
+                <th className="w-28 px-3 py-2 text-right">Total</th>
+                <th className="w-28 px-3 py-2 text-right">Due</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((inv) => (
+                <tr key={inv.id} className="hover:bg-neutral-50">
+                  <td className="px-3 py-2 tabular-nums">
+                    <Link
+                      href={withFrom(`/customer-invoices/${inv.id}`, { href: `/customers/${id}`, label: "Customer" })}
+                      className="hover:underline"
+                    >
+                      {inv.number}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2 tabular-nums text-muted">{usDate(inv.issued_on)}</td>
+                  <td className={`px-3 py-2 ${inv.status === "overdue" ? "text-accent" : "text-muted"}`}>
+                    {INVOICE_STATUS_LABEL[inv.status]}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">{money(inv.total)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-accent">
+                    {inv.status !== "void" && inv.balance > 0.005 ? money(inv.balance) : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
       <CustomerActions
         id={id}
         orgId={customer.org_id as string}
         name={customerLabel(customer)}
         email={(customer.email as string) ?? null}
         orderCount={withMoney.length}
-        today={todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone())}
+        today={today}
         defaultLocationId={session.activeLocation?.id ?? null}
         takenBy={session.membership.display_name ?? session.email}
         canWrite={canWrite}

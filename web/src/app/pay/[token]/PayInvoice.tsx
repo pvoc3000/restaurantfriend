@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/specialOrders";
+import { isCustomerInvoiceSnapshot, orderLineDescription } from "@/lib/customerInvoices";
 import { usDate } from "@/lib/specialOrderDocs";
 import {
   payStateMessage,
@@ -328,17 +329,32 @@ export function PayInvoice({ token }: { token: string }) {
         <p className="text-[13px] text-muted">{invoice.org.contactLine}</p>
       </header>
 
-      {/* ONE LINE, not the itemisation (Mark, 2026-09-22: "we don't need
-          individual line items. let's do one line item with the order number,
-          name, and date"). The attached PDF still itemises; this page's job is
-          to say WHICH order is being paid and how much, and a customer paying
-          on a phone checks the order, not the dozen donuts. The line carries
-          the invoice TOTAL, so tax, delivery and discounts are inside it. */}
+      {/* ONE LINE PER ORDER, not the itemisation (Mark, 2026-09-22: "we
+          don't need individual line items. let's do one line item with the
+          order number, name, and date"). An order's own invoice is one such
+          line carrying the invoice TOTAL, so tax, delivery and discounts are
+          inside it; a customer invoice (124) is one per order it covers —
+          Cafe Knotted's week is seven. The attached PDF is the paper. */}
       <section className="space-y-1 text-[15px] tabular-nums">
-        <div className="flex items-baseline justify-between gap-4 border-y-2 border-ink py-3">
-          <span className="min-w-0">{orderLine(invoice)}</span>
-          <span className="shrink-0">{money(state.total)}</span>
-        </div>
+        {isCustomerInvoiceSnapshot(invoice) ? (
+          <div className="border-y-2 border-ink py-2">
+            <p className="pb-1 text-[13px] text-muted">
+              Invoice #{invoice.number}
+              {invoice.due_on ? ` · due ${usDate(invoice.due_on)}` : ""}
+            </p>
+            {invoice.lines.map((line, i) => (
+              <div key={i} className="flex items-baseline justify-between gap-4 py-1">
+                <span className="min-w-0">{line.description}</span>
+                <span className="shrink-0">{money(line.amount)}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-baseline justify-between gap-4 border-y-2 border-ink py-3">
+            <span className="min-w-0">{orderLineDescription(invoice)}</span>
+            <span className="shrink-0">{money(state.total)}</span>
+          </div>
+        )}
         {state.paid !== 0 && <Total label="Paid" value={-state.paid} />}
         <div className="flex items-baseline justify-between gap-4 border-t-2 border-ink pt-2 text-[19px] font-bold">
           <span>Amount due</span>
@@ -417,15 +433,6 @@ export function PayInvoice({ token }: { token: string }) {
       </section>
     </Shell>
   );
-}
-
-/** "Order #10070 · Birthday · 9/26/2026". The order's own name, or the
- *  customer's when the order has none; the date is the EVENT's, which is the
- *  one the customer knows the order by. Parts that are empty drop out. */
-function orderLine(invoice: { number: string; title: string | null; customer_name: string; event_date: string | null }): string {
-  return [`Order #${invoice.number}`, invoice.title || invoice.customer_name, usDate(invoice.event_date)]
-    .filter((part) => part && part.trim() !== "")
-    .join(" · ");
 }
 
 function Total({ label, value }: { label: string; value: number }) {

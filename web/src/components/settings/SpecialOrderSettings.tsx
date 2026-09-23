@@ -93,9 +93,11 @@ const VAR_EXAMPLE: Record<string, string> = {
   method: "visa ending 1111",
   balance_line: "“Balance remaining: $124.00” as its own line, or nothing when paid in full",
   receipt_line: "Square’s receipt link as its own line, or nothing (always nothing in sandbox)",
+  due_on: "10/8/2026",
+  orders: "the invoice’s lines, one per order, each with its amount",
 };
 
-/** The seven messages this module can send, in the order somebody meets them. */
+/** The nine messages this module can send, in the order somebody meets them. */
 const TEMPLATES: {
   key: keyof typeof DEFAULT_TEMPLATES;
   label: string;
@@ -142,6 +144,18 @@ const TEMPLATES: {
     label: "Kitchen order",
     when: "Internal — the kitchen document, which carries no prices.",
     vars: ["number", "event_date"],
+  },
+  {
+    key: "customer_invoice",
+    label: "Customer invoice",
+    when: "Sent with a customer invoice — several orders billed at once, like a wholesale week. {pay_line} is the pay link.",
+    vars: ["number", "first_name", "full_name", "total", "due_on", "orders", "pay_line"],
+  },
+  {
+    key: "invoice_payment",
+    label: "Payment received (invoice)",
+    when: "Sent automatically when a customer pays a customer invoice with its pay link.",
+    vars: ["number", "first_name", "full_name", "amount", "method", "balance", "balance_line", "receipt_line"],
   },
   {
     key: "statement",

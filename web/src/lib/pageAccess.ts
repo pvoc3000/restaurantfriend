@@ -155,6 +155,11 @@ export const PAGE_ACCESS: Record<string, Record<Role, PageAccess>> = {
   // ── Special Orders ────────────────────────────────────────────────────────
   "/special-orders":       row("R", "W", "W", "W", "W"),
   "/customers":            row("R", "R", "W", "W", "W"),
+  // Not on the sheet — built 2026-09-23 (124). The table's read policy is
+  // membership-wide like every special-order table (092), but an invoice is
+  // money owed rather than an order to make, so staff are not shown it;
+  // supervisor+ writes, as it does on the orders it covers.
+  "/customer-invoices":    row("-", "W", "W", "W", "W"),
 
   // ── The tablet landing page ───────────────────────────────────────────────
   // Not on the sheet — it did not exist. A page of doors, each of which is
