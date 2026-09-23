@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/client";
 import { PickList } from "@/components/ui/PickList";
+import { Switch } from "@/components/ui/Switch";
 import { TextInput } from "@/components/ui/TextInput";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { RowMenu } from "@/components/ui/RowMenu";
@@ -965,15 +966,10 @@ export function PlanMatrix({
           disabled: pending || trays.length === 0,
         },
         {
-          label: review ? "Stop Checking Pars" : "Check Pars",
-          onSelect: () => setReview((v) => !v),
-          disabled: !review && differing.length === 0,
-          separatorBefore: true,
-        },
-        {
           label: `Use ${locationCode} Defaults`,
           onSelect: takeAllSuggested,
           disabled: pending || !review || differing.length === 0,
+          separatorBefore: true,
         },
         {
           // The riskier direction — it writes the SHOP's catalog, which every
@@ -1029,6 +1025,22 @@ export function PlanMatrix({
                 className={PLAN_CONTROL_WIDTH}
               />
             </div>
+          ) : null}
+          {/* PAR CHECK MODE IS A SWITCH, not a menu command (Mark, 2026-09-23:
+              "might be more intuitive"). It is a MODE — it stays on and changes
+              what every slot shows — and a menu item that renamed itself to
+              "Stop Checking Pars" hid that state behind a click. Off and with
+              nothing to check, it cannot be turned on: the count above the
+              table already says every par matches. */}
+          {editable ? (
+            <Switch
+              checked={review}
+              onChange={setReview}
+              disabled={!review && differing.length === 0}
+              title={`Offer ${locationCode}'s default beside every par that differs from it`}
+            >
+              Par Check Mode
+            </Switch>
           ) : null}
           {/* The grand total, under the picker (Mark, 2026-09-12). */}
           <span className="text-[13px] text-muted">
