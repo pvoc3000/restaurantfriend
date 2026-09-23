@@ -95,6 +95,28 @@ test accounts → Open). Run the same command against
 `connect.squareupsandbox.com` with the sandbox token, and paste the result into
 **Sandbox item variation ID**.
 
+**Since 2026-09-23 these are pickers, and the curl is only a fallback.** The
+`square-catalog` function (deploy it like the others) lists every item in the
+catalog of the environment the pay link charges into, so on Settings → General
+the fields for THAT environment offer your Square items by name, with the
+category beside each. The other environment's fields stay typed boxes, since
+their catalog is in an account this token can't see.
+
+### The "Wholesale Order" item (migration 125)
+
+A payment for **wholesale** (every order being paid was made by a standing
+order, such as Cafe Knotted's week on one customer invoice) is sold as a
+second item, so Square files it under its own category. Create a
+variable-priced **Wholesale Order** item in a **Wholesale** category in the
+Square dashboard, then pick it in **"Wholesale Order" item** (and the sandbox
+twin for testing). Until you do, wholesale payments are sold as the Special
+Order item as before.
+
+Then map the new category in **Settings → Accounting → Sales from Square**:
+the Wholesale row appears after the first nightly sync that sees a sale in it,
+and until it's mapped (to Wholesale Income) that sale posts to Uncategorized
+Income and is named on the day's receipt. It never blocks the day.
+
 ## Step 3 — switch to production
 
 1. In the application, switch the toggle to **Production** and copy the

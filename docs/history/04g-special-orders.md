@@ -12,6 +12,44 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-23, MIGRATION 125 WRITTEN, NOT YET APPLIED — THE INVOICE'S
+   COMMANDS ARE ONE ACTIONS MENU; A WHOLESALE PAYMENT IS SOLD AS "WHOLESALE
+   ORDER"; SQUARE ITEMS ARE PICKED, NOT PASTED.** Mark applied 124, redeployed
+   the three functions and made invoice 1001 (three Knotted days, 3 × $613.50,
+   due 10/1 — read back, 3 "Added to invoice 1001" log lines). Then three asks.
+   (a) "move all the 'command' buttons into an actionmenu at the top of the
+   invoice detail page like every other page" — `CustomerInvoiceCommandMenu`
+   in the title row (`OrderCommandMenu`'s shape: `SendCustomerInvoice` hands
+   its row up through a render prop and keeps its compose card); groups
+   Preview · Download · Send… / Record Payment… / Update Amounts / Void… ·
+   Delete…. Readers get Preview and Download.
+   (b) "Don't we need to set a 'Wholesale Order' square token in settings the
+   same way we did 'Special Order'?" — yes: 125's `pay_link_token_variation`
+   sells a payment as `square_payments.wholesale_item_variation_id` (or the
+   sandbox twin) when EVERY order it pays was made by a standing order — the
+   app's existing definition of wholesale — and as Special Order otherwise; an
+   empty wholesale field falls back, so nothing moved until it is set.
+   `claim_pay_token` redefined in full to use it. The QBO side needs no code: a
+   new Square category registers itself in `accounting_sales_mappings` and posts
+   to Uncategorized Income, named, until mapped (Wholesale Income exists).
+   (c) "is there a way to grab the item names and tokens from square and use a
+   picklist in settings" — the new signed-in `square-catalog` function (owner/
+   admin; the pay link's own token pair, so it lists that environment's
+   catalog; `/v2/catalog/list` ITEM + CATEGORY, every page) feeds
+   `settings/SquareItemSetting`, a picker of "Item — Variation" with the
+   category as hint (`lib/squareCatalog.variationOptions`); the other
+   environment's fields stay typed; a saved id Square no longer lists is kept
+   under its raw id. One request per settings visit (module-level promise).
+   **Also found reading back 1001: Settings says PRODUCTION**, not sandbox as I
+   had told Mark — so a pay link sent now charges a real card.
+   **Verified:** 125 on the throwaway Postgres (prelude + 124 + 125, applied
+   twice): all-standing invoice → WHOLE, mixed → SPECIAL, a standing day's own
+   link → WHOLE, a regular order → SPECIAL, empty wholesale → SPECIAL, sandbox →
+   the sandbox ids; one overload, anon cannot call the helper. Fixtures 2,021
+   (the keep-a-missing-id case broken to see it red); tsc, lint, `deno check
+   square-catalog`. NOT verified: the menu or the pickers in the pane (PIN
+   screen), a real catalog response.
+
    **Shipped 2026-09-23, MIGRATION 124 WRITTEN, NOT YET APPLIED — CUSTOMER
    INVOICES: ONE INVOICE, MANY ORDERS, ONE PAY LINK.** Mark: "what's the next
    step … to get closer to our customer invoices page?", then, answering the

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/client";
 import { FORM_FIELD_DRESS } from "@/components/ui/fieldMetrics";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
 import { customerLabel, money, readSettings } from "@/lib/specialOrders";
@@ -103,6 +103,7 @@ export function SendCustomerInvoice({
   today,
   resend,
   disabled,
+  children,
 }: {
   id: string;
   orgId: string;
@@ -110,6 +111,9 @@ export function SendCustomerInvoice({
   today: string;
   resend: boolean;
   disabled: boolean;
+  /** Hands its row UP to the record's one Actions menu and keeps drawing its
+   *  own compose card — `SendDocument`'s render-prop shape. */
+  children: (items: ActionMenuItem[]) => ReactNode;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -221,11 +225,15 @@ export function SendCustomerInvoice({
 
   return (
     <>
-      <button type="button" className={BUTTON_CLASS} onClick={open} disabled={disabled || busy !== null}>
-        {busy === "compose" ? "Loading…" : resend ? "Send Again…" : "Send…"}
-      </button>
-      {sentNote && <p className="text-[13px] text-[var(--rf-green-600)]">{sentNote}</p>}
-      {error && !compose && <p className="text-[13px] text-accent">{error}</p>}
+      {children([
+        {
+          label: busy === "compose" ? "Loading…" : resend ? "Send Again…" : "Send…",
+          onSelect: () => void open(),
+          disabled: disabled || busy !== null,
+        },
+      ])}
+      {sentNote && <p className="max-w-sm text-right text-[13px] text-[var(--rf-green-600)]">{sentNote}</p>}
+      {error && !compose && <p className="max-w-sm text-right text-[13px] text-accent">{error}</p>}
 
       {compose && pending && (
         <Dialog

@@ -66,6 +66,7 @@ import "./productionHistory.fixtures";
 import "./inquiry.fixtures";
 import "./payLink.fixtures";
 import "./customerInvoices.fixtures";
+import "./squareCatalog.fixtures";
 import "./squareOrder.fixtures";
 import "./inspections.fixtures";
 import "./orgDocuments.fixtures";

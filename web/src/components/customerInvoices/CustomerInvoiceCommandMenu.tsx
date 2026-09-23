@@ -4,12 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
-import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
 import { TextInput } from "@/components/ui/TextInput";
-import { SectionHeading } from "@/components/ui/SectionHeading";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import {
   DEFAULT_PAYMENT_TYPE,
@@ -23,7 +22,11 @@ import { invoiceFileName, type InvoiceStatus } from "@/lib/customerInvoices";
 import { SendCustomerInvoice, loadOrg, renderInvoicePdf } from "./SendCustomerInvoice";
 
 /**
- * The invoice record's commands (migration 124).
+ * The invoice record's commands (migration 124), as ONE "Actions" menu level
+ * with the title at the right margin — every record screen's shape (Mark,
+ * 2026-09-23: "like every other page in the app"). Groups: the document
+ * (Preview, Download, Send…), the money (Record Payment…), the draft (Update
+ * Amounts), and the destructive pair (Void…, Delete).
  *
  * SEND is the one that matters, and it lives in `SendCustomerInvoice` — the
  * compose card with the PDF beside it, `SendDocument`'s shape. The rest:
@@ -39,7 +42,7 @@ import { SendCustomerInvoice, loadOrg, renderInvoicePdf } from "./SendCustomerIn
  *   stay on the orders; a refund is its own act on the order's Payments table.
  * - **Delete** — an unsent invoice with nothing paid, for a mistake.
  */
-export function CustomerInvoiceActions({
+export function CustomerInvoiceCommandMenu({
   id,
   orgId,
   numberText,
@@ -213,60 +216,70 @@ export function CustomerInvoiceActions({
       router.refresh();
     });
 
+  const group = (items: ActionMenuItem[]) =>
+    items.map((it, i) => (i === 0 ? { ...it, separatorBefore: true } : it));
+
+  const menu = (sendItems: ActionMenuItem[]) => {
+    const documents: ActionMenuItem[] = [
+      { label: busy === "preview" ? "Rendering…" : "Preview", onSelect: preview, disabled: busy !== null },
+      { label: busy === "download" ? "Rendering…" : "Download", onSelect: () => void download(), disabled: busy !== null },
+      ...sendItems,
+    ];
+    const moneyRows: ActionMenuItem[] =
+      canWrite && live && balance > 0.005
+        ? [
+            {
+              label: "Record Payment…",
+              disabled: busy !== null,
+              onSelect: () => {
+                setPayAmount(balance.toFixed(2));
+                setPayOn(today);
+                setPayType(DEFAULT_PAYMENT_TYPE);
+                setPayNote("");
+                setPaying(true);
+              },
+            },
+          ]
+        : [];
+    const draftRows: ActionMenuItem[] =
+      canWrite && draft
+        ? [{ label: busy === "amounts" ? "Updating…" : "Update Amounts", onSelect: () => void updateAmounts(), disabled: busy !== null }]
+        : [];
+    const destructive: ActionMenuItem[] = [
+      ...(canWrite && live
+        ? [{ label: busy === "void" ? "Voiding…" : "Void…", onSelect: () => void voidInvoice(), danger: true, disabled: busy !== null }]
+        : []),
+      ...(canWrite && draft && paid === 0
+        ? [{ label: "Delete…", onSelect: () => void remove(), danger: true, disabled: busy !== null }]
+        : []),
+    ];
+    const groups = [documents, moneyRows, draftRows, destructive].filter((g) => g.length > 0);
+    return (
+      <ActionMenu
+        ariaLabel={`Actions for invoice ${numberText}`}
+        items={groups.flatMap((g, i) => (i === 0 ? g : group(g)))}
+      />
+    );
+  };
+
   return (
-    <section className="space-y-3">
-      <SectionHeading>Commands</SectionHeading>
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className={BUTTON_CLASS} onClick={preview} disabled={busy !== null}>
-          {busy === "preview" ? "Rendering…" : "Preview"}
-        </button>
-        <button type="button" className={BUTTON_CLASS} onClick={download} disabled={busy !== null}>
-          {busy === "download" ? "Rendering…" : "Download"}
-        </button>
-        {canWrite && live ? (
-          <SendCustomerInvoice
-            id={id}
-            orgId={orgId}
-            numberText={numberText}
-            today={today}
-            resend={!draft}
-            disabled={busy !== null}
-          />
-        ) : null}
-        {canWrite && live && balance > 0.005 ? (
-          <button
-            type="button"
-            className={BUTTON_CLASS}
-            disabled={busy !== null}
-            onClick={() => {
-              setPayAmount(balance.toFixed(2));
-              setPayOn(today);
-              setPayType(DEFAULT_PAYMENT_TYPE);
-              setPayNote("");
-              setPaying(true);
-            }}
-          >
-            Record Payment…
-          </button>
-        ) : null}
-        {canWrite && draft ? (
-          <button type="button" className={BUTTON_CLASS} onClick={updateAmounts} disabled={busy !== null}>
-            {busy === "amounts" ? "Updating…" : "Update Amounts"}
-          </button>
-        ) : null}
-        {canWrite && live ? (
-          <button type="button" className={DANGER_BUTTON_CLASS} onClick={voidInvoice} disabled={busy !== null}>
-            {busy === "void" ? "Voiding…" : "Void…"}
-          </button>
-        ) : null}
-        {canWrite && draft && paid === 0 ? (
-          <button type="button" className={DANGER_BUTTON_CLASS} onClick={remove} disabled={busy !== null}>
-            Delete
-          </button>
-        ) : null}
-      </div>
-      {note ? <p className="text-[13px] text-[var(--rf-green-600)]">{note}</p> : null}
-      {error ? <p className="text-[13px] text-accent">{error}</p> : null}
+    <div className="flex shrink-0 flex-col items-end gap-2">
+      {canWrite && live ? (
+        <SendCustomerInvoice
+          id={id}
+          orgId={orgId}
+          numberText={numberText}
+          today={today}
+          resend={!draft}
+          disabled={busy !== null}
+        >
+          {menu}
+        </SendCustomerInvoice>
+      ) : (
+        menu([])
+      )}
+      {note ? <p className="max-w-sm text-right text-[13px] text-[var(--rf-green-600)]">{note}</p> : null}
+      {error ? <p className="max-w-sm text-right text-[13px] text-accent">{error}</p> : null}
 
       {paying && (
         <Dialog
@@ -349,6 +362,6 @@ export function CustomerInvoiceActions({
           </div>
         </Dialog>
       )}
-    </section>
+    </div>
   );
 }

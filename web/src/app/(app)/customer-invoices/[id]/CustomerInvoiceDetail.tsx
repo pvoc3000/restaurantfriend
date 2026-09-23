@@ -19,7 +19,7 @@ import { RecordNav } from "@/components/ui/RecordNav";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
-import { CustomerInvoiceActions } from "@/components/customerInvoices/CustomerInvoiceActions";
+import { CustomerInvoiceCommandMenu } from "@/components/customerInvoices/CustomerInvoiceCommandMenu";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { canEditPage } from "@/lib/pageAccess";
 
@@ -27,7 +27,7 @@ const INVOICES_CRUMB = { href: "/customer-invoices", label: "Invoices" };
 
 /**
  * One customer invoice (migration 124): what it bills, what has been paid on
- * it, and the commands — Send, Record Payment, Update Amounts, Void.
+ * it, and the commands — one Actions menu in the title row.
  *
  * THE LINES ARE THE PAPER. Each is frozen at the amount written when the
  * invoice was made (and frozen harder once it is sent — the database refuses
@@ -84,20 +84,34 @@ export async function CustomerInvoiceDetail({
         <RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />
       </div>
 
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Invoice {numberText}
-        </h1>
-        <p className="text-sm text-muted">
-          <span className={status === "overdue" ? "text-accent" : undefined}>
-            {INVOICE_STATUS_LABEL[status]}
-          </span>
-          {" · "}
-          {lines.length} order{lines.length === 1 ? "" : "s"} · {money(view.total)}
-          {status !== "void" && view.balance > 0.005 ? (
-            <span className="text-accent"> · {money(view.balance)} due</span>
-          ) : null}
-        </p>
+      {/* THE TITLE ROW CARRIES THE ONE ACTIONS MENU, level with the title at
+          the right margin — every record screen's shape. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            Invoice {numberText}
+          </h1>
+          <p className="text-sm text-muted">
+            <span className={status === "overdue" ? "text-accent" : undefined}>
+              {INVOICE_STATUS_LABEL[status]}
+            </span>
+            {" · "}
+            {lines.length} order{lines.length === 1 ? "" : "s"} · {money(view.total)}
+            {status !== "void" && view.balance > 0.005 ? (
+              <span className="text-accent"> · {money(view.balance)} due</span>
+            ) : null}
+          </p>
+        </div>
+        <CustomerInvoiceCommandMenu
+          id={id}
+          orgId={invoice.org_id}
+          numberText={numberText}
+          status={status}
+          balance={view.balance}
+          paid={view.paid}
+          today={today}
+          canWrite={canWrite}
+        />
       </div>
 
       <section className="space-y-3">
@@ -254,16 +268,6 @@ export async function CustomerInvoiceDetail({
         )}
       </section>
 
-      <CustomerInvoiceActions
-        id={id}
-        orgId={invoice.org_id}
-        numberText={numberText}
-        status={status}
-        balance={view.balance}
-        paid={view.paid}
-        today={today}
-        canWrite={canWrite}
-      />
     </div>
   );
 }

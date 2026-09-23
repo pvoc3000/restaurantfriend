@@ -3,6 +3,7 @@ import { Fragment } from "react";
 import { percentLabel, toPercent } from "@/lib/percent";
 
 import { PercentSetting } from "./PercentSetting";
+import { SquareItemSetting } from "./SquareItemSetting";
 
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -607,22 +608,37 @@ export function SpecialOrderSettings({
                 })
               : <span>{text(squarePay.application_id) ?? "—"}</span>}
           </dd>
-          <dt className="py-0.5 text-subtle">“Special Order” item variation ID</dt>
-          <dd className="py-0.5">
-            {editable
-              ? cell(["square_payments", "item_variation_id"], text(squarePay.item_variation_id), {
-                  ariaLabel: "Square Special Order item variation ID",
-                })
-              : <span>{text(squarePay.item_variation_id) ?? "—"}</span>}
-          </dd>
-          <dt className="py-0.5 text-subtle">Sandbox item variation ID</dt>
-          <dd className="py-0.5">
-            {editable
-              ? cell(["square_payments", "sandbox_item_variation_id"], text(squarePay.sandbox_item_variation_id), {
-                  ariaLabel: "Square sandbox item variation ID",
-                })
-              : <span>{text(squarePay.sandbox_item_variation_id) ?? "—"}</span>}
-          </dd>
+          {/* THE ITEMS A PAYMENT IS SOLD AS, chosen from Square's own catalog
+              (2026-09-23) — the environment the pay link charges into is a
+              picker, the other is typed. "Wholesale Order" (125) is used when
+              every order being paid was made by a standing order; empty, those
+              payments are sold as the Special Order item as before. */}
+          {(
+            [
+              ["item_variation_id", "“Special Order” item", "production"],
+              ["wholesale_item_variation_id", "“Wholesale Order” item", "production"],
+              ["sandbox_item_variation_id", "Sandbox “Special Order” item", "sandbox"],
+              ["sandbox_wholesale_item_variation_id", "Sandbox “Wholesale Order” item", "sandbox"],
+            ] as const
+          ).map(([key, label, env]) => (
+            <Fragment key={key}>
+              <dt className="py-0.5 text-subtle">{label}</dt>
+              <dd className="py-0.5">
+                {editable ? (
+                  <SquareItemSetting
+                    orgId={orgId}
+                    path={["square_payments", key]}
+                    value={text(squarePay[key])}
+                    settings={settings}
+                    environment={env}
+                    label={`Square ${label.replace(/[“”]/g, "")}`}
+                  />
+                ) : (
+                  <span>{text(squarePay[key]) ?? "—"}</span>
+                )}
+              </dd>
+            </Fragment>
+          ))}
           <dt className="py-0.5 text-subtle">Sandbox location ID</dt>
           <dd className="py-0.5">
             {editable
