@@ -626,3 +626,16 @@
    InlineValue cells, one-tap move to another field, tap-away dismiss, and ›
    scrolling an off-screen field into view. **Not yet tried on an iPad** — the
    one thing the harness can't prove is WebKit's synthesised mouse sequence.
+   **And it proved to be the thing** (Mark, same day, on the iPad: "it still
+   takes two taps"). Tapping another field still spent the first tap on
+   dismissing: iOS delivers a tap's focus AFTER pointerup, and our blur there
+   changed the page first (a save, the pad unmounting, the outline coming off)
+   — most likely WebKit's content-change heuristic then treated the tap as a
+   hover and dropped the focus. Fix: on a tap outside, `CalcPad` focuses the
+   tapped input/textarea/select ITSELF, before anything changes (which blurs
+   and saves the old field in the same move), and clicks an `InlineValue`
+   opener the way › does; only a tap on something that isn't a field blurs and
+   closes. Verified by dispatching pointer events alone, with no browser focus
+   following — the iOS failure mode — onto a calculator field, an InlineValue
+   cell and a plain text field: one tap each, and a typed 73 saved on the way.
+   Still to confirm on the iPad itself.

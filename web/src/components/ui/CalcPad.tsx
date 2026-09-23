@@ -387,8 +387,19 @@ export function CalcPad() {
    * lands. That blur is ours rather than the browser's because iOS does not
    * take focus off an input when you tap something that can't take focus
    * itself — a plain cell, a button — so without it the pad would never leave.
-   * If the tap lands on another calculator field, that field's focusin puts the
-   * pad straight back on it.
+   *
+   * A TAP ON ANOTHER FIELD FOCUSES IT OURSELVES, rather than leaving that to
+   * the browser (Mark, 2026-09-23, on the iPad: "the first tap dismisses the
+   * calculator, the second to focus the next field"). In the desktop harness
+   * the browser's own focus arrived after our blur and it took one tap; on iOS
+   * it didn't. The likely reason is WebKit's content-change heuristic: iOS
+   * fires the tap's mouse events and focus AFTER pointerup, and when the page
+   * changes in between — here our blur saves the field, the pad unmounts, the
+   * outline comes off — it can treat the tap as a hover and drop the focus. So
+   * we don't wait for it: the tapped field is focused right here, before
+   * anything changes, which also blurs (and saves) the old one in the same
+   * move, and the pad retargets without ever going down. An `InlineValue` cell
+   * at rest is opened by clicking it, the way › does.
    *
    * On pointerUP, and only for a TAP: a finger that travels is scrolling the
    * page, and the pad should ride that out rather than close.
@@ -406,6 +417,18 @@ export function CalcPad() {
       const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y);
       start = null;
       if (moved > TAP_SLOP || inside(e.target)) return;
+      const hit = e.target instanceof Element ? e.target : null;
+      const field = hit?.closest<HTMLElement>("input, textarea, select, [contenteditable='true']");
+      if (field && !(field as HTMLInputElement).disabled) {
+        field.focus({ preventScroll: true });
+        return;
+      }
+      const opener = hit?.closest<HTMLElement>("[data-rf-calc-opener]");
+      if (opener) {
+        target.blur();
+        opener.click();
+        return;
+      }
       target.blur();
       setTarget(null);
     };
