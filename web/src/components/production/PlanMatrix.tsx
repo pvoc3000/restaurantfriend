@@ -1006,6 +1006,22 @@ export function PlanMatrix({
               triggerClassName={`${PLAN_CONTROL_WIDTH} ${BUTTON_CLASS}`}
             />
           ) : null}
+          {/* PAR CHECK MODE IS A SWITCH, not a menu command (Mark, 2026-09-23:
+              "might be more intuitive"). It is a MODE — it stays on and changes
+              what every slot shows — and a menu item that renamed itself to
+              "Stop Checking Pars" hid that state behind a click. Off and with
+              nothing to check, it cannot be turned on: the count above the
+              table already says every par matches. */}
+          {editable ? (
+            <Switch
+              checked={review}
+              onChange={setReview}
+              disabled={!review && differing.length === 0}
+              title={`Offer ${locationCode}'s default beside every par that differs from it`}
+            >
+              Par Check Mode
+            </Switch>
+          ) : null}
           {trays.length > 1 ? (
             // The caption to the LEFT of the control here (Mark, 2026-09-12),
             // where a filter row's `ControlField` stacks it above: this picker
@@ -1025,22 +1041,6 @@ export function PlanMatrix({
                 className={PLAN_CONTROL_WIDTH}
               />
             </div>
-          ) : null}
-          {/* PAR CHECK MODE IS A SWITCH, not a menu command (Mark, 2026-09-23:
-              "might be more intuitive"). It is a MODE — it stays on and changes
-              what every slot shows — and a menu item that renamed itself to
-              "Stop Checking Pars" hid that state behind a click. Off and with
-              nothing to check, it cannot be turned on: the count above the
-              table already says every par matches. */}
-          {editable ? (
-            <Switch
-              checked={review}
-              onChange={setReview}
-              disabled={!review && differing.length === 0}
-              title={`Offer ${locationCode}'s default beside every par that differs from it`}
-            >
-              Par Check Mode
-            </Switch>
           ) : null}
           {/* The grand total, under the picker (Mark, 2026-09-12). */}
           <span className="text-[13px] text-muted">
