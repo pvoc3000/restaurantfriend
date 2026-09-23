@@ -1006,22 +1006,6 @@ export function PlanMatrix({
               triggerClassName={`${PLAN_CONTROL_WIDTH} ${BUTTON_CLASS}`}
             />
           ) : null}
-          {/* PAR CHECK MODE IS A SWITCH, not a menu command (Mark, 2026-09-23:
-              "might be more intuitive"). It is a MODE — it stays on and changes
-              what every slot shows — and a menu item that renamed itself to
-              "Stop Checking Pars" hid that state behind a click. Off and with
-              nothing to check, it cannot be turned on: the count above the
-              table already says every par matches. */}
-          {editable ? (
-            <Switch
-              checked={review}
-              onChange={setReview}
-              disabled={!review && differing.length === 0}
-              title={`Offer ${locationCode}'s default beside every par that differs from it`}
-            >
-              Par Check Mode
-            </Switch>
-          ) : null}
           {trays.length > 1 ? (
             // The caption to the LEFT of the control here (Mark, 2026-09-12),
             // where a filter row's `ControlField` stacks it above: this picker
@@ -1050,22 +1034,47 @@ export function PlanMatrix({
       </div>
 
       <div className="space-y-3">
-      {/* How many pars disagree with this shop's defaults — the count you need
-          to decide whether to Check Pars, stated BEFORE you turn it on. */}
-      {editable && (differing.length > 0 || review) ? (
-        <p className="text-[13px] text-muted">
-          {differing.length === 0 ? (
-            <>Every par matches {locationCode}&rsquo;s defaults.</>
-          ) : (
-            <>
-              <span className="font-medium text-ink">
-                {differing.length} par{differing.length === 1 ? "" : "s"}
-              </span>{" "}
-              differ{differing.length === 1 ? "s" : ""} from {locationCode}&rsquo;s defaults
-              {review ? " — checking" : ""}.
-            </>
-          )}
-        </p>
+      {/* The strip directly above the table: the count on the left, the switch
+          that acts on it on the right, whose right edge is the Actions menu's
+          (Mark, 2026-09-23: "just above the datatable headers. Still aligned
+          with the actionmenu"). The row exists only for an editor; a reader
+          has neither. */}
+      {editable ? (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          {/* How many pars disagree with this shop's defaults — the count you
+              need to decide whether to turn Par Check Mode on, stated BEFORE
+              you do. */}
+          {differing.length > 0 || review ? (
+            <p className="min-w-0 text-[13px] text-muted">
+              {differing.length === 0 ? (
+                <>Every par matches {locationCode}&rsquo;s defaults.</>
+              ) : (
+                <>
+                  <span className="font-medium text-ink">
+                    {differing.length} par{differing.length === 1 ? "" : "s"}
+                  </span>{" "}
+                  differ{differing.length === 1 ? "s" : ""} from {locationCode}&rsquo;s defaults
+                  {review ? " — checking" : ""}.
+                </>
+              )}
+            </p>
+          ) : null}
+          {/* PAR CHECK MODE IS A SWITCH, not a menu command (Mark, 2026-09-23:
+              "might be more intuitive"). It is a MODE — it stays on and changes
+              what every slot shows — and a menu item that renamed itself to
+              "Stop Checking Pars" hid that state behind a click. Off and with
+              nothing to check, it cannot be turned on: the count beside it
+              already says every par matches. */}
+          <Switch
+            checked={review}
+            onChange={setReview}
+            disabled={!review && differing.length === 0}
+            title={`Offer ${locationCode}'s default beside every par that differs from it`}
+            className="ml-auto"
+          >
+            Par Check Mode
+          </Switch>
+        </div>
       ) : null}
 
       <div ref={scrollerRef} className="overflow-x-auto">
