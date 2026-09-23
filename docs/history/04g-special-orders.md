@@ -12,6 +12,19 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Verified live 2026-09-22 — A PRODUCTION DELIVERY ORDER, PAID WITH APPLE
+   PAY.** #10073 (delivery from DF02, $1.00 taxable item at 9.75%, $1.00
+   delivery): breakdown taxable 1.00 / other 0 / delivery 1.00; Square charged
+   $2.10 = the invoice, so the built order met the total-must-match check;
+   Square's item report shows only the $1.00 Special Orders line — delivery is
+   a SERVICE CHARGE and lives in the Sales summary, not the item report. Paid
+   with Apple Pay in Safari once the domain verified (`web/public/.well-known/
+   apple-developer-merchantid-domain-association`, with `/.well-known/` taken
+   out of `proxy.ts`'s matcher — it had been redirecting Apple's verifier to
+   /login). Landed at Order + Schedule Delivery, 122's rule in production.
+   Still not exercised: an UNTAXED goods line / rush fee, a gift card, a
+   decline, Google Pay.
+
    **Verified live 2026-09-22 — THE FIRST REFUND, AND WHAT IT DOES TO THE
    BOOKS.** Mark refunded #10072's $1.10 from the order: a −$1.10 `Square
    Refund` row carrying Square's refund id, `created_by` Mark, net paid 0,
