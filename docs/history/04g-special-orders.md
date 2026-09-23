@@ -12,7 +12,18 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Shipped 2026-09-22, MIGRATION 122 WRITTEN, NOT YET APPLIED — A DELIVERY
+   **Verified live 2026-09-22 — 121 AND 122 ON REAL SANDBOX PAYMENTS.** #10070
+   (pickup, then re-invoiced): the pay link moved it invoice → order and set
+   Print Order in one statement; re-sending the invoice superseded the older
+   link. #10071 (delivery, no courier booked, fresh): paid online → "Status
+   changed from invoice to order; To-do set to Schedule Delivery"; Mark then
+   filled the delivery-scheduled date → "To-do cleared (was Schedule
+   Delivery)", flag untouched, suggestion now Print Order. One test detour
+   worth knowing: #10070's second payment left a LEFTOVER Print Order in place
+   (the status had been moved back to invoice by hand, the to-do had not) —
+   correct, since the pay link only replaces an empty or answered to-do.
+
+   **Shipped 2026-09-22, MIGRATION 122 APPLIED (Mark, same day) — A DELIVERY
    PAID IN FULL BOOKS ITS COURIER FIRST.** Mark: "if the order is set for
    delivery, when it's paid in full, the to do should be set to 'schedule
    delivery'". One rule, `paidTodo` in `lib/specialOrders` — delivery with no
