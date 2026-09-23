@@ -171,12 +171,24 @@ export const TODO_OPTIONS: PickOption[] = [
  */
 export const PAYMENT_TYPE_OPTIONS: PickOption[] = [
   { value: "Square Invoice", label: "Square Invoice", hint: "the usual" },
-  { value: "Square Online", label: "Square Online" },
+  { value: "Square Online", label: "Square Online", hint: "the pay link" },
+  { value: "Square Refund", label: "Square Refund", hint: "a pay-link refund, negative" },
   { value: "cash", label: "Cash" },
   { value: "check", label: "Check" },
   { value: "comp", label: "Comp" },
   { value: "legacy", label: "Legacy", hint: "migrated from FileMaker's paid total" },
 ];
+
+/** A payment the Refund… command can give back: written by `square-pay`
+ *  (migration 119), so it carries the Square payment id. Hand-typed rows do
+ *  not, and are refunded in Square's own dashboard. */
+export function isRefundablePayment(p: {
+  payment_type: string | null;
+  external_ref: string | null;
+  amount: number | null;
+}): boolean {
+  return p.payment_type === "Square Online" && Boolean(p.external_ref) && Number(p.amount) > 0;
+}
 
 /** What a new payment offers before anybody chooses — 1,188 of 1,190. */
 export const DEFAULT_PAYMENT_TYPE = "Square Invoice";

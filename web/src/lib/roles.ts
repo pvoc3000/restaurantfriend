@@ -126,6 +126,14 @@ export function canManageMembers(role: Role): boolean {
 }
 
 /**
+ * Give money back to a customer through Square — the Refund… command on a
+ * pay-link payment (Mark, 2026-09-22: "manager and up"). The same set as
+ * `canManageMembers` today and named separately for `canReadHr`'s reason:
+ * "may refund" and "may grant access" are different questions.
+ */
+export const canRefundPayments = canManageMembers;
+
+/**
  * Read and write the HR record — migration 020's employees policies.
  *
  * The same set as canManageMembers today, and named separately on purpose:

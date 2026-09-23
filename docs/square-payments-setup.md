@@ -143,6 +143,26 @@ Google Pay needs no setup.
 
 ---
 
+## Refunds
+
+A manager or the owner can refund a pay-link payment from the order's Payments
+section: **Refund…** on the payment row. It asks for an amount (the whole
+payment to start with, or less for a part refund) and a reason. The money goes
+back through Square to the card or gift card it came from. The refund is
+recorded as a negative **Square Refund** payment, so the balance follows. The
+order's status and to-do are left alone.
+
+It needs its own function deployed once:
+
+```bash
+npx supabase functions deploy square-refund --project-ref kltxioacvneshbyhxtaj
+```
+
+Only pay-link payments carry the Square payment id this needs. Payments typed
+in by hand ("Square Invoice") are refunded in the Square dashboard, and their
+refund recorded by hand. A payment made in sandbox can't be refunded in
+production, or the other way round.
+
 ## What happens when
 
 - **The invoice is sent** → a pay token is minted and bound to the invoice as

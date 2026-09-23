@@ -56,7 +56,7 @@ import {
   type SoAttachment,
 } from "@/lib/specialOrderAttachments";
 import { canEditPage } from "@/lib/pageAccess";
-import { canScheduleProduction } from "@/lib/roles";
+import { canRefundPayments, canScheduleProduction } from "@/lib/roles";
 
 const SPECIAL_ORDERS_CRUMB = { href: "/special-orders", label: "Special Orders" };
 
@@ -1100,6 +1100,7 @@ export async function SpecialOrderDetail({
                     rows={payments}
                     balance={totals.balance}
                     canWrite={canWrite}
+                    canRefund={canRefundPayments(session.membership.role)}
                     today={today}
                     workflow={row as never}
                   />

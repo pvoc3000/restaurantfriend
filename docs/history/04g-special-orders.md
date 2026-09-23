@@ -12,7 +12,26 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Shipped 2026-09-22, MIGRATION 123 WRITTEN, NOT YET APPLIED — THE PAYMENT
+   **Shipped 2026-09-22, `square-refund` NOT YET DEPLOYED — REFUND A PAY-LINK
+   PAYMENT FROM THE ORDER.** Mark, after the first real payment (#10072, $1.10
+   = $1.00 Special Orders + $0.10 tax at DF02 — the Square report showed the
+   line under Special Orders): "is refunding it from within restaurant friend a
+   possibility?" … "build it — manager and up, leave status alone". A
+   **Refund…** command on Payments rows that `isRefundablePayment` accepts
+   (`Square Online` + a Square payment id + positive), shown to
+   `canRefundPayments` (lib/roles, = `canManageMembers`, named separately). The
+   new signed-in function reads the row through the CALLER's client (RLS),
+   re-checks owner/admin, reads the payment back from Square and refuses more
+   than `amount − refunded_money` (so a refund made in Square's dashboard
+   counts), posts `/v2/refunds` with one idempotency key per dialog, and records
+   a NEGATIVE `special_order_payments` row, `payment_type = 'Square Refund'`,
+   `external_ref` = the refund id, through the caller's client. Status, to-do
+   and dates are not touched. A refund Square accepted but we failed to record
+   is logged on the order and returned as a warning. No migration. NOT
+   verified against Square yet — needs the deploy and a real refund (#10072
+   is the obvious one).
+
+   **Shipped 2026-09-22, MIGRATION 123 APPLIED (Mark, same day) — THE PAYMENT
    SAYS WHAT IT WAS.** Mark asked how pay-link payments categorize in Square:
    a bare payment is a custom amount → UNCATEGORIZED → Uncategorized Income,
    tax and delivery folded in. "Let's do it the proper way." `square-pay` now
@@ -37,6 +56,14 @@
    half-to-even case red. Verified on a throwaway Postgres with 119–123. The
    WEB half (writing `breakdown` at send) was held back until 123 is applied,
    because an insert naming a missing column would break sending invoices.
+
+   **Verified live 2026-09-22 — THE FIRST PRODUCTION PAYMENT.** #10072,
+   pickup at DF02, one $1.00 taxable item at 9.75%: charged $1.10, recorded
+   as Square Online "visa ending 2998", moved to Order + Print Order. Square's
+   item report shows "Order #10072 — production test order" in the SPECIAL
+   ORDERS category at $1.00 (tax not per-item). Our half-up and Square's
+   half-to-even agree on 9.75¢ → 10¢. Delivery/untaxed split not yet exercised
+   in production.
 
    **Verified live 2026-09-22 — 121 AND 122 ON REAL SANDBOX PAYMENTS.** #10070
    (pickup, then re-invoiced): the pay link moved it invoice → order and set

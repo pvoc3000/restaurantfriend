@@ -15,6 +15,7 @@
 
 import { eq, no, ok, test } from "./harness";
 import {
+  isRefundablePayment,
   KIND_COMMAND_NOUN,
   KIND_LABEL,
   contactCopyPlan,
@@ -998,4 +999,12 @@ test("every order kind has a command noun, and it matches KIND_LABEL's words", (
       `${k}: "${KIND_COMMAND_NOUN[k]}" should be Title Case`,
     );
   }
+});
+
+test("isRefundablePayment: only a pay-link payment, with its Square id, for money received", () => {
+  ok(isRefundablePayment({ payment_type: "Square Online", external_ref: "ff4oOrh", amount: 1.1 }));
+  no(isRefundablePayment({ payment_type: "Square Invoice", external_ref: null, amount: 248 }), "hand-typed");
+  no(isRefundablePayment({ payment_type: "Square Online", external_ref: null, amount: 248 }), "no Square id");
+  no(isRefundablePayment({ payment_type: "Square Refund", external_ref: "r1", amount: -1.1 }), "a refund itself");
+  no(isRefundablePayment({ payment_type: "Square Online", external_ref: "x", amount: 0 }), "nothing to give back");
 });

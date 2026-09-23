@@ -10,6 +10,7 @@ import {
   type WorkflowOrder,
 } from "@/lib/orderWorkflow";
 import { WorkflowOffer } from "./WorkflowOffer";
+import { RefundPayment } from "./RefundPayment";
 
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
@@ -22,6 +23,7 @@ import { DateField } from "@/components/ui/DateField";
 import {
   DEFAULT_PAYMENT_TYPE,
   PAYMENT_TYPE_OPTIONS as PAYMENT_TYPES,
+  isRefundablePayment,
   money,
 } from "@/lib/specialOrders";
 
@@ -51,6 +53,7 @@ export function OrderPayments({
   rows,
   balance,
   canWrite,
+  canRefund = false,
   today,
   workflow,
 }: {
@@ -59,6 +62,8 @@ export function OrderPayments({
   rows: PaymentRow[];
   balance: number;
   canWrite: boolean;
+  /** Manager and up — `canRefundPayments`. Offers Refund… on pay-link rows. */
+  canRefund?: boolean;
   today: string;
   /** Enough of the order to ask whether a settling payment finishes it. */
   workflow: WorkflowOrder;
@@ -69,6 +74,7 @@ export function OrderPayments({
   const [error, setError] = useState<string | null>(null);
 
   const [offer, setOffer] = useState<Consequence[] | null>(null);
+  const [refunding, setRefunding] = useState<PaymentRow | null>(null);
   const [adding, setAdding] = useState(false);
   const [amount, setAmount] = useState("");
   const [paidOn, setPaidOn] = useState<string | null>(today);
@@ -211,7 +217,17 @@ export function OrderPayments({
                   )}
                 </td>
                 {canWrite ? (
-                  <td className="px-1 py-2 text-right">
+                  <td className="whitespace-nowrap px-1 py-2 text-right">
+                    {canRefund && isRefundablePayment(p) ? (
+                      <button
+                        type="button"
+                        onClick={() => setRefunding(p)}
+                        disabled={pending}
+                        className="mr-2 text-[13px] text-muted underline underline-offset-2 hover:text-ink disabled:opacity-35"
+                      >
+                        Refund…
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => remove(p)}
@@ -290,6 +306,14 @@ export function OrderPayments({
       ) : null}
 
       {error ? <p className="text-[13px] text-accent">{error}</p> : null}
+      {refunding && (
+        <RefundPayment
+          paymentId={refunding.id}
+          amount={Number(refunding.amount ?? 0)}
+          method={(refunding.note ?? "").replace(/^Pay link · /, "") || null}
+          onClose={() => setRefunding(null)}
+        />
+      )}
       {/* Asked only once the balance is clear — see `take`. */}
       {offer && (
         <WorkflowOffer
