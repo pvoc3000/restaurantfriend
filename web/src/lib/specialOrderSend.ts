@@ -10,6 +10,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { invoiceSplit } from "./quickbooks";
 import { customerLabel } from "./specialOrders";
 import type { OrderDocData } from "./specialOrderDocs";
 
@@ -263,6 +264,28 @@ export async function mintPayToken(
 }
 
 /**
+ * WHAT THE MONEY IS, for the Square order behind a pay-link payment (migration
+ * 123; `supabase/functions/_shared/squareOrder`). `invoiceSplit` — the same
+ * arithmetic the QuickBooks push sends as its TAX and NON lines — gives the
+ * taxable and untaxed nets after the discount; delivery comes out of the
+ * untaxed half because Square books it as a SERVICE CHARGE, and the rush fee
+ * stays in it as untaxed income. Snapshotted at send beside the total, at the
+ * same trust level.
+ */
+export function payBreakdown(order: OrderDocData) {
+  const { taxableNet, nonTaxableNet } = invoiceSplit(order.totals);
+  const round2 = (v: number) => Math.round(v * 100) / 100;
+  return {
+    taxable_net: taxableNet,
+    other_net: round2(nonTaxableNet - order.totals.deliveryCharge),
+    delivery: order.totals.deliveryCharge,
+    tax: order.totals.tax,
+    tax_rate: Number(order.money.tax_rate ?? 0),
+    total: order.totals.total,
+  };
+}
+
+/**
  * The invoice as sent, and its TOTAL as its own column — the figure the pay
  * link charges against, less whatever has been paid since. Written BEFORE the
  * send, for `bindQuoteSnapshot`'s reason.
@@ -270,11 +293,12 @@ export async function mintPayToken(
 export async function bindPaySnapshot(
   supabase: SupabaseClient,
   token: string,
-  snapshot: QuoteSnapshot
+  snapshot: QuoteSnapshot,
+  breakdown: ReturnType<typeof payBreakdown>
 ): Promise<void> {
   const { data, error } = await supabase
     .from("special_order_pay_tokens")
-    .update({ document_snapshot: snapshot, total: snapshot.totals.total })
+    .update({ document_snapshot: snapshot, total: snapshot.totals.total, breakdown })
     .eq("token", token)
     .select("id");
   if (error) throw new Error(error.message);

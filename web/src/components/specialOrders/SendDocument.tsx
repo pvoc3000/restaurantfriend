@@ -27,6 +27,7 @@ import {
   mintPayToken,
   mintQuoteToken,
   offersPayLink,
+  payBreakdown,
   quoteSnapshot,
   resolveAppBase,
   sendSpecialOrderEmail,
@@ -296,7 +297,8 @@ export function SendDocument({
         await bindPaySnapshot(
           supabase,
           pending.payToken,
-          invoiceSnapshot(pending.order, pending.org, today)
+          invoiceSnapshot(pending.order, pending.org, today),
+          payBreakdown(pending.order)
         );
       }
 
