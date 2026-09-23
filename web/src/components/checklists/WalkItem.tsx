@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -71,7 +71,7 @@ const STATE_BUTTONS: { status: CheckStatus; label: string }[] = [
  * correct is one people stop trusting.
  */
 export function WalkItem({
-  row,
+  row: saved,
   orgId,
   locationId,
   runId,
@@ -87,8 +87,42 @@ export function WalkItem({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  /**
+   * WHAT THIS ROW HAS BEEN TOLD, AHEAD OF THE SERVER SAYING SO.
+   *
+   * A tap used to wait on three round trips in a row before the button moved —
+   * `auth.getUser()` (a call to Supabase Auth, every tap), the update, and then
+   * `router.refresh()`, which re-runs the whole route: the session, the run, its
+   * items, five lookups and a batch of signed photo URLs, and inside the shift
+   * report the entire report. About three seconds on the floor (Mark,
+   * 2026-09-23), for a screen whose whole job is being tapped seventy times.
+   *
+   * So the write is applied HERE first and the button moves on the tap. The
+   * refresh still runs, so the counts, the Finish button's weight and anything
+   * another device changed all catch up — they just no longer hold the button
+   * hostage. A failed write drops the overlay, so the row falls back to what
+   * the server actually has, and the error says why.
+   *
+   * The overlay is dropped when a NEW `row` arrives from the server and this
+   * row has no write in flight, via the "adjust state while rendering" pattern
+   * rather than an effect, so there is never a frame showing the server's old
+   * answer over the new one. THE IN-FLIGHT GUARD IS THE POINT: every refresh
+   * hands EVERY row a new object, so without it, ticking down a list — Done on
+   * one row, Done on the next before the first refresh lands — would flick the
+   * second row back to pending for a moment when the first row's refresh
+   * arrived carrying the second row's old status.
+   */
+  const [overlay, setOverlay] = useState<Partial<WalkItemRow> | null>(null);
+  const [inFlight, setInFlight] = useState(0);
+  const [seen, setSeen] = useState(saved);
+  if (seen !== saved) {
+    setSeen(saved);
+    if (inFlight === 0) setOverlay(null);
+  }
+  const row: WalkItemRow = overlay ? { ...saved, ...overlay } : saved;
   const fileInput = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState(row.note ?? "");
+  const [text, setText] = useState(saved.value_text ?? "");
   const [value, setValue] = useState(
     row.value_number == null ? "" : String(row.value_number),
   );
@@ -110,17 +144,30 @@ export function WalkItem({
    * statement, which is the constraint that started all this.
    */
   const [arming, setArming] = useState<CheckStatus | null>(null);
-  const [, startTransition] = useTransition();
 
   const outOfRange = readingLabel(row, row.value_number);
 
-  async function write(patch: Record<string, unknown>) {
+  async function write(patch: Partial<WalkItemRow>) {
     onError(null);
+    setOverlay((o) => ({ ...o, ...patch }));
+    setInFlight((n) => n + 1);
+    try {
+      return await save(patch);
+    } finally {
+      setInFlight((n) => n - 1);
+    }
+  }
+
+  async function save(patch: Partial<WalkItemRow>) {
+    // `getSession`, NOT `getUser`: this only fills a column, and `getUser` is a
+    // round trip to Supabase Auth on every tap where `getSession` reads the
+    // session already in hand. RLS still checks the real token on the update.
+    const { data: auth } = await supabase.auth.getSession();
     const { data, error } = await supabase
       .from("checklist_run_items")
       .update({
         ...patch,
-        checked_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+        checked_by: auth.session?.user.id ?? null,
         checked_at: new Date().toISOString(),
       })
       .eq("id", row.id)
@@ -129,6 +176,7 @@ export function WalkItem({
       // stops a submitted run silently swallowing a tap.
       .select("id");
     if (error || !data || data.length === 0) {
+      setOverlay(null);
       onError(error?.message ?? "That answer was not saved.");
       return false;
     }
@@ -150,11 +198,9 @@ export function WalkItem({
       return;
     }
     setArming(null);
-    startTransition(async () => {
-      await write({
-        status: target,
-        note: target === "pending" ? null : note.trim() || null,
-      });
+    void write({
+      status: target,
+      note: target === "pending" ? null : note.trim() || null,
     });
   }
 
@@ -175,12 +221,10 @@ export function WalkItem({
       implied === "issue" && !note.trim()
         ? `Reading ${parsed}${row.unit ? ` ${row.unit}` : ""} — ${readingLabel(row, parsed) ?? "out of range"}`
         : note.trim() || null;
-    startTransition(async () => {
-      await write({
-        value_number: parsed,
-        status: implied,
-        note: implied === "pending" ? null : autoNote,
-      });
+    void write({
+      value_number: parsed,
+      status: implied,
+      note: implied === "pending" ? null : autoNote,
     });
   }
 
@@ -364,17 +408,15 @@ export function WalkItem({
                 type="button"
                 disabled={!writable}
                 aria-pressed={on}
-                onClick={() =>
-                  startTransition(async () => {
-                    const next = on ? null : choice;
-                    await write({
-                      value_text: next,
-                      ...(next !== null && row.status === "pending"
-                        ? { status: "done" as CheckStatus }
-                        : {}),
-                    });
-                  })
-                }
+                onClick={() => {
+                  const next = on ? null : choice;
+                  void write({
+                    value_text: next,
+                    ...(next !== null && row.status === "pending"
+                      ? { status: "done" as CheckStatus }
+                      : {}),
+                  });
+                }}
                 className={`${TAP} ${
                   on
                     ? "border-ink bg-ink text-white"
@@ -390,13 +432,16 @@ export function WalkItem({
 
       {row.response_type === "text" && (
         <input
-          value={row.value_text ?? ""}
+          // Its own state and written on BLUR, the reading's rule. It used to
+          // write on every keystroke with the server's value as the only
+          // state, so each letter waited on a save and a full refresh before
+          // it appeared.
+          value={text}
           disabled={!writable}
-          onChange={(e) => {
-            const v = e.target.value;
-            startTransition(async () => {
-              await write({ value_text: v || null });
-            });
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => {
+            const v = text.trim() || null;
+            if (v !== (row.value_text ?? null)) void write({ value_text: v });
           }}
           aria-label={`${row.prompt} answer`}
           className="h-11 w-full border border-hairline px-2 text-[16px] focus:border-ink focus:outline-none disabled:opacity-50"
@@ -413,12 +458,10 @@ export function WalkItem({
               disabled={!writable}
               aria-pressed={row.score === n}
               onClick={() =>
-                startTransition(async () => {
-                  // Pressing the score it already has clears it — "not scored"
-                  // is the resting state and has to be reachable, or 89% of
-                  // everything becomes a 5 by accident.
-                  await write({ score: row.score === n ? null : n });
-                })
+                // Pressing the score it already has clears it — "not scored"
+                // is the resting state and has to be reachable, or 89% of
+                // everything becomes a 5 by accident.
+                void write({ score: row.score === n ? null : n })
               }
               className={`${TAP} w-11 justify-center ${
                 row.score === n
@@ -458,9 +501,7 @@ export function WalkItem({
               // status was never written, so there is nothing to complain about
               // and nothing to undo.
               if (!note.trim()) return;
-              startTransition(async () => {
-                await write({ status: target, note: note.trim() });
-              });
+              void write({ status: target, note: note.trim() });
               return;
             }
             if ((note.trim() || null) === (row.note ?? null)) return;
@@ -472,9 +513,7 @@ export function WalkItem({
               setNote(row.note ?? "");
               return;
             }
-            startTransition(async () => {
-              await write({ note: note.trim() || null });
-            });
+            void write({ note: note.trim() || null });
           }}
           rows={2}
           placeholder={
