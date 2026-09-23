@@ -12,7 +12,20 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Shipped 2026-09-22, `square-refund` NOT YET DEPLOYED — REFUND A PAY-LINK
+   **Verified live 2026-09-22 — THE FIRST REFUND, AND WHAT IT DOES TO THE
+   BOOKS.** Mark refunded #10072's $1.10 from the order: a −$1.10 `Square
+   Refund` row carrying Square's refund id, `created_by` Mark, net paid 0,
+   status/to-do untouched; Square showed "Pending refunds $1.10". BUT Square
+   reports an API refund as REFUNDS BY AMOUNT, and `docs/square-setup.md`
+   already measured that a refund by amount is a CUSTOM_AMOUNT return on
+   UNCATEGORIZED, tax included — so the day's journal entry books Special
+   Orders +1.00, tax +0.10, Uncategorized −1.10: balanced, but the sale and its
+   reversal sit in different accounts and the tax is never reversed. Open: an
+   itemized refund (returning the original order's lines) if Square's API
+   allows it on an online payment, else teach the journal-entry builder to map
+   a pay-link refund back by its refund id. Not decided.
+
+   **Shipped 2026-09-22, `square-refund` DEPLOYED (Mark, same day) — REFUND A PAY-LINK
    PAYMENT FROM THE ORDER.** Mark, after the first real payment (#10072, $1.10
    = $1.00 Special Orders + $0.10 tax at DF02 — the Square report showed the
    line under Special Orders): "is refunding it from within restaurant friend a
