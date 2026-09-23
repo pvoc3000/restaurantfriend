@@ -564,6 +564,10 @@ export function SpecialOrderSettings({
           lands at the Square location of the shop that makes the order (Mark,
           2026-09-22). The sandbox one exists because the sandbox is a
           separate Square account where DF01's real id does not exist.
+          The item variation ids (123) name the "Special Order" item every
+          pay-link line is sold as, which is what files the money under the
+          Special Orders category; empty reports as Uncategorized. The sandbox
+          has its own catalog, so its own id.
           Until the application id is filled, no invoice carries a pay link. */}
       <section className="space-y-4">
         <SectionHeading>Online payment (Square)</SectionHeading>
@@ -588,6 +592,22 @@ export function SpecialOrderSettings({
                   ariaLabel: "Square application ID",
                 })
               : <span>{text(squarePay.application_id) ?? "—"}</span>}
+          </dd>
+          <dt className="py-0.5 text-subtle">“Special Order” item variation ID</dt>
+          <dd className="py-0.5">
+            {editable
+              ? cell(["square_payments", "item_variation_id"], text(squarePay.item_variation_id), {
+                  ariaLabel: "Square Special Order item variation ID",
+                })
+              : <span>{text(squarePay.item_variation_id) ?? "—"}</span>}
+          </dd>
+          <dt className="py-0.5 text-subtle">Sandbox item variation ID</dt>
+          <dd className="py-0.5">
+            {editable
+              ? cell(["square_payments", "sandbox_item_variation_id"], text(squarePay.sandbox_item_variation_id), {
+                  ariaLabel: "Square sandbox item variation ID",
+                })
+              : <span>{text(squarePay.sandbox_item_variation_id) ?? "—"}</span>}
           </dd>
           <dt className="py-0.5 text-subtle">Sandbox location ID</dt>
           <dd className="py-0.5">

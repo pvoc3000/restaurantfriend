@@ -12,6 +12,32 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-22, MIGRATION 123 WRITTEN, NOT YET APPLIED — THE PAYMENT
+   SAYS WHAT IT WAS.** Mark asked how pay-link payments categorize in Square:
+   a bare payment is a custom amount → UNCATEGORIZED → Uncategorized Income,
+   tax and delivery folded in. "Let's do it the proper way." `square-pay` now
+   creates a Square ORDER first and pays against it: goods as the existing
+   "Special Order" item (variable price, Special Orders category — Mark), the
+   tax as a real Square tax on the taxable line, delivery as an untaxed
+   TOTAL_PHASE service charge, rush on the untaxed goods line, discounts netted
+   (`invoiceSplit`, as the QBO push). Square takes a tax only as a PERCENTAGE
+   and rounds half-to-even where `orderTotals` rounds half-up, so
+   `_shared/squareOrder.ts` predicts Square's tax and puts the difference on
+   the untaxed line; `square-pay` then refuses to charge unless Square's own
+   `total_money` equals the balance. Part-paid invoices scale every part by
+   balance ÷ total. 123 adds `special_order_pay_tokens.breakdown` (snapshotted
+   at send by `payBreakdown`) and returns it, the title and the item variation
+   (`square_payments.item_variation_id`, or `sandbox_item_variation_id` in
+   sandbox) from `claim_pay_token`. A link sent before 123, or with no item
+   configured, still pays: one line, or Uncategorized. The builder lives under
+   `supabase/functions/_shared` and the FIXTURE SUITE NOW COMPILES IT — its
+   tsconfig's rootDir moved to the repo, the run path to
+   `.fixtures-build/web/scripts/fixtures/run.js`, and two data paths gained a
+   `../`. 9 new cases (2,004 total); removing the rounding line turns the
+   half-to-even case red. Verified on a throwaway Postgres with 119–123. The
+   WEB half (writing `breakdown` at send) was held back until 123 is applied,
+   because an insert naming a missing column would break sending invoices.
+
    **Verified live 2026-09-22 — 121 AND 122 ON REAL SANDBOX PAYMENTS.** #10070
    (pickup, then re-invoiced): the pay link moved it invoice → order and set
    Print Order in one statement; re-sending the invoice superseded the older

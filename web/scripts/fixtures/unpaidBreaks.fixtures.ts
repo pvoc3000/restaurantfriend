@@ -28,7 +28,7 @@ import { test, eq, ok } from "./harness";
 import { planImport } from "../../src/lib/homebaseImport";
 
 const REAL = readFileSync(
-  join(__dirname, "../../../scripts/fixtures/data/homebase-df01-slice.csv"),
+  join(__dirname, "../../../../scripts/fixtures/data/homebase-df01-slice.csv"),
   "utf8"
 );
 

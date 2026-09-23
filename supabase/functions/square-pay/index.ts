@@ -30,6 +30,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { resolveTransport, sendMail, type ProviderConfig } from "../_shared/email.ts";
+import { buildSquareOrder, type PayBreakdown } from "../_shared/squareOrder.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -164,6 +165,9 @@ Deno.serve(async (req) => {
       number?: string;
       balance?: number | string;
       location_id?: string;
+      title?: string | null;
+      breakdown?: PayBreakdown | null;
+      variation_id?: string | null;
     };
 
     // `unknown`, `superseded`, `cancelled`, `paid`, `busy` — the page words them.
@@ -182,14 +186,79 @@ Deno.serve(async (req) => {
       });
     }
 
-    /* ---- 2. THE CHARGE ------------------------------------------------- */
+    /* ---- 2. THE ORDER --------------------------------------------------- */
 
+    // What the money WAS, in Square's own terms — Special Orders goods, sales
+    // tax, delivery. See `_shared/squareOrder.ts` (migration 123).
     const reference = `Order ${claim.number ?? ""}`.trim();
+    const label = `Order #${claim.number ?? ""}${claim.title ? ` — ${claim.title}` : ""}`.slice(0, 500);
+    const plan = buildSquareOrder({
+      balanceCents: cents,
+      breakdown: claim.breakdown ?? null,
+      label,
+      variationId: claim.variation_id ?? null,
+      locationId: claim.location_id,
+      referenceId: reference.slice(0, 40),
+    });
+
+    const squareHeaders = {
+      Authorization: `Bearer ${squareToken}`,
+      "Square-Version": SQUARE_VERSION,
+      "Content-Type": "application/json",
+    };
+
+    let orderId: string | null = null;
+    try {
+      const orderRes = await fetch(`${SQUARE_BASE[env]}/v2/orders`, {
+        method: "POST",
+        headers: squareHeaders,
+        // Derived from the payment's key, so a retried press re-finds the same
+        // order rather than leaving a second open one behind.
+        body: JSON.stringify({
+          idempotency_key: `${String(idempotency_key).slice(0, 45)}-order`,
+          order: plan.order,
+        }),
+      });
+      const orderBody = (await orderRes.json().catch(() => ({}))) as {
+        order?: { id: string; total_money?: { amount: number } };
+        errors?: unknown;
+      };
+      // THE ORDER MUST COME TO THE INVOICE, TO THE CENT. `squareOrder` predicts
+      // Square's tax; this is Square saying what it actually computed. If they
+      // disagree, nothing is charged — a customer paying a different figure
+      // from the one on their invoice is worse than paying later.
+      if (!orderRes.ok || !orderBody.order) {
+        console.error("square-pay: order refused", orderRes.status, JSON.stringify(orderBody.errors));
+      } else if (orderBody.order.total_money?.amount !== cents) {
+        console.error(
+          "square-pay: order total mismatch",
+          orderBody.order.total_money?.amount,
+          "expected",
+          cents,
+          JSON.stringify(plan)
+        );
+      } else {
+        orderId = orderBody.order.id;
+      }
+    } catch (e) {
+      console.error("square-pay: order failed", e);
+    }
+    if (!orderId) {
+      await release();
+      return json(200, {
+        state: "declined",
+        message: "This invoice can’t be paid online right now. Please reply to our email and we’ll help.",
+      });
+    }
+
+    /* ---- 3. THE CHARGE ------------------------------------------------- */
+
     const payload = {
       source_id,
       idempotency_key: String(idempotency_key).slice(0, 45),
       amount_money: { amount: cents, currency: "USD" },
       location_id: claim.location_id,
+      order_id: orderId,
       autocomplete: true,
       reference_id: reference.slice(0, 40),
       note: `Invoice ${reference} — pay link`.slice(0, 500),
@@ -204,11 +273,7 @@ Deno.serve(async (req) => {
       try {
         res = await fetch(`${SQUARE_BASE[env]}/v2/payments`, {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${squareToken}`,
-            "Square-Version": SQUARE_VERSION,
-            "Content-Type": "application/json",
-          },
+          headers: squareHeaders,
           body: JSON.stringify(payload),
         });
       } catch {
@@ -245,7 +310,7 @@ Deno.serve(async (req) => {
       return json(200, { state: "declined", message: declineMessage(code, source_type) });
     }
 
-    /* ---- 3. THE RECORD (service_role) ---------------------------------- */
+    /* ---- 4. THE RECORD (service_role) ---------------------------------- */
 
     const card = payment.card_details?.card;
     const method =
@@ -274,7 +339,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    /* ---- 4. THE CONFIRMATION ------------------------------------------- */
+    /* ---- 5. THE CONFIRMATION ------------------------------------------- */
 
     // The "Payment received" message on Settings → Messages, filled here on
     // the server. See `PAYMENT_TEMPLATE` for why this has its own copy.

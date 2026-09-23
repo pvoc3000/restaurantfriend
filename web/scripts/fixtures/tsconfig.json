@@ -6,7 +6,7 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "outDir": "../../.fixtures-build",
-    "rootDir": "../..",
+    "rootDir": "../../..",
     "incremental": false,
     "types": ["node"]
   },
@@ -41,6 +41,7 @@
     "../../src/lib/recipeCosts.ts",
     "../../src/lib/recipes.ts",
     "../../src/lib/sales.ts",
-    "../../src/lib/squareSalesCsv.ts"
+    "../../src/lib/squareSalesCsv.ts",
+    "../../../supabase/functions/_shared/squareOrder.ts"
   ]
 }

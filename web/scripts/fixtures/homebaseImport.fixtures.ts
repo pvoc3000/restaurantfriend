@@ -19,7 +19,7 @@ import {
 // Resolved from THIS file's location so the suite runs from any cwd. The
 // compiled harness lives under .fixtures-build, so walk back to the source dir.
 const REAL = readFileSync(
-  join(__dirname, "../../../scripts/fixtures/data/homebase-df01-slice.csv"),
+  join(__dirname, "../../../../scripts/fixtures/data/homebase-df01-slice.csv"),
   "utf8"
 );
 

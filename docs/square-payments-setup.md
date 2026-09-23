@@ -73,6 +73,28 @@ Send yourself an invoice on a test order and pay it with Square's test card:
 list of test cards and test gift cards is under "Sandbox payments" in their
 developer docs.
 
+### The "Special Order" item (migration 123)
+
+Every pay-link payment is sold as your existing **Special Order** item, which
+has a variable price and sits in the **Special Orders** category. That files
+the goods under Special Orders, the tax as sales tax and delivery as a service
+charge, so the nightly journal entry books each to its own account. Without
+the item id the payment still works, but reports as Uncategorized.
+
+Square's dashboard doesn't show the id, so ask Square for it. Paste the right
+token in place of `EAAA…`:
+
+```bash
+curl -s https://connect.squareup.com/v2/catalog/search -X POST -H "Authorization: Bearer EAAA…" -H "Square-Version: 2026-07-15" -H "Content-Type: application/json" -d '{"object_types":["ITEM"],"query":{"text_query":{"keywords":["Special Order"]}}}' | grep -o '"type":"ITEM_VARIATION","id":"[^"]*"'
+```
+
+Paste the printed id into **"Special Order" item variation ID**. The sandbox
+has its own catalog, so for testing, create a variable-priced "Special Order"
+item in the sandbox test account's dashboard (Developer dashboard → Sandbox
+test accounts → Open). Run the same command against
+`connect.squareupsandbox.com` with the sandbox token, and paste the result into
+**Sandbox item variation ID**.
+
 ## Step 3 — switch to production
 
 1. In the application, switch the toggle to **Production** and copy the
