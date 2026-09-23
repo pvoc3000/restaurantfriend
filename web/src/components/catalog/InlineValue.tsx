@@ -286,7 +286,7 @@ export function InlineValue({
   table,
   id,
   column,
-  value,
+  value: saved,
   kind = "text",
   placeholder = "—",
   align = "left",
@@ -504,6 +504,28 @@ export function InlineValue({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * THE VALUE JUST SAVED, shown until the server's copy catches up.
+   *
+   * The editor closes on save, and the resting button used to go straight back
+   * to the `value` prop — the OLD value — until `router.refresh()` had re-run
+   * the whole route, a second or more later. So every inline edit in the app
+   * looked, briefly, as though it had not taken (Mark, 2026-09-23, after the
+   * same fix on the checklist walk). Wrapped in an object so a saved `null` can
+   * be told from "nothing pending".
+   *
+   * Dropped the moment a new `value` arrives from the server (the "adjust
+   * state while rendering" pattern, so there is no frame of the old value), and
+   * on a failed write, so the cell falls back to what the database holds.
+   */
+  const [pending, setPending] = useState<{ v: string | number | null } | null>(null);
+  const [seen, setSeen] = useState(saved);
+  if (seen !== saved) {
+    setSeen(saved);
+    setPending(null);
+  }
+  const value = pending ? pending.v : saved;
+
   // The draft only exists while editing — seeded on open, discarded on close —
   // so a fresh server value after router.refresh() needs no re-sync effect.
   // What the reader sees and types. Identical to `value` unless `scale` is set.
@@ -570,6 +592,7 @@ export function InlineValue({
 
     setSaving(true);
     setError(null);
+    setPending({ v: next });
 
     // A caller-supplied write replaces the statement and nothing else. It is
     // checked FIRST so none of the row-identity machinery below applies: a
@@ -580,6 +603,7 @@ export function InlineValue({
       const { error } = await onWrite(next);
       setSaving(false);
       if (error) {
+        setPending(null);
         setError(error);
         if (reopen) setEditing(true);
         return;
@@ -593,10 +617,11 @@ export function InlineValue({
     const where = match ?? (id ? { id } : null);
     if (!where) {
       setSaving(false);
+      setPending(null);
       setError("this field has no row to write to");
       return;
     }
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from(table)
       .update(
         jsonColumn && jsonPath
@@ -613,10 +638,16 @@ export function InlineValue({
               }
             : { [column]: next, ...(alsoUpdate?.(next) ?? {}) }
       )
-      .match(where);
+      .match(where)
+      // THE ROW COUNT IS THE ONLY HONEST SUCCESS TEST. An update RLS will not
+      // let through matches zero rows and returns no error, and since `pending`
+      // it would otherwise leave the typed value on screen as though it had
+      // been saved. Selecting the key columns back is the cheapest way to ask.
+      .select(Object.keys(where).join(","));
     setSaving(false);
-    if (error) {
-      setError(error.message);
+    if (error || !data || data.length === 0) {
+      setPending(null);
+      setError(error?.message ?? "not saved");
       if (reopen) setEditing(true);
       return;
     }

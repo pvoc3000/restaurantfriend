@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useOptimisticRows } from "@/lib/useOptimisticRows";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { PickList } from "@/components/ui/PickList";
@@ -60,7 +61,7 @@ export type Assignee = { user_id: string; name: string };
  * list without losing its history.
  */
 export function TasksScreen({
-  rows,
+  rows: savedRows,
   kind,
   today,
   orgId,
@@ -91,6 +92,9 @@ export function TasksScreen({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  // Mark done, Reopen and the kind picker show on the tap rather than after
+  // the refresh that follows them.
+  const { rows, optimistic } = useOptimisticRows(savedRows);
   const [search, setSearch] = useState("");
   const [tier, setTier] = useState<"open" | "done" | "all">("open");
   const [failed, setFailed] = useState<string | null>(null);
@@ -102,7 +106,6 @@ export function TasksScreen({
   // the row up each render is what makes the panel live.
   const [photosForId, setPhotosForId] = useState<string | null>(null);
   const photosFor = photosForId ? (rows.find((r) => r.id === photosForId) ?? null) : null;
-  const [, startTransition] = useTransition();
 
   const assigneeName = useMemo(
     () => new Map(assignees.map((a) => [a.user_id, a.name])),
@@ -131,8 +134,10 @@ export function TasksScreen({
 
   async function markDone(row: TaskRow) {
     setFailed(null);
-    startTransition(async () => {
-      const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+    await optimistic(row.id, { status: "done" }, async () => {
+      // `getSession`, not `getUser`: this only fills a column, and `getUser` is
+      // a round trip to Supabase Auth. RLS still checks the real token.
+      const uid = (await supabase.auth.getSession()).data.session?.user.id ?? null;
       const { data, error } = await supabase
         .from("location_tasks")
         .update({ status: "done", done_at: new Date().toISOString(), done_by: uid })
@@ -140,15 +145,16 @@ export function TasksScreen({
         .select("id");
       if (error || !data || data.length === 0) {
         setFailed(error?.message ?? "That change was not saved.");
-        return;
+        return false;
       }
       router.refresh();
+      return true;
     });
   }
 
   async function reopen(row: TaskRow) {
     setFailed(null);
-    startTransition(async () => {
+    await optimistic(row.id, { status: "open" }, async () => {
       // Reopening clears the RESOLUTION as well as the status, or the row reads
       // open while still claiming somebody settled it on Tuesday — 059's rule
       // for a reopened purchase request, and the same failure.
@@ -159,15 +165,16 @@ export function TasksScreen({
         .select("id");
       if (error || !data || data.length === 0) {
         setFailed(error?.message ?? "That change was not saved.");
-        return;
+        return false;
       }
       router.refresh();
+      return true;
     });
   }
 
   async function setKind(row: TaskRow, next: TaskKind) {
     setFailed(null);
-    startTransition(async () => {
+    await optimistic(row.id, { kind: next }, async () => {
       const { data, error } = await supabase
         .from("location_tasks")
         .update({ kind: next })
@@ -175,9 +182,10 @@ export function TasksScreen({
         .select("id");
       if (error || !data || data.length === 0) {
         setFailed(error?.message ?? "That change was not saved.");
-        return;
+        return false;
       }
       router.refresh();
+      return true;
     });
   }
 

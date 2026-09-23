@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TabPicker } from "@/components/ui/TabPicker";
@@ -19,6 +19,7 @@ import {
   type CarryableTask,
 } from "@/lib/facilityTasks";
 import { STICKY_BAND_UNDER_RUNNER } from "@/lib/tableHead";
+import { useOptimisticRows } from "@/lib/useOptimisticRows";
 import { WalkItem, type WalkItemRow } from "./WalkItem";
 
 export type WalkTask = CarryableTask & {
@@ -49,7 +50,7 @@ export function ChecklistWalk({
   orgId,
   locationId,
   items,
-  tasks,
+  tasks: savedTasks,
   taskWarning = null,
   today,
   editable,
@@ -96,7 +97,10 @@ export function ChecklistWalk({
     "all",
   );
   const [failed, setFailed] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+
+  // A pinned task's status as just tapped, ahead of the server — the button
+  // used to wait on two writes and a full refresh before it moved.
+  const { rows: tasks, optimistic } = useOptimisticRows(savedTasks);
 
   const writable = editable && isOpen;
 
@@ -124,7 +128,7 @@ export function ChecklistWalk({
 
   async function actOnTask(task: WalkTask, done: boolean) {
     setFailed(null);
-    startTransition(async () => {
+    await optimistic(task.id, { status: done ? "done" : "open" }, async () => {
       // Two writes and only the FIRST is the truth: the task's own status is
       // its one identity, and the pointer row records what tonight's walk did
       // about it. A task marked done here is done everywhere, which is the
@@ -140,7 +144,7 @@ export function ChecklistWalk({
         .select("id");
       if (error || !data || data.length === 0) {
         setFailed(error?.message ?? "That change was not saved.");
-        return;
+        return false;
       }
       await supabase.from("checklist_run_tasks").upsert(
         {
@@ -152,6 +156,7 @@ export function ChecklistWalk({
         { onConflict: "run_id,task_id" },
       );
       router.refresh();
+      return true;
     });
   }
 

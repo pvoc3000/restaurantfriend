@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { STICKY_HEAD_ROW_UNDER_RUNNER } from "@/lib/tableHead";
 import { CountField, TextField } from "./fields";
+import { useOptimisticRows } from "@/lib/useOptimisticRows";
 
 export type PremadeRow = {
   scheduleItemId: string;
@@ -52,7 +53,7 @@ export function PremadesPage({
   locationId,
   reportDate,
   scheduleTitle,
-  rows,
+  rows: savedRows,
   editable,
 }: {
   reportId: string;
@@ -71,6 +72,9 @@ export function PremadesPage({
   const [, startTransition] = useTransition();
   const [generating, setGenerating] = useState(false);
   const [noPlan, setNoPlan] = useState(false);
+  // Counts show as they are typed in, rather than after a refresh of the WHOLE
+  // shift report — the heaviest page in the app.
+  const { rows, optimistic } = useOptimisticRows(savedRows, (r) => r.scheduleItemId);
 
   /** Rows with nothing in the Left column yet — what the button below fills. */
   const uncounted = rows.filter((r) => r.leftover === null);
@@ -96,7 +100,8 @@ export function PremadesPage({
    */
   function nothingLeftOver() {
     if (uncounted.length === 0) return;
-    startTransition(async () => {
+    const ids = uncounted.map((r) => r.scheduleItemId);
+    void optimistic(ids, { leftover: 0 }, async () => {
       // ONE upsert for every row. Uniform keys, which PostgREST's bulk upsert
       // requires — and because `made` is not among them it is left alone on
       // rows that already have one rather than being reset.
@@ -114,15 +119,22 @@ export function PremadesPage({
         .select("id");
       if (error) {
         setFailed(error.message);
-        return;
+        return false;
       }
       setFailed(null);
       router.refresh();
+      return true;
     });
   }
 
   function save(scheduleItemId: string, patch: Record<string, number | string | null>) {
-    startTransition(async () => {
+    // `note` is the column; on the row it is `countNote`, because the row's own
+    // `note` is the schedule's instruction — see `PremadeRow`.
+    const shown: Partial<PremadeRow> = {};
+    if ("made" in patch) shown.made = patch.made as number | null;
+    if ("leftover" in patch) shown.leftover = patch.leftover as number | null;
+    if ("note" in patch) shown.countNote = patch.note as string | null;
+    void optimistic(scheduleItemId, shown, async () => {
       // UPSERT on the pair, because most lines have no draft row until somebody
       // types in one — an update would match nothing and report success.
       const { error } = await supabase
@@ -141,10 +153,11 @@ export function PremadesPage({
             ? `${error.message} — if this names a missing column, migration 081 has not been applied yet.`
             : error.message
         );
-        return;
+        return false;
       }
       setFailed(null);
       router.refresh();
+      return true;
     });
   }
 

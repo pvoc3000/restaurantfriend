@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { TimePicker } from "@/components/ui/TimePicker";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { FieldLabel, TextField } from "./fields";
+import { useOptimisticRows } from "@/lib/useOptimisticRows";
 
 export type RatingRow = {
   id: string;
@@ -19,6 +20,17 @@ export type RatingRow = {
   gotBreak: boolean | null;
   breakStartedAt: string | null;
   breakReason: string | null;
+};
+
+/** The row's field for each column `patch` writes — what the screen shows
+ *  while the write is on its way. */
+const FIELD_OF: Record<string, keyof RatingRow> = {
+  position: "position",
+  score: "score",
+  note: "note",
+  got_break: "gotBreak",
+  break_started_at: "breakStartedAt",
+  break_reason: "breakReason",
 };
 
 const SCORES: PickOption[] = [5, 4, 3, 2, 1, 0].map((n) => ({
@@ -52,7 +64,7 @@ const SCORES: PickOption[] = [5, 4, 3, 2, 1, 0].map((n) => ({
 export function RatingsPage({
   reportId,
   orgId,
-  rows,
+  rows: savedRows,
   roster,
   positions,
   editable,
@@ -70,19 +82,32 @@ export function RatingsPage({
   const [adding, setAdding] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  // Each pick, tick and note shows on the tap. A change here used to wait on a
+  // refresh of the WHOLE shift report — the heaviest page in the app.
+  const { rows, optimistic } = useOptimisticRows(savedRows);
 
   const rated = new Set(rows.map((r) => r.employeeId));
   const available = roster.filter((r) => !rated.has(r.value));
 
   function patch(id: string, values: Record<string, string | number | boolean | null>) {
-    startTransition(async () => {
-      const { error } = await supabase
+    setFailed(null);
+    const shown: Partial<RatingRow> = {};
+    for (const [column, v] of Object.entries(values)) {
+      const field = FIELD_OF[column];
+      if (field) (shown as Record<string, unknown>)[field] = v;
+    }
+    void optimistic(id, shown, async () => {
+      const { data, error } = await supabase
         .from("shift_report_ratings")
         .update(values)
         .eq("id", id)
         .select("id");
-      if (error) setFailed(error.message);
+      if (error || !data || data.length === 0) {
+        setFailed(error?.message ?? "That change was not saved.");
+        return false;
+      }
       router.refresh();
+      return true;
     });
   }
 
