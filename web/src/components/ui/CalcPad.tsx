@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { evaluateNumeric, looksUnfinished } from "@/lib/calc";
 
 /**
@@ -74,6 +74,8 @@ export function useCoarsePointer() {
  */
 export function useCalcField() {
   const coarse = useCoarsePointer();
+  // `aria-label` (or `title`) on the field is what the pad's title bar shows,
+  // so a field reached with › says which one it is — give it one.
   return {
     "data-rf-calc": "",
     inputMode: (coarse ? "none" : "decimal") as "none" | "decimal",
@@ -150,15 +152,15 @@ const KEYS: ReadonlyArray<Key> = [
  * after `text-[24px]` is a coin flip that a token reorder would silently flip
  * back. Exactly one text-size utility is ever emitted per key.
  */
-const KEY_SIZE_BASE = "text-[24px]";
+const KEY_SIZE_BASE = "text-[19px]";
 const KEY_SIZE: Record<string, string> = {
-  "÷": "text-[29px]",
-  "×": "text-[29px]",
-  "−": "text-[29px]",
-  "+": "text-[29px]",
-  "=": "text-[32px]",
+  "÷": "text-[23px]",
+  "×": "text-[23px]",
+  "−": "text-[23px]",
+  "+": "text-[23px]",
+  "=": "text-[25px]",
 };
-const KEY_NUDGE: Record<string, string> = { "⌫": "-translate-x-[3px]" };
+const KEY_NUDGE: Record<string, string> = { "⌫": "-translate-x-[2px]" };
 
 /**
  * EVERY KEY IS THE APP'S OWN MAC BUTTON (Mark, 2026-09-10: "give our calculator
@@ -193,24 +195,121 @@ function setNativeValue(el: HTMLInputElement, value: string) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
+/**
+ * Every field the pad can reach, in page order: the inputs it drives, and the
+ * resting `InlineValue` buttons that OPEN one (`data-rf-calc-opener`). A
+ * disabled field, or one not on screen at all, is skipped.
+ */
+function calcStops(): HTMLElement[] {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>("[data-rf-calc], [data-rf-calc-opener]")
+  ).filter(
+    (n) =>
+      !(n instanceof HTMLInputElement || n instanceof HTMLButtonElement ? n.disabled : false) &&
+      n.getClientRects().length > 0
+  );
+}
+
+function isCalcField(n: EventTarget | Element | null): n is HTMLInputElement {
+  return n instanceof HTMLInputElement && n.dataset.rfCalc !== undefined;
+}
+
+/** What the title bar calls the field: its accessible name, else its tooltip. */
+function labelFor(el: HTMLInputElement): string {
+  return (
+    el.getAttribute("aria-label") ||
+    el.labels?.[0]?.textContent?.trim() ||
+    el.title ||
+    "Calculator"
+  );
+}
+
+/**
+ * THE PAD SITS ON THE FAR SIDE OF THE PAGE FROM THE FIELD (Mark, 2026-09-23,
+ * after supervisors complained it sat on the shift report's Made and Left
+ * columns). It used to be centred, which is where a table's number columns
+ * usually are.
+ *
+ * Pinned to the window's LEFT edge when the field is right of centre, the right
+ * edge otherwise, and centred up and down. Only when neither side has room for
+ * it beside the field (a phone) does it go above or below instead.
+ *
+ * AND ONCE UP, IT STAYS WHERE IT IS until it would cover the field. A table's
+ * number columns often straddle the middle — the shift report's Made is left of
+ * centre and Left right of it — and choosing afresh for every field flipped the
+ * pad across the screen on every ›, so the next tap landed on the page instead
+ * of a key (measured 2026-09-23). It remembers between openings as well, so
+ * tapping the next field brings it back where it was. A pad that holds still
+ * can be learned.
+ */
+type Side = "left" | "right" | "top" | "bottom";
+
+/** The window's width plus the guard ring, both sides. Keep in step with the classes below. */
+const PAD_OUTER_WIDTH = 240 + 2 * 16;
+
+/** Would the pad, parked at `side`, sit on top of the field? */
+function covers(side: Side, r: DOMRect, padHeight: number): boolean {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  if (side === "left") return r.left < PAD_OUTER_WIDTH;
+  if (side === "right") return r.right > vw - PAD_OUTER_WIDTH;
+  if (side === "top") return r.top < padHeight;
+  return r.bottom > vh - padHeight;
+}
+
+function sideFor(el: HTMLElement, current: Side | null, padHeight: number): Side {
+  const r = el.getBoundingClientRect();
+  if (current && !covers(current, r, padHeight)) return current;
+  const vw = window.innerWidth;
+  const fieldIsRight = r.left + r.width / 2 > vw / 2;
+  const order: Side[] = fieldIsRight ? ["left", "right"] : ["right", "left"];
+  for (const side of order) if (!covers(side, r, padHeight)) return side;
+  return r.top + r.height / 2 > window.innerHeight / 2 ? "top" : "bottom";
+}
+
+const SIDE_CLASS: Record<Side, string> = {
+  left: "left-0 top-1/2 -translate-y-1/2",
+  right: "right-0 top-1/2 -translate-y-1/2",
+  top: "top-0 left-1/2 -translate-x-1/2",
+  bottom: "bottom-0 left-1/2 -translate-x-1/2",
+};
+
+/** How far a finger may travel and still count as a tap rather than a scroll. */
+const TAP_SLOP = 10;
+
 export function CalcPad() {
   const coarse = useCoarsePointer();
   const [target, setTarget] = useState<HTMLInputElement | null>(null);
   /** Mirrored so the readout re-renders; the input is the source of truth. */
   const [draft, setDraft] = useState("");
+  const [label, setLabel] = useState("");
+  const [side, setSide] = useState<Side>("left");
+  const padRef = useRef<HTMLDivElement>(null);
+  /** Where the pad was last parked. Kept between openings too, so it comes back where it was. */
+  const parked = useRef<Side | null>(null);
 
   useEffect(() => {
-    const isCalcField = (n: EventTarget | null): n is HTMLInputElement =>
-      n instanceof HTMLInputElement && n.dataset.rfCalc !== undefined;
-
     const onFocusIn = (e: FocusEvent) => {
       const el = isCalcField(e.target) ? e.target : null;
       setTarget(el);
-      setDraft(el?.value ?? "");
+      if (!el) return;
+      setDraft(el.value);
+      setLabel(labelFor(el));
+      parked.current = sideFor(el, parked.current, padRef.current?.offsetHeight ?? 420);
+      setSide(parked.current);
     };
     // No key can take focus (see the pointerdown handler), so a focusout is a
     // genuine departure — a save, an Escape, or the next field.
-    const onFocusOut = () => setTarget(null);
+    //
+    // DEFERRED ONE TICK, so moving from one field to the next doesn't take the
+    // pad down and put it straight back up. The next field's `focusin` has
+    // landed by then (an `InlineValue` mounts its input and autofocuses it
+    // within the click that opened it), and the pad simply retargets.
+    const onFocusOut = () => {
+      setTimeout(() => {
+        if (!isCalcField(document.activeElement)) setTarget(null);
+      }, 0);
+    };
 
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
@@ -230,15 +329,14 @@ export function CalcPad() {
   }, [target]);
 
   /**
-   * A STRANDED SCRIM IS THE WORST THING THIS COULD DO, so don't rely on
+   * A STRANDED PAD IS THE WORST THING THIS COULD DO, so don't rely on
    * `focusout` alone to take it down.
    *
    * `InlineValue` unmounts its input on Escape and after a save, and a focused
    * element being removed is exactly the case where browsers have historically
    * disagreed about firing blur/focusout — WebKit especially, which is what
    * this runs on. If it doesn't fire, the pad is left pointing at a detached
-   * node with a full-screen scrim over the app and every key inert: it reads as
-   * the app having frozen, and only a reload clears it.
+   * node with every key inert.
    *
    * So watch for the target leaving the document and drop it. Cheap in the way
    * that matters — the observer exists only while the pad is up, and its
@@ -253,14 +351,76 @@ export function CalcPad() {
     return () => observer.disconnect();
   }, [target]);
 
-  // NOTHING SCROLLS THE FIELD INTO VIEW ANY MORE, and that's the point of
-  // centring (Mark, 2026-08-10: "can it appear as an overlay center of the
-  // screen with a dim background"). While the pad sat at the foot of the window
-  // it could cover the very field you were editing, so it measured and scrolled
-  // — a lurch under your hands at the moment you started typing. Centred behind
-  // a scrim there is nothing to avoid: everything else is dimmed anyway, and
-  // the readout IS the field while the pad is up. The page stays exactly where
-  // you left it.
+  /**
+   * THE FIELD BEING EDITED IS OUTLINED (`[data-rf-calc-active]` in
+   * mac-look.css), because › can take you to a field you never touched and the
+   * pad is no longer beside it. And if › lands on one that is off screen, it is
+   * scrolled to the middle — only then: a field you just tapped is already where
+   * your finger is, and moving the page under it would be a lurch.
+   */
+  useEffect(() => {
+    if (!target || !coarse) return;
+    target.setAttribute("data-rf-calc-active", "");
+    const r = target.getBoundingClientRect();
+    if (r.top < 96 || r.bottom > window.innerHeight - 24) {
+      target.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+    const onResize = () => {
+      parked.current = sideFor(target, parked.current, padRef.current?.offsetHeight ?? 420);
+      setSide(parked.current);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      target.removeAttribute("data-rf-calc-active");
+      window.removeEventListener("resize", onResize);
+    };
+  }, [target, coarse]);
+
+  /**
+   * THE PAGE STAYS LIVE WHILE THE PAD IS UP (Mark, 2026-09-23). There used to
+   * be an invisible full-screen catcher behind the pad, so the first tap
+   * anywhere else only dismissed it — tapping the next field meant tapping it
+   * twice, which is what supervisors were complaining about on the shift report.
+   *
+   * Now a tap outside the pad goes where it was aimed, and ALSO finishes the
+   * edit: the field is blurred (every field here saves on blur) before the tap
+   * lands. That blur is ours rather than the browser's because iOS does not
+   * take focus off an input when you tap something that can't take focus
+   * itself — a plain cell, a button — so without it the pad would never leave.
+   * If the tap lands on another calculator field, that field's focusin puts the
+   * pad straight back on it.
+   *
+   * On pointerUP, and only for a TAP: a finger that travels is scrolling the
+   * page, and the pad should ride that out rather than close.
+   */
+  useEffect(() => {
+    if (!target || !coarse) return;
+    let start: { x: number; y: number } | null = null;
+    const inside = (n: EventTarget | null) =>
+      n instanceof Node && (padRef.current?.contains(n) || n === target);
+    const onDown = (e: PointerEvent) => {
+      start = inside(e.target) ? null : { x: e.clientX, y: e.clientY };
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!start) return;
+      const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+      start = null;
+      if (moved > TAP_SLOP || inside(e.target)) return;
+      target.blur();
+      setTarget(null);
+    };
+    const onCancel = () => {
+      start = null;
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("pointerup", onUp, true);
+    document.addEventListener("pointercancel", onCancel, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("pointerup", onUp, true);
+      document.removeEventListener("pointercancel", onCancel, true);
+    };
+  }, [target, coarse]);
 
   if (!target || !coarse) return null;
 
@@ -345,24 +505,43 @@ export function CalcPad() {
       caretTo(el, 0);
       return;
     }
-    // NO KEY SENDS THIS ANY MORE — the catcher is its only caller, so "done"
-    // means "the reader tapped outside" and nothing else. Keeping it an action
-    // rather than inlining it at the catcher is deliberate: `write`'s fallthrough
-    // below would otherwise type a stray character into the field for any action
-    // it doesn't recognise, and this is the one that must never be typed.
+    // "done" is the close box, and nothing else sends it. Keeping it an action
+    // rather than inlining it is deliberate: `write`'s fallthrough below would
+    // otherwise type a stray character into the field for any action it
+    // doesn't recognise, and this is the one that must never be typed.
     //
     // Every field commits on blur — InlineValue saves, the guide's boxes upsert
-    // — so leaving IS the commit, and there is now exactly one way to leave.
-    // Clearing `target` as well is belt and braces: normally the blur's own
-    // focusout does it, and on a detached node (see the observer above) blur is
-    // a no-op, so without this a tap on the scrim couldn't dismiss the pad
-    // either. Idempotent when focusout does arrive.
+    // — so leaving IS the commit. Clearing `target` as well is belt and braces:
+    // on a detached node (see the observer above) blur is a no-op.
     if (action === "done") {
       el.blur();
       setTarget(null);
       return;
     }
+    if (action === "prev" || action === "next") return step(el, action === "next" ? 1 : -1);
     write(action);
+  }
+
+  /**
+   * ‹ AND › WALK THE PAGE'S CALCULATOR FIELDS IN ORDER (Mark, 2026-09-23) —
+   * the arrows over iOS's own keyboard, for a shift report that is thirty counts
+   * in a row. Page order is reading order: across a row, then down.
+   *
+   * Moving focus is the commit, as ever: the field being left blurs and saves.
+   * An `InlineValue` at rest is a button rather than an input, so it is opened
+   * by clicking it, and its editor takes focus as it mounts. At either end the
+   * arrow does nothing, rather than wrapping round to a field off screen.
+   */
+  function step(el: HTMLInputElement, dir: 1 | -1) {
+    const stops = calcStops();
+    const next = stops[stops.indexOf(el) + dir];
+    if (stops.indexOf(el) < 0 || !next) return;
+    if (next instanceof HTMLInputElement) {
+      next.focus({ preventScroll: true });
+    } else {
+      el.blur();
+      next.click();
+    }
   }
 
   const text = draft.trim();
@@ -375,190 +554,136 @@ export function CalcPad() {
   // parser it defers to, and is fixture-pinned in both directions.
   const showsRefusal = result === null && text !== "" && !looksUnfinished(text);
 
+  /** Every control on the pad acts on pointerdown and holds focus; see the keys. */
+  const hold = {
+    onMouseDown: (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    },
+  };
+  const act = (action: string) => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      press(action);
+    },
+    ...hold,
+  });
+
   return (
     <div
-      // THE CATCHER — full screen, and INVISIBLE (Mark, 2026-08-10: "no
-      // dimming"). z-[80] is above anchored panels (70), the top of the app's
-      // ladder: this stands in for the system keyboard, so nothing may cover
-      // it.
+      ref={padRef}
+      // z-[80] is above anchored panels (70), the top of the app's ladder:
+      // this stands in for the system keyboard, so nothing may cover it.
       //
-      // It still covers everything even with nothing painted, which is what
-      // keeps "tap anywhere else to finish" working. Known cost of losing the
-      // dimming, and accepted: the page behind now LOOKS live while it isn't,
-      // so the first tap outside spends itself on dismissing rather than on
-      // whatever you aimed at. That is how every popover in the app behaves,
-      // but the scrim used to say so and now nothing does.
-      className="fixed inset-0 z-[80] flex items-center justify-center"
-      // A tap OUTSIDE the pad does what `=` does. preventDefault first, or the
-      // tap blurs the field by itself and the save happens without us — which
-      // is the same outcome by luck rather than by decision, and on a field
-      // whose editor unmounts on blur it would race the commit.
+      // THE GUARD RING — `p-4` of transparent margin round the window. A tap
+      // on it is swallowed rather than reaching the page, so a finger that
+      // drifts a few millimetres off a corner key while hammering ⌫ doesn't
+      // land on whatever is behind (Mark, 2026-08-10, when a near miss used to
+      // dismiss the pad). Keep `PAD_OUTER_WIDTH` in step with it.
+      className={`fixed z-[80] p-4 ${SIDE_CLASS[side]}`}
       onPointerDown={(e) => {
         e.preventDefault();
-        press("done");
+        e.stopPropagation();
       }}
-      // Suppress only — `press("done")` stays on pointerdown, so a tap outside
-      // commits exactly once. This stops the synthesised mousedown blurring the
-      // field a second time, by its own route, after we have already decided.
-      onMouseDown={(e) => e.preventDefault()}
+      {...hold}
     >
-      {/* THE GUARD RING — transparent, and the reason the pad stopped
-          dismissing itself while you were using it.
-
-          Mark, 2026-08-10: "I don't like when the calc dismisses if you hit
-          delete enough times to clear the number." Backspace never dismissed
-          anything — 4 presses in the harness empty the field and leave the pad
-          up. What dismisses is the CATCHER, and the panel's own padding put it
-          only 12px outside the edge of a corner key. Hammer ⌫ in the bottom-left
-          and a finger that drifts a few millimetres lands on it.
-
-          The timing is the tell: this appeared when the scrim came off. While
-          the page was dimmed you could SEE where the panel ended; invisible,
-          that boundary is a guess, and a miss costs you the whole pad.
-
-          So 28px of transparent margin absorbs a near miss instead. A tap that
-          genuinely means "somewhere else" is still further out than that, and
-          still finishes the edit. */}
-      <div
-        className="p-7"
-        onPointerDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        // See the key buttons: pointerdown alone doesn't hold focus in WebKit.
-        onMouseDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-      >
       <div
         // THE 1984 MAC CALCULATOR, IN THE APP'S OWN MAC LOOK (Mark, 2026-09-10:
-        // "the calculator looks like the modern mac right now — let's retrofy
-        // it while keeping the layout the same", with the original desk
-        // accessory as the reference). A black title bar over a stippled body,
-        // a 2px black frame, and a hard drop shadow — the same 3px-down-and-right
-        // shadow every Mac button in the app carries, one step heavier for a
-        // window.
+        // "retrofy it while keeping the layout the same"). A black title bar
+        // over a stippled body, a 2px black frame, and the hard drop shadow
+        // every Mac button in the app carries, one step heavier for a window.
+        // The rounded corners are what tells a floating window from a box on
+        // the page.
         //
-        // It replaced a dark, rounded, orange-keyed copy of macOS Calculator
-        // (Mark, 2026-08-10: "copy this UI"). The argument for looking like a
-        // calculator rather than like app chrome still holds — this stands in
-        // for the system keyboard — and since the Mac look went app-wide the
-        // calculator people know and the app's own buttons are the same thing.
-        //
-        // The corners are the one soft thing left, and deliberately: the
-        // original's window corners were rounded, and they are what tells a
-        // floating window from a box on the page.
-        className="w-[min(21rem,calc(100vw-4.5rem))] overflow-hidden rounded-[8px] border-2 border-ink bg-white shadow-[4px_4px_0_0_#000]"
-        // A tap anywhere on the pad, including its gaps, must not move focus —
-        // and must not reach the catcher, or every key press would also commit.
-        onPointerDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        // See the key buttons: pointerdown alone doesn't hold focus in WebKit.
-        onMouseDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
+        // 15rem WIDE, down from 21 (Mark, 2026-09-23: "it doesn't need to be so
+        // big"). A key still comes out about 50px square, over the 44px a
+        // finger needs.
+        className="w-[15rem] overflow-hidden rounded-[8px] border-2 border-ink bg-white shadow-[4px_4px_0_0_#000]"
       >
-        {/* THE TITLE BAR. Its close box is real: it does what a tap outside
-            does (`done` — blur, which is the commit), because a close box that
-            does nothing is a lie on the one surface people already know how to
-            read. 44px of target around an 18px box. */}
-        <div className="flex h-11 items-center gap-1 bg-ink pr-3 text-white">
+        {/* THE TITLE BAR names the field being edited — `aria-label` on the
+            input — since › can reach one you never touched and the pad is
+            across the page from it. Its close box does what a tap outside does
+            (`done` — blur, which is the commit). Every target is 40px. */}
+        <div className="flex h-10 items-center bg-ink text-white">
           <button
             type="button"
             tabIndex={-1}
             aria-label="Close the calculator"
-            className="flex h-11 w-11 shrink-0 items-center justify-center"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              press("done");
-            }}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center"
+            {...act("done")}
           >
-            <span className="block h-[18px] w-[18px] border-2 border-white" />
+            <span className="block h-[16px] w-[16px] border-2 border-white" />
           </button>
-          <span className="text-[17px] font-bold tracking-[0.02em]">Calculator</span>
-        </div>
-
-        <div className="mac-stipple p-3">
-        {/* THE READOUT, Apple's way round: the expression small and grey above,
-            what it comes to large below, both right-aligned so the digits line
-            up as they grow. A sunken white well — `mac-field`, the search box's
-            own inset — so it reads as a window onto a value rather than a key.
-
-            It does a second job here that a calculator's doesn't have to. The
-            field being edited is somewhere behind this panel and may be off
-            screen entirely, so while the pad is up this IS the field — which is
-            why it gets two lines and 40px of type rather than a caption. A
-            refusal is red, the app's colour for something wrong. */}
-        <div className="mac-field mb-3 border border-ink bg-white px-3 pb-1.5 pt-2 text-right">
-          <div className="h-5 truncate font-mono text-[15px] leading-5 text-muted">
-            {showsResult ? draft : showsRefusal ? "can’t read that" : "\u00a0"}
-          </div>
-          <div
-            className={`truncate font-mono text-[40px] leading-tight ${
-              showsRefusal ? "text-accent" : "text-ink"
-            }`}
+          <span className="min-w-0 flex-1 truncate text-[14px] font-bold">{label}</span>
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Previous field"
+            className="flex h-10 w-10 shrink-0 items-center justify-center text-[26px] leading-none active:bg-neutral-700"
+            {...act("prev")}
           >
-            {showsResult ? result : draft || "0"}
-          </div>
+            ‹
+          </button>
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Next field"
+            className="flex h-10 w-10 shrink-0 items-center justify-center text-[26px] leading-none active:bg-neutral-700"
+            {...act("next")}
+          >
+            ›
+          </button>
         </div>
 
-        <div className="grid grid-cols-4 gap-2.5">
-          {KEYS.map(([label, action]) => (
-            <button
-              key={label}
-              type="button"
-              // Act on pointerdown and preventDefault: focus must never leave
-              // the field (a blur would save a half-typed expression), and
-              // acting here means the key doesn't depend on a compatibility
-              // click arriving after we've cancelled the default.
-              // stopPropagation keeps it off the catcher, whose own handler
-              // commits.
-              onPointerDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                press(action);
-              }}
-              // AND AGAIN ON MOUSEDOWN, which is not belt and braces — it is
-              // the only one of the two WebKit is known to honour for keeping
-              // focus. iOS builds pointer events on top of touches and then
-              // synthesises a mouse sequence, and `preventDefault()` on the
-              // POINTER event does not reliably cancel the focus change that
-              // rides the synthesised `mousedown`. Chromium suppresses it from
-              // the pointerdown alone, which is why the pad tests clean on a
-              // desktop and only misbehaves on the iPad.
-              //
-              // Losing focus here is not cosmetic: the field's focusout is what
-              // CalcPad reads as "the reader has left", so it takes the pad down
-              // — on EVERY key (Mark, 2026-08-10). The digit still lands, since
-              // pointerdown already ran, which is the tell.
-              //
-              // `TextInput`'s ✕ learned exactly this and for exactly this
-              // reason ("without it the field blurs on press"). It acts on
-              // pointerdown and nowhere else, so this handler only ever
-              // suppresses — it can never double-press.
-              onMouseDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              tabIndex={-1}
-              aria-label={label}
-              className={`${KEY_CLASS} ${KEY_SIZE[label] ?? KEY_SIZE_BASE}`}
+        <div className="mac-stipple p-2">
+          {/* THE READOUT, Apple's way round: the expression small and grey
+              above, what it comes to large below, both right-aligned so the
+              digits line up as they grow. A sunken white well — `mac-field`,
+              the search box's own inset. A refusal is red, the app's colour
+              for something wrong. */}
+          <div className="mac-field mb-2 border border-ink bg-white px-2 pb-1 pt-1 text-right">
+            <div className="h-4 truncate font-mono text-[12px] leading-4 text-muted">
+              {showsResult ? draft : showsRefusal ? "can’t read that" : " "}
+            </div>
+            <div
+              className={`truncate font-mono text-[28px] leading-tight ${
+                showsRefusal ? "text-accent" : "text-ink"
+              }`}
             >
-              <span className={KEY_NUDGE[label]}>{label}</span>
-            </button>
-          ))}
+              {showsResult ? result : draft || "0"}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 gap-1.5">
+            {KEYS.map(([label, action]) => (
+              <button
+                key={label}
+                type="button"
+                // Act on pointerdown and preventDefault: focus must never leave
+                // the field (a blur would save a half-typed expression), and
+                // acting here means the key doesn't depend on a compatibility
+                // click arriving after we've cancelled the default.
+                //
+                // AND preventDefault AGAIN ON MOUSEDOWN (`hold`), which is not
+                // belt and braces — it is the only one of the two WebKit is
+                // known to honour for keeping focus. iOS synthesises a mouse
+                // sequence after the pointer events, and `preventDefault()` on
+                // the POINTER event does not reliably cancel the focus change
+                // that rides the synthesised `mousedown`. Chromium suppresses
+                // it from the pointerdown alone, which is why the pad tests
+                // clean on a desktop and only misbehaves on the iPad (Mark,
+                // 2026-08-10). `TextInput`'s ✕ learned exactly this.
+                {...act(action)}
+                tabIndex={-1}
+                aria-label={label}
+                className={`${KEY_CLASS} ${KEY_SIZE[label] ?? KEY_SIZE_BASE}`}
+              >
+                <span className={KEY_NUDGE[label]}>{label}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        </div>
-      </div>
       </div>
     </div>
   );

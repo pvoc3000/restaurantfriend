@@ -826,6 +826,10 @@ export function InlineValue({
           // asks for no system keyboard at all and `ui/CalcPad` supplies one
           // that has them. Only on the kind that runs `evaluateNumeric`.
           {...(kind === "number" ? calcField : {})}
+          // The editor carries the resting button's name, so it keeps it while
+          // you type — and `ui/CalcPad`'s title bar reads it to say which field
+          // the pad is on.
+          aria-label={ariaLabel ?? column}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={save}
           onKeyDown={(e) => {
@@ -861,6 +865,9 @@ export function InlineValue({
       onClick={open}
       title="Click to edit"
       aria-label={ariaLabel ?? column}
+      // A stop for `ui/CalcPad`'s ‹ ›: at rest this cell is a button, and
+      // clicking it opens the calculator field.
+      data-rf-calc-opener={kind === "number" ? "" : undefined}
       // Dotted underline at rest — the quietest possible "this is editable".
       className={`w-full ${INLINE_BOX} ${restLook(boxed, multiline, align, rows)} hover:bg-neutral-100 ${
         align === "right" ? "text-right tabular-nums" : "text-left"

@@ -603,3 +603,26 @@
    Send's flush and 107's reopen never looked at a schedule's source. Uncounted
    special-order lines now count towards the Send gate like any other line.
    Not walked live — the pane was signed out.
+
+   **THE CALCULATOR STOPPED GETTING IN THE WAY** (Mark, 2026-09-23:
+   supervisors entering premade counts had to close the pad before they could
+   tap the next field). The cause was not only its size: `ui/CalcPad` put an
+   INVISIBLE full-screen catcher behind itself, so the first tap anywhere else
+   only dismissed it — every next field took two taps. Four changes, all in
+   `CalcPad`, so every calculator field in the app gets them:
+   (1) **tap-through** — the catcher is gone; a tap outside blurs the field (the
+   commit) and still lands where it was aimed, and a finger that travels is a
+   scroll, not a dismissal; (2) **‹ › in the title bar** walk the page's
+   calculator fields in reading order, including `InlineValue` cells at rest
+   (`data-rf-calc-opener`), and the title bar names the field from its
+   `aria-label` while the field itself wears a 3px ring
+   (`[data-rf-calc-active]`); (3) **placement** — pinned to the window edge
+   away from the field, centred vertically, and it STAYS PARKED until it would
+   cover the field: choosing afresh per field flipped it across the screen
+   between Made (left of centre) and Left (right of it) and the next tap missed
+   a key; (4) **smaller** — 15rem wide, down from 21, keys about 50px.
+   Verified in the pane with a coarse pointer faked and a temporary harness
+   (the pane was on the lock screen): typing, `3+4=`, ›/‹ across inputs and
+   InlineValue cells, one-tap move to another field, tap-away dismiss, and ›
+   scrolling an off-screen field into view. **Not yet tried on an iPad** — the
+   one thing the harness can't prove is WebKit's synthesised mouse sequence.

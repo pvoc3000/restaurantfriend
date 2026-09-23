@@ -589,6 +589,18 @@
   image-rendering: pixelated;
 }
 
+/* ---- [data-rf-calc-active]: the field the calculator is typing into ------- */
+
+/* Set by `ui/CalcPad` on its target while the pad is up (Mark, 2026-09-23).
+   The pad sits across the page from the field and › can take you to one you
+   never touched, so the field says which it is: a 3px black ring, drawn as an
+   outline so it takes no room and moves nothing. Beats `focus:outline-none`,
+   which is the point. */
+[data-rf-calc-active] {
+  outline: 3px solid var(--color-ink) !important;
+  outline-offset: 1px;
+}
+
 /* ---- .mac-field: the search box ---------------------------------------- */
 
 /* SUNKEN, the old Mac text field: a 1px border with a hard 2px black shadow

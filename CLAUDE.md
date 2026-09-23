@@ -479,7 +479,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 
 - **`InlineValue`'s OPEN EDITOR CARRIES NO `aria-label`, where its resting
   button does** (found 2026-09-03 while testing the checklist template's unit
-  cell). A screen reader names the field until you click it and then loses the
+  cell). **Half done 2026-09-23:** the single-line text/number editor now
+  carries it, because `ui/CalcPad`'s title bar reads it; the other editing
+  branches (multiline etc.) still don't. A screen reader names the field until you click it and then loses the
   name at the moment you are typing into it — every inline cell in the app, not
   one screen. One prop threaded through the editing branch; not done, because it
   is a pass of its own and nobody asked for it.
