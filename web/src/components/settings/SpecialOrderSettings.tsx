@@ -89,9 +89,13 @@ const VAR_EXAMPLE: Record<string, string> = {
   period: "Sep 14 – Sep 20",
   approve_line: "the approval link, as its own paragraph — only on a quote that has one",
   pay_line: "the pay link, as its own paragraph — only on an invoice with a balance, once online payment is set up",
+  amount: "$124.00 — what was just paid",
+  method: "visa ending 1111",
+  balance_line: "“Balance remaining: $124.00” as its own line, or nothing when paid in full",
+  receipt_line: "Square’s receipt link as its own line, or nothing (always nothing in sandbox)",
 };
 
-/** The six messages this module can send, in the order somebody meets them. */
+/** The seven messages this module can send, in the order somebody meets them. */
 const TEMPLATES: {
   key: keyof typeof DEFAULT_TEMPLATES;
   label: string;
@@ -120,6 +124,12 @@ const TEMPLATES: {
     label: "Invoice",
     when: "Sent with the invoice PDF. {pay_line} is the pay link, and only appears when there is one.",
     vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "cutoff_clause", "total", "balance", "employee_name", "fulfillment_note", "pay_line"],
+  },
+  {
+    key: "payment",
+    label: "Payment received",
+    when: "Sent automatically when a customer pays online with the invoice’s pay link.",
+    vars: ["number", "title_suffix", "first_name", "full_name", "amount", "method", "balance", "balance_line", "receipt_line", "employee_name"],
   },
   {
     key: "receipt",
@@ -153,7 +163,7 @@ export function SpecialOrderSettings({
   /**
    * Which of the org settings screen's tabs this is rendering for (Mark,
    * 2026-09-05, moved the same day): `messages` is every piece of WORDING a
-   * customer reads — the six templates, the inquiry form's copy, the
+   * customer reads — the seven templates, the inquiry form's copy, the
    * documents' copy — and the mailbox they leave from; `general` is the timing
    * numbers. One component, because every cell writes the same jsonb
    * document through the same `cell` helper.

@@ -64,6 +64,33 @@ function toCents(value: unknown): number | null {
 }
 
 /**
+ * THE "PAYMENT RECEIVED" MESSAGE'S DEFAULT — a MIRROR of `DEFAULT_TEMPLATES.
+ * payment` in web/src/lib/specialOrderDocs.ts, which is what Settings →
+ * Messages shows. Deno cannot import from `web/` (submit-inquiry keeps its
+ * inquiry default the same way), so the two are kept in step by hand; this one
+ * is the copy that is actually SENT when the org has not written its own.
+ */
+const PAYMENT_TEMPLATE = {
+  subject: "Payment received — order #{number}{title_suffix}",
+  body:
+    "Hi {first_name},\n\n" +
+    "Thank you — we received your payment of {amount} for order #{number} ({method}).\n" +
+    "{balance_line}" +
+    "{receipt_line}" +
+    "\nIf anything needs changing, just reply to this message.\n",
+};
+
+/** `fillTemplate`'s rule: an unknown `{token}` is left as typed, so a typo is
+ *  visible in the message rather than swallowed. */
+function fill(template: string, values: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (m, key) => (key in values ? values[key] : m));
+}
+
+function firstNameOf(name: string | null | undefined): string {
+  return (name ?? "").trim().split(/\s+/)[0] ?? "";
+}
+
+/**
  * What a decline MEANS to the person holding the card. Square's codes are for
  * developers; "GENERIC_DECLINE" on a phone reads as our bug.
  */
@@ -249,9 +276,13 @@ Deno.serve(async (req) => {
 
     /* ---- 4. THE CONFIRMATION ------------------------------------------- */
 
+    // The "Payment received" message on Settings → Messages, filled here on
+    // the server. See `PAYMENT_TEMPLATE` for why this has its own copy.
     const { data: order } = await admin
       .from("special_orders")
-      .select("number, title, contact_email, inbound_message_id, customers(email)")
+      .select(
+        "number, title, contact_name, contact_email, inbound_message_id, taken_by, taken_by_employee_id, customers(first_name, last_name, company, email)"
+      )
       .eq("id", claim.order_id)
       .maybeSingle();
     const { data: org } = await admin
@@ -261,15 +292,81 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const orgSettings = (org?.settings ?? {}) as {
       email_provider?: ProviderConfig;
-      special_orders?: { email_provider?: ProviderConfig; reply_to?: string };
+      special_orders?: {
+        email_provider?: ProviderConfig;
+        reply_to?: string;
+        email_cc?: string;
+        email?: { payment?: { subject?: string; body?: string } };
+      };
       billing?: { email?: string };
     };
 
-    const customerEmail =
-      order?.contact_email ?? (order?.customers as { email?: string } | null)?.email ?? null;
+    const customer = (order?.customers ?? null) as {
+      first_name?: string | null;
+      last_name?: string | null;
+      company?: string | null;
+      email?: string | null;
+    } | null;
 
-    if (customerEmail) {
+    // `documentRecipient` / `documentCc` in lib/specialOrderDocs: the CUSTOMER
+    // first (Mark, 2026-09-21), the standing Cc, and the day-of contact when
+    // they are a different address.
+    const to = (customer?.email ?? order?.contact_email ?? "").trim();
+    const ccList = (orgSettings.special_orders?.email_cc ?? "")
+      .split(",")
+      .map((a) => a.trim())
+      .filter(Boolean);
+    const contactEmail = (order?.contact_email ?? "").trim();
+    if (
+      contactEmail &&
+      ![to, ...ccList].map((a) => a.toLowerCase()).includes(contactEmail.toLowerCase())
+    ) {
+      ccList.push(contactEmail);
+    }
+
+    if (to) {
       try {
+        // WHO IS HANDLING IT, the same way the documents sign off: the linked
+        // employee's name where there is one, FileMaker's text where not.
+        let taker: string | null = order?.taken_by ?? null;
+        // `special_order_takers` (053) checks the CALLER's membership, which
+        // service_role does not have, so the one row is read directly and
+        // named the way that function names it: nickname first, else first.
+        if (order?.taken_by_employee_id) {
+          const { data: emp } = await admin
+            .from("employees")
+            .select("nickname, first_name, last_name")
+            .eq("id", order.taken_by_employee_id)
+            .maybeSingle();
+          const first = (emp?.nickname ?? "").trim() || (emp?.first_name ?? "").trim();
+          if (first) taker = first;
+        }
+
+        const person = [customer?.first_name, customer?.last_name].filter(Boolean).join(" ").trim();
+        const fullName = person || (customer?.company ?? "").trim() || (order?.contact_name ?? "").trim();
+        const remaining = Number((recorded as { balance?: number | string } | null)?.balance ?? 0);
+        const money = (v: number) => `$${v.toFixed(2)}`;
+        const number = order?.number ?? claim.number ?? "";
+
+        const values: Record<string, string> = {
+          number,
+          title: order?.title ?? "",
+          title_suffix: order?.title ? ` — ${order.title}` : "",
+          first_name: firstNameOf(fullName) || "there",
+          full_name: fullName,
+          employee_name: firstNameOf(taker),
+          amount: money(amount),
+          method,
+          balance: money(Math.max(remaining, 0)),
+          balance_line: remaining > 0.005 ? `Balance remaining: ${money(remaining)}\n` : "",
+          receipt_line: payment.receipt_url ? `\nYour receipt: ${payment.receipt_url}\n` : "",
+          org: org?.name ?? "",
+        };
+
+        const configured = orgSettings.special_orders?.email?.payment ?? {};
+        const orDefault = (v: string | undefined, fallback: string) =>
+          typeof v === "string" && v.trim() !== "" ? v : fallback;
+
         const transport = resolveTransport({
           explicit: orgSettings.special_orders?.email_provider,
           orgProvider: orgSettings.email_provider,
@@ -278,16 +375,12 @@ Deno.serve(async (req) => {
         });
         const raw = (order?.inbound_message_id ?? "").trim();
         const inReplyTo = raw ? (raw.startsWith("<") ? raw : `<${raw}>`) : undefined;
-        const remaining = Number((recorded as { balance?: number | string } | null)?.balance ?? 0);
 
         await sendMail(transport, {
-          to: customerEmail,
-          subject: `Payment received — order #${order?.number ?? claim.number ?? ""}${order?.title ? ` — ${order.title}` : ""}`,
-          text:
-            `Thank you — we received your payment of $${amount.toFixed(2)} for order #${order?.number ?? claim.number ?? ""} (${method}).\n\n` +
-            (remaining > 0 ? `Balance remaining: $${remaining.toFixed(2)}\n\n` : "") +
-            (payment.receipt_url ? `Your receipt: ${payment.receipt_url}\n\n` : "") +
-            `If anything needs changing, just reply to this message.\n`,
+          to,
+          cc: ccList.length ? ccList.join(", ") : undefined,
+          subject: fill(orDefault(configured.subject, PAYMENT_TEMPLATE.subject), values),
+          text: fill(orDefault(configured.body, PAYMENT_TEMPLATE.body), values),
           inReplyTo,
           references: inReplyTo,
         });
