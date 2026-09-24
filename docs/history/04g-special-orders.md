@@ -42,6 +42,15 @@
    letters 40/50, regular 61/67.** Still blank on the menu: the nine Promise
    Ring flavours beyond the three glazes, Bar - Maple / Rocky Road, Bismark -
    No Glaze / Sugar, Glazed Donut, Motion City Sandwich, Small Brown Bites.
+   **Then Mark: "fix those typos" and, on minis, giants and letters, replace
+   any cake-donut wording** ("vanilla cake", "banana cake" …) with "raised
+   mini donut" / "raised giant donut" / "raised letter donut" — those sizes
+   are all raised dough whatever the flavour's regular is. One pattern
+   covered all fifteen flavours' phrasings ("A [moist] <flavour> cake [and
+   spice] donut" → "A raised <size> donut"; Lavender Arms' lowercase "a" became
+   "A"); the four typos fixed on every size. 55 items, each write guarded on
+   the text being unchanged since the dry run; afterwards no mini, giant or
+   letter description mentions cake.
 
    **Also 2026-09-24, after Mark used it — EVERY LETTER GETS A FLAVOR, AND NO
    ADDRESS ON A PICKUP.** (1) "force the user to set the flavor for each
