@@ -12,7 +12,7 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Shipped 2026-09-23, MIGRATION 129 WRITTEN, NOT YET APPLIED — "SOLD AS"
+   **Shipped 2026-09-23, MIGRATION 129 APPLIED (Mark, same day) — "SOLD AS"
    LIVES ON THE ORDER, SO A ONE-OFF CAN BE WHOLESALE.** Mark, having asked how
    the app tells regular from wholesale (answer: by ORIGIN — `kind = 'order'`
    with or without a `standing_order_id`): "I feel like we need to be able to
@@ -34,7 +34,7 @@
    order special; a new line takes the order's value over the caller's; flips
    both ways while unpaid, stays once paid; hand edit refused; the order link
    SPECIAL → WHOLE when flipped; bad value refused. tsc, lint, fixtures.
-   **The order screen now selects `square_item`, so the web push waits for 129.**
+   The order screen selects `square_item`; pushed once 129 was applied.
 
    **Shipped 2026-09-23, MIGRATION 128 APPLIED (Mark, same day; the order-money parity check over 1,096 real orders — every 2026 order and every 12th older — found 0 mismatches once the script paged its lines past PostgREST's 1,000-row cap) — A CUSTOMER
    INVOICE FOLLOWS ITS ORDERS, AND IS RE-SENT WHEN THEY CHANGE.** Mark: "the
