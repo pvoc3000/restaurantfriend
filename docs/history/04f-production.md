@@ -1,5 +1,19 @@
 <!-- Moved verbatim from CLAUDE.md on 2026-09-18 (Claude Code /doctor). Everything below line 2 is the original text. -->
 
+**2026-09-24 — THE PRICE OVERRIDE, REACHABLE ON A SHOP WITH NO ROW.** Mark,
+adding the Misc item "Stumptown Coffee - 96oz": "I have no way of setting a
+price. In FMP I had a price override option." The override already existed —
+`production_item_locations.price_override`, the item record's Info ▸ Default
+pars ▸ "Price here" — but a shop with no row showed "—", and the only way to
+make a row was "Set Default Pars", which names the wrong thing for an item with
+no par. The empty "Price here" cell is now editable and typing a price INSERTS
+the row carrying it (`insertPrice` in `ProductionItemLocations`, org_id
+explicit); clearing it on a row-less shop writes nothing. No migration. Not
+walked in the browser (the pane was signed out) — the insert is `createRow`'s
+plus the one column. Remember the inquiry form prices at the pickup shop (or
+the delivery origin), so an override at one shop only leaves the item
+"priced in your quote" at the other.
+
 4f. 🚧 **Production** — specced 2026-08-07; **ALL FIVE PHASES NOW BUILT**
    (036–044; **044 NEEDS APPLYING**, everything before it is applied).
    *Probe, don't read this line* — it has been wrong in both directions for four

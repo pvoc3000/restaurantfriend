@@ -81,6 +81,29 @@ export function ProductionItemLocations({
     router.refresh();
   }
 
+  /**
+   * THE PRICE OVERRIDE ON A SHOP WITH NO ROW YET (Mark, 2026-09-24: "I have
+   * no way of setting a price. In FMP I had a price override option"). The
+   * override was already this table's "Price here", but only a shop WITH a row
+   * showed the cell, and the only way to make a row was "Set Default Pars" — a
+   * button naming the wrong thing for a Misc item like a box of coffee, which
+   * has no par at all. So the empty cell is itself editable, and typing a price
+   * INSERTS the row carrying it (org_id explicit, design rule 1); the pars stay
+   * empty. Clearing it on a shop with no row writes nothing.
+   */
+  function insertPrice(locationId: string) {
+    return async (next: string | number | null) => {
+      if (next === null || next === "") return { error: null };
+      const { data, error } = await supabase
+        .from("production_item_locations")
+        .insert({ org_id: orgId, item_id: itemId, location_id: locationId, price_override: next })
+        .select("id");
+      if (error) return { error: error.message };
+      if (!data?.length) return { error: "Nothing was written — you may not have permission." };
+      return { error: null };
+    };
+  }
+
   const byLocation = new Map(pars.map((p) => [p.location_id, p]));
 
   type Line = {
@@ -169,7 +192,25 @@ export function ProductionItemLocations({
       sortValue: (l) => l.row?.price_override ?? null,
       render: (l) => {
         if (!l.row) {
-          return <span className={`${READ_ONLY_VALUE} text-subtle`}>—</span>;
+          return editable ? (
+            <span className="flex flex-col items-end">
+              <InlineValue
+                table="production_item_locations"
+                column="price_override"
+                kind="number"
+                align="right"
+                value={null}
+                ariaLabel={`Price at ${l.location.code}`}
+                format={(v) => `$${Number(v).toFixed(2)}`}
+                onWrite={insertPrice(l.location.id)}
+              />
+              <span className={`${READ_ONLY_VALUE} text-[12px] text-subtle`}>
+                {gridPrice === null ? "no grid price" : `grid $${gridPrice.toFixed(2)}`}
+              </span>
+            </span>
+          ) : (
+            <span className={`${READ_ONLY_VALUE} text-subtle`}>—</span>
+          );
         }
         return (
           <span className="flex flex-col items-end">
