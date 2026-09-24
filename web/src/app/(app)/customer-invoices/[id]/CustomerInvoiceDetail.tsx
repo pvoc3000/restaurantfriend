@@ -83,6 +83,7 @@ export async function CustomerInvoiceDetail({
     items: part((t) => t.subtotal),
     discount: part((t) => t.discount),
     delivery: part((t) => t.deliveryCharge),
+    rush: part((t) => t.rushFee),
     tax: part((t) => t.tax),
     paid: part((t) => t.paid),
     balance: part((t) => t.balance),
@@ -201,12 +202,13 @@ export async function CustomerInvoiceDetail({
               <th className="w-44 px-3 py-2 text-left">Sold as</th>
               {/* THE ORDER'S OWN PAYMENTS FIGURES, in the order its record shows
                   them (Mark, 2026-09-23: "Items, Discount, Delivery, Tax, Paid,
-                  Balance") — each order today, from `orderTotals`, so the row
-                  reads across. The invoice's own frozen amount only appears,
+                  Balance", then "add rush fee too") — each order today, from
+                  `orderTotals`, so the row reads across. The invoice's own frozen amount only appears,
                   under Balance, when the order has moved away from it. */}
               <th className="w-28 px-3 py-2 text-right">Items</th>
               <th className="w-28 px-3 py-2 text-right">Discount</th>
               <th className="w-28 px-3 py-2 text-right">Delivery</th>
+              <th className="w-28 px-3 py-2 text-right">Rush fee</th>
               <th className="w-28 px-3 py-2 text-right">Tax</th>
               <th className="w-28 px-3 py-2 text-right">Paid</th>
               <th className="w-32 px-3 py-2 text-right">Balance</th>
@@ -254,6 +256,9 @@ export async function CustomerInvoiceDetail({
                     {figure(l.totals?.deliveryCharge)}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-muted">
+                    {figure(l.totals?.rushFee)}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-muted">
                     {figure(l.totals?.tax)}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-muted">
@@ -275,6 +280,7 @@ export async function CustomerInvoiceDetail({
               <td className="px-3 py-2 text-right tabular-nums">{figure(sums.items)}</td>
               <td className="px-3 py-2 text-right tabular-nums">{figure(sums.discount, true)}</td>
               <td className="px-3 py-2 text-right tabular-nums">{figure(sums.delivery)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{figure(sums.rush)}</td>
               <td className="px-3 py-2 text-right tabular-nums">{figure(sums.tax)}</td>
               <td className="px-3 py-2 text-right tabular-nums">{figure(sums.paid)}</td>
               <td className="px-3 py-2 text-right tabular-nums">{money(sums.balance)}</td>
