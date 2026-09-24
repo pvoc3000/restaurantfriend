@@ -12,6 +12,37 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-23, MIGRATION 126 WRITTEN, NOT YET APPLIED — EACH
+   INVOICE LINE SAYS WHICH SQUARE ITEM IT IS SOLD AS.** Mark, once 125 was in:
+   "since we can select the wholesale or special order item with a picklist
+   now, why don't we allow the user to set/change it on the invoice. It could
+   be a column in the orders section." `customer_invoice_lines.square_item`
+   ('special_order' | 'wholesale', not null) — a KIND, not a Square id, so it
+   means the same in sandbox and production and follows Settings; backfilled
+   and written at creation by 125's rule (a standing-order day → wholesale), a
+   caller's `square_item` in `p_lines` wins. **Editable through the freeze** on
+   a sent invoice until it is paid or void — the one column the trigger lets
+   through, because the category is not on the customer's paper. A "Sold as"
+   picker column on the record's Orders table. At pay time `claim_pay_token`
+   returns `items` (each line's variation via `pay_link_item_variation`,
+   wholesale falling back to special when unset); the web snapshots each
+   line's split in the token's `breakdown.lines`; `_shared/squareOrder`'s
+   `buildSquareOrder` takes `groups`, merges same-item groups and cuts one
+   order into lines PER ITEM (delivery summed into one service charge, the
+   pennies on the biggest untaxed line). Taxed goods under two items collapse
+   to the one-item order rather than predict Square's per-line tax rounding.
+   An invoice token's single `variation_id` (the fallback) is wholesale only
+   when every line is. **Verified:** 126 on the throwaway Postgres over a SENT
+   pre-126 invoice (backfill by the rule; applied twice); a new invoice by rule
+   with an override; on a sent invoice the item changes and an amount (alone or
+   with it) is refused; a bad value refused; paid → refused; claim items
+   WHOLE/SPECIAL/SPECIAL; wholesale-unset fallback; an order token keeps 125's
+   rule with no items; one overload each, anon only on `claim_pay_token`. Six
+   new squareOrder fixtures (2,027) — merged groups, two items to the cent, a
+   part-paid scale, tax on one item, the collapse, and "one group is exactly
+   the one-item order"; dropping the grouped rounding line turns the part-paid
+   case red. tsc, lint, `deno check square-pay`. `square-pay` NEEDS A REDEPLOY.
+
    **Shipped 2026-09-23, MIGRATION 125 APPLIED, `square-catalog` DEPLOYED (Mark, same day) — THE INVOICE'S
    COMMANDS ARE ONE ACTIONS MENU; A WHOLESALE PAYMENT IS SOLD AS "WHOLESALE
    ORDER"; SQUARE ITEMS ARE PICKED, NOT PASTED.** Mark applied 124, redeployed

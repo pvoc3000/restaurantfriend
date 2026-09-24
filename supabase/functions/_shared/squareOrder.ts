@@ -81,7 +81,156 @@ export function percentString(rate: number): string {
 
 const usd = (cents: number) => ({ amount: cents, currency: "USD" });
 
+/**
+ * One Square item's share of the money (126): a customer invoice whose lines
+ * are sold as different items — Knotted's days as Wholesale, a birthday order
+ * as Special Order — becomes one Square order with lines PER ITEM, so each
+ * lands in its own category.
+ */
+export type SquareOrderGroup = { variationId: string | null; breakdown: PayBreakdown };
+
+/**
+ * Breakdowns summed, or null when they cannot share taxed lines: Square
+ * applies one percentage per tax, so two different rates on taxed goods is a
+ * split this module will not guess at.
+ */
+export function sumBreakdowns(parts: PayBreakdown[]): PayBreakdown | null {
+  if (parts.length === 0) return null;
+  const rates = new Set(parts.filter((p) => p.taxable_net > 0).map((p) => p.tax_rate));
+  if (rates.size > 1) return null;
+  const sum = (k: keyof PayBreakdown) =>
+    Math.round(parts.reduce((a, p) => a + Number(p[k] || 0), 0) * 100) / 100;
+  return {
+    taxable_net: sum("taxable_net"),
+    other_net: sum("other_net"),
+    delivery: sum("delivery"),
+    tax: sum("tax"),
+    tax_rate: parts.find((p) => p.taxable_net > 0)?.tax_rate ?? 0,
+    total: sum("total"),
+  };
+}
+
 export function buildSquareOrder(args: {
+  balanceCents: number;
+  breakdown: PayBreakdown | null;
+  /** "Order #10071 — Birthday" */
+  label: string;
+  /** The "Special Orders" item's variation; null reports as Uncategorized. */
+  variationId: string | null;
+  locationId: string;
+  referenceId: string;
+  /**
+   * 126: the money PER SQUARE ITEM, when a customer invoice's lines are sold as
+   * more than one. Groups naming the same variation are merged. Absent, or
+   * down to one item after merging, this is the one-item order it always was.
+   * Taxed goods under two items collapse back to one item (`breakdown` and
+   * `variationId`): Square computes tax per line, and predicting its rounding
+   * across several taxed lines is the kind of cleverness the total check
+   * below would have to catch.
+   */
+  groups?: SquareOrderGroup[] | null;
+}): SquareOrderPlan {
+  const merged = mergeGroups(args.groups ?? []);
+  if (merged && merged.length > 1 && merged.filter((g) => g.breakdown.taxable_net > 0).length <= 1) {
+    const plan = buildGrouped({ ...args, groups: merged });
+    if (plan) return plan;
+  }
+  if (merged && merged.length === 1) {
+    return buildOne({ ...args, breakdown: merged[0].breakdown, variationId: merged[0].variationId });
+  }
+  return buildOne(args);
+}
+
+/** Same variation → one group; null when a group's parts cannot be summed. */
+function mergeGroups(groups: SquareOrderGroup[]): SquareOrderGroup[] | null {
+  if (groups.length === 0) return null;
+  const byVariation = new Map<string, PayBreakdown[]>();
+  for (const g of groups) {
+    const key = g.variationId ?? "";
+    byVariation.set(key, [...(byVariation.get(key) ?? []), g.breakdown]);
+  }
+  const out: SquareOrderGroup[] = [];
+  for (const [key, parts] of byVariation) {
+    const breakdown = sumBreakdowns(parts);
+    if (!breakdown) return null;
+    out.push({ variationId: key || null, breakdown });
+  }
+  return out;
+}
+
+function buildGrouped(args: {
+  balanceCents: number;
+  label: string;
+  locationId: string;
+  referenceId: string;
+  groups: SquareOrderGroup[];
+}): SquareOrderPlan | null {
+  const { balanceCents, label, locationId, referenceId, groups } = args;
+  const totalCents = Math.round(groups.reduce((a, g) => a + g.breakdown.total, 0) * 100);
+  if (!(totalCents > 0) || balanceCents <= 0) return null;
+  const f = Math.min(1, balanceCents / totalCents);
+
+  const parts = groups.map((g) => ({
+    variationId: g.variationId,
+    taxable: Math.round(g.breakdown.taxable_net * 100 * f),
+    other: Math.round(g.breakdown.other_net * 100 * f),
+    delivery: Math.round(g.breakdown.delivery * 100 * f),
+    rate: g.breakdown.tax_rate > 0 ? g.breakdown.tax_rate : 0,
+  }));
+  if (parts.some((p) => p.taxable < 0 || p.other < 0 || p.delivery < 0)) return null;
+
+  const taxedPart = parts.find((p) => p.taxable > 0 && p.rate > 0);
+  const tax = taxedPart ? bankersRound(taxedPart.taxable * taxedPart.rate) : 0;
+  const delivery = parts.reduce((a, p) => a + p.delivery, 0);
+  const rounding =
+    balanceCents - (parts.reduce((a, p) => a + p.taxable + p.other, 0) + delivery + tax);
+  if (Math.abs(rounding) > 5) return null;
+  // The pennies ride on the biggest untaxed line, where they are least visible.
+  const sink = parts.reduce((best, p) => (p.other > best.other ? p : best), parts[0]);
+  sink.other += rounding;
+  if (sink.other < 0) return null;
+
+  const lines: Record<string, unknown>[] = [];
+  for (const p of parts) {
+    const line = (name: string, cents: number, extra: Record<string, unknown> = {}) => ({
+      name,
+      quantity: "1",
+      ...(p.variationId ? { catalog_object_id: p.variationId } : {}),
+      base_price_money: usd(cents),
+      ...extra,
+    });
+    if (p.taxable > 0) {
+      lines.push(line(label, p.taxable, p.rate > 0 ? { applied_taxes: [{ tax_uid: "sales-tax" }] } : {}));
+    }
+    if (p.other > 0) lines.push(line(p.taxable > 0 ? `${label} (not taxed)` : label, p.other));
+  }
+  if (lines.length === 0) return null;
+
+  const order: Record<string, unknown> = {
+    location_id: locationId,
+    reference_id: referenceId,
+    line_items: lines,
+  };
+  if (tax > 0 && taxedPart) {
+    order.taxes = [
+      {
+        uid: "sales-tax",
+        name: "Sales tax",
+        percentage: percentString(taxedPart.rate),
+        type: "ADDITIVE",
+        scope: "LINE_ITEM",
+      },
+    ];
+  }
+  if (delivery > 0) {
+    order.service_charges = [
+      { name: "Delivery", amount_money: usd(delivery), calculation_phase: "TOTAL_PHASE", taxable: false },
+    ];
+  }
+  return { order, expectedCents: balanceCents, taxCents: tax, roundingCents: rounding, single: false };
+}
+
+function buildOne(args: {
   balanceCents: number;
   breakdown: PayBreakdown | null;
   /** "Order #10071 — Birthday" */

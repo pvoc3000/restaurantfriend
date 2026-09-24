@@ -29,12 +29,31 @@ export type CustomerInvoice = {
   document_path: string | null;
 };
 
+/**
+ * WHICH SQUARE ITEM A LINE IS SOLD AS (126) — a kind, resolved to this
+ * environment's variation at pay time. Written at creation by 125's rule (a
+ * standing-order day is Wholesale) and changeable per line until the invoice
+ * is paid or void.
+ */
+export type SquareItem = "special_order" | "wholesale";
+
+export const SQUARE_ITEM_OPTIONS: { value: SquareItem; label: string }[] = [
+  { value: "special_order", label: "Special Order" },
+  { value: "wholesale", label: "Wholesale Order" },
+];
+
+export const SQUARE_ITEM_LABEL: Record<SquareItem, string> = {
+  special_order: "Special Order",
+  wholesale: "Wholesale Order",
+};
+
 export type CustomerInvoiceLine = {
   id: string;
   special_order_id: string;
   description: string;
   amount: number;
   sort: number | null;
+  square_item: SquareItem;
 };
 
 export type InvoiceStatus = "draft" | "sent" | "overdue" | "paid" | "void";

@@ -181,8 +181,11 @@ Deno.serve(async (req) => {
       balance?: number | string;
       location_id?: string;
       title?: string | null;
-      breakdown?: PayBreakdown | null;
+      /** 126: an invoice's breakdown also carries `lines`, keyed by line id. */
+      breakdown?: (PayBreakdown & { lines?: Record<string, PayBreakdown> }) | null;
       variation_id?: string | null;
+      /** 126: each invoice line's Square item, resolved to a variation. */
+      items?: { line_id: string; variation_id: string | null }[] | null;
     };
 
     // `unknown`, `superseded`, `cancelled`, `paid`, `busy` — the page words them.
@@ -208,9 +211,18 @@ Deno.serve(async (req) => {
     // tax, delivery. See `_shared/squareOrder.ts` (migration 123).
     const reference = `${isInvoice ? "Invoice" : "Order"} ${claim.number ?? ""}`.trim();
     const label = `${isInvoice ? "Invoice" : "Order"} #${claim.number ?? ""}${claim.title ? ` — ${claim.title}` : ""}`.slice(0, 500);
+    // 126: an invoice whose lines are sold as different items gets Square
+    // lines per item — only when every line's money was snapshotted, or the
+    // one-item order it always was.
+    const perLine = claim.breakdown?.lines;
+    const groups =
+      claim.items?.length && perLine && claim.items.every((i) => perLine[i.line_id])
+        ? claim.items.map((i) => ({ variationId: i.variation_id, breakdown: perLine[i.line_id] }))
+        : null;
     const plan = buildSquareOrder({
       balanceCents: cents,
       breakdown: claim.breakdown ?? null,
+      groups,
       label,
       variationId: claim.variation_id ?? null,
       locationId: claim.location_id,

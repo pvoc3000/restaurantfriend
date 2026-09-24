@@ -84,7 +84,7 @@ export async function fetchInvoiceView(
 
   const { data: lineRows, error: lineError } = await supabase
     .from("customer_invoice_lines")
-    .select("id, special_order_id, description, amount, sort")
+    .select("id, special_order_id, description, amount, sort, square_item")
     .eq("invoice_id", id)
     .order("sort", { ascending: true, nullsFirst: false });
   if (lineError) throw new Error(lineError.message);

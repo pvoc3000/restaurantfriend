@@ -127,7 +127,9 @@ export function SendCustomerInvoice({
     filename: string;
     payToken: string | null;
     snapshot: CustomerInvoiceSnapshot;
-    breakdown: ReturnType<typeof breakdownFromTotals> | null;
+    breakdown: (ReturnType<typeof breakdownFromTotals> & {
+      lines: Record<string, ReturnType<typeof breakdownFromTotals>>;
+    }) | null;
   } | null>(null);
 
   function close() {
@@ -159,11 +161,15 @@ export function SendCustomerInvoice({
       }
 
       const snapshot = invoiceSnapshotOf(view, number, doc, today);
-      const breakdown = sumBreakdowns(
+      // Each line's own split as well as the sum (126): the Square order is
+      // cut per ITEM from these, since a line's item can change after send.
+      const perLine = Object.fromEntries(
         view.lines
           .filter((l) => l.totals)
-          .map((l) => breakdownFromTotals(l.totals!, l.order?.tax_rate ?? null))
+          .map((l) => [l.id, breakdownFromTotals(l.totals!, l.order?.tax_rate ?? null)])
       );
+      const summed = sumBreakdowns(Object.values(perLine));
+      const breakdown = summed ? { ...summed, lines: perLine } : null;
 
       setCompose(invoiceEmail(view, number, settings, pay));
       setPending({

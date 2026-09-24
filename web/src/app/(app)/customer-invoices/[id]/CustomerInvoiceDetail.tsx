@@ -9,6 +9,8 @@ import { usDate } from "@/lib/specialOrderDocs";
 import { fetchInvoiceView } from "@/lib/customerInvoiceQueries";
 import {
   INVOICE_STATUS_LABEL,
+  SQUARE_ITEM_LABEL,
+  SQUARE_ITEM_OPTIONS,
   invoiceNumberText,
   invoiceStatus,
   lineDrift,
@@ -177,6 +179,11 @@ export async function CustomerInvoiceDetail({
             <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
               <th className="px-3 py-2 text-left">Line</th>
               <th className="w-28 px-3 py-2 text-left">Order status</th>
+              {/* 126 (Mark, 2026-09-23): which Square item the money is
+                  filed under. Proposed by the rule at creation, changeable
+                  until the invoice is paid — it is not on the customer's
+                  paper, so a sent invoice still lets it through. */}
+              <th className="w-44 px-3 py-2 text-left">Sold as</th>
               <th className="w-32 px-3 py-2 text-right">Amount</th>
               <th className="w-32 px-3 py-2 text-right">Paid</th>
             </tr>
@@ -197,6 +204,22 @@ export async function CustomerInvoiceDetail({
                   <td className="px-3 py-2 text-muted">
                     {l.order?.status ? STATUS_LABEL[l.order.status] : "—"}
                   </td>
+                  <td className="px-3 py-1">
+                    {canWrite && !invoice.paid_at && !invoice.voided_at ? (
+                      <InlineValue
+                        table="customer_invoice_lines"
+                        id={l.id}
+                        column="square_item"
+                        kind="pick"
+                        nullable={false}
+                        value={l.square_item}
+                        options={SQUARE_ITEM_OPTIONS}
+                        ariaLabel={`Square item for ${l.description}`}
+                      />
+                    ) : (
+                      <span className="text-muted">{SQUARE_ITEM_LABEL[l.square_item]}</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-right tabular-nums">
                     {money(l.amount)}
                     {drift !== null ? (
@@ -214,7 +237,7 @@ export async function CustomerInvoiceDetail({
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-ink font-semibold">
-              <td className="px-3 py-2" colSpan={2}>Total</td>
+              <td className="px-3 py-2" colSpan={3}>Total</td>
               <td className="px-3 py-2 text-right tabular-nums">{money(view.total)}</td>
               <td className="px-3 py-2 text-right tabular-nums">{view.paid !== 0 ? money(view.paid) : "—"}</td>
             </tr>

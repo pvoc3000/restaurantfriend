@@ -309,7 +309,11 @@ export async function bindPaySnapshot(
   /** An order's `QuoteSnapshot` or a customer invoice's snapshot (124) —
    *  anything that says its total. */
   snapshot: { totals: { total: number } },
-  breakdown: ReturnType<typeof payBreakdown> | null
+  /** A customer invoice's (126) also carries `lines`: each line's own split,
+   *  keyed by line id, so the Square order can be cut per item. */
+  breakdown:
+    | (ReturnType<typeof payBreakdown> & { lines?: Record<string, ReturnType<typeof payBreakdown>> })
+    | null
 ): Promise<void> {
   const { data, error } = await supabase
     .from("special_order_pay_tokens")

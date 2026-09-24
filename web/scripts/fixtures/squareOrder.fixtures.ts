@@ -111,3 +111,104 @@ test("a breakdown that disagrees with the balance by more than pennies falls bac
   eq(p.single, true);
   eq(squareTotal(p.order), 14950);
 });
+
+// ---- 126: lines per Square item ----------------------------------------
+
+const untaxed = (total: number, delivery = 0): PayBreakdown => ({
+  taxable_net: 0, other_net: total - delivery, delivery, tax: 0, tax_rate: 0, total,
+});
+
+test("groups: Knotted days as Wholesale and a birthday as Special, one order, each its own item", () => {
+  const plan = buildSquareOrder({
+    ...base,
+    balanceCents: 173850,
+    breakdown: null,
+    groups: [
+      { variationId: "WHOLE", breakdown: untaxed(613.5, 40) },
+      { variationId: "WHOLE", breakdown: untaxed(1125, 40) },
+      { variationId: "SPECIAL", breakdown: untaxed(0, 0) },
+    ].filter((g) => g.breakdown.total > 0),
+  });
+  eq(plan.single, false);
+  eq(squareTotal(plan.order), 173850);
+  const lines = plan.order.line_items as { catalog_object_id: string; base_price_money: { amount: number } }[];
+  eq(lines.length, 1, "the two Wholesale days merge into one line");
+  eq(lines[0].catalog_object_id, "WHOLE");
+  eq((plan.order.service_charges as { amount_money: { amount: number } }[])[0].amount_money.amount, 8000);
+});
+
+test("groups: two items, two lines, the total to the cent", () => {
+  const plan = buildSquareOrder({
+    ...base,
+    balanceCents: 100000,
+    breakdown: null,
+    groups: [
+      { variationId: "WHOLE", breakdown: untaxed(613.5, 40) },
+      { variationId: "SPECIAL", breakdown: untaxed(386.5) },
+    ],
+  });
+  const lines = plan.order.line_items as { catalog_object_id: string; base_price_money: { amount: number } }[];
+  eq(lines.map((l) => l.catalog_object_id), ["WHOLE", "SPECIAL"]);
+  eq(lines.map((l) => l.base_price_money.amount), [57350, 38650]);
+  eq(squareTotal(plan.order), 100000);
+});
+
+test("groups: a part-paid invoice scales every group and still lands on the balance", () => {
+  const plan = buildSquareOrder({
+    ...base,
+    balanceCents: 33333,
+    breakdown: null,
+    groups: [
+      { variationId: "WHOLE", breakdown: untaxed(613.5, 40) },
+      { variationId: "SPECIAL", breakdown: untaxed(386.5) },
+    ],
+  });
+  eq(plan.single, false);
+  eq(squareTotal(plan.order), 33333);
+});
+
+test("groups: tax on one item's goods is predicted as for one line", () => {
+  const taxed: PayBreakdown = { taxable_net: 100, other_net: 0, delivery: 0, tax: 9.75, tax_rate: 0.0975, total: 109.75 };
+  const plan = buildSquareOrder({
+    ...base,
+    balanceCents: 72325,
+    breakdown: null,
+    groups: [
+      { variationId: "WHOLE", breakdown: untaxed(613.5) },
+      { variationId: "SPECIAL", breakdown: taxed },
+    ],
+  });
+  eq(plan.single, false);
+  eq(plan.taxCents, 975);
+  eq(squareTotal(plan.order), 72325);
+});
+
+test("groups: taxed goods under two items collapse to the one-item order", () => {
+  const taxed: PayBreakdown = { taxable_net: 100, other_net: 0, delivery: 0, tax: 9.75, tax_rate: 0.0975, total: 109.75 };
+  const summed: PayBreakdown = { taxable_net: 200, other_net: 0, delivery: 0, tax: 19.5, tax_rate: 0.0975, total: 219.5 };
+  const plan = buildSquareOrder({
+    ...base,
+    balanceCents: 21950,
+    breakdown: summed,
+    variationId: "SPECIAL",
+    groups: [
+      { variationId: "WHOLE", breakdown: taxed },
+      { variationId: "SPECIAL", breakdown: taxed },
+    ],
+  });
+  const lines = plan.order.line_items as { catalog_object_id: string }[];
+  ok(lines.every((l) => l.catalog_object_id === "SPECIAL"), "one item, the fallback's");
+  eq(squareTotal(plan.order), 21950);
+});
+
+test("groups: absent or a single item is exactly the one-item order", () => {
+  const one = buildSquareOrder({ ...base, balanceCents: 61350, breakdown: untaxed(613.5, 40), variationId: "WHOLE" });
+  const grouped = buildSquareOrder({
+    ...base,
+    balanceCents: 61350,
+    breakdown: null,
+    variationId: null,
+    groups: [{ variationId: "WHOLE", breakdown: untaxed(613.5, 40) }],
+  });
+  eq(grouped, one);
+});
