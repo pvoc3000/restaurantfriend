@@ -30,6 +30,18 @@
    ours is x12). **201 items across 71 flavors written.** Square's text is
    copied verbatim, typos included ("tard lemon curd", "cinnamon role",
    "bizmark", "Strawberries glaze").
+   **Then Mark's catalog export** (`…_catalog-2026-09-23-0018.xlsx`, header on
+   ROW 2, text as inline strings): it holds items the API list no longer
+   returns. 41 more — Cannoli Ghost, Limp Twist ×2, the eight Mochi (the
+   generic "Mochi Donut"), raised Rites ×3 and the raised-dough mini/giant/
+   letter Rites (by `item_type`), Pride ×3, Holiday Rites; and the specific
+   Promise Ring (Plain/Chocolate/Maple) and Rites (Chocolate/Vanilla) texts
+   REPLACED the generic ones written minutes earlier, guarded on the text
+   still being that generic one. Skipped: the Valentine's items (different
+   names; one is an HTML sales blurb). **Menu now: giants 39/39, minis 40/40,
+   letters 40/50, regular 61/67.** Still blank on the menu: the nine Promise
+   Ring flavours beyond the three glazes, Bar - Maple / Rocky Road, Bismark -
+   No Glaze / Sugar, Glazed Donut, Motion City Sandwich, Small Brown Bites.
 
    **Also 2026-09-24, after Mark used it — EVERY LETTER GETS A FLAVOR, AND NO
    ADDRESS ON A PICKUP.** (1) "force the user to set the flavor for each
