@@ -2,6 +2,7 @@
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
+import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { formatCost, type Cost } from "@/lib/productionCost";
 import { formatMargin, margin, type ResolvedPrice } from "@/lib/productionPrice";
 
@@ -46,6 +47,9 @@ export type ItemFieldsData = {
   price_tier: string | null;
   tally_box_size: number;
   notes: string | null;
+  /** Migration 132 — offered on the public inquiry form, and what it says. */
+  show_on_inquiry_form: boolean;
+  public_description: string | null;
 };
 
 export type Vocabularies = {
@@ -103,7 +107,8 @@ export function ProductionItemFields({
             Finish    Price
             Size      Cost
             Trays of  Margin
-            Notes
+            Notes     Inquiry form
+            Description (public), full width
 
           So the pairs below are (left, right), and moving one field means
           moving its opposite number too or everything after it shifts by one.
@@ -180,6 +185,48 @@ export function ProductionItemFields({
           <span className={READ_ONLY_VALUE}>{item.notes ?? "—"}</span>
         )}
       </Row>
+
+      {/* THE PUBLIC FORM (migration 132, 2026-09-24). Every active item is
+          offered unless switched off here; the form also needs a price. */}
+      <Row label="Inquiry form">
+        <ActiveToggle
+          table="production_items"
+          id={item.id}
+          column="show_on_inquiry_form"
+          active={item.show_on_inquiry_form}
+          readOnly={!editable}
+          yesNo
+          label={
+            item.show_on_inquiry_form
+              ? "Offered on the inquiry form — click to hide"
+              : "Hidden from the inquiry form — click to offer"
+          }
+          control="switch"
+        />
+      </Row>
+
+      {/* WHAT A CUSTOMER READS — not the kitchen's Notes. Full width, since it
+          is a sentence or two. The form falls back to a same-named item's
+          description, so a flavour is written once across its sizes. */}
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+        Description (public)
+      </dt>
+      <dd className="min-w-0 sm:col-span-3">
+        {editable ? (
+          <InlineValue
+            boxed={BOXED_FIELDS}
+            table="production_items"
+            id={item.id}
+            column="public_description"
+            value={item.public_description}
+            multiline
+            rows={3}
+            ariaLabel="Description (public)"
+          />
+        ) : (
+          <span className={READ_ONLY_VALUE}>{item.public_description ?? "—"}</span>
+        )}
+      </dd>
     </dl>
   );
 }

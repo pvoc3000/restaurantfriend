@@ -62,6 +62,7 @@ export default async function ProductionItemsPage({
       price_class: i.price_class,
       price_tier: i.price_tier,
       is_active: i.is_active,
+      show_on_inquiry_form: i.show_on_inquiry_form,
       componentCount: i.elements.length,
       cost,
       price: resolved.price,

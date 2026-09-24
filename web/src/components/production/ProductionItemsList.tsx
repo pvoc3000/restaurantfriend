@@ -38,6 +38,9 @@ export type ProductionItemRow = {
   price_class: string | null;
   price_tier: string | null;
   is_active: boolean;
+  /** Offered on the public inquiry form — every active item unless switched
+   *  off (migration 132), and only ever shown there with a price. */
+  show_on_inquiry_form: boolean;
   componentCount: number;
   cost: Cost;
   price: number | null;
@@ -70,6 +73,7 @@ const SORT_KEYS = [
   "cost",
   "price",
   "margin",
+  "inquiry",
 ] as const;
 
 /** Whatever a column actually holds, A–Z, with a "None" option after it. */
@@ -195,6 +199,16 @@ export function ProductionItemsList({
           { value: "unpriced", label: "Unpriced" },
         ],
         matches: (r, v) => (v === "unpriced" ? r.price === null : r.price !== null),
+      },
+      {
+        key: "inquiry",
+        label: "Inquiry form",
+        options: [
+          { value: "offered", label: "Offered" },
+          { value: "hidden", label: "Hidden" },
+        ],
+        matches: (r, v) =>
+          v === "hidden" ? !r.show_on_inquiry_form : r.show_on_inquiry_form,
       },
     ],
     [rows]
@@ -456,6 +470,38 @@ export function ProductionItemsList({
         </span>
       ),
     },
+    // WHETHER THE PUBLIC INQUIRY FORM OFFERS IT (migration 132, 2026-09-24).
+    // Every active item is offered unless switched off here, and the form
+    // additionally needs a price — so "Offered" on an unpriced row is a promise
+    // the menu will not keep until somebody prices it. A switch, for this
+    // list's reason: the selection column is the only checkbox in the row.
+    // Hidden when compact — at a narrow window it is the least-read column.
+    {
+      key: "inquiry",
+      label: "Inquiry form",
+      width: 90,
+      minWidth: 64,
+      hideWhenCompact: true,
+      sortValue: (r) => (r.show_on_inquiry_form ? 0 : 1),
+      sortTiebreaks: [(r) => r.name],
+      render: (r) =>
+        editable ? (
+          <ActiveToggle
+            table="production_items"
+            id={r.id}
+            column="show_on_inquiry_form"
+            active={r.show_on_inquiry_form}
+            label={
+              r.show_on_inquiry_form
+                ? "Offered on the inquiry form — click to hide"
+                : "Hidden from the inquiry form — click to offer"
+            }
+            control="switch"
+          />
+        ) : (
+          <span className="text-muted">{r.show_on_inquiry_form ? "Yes" : "No"}</span>
+        ),
+    },
     // The row's own commands — Duplicate and Delete (Mark, 2026-09-08).
     // Unlabelled, so it stays out of the Columns menu, and 68 = the 36px
     // button plus the cell's padding (`VendorItemsTable`'s arithmetic; a
@@ -601,7 +647,7 @@ export function ProductionItemsList({
       // STORED WIDTH OUTRANKS THE DECLARED ONE — without the bump anyone who
       // had dragged this table would keep the old numbers and the new column
       // would be squeezed against a total that no longer adds up.
-      storageKey="production-items.v4"
+      storageKey="production-items.v5"
       compactBelow={1280}
       columnChooser
       group={groups}

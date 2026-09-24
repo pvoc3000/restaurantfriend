@@ -88,7 +88,7 @@ export async function ProductionItemDetail({
     loadItemGraph(supabase),
     supabase
       .from("production_items")
-      .select("id, name, notes, is_active, tally_box_size")
+      .select("id, name, notes, is_active, tally_box_size, show_on_inquiry_form, public_description")
       .eq("id", id)
       .maybeSingle(),
     // 040 built `production_schedule_items_item_idx` for exactly this query and
@@ -237,6 +237,8 @@ export async function ProductionItemDetail({
                   price_tier: item.price_tier,
                   tally_box_size: Number(row.tally_box_size ?? 6),
                   notes: (row.notes ?? null) as string | null,
+                  show_on_inquiry_form: Boolean(row.show_on_inquiry_form),
+                  public_description: (row.public_description ?? null) as string | null,
                 }}
                 cost={cost}
                 price={price}

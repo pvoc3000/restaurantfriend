@@ -39,6 +39,7 @@ import { Switch } from "@/components/ui/Switch";
 export function ActiveToggle({
   table,
   id,
+  column = "is_active",
   active,
   label,
   readOnly = false,
@@ -48,6 +49,11 @@ export function ActiveToggle({
 }: {
   table: string;
   id: string;
+  /** The boolean column it writes. `is_active` unless a record has a second
+   *  on/off fact of the same shape — a production item's "offered on the
+   *  inquiry form" (migration 132). The words it reads out stay Active /
+   *  Inactive, so a caller writing another column passes `label`. */
+  column?: string;
   active: boolean;
   label?: string;
   /** Say the state in a word and offer no box — a Read Only cell of the
@@ -81,7 +87,7 @@ export function ActiveToggle({
         ? await onWrite(next)
         : await supabase
             .from(table)
-            .update({ is_active: next })
+            .update({ [column]: next })
             .eq("id", id);
       if (error) {
         setOn(!next);

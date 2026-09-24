@@ -262,6 +262,8 @@ export type ItemGraph = {
     price_tier: string | null;
     tally_box_size: number;
     is_active: boolean;
+    /** Offered on the public inquiry form (migration 132: hide by exception). */
+    show_on_inquiry_form: boolean;
   })[];
   grid: PriceGridCell[];
   gridOverrides: PriceGridOverride[];
@@ -285,7 +287,7 @@ export async function loadItemGraph(
       supabase,
       "production_items",
       `id, name, item_type, subtype, finish, size,
-       price_class, price_tier, tally_box_size, is_active`
+       price_class, price_tier, tally_box_size, is_active, show_on_inquiry_form`
     ),
     fetchAll(supabase, "production_item_elements", "id, item_id, element_id, qty, unit, sort"),
     fetchAll(supabase, "production_item_locations", "id, item_id, location_id, price_override"),
@@ -336,6 +338,7 @@ export async function loadItemGraph(
         price_tier: (i.price_tier ?? null) as string | null,
         tally_box_size: Number(i.tally_box_size ?? 6),
         is_active: (i.is_active ?? true) as boolean,
+        show_on_inquiry_form: (i.show_on_inquiry_form ?? false) as boolean,
         elements: edgesByItem.get(i.id as string) ?? [],
       })),
       grid: grid.data.map((g) => ({

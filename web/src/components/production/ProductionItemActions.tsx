@@ -25,14 +25,19 @@ import { duplicateTitle } from "@/lib/productionPlans";
  * failed with `column production_items.base_element_id does not exist`. Probe
  * the columns; don't read the migration that created them.
  *
- * `show_on_inquiry_form` is deliberately NOT copied. It is opt-in and it is
- * PUBLIC — 4a's inquiry form reads it — so carrying it over would put a
- * half-finished row named "… copy" in front of customers the moment the copy
- * exists. `is_active` IS copied, which is safe for the mirror-image reason: an
- * item is made because it is on a tray, and a copy is on none.
+ * `show_on_inquiry_form` is deliberately NOT copied, and since migration 132
+ * the copy is WRITTEN FALSE rather than left to the default. It is PUBLIC —
+ * the inquiry form reads it — so carrying it over would put a half-finished
+ * row named "… copy" in front of customers the moment the copy exists. Until
+ * 132 omitting it was enough, because the default was false; 132 flipped the
+ * default to true (hide by exception), so an omitted column now means ON.
+ * `public_description` IS copied — it is a sentence, not an offer, and the
+ * copy is usually the same flavour in another size. `is_active` IS copied,
+ * which is safe for the mirror-image reason: an item is made because it is on
+ * a tray, and a copy is on none.
  */
 const ITEM_COLUMNS =
-  "org_id, name, item_type, subtype, finish, size, price_class, price_tier, tally_box_size, tray_capacity, is_active, notes";
+  "org_id, name, item_type, subtype, finish, size, price_class, price_tier, tally_box_size, tray_capacity, is_active, notes, public_description";
 const COMPONENT_COLUMNS = "org_id, element_id, qty, unit, sort, note";
 const LOCATION_COLUMNS =
   "org_id, location_id, par_by_weekday, price_override, is_active, notes";
@@ -159,7 +164,11 @@ export function ProductionItemActions({
     const source = item as unknown as Row;
     const { data: created, error: createErr } = await supabase
       .from("production_items")
-      .insert({ ...source, name: duplicateTitle(existingNames, String(source.name)) })
+      .insert({
+        ...source,
+        name: duplicateTitle(existingNames, String(source.name)),
+        show_on_inquiry_form: false,
+      })
       .select("id")
       .single();
     if (createErr || !created)
