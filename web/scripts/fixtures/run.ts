@@ -64,6 +64,8 @@ import "./productionElements.fixtures";
 import "./recipeIngredients.fixtures";
 import "./productionHistory.fixtures";
 import "./inquiry.fixtures";
+import "./inquiryOrder.fixtures";
+import "./deliveryFee.fixtures";
 import "./payLink.fixtures";
 import "./customerInvoices.fixtures";
 import "./squareCatalog.fixtures";

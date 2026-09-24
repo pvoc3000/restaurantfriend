@@ -96,6 +96,7 @@ const VAR_EXAMPLE: Record<string, string> = {
   receipt_line: "Square’s receipt link as its own line, or nothing (always nothing in sandbox)",
   due_on: "10/8/2026",
   orders: "the invoice’s lines, one per order, each with its amount",
+  items: "what the customer built on the form, a line each, with an estimated subtotal — or nothing when they only described it",
 };
 
 /** The nine messages this module can send, in the order somebody meets them. */
@@ -114,7 +115,7 @@ const TEMPLATES: {
       "Sent the moment somebody submits the public form. It also starts the " +
       "email thread — every quote, invoice and receipt for that order replies " +
       "onto this message.",
-    vars: ["number", "first_name", "full_name", "employee_name", "org"],
+    vars: ["number", "first_name", "full_name", "employee_name", "org", "items"],
   },
   {
     key: "quote",
@@ -171,8 +172,11 @@ export function SpecialOrderSettings({
   settings,
   editable,
   section,
+  shops = [],
 }: {
   orgId: string;
+  /** The org's open physical shops, for the delivery estimate's origin. */
+  shops?: { id: string; label: string }[];
   settings: Settings;
   editable: boolean;
   /**
@@ -190,6 +194,8 @@ export function SpecialOrderSettings({
   const emails = (so.email ?? {}) as Record<string, { subject?: string; body?: string }>;
   const fulfillmentNotes = (so.fulfillment_note ?? {}) as Record<string, unknown>;
   const squarePay = (settings.square_payments ?? {}) as Record<string, unknown>;
+  const minimums = (so.inquiry_minimums ?? {}) as Record<string, unknown>;
+  const delivery = (so.delivery ?? {}) as Record<string, unknown>;
 
   /** Every cell on this screen writes one key inside `orgs.settings`. */
   const cell = (
@@ -568,6 +574,46 @@ export function SpecialOrderSettings({
           <Num label="Standing orders made this far ahead (days)" path={["special_orders", "horizon_days"]} v={num(so.horizon_days)} {...{ cell, editable }} />
           <Num label="Inquiries accepted per hour, per email" path={["special_orders", "inquiry_max_per_email_per_hour"]} v={num(so.inquiry_max_per_email_per_hour)} {...{ cell, editable }} />
           <Num label="Inquiries accepted per hour, in total" path={["special_orders", "inquiry_max_per_hour"]} v={num(so.inquiry_max_per_hour)} {...{ cell, editable }} />
+        </dl>
+      </section>
+
+      {/* ---- the inquiry form's minimums (migration 132) ------------------
+          Each category a customer orders must meet its own (Mark,
+          2026-09-24). Read by the form AND by `create_inquiry`, which refuses
+          a basket short of any of them. 0 turns one off. */}
+      <section className="space-y-4">
+        <SectionHeading>Inquiry form minimums</SectionHeading>
+        <dl className="grid max-w-2xl grid-cols-[1fr_6rem] gap-x-6 gap-y-1 text-sm">
+          <Num label="Donuts, in total" path={["special_orders", "inquiry_minimums", "regular"]} v={num(minimums.regular)} {...{ cell, editable }} />
+          <Num label="Mini donuts, in total" path={["special_orders", "inquiry_minimums", "mini"]} v={num(minimums.mini)} {...{ cell, editable }} />
+          <Num label="Mini donuts, of each flavor" path={["special_orders", "inquiry_minimums", "mini_per_flavor"]} v={num(minimums.mini_per_flavor)} {...{ cell, editable }} />
+          <Num label="Donut letters, in total" path={["special_orders", "inquiry_minimums", "letter"]} v={num(minimums.letter)} {...{ cell, editable }} />
+          <Num label="Giant donuts, in total" path={["special_orders", "inquiry_minimums", "giant"]} v={num(minimums.giant)} {...{ cell, editable }} />
+        </dl>
+      </section>
+
+      {/* ---- the delivery estimate (inquiry form) --------------------------
+          Base fee + a rate per DRIVING mile from one shop, worked out by the
+          `inquiry-delivery-quote` function (Google Routes). Beyond the maximum
+          the form says "we'll quote it". Until the shop and the per-mile rate
+          are both set, the form offers no estimate at all. Only the computed
+          fee ever reaches a customer; these numbers stay here. */}
+      <section className="space-y-4">
+        <SectionHeading>Delivery estimate</SectionHeading>
+        <dl className="grid max-w-2xl grid-cols-[1fr_12rem] gap-x-6 gap-y-1 text-sm">
+          <dt className="py-0.5 text-subtle">Measured from</dt>
+          <dd className="py-0.5">
+            {editable
+              ? cell(["special_orders", "delivery", "origin_location_id"], text(delivery.origin_location_id), {
+                  kind: "pick",
+                  options: shops.map((s) => ({ value: s.id, label: s.label })),
+                  ariaLabel: "Delivery measured from",
+                })
+              : <span>{shops.find((s) => s.id === delivery.origin_location_id)?.label ?? "—"}</span>}
+          </dd>
+          <Num label="Base fee ($)" path={["special_orders", "delivery", "base_fee"]} v={num(delivery.base_fee)} {...{ cell, editable }} />
+          <Num label="Per mile ($)" path={["special_orders", "delivery", "per_mile"]} v={num(delivery.per_mile)} {...{ cell, editable }} />
+          <Num label="Farthest we estimate (miles)" path={["special_orders", "delivery", "max_miles"]} v={num(delivery.max_miles)} {...{ cell, editable }} />
         </dl>
       </section>
       {/* ---- the pay link (migrations 119, 120) --------------------------

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { DateField } from "@/components/ui/DateField";
 import { TimePicker } from "@/components/ui/TimePicker";
@@ -15,6 +15,21 @@ import {
   type InquiryErrors,
   type InquiryShop,
 } from "@/lib/inquiry";
+import {
+  EMPTY_BASKET,
+  EMPTY_RULES,
+  basketIsEmpty,
+  basketLines,
+  basketPayload,
+  basketProblems,
+  estimateTotals,
+  readMenu,
+  todayIn,
+  type Basket,
+  type InquiryMenuItem,
+  type InquiryRules,
+} from "@/lib/inquiryOrder";
+import { BasketSummary, OrderBuilder, type DeliveryQuote } from "./OrderBuilder";
 
 /**
  * The customer's whole surface for starting an order.
@@ -72,8 +87,43 @@ export function InquiryForm({ orgId }: { orgId: string }) {
   const [done, setDone] = useState<{ title: string; body: string; ok: boolean } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
 
+  // THE BASKET (4b). The menu is priced at a SHOP, so it is fetched again when
+  // the pickup shop changes — the price a customer sees must be the one 133
+  // writes, and that is read at the same shop (`inquiry_price_location`).
+  const [menu, setMenu] = useState<InquiryMenuItem[]>([]);
+  const [rules, setRules] = useState<InquiryRules>(EMPTY_RULES);
+  const [basket, setBasket] = useState<Basket>(EMPTY_BASKET);
+  // The delivery estimate, KEYED BY THE ADDRESS it was worked out for: an
+  // edited address makes it stale without an effect to clear it.
+  const [quoted, setQuoted] = useState<{ address: string; quote: DeliveryQuote } | null>(null);
+
+  const priceLocation = draft.fulfillment === "pickup" && draft.locationId ? draft.locationId : null;
+
   const errors: InquiryErrors = validateInquiry(draft);
   const shown: InquiryErrors = touched ? errors : {};
+
+  const empty = basketIsEmpty(basket);
+  const lines = useMemo(() => basketLines(basket, menu), [basket, menu]);
+  const problems = useMemo(() => basketProblems(basket, menu, rules.minimums), [basket, menu, rules]);
+
+  const address = draft.address.trim();
+  const delivery: DeliveryQuote =
+    draft.fulfillment !== "delivery"
+      ? { status: "none" }
+      : !rules.delivery_estimate
+        ? { status: "unavailable" }
+        : !address
+          ? { status: "needs_address" }
+          : quoted && quoted.address === address
+            ? quoted.quote
+            : { status: "needs_address" };
+  const estimate = estimateTotals({
+    lines,
+    rules,
+    eventDate: draft.eventDate || null,
+    today: todayIn(rules.timezone),
+    deliveryFee: delivery.status === "ok" ? delivery.fee : null,
+  });
 
   /**
    * THE HYDRATION GUARD, and `/welcome`'s lesson behind it: before React
@@ -112,6 +162,54 @@ export function InquiryForm({ orgId }: { orgId: string }) {
     };
   }, [orgId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("inquiry_menu", {
+        p_org_id: orgId,
+        p_location_id: priceLocation,
+      });
+      if (cancelled) return;
+      if (error) {
+        // No menu means no builder, and the form is exactly the v1 form —
+        // which is a fine form to fill in. The commonest cause by far is
+        // migration 132 not having been applied.
+        console.error("inquiry_menu failed", error.message);
+        return;
+      }
+      const read = readMenu(data);
+      setMenu(read.items);
+      setRules(read.rules);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, priceLocation]);
+
+  /** Ask `inquiry-delivery-quote` what delivery to this address comes to. On
+   *  BLUR, not per keystroke: every call is a paid maps lookup. */
+  async function quoteDelivery() {
+    if (draft.fulfillment !== "delivery" || !rules.delivery_estimate || !address) return;
+    if (quoted && quoted.address === address && quoted.quote.status !== "unavailable") return;
+    const asked = address;
+    setQuoted({ address: asked, quote: { status: "loading" } });
+    const supabase = createClient();
+    const { data, error } = await supabase.functions.invoke("inquiry-delivery-quote", {
+      body: { org_id: orgId, address: asked },
+    });
+    const r = (data ?? {}) as { state?: string; fee?: number; miles?: number };
+    const quote: DeliveryQuote =
+      error || !r.state
+        ? { status: "unavailable" }
+        : r.state === "ok" && typeof r.fee === "number" && typeof r.miles === "number"
+          ? { status: "ok", fee: r.fee, miles: r.miles }
+          : r.state === "outside_area"
+            ? { status: "outside" }
+            : { status: "unavailable" };
+    setQuoted((prev) => (prev && prev.address === asked ? { address: asked, quote } : prev));
+  }
+
   function set<K extends keyof InquiryDraft>(key: K, value: InquiryDraft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
   }
@@ -119,12 +217,18 @@ export function InquiryForm({ orgId }: { orgId: string }) {
   async function submit() {
     setTouched(true);
     if (Object.keys(errors).length > 0) return;
+    // The basket's own rules — the minimums, a flavour for every message, no
+    // character we cannot cut. 133 checks them all again.
+    if (problems.length > 0) {
+      document.getElementById("summary-heading")?.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
+    }
 
     setBusy(true);
     setFailed(null);
     const supabase = createClient();
     const { data, error } = await supabase.functions.invoke("submit-inquiry", {
-      body: inquiryPayload(draft, orgId, honeypot),
+      body: inquiryPayload(draft, orgId, honeypot, empty ? null : basketPayload(basket, menu)),
     });
     setBusy(false);
 
@@ -276,6 +380,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
             value={draft.address}
             autoComplete="street-address"
             onChange={(e) => set("address", e.target.value)}
+            onBlur={() => void quoteDelivery()}
             className={inputClass()}
           />
         </Field>
@@ -311,24 +416,54 @@ export function InquiryForm({ orgId }: { orgId: string }) {
           </Field>
         </div>
 
-        <Field label="What are you interested in?">
-          <select
-            value={draft.interest}
-            onChange={(e) => set("interest", e.target.value)}
-            className={inputClass()}
-          >
-            <option value="">Not sure yet</option>
-            {INQUIRY_INTEREST_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </Field>
+        {menu.length > 0 && (
+          <>
+            <OrderBuilder
+              menu={menu}
+              basket={basket}
+              onChange={setBasket}
+              minimums={rules.minimums}
+            />
+            <BasketSummary
+              lines={lines}
+              problems={problems}
+              showProblems={touched}
+              estimate={estimate}
+              delivery={delivery}
+            />
+          </>
+        )}
 
+        {/* The coarse "interested in" question is for somebody DESCRIBING an
+            order; once they have built one, the basket says it better. */}
+        {empty && (
+          <Field label="What are you interested in?">
+            <select
+              value={draft.interest}
+              onChange={(e) => set("interest", e.target.value)}
+              className={inputClass()}
+            >
+              <option value="">Not sure yet</option>
+              {INQUIRY_INTEREST_OPTIONS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        {/* THE FALLBACK, always here (Mark: "If they want something we don't
+            have the ability to model in this page, we should have a fall back
+            option for them"). Relabelled once there is a basket, because by
+            then it is for what the builder could not say. */}
         <Field
-          label="What are you looking for?"
-          hint="Flavours, colours, wording on letter donuts — as much detail as you have."
+          label={empty ? "What are you looking for?" : "Anything else?"}
+          hint={
+            empty
+              ? "Flavours, colours, wording on letter donuts — as much detail as you have."
+              : "Something we don’t list, colours, decorations, how to lay out the letters — anything the order above doesn’t say."
+          }
         >
           <textarea
             value={draft.description}

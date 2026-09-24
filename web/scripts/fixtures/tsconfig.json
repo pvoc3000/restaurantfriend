@@ -42,6 +42,7 @@
     "../../src/lib/recipes.ts",
     "../../src/lib/sales.ts",
     "../../src/lib/squareSalesCsv.ts",
-    "../../../supabase/functions/_shared/squareOrder.ts"
+    "../../../supabase/functions/_shared/squareOrder.ts",
+    "../../../supabase/functions/_shared/deliveryFee.ts"
   ]
 }

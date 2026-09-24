@@ -29,7 +29,13 @@ export type InquiryState =
   | "email_invalid"
   | "date_invalid"
   | "time_invalid"
-  | "fulfillment_invalid";
+  | "fulfillment_invalid"
+  // Migration 133 — the basket. The page checks all four first
+  // (`lib/inquiryOrder`), so a customer only meets these past a stale menu.
+  | "items_invalid"
+  | "item_unavailable"
+  | "letter_invalid"
+  | "minimum_not_met";
 
 export type InquiryFulfillment = "pickup" | "delivery";
 
@@ -249,6 +255,26 @@ export function inquiryStateMessage(state: InquiryState | string): {
         title: "Pickup or delivery?",
         body: "Choose one and try again.",
       };
+    case "item_unavailable":
+      return {
+        ok: false,
+        title: "Something in your order just came off the menu",
+        body:
+          "Reload the page to see what we have today, or tell us what you’re " +
+          "after in the box at the bottom and we’ll sort it out.",
+      };
+    case "minimum_not_met":
+      return {
+        ok: false,
+        title: "Your order is under one of our minimums",
+        body: "Have a look at the notes beside your order and adjust the quantities.",
+      };
+    case "letter_invalid":
+      return {
+        ok: false,
+        title: "We can’t make one of those letters",
+        body: "Take it out of your message, or describe what you want in the box at the bottom.",
+      };
     default:
       return {
         ok: false,
@@ -266,7 +292,10 @@ export function inquiryStateMessage(state: InquiryState | string): {
 export function inquiryPayload(
   draft: InquiryDraft,
   orgId: string,
-  honeypot: string
+  honeypot: string,
+  /** `lib/inquiryOrder`'s `basketPayload` — 133's `p_items`. Null when the
+   *  customer built nothing, which sends `{}` and makes 058's lead exactly. */
+  items: unknown = null
 ): Record<string, unknown> {
   const orNull = (s: string) => (s.trim() === "" ? null : s.trim());
   return {
@@ -283,6 +312,7 @@ export function inquiryPayload(
     interest: orNull(draft.interest),
     description: orNull(draft.description),
     allergies: orNull(draft.allergies),
+    items: items ?? {},
     honeypot,
   };
 }

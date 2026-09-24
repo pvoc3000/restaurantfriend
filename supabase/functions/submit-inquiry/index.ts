@@ -39,7 +39,7 @@
 // is why `newMessageId` exists rather than storing what `sendMail` returns
 // (a provider id, which threads with nothing).
 
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 import {
   newMessageId,
@@ -48,6 +48,7 @@ import {
   TransportError,
   type ProviderConfig,
 } from "../_shared/email.ts";
+import { quoteDelivery } from "../_shared/deliveryQuote.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -102,10 +103,103 @@ const DEFAULT_BODY = [
   "",
   "Your reference is #{number}. Just reply to this message if you want to add",
   "anything or change a detail.",
-  "",
+  "{items}",
   "— {org}",
   "",
 ].join("\n");
+
+/**
+ * `{items}` — what the customer built (133), read back from the LEAD rather
+ * than from the request, so the email states the prices the gate wrote and
+ * not the ones the page showed. Its own paragraph with a blank line either
+ * side, or nothing at all when they only described the order — so a template
+ * can carry the token unconditionally.
+ */
+async function itemsBlock(
+  admin: SupabaseClient,
+  orderId: string
+): Promise<string> {
+  const { data } = await admin
+    .from("special_order_items")
+    .select("name, qty, unit_price")
+    .eq("order_id", orderId)
+    .order("sort");
+  const lines = (data ?? []) as { name: string; qty: number | string; unit_price: number | string }[];
+  if (lines.length === 0) return "";
+  const usd = (x: number) =>
+    x.toLocaleString("en-US", { style: "currency", currency: "USD" });
+  let subtotal = 0;
+  const rows = lines.map((l) => {
+    const qty = Number(l.qty);
+    const total = qty * Number(l.unit_price);
+    subtotal += total;
+    return `  ${qty} × ${l.name} — ${usd(total)}`;
+  });
+  return [
+    "",
+    "What you asked for:",
+    ...rows,
+    `Estimated subtotal: ${usd(Math.round(subtotal * 100) / 100)} — your quote will confirm the final price.`,
+    "",
+  ].join("\n");
+}
+
+/**
+ * Measure a delivery lead's distance and write the estimate onto it:
+ * `delivery_distance` (miles) and `delivery_charge` (what we charge), both
+ * ordinary editable fields on the order, plus a log entry saying where the
+ * numbers came from. Only when the lead IS a delivery with an address and
+ * nothing is filled in yet. Returns a short word for the response, never throws.
+ */
+async function estimateDelivery(
+  orgId: string,
+  orderId: string,
+  fulfillment: unknown,
+  address: unknown
+): Promise<string> {
+  if (fulfillment !== "delivery" || typeof address !== "string" || address.trim().length < 5) {
+    return "none";
+  }
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!serviceKey) return "none";
+  try {
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+    const result = await quoteDelivery(admin, orgId, address.replace(/\s+/g, " ").trim());
+    if (result.state === "ok") {
+      await admin
+        .from("special_orders")
+        .update({ delivery_distance: result.miles, delivery_charge: result.fee })
+        .eq("id", orderId)
+        .is("delivery_charge", null);
+      await admin.from("special_order_events").insert({
+        org_id: orgId,
+        order_id: orderId,
+        message: `Delivery estimated on the website: ${result.miles.toFixed(1)} mi, $${result.fee.toFixed(2)}`,
+        author: "Website",
+        source: "app",
+      });
+    } else if (result.state === "outside_area") {
+      await admin
+        .from("special_orders")
+        .update({ delivery_distance: result.miles })
+        .eq("id", orderId)
+        .is("delivery_distance", null);
+      await admin.from("special_order_events").insert({
+        org_id: orgId,
+        order_id: orderId,
+        message: `Delivery is ${result.miles.toFixed(1)} mi — beyond the estimate's range, so none was given`,
+        author: "Website",
+        source: "app",
+      });
+    } else if (result.state === "error") {
+      console.error("submit-inquiry delivery estimate", result.detail);
+    }
+    return result.state;
+  } catch (e) {
+    console.error("submit-inquiry delivery estimate", e instanceof Error ? e.message : String(e));
+    return "error";
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -126,6 +220,7 @@ Deno.serve(async (req) => {
       interest,
       description,
       allergies,
+      items,
       honeypot,
     } = body ?? {};
 
@@ -162,6 +257,9 @@ Deno.serve(async (req) => {
       p_description: description ?? null,
       p_allergies: allergies ?? null,
       p_meta: meta,
+      // 133: the basket. The gate validates and re-prices it; `{}` (nothing
+      // built) makes 058's lead exactly.
+      p_items: items && typeof items === "object" ? items : {},
     });
     if (rpcError) return json(400, { error: rpcError.message });
 
@@ -183,12 +281,21 @@ Deno.serve(async (req) => {
       return json(200, state);
     }
 
+    /* ---- 1b. THE DELIVERY ESTIMATE (4b) -------------------------------- */
+
+    // Worked out AGAIN here rather than trusted from the page, the way 133
+    // re-prices the basket: the lead is written with the distance and fee the
+    // server measured, and whoever answers it starts from a number instead of
+    // a blank. Before the email branch, so a phone-only lead gets it too.
+    // Like the email, a failure here is bookkeeping and never an error.
+    const deliveryNote = await estimateDelivery(state.org_id, state.order_id, fulfillment, address);
+
     /* ---- 2. THE CONFIRMATION, AND THE THREAD ROOT ----------------------- */
 
     if (!state.contact_email) {
       // A phone-only inquiry is a real submission and there is nobody to write
       // to. Not a failure, and not worth a warning in the log either.
-      return json(200, state);
+      return json(200, { ...state, delivery: deliveryNote });
     }
 
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -236,6 +343,7 @@ Deno.serve(async (req) => {
         first_name: full.split(/\s+/)[0] || "there",
         full_name: full,
         org: org?.name ?? "",
+        items: await itemsBlock(admin, state.order_id),
       };
       const configured = orgSettings.special_orders?.email?.inquiry ?? {};
       const subject = fill(configured.subject ?? DEFAULT_SUBJECT, values);
@@ -288,7 +396,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    return json(200, { ...state, warning: warnings.length ? warnings.join("; ") : undefined });
+    return json(200, {
+      ...state,
+      delivery: deliveryNote,
+      warning: warnings.length ? warnings.join("; ") : undefined,
+    });
   } catch (e) {
     if (e instanceof TransportError) return json(e.status, { error: e.message });
     return json(500, { error: e instanceof Error ? e.message : String(e) });

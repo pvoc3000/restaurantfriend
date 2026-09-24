@@ -130,7 +130,15 @@ export default async function SettingsPage({
         <div className="min-w-0 flex-1 space-y-16">
           {tab === "general" && (
             <>
-              <SpecialOrderSettings orgId={orgId} settings={settings} editable={editable} section="general" />
+              <SpecialOrderSettings
+                orgId={orgId}
+                settings={settings}
+                editable={editable}
+                section="general"
+                shops={session.activeLocations
+                  .filter((l) => l.kind === "physical")
+                  .map((l) => ({ id: l.id, label: `${l.code} ${l.name}` }))}
+              />
               {/* Say what this screen does NOT cover, so its absence is a
                   statement rather than something to hunt for. */}
               <section className="space-y-2 border-t border-hairline pt-6">

@@ -205,7 +205,7 @@ test("the payload's keys are the ones `submit-inquiry` reads", () => {
     Object.keys(inquiryPayload(EMPTY_INQUIRY, "org-1", "")).sort(),
     [
       "address", "allergies", "description", "email", "event_date", "event_time",
-      "fulfillment", "honeypot", "interest", "location_id", "name", "occasion",
+      "fulfillment", "honeypot", "interest", "items", "location_id", "name", "occasion",
       "org_id", "phone",
     ]
   );
