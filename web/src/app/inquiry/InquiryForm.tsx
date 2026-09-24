@@ -438,10 +438,11 @@ export function InquiryForm({ orgId }: { orgId: string }) {
 
         {/* THE FALLBACK, always here (Mark: "If they want something we don't
             have the ability to model in this page, we should have a fall back
-            option for them"). Relabelled once there is a basket, because by
-            then it is for what the builder could not say. */}
+            option for them"). "Anything else?" whether or not there is a basket
+            (Mark, 2026-09-24); the HINT still changes, since with nothing built
+            it is where the whole order gets described. */}
         <Field
-          label={empty ? "What are you looking for?" : "Anything else?"}
+          label="Anything else?"
           hint={
             empty
               ? "Flavours, colours, wording on letter donuts — as much detail as you have."
