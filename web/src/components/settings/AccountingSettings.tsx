@@ -42,9 +42,6 @@ export type AccountingStatus = {
   /** 131: the item a wholesale line (Sold as) is sent under. */
   wholesale_item_ref?: string | null;
   wholesale_item_name?: string | null;
-  /** 132: the QuickBooks customer every unlinked special-order customer bills to. */
-  special_order_customer_ref?: string | null;
-  special_order_customer_name?: string | null;
   tax_code_ref: string | null;
   tax_code_name: string | null;
   refresh_token_expires_at: string | null;
@@ -108,7 +105,6 @@ export function AccountingSettings({
   const [accounts, setAccounts] = useState<Choice[] | null>(null);
   const [items, setItems] = useState<Choice[] | null>(null);
   const [taxCodes, setTaxCodes] = useState<Choice[] | null>(null);
-  const [customers, setCustomers] = useState<Choice[] | null>(null);
   const [environment, setEnvironment] = useState(initialStatus?.environment ?? "sandbox");
 
   const callback = params.get("quickbooks");
@@ -162,14 +158,12 @@ export function AccountingSettings({
       const accts = await invokeQbo(supabase, { mode: "accounts" });
       const its = await invokeQbo(supabase, { mode: "items" });
       const codes = await invokeQbo(supabase, { mode: "tax_codes" });
-      const custs = await invokeQbo(supabase, { mode: "customers" });
       if (cancelled) return;
-      if (custs.data?.customers) setCustomers(custs.data.customers as Choice[]);
       if (its.data?.items) setItems(its.data.items as Choice[]);
       if (codes.data?.tax_codes) setTaxCodes(codes.data.tax_codes as Choice[]);
       // Same rule as the vendor block: a dropped failure here leaves a picker
       // with no options and no reason, which reads as nothing being wrong.
-      const failure = meta.message ?? accts.message ?? its.message ?? codes.message ?? custs.message;
+      const failure = meta.message ?? accts.message ?? its.message ?? codes.message;
       if (failure) setError(failure);
       if (meta.data?.company_name) setCompany(meta.data.company_name as string);
       if (accts.data?.accounts) setAccounts(accts.data.accounts as Choice[]);
@@ -217,7 +211,7 @@ export function AccountingSettings({
   }
 
   async function setDefault(
-    kind: "bill" | "item" | "wholesale" | "customer" | "tax",
+    kind: "bill" | "item" | "wholesale" | "tax",
     choice: Choice | null
   ) {
     setBusy("defaults");
@@ -238,12 +232,7 @@ export function AccountingSettings({
                 wholesale_item_ref: choice?.id ?? null,
                 wholesale_item_name: choice?.name ?? null,
               }
-            : kind === "customer"
-              ? {
-                  special_order_customer_ref: choice?.id ?? null,
-                  special_order_customer_name: choice?.name ?? null,
-                }
-              : { tax_code_ref: choice?.id ?? null, tax_code_name: choice?.name ?? null };
+            : { tax_code_ref: choice?.id ?? null, tax_code_name: choice?.name ?? null };
     const res = await call({ mode: "set_defaults", ...patch });
     setBusy(null);
     if (res) await loadStatus();
@@ -399,30 +388,6 @@ export function AccountingSettings({
               placeholder={items && items.length === 0 ? "No items in QuickBooks" : "Choose an item"}
               options={(items ?? []).map((i) => ({ value: i.id, label: i.name, hint: i.type }))}
               onPick={(next) => void setDefault("wholesale", items?.find((i) => i.id === next) ?? null)}
-              panelMinWidth={320}
-            />
-          </div>
-          <div className="flex items-baseline justify-between gap-6">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-              Special order customer
-            </span>
-            <PickList
-              variant="field"
-              boxed
-              clearable
-              clearLabel="None"
-              ariaLabel="QuickBooks customer unlinked special-order customers bill to"
-              disabled={!editable || busy !== null}
-              value={customers ? status?.special_order_customer_ref ?? null : null}
-              placeholder={
-                !customers
-                  ? "Reading QuickBooks…"
-                  : customers.length === 0
-                    ? "No customers in QuickBooks"
-                    : "None"
-              }
-              options={(customers ?? []).map((c) => ({ value: c.id, label: c.name }))}
-              onPick={(next) => void setDefault("customer", customers?.find((c) => c.id === next) ?? null)}
               panelMinWidth={320}
             />
           </div>

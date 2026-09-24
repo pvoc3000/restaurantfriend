@@ -7,6 +7,8 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { PickList } from "@/components/ui/PickList";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { qboVendorId, type AccountingRef } from "@/lib/quickbooks";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { QuickBooksCustomerStep } from "./QuickBooksCustomerStep";
 
 /**
  * Which QuickBooks customer this is.
@@ -16,10 +18,12 @@ import { qboVendorId, type AccountingRef } from "@/lib/quickbooks";
  * rather than to a shop (`/customers` is exempt from `InactiveLocationGate` for
  * the same reason), so 081's `customers.external_ref` is the right home.
  *
- * WE NEVER CREATE ONE. QuickBooks enforces a globally unique `DisplayName` and
- * raises 6240 on a collision, and 187 of the 5,874 real email addresses repeat
- * with 138 carrying none at all — so name-matching customers automatically
- * would collide constantly. Picking is the honest interface.
+ * PICK ONE, OR FIND-OR-CREATE BY EMAIL (2026-09-24). Nothing is matched by
+ * NAME automatically — 187 of the 5,874 real email addresses repeat and names
+ * collide far more — and since the catch-all failed, a wrong link is a privacy
+ * fault as well as a books one: QuickBooks' pay page shows every open invoice
+ * on a customer. `QuickBooksCustomerStep` links only an exact email match, and
+ * otherwise creates the customer from this record.
  */
 export function CustomerAccounting({
   customerId,
@@ -36,6 +40,7 @@ export function CustomerAccounting({
   const [picked, setPicked] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stepOpen, setStepOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,10 +125,29 @@ export function CustomerAccounting({
         </dd>
       </dl>
       {!picked && options && (
-        <p className="max-w-2xl text-[13px] text-muted">
-          {customerName}&rsquo;s invoices cannot be sent until this is linked. We
-          never create one — pick it here, or add it in QuickBooks first.
-        </p>
+        <div className="flex max-w-2xl items-center gap-4">
+          <button type="button" className={BUTTON_CLASS} onClick={() => setStepOpen(true)}>
+            Find or Create in QuickBooks…
+          </button>
+          <p className="text-[13px] text-muted">
+            {customerName}’s QuickBooks invoices can’t be sent until this is linked.
+          </p>
+        </div>
+      )}
+      {stepOpen && (
+        <QuickBooksCustomerStep
+          customerId={customerId}
+          onClose={() => setStepOpen(false)}
+          onLinked={(qboId) => {
+            setStepOpen(false);
+            setPicked(qboId);
+            // A new customer is not in the list read on arrival; read it again
+            // so the picker can name it.
+            void invokeQbo(supabase, { mode: "customers" }).then(({ data }) => {
+              if (data?.customers) setOptions(data.customers as { id: string; name: string }[]);
+            });
+          }}
+        />
       )}
       {error && <p className="max-w-2xl text-[13px] text-accent">{error}</p>}
     </section>

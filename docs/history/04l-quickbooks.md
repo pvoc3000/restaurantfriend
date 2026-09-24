@@ -328,3 +328,23 @@
    customer's OTHER open invoices (pay-several). With a shared customer that
    would show one customer everyone else's unpaid special orders. Test: two
    open invoices on the catch-all, different emails, open the first's link.
+
+   **THE CATCH-ALL FAILED THE PRIVACY TEST AND IS RETIRED (2026-09-24).** Mark
+   sent two invoices on "Special Orders Customer" to two addresses: **each pay
+   page showed the other invoice.** QuickBooks' pay page lists every open
+   invoice on a customer, so a shared customer is a leak, not just a bookkeeping
+   shortcut — and 081's one-to-one index is now a PRIVACY guard as well. The
+   fallback is gone from the builder, `push_customer_invoice` and Settings;
+   132's two columns stay, unread (082's precedent).
+   **Replaced by LINK OR CREATE, one QuickBooks customer per customer of ours,
+   made only when they are billed through QuickBooks**
+   (`QuickBooksCustomerStep`, on the customer record and at Send for an unlinked
+   customer). `qbo-sync` `find_customer` looks for the SAME EMAIL — filtered by
+   QuickBooks, or over every page if it refuses that filter — and hides any
+   match already linked to another of ours; `link_customer` re-checks the email
+   against QuickBooks' record before linking; `create_customer` requires our
+   customer's own email in the payload and answers 6240 (name taken) so the
+   step retries once as "Name (tag)", the tag being the FileMaker id or six
+   characters of ours (`qboDisplayName`). No name is ever matched
+   automatically. The manual picker on the customer record still links by
+   name, for wholesale accounts — a manager's deliberate choice.

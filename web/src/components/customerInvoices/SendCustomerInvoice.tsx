@@ -40,6 +40,7 @@ import {
   type CustomerInvoicePushInputs,
 } from "@/lib/quickbooks";
 import { fetchInvoiceView, type InvoiceView } from "@/lib/customerInvoiceQueries";
+import { QuickBooksCustomerStep } from "@/components/specialOrders/QuickBooksCustomerStep";
 import {
   invoiceFileName,
   invoiceNumberText,
@@ -177,6 +178,9 @@ export function SendCustomerInvoice({
   const [error, setError] = useState<string | null>(null);
   const [sentNote, setSentNote] = useState<string | null>(null);
   const [compose, setCompose] = useState<Compose | null>(null);
+  /** An unlinked customer on a QuickBooks invoice: link or create them first,
+   *  then compose. */
+  const [linkFor, setLinkFor] = useState<string | null>(null);
   const [pending, setPending] = useState<{
     blob: Blob;
     url: string;
@@ -218,6 +222,10 @@ export function SendCustomerInvoice({
         // QuickBooks' link only exists once the invoice is pushed, which
         // happens at Send — so the body carries a placeholder until then.
         qbo = await quickBooksInputs(supabase, orgId, view, number);
+        if (!qbo.customerRef && view.invoice.customer_id) {
+          setLinkFor(view.invoice.customer_id);
+          return;
+        }
         const refusals = customerInvoiceRefusals({ ...qbo, billEmail: view.customer?.email ?? "-" });
         if (refusals.length > 0) throw new Error(refusals[0]);
         if (view.balance > 0.005) pay = QBO_LINK_PLACEHOLDER;
@@ -350,6 +358,17 @@ export function SendCustomerInvoice({
       ])}
       {sentNote && <p className="max-w-sm text-right text-[13px] text-[var(--rf-green-600)]">{sentNote}</p>}
       {error && !compose && <p className="max-w-sm text-right text-[13px] text-accent">{error}</p>}
+
+      {linkFor && (
+        <QuickBooksCustomerStep
+          customerId={linkFor}
+          onClose={() => setLinkFor(null)}
+          onLinked={() => {
+            setLinkFor(null);
+            void open();
+          }}
+        />
+      )}
 
       {compose && pending && (
         <Dialog
@@ -506,7 +525,7 @@ async function quickBooksInputs(
     view.invoice.customer_id
       ? supabase
           .from("customers")
-          .select("external_ref, address")
+          .select("external_ref")
           .eq("id", view.invoice.customer_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -517,7 +536,6 @@ async function quickBooksInputs(
             status?: string;
             invoice_item_ref?: string | null;
             wholesale_item_ref?: string | null;
-            special_order_customer_ref?: string | null;
             tax_code_ref?: string | null;
           }
         | undefined)
@@ -536,10 +554,6 @@ async function quickBooksInputs(
     },
     customerName: view.customerName,
     customerRef: qboVendorId((customer?.data?.external_ref ?? null) as AccountingRef | null),
-    // 132: where an unlinked special-order customer bills, and who the
-    // invoice then says it is for.
-    specialOrderCustomerRef: row?.special_order_customer_ref ?? null,
-    billTo: billToOf(view, (customer?.data?.address ?? null) as Record<string, unknown> | null),
     itemRef: row?.invoice_item_ref ?? null,
     wholesaleItemRef: row?.wholesale_item_ref ?? null,
     taxCodeRef: row?.tax_code_ref ?? null,
@@ -618,16 +632,3 @@ async function pushToQuickBooks(
   return { link, warnings, ref: recorded };
 }
 
-/** Our customer's name and address, as the catch-all invoice's bill-to (132). */
-function billToOf(view: InvoiceView, address: Record<string, unknown> | null): CustomerInvoicePushInputs["billTo"] {
-  const a = address ?? {};
-  const str = (k: string) => (typeof a[k] === "string" ? (a[k] as string) : null);
-  return {
-    name: view.customerName,
-    street: str("street"),
-    street2: str("street2"),
-    city: str("city"),
-    state: str("state"),
-    zip: str("zip"),
-  };
-}

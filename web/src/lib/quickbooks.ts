@@ -770,21 +770,10 @@ export type CustomerInvoicePushInputs = {
     external_ref: AccountingRef | null;
   };
   customerName: string;
-  /** The customer's OWN QuickBooks customer — a wholesale client's link. */
+  /** The customer's OWN QuickBooks customer. Always their own: a shared one
+   *  lets every customer on it see the others' open invoices on QuickBooks'
+   *  pay page (measured 2026-09-24, which retired 132's catch-all). */
   customerRef: string | null;
-  /** The catch-all every unlinked customer bills to (132), from Settings →
-   *  Accounting. Never a link: 081 keeps links one-to-one. */
-  specialOrderCustomerRef?: string | null;
-  /** Our customer's own name and address, printed as the bill-to when the
-   *  invoice goes to the catch-all. */
-  billTo?: {
-    name: string;
-    street?: string | null;
-    street2?: string | null;
-    city?: string | null;
-    state?: string | null;
-    zip?: string | null;
-  } | null;
   /** Where the invoice is being sent. QuickBooks makes no InvoiceLink without
    *  a BillEmail. */
   billEmail: string | null;
@@ -797,36 +786,14 @@ export type CustomerInvoicePushInputs = {
 /** A line that bills nothing because its order was cancelled (128). */
 const billsNothing = (l: CustomerInvoicePushLine) => l.cancelled && round2(l.amount) === 0;
 
-/**
- * WHICH QUICKBOOKS CUSTOMER THE INVOICE NAMES (132). A linked customer bills to
- * their own record; an unlinked one to the special-order catch-all — but only
- * for special orders: a wholesale client is meant to have a record of their
- * own (Mark, 2026-09-24), so an unlinked wholesale invoice is refused rather
- * than quietly lumped in with retail.
- */
-export function quickBooksCustomerFor(
-  inputs: Pick<CustomerInvoicePushInputs, "customerRef" | "specialOrderCustomerRef" | "lines">
-): { ref: string; catchAll: boolean } | null {
-  if (inputs.customerRef) return { ref: inputs.customerRef, catchAll: false };
-  const wholesale = inputs.lines.some((l) => !billsNothing(l) && l.square_item === "wholesale");
-  if (!wholesale && inputs.specialOrderCustomerRef) {
-    return { ref: inputs.specialOrderCustomerRef, catchAll: true };
-  }
-  return null;
-}
-
 export function customerInvoiceRefusals(inputs: CustomerInvoicePushInputs): string[] {
   const { invoice, customerName, lines } = inputs;
   const out: string[] = [];
   const live = lines.filter((l) => !billsNothing(l));
 
   if (invoice.voided_at) out.push("This invoice is void.");
-  if (!quickBooksCustomerFor(inputs)) {
-    out.push(
-      live.some((l) => l.square_item === "wholesale")
-        ? `${customerName} is billed as wholesale, so they bill to their own QuickBooks customer. Link one on their record.`
-        : `No QuickBooks customer is linked to ${customerName}, and no special order customer is set in Settings → Accounting.`
-    );
+  if (!inputs.customerRef) {
+    out.push(`${customerName} is not linked to a QuickBooks customer yet.`);
   }
   if (!inputs.billEmail?.trim()) {
     out.push("There is no address to send to, and QuickBooks makes no pay link without one.");
@@ -901,9 +868,8 @@ export function buildCustomerInvoicePayload(
     push(nonTaxableNet, false, both ? `${l.description} — not taxed` : l.description);
   }
 
-  const who = quickBooksCustomerFor(inputs)!;
   const body: Record<string, unknown> = {
-    CustomerRef: { value: who.ref },
+    CustomerRef: { value: inputs.customerRef },
     Line: lines,
     PrivateNote: `restaurantfriend customer_invoice ${invoice.id}`,
     TxnDate: invoice.issued_on,
@@ -914,9 +880,6 @@ export function buildCustomerInvoicePayload(
   if (taxed && inputs.taxCodeRef) {
     body.TxnTaxDetail = { TxnTaxCodeRef: { value: inputs.taxCodeRef } };
   }
-  // On the catch-all, the invoice says who it is really for — QuickBooks'
-  // invoice and pay page would otherwise read "Special Orders Customer".
-  if (who.catchAll) body.BillAddr = billAddress(inputs.billTo, inputs.customerName);
   const docNumber = docNumberFor(invoice.number_text);
   if (docNumber) body.DocNumber = docNumber;
   if (invoice.due_on) body.DueDate = invoice.due_on;
@@ -931,20 +894,80 @@ export function buildCustomerInvoicePayload(
   return { entity: "Invoice", path: "invoice", body };
 }
 
-/** QuickBooks' PhysicalAddress: the name first, then the street lines. Blank
- *  parts are left out rather than sent empty. */
-function billAddress(
-  to: CustomerInvoicePushInputs["billTo"],
-  fallbackName: string
-): Record<string, string> {
-  const t = (v: string | null | undefined) => (v ?? "").trim();
-  const lines = [t(to?.name) || fallbackName, t(to?.street), t(to?.street2)].filter(Boolean);
-  const out: Record<string, string> = {};
-  lines.forEach((l, i) => (out[`Line${i + 1}`] = l.slice(0, 500)));
-  if (t(to?.city)) out.City = t(to?.city);
-  if (t(to?.state)) out.CountrySubDivisionCode = t(to?.state);
-  if (t(to?.zip)) out.PostalCode = t(to?.zip);
-  return out;
+// ---------------------------------------------------------------------------
+// A customer of our own, made or found in QuickBooks
+// ---------------------------------------------------------------------------
+
+/** Our customer, as the QuickBooks customer step reads it. */
+export type OurCustomer = {
+  id: string;
+  legacy_id?: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  company: string | null;
+  email: string | null;
+  phone: string | null;
+  address?: Record<string, unknown> | null;
+};
+
+/**
+ * THE SAME PERSON, BY EMAIL, EXACTLY. A name is not an identity — 187 of our
+ * addresses repeat and plenty of names do — and linking the wrong person puts
+ * two customers on one QuickBooks record, where each can read the other's open
+ * invoices on QuickBooks' pay page. Case and surrounding space only.
+ */
+export function sameEmail(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = (a ?? "").trim().toLowerCase();
+  const y = (b ?? "").trim().toLowerCase();
+  return x !== "" && x === y;
+}
+
+export function customerLinkRefusals(c: Pick<OurCustomer, "email">): string[] {
+  return (c.email ?? "").trim()
+    ? []
+    : ["This customer has no email address. Add one first — it is how QuickBooks is matched, and where the invoice goes."];
+}
+
+/** Company, else the person — the name a customer is known by. */
+function customerDisplay(c: OurCustomer): string {
+  const person = [c.first_name, c.last_name].map((v) => (v ?? "").trim()).filter(Boolean).join(" ");
+  return (c.company ?? "").trim() || person || (c.email ?? "").trim();
+}
+
+/**
+ * The QuickBooks DisplayName: our name, or with a short tag of ours when
+ * QuickBooks already has that name (fault 6240, names are unique there). A
+ * colon is QuickBooks' sub-customer separator, so it is replaced.
+ */
+export function qboDisplayName(c: OurCustomer, disambiguate = false): string {
+  const base = customerDisplay(c).replace(/[:\t\n\r]+/g, " ").replace(/\s+/g, " ").trim();
+  const tag = (c.legacy_id ?? "").trim() || c.id.replace(/-/g, "").slice(0, 6);
+  return (disambiguate ? `${base} (${tag})` : base).slice(0, 500);
+}
+
+/** A new QuickBooks customer from our record. Blank parts are left out. */
+export function buildQboCustomerPayload(c: OurCustomer, disambiguate = false): Record<string, unknown> {
+  const refusals = customerLinkRefusals(c);
+  if (refusals.length > 0) throw new Error(refusals[0]);
+  const t = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const body: Record<string, unknown> = {
+    DisplayName: qboDisplayName(c, disambiguate),
+    PrimaryEmailAddr: { Address: t(c.email) },
+    Notes: `restaurantfriend customer ${c.id}`,
+  };
+  if (t(c.first_name)) body.GivenName = t(c.first_name).slice(0, 100);
+  if (t(c.last_name)) body.FamilyName = t(c.last_name).slice(0, 100);
+  if (t(c.company)) body.CompanyName = t(c.company).slice(0, 100);
+  if (t(c.phone)) body.PrimaryPhone = { FreeFormNumber: t(c.phone).slice(0, 30) };
+  const a = c.address ?? {};
+  const addr: Record<string, string> = {};
+  if (t(a.street)) addr.Line1 = t(a.street);
+  if (t(a.street2)) addr.Line2 = t(a.street2);
+  if (t(a.city)) addr.City = t(a.city);
+  if (t(a.state)) addr.CountrySubDivisionCode = t(a.state);
+  if (t(a.zip)) addr.PostalCode = t(a.zip);
+  if (Object.keys(addr).length > 0) body.BillAddr = addr;
+  return body;
 }
 
 /** What our email's pay line says until the push returns the real link. */

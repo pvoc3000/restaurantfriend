@@ -405,8 +405,6 @@ Deno.serve(async (req) => {
         invoice_item_name?: string | null;
         wholesale_item_ref?: string | null;
         wholesale_item_name?: string | null;
-        special_order_customer_ref?: string | null;
-        special_order_customer_name?: string | null;
         tax_code_ref?: string | null;
         tax_code_name?: string | null;
       };
@@ -417,8 +415,6 @@ Deno.serve(async (req) => {
         "invoice_item_name",
         "wholesale_item_ref",
         "wholesale_item_name",
-        "special_order_customer_ref",
-        "special_order_customer_name",
         "tax_code_ref",
         "tax_code_name",
       ] as const) {
@@ -1755,6 +1751,157 @@ Deno.serve(async (req) => {
     }
 
     // -----------------------------------------------------------------------
+    // find_customer · link_customer · create_customer — ONE QuickBooks
+    // customer for each of ours, found by email or made from our record
+    // -----------------------------------------------------------------------
+    //
+    // Mark, 2026-09-24, after the catch-all failed: QuickBooks' pay page shows
+    // every open invoice on a customer, so two of ours on one QuickBooks record
+    // read each other's. The rules that follow from it, all enforced HERE:
+    //   · a match is the SAME EMAIL, exactly (case and space aside) — never a
+    //     name, which is what would put two people on one record;
+    //   · a QuickBooks customer already linked to another of ours is not
+    //     offered, and 081's unique index refuses it anyway;
+    //   · a create carries our customer's own email, so it cannot be made for
+    //     somebody else.
+    // Writes to `customers` go through the CALLER's client, so RLS decides who
+    // may link (supervisor+, 051).
+    if (mode === "find_customer" || mode === "link_customer" || mode === "create_customer") {
+      const req = body as unknown as {
+        customer_id?: string;
+        qbo_id?: string;
+        payload?: Record<string, unknown>;
+      };
+      if (!req.customer_id) return json(400, { error: "missing customer_id" });
+
+      const { data: ours, error: oursErr } = await supabase
+        .from("customers")
+        .select("id, email, external_ref")
+        .eq("id", req.customer_id)
+        .maybeSingle();
+      if (oursErr) return json(500, { error: oursErr.message });
+      if (!ours) return json(404, { error: "No such customer" });
+      const email = String(ours.email ?? "").trim().toLowerCase();
+      if (!email) {
+        return json(400, { error: "This customer has no email address. Add one first." });
+      }
+      const already = (ours.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id ?? null;
+      if (already) return json(400, { error: "This customer is already linked to QuickBooks." });
+
+      const same = (v: unknown) => String(v ?? "").trim().toLowerCase() === email;
+      const link = async (qboId: string) => {
+        const { data, error } = await supabase
+          .from("customers")
+          .update({ external_ref: { qbo: { id: qboId } } })
+          .eq("id", ours.id)
+          .select("id");
+        if (error) {
+          return /customers_external_ref_qbo_unique|duplicate key/i.test(error.message)
+            ? "That QuickBooks customer is already linked to another of your customers."
+            : error.message;
+        }
+        if (!data || data.length === 0) {
+          return "That wasn't saved — linking a customer needs supervisor access or above.";
+        }
+        return null;
+      };
+
+      if (mode === "find_customer") {
+        type QCust = { Id?: unknown; DisplayName?: unknown; PrimaryEmailAddr?: { Address?: unknown }; Active?: unknown };
+        // Filtered by QuickBooks when it will, and by us over every page when
+        // it will not — a property QuickBooks RETURNS is not therefore
+        // QUERYABLE (the VendorCredit Balance lesson), so the fallback is
+        // there on purpose rather than as a guess.
+        let found: QCust[] = [];
+        try {
+          const q = `select Id, DisplayName, PrimaryEmailAddr, Active from Customer where PrimaryEmailAddr = ${qboQuote(String(ours.email).trim())}`;
+          const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(q)}`)) as {
+            QueryResponse?: { Customer?: QCust[] };
+          };
+          found = res.QueryResponse?.Customer ?? [];
+        } catch (e) {
+          if (!(e instanceof QboError) || e.status !== 400) throw e;
+          for (let start = 1; start < 20000; start += 1000) {
+            const q = `select Id, DisplayName, PrimaryEmailAddr, Active from Customer startposition ${start} maxresults 1000`;
+            const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(q)}`)) as {
+              QueryResponse?: { Customer?: QCust[] };
+            };
+            const page = res.QueryResponse?.Customer ?? [];
+            found.push(...page);
+            if (page.length < 1000) break;
+          }
+        }
+        const matches = found.filter((c) => same(c.PrimaryEmailAddr?.Address) && c.Active !== false);
+        const ids = matches.map((c) => String(c.Id));
+        const { data: taken } = ids.length
+          ? await supabase
+              .from("customers")
+              .select("id, external_ref")
+              .in("external_ref->qbo->>id", ids)
+          : { data: [] as { id: string; external_ref: unknown }[] };
+        const takenIds = new Set(
+          (taken ?? []).map((t) => String((t.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id ?? ""))
+        );
+        return json(200, {
+          matches: matches.map((c) => ({
+            id: String(c.Id),
+            name: String(c.DisplayName ?? ""),
+            email: String(c.PrimaryEmailAddr?.Address ?? ""),
+            linked_elsewhere: takenIds.has(String(c.Id)),
+          })),
+        });
+      }
+
+      if (mode === "link_customer") {
+        if (!req.qbo_id) return json(400, { error: "missing qbo_id" });
+        const res = (await qboFetch(admin, conn, `customer/${encodeURIComponent(req.qbo_id)}`)) as {
+          Customer?: { Id?: unknown; PrimaryEmailAddr?: { Address?: unknown } };
+        };
+        if (!res.Customer?.Id) return json(404, { error: "QuickBooks has no such customer." });
+        if (!same(res.Customer.PrimaryEmailAddr?.Address)) {
+          return json(400, {
+            error: "That QuickBooks customer has a different email address, so it may be somebody else. Not linked.",
+          });
+        }
+        const problem = await link(String(res.Customer.Id));
+        if (problem) return json(400, { error: problem });
+        return json(200, { linked: true, qbo_id: String(res.Customer.Id) });
+      }
+
+      // create_customer
+      const payload = req.payload;
+      if (!payload) return json(400, { error: "missing payload" });
+      if (payload.Id !== undefined) return json(400, { error: "A new customer names no Id." });
+      if (!same((payload.PrimaryEmailAddr as { Address?: unknown } | undefined)?.Address)) {
+        return json(400, { error: "The new customer must carry this customer's own email address." });
+      }
+      let saved: { Customer?: { Id?: unknown; DisplayName?: unknown } };
+      try {
+        saved = (await qboFetch(admin, conn, "customer", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })) as typeof saved;
+      } catch (e) {
+        // 6240: the name is taken. Said as its own answer, so the caller can
+        // try again with our tag on the name rather than show a failure.
+        if (e instanceof QboError && e.faultCode === "6240") {
+          return json(409, { error: `${e.message} (6240)`, fault: "6240" });
+        }
+        throw e;
+      }
+      const id = saved.Customer?.Id;
+      if (!id) return json(502, { error: "QuickBooks created the customer but returned no id." });
+      const problem = await link(String(id));
+      if (problem) {
+        return json(500, {
+          error: `The customer was created in QuickBooks (id ${id}) but not linked here: ${problem}`,
+          qbo_id: String(id),
+        });
+      }
+      return json(200, { created: true, qbo_id: String(id), name: String(saved.Customer?.DisplayName ?? "") });
+    }
+
+    // -----------------------------------------------------------------------
     // push_customer_invoice — a customer invoice routed to QuickBooks (131)
     // -----------------------------------------------------------------------
     //
@@ -1795,23 +1942,15 @@ Deno.serve(async (req) => {
         .select("external_ref")
         .eq("id", inv.customer_id)
         .maybeSingle();
-      // A linked customer bills to their own QuickBooks record; an unlinked
-      // one to the special-order catch-all (132). Nothing else is accepted.
-      const linked =
+      // THEIR OWN QuickBooks customer, never a shared one: QuickBooks' pay page
+      // shows every open invoice on a customer, so two of ours on one record
+      // can read each other's (measured 2026-09-24, which retired 132's
+      // catch-all). 081's unique index keeps each link one-to-one.
+      const customerRef =
         (customer?.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id ?? null;
-      let customerRef = linked;
-      if (!customerRef) {
-        const { data: defaults } = await admin
-          .from("accounting_connections")
-          .select("special_order_customer_ref")
-          .eq("id", conn.id)
-          .maybeSingle();
-        customerRef = (defaults?.special_order_customer_ref as string | null) ?? null;
-      }
       if (!customerRef) {
         return json(400, {
-          error: "No QuickBooks customer is linked, and no special order customer is set in " +
-            "Settings → Accounting.",
+          error: "This customer is not linked to a QuickBooks customer yet.",
         });
       }
       if ((req.payload.CustomerRef as { value?: string } | undefined)?.value !== customerRef) {
