@@ -12,6 +12,25 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
+   **Also 2026-09-24 — DESCRIPTIONS FROM SQUARE** (Mark: "pull the
+   descriptions for the donuts … the same description is fine for the giant,
+   mini, and letter version"). A one-off, local, service-role fill of
+   `production_items.public_description`: Square's catalog read through
+   `sync-square-sales`' read-only `get` mode on a minted owner session (signed
+   out after). Matched BY NAME across every size, inactive items included; the
+   in-store copy preferred over the "(D)" Delivery App copy; anything under 20
+   characters skipped (the Delivery App's placeholders "Donut", "Ice Cream"); a
+   filled description never overwritten. A short ALIAS list only where Square's
+   text is TRUE of our donut: Yellowcarrot, Fritter Seems Forever → FSF - Apple,
+   Dag Nutty → its three nuts, Jelly Sound → Raspberry only (it names the jam),
+   Promise Ring → Glazed/Choc/Maple/Vanilla only (the glazes it lists), Old
+   Fashioned → Chocolate/Maple/No Glaze/Vanilla, Rites of Sprinkles - Cake →
+   Cake/Choc + Cake/Van, King Puff, Strawberrylab - Choc, Donut Letter → Donut
+   Letters. Skipped on purpose: Small Brown Bites (Square says "bundle of 9",
+   ours is x12). **201 items across 71 flavors written.** Square's text is
+   copied verbatim, typos included ("tard lemon curd", "cinnamon role",
+   "bizmark", "Strawberries glaze").
+
    **Also 2026-09-24, after Mark used it — EVERY LETTER GETS A FLAVOR, AND NO
    ADDRESS ON A PICKUP.** (1) "force the user to set the flavor for each
    letter, but in the stages you've set up already": the letters card is now
