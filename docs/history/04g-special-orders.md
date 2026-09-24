@@ -12,8 +12,10 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
-   **Also 2026-09-24 — EXTRAS, AND NO "INTERESTED IN" (migration 134 WRITTEN,
-   NOT YET APPLIED; `submit-inquiry` changed, NOT YET REDEPLOYED).** Mark: "add
+   **Also 2026-09-24 — EXTRAS, AND NO "INTERESTED IN" (migration 134 APPLIED by
+   Mark; `submit-inquiry` REDEPLOYED the same day — probed: the live menu
+   carries 2 extras, Catering Platter at $5.00 (Mark priced it) and Utensils
+   (ea) unpriced).** Mark: "add
    a section at the end of the inquiry form for misc items like catering
    platters, utensils, etc" and "the 'what are you interested in?' field …
    seems unnecessary now".
