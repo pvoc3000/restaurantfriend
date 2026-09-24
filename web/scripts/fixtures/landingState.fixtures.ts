@@ -6,6 +6,7 @@ import {
   checklistState,
   planState,
   purchaseOrdersState,
+  purchaseRequestState,
   schedulesState,
   shiftReportState,
   specialOrdersState,
@@ -65,6 +66,9 @@ test("the rest are one sentence each way", () => {
   eq(tagsState({ onPlan: 0 }).note, "None on today's plan");
   eq(purchaseOrdersState({ open: 4 }).note, "4 awaiting delivery");
   eq(purchaseOrdersState({ open: 0 }).note, "Nothing awaiting delivery");
+  eq(purchaseRequestState({ open: 1 }).note, "1 open request");
+  eq(purchaseRequestState({ open: 3 }).note, "3 open requests");
+  eq(purchaseRequestState({ open: 0 }).note, null);
   eq(specialOrdersState({ thisWeek: 3 }).note, "3 this week");
   eq(specialOrdersState({ thisWeek: 0 }).note, "None this week");
 });

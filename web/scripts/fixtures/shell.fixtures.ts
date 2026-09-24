@@ -3,7 +3,7 @@
 // where Back goes.
 
 import { SECTIONS } from "../../src/lib/nav";
-import { canReachPage } from "../../src/lib/pageAccess";
+import { canEditPage, canReachPage } from "../../src/lib/pageAccess";
 import { TABLET_HOME, parseShell, resolveShell } from "../../src/lib/shell";
 import {
   LANDING_GROUPS,
@@ -71,10 +71,22 @@ test("a role sees exactly the tiles whose route it may reach", () => {
     const shown = new Set(tilesForRole(role).flatMap((g) => g.tiles.map((t) => t.key)));
     for (const group of LANDING_GROUPS) {
       for (const tile of group.tiles) {
-        eq(shown.has(tile.key), canReachPage(role, tile.href.split("?")[0]), `${role} ${tile.key}`);
+        const path = tile.href.split("?")[0];
+        const allowed = tile.needs === "write" ? canEditPage(role, path) : canReachPage(role, path);
+        eq(shown.has(tile.key), allowed, `${role} ${tile.key}`);
       }
     }
   }
+});
+
+test("Submit a Purchase Request is for the roles that may file one", () => {
+  // Staff READ the queue (the sheet's R) and are not offered New request there,
+  // so the tile follows the command, not the door.
+  const has = (role: "staff" | "supervisor" | "purchaser") =>
+    tilesForRole(role).some((g) => g.tiles.some((t) => t.key === "purchase_request"));
+  ok(!has("staff"), "staff: no tile");
+  ok(has("supervisor"), "supervisor: tile");
+  ok(has("purchaser"), "purchaser: tile");
 });
 
 test("a group left with no tiles is dropped, not shown empty", () => {

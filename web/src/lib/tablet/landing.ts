@@ -10,7 +10,7 @@
 import { parseTrail } from "../breadcrumbs";
 import type { RawSearchParams } from "../filterMenus";
 import { findSection, findSub, resolveRoute } from "../nav";
-import { canReachPage } from "../pageAccess";
+import { canEditPage, canReachPage } from "../pageAccess";
 import type { Role } from "../roles";
 import { TABLET_HOME } from "../shell";
 
@@ -27,9 +27,20 @@ export type TileKey =
   | "vendors"
   | "order_guide"
   | "purchase_orders"
+  | "purchase_request"
   | "special_orders";
 
-export type Tile = { key: TileKey; label: string; href: string };
+export type Tile = {
+  key: TileKey;
+  label: string;
+  href: string;
+  /**
+   * "write" for a tile that DOES something on its route rather than opening
+   * it — shown only to a role the sheet lets write there, the gate the
+   * route's own command reads (`canEditPage`). Absent, reaching it is enough.
+   */
+  needs?: "write";
+};
 export type TileGroup = { label: string; tiles: Tile[] };
 
 export const LANDING_GROUPS: readonly TileGroup[] = [
@@ -63,6 +74,16 @@ export const LANDING_GROUPS: readonly TileGroup[] = [
       { key: "vendors", label: "View the Vendor List", href: "/vendors" },
       { key: "order_guide", label: "Run the Order Guide", href: "/order-guide" },
       { key: "purchase_orders", label: "View Purchase Orders", href: "/purchase-orders" },
+      // Not a door but the command itself (Mark, 2026-09-24): the tile opens
+      // `NewPurchaseRequest` on the landing page, so noticing the gloves are
+      // low is one tap and a sentence. The href is the queue it files into —
+      // the fallback when there is no working shop, and the row that gates it.
+      {
+        key: "purchase_request",
+        label: "Submit a Purchase Request",
+        href: "/purchase-requests",
+        needs: "write",
+      },
     ],
   },
   {
@@ -85,7 +106,9 @@ function pathOf(href: string): string {
 export function tilesForRole(role: Role): TileGroup[] {
   return LANDING_GROUPS.map((group) => ({
     label: group.label,
-    tiles: group.tiles.filter((t) => canReachPage(role, pathOf(t.href))),
+    tiles: group.tiles.filter((t) =>
+      t.needs === "write" ? canEditPage(role, pathOf(t.href)) : canReachPage(role, pathOf(t.href))
+    ),
   })).filter((group) => group.tiles.length > 0);
 }
 

@@ -77,6 +77,19 @@
    `isPoOpen`'s "not closed"**: the first cut said "5751 open", which is the
    FileMaker history of received-and-never-closed orders, where "21 awaiting
    delivery" is the answer a supervisor at the door wants.
+   **A TILE CAN BE A COMMAND, NOT A DOOR** (Mark, 2026-09-24: "a button on
+   the tablet homescreen, under purchasing, that enables the supervisors to
+   create/submit a purchase request"). **Submit a Purchase Request** opens the
+   queue's own `NewPurchaseRequest` dialog ON the landing page
+   (`tablet/RequestTile`, via a new `trigger` render prop), so filing is one tap
+   and a sentence; the panel closes, the page refreshes, and the tile's line
+   ("2 open requests", nothing at zero — `purchaseRequestState`) is the
+   confirmation. **Its gate is WRITE, not reach** (`Tile.needs: "write"`, read
+   by `tilesForRole`): `/purchase-requests` is `R` for staff, who read the
+   queue and are not offered New request on it, so the tile follows the
+   command. Supervisor+ see it. With no working shop it falls back to a link to
+   the queue. `TILE_CLASS` moved to `tablet/tileClass.ts` so the server
+   `Landing` and the client tile share one box without an import cycle.
    **THE LOOKUP TILES REUSE THE DESK LISTS AS THEY ARE** (Mark's choice). What
    a role may edit is already the sheet's cell; `compactBelow` (1280) already
    fires at iPad widths. Touch-shaped lists come later where these prove

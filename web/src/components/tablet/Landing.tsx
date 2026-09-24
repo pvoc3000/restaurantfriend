@@ -2,6 +2,9 @@ import Link from "next/link";
 
 import type { TileGroup, TileKey } from "@/lib/tablet/landing";
 
+import { RequestTile, type RequestContext } from "./RequestTile";
+import { TILE_CLASS } from "./tileClass";
+
 /** What a tile says about itself today, and where it really goes. */
 export type TileState = {
   /** One muted line under the label — what is outstanding — or null. */
@@ -20,9 +23,12 @@ export type TileState = {
 export function Landing({
   groups,
   state,
+  request,
 }: {
   groups: TileGroup[];
   state: Partial<Record<TileKey, TileState>>;
+  /** Who files, and where — null when there is no working shop to file for. */
+  request: RequestContext | null;
 }) {
   return (
     <div className="mx-auto max-w-5xl space-y-10 text-[16px]">
@@ -40,15 +46,14 @@ export function Landing({
                 // tall as its own label, so a two-line tile stood 11px taller
                 // than the one-line tiles beside it (Mark, 2026-09-09).
                 <li key={tile.key} className="flex">
-                  <Link
-                    href={s?.href ?? tile.href}
-                    // `mac-control` — the Mac look's shadow, grey hover and
-                    // press (Mark, 2026-09-10: "those are buttons afterall").
-                    className="mac-control flex min-h-24 flex-1 flex-col justify-center gap-1 border border-ink bg-white px-5 py-4 no-underline transition-colors hover:bg-neutral-100 active:bg-neutral-200"
-                  >
-                    <span className="font-bold uppercase tracking-[0.04em] text-ink">{tile.label}</span>
-                    {s?.note && <span className="text-[14px] text-muted">{s.note}</span>}
-                  </Link>
+                  {tile.key === "purchase_request" && request ? (
+                    <RequestTile label={tile.label} note={s?.note ?? null} {...request} />
+                  ) : (
+                    <Link href={s?.href ?? tile.href} className={TILE_CLASS}>
+                      <span className="font-bold uppercase tracking-[0.04em] text-ink">{tile.label}</span>
+                      {s?.note && <span className="text-[14px] text-muted">{s.note}</span>}
+                    </Link>
+                  )}
                 </li>
               );
             })}

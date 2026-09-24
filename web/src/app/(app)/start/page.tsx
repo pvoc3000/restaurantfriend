@@ -15,6 +15,7 @@ import {
   checklistState,
   planState,
   purchaseOrdersState,
+  purchaseRequestState,
   schedulesState,
   shiftReportState,
   specialOrdersState,
@@ -31,7 +32,7 @@ import { daysAfter, serverTimeZone, todayInTimeZone } from "@/lib/today";
  *
  * What follows is the TABLET page.
  *
- * EACH TILE SAYS WHAT IS OUTSTANDING. Nine small, location-scoped probes in
+ * EACH TILE SAYS WHAT IS OUTSTANDING. Ten small, location-scoped probes in
  * one wave, every one reusing the helper its own screen reads — so a tile and
  * the screen behind it cannot disagree about what "on the plan" or "pinned for
  * tonight" means. A probe that FAILS drops its line rather than the page: a
@@ -64,7 +65,7 @@ export default async function StartPage() {
     const SKIP = Promise.resolve({ data: null, error: null, count: null });
     const want = (key: TileKey) => shown.has(key);
 
-    const [reports, templates, runs, tasks, plans, schedules, planDays, pos, orders, logs] =
+    const [reports, templates, runs, tasks, plans, schedules, planDays, pos, requests, orders, logs] =
       await Promise.all([
         want("shift_report")
           ? supabase
@@ -128,6 +129,13 @@ export default async function StartPage() {
               // 5,751 FileMaker orders were received and never closed, and a
               // supervisor at the door wants the ones a truck still owes.
               .in("status", ["draft", "sent"])
+          : SKIP,
+        want("purchase_request")
+          ? supabase
+              .from("purchase_requests")
+              .select("id", { count: "exact", head: true })
+              .eq("location_id", loc)
+              .eq("status", "open")
           : SKIP,
         want("special_orders")
           ? supabase
@@ -199,6 +207,10 @@ export default async function StartPage() {
       state.purchase_orders = purchaseOrdersState({ open: pos.count ?? 0 });
     }
 
+    if (want("purchase_request") && !requests.error) {
+      state.purchase_request = purchaseRequestState({ open: requests.count ?? 0 });
+    }
+
     if (want("special_orders") && !orders.error) {
       const rows = (orders.data ?? []) as { kitchen_location_id: string | null; location_id: string | null }[];
       state.special_orders = specialOrdersState({ thisWeek: ordersForKitchen(rows, loc).length });
@@ -216,5 +228,21 @@ export default async function StartPage() {
 
   // No heading (Mark, 2026-09-10): the shop's code already sits in the bar's
   // location picker, so an h1 restating it was the same fact twice.
-  return <Landing groups={groups} state={state} />;
+  const active = session.activeLocation;
+  return (
+    <Landing
+      groups={groups}
+      state={state}
+      request={
+        active
+          ? {
+              orgId: session.membership.org_id,
+              locationId: active.id,
+              userId: session.userId,
+              locationCode: active.code,
+            }
+          : null
+      }
+    />
+  );
 }

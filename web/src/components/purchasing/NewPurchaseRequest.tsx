@@ -54,11 +54,18 @@ export function NewPurchaseRequest({
   locationId,
   userId,
   locationCode,
+  trigger,
 }: {
   orgId: string;
   locationId: string;
   userId: string;
   locationCode: string;
+  /**
+   * What opens the panel, in place of the queue's "New request" button — the
+   * tablet landing page's tile (`tablet/RequestTile`), which is this same
+   * command dressed as a door.
+   */
+  trigger?: (open: () => void) => ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -142,9 +149,13 @@ export function NewPurchaseRequest({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={BUTTON_CLASS}>
-        New request
-      </button>
+      {trigger ? (
+        trigger(() => setOpen(true))
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} className={BUTTON_CLASS}>
+          New request
+        </button>
+      )}
 
       {open && (
         <Dialog
