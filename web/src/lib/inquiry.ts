@@ -26,6 +26,14 @@ export type InquiryState =
   | "unknown_org"
   | "name_required"
   | "contact_required"
+  // Migration 135 (Mark, 2026-09-24): email AND phone, the occasion, and the
+  // date and time are all required now.
+  | "email_required"
+  | "phone_required"
+  | "phone_invalid"
+  | "occasion_required"
+  | "date_required"
+  | "time_required"
   | "email_invalid"
   | "date_invalid"
   | "time_invalid"
@@ -151,6 +159,22 @@ export function isRealTime(value: string): boolean {
 export type InquiryErrors = Partial<Record<keyof InquiryDraft, string>>;
 
 /**
+ * WHAT A CUSTOMER MUST FILL IN (Mark, 2026-09-24: "make both email and phone
+ * number required. Make Occasion required. make date and time required"), and
+ * the page marks each of these after its label. Until then only the name and
+ * ONE way to reach them were required, and nothing on the page said so.
+ * Migration 135 refuses the same set; keep the two in step by hand.
+ */
+export const INQUIRY_REQUIRED: readonly (keyof InquiryDraft)[] = [
+  "name",
+  "email",
+  "phone",
+  "occasion",
+  "eventDate",
+  "eventTime",
+];
+
+/**
  * What is wrong with this draft, keyed by field so the message can sit under
  * the box it is about.
  *
@@ -166,26 +190,31 @@ export function validateInquiry(draft: InquiryDraft): InquiryErrors {
     errors.name = "We need a name to call you by.";
   }
 
-  const hasEmail = draft.email.trim() !== "";
-  const hasPhone = draft.phone.trim() !== "";
-
-  if (hasEmail && !looksLikeEmail(draft.email)) {
+  // BOTH, since 135 (Mark). Each is named on its own field: two missing
+  // things are two problems now, where "one of two" used to be one.
+  if (!draft.email.trim()) {
+    errors.email = "We need an email address — it’s where your quote goes.";
+  } else if (!looksLikeEmail(draft.email)) {
     errors.email = "That doesn’t look like an email address.";
   }
-  if (hasPhone && !looksLikePhone(draft.phone)) {
+  if (!draft.phone.trim()) {
+    errors.phone = "We need a phone number in case we have a question.";
+  } else if (!looksLikePhone(draft.phone)) {
     errors.phone = "That doesn’t look like a phone number.";
   }
-  if (!hasEmail && !hasPhone) {
-    // Named on the EMAIL field rather than both, because asking for one of two
-    // things in two places reads as two problems. Email is the one we prefer —
-    // it is what the confirmation and the quote go to.
-    errors.email = "An email address or a phone number — either will do.";
+
+  if (!draft.occasion.trim()) {
+    errors.occasion = "Tell us what it’s for — a birthday, a wedding, an office party…";
   }
 
-  if (draft.eventDate.trim() && !isRealDate(draft.eventDate)) {
+  if (!draft.eventDate.trim()) {
+    errors.eventDate = "Choose the date you need it.";
+  } else if (!isRealDate(draft.eventDate)) {
     errors.eventDate = "That date doesn’t exist.";
   }
-  if (draft.eventTime.trim() && !isRealTime(draft.eventTime)) {
+  if (!draft.eventTime.trim()) {
+    errors.eventTime = "Choose a time.";
+  } else if (!isRealTime(draft.eventTime)) {
     errors.eventTime = "That time doesn’t look right.";
   }
 
@@ -249,6 +278,18 @@ export function inquiryStateMessage(state: InquiryState | string): {
       return { ok: false, title: "That date doesn’t exist", body: "Check the day and month." };
     case "time_invalid":
       return { ok: false, title: "That time doesn’t look right", body: "Use a 24-hour time." };
+    case "email_required":
+      return { ok: false, title: "We need an email address", body: "It’s where your quote will go." };
+    case "phone_required":
+      return { ok: false, title: "We need a phone number", body: "In case we have a question about your order." };
+    case "phone_invalid":
+      return { ok: false, title: "That phone number doesn’t look right", body: "Have another look at it." };
+    case "occasion_required":
+      return { ok: false, title: "What’s the occasion?", body: "A birthday, a wedding, an office party — tell us what it’s for." };
+    case "date_required":
+      return { ok: false, title: "When do you need it?", body: "Choose a date." };
+    case "time_required":
+      return { ok: false, title: "What time do you need it?", body: "Choose a time." };
     case "fulfillment_invalid":
       return {
         ok: false,

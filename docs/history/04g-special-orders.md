@@ -12,6 +12,24 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
+   **Also 2026-09-24 — REQUIRED FIELDS, MARKED (migration 135 WRITTEN, NOT
+   YET APPLIED).** Mark: "I don't see any indications that any fields are
+   required" — true: only the name and ONE of email/phone were, and nothing
+   said so. Now "make both email and phone number required. Make Occasion
+   required. make date and time required", each label marked "with a symbol
+   or glyph": a red `*` after the label (screen readers hear "(required)"),
+   and a "* Required" key under the intro. `INQUIRY_REQUIRED` in
+   lib/inquiry.ts is the list; `validateInquiry` names each missing field on
+   its own box (email and phone are two problems now, not one). 135 refuses
+   the same set in the gate — `email_required`, `phone_required`,
+   `phone_invalid` (under seven digits), `occasion_required`,
+   `date_required`, `time_required` — with the honeypot still decided first.
+   Delivery address, pickup shop, the order, details and allergies stay
+   optional. **Going back to the v1 form now also means going back on 135**,
+   since v1 did not ask for all of these. Harness: every refusal, a bot with
+   everything blank still told `received`, a full submission created, 135
+   rerun. Browser: an empty Send shows all six messages and posts nothing.
+
    **Also 2026-09-24 — EXTRAS, AND NO "INTERESTED IN" (migration 134 APPLIED by
    Mark; `submit-inquiry` REDEPLOYED the same day — probed: the live menu
    carries 2 extras, Catering Platter at $5.00 (Mark priced it) and Utensils

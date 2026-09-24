@@ -274,6 +274,12 @@ export function InquiryForm({ orgId }: { orgId: string }) {
           Everything we make is custom, so a real person reads every one of
           these.
         </p>
+        {/* The key to the mark every required label carries (Mark, 2026-09-24:
+            "Indicate the fields that are required by putting a symbol or
+            glyph after the label"). */}
+        <p className="text-[13px] text-muted">
+          <RequiredMark /> Required
+        </p>
       </header>
 
       <form
@@ -283,44 +289,48 @@ export function InquiryForm({ orgId }: { orgId: string }) {
           void submit();
         }}
       >
-        <Field label="Full name" error={shown.name}>
+        <Field label="Full name" required error={shown.name}>
           <input
             type="text"
             value={draft.name}
             autoComplete="name"
             onChange={(e) => set("name", e.target.value)}
+            aria-required
             className={inputClass(shown.name)}
           />
         </Field>
 
-        <Field label="Email" error={shown.email}>
+        <Field label="Email" required error={shown.email}>
           <input
             type="email"
             inputMode="email"
             value={draft.email}
             autoComplete="email"
             onChange={(e) => set("email", e.target.value)}
+            aria-required
             className={inputClass(shown.email)}
           />
         </Field>
 
-        <Field label="Phone number" error={shown.phone}>
+        <Field label="Phone number" required error={shown.phone}>
           <input
             type="tel"
             inputMode="tel"
             value={draft.phone}
             autoComplete="tel"
             onChange={(e) => set("phone", e.target.value)}
+            aria-required
             className={inputClass(shown.phone)}
           />
         </Field>
 
-        <Field label="Occasion" hint="Birthday, wedding, office party…">
+        <Field label="Occasion" required hint="Birthday, wedding, office party…" error={shown.occasion}>
           <input
             type="text"
             value={draft.occasion}
             onChange={(e) => set("occasion", e.target.value)}
-            className={inputClass()}
+            aria-required
+            className={inputClass(shown.occasion)}
           />
         </Field>
 
@@ -392,7 +402,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
               submit no date at all believing they had asked for today. That
               component is where the fix lives, and copying a second one here is
               how the bug comes back. */}
-          <Field label="Date" error={shown.eventDate}>
+          <Field label="Date" required error={shown.eventDate}>
             <DateField
               variant="field"
               value={draft.eventDate || null}
@@ -403,7 +413,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
           {/* `ui/TimePicker` beside `ui/DateField`, both in the form box, so
               the two read as one pair (Mark, 2026-09-11: every time in the app
               is our own picker). */}
-          <Field label="Time" error={shown.eventTime}>
+          <Field label="Time" required error={shown.eventTime}>
             <TimePicker
               variant="field"
               value={draft.eventTime || null}
@@ -516,17 +526,28 @@ function Field({
   label,
   hint,
   error,
+  required = false,
   children,
 }: {
   label: string;
   hint?: string;
   error?: string;
+  /** Marks the label (`INQUIRY_REQUIRED`, migration 135). The mark only —
+   *  `validateInquiry` and the gate are what actually require it. */
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className="block space-y-1.5">
       <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
         {label}
+        {required && (
+          <>
+            {" "}
+            <RequiredMark />
+            <span className="sr-only"> (required)</span>
+          </>
+        )}
       </span>
       {children}
       {error ? (
@@ -535,6 +556,16 @@ function Field({
         <span className="block text-[13px] text-muted">{hint}</span>
       ) : null}
     </label>
+  );
+}
+
+/** The required mark: an asterisk in the error colour, hidden from screen
+ *  readers, which hear "(required)" beside it instead. */
+function RequiredMark() {
+  return (
+    <span aria-hidden className="font-semibold text-accent">
+      *
+    </span>
   );
 }
 

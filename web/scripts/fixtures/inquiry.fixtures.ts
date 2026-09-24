@@ -10,6 +10,7 @@ import { test, eq, ok, no } from "./harness";
 import {
   EMPTY_INQUIRY,
   INQUIRY_INTEREST_OPTIONS,
+  INQUIRY_REQUIRED,
   inquiryIsSubmittable,
   inquiryPayload,
   inquiryStateMessage,
@@ -24,6 +25,17 @@ import {
 
 function draft(over: Partial<InquiryDraft> = {}): InquiryDraft {
   return { ...EMPTY_INQUIRY, name: "Victoria Fay", email: "vlangfay@gmail.com", ...over };
+}
+
+/** Every required field filled — 135's rules. */
+function full(over: Partial<InquiryDraft> = {}): InquiryDraft {
+  return draft({
+    phone: "(323) 630-0095",
+    occasion: "Birthday",
+    eventDate: "2026-10-30",
+    eventTime: "10:00",
+    ...over,
+  });
 }
 
 /* -------------------------------------------------------------------------
@@ -119,43 +131,34 @@ test("time: 24-hour, and the boundaries", () => {
  * validateInquiry — what a lead is allowed to be missing
  * ---------------------------------------------------------------------- */
 
-test("a name and ONE way to reach them is the whole requirement", () => {
-  eq(validateInquiry(draft()), {}, "name + email is enough");
-  eq(validateInquiry(draft({ email: "", phone: "(323) 630-0095" })), {}, "name + phone is enough");
-  ok(inquiryIsSubmittable(draft({ email: "", phone: "3236300095" })));
+test("REQUIRED (135, Mark 2026-09-24): name, email, phone, occasion, date, time", () => {
+  eq(validateInquiry(full()), {}, "all six is enough");
+  ok(inquiryIsSubmittable(full()));
+  eq(INQUIRY_REQUIRED, ["name", "email", "phone", "occasion", "eventDate", "eventTime"]);
+  for (const k of INQUIRY_REQUIRED) {
+    eq(Object.keys(validateInquiry(full({ [k]: "" }))), [k], `${k} missing is exactly one problem, on ${k}`);
+    eq(Object.keys(validateInquiry(full({ [k]: "   " }))), [k], `${k} as whitespace is missing`);
+  }
 });
 
-test("everything else is optional — a lead is the START of a conversation", () => {
-  // Turning away somebody who has not decided when their party is would refuse
-  // exactly the inquiries this shop wants.
-  eq(validateInquiry(draft({ occasion: "", eventDate: "", eventTime: "", description: "" })), {});
+test("everything else stays optional", () => {
+  eq(validateInquiry(full({ address: "", locationId: "", description: "", allergies: "", interest: "" })), {});
 });
 
-test("no name is refused", () => {
-  ok(validateInquiry(draft({ name: "" })).name);
-  ok(validateInquiry(draft({ name: "   " })).name, "whitespace is not a name");
-});
-
-test("no way to reach them is ONE message, on the email field", () => {
-  const errors = validateInquiry(draft({ email: "", phone: "" }));
-  ok(errors.email, "the message lands on email");
-  no(errors.phone, "and NOT also on phone — one problem reads as one problem");
+test("email and phone are each their OWN problem now", () => {
+  eq(Object.keys(validateInquiry(full({ email: "", phone: "" }))).sort(), ["email", "phone"]);
 });
 
 test("a malformed contact detail is named where it was typed", () => {
-  eq(Object.keys(validateInquiry(draft({ email: "nope" }))), ["email"]);
-  // A half-typed phone and no email is ONE problem, not two: saying both
-  // "that isn't a phone number" and "we need an email or a phone" makes a
-  // person hunt for a second mistake they have not made. The precise message
-  // wins, and `inquiryIsSubmittable` still refuses.
-  eq(Object.keys(validateInquiry(draft({ email: "", phone: "12" }))), ["phone"]);
-  no(inquiryIsSubmittable(draft({ email: "", phone: "12" })));
+  eq(Object.keys(validateInquiry(full({ email: "nope" }))), ["email"]);
+  eq(Object.keys(validateInquiry(full({ phone: "12" }))), ["phone"]);
+  no(inquiryIsSubmittable(full({ phone: "12" })));
 });
 
 test("an impossible date or time is caught before it is posted", () => {
-  ok(validateInquiry(draft({ eventDate: "2026-02-31" })).eventDate);
-  ok(validateInquiry(draft({ eventTime: "25:00" })).eventTime);
-  no(inquiryIsSubmittable(draft({ eventDate: "2026-02-31" })));
+  ok(validateInquiry(full({ eventDate: "2026-02-31" })).eventDate);
+  ok(validateInquiry(full({ eventTime: "25:00" })).eventTime);
+  no(inquiryIsSubmittable(full({ eventDate: "2026-02-31" })));
 });
 
 /* -------------------------------------------------------------------------
@@ -176,6 +179,8 @@ test("every refusal has its own words, and none of them is a code", () => {
   const states = [
     "unknown_org", "name_required", "contact_required",
     "email_invalid", "date_invalid", "time_invalid", "fulfillment_invalid",
+    "email_required", "phone_required", "phone_invalid", "occasion_required",
+    "date_required", "time_required",
   ];
   for (const s of states) {
     const m = inquiryStateMessage(s);
