@@ -12,6 +12,12 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **And (same day) — THE ORDERS TABLE IS A `DataTable`** (Mark: "the order
+   table should be a datatable"): `customerInvoices/CustomerInvoiceLinesTable`,
+   a client component fed plain rows by the server page — sortable, hideable
+   and reorderable columns (`customer-invoice-lines.v1`), defaulting to the
+   invoice's own line order, with `totals` summing the money under each column.
+
    **Then (same day) — THE ORDERS TABLE READS LIKE THE ORDER'S PAYMENTS
    SECTION:** Items · Discount · Delivery · Rush fee · Tax · Paid · Balance (Mark: "add the
    item total field … change amount to 'Balance'"). All six are the ORDER's
