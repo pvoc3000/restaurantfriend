@@ -504,7 +504,11 @@ async function quickBooksInputs(
   const [conn, customer] = await Promise.all([
     supabase.rpc("accounting_connection_status", { p_org: orgId }),
     view.invoice.customer_id
-      ? supabase.from("customers").select("external_ref").eq("id", view.invoice.customer_id).maybeSingle()
+      ? supabase
+          .from("customers")
+          .select("external_ref, address")
+          .eq("id", view.invoice.customer_id)
+          .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
   const row = Array.isArray(conn.data)
@@ -513,6 +517,7 @@ async function quickBooksInputs(
             status?: string;
             invoice_item_ref?: string | null;
             wholesale_item_ref?: string | null;
+            special_order_customer_ref?: string | null;
             tax_code_ref?: string | null;
           }
         | undefined)
@@ -531,6 +536,10 @@ async function quickBooksInputs(
     },
     customerName: view.customerName,
     customerRef: qboVendorId((customer?.data?.external_ref ?? null) as AccountingRef | null),
+    // 132: where an unlinked special-order customer bills, and who the
+    // invoice then says it is for.
+    specialOrderCustomerRef: row?.special_order_customer_ref ?? null,
+    billTo: billToOf(view, (customer?.data?.address ?? null) as Record<string, unknown> | null),
     itemRef: row?.invoice_item_ref ?? null,
     wholesaleItemRef: row?.wholesale_item_ref ?? null,
     taxCodeRef: row?.tax_code_ref ?? null,
@@ -607,4 +616,18 @@ async function pushToQuickBooks(
   const theirs = taxDisagreement(Math.round(ourTax * 100) / 100, data?.tax as number | undefined);
   if (theirs) warnings.push(theirs);
   return { link, warnings, ref: recorded };
+}
+
+/** Our customer's name and address, as the catch-all invoice's bill-to (132). */
+function billToOf(view: InvoiceView, address: Record<string, unknown> | null): CustomerInvoicePushInputs["billTo"] {
+  const a = address ?? {};
+  const str = (k: string) => (typeof a[k] === "string" ? (a[k] as string) : null);
+  return {
+    name: view.customerName,
+    street: str("street"),
+    street2: str("street2"),
+    city: str("city"),
+    state: str("state"),
+    zip: str("zip"),
+  };
 }

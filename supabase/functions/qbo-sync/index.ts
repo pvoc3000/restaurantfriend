@@ -405,6 +405,8 @@ Deno.serve(async (req) => {
         invoice_item_name?: string | null;
         wholesale_item_ref?: string | null;
         wholesale_item_name?: string | null;
+        special_order_customer_ref?: string | null;
+        special_order_customer_name?: string | null;
         tax_code_ref?: string | null;
         tax_code_name?: string | null;
       };
@@ -415,6 +417,8 @@ Deno.serve(async (req) => {
         "invoice_item_name",
         "wholesale_item_ref",
         "wholesale_item_name",
+        "special_order_customer_ref",
+        "special_order_customer_name",
         "tax_code_ref",
         "tax_code_name",
       ] as const) {
@@ -1791,11 +1795,23 @@ Deno.serve(async (req) => {
         .select("external_ref")
         .eq("id", inv.customer_id)
         .maybeSingle();
-      const customerRef =
+      // A linked customer bills to their own QuickBooks record; an unlinked
+      // one to the special-order catch-all (132). Nothing else is accepted.
+      const linked =
         (customer?.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id ?? null;
+      let customerRef = linked;
+      if (!customerRef) {
+        const { data: defaults } = await admin
+          .from("accounting_connections")
+          .select("special_order_customer_ref")
+          .eq("id", conn.id)
+          .maybeSingle();
+        customerRef = (defaults?.special_order_customer_ref as string | null) ?? null;
+      }
       if (!customerRef) {
         return json(400, {
-          error: "No QuickBooks customer is linked. Pick one on the customer's record.",
+          error: "No QuickBooks customer is linked, and no special order customer is set in " +
+            "Settings → Accounting.",
         });
       }
       if ((req.payload.CustomerRef as { value?: string } | undefined)?.value !== customerRef) {

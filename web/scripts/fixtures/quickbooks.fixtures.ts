@@ -991,7 +991,7 @@ test("each refusal fires", () => {
     customerInvoiceRefusals(i).some((r) => r.includes(s));
   eq(customerInvoiceRefusals(civ()), [], "a clean week has none");
   ok(has(civ({ invoice: { ...civ().invoice, voided_at: "2026-09-21" } }), "void"), "void");
-  ok(has(civ({ customerRef: null }), "No QuickBooks customer"), "no customer");
+  ok(has(civ({ customerRef: null }), "own QuickBooks customer"), "no customer");
   ok(has(civ({ billEmail: " " }), "no address"), "no email");
   ok(has(civ({ wholesaleItemRef: null }), "wholesale"), "no wholesale item");
   no(has(civ({ itemRef: null }), "special orders"), "special-order item not needed for a wholesale week");
@@ -1008,3 +1008,48 @@ test("each refusal fires", () => {
 function round(n: number) {
   return Math.round(n * 100) / 100;
 }
+
+// 132 — the special-order catch-all
+import { quickBooksCustomerFor } from "../../src/lib/quickbooks";
+
+const unlinkedRetail = (over: Partial<CustomerInvoicePushInputs> = {}) =>
+  civ({
+    customerName: "Dana Reyes",
+    customerRef: null,
+    specialOrderCustomerRef: "77",
+    billTo: { name: "Dana Reyes", street: "12 Elm St", street2: "", city: "Los Angeles", state: "CA", zip: "90026" },
+    lines: [taxedOrder],
+    ...over,
+  });
+
+test("an unlinked special-order customer bills to the catch-all, with their own bill-to", () => {
+  const { body } = buildCustomerInvoicePayload(unlinkedRetail());
+  eq(body.CustomerRef, { value: "77" }, "catch-all");
+  eq(
+    body.BillAddr,
+    { Line1: "Dana Reyes", Line2: "12 Elm St", City: "Los Angeles", CountrySubDivisionCode: "CA", PostalCode: "90026" },
+    "real name and address, blank street2 left out"
+  );
+});
+
+test("a linked customer bills to their own record and keeps QuickBooks' address", () => {
+  const { body } = buildCustomerInvoicePayload(unlinkedRetail({ customerRef: "58" }));
+  eq(body.CustomerRef, { value: "58" }, "own record wins");
+  eq(body.BillAddr, undefined, "no override");
+});
+
+test("an unlinked WHOLESALE invoice is refused, never lumped into the catch-all", () => {
+  const i = civ({ customerRef: null, specialOrderCustomerRef: "77" });
+  eq(quickBooksCustomerFor(i), null, "no customer");
+  ok(customerInvoiceRefusals(i).some((r) => r.includes("billed as wholesale")), "says why");
+});
+
+test("unlinked with no catch-all set is refused and names the setting", () => {
+  const i = unlinkedRetail({ specialOrderCustomerRef: null });
+  ok(customerInvoiceRefusals(i).some((r) => r.includes("Settings → Accounting")), "names the setting");
+});
+
+test("a bill-to with no name falls back to the customer's label", () => {
+  const { body } = buildCustomerInvoicePayload(unlinkedRetail({ billTo: null }));
+  eq(body.BillAddr, { Line1: "Dana Reyes" }, "name only");
+});

@@ -770,7 +770,21 @@ export type CustomerInvoicePushInputs = {
     external_ref: AccountingRef | null;
   };
   customerName: string;
+  /** The customer's OWN QuickBooks customer — a wholesale client's link. */
   customerRef: string | null;
+  /** The catch-all every unlinked customer bills to (132), from Settings →
+   *  Accounting. Never a link: 081 keeps links one-to-one. */
+  specialOrderCustomerRef?: string | null;
+  /** Our customer's own name and address, printed as the bill-to when the
+   *  invoice goes to the catch-all. */
+  billTo?: {
+    name: string;
+    street?: string | null;
+    street2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip?: string | null;
+  } | null;
   /** Where the invoice is being sent. QuickBooks makes no InvoiceLink without
    *  a BillEmail. */
   billEmail: string | null;
@@ -783,14 +797,36 @@ export type CustomerInvoicePushInputs = {
 /** A line that bills nothing because its order was cancelled (128). */
 const billsNothing = (l: CustomerInvoicePushLine) => l.cancelled && round2(l.amount) === 0;
 
+/**
+ * WHICH QUICKBOOKS CUSTOMER THE INVOICE NAMES (132). A linked customer bills to
+ * their own record; an unlinked one to the special-order catch-all — but only
+ * for special orders: a wholesale client is meant to have a record of their
+ * own (Mark, 2026-09-24), so an unlinked wholesale invoice is refused rather
+ * than quietly lumped in with retail.
+ */
+export function quickBooksCustomerFor(
+  inputs: Pick<CustomerInvoicePushInputs, "customerRef" | "specialOrderCustomerRef" | "lines">
+): { ref: string; catchAll: boolean } | null {
+  if (inputs.customerRef) return { ref: inputs.customerRef, catchAll: false };
+  const wholesale = inputs.lines.some((l) => !billsNothing(l) && l.square_item === "wholesale");
+  if (!wholesale && inputs.specialOrderCustomerRef) {
+    return { ref: inputs.specialOrderCustomerRef, catchAll: true };
+  }
+  return null;
+}
+
 export function customerInvoiceRefusals(inputs: CustomerInvoicePushInputs): string[] {
   const { invoice, customerName, lines } = inputs;
   const out: string[] = [];
   const live = lines.filter((l) => !billsNothing(l));
 
   if (invoice.voided_at) out.push("This invoice is void.");
-  if (!inputs.customerRef) {
-    out.push(`No QuickBooks customer is linked to ${customerName}. Pick one on their record.`);
+  if (!quickBooksCustomerFor(inputs)) {
+    out.push(
+      live.some((l) => l.square_item === "wholesale")
+        ? `${customerName} is billed as wholesale, so they bill to their own QuickBooks customer. Link one on their record.`
+        : `No QuickBooks customer is linked to ${customerName}, and no special order customer is set in Settings → Accounting.`
+    );
   }
   if (!inputs.billEmail?.trim()) {
     out.push("There is no address to send to, and QuickBooks makes no pay link without one.");
@@ -865,8 +901,9 @@ export function buildCustomerInvoicePayload(
     push(nonTaxableNet, false, both ? `${l.description} — not taxed` : l.description);
   }
 
+  const who = quickBooksCustomerFor(inputs)!;
   const body: Record<string, unknown> = {
-    CustomerRef: { value: inputs.customerRef },
+    CustomerRef: { value: who.ref },
     Line: lines,
     PrivateNote: `restaurantfriend customer_invoice ${invoice.id}`,
     TxnDate: invoice.issued_on,
@@ -877,6 +914,9 @@ export function buildCustomerInvoicePayload(
   if (taxed && inputs.taxCodeRef) {
     body.TxnTaxDetail = { TxnTaxCodeRef: { value: inputs.taxCodeRef } };
   }
+  // On the catch-all, the invoice says who it is really for — QuickBooks'
+  // invoice and pay page would otherwise read "Special Orders Customer".
+  if (who.catchAll) body.BillAddr = billAddress(inputs.billTo, inputs.customerName);
   const docNumber = docNumberFor(invoice.number_text);
   if (docNumber) body.DocNumber = docNumber;
   if (invoice.due_on) body.DueDate = invoice.due_on;
@@ -889,6 +929,22 @@ export function buildCustomerInvoicePayload(
   }
 
   return { entity: "Invoice", path: "invoice", body };
+}
+
+/** QuickBooks' PhysicalAddress: the name first, then the street lines. Blank
+ *  parts are left out rather than sent empty. */
+function billAddress(
+  to: CustomerInvoicePushInputs["billTo"],
+  fallbackName: string
+): Record<string, string> {
+  const t = (v: string | null | undefined) => (v ?? "").trim();
+  const lines = [t(to?.name) || fallbackName, t(to?.street), t(to?.street2)].filter(Boolean);
+  const out: Record<string, string> = {};
+  lines.forEach((l, i) => (out[`Line${i + 1}`] = l.slice(0, 500)));
+  if (t(to?.city)) out.City = t(to?.city);
+  if (t(to?.state)) out.CountrySubDivisionCode = t(to?.state);
+  if (t(to?.zip)) out.PostalCode = t(to?.zip);
+  return out;
 }
 
 /** What our email's pay line says until the push returns the real link. */

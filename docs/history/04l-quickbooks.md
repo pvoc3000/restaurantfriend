@@ -312,3 +312,19 @@
    Also fixed in passing: `push_invoice` posted with a second connection object
    (`conn2`) while its attachment calls used the first, so a token refresh
    during the post could leave those calls on a spent token.
+
+   **ONE QUICKBOOKS CUSTOMER FOR EVERY SPECIAL-ORDER CUSTOMER (2026-09-24,
+   migration 132).** Mark created "Special Orders Customer" in QuickBooks and
+   081's `customers_external_ref_qbo_unique` refused a second link — ours, not
+   QuickBooks'. The guard stays; the catch-all is a SETTING instead
+   (`accounting_connections.special_order_customer_ref`, Settings → Accounting →
+   Special order customer). `quickBooksCustomerFor`: a linked customer bills to
+   their own record; an unlinked one to the catch-all, with their real name and
+   address as the invoice's `BillAddr` so QuickBooks' invoice and pay page don't
+   read "Special Orders Customer"; an unlinked WHOLESALE invoice is refused —
+   wholesale clients keep records of their own (Mark). `push_customer_invoice`
+   accepts the catch-all only for an unlinked customer.
+   **OPEN, check before relying on it:** whether QuickBooks' pay page shows a
+   customer's OTHER open invoices (pay-several). With a shared customer that
+   would show one customer everyone else's unpaid special orders. Test: two
+   open invoices on the catch-all, different emails, open the first's link.

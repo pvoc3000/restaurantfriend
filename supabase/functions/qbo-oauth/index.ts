@@ -233,6 +233,7 @@ Deno.serve(async (req) => {
       .update({ bill_expense_account_ref: null, bill_expense_account_name: null,
                 invoice_item_ref: null, invoice_item_name: null,
                 wholesale_item_ref: null, wholesale_item_name: null,
+                special_order_customer_ref: null, special_order_customer_name: null,
                 tax_code_ref: null, tax_code_name: null })
       .eq("id", row.id));
 
