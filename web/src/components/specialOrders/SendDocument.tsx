@@ -91,6 +91,7 @@ export function SendDocument({
    *  out, and a browser's own idea of today is the browser's timezone. */
   today,
   children,
+  onCustomerInvoice = false,
 }: {
   /**
    * Render the three verbs as rows of an `ui/ActionMenu` instead of three
@@ -105,6 +106,13 @@ export function SendDocument({
   canWrite: boolean;
   orgSettings: Record<string, unknown>;
   today: string;
+  /**
+   * A customer invoice bills this order (124, 127). Its own invoice can still
+   * be emailed as paper, but WITHOUT a pay link: a payment through it would
+   * not count against the customer invoice. The database refuses the link
+   * too (127); this keeps a dead one out of the email.
+   */
+  onCustomerInvoice?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -240,7 +248,7 @@ export function SendDocument({
       // when online payment is configured and there is a balance to pay.
       let payToken: string | null = null;
       let pay = "";
-      if (k === "invoice" && offersPayLink(orgSettings, order)) {
+      if (k === "invoice" && !onCustomerInvoice && offersPayLink(orgSettings, order)) {
         const resolved = resolveAppBase(window.location.origin);
         if ("error" in resolved) throw new Error(resolved.error);
         payToken = await mintPayToken(supabase, { orderId, orgId });

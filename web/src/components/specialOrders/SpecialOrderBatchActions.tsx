@@ -133,6 +133,7 @@ export function SpecialOrderBatchActions({
     customer_id: r.customer?.id ?? null,
     customer_name: customerLabel(r.customer),
     shop: r.kitchen_code ?? r.location_code,
+    on_invoice: r.invoice_id !== null,
     balance: r.totals.balance,
   }));
   const invoiceRefusals = createRefusals(candidates);
@@ -233,7 +234,11 @@ export function SpecialOrderBatchActions({
    * amount has no such test — "put $50 against each of these" is a legitimate
    * thing to say about an order already part-paid.
    */
-  const payable = selected.filter((r) => r.kind === "order");
+  /** 127: an order a customer invoice bills takes its money ON THE INVOICE —
+   *  a payment recorded here would be untagged and the invoice would go on
+   *  asking for it. Skipped, and the dialog says how many. */
+  const invoicedRows = selected.filter((r) => r.kind === "order" && r.invoice_id);
+  const payable = selected.filter((r) => r.kind === "order" && !r.invoice_id);
   const inFull = payable.filter((r) => r.totals.balance > 0.005);
   const payRows = payFull ? inFull : payable;
 
@@ -932,9 +937,15 @@ export function SpecialOrderBatchActions({
                   : `${money(payTotal)} across ${plural(inFull.length, "order")}, each one its own balance.` +
                     (payable.length > inFull.length
                       ? ` ${plural(payable.length - inFull.length, "order")} already settled and will be skipped.`
+                      : "") +
+                    (invoicedRows.length
+                      ? ` ${plural(invoicedRows.length, "order")} on a customer invoice will be skipped — record those payments on the invoice.`
                       : "")
                 : typedOk
-                  ? `${money(typedAmount)} on each of ${plural(payable.length, "order")} — ${money(payTotal)} in all.`
+                  ? `${money(typedAmount)} on each of ${plural(payable.length, "order")} — ${money(payTotal)} in all.` +
+                    (invoicedRows.length
+                      ? ` ${plural(invoicedRows.length, "order")} on a customer invoice will be skipped.`
+                      : "")
                   : "Type an amount to record against every selected order."}
             </p>
           </div>

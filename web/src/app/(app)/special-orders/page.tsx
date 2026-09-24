@@ -200,6 +200,25 @@ export default async function SpecialOrdersPage({
     }
   }
 
+  // WHICH ORDERS A CUSTOMER INVOICE BILLS (124): bulk Record Payment skips
+  // them and Create Invoice refuses them. A failed read (124 unapplied) leaves
+  // every order unbilled, which is what they were before it.
+  const invoiceOf = new Map<string, string>();
+  if (ids.length > 0) {
+    for (let from = 0; ; from += 1000) {
+      const { data, error: invoiceError } = await supabase
+        .from("customer_invoice_lines")
+        .select("special_order_id, invoice_id, customer_invoices!inner ( voided_at )")
+        .in("special_order_id", ids)
+        .is("customer_invoices.voided_at", null)
+        .order("id")
+        .range(from, from + 999);
+      if (invoiceError) break;
+      for (const l of data ?? []) invoiceOf.set(l.special_order_id as string, l.invoice_id as string);
+      if (!data || data.length < 1000) break;
+    }
+  }
+
   // Codes rather than ids on the row: the list groups, filters and prints by
   // code, and `session.locations` is the FULL list so an order at a closed
   // shop still shows which one instead of an em dash.
@@ -224,6 +243,7 @@ export default async function SpecialOrdersPage({
       location_code: codeOf(raw.location_id as string | null),
       kitchen_code: codeOf(raw.kitchen_location_id as string | null),
       customer: (raw.customers as SpecialOrderRow["customer"]) ?? null,
+      invoice_id: invoiceOf.get(o.id as string) ?? null,
       totals: orderTotals(money, lines.get(o.id as string) ?? [], payments.get(o.id as string) ?? [], settings.rush),
     };
   });

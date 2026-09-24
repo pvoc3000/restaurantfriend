@@ -151,13 +151,15 @@ export type InvoiceCandidate = {
   /** Where the money lands (120): the kitchen, else the pickup shop. */
   shop: string | null;
   balance: number;
+  /** Already on a customer invoice that is not void. */
+  on_invoice?: boolean;
 };
 
 /**
  * Why a selection cannot become one invoice, in words — or an empty list.
  * The SAME rules `create_customer_invoice` enforces, said before the dialog
- * opens rather than as a Postgres error after it commits. Orders already on
- * an invoice are the database's to refuse; the list does not know.
+ * opens rather than as a Postgres error after it commits. Since 127 the list
+ * knows which orders are already invoiced too; the database still checks.
  */
 export function createRefusals(rows: InvoiceCandidate[]): string[] {
   const out: string[] = [];
@@ -174,6 +176,10 @@ export function createRefusals(rows: InvoiceCandidate[]): string[] {
   const shops = new Set(rows.map((r) => r.shop ?? ""));
   if (shops.size > 1) {
     out.push("These orders are made at different shops, so one payment cannot cover them.");
+  }
+  const taken = rows.filter((r) => r.on_invoice);
+  if (taken.length) {
+    out.push(`${plural(taken.length, "order is", "orders are")} already on an invoice — void that one first.`);
   }
   const settled = rows.filter((r) => r.kind === "order" && r.balance <= 0.005);
   if (settled.length) out.push(`${plural(settled.length, "order has", "orders have")} nothing owed.`);

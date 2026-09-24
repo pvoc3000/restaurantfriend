@@ -12,6 +12,24 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-23, MIGRATION 127 WRITTEN, NOT YET APPLIED — BOTH
+   DOUBLE-PAY GAPS CLOSED** (Mark: "yes, close both gaps"). (1) The list's bulk
+   **Record Payment…** skips orders a non-void customer invoice bills and says
+   how many ("record those payments on the invoice"); the list page reads
+   `customer_invoice_lines` → non-void invoice for its rows (`invoice_id` on
+   `SpecialOrderRow`), which also lets **Create Invoice…** refuse an
+   already-invoiced order before the database does (`createRefusals`,
+   `on_invoice`). (2) The order's own **Send ▸ Invoice** carries NO pay link
+   while a customer invoice bills it (`SendDocument.onCustomerInvoice`), and
+   127's `pay_token_state` answers SUPERSEDED for an ORDER token whose order is
+   on a non-void customer invoice — so a link emailed BEFORE the invoice
+   existed stands down too, with "this invoice has been updated". Nothing is
+   written to the token: voiding the invoice revives the order's own link; a
+   settled order still reads "paid" first. **Verified** on the throwaway
+   Postgres (applied twice): invoiced → superseded (and unclaimable), free →
+   open, settled → paid, the invoice's own token open, void → open again; one
+   overload, granted to nobody. Fixture for the new refusal (2,028); tsc, lint.
+
    **And (same day) — THE ORDER KNOWS ITS INVOICE.** Mark: "we need to put the
    invoice in the payments area of the payments tab … remove the take a
    payment button from special orders that are part of a customer invoice …
@@ -25,7 +43,7 @@
    **Info tab:** an "Invoice" row after the Details (like Made from, present
    only when there is one): the link and its derived status. NOT yet: the
    list's bulk Record Payment still takes a payment on an invoiced order, and
-   the per-order pay-link double-pay gap is still open.
+   the per-order pay-link double-pay gap is still open — BOTH CLOSED next, below.
 
    **And (same day) — THE ORDERS TABLE IS A `DataTable`** (Mark: "the order
    table should be a datatable"): `customerInvoices/CustomerInvoiceLinesTable`,

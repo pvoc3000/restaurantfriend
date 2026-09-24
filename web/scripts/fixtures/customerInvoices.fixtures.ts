@@ -148,3 +148,8 @@ test("isCustomerInvoiceSnapshot: tells the two snapshots apart", () => {
   eq(isCustomerInvoiceSnapshot({ number: "10070", lines: [] }), false);
   eq(isCustomerInvoiceSnapshot(null), false);
 });
+
+test("createRefusals: an order already on an invoice is refused before the database refuses it", () => {
+  ok(createRefusals([...week, day(8, { on_invoice: true })])[0].includes("already on an invoice"));
+  eq(createRefusals(week.map((r) => ({ ...r, on_invoice: false }))), []);
+});
