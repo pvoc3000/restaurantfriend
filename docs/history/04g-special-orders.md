@@ -13,9 +13,11 @@
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
    **2026-09-24 — 4b, BUILD YOUR ORDER ON `/inquiry` (migrations 132 + 133
-   WRITTEN, NOT YET APPLIED; `submit-inquiry` changed and
-   `inquiry-delivery-quote` new, NEITHER DEPLOYED). *Probe, don't read this
-   line.*** Mark: customers should BUILD the order rather than only describe
+   APPLIED by Mark; `submit-inquiry` v11 and `inquiry-delivery-quote` v1
+   DEPLOYED the same day — probed: the live menu returns 229 items (80 regular,
+   48 mini, 45 giant, 56 letter), a bad basket is refused with nothing written,
+   and the delivery function answers `not_configured` until the Google key and
+   Settings are in). *Probe, don't read this line.*** Mark: customers should BUILD the order rather than only describe
    it — regular donuts, minis, giants and letters, with prices shown, and a
    fallback for anything else. Still a LEAD ("it's a lead, not an order").
    Decisions, all Mark's, 2026-09-24:
@@ -75,12 +77,10 @@
    letter, so per-letter mode opened pre-filled after a second flavour was
    ticked (`alignAssign(…, fillSingle=false)` when storing; fixture-pinned).
    Without a menu (132 unapplied) the page is exactly the v1 form.
-   **To finish:** apply 132 then 133; deploy `submit-inquiry` and
-   `inquiry-delivery-quote`; add the Google key and fill Settings ▸ Delivery
+   **To finish:** add the Google key and fill Settings ▸ Delivery
    estimate; add `{items}` to the inquiry email template if wanted; consider
    switching off "Donut Letters" (a generic letter item the menu offers as a
-   flavour). The production item record SELECTS `public_description`, so it
-   errors until 132 is applied.
+   flavour).
 
    **Also 2026-09-23 — THE ORDER'S MENU AND SPACING.** (1) "disable 'Send to
    quickbooks...'" — `quickbooks={null}` on the order record, so the row is
