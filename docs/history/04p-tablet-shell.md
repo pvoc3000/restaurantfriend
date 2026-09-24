@@ -90,6 +90,16 @@
    command. Supervisor+ see it. With no working shop it falls back to a link to
    the queue. `TILE_CLASS` moved to `tablet/tileClass.ts` so the server
    `Landing` and the client tile share one box without an import cycle.
+   **AN UNREGISTERED TABLET HAS SIGN OUT IN ITS BAR** (Mark, 2026-09-24).
+   He opened a shared tablet signed in as a supervisor and could only get out
+   through Account ▸ Sign out; the PIN picker had never appeared. Not Safari:
+   `registered_devices` held ONE row, "Claude test pane" — neither real tablet
+   had been registered, so no device cookie, no idle lock, no picker and no
+   Switch user. The fix for that is registering each tablet (`/settings ›
+   Shared devices`, owner/manager, on a PASSWORD session, on the tablet). The
+   code change is the fallback: beside Account on the home screen, an
+   unregistered tablet now gets **Sign out** (`signOut`, a full sign-out to
+   /login, `ICON_LOGOUT`); a registered one keeps Switch user alone.
    **THE LOOKUP TILES REUSE THE DESK LISTS AS THEY ARE** (Mark's choice). What
    a role may edit is already the sheet's cell; `compactBelow` (1280) already
    fires at iPad widths. Touch-shaped lists come later where these prove

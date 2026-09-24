@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef } from "react";
 
+import { signOut } from "@/app/actions";
 import { SwitchUser } from "@/components/SwitchUser";
 import { WorkingLocation } from "@/components/WorkingLocation";
 import type { Location } from "@/lib/session";
@@ -11,7 +12,7 @@ import { TABLET_HOME } from "@/lib/shell";
 import { usePublishedHeight } from "@/lib/tableHead";
 import { BAR_CELL } from "./barCell";
 import { BarActions } from "./BarActions";
-import { BarLabel, ICON_HOME, ICON_PERSON } from "./BarLabel";
+import { BarLabel, ICON_HOME, ICON_LOGOUT, ICON_PERSON } from "./BarLabel";
 import { BarRecordNav } from "./BarRecordNav";
 import { TabletBack } from "./TabletBack";
 
@@ -82,9 +83,23 @@ export function TabletBar({
             {registeredDevice ? (
               <SwitchUser size="lg" />
             ) : (
-              <Link href="/account" className={BAR_CELL}>
-                <BarLabel icon={ICON_PERSON} word="Account" />
-              </Link>
+              <>
+                <Link href="/account" className={BAR_CELL}>
+                  <BarLabel icon={ICON_PERSON} word="Account" />
+                </Link>
+                {/* AN UNREGISTERED TABLET GETS SIGN OUT ON ITS HOME SCREEN
+                    (Mark, 2026-09-24). With no device cookie there is no idle
+                    lock and no PIN picker, so whoever signed in last stays
+                    signed in for the next person — and the only way out was
+                    Account ▸ Sign out. A full sign-out, to the password
+                    screen; a REGISTERED tablet has Switch user instead. A
+                    document form, because `signOut` redirects itself. */}
+                <form action={signOut}>
+                  <button type="submit" className={BAR_CELL}>
+                    <BarLabel icon={ICON_LOGOUT} word="Sign out" />
+                  </button>
+                </form>
+              </>
             )}
           </div>
         )}
