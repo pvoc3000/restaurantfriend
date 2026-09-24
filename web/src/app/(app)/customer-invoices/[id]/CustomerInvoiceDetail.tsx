@@ -9,7 +9,6 @@ import { usDate } from "@/lib/specialOrderDocs";
 import { fetchInvoiceView } from "@/lib/customerInvoiceQueries";
 import {
   PROCESSOR_LABEL,
-  PROCESSOR_OPTIONS,
   invoiceNumberText,
   invoiceStatus,
   invoiceChanged,
@@ -24,6 +23,7 @@ import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { CustomerInvoiceCommandMenu } from "@/components/customerInvoices/CustomerInvoiceCommandMenu";
 import { CustomerInvoiceLinesTable } from "@/components/customerInvoices/CustomerInvoiceLinesTable";
 import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
+import { ProcessorField } from "@/components/customerInvoices/ProcessorField";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { canEditPage } from "@/lib/pageAccess";
 
@@ -186,9 +186,7 @@ export async function CustomerInvoiceDetail({
                 which Send to QuickBooks can do before any send. Void it to
                 change its mind. */}
             {canWrite && draft && !qbo?.id ? (
-              <InlineValue boxed={BOXED_FIELDS} table="customer_invoices" id={id} column="processor"
-                           kind="pick" nullable={false} value={processor}
-                           options={PROCESSOR_OPTIONS} ariaLabel="Collect through" />
+              <ProcessorField key={processor} id={id} value={processor} />
             ) : (
               <span className={READ_ONLY_VALUE}>{PROCESSOR_LABEL[processor]}</span>
             )}
