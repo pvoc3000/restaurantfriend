@@ -12,6 +12,18 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-23, MIGRATION 130 WRITTEN, NOT YET APPLIED — AN ORDER'S
+   LOG SAYS WHEN IT LEAVES AN INVOICE.** Mark deleted draft 1001; its orders'
+   logs ended at "Added to invoice 1001". "yes, add the removed-from-invoice
+   log." A BEFORE DELETE trigger on `customer_invoices` (the cascade reaches
+   the lines after the number is gone) logs "Removed from invoice N (draft
+   deleted)" on each order; an AFTER UPDATE OF voided_at logs "Invoice N
+   voided" the first time it is set — voiding is the other way an order leaves
+   an invoice, added unasked and said so. Also noted: numbering is max + 1, so
+   deleting the only invoice lets 1001 be issued again — harmless, since only
+   an unsent draft can be deleted. Verified on the throwaway Postgres: add,
+   delete, re-add, void, re-void → four lines, the re-void silent.
+
    **Shipped 2026-09-23, MIGRATION 129 APPLIED (Mark, same day) — "SOLD AS"
    LIVES ON THE ORDER, SO A ONE-OFF CAN BE WHOLESALE.** Mark, having asked how
    the app tells regular from wholesale (answer: by ORIGIN — `kind = 'order'`
