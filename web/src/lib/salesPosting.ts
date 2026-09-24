@@ -166,6 +166,8 @@ export type SalesPostingRef = {
 
 export type BuildInput = {
   breakdown: SalesBreakdown | null;
+  /** `orgs.name`, which closes the memo (Mark, 2026-09-24). Not hashed. */
+  orgName?: string;
   mappings: readonly SalesMapping[];
   shop: PostingShop;
   businessDate: string;
@@ -524,7 +526,7 @@ export function buildJournalEntry(input: BuildInput): JournalBuild {
     ...(mode === "update" ? { Id: id, SyncToken: syncToken, sparse: false } : {}),
     DocNumber: docNumber,
     TxnDate: businessDate,
-    PrivateNote: `Square sales · ${shop.code} · ${businessDate} · pulled ${breakdown.pulled_at.slice(0, 16).replace("T", " ")} · restaurantfriend`,
+    PrivateNote: `Square sales · ${shop.code} · ${businessDate} · pulled ${breakdown.pulled_at.slice(0, 16).replace("T", " ")}${orgTail(input.orgName)}`,
     Line: lines.map((l) => ({
       DetailType: "JournalEntryLineDetail" as const,
       Amount: centsToAmount(l.cents),
@@ -770,6 +772,8 @@ export function depositHash(input: { docNumber: string; txnDate: string; cents: 
  */
 export function buildDeposit(input: {
   payout: SquarePayout;
+  /** `orgs.name`, which closes the memo. Not hashed. */
+  orgName?: string;
   mappings: readonly SalesMapping[];
   shop: PostingShop;
 }): DepositBuild {
@@ -823,7 +827,7 @@ export function buildDeposit(input: {
     ...(mode === "update" ? { Id: id, SyncToken: syncToken, sparse: false } : {}),
     DocNumber: docNumber,
     TxnDate: payout.arrival_date,
-    PrivateNote: `Square payout · ${shop.code} · sent ${sent}, arriving ${payout.arrival_date} · ${docNumber} · restaurantfriend`,
+    PrivateNote: `Square payout · ${shop.code} · sent ${sent}, arriving ${payout.arrival_date} · ${docNumber}${orgTail(input.orgName)}`,
     DepositToAccountRef: { value: bank!.ref, ...(bank!.name ? { name: bank!.name } : {}) },
     DepartmentRef: dept!,
     Line: [
@@ -919,4 +923,10 @@ export function matchDeposits(
     }
     return { payoutId: p.id, ours, theirs };
   });
+}
+
+/** " · Donut Friend", or nothing when the org has no name. */
+function orgTail(orgName: string | null | undefined): string {
+  const n = (orgName ?? "").trim();
+  return n ? ` · ${n}` : "";
 }

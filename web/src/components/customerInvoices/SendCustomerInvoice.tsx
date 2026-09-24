@@ -520,7 +520,7 @@ async function quickBooksInputs(
   view: InvoiceView,
   number: string
 ): Promise<Omit<CustomerInvoicePushInputs, "billEmail">> {
-  const [conn, customer] = await Promise.all([
+  const [conn, customer, org] = await Promise.all([
     supabase.rpc("accounting_connection_status", { p_org: orgId }),
     view.invoice.customer_id
       ? supabase
@@ -529,6 +529,7 @@ async function quickBooksInputs(
           .eq("id", view.invoice.customer_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    supabase.from("orgs").select("name").eq("id", orgId).maybeSingle(),
   ]);
   const row = Array.isArray(conn.data)
     ? (conn.data[0] as
@@ -553,6 +554,7 @@ async function quickBooksInputs(
       external_ref: (view.invoice.external_ref ?? null) as AccountingRef | null,
     },
     customerName: view.customerName,
+    orgName: (org.data?.name as string | undefined) ?? "",
     customerRef: qboVendorId((customer?.data?.external_ref ?? null) as AccountingRef | null),
     itemRef: row?.invoice_item_ref ?? null,
     wholesaleItemRef: row?.wholesale_item_ref ?? null,

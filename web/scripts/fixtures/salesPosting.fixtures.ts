@@ -479,7 +479,7 @@ test("the real DF01 payout becomes one deposit for its exact amount, into the ba
     JSON.stringify({
       DocNumber: "T316V42B337KEBX",
       TxnDate: "2026-09-16",
-      PrivateNote: "Square payout · DF01 · sent 2026-09-16, arriving 2026-09-16 · T316V42B337KEBX · restaurantfriend",
+      PrivateNote: "Square payout · DF01 · sent 2026-09-16, arriving 2026-09-16 · T316V42B337KEBX",
       DepositToAccountRef: { value: "B", name: "Chase ACH (*1509)" },
       DepartmentRef: { value: "1", name: "DF01 HP" },
       Line: [

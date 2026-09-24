@@ -32,6 +32,8 @@ export type BillPushContext = {
   connected: boolean;
   orgAccount: { ref: string | null; name: string | null } | null;
   vendorName: string;
+  /** `orgs.name`, for the memo on the QuickBooks bill. */
+  orgName: string;
   /** 083's row for THIS invoice's shop. Null when nobody has configured the
    *  vendor there — or when the migration is not applied yet. */
   atShop: VendorLocationAccounting | null;
@@ -53,7 +55,7 @@ export async function readBillPushContext(
   ids: { orgId: string; vendorId: string; locationId: string; billId: string }
 ): Promise<BillPushContext> {
   const { orgId, vendorId, locationId, billId } = ids;
-  const [conn, vendor, invoice, atShop, docs] = await Promise.all([
+  const [conn, vendor, invoice, atShop, docs, org] = await Promise.all([
     supabase.rpc("accounting_connection_status", { p_org: orgId }),
     supabase.from("vendors").select("name").eq("id", vendorId).maybeSingle(),
     supabase.from("vendor_bills").select("external_ref").eq("id", billId).maybeSingle(),
@@ -72,6 +74,7 @@ export async function readBillPushContext(
       .from("purchase_order_attachments")
       .select("id, kind, file_name, content_type, storage_path")
       .eq("bill_id", billId),
+    supabase.from("orgs").select("name").eq("id", orgId).maybeSingle(),
   ]);
 
   const row = Array.isArray(conn.data)
@@ -90,6 +93,7 @@ export async function readBillPushContext(
       ? { ref: row.bill_expense_account_ref ?? null, name: row.bill_expense_account_name ?? null }
       : null,
     vendorName: (vendor.data?.name as string) ?? "this vendor",
+    orgName: (org.data?.name as string | undefined) ?? "",
     atShop: (atShop.data ?? null) as VendorLocationAccounting | null,
     schemaError: atShop.error?.message ?? null,
     billRef: (invoice.data?.external_ref ?? null) as AccountingRef | null,
@@ -129,6 +133,7 @@ export async function sendBillToQuickBooks(
     bill: bill,
     vendorRef,
     vendorName: ctx.vendorName,
+    orgName: ctx.orgName,
     accountRef: account.ref,
     department: tracking.location,
     klass: tracking.klass,

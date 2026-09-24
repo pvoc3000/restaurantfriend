@@ -92,6 +92,7 @@ export function PushOrderToQuickBooks({
     taxCodeRef: string | null;
     customerRef: string | null;
     orderRef: AccountingRef | null;
+    orgName: string;
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,12 +100,13 @@ export function PushOrderToQuickBooks({
   const [warnings, setWarnings] = useState<string[]>([]);
 
   const read = useCallback(async () => {
-    const [conn, customer, order] = await Promise.all([
+    const [conn, customer, order, org] = await Promise.all([
       supabase.rpc("accounting_connection_status", { p_org: orgId }),
       customerId
         ? supabase.from("customers").select("external_ref").eq("id", customerId).maybeSingle()
         : Promise.resolve({ data: null }),
       supabase.from("special_orders").select("external_ref").eq("id", orderId).maybeSingle(),
+      supabase.from("orgs").select("name").eq("id", orgId).maybeSingle(),
     ]);
     const row = Array.isArray(conn.data)
       ? (conn.data[0] as
@@ -117,6 +119,7 @@ export function PushOrderToQuickBooks({
       taxCodeRef: row?.tax_code_ref ?? null,
       customerRef: qboVendorId((customer?.data?.external_ref ?? null) as AccountingRef | null),
       orderRef: (order.data?.external_ref ?? null) as AccountingRef | null,
+      orgName: (org.data?.name as string | undefined) ?? "",
     };
   }, [supabase, orgId, customerId, orderId]);
 
@@ -150,6 +153,7 @@ export function PushOrderToQuickBooks({
     order,
     customerRef: ctx.customerRef,
     customerName,
+    orgName: ctx.orgName,
     itemRef: ctx.itemRef,
     taxCodeRef: ctx.taxCodeRef,
     total: totals.total,

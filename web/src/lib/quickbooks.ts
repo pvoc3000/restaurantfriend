@@ -108,8 +108,20 @@ export function poNumbersPhrase(poNumbers: readonly string[] | undefined): strin
   return `${unique.length === 1 ? "PO" : "POs"} ${unique.join(", ")}`;
 }
 
+/**
+ * THE ORG'S NAME ON WHAT WE PUT IN THE BOOKS (Mark, 2026-09-24: the org name
+ * "instead of restaurant friend") — the private memo that traces a QuickBooks
+ * document back to our record. Nothing reads it back; with no name, just the
+ * rest.
+ */
+export function memoTag(orgName: string | null | undefined, rest: string): string {
+  return [(orgName ?? "").trim(), rest].filter(Boolean).join(" ");
+}
+
 export type BillPushInputs = {
   bill: PushableBill;
+  /** `orgs.name`, for the memo. */
+  orgName?: string;
   /** `vendors.external_ref -> qbo -> id`. Null when nobody has mapped it. */
   vendorRef: string | null;
   /** Only ever used to word a refusal. */
@@ -279,7 +291,8 @@ export function buildBillPayload(
     // QuickBooks bill list shows at a glance.
     PrivateNote: (() => {
       const pos = poNumbersPhrase(bill.po_numbers);
-      return pos ? `${pos} · restaurantfriend ${bill.id}` : `restaurantfriend ${bill.id}`;
+      const tag = memoTag(inputs.orgName, bill.id);
+      return pos ? `${pos} · ${tag}` : tag;
     })(),
   };
 
@@ -520,6 +533,8 @@ export type InvoiceOrder = {
 
 export type InvoicePushInputs = {
   order: InvoiceOrder;
+  /** `orgs.name`, for the memo. */
+  orgName?: string;
   /** `customers.external_ref → qbo → id`. */
   customerRef: string | null;
   customerName: string;
@@ -631,7 +646,7 @@ export function buildInvoicePayload(
   const body: Record<string, unknown> = {
     CustomerRef: { value: customerRef },
     Line: lines,
-    PrivateNote: `restaurantfriend ${order.id}`,
+    PrivateNote: memoTag(inputs.orgName, order.id),
   };
 
   // NAMES A CODE, because an empty detail computed nothing — measured — and no
@@ -770,6 +785,8 @@ export type CustomerInvoicePushInputs = {
     external_ref: AccountingRef | null;
   };
   customerName: string;
+  /** `orgs.name`, for the memo. */
+  orgName?: string;
   /** The customer's OWN QuickBooks customer. Always their own: a shared one
    *  lets every customer on it see the others' open invoices on QuickBooks'
    *  pay page (measured 2026-09-24, which retired 132's catch-all). */
@@ -871,7 +888,7 @@ export function buildCustomerInvoicePayload(
   const body: Record<string, unknown> = {
     CustomerRef: { value: inputs.customerRef },
     Line: lines,
-    PrivateNote: `restaurantfriend customer_invoice ${invoice.id}`,
+    PrivateNote: memoTag(inputs.orgName, `customer invoice ${invoice.id}`),
     TxnDate: invoice.issued_on,
     BillEmail: { Address: inputs.billEmail!.trim() },
     AllowOnlineCreditCardPayment: true,
@@ -961,7 +978,7 @@ export function buildQboCustomerPayload(
   const body: Record<string, unknown> = {
     DisplayName: qboDisplayName(c, disambiguate),
     PrimaryEmailAddr: { Address: t(c.email) },
-    Notes: [orgName.trim(), "customer", c.id].filter(Boolean).join(" "),
+    Notes: memoTag(orgName, `customer ${c.id}`),
   };
   if (t(c.first_name)) body.GivenName = t(c.first_name).slice(0, 100);
   if (t(c.last_name)) body.FamilyName = t(c.last_name).slice(0, 100);

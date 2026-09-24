@@ -78,7 +78,7 @@ test("the dates and doc number ride the bill", () => {
   eq(body.DocNumber, "73535581", "DocNumber");
   eq(body.TxnDate, "2026-08-17", "TxnDate");
   eq(body.DueDate, "2026-09-16", "DueDate");
-  eq(body.PrivateNote, "restaurantfriend inv-1", "PrivateNote traces the record");
+  eq(body.PrivateNote, "inv-1", "PrivateNote traces the record");
 });
 
 test("a null date is omitted rather than sent empty", () => {
@@ -871,14 +871,14 @@ test("a bill linked to an order names the PO in its line description and memo", 
   );
   const line = (body.Line as Record<string, unknown>[])[0];
   eq(line.Description, "Invoice 73535581 · PO 132-181227-01", "description");
-  eq(body.PrivateNote, "PO 132-181227-01 · restaurantfriend inv-1", "memo leads with the PO");
+  eq(body.PrivateNote, "PO 132-181227-01 · inv-1", "memo leads with the PO");
 });
 
 test("a bill with no linked order sends exactly what it always did", () => {
   const { body } = buildBillPayload(inputs({ bill: bill({ po_numbers: [] }) }));
   const line = (body.Line as Record<string, unknown>[])[0];
   eq(line.Description, billLineDescription({ invoice_number: "73535581" }), "description unchanged");
-  eq(body.PrivateNote, "restaurantfriend inv-1", "memo unchanged");
+  eq(body.PrivateNote, "inv-1", "memo unchanged");
 });
 
 // ---------------------------------------------------------------------------
@@ -1061,4 +1061,21 @@ test("no email, no QuickBooks customer", () => {
   let threw = false;
   try { buildQboCustomerPayload({ ...dana, email: null }, "Donut Friend"); } catch { threw = true; }
   ok(threw, "the builder refuses too");
+});
+
+// The memo names the org, not the app (Mark, 2026-09-24)
+import { memoTag } from "../../src/lib/quickbooks";
+
+test("every memo is the org's name then our reference, or just the reference", () => {
+  eq(memoTag("Donut Friend", "inv-1"), "Donut Friend inv-1", "named");
+  eq(memoTag("  ", "inv-1"), "inv-1", "blank name");
+  eq(memoTag(null, "inv-1"), "inv-1", "no name");
+  const { body } = buildCustomerInvoicePayload({ ...civ(), orgName: "Donut Friend" });
+  eq(body.PrivateNote, "Donut Friend customer invoice ci-1", "customer invoice");
+  no(JSON.stringify(body).includes("restaurantfriend"), "the app's name is gone");
+});
+
+test("a bill's memo carries the org's name after the PO", () => {
+  const { body } = buildBillPayload({ ...inputs({ bill: bill({ po_numbers: ["132-181227-01"] }) }), orgName: "Donut Friend" });
+  eq(body.PrivateNote, "PO 132-181227-01 · Donut Friend inv-1", "named");
 });

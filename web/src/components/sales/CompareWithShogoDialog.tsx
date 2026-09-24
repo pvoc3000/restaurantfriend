@@ -107,6 +107,7 @@ export function CompareWithShogoDialog({
           netSalesCents: r.netSalesCents,
           tipsCents: r.tipsCents,
           existing: null,
+          orgName: ctx.orgName,
         });
         if (b.ok) ours.set(`${day.locationCode}|${r.business_date}`, b.lines);
         else refusals.push(`${day.locationCode} ${r.business_date}: ${b.refusals[0]}`);

@@ -31,6 +31,8 @@ export type PostingContext = {
   /** Every location, keyed by id — the shop's class and location ride here. */
   shops: Map<string, PostingShop & { id: string }>;
   mappings: SalesMapping[];
+  /** `orgs.name`, which closes each memo. */
+  orgName: string;
   /** A missing column, which means migration 104 is not applied. */
   schemaError: string | null;
 };
@@ -39,7 +41,7 @@ export async function readPostingContext(
   supabase: SupabaseClient,
   orgId: string
 ): Promise<PostingContext> {
-  const [conn, locs, maps] = await Promise.all([
+  const [conn, locs, maps, org] = await Promise.all([
     supabase.rpc("accounting_connection_status", { p_org: orgId }),
     supabase
       .from("locations")
@@ -47,6 +49,7 @@ export async function readPostingContext(
     supabase
       .from("accounting_sales_mappings")
       .select("kind, square_key, square_name, account_ref, account_name"),
+    supabase.from("orgs").select("name").eq("id", orgId).maybeSingle(),
   ]);
   const row = Array.isArray(conn.data) ? (conn.data[0] as { status?: string } | undefined) : undefined;
   const shops = new Map<string, PostingShop & { id: string }>();
@@ -55,6 +58,7 @@ export async function readPostingContext(
     connected: row?.status === "connected",
     shops,
     mappings: ((maps.data ?? []) as SalesMapping[]),
+    orgName: (org.data?.name as string | undefined) ?? "",
     schemaError: locs.error?.message ?? maps.error?.message ?? null,
   };
 }
