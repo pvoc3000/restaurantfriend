@@ -80,9 +80,12 @@ export async function CustomerInvoiceDetail({
   const part = (pick: (t: NonNullable<(typeof lines)[number]["totals"]>) => number) =>
     Math.round(lines.reduce((a, l) => a + (l.totals ? pick(l.totals) : 0), 0) * 100) / 100;
   const sums = {
+    items: part((t) => t.subtotal),
     discount: part((t) => t.discount),
     delivery: part((t) => t.deliveryCharge),
     tax: part((t) => t.tax),
+    paid: part((t) => t.paid),
+    balance: part((t) => t.balance),
   };
   const figure = (v: number | undefined, negative = false) =>
     v ? `${negative ? "−" : ""}${money(v)}` : "—";
@@ -196,14 +199,17 @@ export async function CustomerInvoiceDetail({
                   until the invoice is paid — it is not on the customer's
                   paper, so a sent invoice still lets it through. */}
               <th className="w-44 px-3 py-2 text-left">Sold as</th>
-              {/* The ORDER's figures today, from `orderTotals`, where Amount is
-                  the invoice's own frozen line — so when an order changes after
-                  the invoice was written, these move and Amount does not. */}
+              {/* THE ORDER'S OWN PAYMENTS FIGURES, in the order its record shows
+                  them (Mark, 2026-09-23: "Items, Discount, Delivery, Tax, Paid,
+                  Balance") — each order today, from `orderTotals`, so the row
+                  reads across. The invoice's own frozen amount only appears,
+                  under Balance, when the order has moved away from it. */}
+              <th className="w-28 px-3 py-2 text-right">Items</th>
               <th className="w-28 px-3 py-2 text-right">Discount</th>
               <th className="w-28 px-3 py-2 text-right">Delivery</th>
               <th className="w-28 px-3 py-2 text-right">Tax</th>
-              <th className="w-32 px-3 py-2 text-right">Amount</th>
-              <th className="w-32 px-3 py-2 text-right">Paid</th>
+              <th className="w-28 px-3 py-2 text-right">Paid</th>
+              <th className="w-32 px-3 py-2 text-right">Balance</th>
             </tr>
           </thead>
           <tbody>
@@ -239,6 +245,9 @@ export async function CustomerInvoiceDetail({
                     )}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-muted">
+                    {figure(l.totals?.subtotal)}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-muted">
                     {figure(l.totals?.discount, true)}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-muted">
@@ -247,16 +256,14 @@ export async function CustomerInvoiceDetail({
                   <td className="px-3 py-2 text-right tabular-nums text-muted">
                     {figure(l.totals?.tax)}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {money(l.amount)}
-                    {drift !== null ? (
-                      <span className="block text-[12px] text-accent">
-                        now {money(l.amount + drift)}
-                      </span>
-                    ) : null}
-                  </td>
                   <td className="px-3 py-2 text-right tabular-nums text-muted">
-                    {l.collected !== 0 ? money(l.collected) : "—"}
+                    {figure(l.totals?.paid)}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {l.totals ? money(l.totals.balance) : money(l.amount)}
+                    {drift !== null ? (
+                      <span className="block text-[12px] text-accent">invoiced {money(l.amount)}</span>
+                    ) : null}
                   </td>
                 </tr>
               );
@@ -265,11 +272,12 @@ export async function CustomerInvoiceDetail({
           <tfoot>
             <tr className="border-t-2 border-ink font-semibold">
               <td className="px-3 py-2" colSpan={3}>Total</td>
+              <td className="px-3 py-2 text-right tabular-nums">{figure(sums.items)}</td>
               <td className="px-3 py-2 text-right tabular-nums">{figure(sums.discount, true)}</td>
               <td className="px-3 py-2 text-right tabular-nums">{figure(sums.delivery)}</td>
               <td className="px-3 py-2 text-right tabular-nums">{figure(sums.tax)}</td>
-              <td className="px-3 py-2 text-right tabular-nums">{money(view.total)}</td>
-              <td className="px-3 py-2 text-right tabular-nums">{view.paid !== 0 ? money(view.paid) : "—"}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{figure(sums.paid)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{money(sums.balance)}</td>
             </tr>
           </tfoot>
         </table>

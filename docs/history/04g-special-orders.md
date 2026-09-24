@@ -12,6 +12,15 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Then (same day) — THE ORDERS TABLE READS LIKE THE ORDER'S PAYMENTS
+   SECTION:** Items · Discount · Delivery · Tax · Paid · Balance (Mark: "add the
+   item total field … change amount to 'Balance'"). All six are the ORDER's
+   figures today (`orderTotals`: subtotal, discount, delivery, tax, every
+   payment, balance), so the row adds across (rush aside) and the footer's
+   Balance is what the orders still owe. The invoice's frozen line amount
+   appears under Balance as "invoiced $x" only when it differs; the header's
+   total and "due" are still the invoice's own.
+
    **Also 2026-09-23 — THE ORDERS TABLE SHOWS DISCOUNT, DELIVERY AND TAX** beside
    Amount and Paid (Mark: "can we also display the other payments fields"). They
    are each ORDER's figures today from `orderTotals`, summed in the footer; Amount
