@@ -898,8 +898,15 @@ test("the kind filter tells a standing order from the days it makes", () => {
   ok(matchesKindFilter(recurrence, "standing_order"));
   no(matchesKindFilter(day, "standing_order"), "a day is not its own recurrence");
   ok(matchesKindFilter({ kind: "template" }, "template"));
+  // 129: Sold as decides it, so a one-off wholesale order is Wholesale and a
+  // standing day switched to Special Order is Special.
+  const oneOffWholesale = { kind: "order", standing_order_id: null, square_item: "wholesale" };
+  const daySoldSpecial = { kind: "order", standing_order_id: "s1", square_item: "special_order" };
+  ok(matchesKindFilter(oneOffWholesale, "standing_day"));
+  no(matchesKindFilter(oneOffWholesale, "order"));
+  ok(matchesKindFilter(daySoldSpecial, "order"));
   // Every order matches exactly one option, or the four cannot sum to the list.
-  for (const r of [day, oneOff, recurrence, { kind: "template" }]) {
+  for (const r of [day, oneOff, recurrence, { kind: "template" }, oneOffWholesale, daySoldSpecial]) {
     eq(ORDER_KIND_FILTERS.filter((f) => matchesKindFilter(r, f.value)).length, 1);
   }
 });

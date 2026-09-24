@@ -12,6 +12,18 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Also 2026-09-23 — "ORDERS", AND THE KIND FILTER BY SOLD AS.** Mark:
+   rename the Kind filter's "Regular Orders" → "Special Orders", "Standing
+   Orders" → "Wholesale Orders", "Regular Order Templates" → "Special Order
+   Templates"; call the section, its first menu item and the list's title just
+   "Orders"; put Invoices between Orders and Customers. Done, plus the tablet
+   start tile ("View Orders") and every breadcrumb that said "Special Orders".
+   The filter's split now reads each order's Sold as (129) rather than
+   `standing_order_id` — otherwise "Wholesale Orders" would have hidden the
+   one-off wholesale order the rename is about; the values (`order`,
+   `standing_day`) are unchanged so saved views keep working. Route, slug and
+   the word "special order" inside the record are unchanged.
+
    **Verified live 2026-09-23 — THE FIRST CUSTOMER INVOICE, SENT AND PAID.**
    Invoice 1001 (a new 1001 after the draft was deleted) for one-off wholesale
    order #10075 ($0.75 goods untaxed + $0.75 delivery): created from the order,

@@ -89,6 +89,8 @@ export type SpecialOrderRow = {
   /** Set when 099 materialized this day FROM a standing order; null on a
    *  hand-typed one. The Kind filter's whole distinction. */
   standing_order_id: string | null;
+  /** Sold as (129) — what the Kind filter's Special / Wholesale split reads. */
+  square_item: string | null;
   /** Derived on the server from the lines and the payments — never a column. */
   totals: OrderTotals;
   /** Every stage date, so the grid and `needsAttention` read the same row. */
@@ -612,7 +614,7 @@ export function SpecialOrdersList({
 
   const listHref = filterHref(PATH, dimensions, filters, search, sort);
   const detailHref = (id: string) =>
-    withFrom(`/special-orders/${id}`, { href: listHref, label: "Special Orders" });
+    withFrom(`/special-orders/${id}`, { href: listHref, label: "Orders" });
 
   const columns: DataColumn<SpecialOrderRow>[] = [
     /**
@@ -755,7 +757,7 @@ export function SpecialOrdersList({
       render: (r) =>
         r.customer ? (
           <Link
-            href={withFrom(`/customers/${r.customer.id}`, { href: listHref, label: "Special Orders" })}
+            href={withFrom(`/customers/${r.customer.id}`, { href: listHref, label: "Orders" })}
             className="hover:underline"
           >
             {customerLabel(r.customer)}
@@ -956,7 +958,7 @@ export function SpecialOrdersList({
           order the ORG's, which is why this screen is exempt from
           `InactiveLocationGate`. */}
       <PageHeading
-        title="Special Orders"
+        title="Orders"
         visible={visible.length}
         total={rows.length}
         noun="orders"

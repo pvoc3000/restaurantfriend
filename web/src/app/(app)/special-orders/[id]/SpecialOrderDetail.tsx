@@ -66,7 +66,7 @@ import {
 } from "@/lib/customerInvoices";
 import { canRefundPayments, canScheduleProduction } from "@/lib/roles";
 
-const SPECIAL_ORDERS_CRUMB = { href: "/special-orders", label: "Special Orders" };
+const SPECIAL_ORDERS_CRUMB = { href: "/special-orders", label: "Orders" };
 
 /**
  * The app's chip box, layout only — the exact string the purchase order and

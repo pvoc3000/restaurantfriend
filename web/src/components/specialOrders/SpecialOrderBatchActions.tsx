@@ -921,7 +921,7 @@ export function SpecialOrderBatchActions({
           orgId={orgId}
           today={today}
           onClose={() => setInvoicing(false)}
-          from={{ href: "/special-orders", label: "Special Orders" }}
+          from={{ href: "/special-orders", label: "Orders" }}
         />
       )}
 

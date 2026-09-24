@@ -55,14 +55,19 @@ export const ORDER_KIND_FILTERS: {
   label: string;
   separatorBefore?: boolean;
 }[] = [
-  { value: "order", label: "Regular Orders" },
+  // RENAMED, AND MATCHED BY "SOLD AS" (Mark, 2026-09-23: "change 'regular
+  // order' to 'special order', 'Standing Orders' to 'Wholesale Orders'"). The
+  // VALUES stay `order` / `standing_day` so saved views and URLs keep working;
+  // since 129 the split is each order's own `square_item`, so a one-off
+  // wholesale order is listed as wholesale — see `matchesKindFilter`.
+  { value: "order", label: "Special Orders" },
   // Mark's words, 2026-09-17: the DAY is the order and the recurrence is the
   // template that makes it. `KIND_LABEL` keeps the schema's own vocabulary for
   // the record screens; this is the filter's.
-  { value: "standing_day", label: "Standing Orders" },
+  { value: "standing_day", label: "Wholesale Orders" },
   // The two templates below the two kinds of real order, ruled off from them
   // and in the same order as the orders above (Mark, 2026-09-17).
-  { value: "template", label: "Regular Order Templates", separatorBefore: true },
+  { value: "template", label: "Special Order Templates", separatorBefore: true },
   { value: "standing_order", label: "Standing Order Templates" },
 ];
 
@@ -88,11 +93,14 @@ export function kindFilterIsDateless(value: string): boolean {
 }
 
 export function matchesKindFilter(
-  order: { kind: string; standing_order_id?: string | null },
+  order: { kind: string; standing_order_id?: string | null; square_item?: string | null },
   value: string
 ): boolean {
-  if (value === "order") return order.kind === "order" && !order.standing_order_id;
-  if (value === "standing_day") return order.kind === "order" && Boolean(order.standing_order_id);
+  // Sold as (129) decides it; a row read without the column falls back to
+  // the old test, made by a standing order.
+  const wholesale = order.square_item ? order.square_item === "wholesale" : Boolean(order.standing_order_id);
+  if (value === "order") return order.kind === "order" && !wholesale;
+  if (value === "standing_day") return order.kind === "order" && wholesale;
   return order.kind === value;
 }
 

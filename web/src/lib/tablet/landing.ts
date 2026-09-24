@@ -66,8 +66,9 @@ export const LANDING_GROUPS: readonly TileGroup[] = [
     ],
   },
   {
-    label: "Special Orders",
-    tiles: [{ key: "special_orders", label: "View Special Orders", href: "/special-orders" }],
+    // "Orders" since 2026-09-23, with the menu.
+    label: "Orders",
+    tiles: [{ key: "special_orders", label: "View Orders", href: "/special-orders" }],
   },
 ];
 

@@ -325,7 +325,10 @@ export const SECTIONS: NavSection[] = [
   },
   {
     slug: "special-orders",
-    label: "Special Orders",
+    // "Orders" since 2026-09-23 (Mark: "change the name of the Special Orders
+    // title and header menu to just Orders"). The slug and route keep their
+    // names: they are addresses, not wording.
+    label: "Orders",
     // The section already existed as two stubs, which answers the brief's own
     // open question about placement: a tier-1 section, not a pair of subs under
     // Operations. `resolveRoute` prefix-matches, so /special-orders/[id],
@@ -337,21 +340,22 @@ export const SECTIONS: NavSection[] = [
     subs: [
       {
         slug: "special-orders",
-        label: "Special Orders",
+        label: "Orders",
         href: "/special-orders",
+        built: true,
+      },
+      {
+        // Migration 124 (2026-09-23): one invoice, many orders, one pay link.
+        // Between Orders and Customers (Mark, same day).
+        slug: "invoices",
+        label: "Invoices",
+        href: "/customer-invoices",
         built: true,
       },
       {
         slug: "customers",
         label: "Customers",
         href: "/customers",
-        built: true,
-      },
-      {
-        // Migration 124 (2026-09-23): one invoice, many orders, one pay link.
-        slug: "invoices",
-        label: "Invoices",
-        href: "/customer-invoices",
         built: true,
       },
     ],
