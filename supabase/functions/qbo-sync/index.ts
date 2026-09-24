@@ -25,6 +25,9 @@
 //   customers      → QBO customers, for the mapping picker on a customer
 //   tax_codes      → QBO tax codes, for the settings picker (084)
 //   push_invoice   → send one special order to QuickBooks as an Invoice
+//   push_customer_invoice → send one customer invoice routed to QuickBooks
+//                    (131), and hand back its pay link (InvoiceLink)
+//   void_customer_invoice → void that invoice in QuickBooks
 //   post_daily_sales     → one shop-day of Square sales as a JournalEntry (104)
 //   find_journal_entries → what is on the books for a date range, flattened —
 //                          the parallel run against Shogo
@@ -400,6 +403,8 @@ Deno.serve(async (req) => {
         bill_expense_account_name?: string | null;
         invoice_item_ref?: string | null;
         invoice_item_name?: string | null;
+        wholesale_item_ref?: string | null;
+        wholesale_item_name?: string | null;
         tax_code_ref?: string | null;
         tax_code_name?: string | null;
       };
@@ -408,6 +413,8 @@ Deno.serve(async (req) => {
         "bill_expense_account_name",
         "invoice_item_ref",
         "invoice_item_name",
+        "wholesale_item_ref",
+        "wholesale_item_name",
         "tax_code_ref",
         "tax_code_name",
       ] as const) {
@@ -1626,8 +1633,10 @@ Deno.serve(async (req) => {
         return json(400, { error: "The payload names a different QuickBooks customer." });
       }
 
-      const conn2 = await loadConnection(admin, orgId);
-      const { saved, retried } = await postDocument(admin, conn2, "Invoice", req.payload);
+      // `conn`, the one loaded above, and ONLY that one: a token refresh updates
+      // the object in place, and a second copy would still hold the spent one
+      // when the attachment calls below reach for it.
+      const { saved, retried } = await postDocument(admin, conn, "Invoice", req.payload);
       const doc = saved?.Invoice;
       if (!doc?.Id || doc?.SyncToken === undefined || doc?.SyncToken === null) {
         return json(502, { error: "QuickBooks saved the invoice but returned no id and sync token." });
@@ -1739,6 +1748,194 @@ Deno.serve(async (req) => {
         // is not an update, it is a CREATE, which duplicates the invoice.
         ref,
       });
+    }
+
+    // -----------------------------------------------------------------------
+    // push_customer_invoice — a customer invoice routed to QuickBooks (131)
+    // -----------------------------------------------------------------------
+    //
+    // Mark, 2026-09-24: QuickBooks as a second processor, to try against
+    // Square. The invoice goes to QuickBooks and OUR email carries QuickBooks'
+    // own pay link, so this answers with it. The payload is built and checked
+    // by `buildCustomerInvoicePayload` in `web/src/lib/quickbooks.ts` — the
+    // amounts are trusted from the browser for `push_invoice`'s reason
+    // (decision 6); what is checked here is everything that could point the
+    // money somewhere else: the processor, the customer, and which QuickBooks
+    // invoice an update names.
+    if (mode === "push_customer_invoice") {
+      const req = body as unknown as {
+        customer_invoice_id?: string;
+        payload?: Record<string, unknown>;
+        attachments?: AttachRequest[];
+        replace_attachable_id?: string;
+      };
+      if (!req.customer_invoice_id || !req.payload) {
+        return json(400, { error: "missing customer_invoice_id or payload" });
+      }
+
+      const { data: inv, error: invErr } = await supabase
+        .from("customer_invoices")
+        .select("id, number, processor, voided_at, customer_id, external_ref")
+        .eq("id", req.customer_invoice_id)
+        .maybeSingle();
+      if (invErr) return json(500, { error: invErr.message });
+      if (!inv) return json(404, { error: "No such invoice" });
+      if (inv.processor !== "quickbooks") {
+        return json(400, { error: "This invoice is collected through Square, not QuickBooks." });
+      }
+      if (inv.voided_at) return json(400, { error: "This invoice is void." });
+      if (!inv.customer_id) return json(400, { error: "This invoice has no customer." });
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("external_ref")
+        .eq("id", inv.customer_id)
+        .maybeSingle();
+      const customerRef =
+        (customer?.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id ?? null;
+      if (!customerRef) {
+        return json(400, {
+          error: "No QuickBooks customer is linked. Pick one on the customer's record.",
+        });
+      }
+      if ((req.payload.CustomerRef as { value?: string } | undefined)?.value !== customerRef) {
+        return json(400, { error: "The payload names a different QuickBooks customer." });
+      }
+
+      // An update may only name the QuickBooks invoice THIS one was pushed as,
+      // and a first push may name none — otherwise a payload could rewrite any
+      // invoice in the company file.
+      const prior = (inv.external_ref as {
+        qbo?: { id?: string; attachments?: Record<string, string>; invoice_link?: string | null };
+      } | null)?.qbo;
+      const claimed = req.payload.Id === undefined || req.payload.Id === null ? null : String(req.payload.Id);
+      if ((prior?.id ?? null) !== claimed) {
+        return json(400, {
+          error: prior?.id
+            ? "This invoice is already in QuickBooks; reload and send again."
+            : "The payload names a QuickBooks invoice this one was never sent as.",
+        });
+      }
+
+      const { saved, retried } = await postDocument(admin, conn, "Invoice", req.payload);
+      const doc = saved?.Invoice;
+      if (!doc?.Id || doc?.SyncToken === undefined || doc?.SyncToken === null) {
+        return json(502, { error: "QuickBooks saved the invoice but returned no id and sync token." });
+      }
+      const warnings: string[] = [];
+      if (retried) warnings.push(STALE_RETRY_NOTE);
+
+      const ref = {
+        qbo: {
+          id: String(doc.Id),
+          sync_token: String(doc.SyncToken),
+          doc_number: doc.DocNumber === undefined || doc.DocNumber === null ? null : String(doc.DocNumber),
+          entity: "Invoice",
+          invoice_link: prior?.invoice_link ?? null,
+          ...(prior?.attachments && Object.keys(prior.attachments).length
+            ? { attachments: prior.attachments }
+            : {}),
+        },
+      };
+      // Recorded BEFORE the attachments and the link: the invoice is in
+      // QuickBooks now, and a push that could not be recorded here must say so
+      // rather than let the next one create a second.
+      const record = async () =>
+        await supabase
+          .from("customer_invoices")
+          .update({ external_ref: ref })
+          .eq("id", inv.id)
+          .select("id");
+      const first = await record();
+      if (first.error || !first.data || first.data.length === 0) {
+        return json(500, {
+          error: "It reached QuickBooks but could not be recorded here, so pushing again " +
+            `would duplicate it. Its QuickBooks id is ${doc.Id}.`,
+          qbo_id: String(doc.Id),
+        });
+      }
+
+      // The sheet is replaced, not added to — `push_invoice`'s reasoning.
+      const stale = (req.replace_attachable_id ?? "").toString().trim();
+      if (stale) {
+        try {
+          await qboFetch(admin, conn, "attachable?operation=delete", {
+            method: "POST",
+            body: JSON.stringify({ Id: stale, SyncToken: "0" }),
+          });
+        } catch { /* it is gone, or it was never there */ }
+      }
+      const sheet = req.attachments as AttachRequest[] | undefined;
+      const attachmentResults = sheet?.length
+        ? await runAttachments("Invoice", String(doc.Id), sheet, supabase, admin, conn)
+        : [];
+
+      // THE PAY LINK, read back with the current token in one call — attaching
+      // bumps the SyncToken, so this re-read does both jobs. QuickBooks only
+      // makes the link when Payments is on and the invoice has a BillEmail.
+      const live = (await qboFetch(admin, conn, `invoice/${doc.Id}?include=invoiceLink`)) as {
+        Invoice?: { SyncToken?: unknown; InvoiceLink?: string; TotalAmt?: unknown; TxnTaxDetail?: { TotalTax?: unknown } };
+      };
+      const link = live?.Invoice?.InvoiceLink?.trim() || null;
+      if (live?.Invoice?.SyncToken !== undefined && live?.Invoice?.SyncToken !== null) {
+        ref.qbo.sync_token = String(live.Invoice.SyncToken);
+      }
+      ref.qbo.invoice_link = link;
+      const second = await record();
+      if (second.error) warnings.push(`The pay link was not recorded here: ${second.error.message}`);
+
+      if (!link) {
+        return json(502, {
+          error: "QuickBooks saved the invoice but gave no pay link. Check that QuickBooks " +
+            "Payments is on and accepts cards or bank transfers for invoices, then send again.",
+          qbo_id: String(doc.Id),
+          ref,
+        });
+      }
+
+      return json(200, {
+        entity: "Invoice",
+        warnings,
+        qbo_id: String(doc.Id),
+        doc_number: ref.qbo.doc_number,
+        total: Number(live?.Invoice?.TotalAmt ?? doc.TotalAmt ?? 0),
+        tax: Number(
+          live?.Invoice?.TxnTaxDetail?.TotalTax ??
+            (doc.TxnTaxDetail as { TotalTax?: unknown } | undefined)?.TotalTax ?? 0
+        ),
+        updated: Boolean(claimed),
+        invoice_link: link,
+        attachment_results: attachmentResults,
+        ref,
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // void_customer_invoice — void it in QuickBooks before voiding it here
+    // -----------------------------------------------------------------------
+    // QuickBooks refuses to void an invoice a payment is applied to, and that
+    // refusal is passed on as it is: the money has to be dealt with first.
+    if (mode === "void_customer_invoice") {
+      const req = body as unknown as { customer_invoice_id?: string };
+      if (!req.customer_invoice_id) return json(400, { error: "missing customer_invoice_id" });
+
+      const { data: inv, error: invErr } = await supabase
+        .from("customer_invoices")
+        .select("id, processor, external_ref")
+        .eq("id", req.customer_invoice_id)
+        .maybeSingle();
+      if (invErr) return json(500, { error: invErr.message });
+      if (!inv) return json(404, { error: "No such invoice" });
+      const q = (inv.external_ref as { qbo?: { id?: string } } | null)?.qbo;
+      if (!q?.id) return json(200, { voided: false, reason: "never sent to QuickBooks" });
+
+      const token = await currentSyncToken(admin, conn, "Invoice", q.id, "");
+      if (!token) return json(502, { error: "Could not read the invoice from QuickBooks." });
+      await qboFetch(admin, conn, "invoice?operation=void", {
+        method: "POST",
+        body: JSON.stringify({ Id: q.id, SyncToken: token }),
+      });
+      return json(200, { voided: true, qbo_id: q.id });
     }
 
     if (mode === "items") {

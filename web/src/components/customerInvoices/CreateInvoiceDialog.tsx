@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { DateField } from "@/components/ui/DateField";
+import { TabPicker } from "@/components/ui/TabPicker";
 import { money } from "@/lib/specialOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import {
@@ -14,7 +15,9 @@ import {
   invoiceLinesFor,
   readInvoiceTerms,
   sendIntent,
+  PROCESSOR_OPTIONS,
   type InvoiceCandidate,
+  type InvoiceProcessor,
 } from "@/lib/customerInvoices";
 
 /**
@@ -58,6 +61,7 @@ export function CreateInvoiceDialog({
   const supabase = createClient();
   const router = useRouter();
   const [due, setDue] = useState<string | null>(null);
+  const [processor, setProcessor] = useState<InvoiceProcessor>("square");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,6 +104,19 @@ export function CreateInvoiceDialog({
       setBusy(false);
       setError(e.message);
       return;
+    }
+    // 131: Square is the column's default, so only QuickBooks needs a write.
+    if (processor !== "square") {
+      const { error: pe } = await supabase
+        .from("customer_invoices")
+        .update({ processor })
+        .eq("id", data as string)
+        .select("id");
+      if (pe) {
+        setBusy(false);
+        setError(`The invoice was created, but not set to collect through QuickBooks: ${pe.message}`);
+        return;
+      }
     }
     const href = thenSend
       ? `/customer-invoices/${data as string}?send=${sendIntent()}`
@@ -168,12 +185,24 @@ export function CreateInvoiceDialog({
                 </tfoot>
               ) : null}
             </table>
-            <label className="block max-w-[14rem] space-y-1.5">
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                Due
-              </span>
-              <DateField value={due} onChange={setDue} ariaLabel="Due date" boxed />
-            </label>
+            <div className="flex flex-wrap items-end gap-6">
+              <label className="block w-[14rem] space-y-1.5">
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Due
+                </span>
+                <DateField value={due} onChange={setDue} ariaLabel="Due date" boxed />
+              </label>
+              <div className="space-y-1.5">
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Collect through
+                </span>
+                <TabPicker
+                  options={PROCESSOR_OPTIONS.map((o) => ({ key: o.value, label: o.label }))}
+                  value={processor}
+                  onChange={setProcessor}
+                />
+              </div>
+            </div>
           </>
         )}
         {error && <p className="text-sm text-accent">{error}</p>}

@@ -62,7 +62,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 4i. ✅ Which shops a member may work at (migration 073) — `docs/history/04i-location-access.md`
 4j. ✅ Password reset (migration 074 + `request-password-reset`) — `docs/history/04j-password-reset.md`
 4k. 🚧 Facility checks (checklists, tasks, maintenance, inspections, documents, equipment) — `docs/history/04k-facility-checks.md`
-4l. ✅ QuickBooks Online (bills, invoices, connection, credentials) — `docs/history/04l-quickbooks.md`
+4l. ✅ QuickBooks Online (bills, invoices, connection, credentials; 🚧 QuickBooks as a test processor on customer invoices, migration 131 + `qbo-webhook`) — `docs/history/04l-quickbooks.md`
 4m. ✅ Page permissions (`lib/pageAccess.ts`, migration 092) — `docs/history/04m-page-permissions.md`
 4n. ✅ Tags (display signs priced at print time) — `docs/history/04n-tags.md`
 4o. ✅ Shared iPad PIN switching (migration 097) — `docs/history/04o-shared-ipad.md`
@@ -677,7 +677,12 @@ question it would answer is observable from a linked run.
 **A flagged issue now reaches the emailed shift report** (2026-08-30), which is
 the requirement the module was asked for. See the handoff for what remains.
 **QUICKBOOKS PAYMENTS is killed, and the reasoning matters more than the
-verdict** (2026-09-02): it would mean a second merchant account beside Square,
+verdict** (2026-09-02) — **REOPENED AS AN EXPERIMENT 2026-09-24** (Mark: "I
+have a hunch that QBO will be better for us, but until I try it I won't know"):
+a customer invoice whose `processor` is `quickbooks` (131) IS pushed and IS
+collected by QuickBooks Payments, which never touches Square, so it does not
+double-count. Every rule below about not pushing applies to SQUARE-collected
+invoices only. See 04l. The 2026-09-02 reasoning: it would mean a second merchant account beside Square,
 it fights the document flow this app deliberately owns, and it would make
 QuickBooks a second writer of a fact `special_order_payments` already holds.
 The live question underneath it is **ACH on wholesale**, and that belongs with

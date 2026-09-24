@@ -23,7 +23,22 @@ import {
   mintPayToken,
   resolveAppBase,
 } from "@/lib/specialOrderSend";
-import { payLine, payUrl } from "@/lib/payLink";
+import { payLine, payUrl, quickBooksPayLine } from "@/lib/payLink";
+import { invokeQbo } from "@/lib/qboClient";
+import {
+  INVOICE_SHEET_KEY,
+  QBO_LINK_PLACEHOLDER,
+  attachableFromResponse,
+  attachableMetadata,
+  buildCustomerInvoicePayload,
+  customerInvoiceRefusals,
+  qboVendorId,
+  recordedAttachments,
+  taxDisagreement,
+  withAttachments,
+  type AccountingRef,
+  type CustomerInvoicePushInputs,
+} from "@/lib/quickbooks";
 import { fetchInvoiceView, type InvoiceView } from "@/lib/customerInvoiceQueries";
 import {
   invoiceFileName,
@@ -167,6 +182,9 @@ export function SendCustomerInvoice({
     url: string;
     filename: string;
     payToken: string | null;
+    /** A QuickBooks invoice (131): pushed at Send, its link swapped in for
+     *  the placeholder. `billEmail` is filled from To at that moment. */
+    qbo: Omit<CustomerInvoicePushInputs, "billEmail"> | null;
     snapshot: CustomerInvoiceSnapshot;
     breakdown: (ReturnType<typeof breakdownFromTotals> & {
       lines: Record<string, ReturnType<typeof breakdownFromTotals>>;
@@ -192,9 +210,18 @@ export function SendCustomerInvoice({
       // configured and something is owed; the address resolved first.
       const sq = (settings.square_payments ?? {}) as Record<string, unknown>;
       const configured = typeof sq.application_id === "string" && sq.application_id.trim() !== "";
+      const viaQbo = view.invoice.processor === "quickbooks";
       let payToken: string | null = null;
       let pay = "";
-      if (configured && view.balance > 0.005) {
+      let qbo: Omit<CustomerInvoicePushInputs, "billEmail"> | null = null;
+      if (viaQbo) {
+        // QuickBooks' link only exists once the invoice is pushed, which
+        // happens at Send — so the body carries a placeholder until then.
+        qbo = await quickBooksInputs(supabase, orgId, view, number);
+        const refusals = customerInvoiceRefusals({ ...qbo, billEmail: view.customer?.email ?? "-" });
+        if (refusals.length > 0) throw new Error(refusals[0]);
+        if (view.balance > 0.005) pay = QBO_LINK_PLACEHOLDER;
+      } else if (configured && view.balance > 0.005) {
         const resolved = resolveAppBase(window.location.origin);
         if ("error" in resolved) throw new Error(resolved.error);
         payToken = await mintPayToken(supabase, { customerInvoiceId: id, orgId });
@@ -212,12 +239,13 @@ export function SendCustomerInvoice({
       const summed = sumBreakdowns(Object.values(perLine));
       const breakdown = summed ? { ...summed, lines: perLine } : null;
 
-      setCompose(invoiceEmail(view, number, settings, pay));
+      setCompose(invoiceEmail(view, number, settings, pay, viaQbo));
       setPending({
         blob,
         url: URL.createObjectURL(blob),
         filename: invoiceFileName(number, view.invoice.issued_on ?? today),
         payToken,
+        qbo,
         snapshot,
         breakdown,
       });
@@ -259,13 +287,26 @@ export function SendCustomerInvoice({
       if (pending.payToken) {
         await bindPaySnapshot(supabase, pending.payToken, pending.snapshot, pending.breakdown);
       }
+      // QUICKBOOKS FIRST (131): the invoice goes in, its pay link comes back,
+      // and only then does the email go — a failed push sends nothing.
+      let body = compose.body;
+      const qboNotes: string[] = [];
+      if (pending.qbo) {
+        const pushed = await pushToQuickBooks(supabase, pending.qbo, compose.to, pending.blob, pending.filename);
+        body = body.split(QBO_LINK_PLACEHOLDER).join(pushed.link);
+        qboNotes.push(...pushed.warnings);
+        // It is in QuickBooks now. Should the email fail, Send again must
+        // UPDATE that invoice, not try to create a second.
+        const qbo = { ...pending.qbo, invoice: { ...pending.qbo.invoice, external_ref: pushed.ref } };
+        setPending((p) => (p ? { ...p, qbo } : p));
+      }
       const { data, error: e } = await supabase.functions.invoke("send-special-order-email", {
         body: {
           customer_invoice_id: id,
           to: compose.to,
           cc: compose.cc || undefined,
           subject: compose.subject,
-          body: compose.body,
+          body,
           pdf_base64: await blobToBase64(pending.blob),
           filename: pending.filename,
           pay_token: pending.payToken ?? undefined,
@@ -281,10 +322,15 @@ export function SendCustomerInvoice({
         }
         throw new Error(message);
       }
-      const warning = (data as { warning?: string } | null)?.warning;
+      const warning = [(data as { warning?: string } | null)?.warning, ...qboNotes]
+        .filter(Boolean)
+        .join(" ");
       const to = compose.to;
       close();
-      setSentNote(`Invoice ${numberText} sent to ${to}${warning ? ` — ${warning}` : ""}`);
+      setSentNote(
+        `Invoice ${numberText} ${pending.qbo ? "sent to QuickBooks and emailed" : "sent"} to ${to}` +
+          `${warning ? ` — ${warning}` : ""}`
+      );
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -411,7 +457,8 @@ function invoiceEmail(
   view: InvoiceView,
   number: string,
   settings: Record<string, unknown>,
-  pay: string
+  pay: string,
+  viaQbo = false
 ): Compose {
   const so = (settings.special_orders ?? {}) as Record<string, unknown>;
   const templates = (so.email ?? {}) as Record<string, { subject?: string; body?: string }>;
@@ -427,7 +474,7 @@ function invoiceEmail(
     due_on: view.invoice.due_on ? usDate(view.invoice.due_on) : "on receipt",
     orders: view.lines.map((l) => `${l.description} — ${money(l.amount)}`).join("\n"),
     pay_url: pay,
-    pay_line: payLine(pay),
+    pay_line: viaQbo ? quickBooksPayLine(pay) : payLine(pay),
   };
   return {
     to: (view.customer?.email ?? "").trim(),
@@ -444,4 +491,120 @@ function blobToBase64(blob: Blob): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(blob);
   });
+}
+
+/** What the QuickBooks push needs beyond the invoice view: the connection's
+ *  items and tax code, and the customer's QuickBooks id. */
+async function quickBooksInputs(
+  supabase: SupabaseClient,
+  orgId: string,
+  view: InvoiceView,
+  number: string
+): Promise<Omit<CustomerInvoicePushInputs, "billEmail">> {
+  const [conn, customer] = await Promise.all([
+    supabase.rpc("accounting_connection_status", { p_org: orgId }),
+    view.invoice.customer_id
+      ? supabase.from("customers").select("external_ref").eq("id", view.invoice.customer_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const row = Array.isArray(conn.data)
+    ? (conn.data[0] as
+        | {
+            status?: string;
+            invoice_item_ref?: string | null;
+            wholesale_item_ref?: string | null;
+            tax_code_ref?: string | null;
+          }
+        | undefined)
+    : undefined;
+  if (row?.status !== "connected") {
+    throw new Error("QuickBooks is not connected. Connect it in Settings → Accounting.");
+  }
+  return {
+    invoice: {
+      id: view.invoice.id,
+      number_text: number,
+      issued_on: view.invoice.issued_on,
+      due_on: view.invoice.due_on,
+      voided_at: view.invoice.voided_at,
+      external_ref: (view.invoice.external_ref ?? null) as AccountingRef | null,
+    },
+    customerName: view.customerName,
+    customerRef: qboVendorId((customer?.data?.external_ref ?? null) as AccountingRef | null),
+    itemRef: row?.invoice_item_ref ?? null,
+    wholesaleItemRef: row?.wholesale_item_ref ?? null,
+    taxCodeRef: row?.tax_code_ref ?? null,
+    lines: view.lines.map((l) => ({
+      description: l.description,
+      amount: l.amount,
+      square_item: l.square_item,
+      cancelled: l.order?.status === "cancelled",
+      totals: l.totals,
+    })),
+  };
+}
+
+/**
+ * Push (or update) the invoice in QuickBooks with the PDF being emailed
+ * attached, record the attachment, and hand back the pay link. Throws on any
+ * failure, so the caller sends nothing.
+ */
+async function pushToQuickBooks(
+  supabase: SupabaseClient,
+  inputs: Omit<CustomerInvoicePushInputs, "billEmail">,
+  to: string,
+  pdf: Blob,
+  fileName: string
+): Promise<{ link: string; warnings: string[]; ref: AccountingRef }> {
+  // The first address only: QuickBooks' BillEmail is one address.
+  const billEmail = to.split(/[,;]/)[0]?.trim() ?? "";
+  const { body } = buildCustomerInvoicePayload({ ...inputs, billEmail });
+  const ref = inputs.invoice.external_ref;
+  const previousSheet = recordedAttachments(ref)[INVOICE_SHEET_KEY] ?? null;
+  const sheet = {
+    key: INVOICE_SHEET_KEY,
+    file_name: fileName,
+    content_type: "application/pdf",
+    metadata: attachableMetadata({
+      entity: "Invoice",
+      entityId: ref?.qbo?.id ?? "0",
+      fileName,
+      contentType: "application/pdf",
+    }),
+    pdf_base64: await blobToBase64(pdf),
+  };
+
+  const { data, message } = await invokeQbo(supabase, {
+    mode: "push_customer_invoice",
+    customer_invoice_id: inputs.invoice.id,
+    payload: body,
+    attachments: [sheet],
+    ...(previousSheet ? { replace_attachable_id: previousSheet } : {}),
+  });
+  if (message) throw new Error(`QuickBooks: ${message} Nothing was emailed.`);
+  const link = String(data?.invoice_link ?? "");
+  if (!link) throw new Error("QuickBooks gave no pay link. Nothing was emailed.");
+
+  const warnings: string[] = [...((data?.warnings as string[]) ?? [])];
+  const added: Record<string, string> = {};
+  for (const r of (data?.attachment_results as { key: string; response?: unknown; error?: string }[]) ?? []) {
+    if (r.error) { warnings.push(r.error); continue; }
+    const read = attachableFromResponse(r.response);
+    if (read.ok) added[r.key] = read.id;
+    else warnings.push(`The invoice PDF was not attached in QuickBooks: ${read.message}`);
+  }
+  let recorded = data!.ref as AccountingRef;
+  if (Object.keys(added).length > 0) {
+    recorded = withAttachments(recorded, added);
+    const { error } = await supabase
+      .from("customer_invoices")
+      .update({ external_ref: recorded })
+      .eq("id", inputs.invoice.id)
+      .select("id");
+    if (error) warnings.push("The PDF went up to QuickBooks but was not recorded, so the next send attaches a second copy.");
+  }
+  const ourTax = inputs.lines.reduce((a, l) => a + Number(l.totals?.tax ?? 0), 0);
+  const theirs = taxDisagreement(Math.round(ourTax * 100) / 100, data?.tax as number | undefined);
+  if (theirs) warnings.push(theirs);
+  return { link, warnings, ref: recorded };
 }

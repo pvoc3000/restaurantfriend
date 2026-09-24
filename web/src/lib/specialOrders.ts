@@ -181,6 +181,7 @@ export const PAYMENT_TYPE_OPTIONS: PickOption[] = [
   { value: "Square Invoice", label: "Square Invoice", hint: "the usual" },
   { value: "Square Online", label: "Square Online", hint: "the pay link" },
   { value: "Square Refund", label: "Square Refund", hint: "a pay-link refund, negative" },
+  { value: "QuickBooks Payments", label: "QuickBooks Payments", hint: "a QuickBooks invoice's pay link" },
   { value: "cash", label: "Cash" },
   { value: "check", label: "Check" },
   { value: "comp", label: "Comp" },

@@ -265,3 +265,50 @@
    and why the failure waited for the first credit to be adopted.
    **The general trap: a property QuickBooks RETURNS on a document is not
    therefore QUERYABLE.** Probe with the `query` mode before naming a column.
+
+   **QUICKBOOKS AS A SECOND PAYMENT PROCESSOR ON CUSTOMER INVOICES (2026-09-24,
+   migration 131).** Mark: "i want to build a QBO workflow into our customer
+   invoice system so I can test it out … I have a hunch that QBO will be better
+   for us, but until I try it I won't know for sure." The app is not live, so
+   two payment paths side by side is fine. This REVERSES, for the experiment,
+   "QBO records only" and the QuickBooks Payments kill above. His answers:
+   - **Per invoice**: `customer_invoices.processor` is `square` (the default)
+     or `quickbooks`, set on the draft (Collect through, on the record and in
+     Create Invoice…) and LOCKED ONCE SENT by a trigger.
+   - **Our email, QuickBooks' link.** Send pushes the invoice
+     (`qbo-sync` `push_customer_invoice`), reads back `InvoiceLink`
+     (`?include=invoiceLink`; needs `BillEmail` and Payments on) and swaps it
+     for the body's placeholder, THEN emails. A failed push sends nothing. Our
+     template, CC, PDF, send history and re-send are unchanged; no `/pay` token
+     is minted. Send Again is a sparse update of the same QBO invoice, so the
+     link stays the same.
+   - **One line per order**, "Order #n · title · date", split TAX/NON only
+     where an order has both (`buildCustomerInvoicePayload`, fixture-tested);
+     the item follows Sold as — `invoice_item_ref` for special orders, the new
+     `wholesale_item_ref` (Settings → Accounting) for wholesale. A wholesale
+     week is exactly one NON line per day.
+   - **Refused for now**: an order with a payment taken outside the invoice (a
+     deposit) — the line is short of the order's total and QBO would bill the
+     whole of it.
+   - **Void** (and Delete of a draft that reached QBO) voids it in QuickBooks
+     first; QBO's own refusal (a payment applied) stops it here too.
+   - **Payment comes back by WEBHOOK**: `qbo-webhook` (deployed
+     `--no-verify-jwt`) checks `intuit-signature` against the secret
+     `QBO_WEBHOOK_VERIFIER`, reads the Payment back from QuickBooks, and calls
+     `record_qbo_invoice_payment` → `allocate_customer_invoice_payment` as
+     payment type `QuickBooks Payments`. 124's Square Online unique index is
+     widened to that type, so a retried notification is a no-op (measured in
+     the harness both ways). A payment voided or deleted in QBO is logged, not
+     reversed. It reads both the classic and the CloudEvents payload and logs
+     which arrived.
+   - **Not double-counted**: the money goes through QuickBooks Payments, never
+     Square, so the nightly Square journal entry never sees it.
+   Setup, done by hand: apply 131; deploy `qbo-sync`, `qbo-oauth`,
+   `send-special-order-email` and `qbo-webhook`; in the Intuit developer app add
+   the webhook URL `https://kltxioacvneshbyhxtaj.supabase.co/functions/v1/qbo-webhook`
+   subscribed to Payment; `supabase secrets set QBO_WEBHOOK_VERIFIER=…`; choose
+   the Wholesale item in Settings → Accounting; link each test customer to its
+   QBO customer on their record.
+   Also fixed in passing: `push_invoice` posted with a second connection object
+   (`conn2`) while its attachment calls used the first, so a token refresh
+   during the post could leave those calls on a spent token.

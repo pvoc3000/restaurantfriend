@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
+import { invokeQbo } from "@/lib/qboClient";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { DateField } from "@/components/ui/DateField";
@@ -49,6 +50,7 @@ export function CustomerInvoiceCommandMenu({
   paid,
   today,
   canWrite,
+  inQuickBooks = false,
   autoSend = null,
 }: {
   id: string;
@@ -57,6 +59,8 @@ export function CustomerInvoiceCommandMenu({
   status: InvoiceStatus;
   balance: number;
   paid: number;
+  /** Pushed to QuickBooks (131): a void or delete here voids it there first. */
+  inQuickBooks?: boolean;
   /** The ORG's calendar day — what a payment and a void are dated. */
   today: string;
   canWrite: boolean;
@@ -111,6 +115,14 @@ export function CustomerInvoiceCommandMenu({
       downloadBlob(blob, invoiceFileName(numberText, view.invoice.issued_on));
     });
 
+  /** Void it in QuickBooks FIRST (131), so a refusal there — a payment
+   *  already applied — stops the void here too. */
+  const voidInQuickBooks = async () => {
+    if (!inQuickBooks) return;
+    const { message } = await invokeQbo(supabase, { mode: "void_customer_invoice", customer_invoice_id: id });
+    if (message) throw new Error(`QuickBooks would not void it: ${message}`);
+  };
+
   const voidInvoice = async () => {
     if (
       !(await confirmDialog({
@@ -128,6 +140,7 @@ export function CustomerInvoiceCommandMenu({
       return;
     }
     await run("void", async () => {
+      await voidInQuickBooks();
       const { data, error: e } = await supabase
         .from("customer_invoices")
         .update({ voided_at: today })
@@ -152,6 +165,9 @@ export function CustomerInvoiceCommandMenu({
       return;
     }
     await run("delete", async () => {
+      // A draft can already be in QuickBooks when its email failed after the
+      // push; deleting it here must not leave that invoice open there.
+      await voidInQuickBooks();
       const { data, error: e } = await supabase
         .from("customer_invoices")
         .delete()

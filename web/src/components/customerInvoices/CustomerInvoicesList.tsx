@@ -26,7 +26,12 @@ import {
 import { sortRows } from "@/lib/tableSort";
 import { money } from "@/lib/specialOrders";
 import { usDate } from "@/lib/specialOrderDocs";
-import { INVOICE_STATUS_LABEL, type InvoiceStatus } from "@/lib/customerInvoices";
+import {
+  INVOICE_STATUS_LABEL,
+  PROCESSOR_LABEL,
+  type InvoiceProcessor,
+  type InvoiceStatus,
+} from "@/lib/customerInvoices";
 
 export type CustomerInvoiceRow = {
   id: string;
@@ -37,6 +42,7 @@ export type CustomerInvoiceRow = {
   issued_on: string;
   due_on: string | null;
   status: InvoiceStatus;
+  processor: InvoiceProcessor;
   orders: number;
   total: number;
   paid: number;
@@ -45,7 +51,7 @@ export type CustomerInvoiceRow = {
 
 const PATH = "/customer-invoices";
 
-const SORT_KEYS = ["number", "customer", "issued", "due", "status", "orders", "total", "balance"] as const;
+const SORT_KEYS = ["number", "customer", "issued", "due", "status", "processor", "orders", "total", "balance"] as const;
 
 /**
  * Every customer invoice (migration 124). There is NO create command here:
@@ -162,6 +168,14 @@ export function CustomerInvoicesList({
           {INVOICE_STATUS_LABEL[r.status]}
         </span>
       ),
+    },
+    {
+      key: "processor",
+      label: "Collect through",
+      width: 120,
+      sortValue: (r) => r.processor,
+      sortTiebreaks: [(r) => String(r.number).padStart(9, "0")],
+      render: (r) => <span className="text-muted">{PROCESSOR_LABEL[r.processor]}</span>,
     },
     {
       key: "orders",

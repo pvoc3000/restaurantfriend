@@ -32,7 +32,7 @@ export default async function CustomerInvoicesPage({
   const { data: invoices, error } = await supabase
     .from("customer_invoices")
     .select(
-      `id, number, customer_id, issued_on, due_on, sent_at, paid_at, voided_at,
+      `id, number, customer_id, issued_on, due_on, sent_at, paid_at, voided_at, processor,
        customers ( id, first_name, last_name, company )`
     )
     .eq("org_id", orgId)
@@ -78,6 +78,7 @@ export default async function CustomerInvoicesPage({
       issued_on: inv.issued_on as string,
       due_on: inv.due_on as string | null,
       status: invoiceStatus(inv as never, today, invoiceChanged(mine)),
+      processor: ((inv as { processor?: string }).processor === "quickbooks" ? "quickbooks" : "square"),
       orders: mine.length,
       ...money,
     };

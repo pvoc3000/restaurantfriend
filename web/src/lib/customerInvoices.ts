@@ -29,6 +29,24 @@ export type CustomerInvoice = {
   document_path: string | null;
   /** The latest send (128); `sent_at` stays the first. */
   last_sent_at?: string | null;
+  /** Who takes the money (131). Locked once sent. */
+  processor?: InvoiceProcessor;
+  /** `{ qbo: { id, sync_token, doc_number, invoice_link, attachments } }` once
+   *  a QuickBooks invoice has been pushed (131). */
+  external_ref?: Record<string, unknown> | null;
+};
+
+/** Square (the pay link, the default) or QuickBooks Payments (131). */
+export type InvoiceProcessor = "square" | "quickbooks";
+
+export const PROCESSOR_OPTIONS: { value: InvoiceProcessor; label: string }[] = [
+  { value: "square", label: "Square" },
+  { value: "quickbooks", label: "QuickBooks" },
+];
+
+export const PROCESSOR_LABEL: Record<InvoiceProcessor, string> = {
+  square: "Square",
+  quickbooks: "QuickBooks",
 };
 
 /**

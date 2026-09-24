@@ -76,6 +76,9 @@ export type AccountingRef = {
      *  which somebody can rename inside QuickBooks. */
     attachments?: Record<string, string>;
     entity?: QboEntity;
+    /** A customer invoice routed to QuickBooks (131): the link QuickBooks
+     *  Payments takes the money on, which our email carries. */
+    invoice_link?: string | null;
   };
 };
 
@@ -727,6 +730,169 @@ export function invoiceSplit(totals: {
   const nonTaxableNet = round2(totals.total - totals.tax - taxableNet);
   return { taxableNet, nonTaxableNet };
 }
+
+// ---------------------------------------------------------------------------
+// Customer invoices routed to QuickBooks (131)
+// ---------------------------------------------------------------------------
+
+/**
+ * One line of a customer invoice, as the push needs it. Structural, so this
+ * module stays free of `lib/customerInvoices` and `lib/specialOrders`.
+ */
+export type CustomerInvoicePushLine = {
+  /** "Order #n · title · date" — the invoice line's own wording. */
+  description: string;
+  /** What the invoice bills for this order (128): its total less payments
+   *  not taken on this invoice. */
+  amount: number;
+  square_item: "special_order" | "wholesale";
+  cancelled: boolean;
+  /** The order's money today — null when the order could not be read. */
+  totals: {
+    subtotal: number;
+    taxableSubtotal: number;
+    discount: number;
+    deliveryCharge: number;
+    rushFee: number;
+    tax: number;
+    total: number;
+  } | null;
+};
+
+export type CustomerInvoicePushInputs = {
+  invoice: {
+    id: string;
+    /** The number as printed, prefix included. */
+    number_text: string;
+    issued_on: string;
+    due_on: string | null;
+    voided_at: string | null;
+    external_ref: AccountingRef | null;
+  };
+  customerName: string;
+  customerRef: string | null;
+  /** Where the invoice is being sent. QuickBooks makes no InvoiceLink without
+   *  a BillEmail. */
+  billEmail: string | null;
+  itemRef: string | null;
+  wholesaleItemRef: string | null;
+  taxCodeRef: string | null;
+  lines: CustomerInvoicePushLine[];
+};
+
+/** A line that bills nothing because its order was cancelled (128). */
+const billsNothing = (l: CustomerInvoicePushLine) => l.cancelled && round2(l.amount) === 0;
+
+export function customerInvoiceRefusals(inputs: CustomerInvoicePushInputs): string[] {
+  const { invoice, customerName, lines } = inputs;
+  const out: string[] = [];
+  const live = lines.filter((l) => !billsNothing(l));
+
+  if (invoice.voided_at) out.push("This invoice is void.");
+  if (!inputs.customerRef) {
+    out.push(`No QuickBooks customer is linked to ${customerName}. Pick one on their record.`);
+  }
+  if (!inputs.billEmail?.trim()) {
+    out.push("There is no address to send to, and QuickBooks makes no pay link without one.");
+  }
+  if (live.length === 0) out.push("This invoice has no lines to bill.");
+  if (live.some((l) => l.square_item === "special_order") && !inputs.itemRef) {
+    out.push("No QuickBooks item is set for special orders. Choose one in Settings → Accounting.");
+  }
+  if (live.some((l) => l.square_item === "wholesale") && !inputs.wholesaleItemRef) {
+    out.push("No QuickBooks item is set for wholesale. Choose one in Settings → Accounting.");
+  }
+  if (!inputs.taxCodeRef && live.some((l) => Number(l.totals?.tax ?? 0) > 0)) {
+    out.push("No QuickBooks tax code is set. Choose one in Settings → Accounting.");
+  }
+  for (const l of live) {
+    if (!l.totals) {
+      out.push(`${l.description} could not be read.`);
+      continue;
+    }
+    // A deposit taken before the order was invoiced leaves the line short of
+    // the order's total. QuickBooks would tax and bill the whole order, so the
+    // figures would disagree with the customer's copy. Not modelled yet.
+    if (Math.abs(round2(l.amount) - round2(l.totals.total)) >= 0.005) {
+      out.push(
+        `${l.description} has a payment taken outside this invoice (a deposit), ` +
+          "which a QuickBooks invoice cannot show yet."
+      );
+    }
+  }
+  if (round2(live.reduce((a, l) => a + Number(l.amount), 0)) < 0) {
+    out.push("This invoice's total is negative. A refund is a credit memo, which is not sent yet.");
+  }
+  return out;
+}
+
+/**
+ * ONE LINE PER ORDER (Mark, 2026-09-24), split in two only where an order has
+ * both taxed and untaxed money — `buildInvoicePayload`'s reason: QuickBooks
+ * computes the tax from the lines, and delivery and rush are not taxed. A
+ * wholesale week (no tax) is exactly one NON line per day. The item follows
+ * Sold as.
+ */
+export function buildCustomerInvoicePayload(
+  inputs: CustomerInvoicePushInputs
+): { entity: "Invoice"; path: string; body: Record<string, unknown> } {
+  const refusals = customerInvoiceRefusals(inputs);
+  if (refusals.length > 0) throw new Error(refusals[0]);
+
+  const { invoice } = inputs;
+  const lines: Record<string, unknown>[] = [];
+  let taxed = false;
+
+  for (const l of inputs.lines) {
+    if (billsNothing(l)) continue;
+    const itemRef = l.square_item === "wholesale" ? inputs.wholesaleItemRef : inputs.itemRef;
+    const { taxableNet, nonTaxableNet } = invoiceSplit(l.totals!);
+    const both = round2(taxableNet) > 0 && round2(nonTaxableNet) > 0;
+    const push = (amount: number, taxable: boolean, label: string) => {
+      if (round2(amount) <= 0) return;
+      if (taxable) taxed = true;
+      lines.push({
+        Amount: round2(amount),
+        DetailType: "SalesItemLineDetail",
+        Description: label,
+        SalesItemLineDetail: {
+          ItemRef: { value: itemRef },
+          TaxCodeRef: { value: taxable ? "TAX" : "NON" },
+        },
+      });
+    };
+    push(taxableNet, true, l.description);
+    push(nonTaxableNet, false, both ? `${l.description} — not taxed` : l.description);
+  }
+
+  const body: Record<string, unknown> = {
+    CustomerRef: { value: inputs.customerRef },
+    Line: lines,
+    PrivateNote: `restaurantfriend customer_invoice ${invoice.id}`,
+    TxnDate: invoice.issued_on,
+    BillEmail: { Address: inputs.billEmail!.trim() },
+    AllowOnlineCreditCardPayment: true,
+    AllowOnlineACHPayment: true,
+  };
+  if (taxed && inputs.taxCodeRef) {
+    body.TxnTaxDetail = { TxnTaxCodeRef: { value: inputs.taxCodeRef } };
+  }
+  const docNumber = docNumberFor(invoice.number_text);
+  if (docNumber) body.DocNumber = docNumber;
+  if (invoice.due_on) body.DueDate = invoice.due_on;
+
+  const existing = qboRef(invoice.external_ref);
+  if (existing) {
+    body.Id = existing.id;
+    body.SyncToken = existing.syncToken;
+    body.sparse = true;
+  }
+
+  return { entity: "Invoice", path: "invoice", body };
+}
+
+/** What our email's pay line says until the push returns the real link. */
+export const QBO_LINK_PLACEHOLDER = "[QuickBooks payment link — added when sent]";
 
 // ---------------------------------------------------------------------------
 // Attachments

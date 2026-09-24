@@ -880,3 +880,131 @@ test("a bill with no linked order sends exactly what it always did", () => {
   eq(line.Description, billLineDescription({ invoice_number: "73535581" }), "description unchanged");
   eq(body.PrivateNote, "restaurantfriend inv-1", "memo unchanged");
 });
+
+// ---------------------------------------------------------------------------
+// Customer invoices routed to QuickBooks (131)
+// ---------------------------------------------------------------------------
+
+import {
+  buildCustomerInvoicePayload,
+  customerInvoiceRefusals,
+  type CustomerInvoicePushInputs,
+  type CustomerInvoicePushLine,
+} from "../../src/lib/quickbooks";
+
+function wholesaleDay(n: number, amount = 84.5): CustomerInvoicePushLine {
+  return {
+    description: `Order #1007${n} · Knotted · 9/2${n}/2026`,
+    amount,
+    square_item: "wholesale",
+    cancelled: false,
+    totals: { subtotal: amount - 10, taxableSubtotal: 0, discount: 0, deliveryCharge: 10, rushFee: 0, tax: 0, total: amount },
+  };
+}
+
+// 120 taxable + 27.40 delivery, 9.5% tax → 11.40 tax, 158.80 total.
+const taxedOrder: CustomerInvoicePushLine = {
+  description: "Order #10080 · Birthday · 9/30/2026",
+  amount: 158.8,
+  square_item: "special_order",
+  cancelled: false,
+  totals: { subtotal: 120, taxableSubtotal: 120, discount: 0, deliveryCharge: 27.4, rushFee: 0, tax: 11.4, total: 158.8 },
+};
+
+function civ(over: Partial<CustomerInvoicePushInputs> = {}): CustomerInvoicePushInputs {
+  return {
+    invoice: {
+      id: "ci-1",
+      number_text: "1004",
+      issued_on: "2026-09-20",
+      due_on: "2026-09-24",
+      voided_at: null,
+      external_ref: null,
+    },
+    customerName: "Cafe Knotted",
+    customerRef: "58",
+    billEmail: "ap@knotted.example",
+    itemRef: "SO",
+    wholesaleItemRef: "WH",
+    taxCodeRef: "2",
+    lines: [1, 2, 3, 4, 5, 6, 7].map((n) => wholesaleDay(n)),
+    ...over,
+  };
+}
+
+const lineOf = (l: Record<string, unknown>) => l.SalesItemLineDetail as Record<string, Record<string, unknown>>;
+
+test("a wholesale week is ONE NON line per day, on the wholesale item", () => {
+  const { body } = buildCustomerInvoicePayload(civ());
+  const lines = body.Line as Record<string, unknown>[];
+  eq(lines.length, 7, "seven lines");
+  ok(lines.every((l) => lineOf(l).TaxCodeRef.value === "NON"), "all untaxed");
+  ok(lines.every((l) => lineOf(l).ItemRef.value === "WH"), "all wholesale item");
+  eq(lines[0].Description, "Order #10071 · Knotted · 9/21/2026", "the line's own wording, no suffix");
+  eq(body.TxnTaxDetail, undefined, "no tax detail when nothing is taxed");
+});
+
+test("a taxed special order splits TAX + NON, and the halves sum to total − tax", () => {
+  const { body } = buildCustomerInvoicePayload(civ({ lines: [taxedOrder] }));
+  const lines = body.Line as Record<string, unknown>[];
+  eq(lines.length, 2, "two parts");
+  eq(lineOf(lines[0]).TaxCodeRef.value, "TAX", "taxable first");
+  eq(lines[0].Amount, 120, "taxable part");
+  eq(lines[1].Amount, 27.4, "delivery untaxed");
+  eq(lines[1].Description, "Order #10080 · Birthday · 9/30/2026 — not taxed", "the NON half says so");
+  ok(lines.every((l) => lineOf(l).ItemRef.value === "SO"), "special-order item");
+  eq(round(Number(lines[0].Amount) + Number(lines[1].Amount)), round(158.8 - 11.4), "sum");
+  eq(body.TxnTaxDetail, { TxnTaxCodeRef: { value: "2" } }, "names the code");
+});
+
+test("the header carries dates, the pay switches, BillEmail and the number", () => {
+  const { body } = buildCustomerInvoicePayload(civ());
+  eq(body.TxnDate, "2026-09-20", "issued");
+  eq(body.DueDate, "2026-09-24", "due");
+  eq(body.DocNumber, "1004", "number");
+  eq(body.BillEmail, { Address: "ap@knotted.example" }, "bill email");
+  eq(body.AllowOnlineCreditCardPayment, true, "card");
+  eq(body.AllowOnlineACHPayment, true, "ACH");
+  eq(body.CustomerRef, { value: "58" }, "customer");
+  eq(body.Id, undefined, "a create names no Id");
+});
+
+test("a pushed invoice updates: Id, SyncToken, sparse", () => {
+  const { body } = buildCustomerInvoicePayload(
+    civ({
+      invoice: { ...civ().invoice, external_ref: { qbo: { id: "901", sync_token: "3" } } },
+    })
+  );
+  eq(body.Id, "901", "id");
+  eq(body.SyncToken, "3", "token");
+  eq(body.sparse, true, "sparse");
+});
+
+test("a cancelled order's zero line is left off, not refused", () => {
+  const cancelled = { ...wholesaleDay(8, 0), cancelled: true };
+  const { body } = buildCustomerInvoicePayload(civ({ lines: [wholesaleDay(1), cancelled] }));
+  eq((body.Line as unknown[]).length, 1, "one line");
+});
+
+test("each refusal fires", () => {
+  const has = (i: CustomerInvoicePushInputs, s: string) =>
+    customerInvoiceRefusals(i).some((r) => r.includes(s));
+  eq(customerInvoiceRefusals(civ()), [], "a clean week has none");
+  ok(has(civ({ invoice: { ...civ().invoice, voided_at: "2026-09-21" } }), "void"), "void");
+  ok(has(civ({ customerRef: null }), "No QuickBooks customer"), "no customer");
+  ok(has(civ({ billEmail: " " }), "no address"), "no email");
+  ok(has(civ({ wholesaleItemRef: null }), "wholesale"), "no wholesale item");
+  no(has(civ({ itemRef: null }), "special orders"), "special-order item not needed for a wholesale week");
+  ok(has(civ({ lines: [taxedOrder], itemRef: null }), "special orders"), "no special-order item");
+  ok(has(civ({ lines: [taxedOrder], taxCodeRef: null }), "tax code"), "no tax code when taxed");
+  no(has(civ({ taxCodeRef: null }), "tax code"), "no code needed untaxed");
+  ok(has(civ({ lines: [{ ...taxedOrder, amount: 108.8 }] }), "deposit"), "deposit taken outside");
+  ok(has(civ({ lines: [] }), "no lines"), "empty");
+  let threw = false;
+  try { buildCustomerInvoicePayload(civ({ customerRef: null })); } catch { threw = true; }
+  ok(threw, "the builder refuses too");
+});
+
+function round(n: number) {
+  return Math.round(n * 100) / 100;
+}

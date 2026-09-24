@@ -232,6 +232,7 @@ Deno.serve(async (req) => {
       .from("accounting_connections")
       .update({ bill_expense_account_ref: null, bill_expense_account_name: null,
                 invoice_item_ref: null, invoice_item_name: null,
+                wholesale_item_ref: null, wholesale_item_name: null,
                 tax_code_ref: null, tax_code_name: null })
       .eq("id", row.id));
 
@@ -292,6 +293,14 @@ Deno.serve(async (req) => {
     await clear("pushed invoices", admin
       .from("special_orders")
       .update({ external_ref: {}, synced_at: null })
+      .eq("org_id", row.org_id)
+      .not("external_ref->qbo", "is", null));
+
+    // 131: a customer invoice routed to QuickBooks, and its pay link — which
+    // points into the OLD company's Payments and must not be re-sent.
+    await clear("pushed customer invoices", admin
+      .from("customer_invoices")
+      .update({ external_ref: null })
       .eq("org_id", row.org_id)
       .not("external_ref->qbo", "is", null));
 

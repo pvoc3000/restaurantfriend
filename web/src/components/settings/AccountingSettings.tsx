@@ -39,6 +39,9 @@ export type AccountingStatus = {
   bill_expense_account_name: string | null;
   invoice_item_ref: string | null;
   invoice_item_name: string | null;
+  /** 131: the item a wholesale line (Sold as) is sent under. */
+  wholesale_item_ref?: string | null;
+  wholesale_item_name?: string | null;
   tax_code_ref: string | null;
   tax_code_name: string | null;
   refresh_token_expires_at: string | null;
@@ -207,7 +210,7 @@ export function AccountingSettings({
     router.refresh();
   }
 
-  async function setDefault(kind: "bill" | "item" | "tax", choice: Choice | null) {
+  async function setDefault(kind: "bill" | "item" | "wholesale" | "tax", choice: Choice | null) {
     setBusy("defaults");
     setError(null);
     const patch =
@@ -221,7 +224,12 @@ export function AccountingSettings({
               invoice_item_ref: choice?.id ?? null,
               invoice_item_name: choice?.name ?? null,
             }
-          : { tax_code_ref: choice?.id ?? null, tax_code_name: choice?.name ?? null };
+          : kind === "wholesale"
+            ? {
+                wholesale_item_ref: choice?.id ?? null,
+                wholesale_item_name: choice?.name ?? null,
+              }
+            : { tax_code_ref: choice?.id ?? null, tax_code_name: choice?.name ?? null };
     const res = await call({ mode: "set_defaults", ...patch });
     setBusy(null);
     if (res) await loadStatus();
@@ -235,8 +243,9 @@ export function AccountingSettings({
 
       <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
         Approved vendor bills are sent to QuickBooks Online as Bills, so they are
-        on the books and can be paid there. Nothing is collected or emailed by
-        QuickBooks — this app keeps sending its own documents.
+        on the books and can be paid there. This app keeps sending its own
+        documents; an invoice set to collect through QuickBooks is also sent
+        there, and its customer pays on QuickBooks’ page.
       </p>
 
       {callback === "connected" && (
@@ -360,6 +369,22 @@ export function AccountingSettings({
               placeholder={items && items.length === 0 ? "No items in QuickBooks" : "Choose an item"}
               options={(items ?? []).map((i) => ({ value: i.id, label: i.name, hint: i.type }))}
               onPick={(next) => void setDefault("item", items?.find((i) => i.id === next) ?? null)}
+              panelMinWidth={320}
+            />
+          </div>
+          <div className="flex items-baseline justify-between gap-6">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+              Wholesale item
+            </span>
+            <PickList
+              variant="field"
+              boxed
+              ariaLabel="Item wholesale invoice lines are sent under"
+              disabled={!editable || busy !== null}
+              value={status?.wholesale_item_ref ?? null}
+              placeholder={items && items.length === 0 ? "No items in QuickBooks" : "Choose an item"}
+              options={(items ?? []).map((i) => ({ value: i.id, label: i.name, hint: i.type }))}
+              onPick={(next) => void setDefault("wholesale", items?.find((i) => i.id === next) ?? null)}
               panelMinWidth={320}
             />
           </div>

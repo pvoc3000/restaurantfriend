@@ -9,6 +9,8 @@ import { usDate } from "@/lib/specialOrderDocs";
 import { fetchInvoiceView } from "@/lib/customerInvoiceQueries";
 import {
   INVOICE_STATUS_LABEL,
+  PROCESSOR_LABEL,
+  PROCESSOR_OPTIONS,
   invoiceNumberText,
   invoiceStatus,
   invoiceChanged,
@@ -77,6 +79,8 @@ export async function CustomerInvoiceDetail({
   const here = `/customer-invoices/${id}`;
   const changed = invoiceChanged(lines);
   const changedCount = lines.filter(lineChanged).length;
+  const processor = invoice.processor ?? "square";
+  const qbo = (invoice.external_ref as { qbo?: { id?: string; doc_number?: string | null; invoice_link?: string | null } } | null)?.qbo;
 
   // Every send, with its PDF (128) — what the customer had, and when.
   const { data: sendRows } = await supabase
@@ -128,6 +132,7 @@ export async function CustomerInvoiceDetail({
           paid={view.paid}
           today={today}
           canWrite={canWrite}
+          inQuickBooks={Boolean(qbo?.id)}
           autoSend={typeof rawParams.send === "string" ? rawParams.send : null}
         />
       </div>
@@ -174,6 +179,42 @@ export async function CustomerInvoiceDetail({
                 : ""}
             </span>
           </Row>
+          <Row label="Collect through">
+            {/* 131: chosen per invoice, locked once sent — the customer then
+                holds that processor's link. */}
+            {canWrite && draft ? (
+              <InlineValue boxed={BOXED_FIELDS} table="customer_invoices" id={id} column="processor"
+                           kind="pick" nullable={false} value={processor}
+                           options={PROCESSOR_OPTIONS} ariaLabel="Collect through" />
+            ) : (
+              <span className={READ_ONLY_VALUE}>{PROCESSOR_LABEL[processor]}</span>
+            )}
+          </Row>
+          {processor === "quickbooks" ? (
+            <Row label="In QuickBooks">
+              <span className={READ_ONLY_VALUE}>
+                {qbo?.id ? (
+                  <>
+                    <a href={`https://app.qbo.intuit.com/app/invoice?txnId=${encodeURIComponent(qbo.id)}`}
+                       target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                      Invoice {qbo.doc_number ?? qbo.id}
+                    </a>
+                    {qbo.invoice_link ? (
+                      <>
+                        {" · "}
+                        <a href={qbo.invoice_link} target="_blank" rel="noreferrer"
+                           className="underline underline-offset-2">
+                          Pay page
+                        </a>
+                      </>
+                    ) : null}
+                  </>
+                ) : (
+                  "Not yet — it goes when the invoice is sent"
+                )}
+              </span>
+            </Row>
+          ) : null}
           <Row label={invoice.voided_at ? "Voided" : "Paid"}>
             <span className={READ_ONLY_VALUE}>
               {invoice.voided_at ? usDate(invoice.voided_at) : invoice.paid_at ? usDate(invoice.paid_at) : "—"}

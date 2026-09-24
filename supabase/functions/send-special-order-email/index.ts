@@ -97,7 +97,10 @@ const FILED_KIND: Record<string, string | null> = {
 function checkApprovalLink(body: string): string | null {
   // `/q/` is the quote's approval link; `/pay/` the invoice's pay link
   // (migration 119). Both are the customer's one click, so both are checked.
-  const found = body.match(/https?:\/\/[^\s<>"')]+\/(?:q|pay)\/[A-Za-z0-9_-]{16,}/);
+  // QuickBooks' own pay link (131) is not ours to check, and its short form
+  // (intuit.me/q/…) would otherwise read as a quote link on the wrong host.
+  const found = [...body.matchAll(/https?:\/\/[^\s<>"')]+\/(?:q|pay)\/[A-Za-z0-9_-]{16,}/g)]
+    .find((m) => !/^https?:\/\/([^/]+\.)?intuit\.(com|me)\//i.test(m[0]));
   if (!found) return null;
 
   const appUrl = Deno.env.get("APP_URL");

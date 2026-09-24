@@ -89,6 +89,12 @@ export function payLine(link: string): string {
   return link ? `\nYou can pay online here by card, Apple Pay, Google Pay or our gift card:\n${link}\n` : "";
 }
 
+/** The same sentence for QuickBooks' own pay page (131), which takes cards and
+ *  bank transfers — not our gift card, and not the wallets Square offers. */
+export function quickBooksPayLine(link: string): string {
+  return link ? `\nYou can pay online here by card or bank transfer:\n${link}\n` : "";
+}
+
 /**
  * What every state other than `open` MEANS to somebody holding the link, in
  * their words. A customer reading the wrong sentence here is the failure of

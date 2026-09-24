@@ -4119,3 +4119,12 @@
    numbering seeds at
    10000 (FMP max 9887; `legacy_id` is NOT unique — 5 duplicated OrderIDs);
    customers migrate WITHOUT the plain-text CC fields, ever.
+
+**A CUSTOMER INVOICE CAN COLLECT THROUGH QUICKBOOKS (2026-09-24, migration
+131)** — Mark is trying QuickBooks Payments against Square, for special orders
+and wholesale alike. `customer_invoices.processor` (Square by default, set on
+the draft, locked once sent); a QuickBooks invoice is pushed at Send and our
+email carries QuickBooks' pay link instead of `/pay`; the payment returns by
+Intuit webhook and settles the orders through `allocate_customer_invoice_payment`
+exactly as a pay-link payment does. The full decisions and setup are in
+`docs/history/04l-quickbooks.md`.
