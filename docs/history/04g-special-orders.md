@@ -9,8 +9,78 @@
    a customer's approval on a public page, takes inquiries on a public form,
    proposes the next step as things happen, **puts the order's donuts on a
    real production schedule**, and **makes a wholesale account's days by
-   itself**. What remains is the inquiry form's own build-your-box picker (4b)
-   and the organic-email parser (4c).
+   itself**. The inquiry form's build-your-order picker (4b) was built
+   2026-09-24 (below); what remains is the organic-email parser (4c).
+
+   **2026-09-24 — 4b, BUILD YOUR ORDER ON `/inquiry` (migrations 132 + 133
+   WRITTEN, NOT YET APPLIED; `submit-inquiry` changed and
+   `inquiry-delivery-quote` new, NEITHER DEPLOYED). *Probe, don't read this
+   line.*** Mark: customers should BUILD the order rather than only describe
+   it — regular donuts, minis, giants and letters, with prices shown, and a
+   fallback for anything else. Still a LEAD ("it's a lead, not an order").
+   Decisions, all Mark's, 2026-09-24:
+   · **Prices shown** ("99% of the time that's what we're asked for").
+   · **Hide by exception**: every ACTIVE item is offered, not a ticked menu —
+     132 flips `show_on_inquiry_form` to default TRUE and switches everything on
+     except `Custom …` and `Misc`, once (a marker stops a re-run switching back
+     on what somebody switched off). The menu also requires a PRICE, so an
+     unpriced item is off the page until priced. Duplicate now WRITES the flag
+     false, because an omitted column means ON since 132.
+   · **Minimums, each category that is ordered meets its own**: 24 regulars;
+     24 minis and 6 of each flavour; 10 letters; 1 giant.
+     `special_orders.inquiry_minimums`, editable in Settings. 12 regulars + 1
+     giant is refused.
+   · **Letters: a message plus flavours, per-letter optional.** One flavour
+     means every letter is it. Several and "you choose" means the lead gets an
+     UNLINKED line per letter, priced at the flavours' average, noted with the
+     customer's flavours — the app's existing "unlinked, can't schedule" flag is
+     the prompt to assign. Per-letter choices link the line. Sequence kept; cut
+     `Letter - "A"`, note `"A"`, qty = sets.
+   · **Descriptions live on the production item** (`public_description`, not
+     Square); the menu falls back to a same-named item's, so a flavour is
+     written once across sizes.
+   · **No Square mapping.** Minis, giants and letters are not in Square, and
+     special-order prices come from the grid.
+   · **Delivery estimate: base + per DRIVING mile from one shop, up to a max**
+     (Google Routes API, `GOOGLE_MAPS_API_KEY`, see
+     `docs/inquiry-delivery-setup.md`). This REVERSES the brief's kill-list
+     line "distance stays hand-entered" for the estimate; the order's
+     `delivery_charge` is still a field. `submit-inquiry` re-measures and writes
+     `delivery_distance` + `delivery_charge` on the lead (only if empty) with a
+     log entry. No estimate until Settings has an origin shop and a per-mile
+     rate. Historic charges could not seed a rate: 268 delivery orders since
+     2024 carry NO distance, and the charge does not follow DeliverLA's flat $18
+     cost ($33–$211).
+   **THE GATE RE-PRICES.** 132's `production_item_price` is `resolveItemPrice`
+   in SQL — proved equal over all 312 live items × {org, DF01, DF02} (936
+   prices) in the harness, and proved to FAIL (14 differences) with the item
+   override step broken. `inquiry_price_location` makes the menu and the gate
+   price at the same shop (pickup shop, else delivery origin, else first
+   physical shop). 133 adds `p_items` LAST with a default, so a 14-argument v1
+   call still resolves and writes 058's lead exactly — **git tag `inquiry-v1`
+   is the v1 form, and going back is a code revert, not a migration.**
+   Harness (all 133 migrations replayed): every refusal state, every minimum
+   boundary (23/24, 19+5 vs 18+6, 9/10, sets counting), hidden/retired/
+   unpriced/not-at-this-shop/wrong-category items, a client price of $0.01
+   ignored for the server's $6.00 DTLA override, honeypot beating a bad basket,
+   nothing written by any refusal, and the browser's REAL payload producing
+   $186.80 in the gate against $186.80 on the page.
+   **Browser, against a live-data menu served to the page** (132 not applied, so
+   `inquiry_menu` was stubbed in the pane only; submits intercepted): the four
+   cards, steppers (+6 regulars/minis, +1 giants), filters, the summary with tax
+   at the pickup shop, delivery, a blocked submit naming the shortfall in red,
+   375px with no overflow. **Two bugs found and fixed there:** every size's
+   quantity box was labelled "How many Angry Samoa" (the size is in the label
+   now), and ticking a FIRST letter flavour silently assigned it to every
+   letter, so per-letter mode opened pre-filled after a second flavour was
+   ticked (`alignAssign(…, fillSingle=false)` when storing; fixture-pinned).
+   Without a menu (132 unapplied) the page is exactly the v1 form.
+   **To finish:** apply 132 then 133; deploy `submit-inquiry` and
+   `inquiry-delivery-quote`; add the Google key and fill Settings ▸ Delivery
+   estimate; add `{items}` to the inquiry email template if wanted; consider
+   switching off "Donut Letters" (a generic letter item the menu offers as a
+   flavour). The production item record SELECTS `public_description`, so it
+   errors until 132 is applied.
 
    **Also 2026-09-23 — THE ORDER'S MENU AND SPACING.** (1) "disable 'Send to
    quickbooks...'" — `quickbooks={null}` on the order record, so the row is

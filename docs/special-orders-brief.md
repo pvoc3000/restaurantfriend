@@ -931,7 +931,7 @@ Worth knowing because none of it is in the original decision list:
 - The row progress bar starts at Quote, not at Lead.
 - A list's create command sits ABOVE the filter row, not at the end of it.
 
-### 4b — the build-your-box picker (NOT BUILT)
+### 4b — the build-your-box picker (BUILT 2026-09-24 — migrations 132 + 133; see docs/history/04g-special-orders.md, which SUPERSEDES the notes below where they differ: hide-by-exception rather than opt-in, prices shown, per-category minimums, letters as a message, a delivery estimate)
 
 The larger of the two remaining pieces. Decision 18's second half.
 

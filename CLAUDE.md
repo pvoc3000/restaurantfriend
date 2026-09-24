@@ -57,7 +57,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 4d. 🚧 Bills (vendor bills, approval, financials lock, filing on close) — `docs/history/04d-invoices.md` (named Invoices until 2026-09-20; see Table naming)
 4e. ✅ Employee events (`employee_events`, `/events`) — `docs/history/04e-employee-events.md`
 4f. 🚧 Production (elements, recipes, items, price grid, plans, schedules, batch logs, costing) — `docs/history/04f-production.md`
-4g. 🚧 Special orders (quotes, documents, /q approval, /inquiry, standing orders, scheduling, /pay link via Square, customer invoices — 124–130 applied) — `docs/history/04g-special-orders.md`
+4g. 🚧 Special orders (quotes, documents, /q approval, /inquiry, standing orders, scheduling, /pay link via Square, customer invoices — 124–130 applied; build-your-order on /inquiry, 132–133 written 2026-09-24, v1 form tagged `inquiry-v1`) — `docs/history/04g-special-orders.md`
 4h. ✅ Supervisor shift report (runner, email, reopen) — `docs/history/04h-shift-report.md`
 4i. ✅ Which shops a member may work at (migration 073) — `docs/history/04i-location-access.md`
 4j. ✅ Password reset (migration 074 + `request-password-reset`) — `docs/history/04j-password-reset.md`
