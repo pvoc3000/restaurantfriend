@@ -348,3 +348,12 @@
    characters of ours (`qboDisplayName`). No name is ever matched
    automatically. The manual picker on the customer record still links by
    name, for wholesale accounts — a manager's deliberate choice.
+
+   **SEND TO QUICKBOOKS BY HAND (2026-09-24).** Mark kept the push at Send
+   (a draft's lines follow its orders, drafts get deleted, and a QuickBooks
+   invoice books revenue on its date) and asked for a manual command beside it:
+   **Send to QuickBooks… / Update in QuickBooks…** in the invoice's Actions
+   menu, shown only when it collects through QuickBooks. The same push as Send,
+   PDF attached, the link step for an unlinked customer — and NO email, and the
+   invoice is not marked sent. Once an invoice is in QuickBooks its Collect
+   through is read-only even as a draft; void it to change its mind.

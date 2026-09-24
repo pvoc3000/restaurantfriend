@@ -10,7 +10,9 @@ import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/u
 import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
 import { TextInput } from "@/components/ui/TextInput";
-import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { alertDialog, confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { customerInvoiceRefusals } from "@/lib/quickbooks";
+import { QuickBooksCustomerStep } from "@/components/specialOrders/QuickBooksCustomerStep";
 import {
   DEFAULT_PAYMENT_TYPE,
   PAYMENT_TYPE_OPTIONS,
@@ -18,7 +20,12 @@ import {
 } from "@/lib/specialOrders";
 import { downloadBlob, openWindowNow, showBlob } from "@/lib/poProcessing";
 import { invoiceFileName, type InvoiceStatus } from "@/lib/customerInvoices";
-import { SendCustomerInvoice, renderInvoicePdf } from "./SendCustomerInvoice";
+import {
+  SendCustomerInvoice,
+  pushToQuickBooks,
+  quickBooksInputs,
+  renderInvoicePdf,
+} from "./SendCustomerInvoice";
 
 /**
  * The invoice record's commands (migration 124), as ONE "Actions" menu level
@@ -51,6 +58,7 @@ export function CustomerInvoiceCommandMenu({
   today,
   canWrite,
   inQuickBooks = false,
+  processor = "square",
   autoSend = null,
 }: {
   id: string;
@@ -61,6 +69,8 @@ export function CustomerInvoiceCommandMenu({
   paid: number;
   /** Pushed to QuickBooks (131): a void or delete here voids it there first. */
   inQuickBooks?: boolean;
+  /** Who collects (131). Send to QuickBooks is offered only for QuickBooks. */
+  processor?: "square" | "quickbooks";
   /** The ORG's calendar day — what a payment and a void are dated. */
   today: string;
   canWrite: boolean;
@@ -78,6 +88,9 @@ export function CustomerInvoiceCommandMenu({
   const [payOn, setPayOn] = useState<string | null>(today);
   const [payType, setPayType] = useState(DEFAULT_PAYMENT_TYPE);
   const [payNote, setPayNote] = useState("");
+  /** An unlinked customer met by Send to QuickBooks: link or create, then
+   *  push. */
+  const [linkFor, setLinkFor] = useState<string | null>(null);
 
   const draft = status === "draft";
   const live = status !== "void";
@@ -114,6 +127,53 @@ export function CustomerInvoiceCommandMenu({
       const { blob, view } = await renderInvoicePdf(supabase, id, today);
       downloadBlob(blob, invoiceFileName(numberText, view.invoice.issued_on));
     });
+
+  /**
+   * SEND TO QUICKBOOKS, WITHOUT EMAILING ANYONE (Mark, 2026-09-24) — the same
+   * push Send makes, with the same PDF attached, for when the books should
+   * have it before (or apart from) the customer. It does not mark the invoice
+   * sent. A second press is an update of the same QuickBooks invoice.
+   */
+  const sendToQuickBooks = async () => {
+    await run("qbo", async () => {
+      const { blob, view } = await renderInvoicePdf(supabase, id, today);
+      const inputs = await quickBooksInputs(supabase, orgId, view, numberText);
+      if (!inputs.customerRef && view.invoice.customer_id) {
+        setLinkFor(view.invoice.customer_id);
+        return;
+      }
+      const email = (view.customer?.email ?? "").trim();
+      const refusals = customerInvoiceRefusals({ ...inputs, billEmail: email });
+      if (refusals.length > 0) {
+        await alertDialog({ title: "This invoice can't go to QuickBooks yet", body: refusals[0] });
+        return;
+      }
+      if (
+        !(await confirmDialog({
+          ...splitConfirmMessage(
+            `${inQuickBooks ? "Update" : "Send"} invoice ${numberText} in QuickBooks?\n\n` +
+              "Nothing is emailed to the customer — use Send… for that."
+          ),
+          confirmLabel: inQuickBooks ? "Update" : "Send",
+        }))
+      ) {
+        return;
+      }
+      const pushed = await pushToQuickBooks(
+        supabase,
+        inputs,
+        email,
+        blob,
+        invoiceFileName(numberText, view.invoice.issued_on)
+      );
+      const doc = pushed.ref.qbo?.doc_number ?? pushed.ref.qbo?.id ?? "";
+      setNote(
+        `${inQuickBooks ? "Updated" : "Sent"} in QuickBooks as Invoice ${doc}` +
+          (pushed.warnings.length ? ` — ${pushed.warnings.join(" ")}` : "")
+      );
+      router.refresh();
+    });
+  };
 
   /** Void it in QuickBooks FIRST (131), so a refusal there — a payment
    *  already applied — stops the void here too. */
@@ -207,6 +267,20 @@ export function CustomerInvoiceCommandMenu({
       { label: busy === "preview" ? "Rendering…" : "Preview", onSelect: preview, disabled: busy !== null },
       { label: busy === "download" ? "Rendering…" : "Download", onSelect: () => void download(), disabled: busy !== null },
       ...sendItems,
+      ...(canWrite && live && processor === "quickbooks"
+        ? [
+            {
+              label:
+                busy === "qbo"
+                  ? "Sending…"
+                  : inQuickBooks
+                    ? "Update in QuickBooks…"
+                    : "Send to QuickBooks…",
+              onSelect: () => void sendToQuickBooks(),
+              disabled: busy !== null,
+            },
+          ]
+        : []),
     ];
     const moneyRows: ActionMenuItem[] =
       canWrite && live && balance > 0.005
@@ -257,6 +331,16 @@ export function CustomerInvoiceCommandMenu({
         </SendCustomerInvoice>
       ) : (
         menu([])
+      )}
+      {linkFor && (
+        <QuickBooksCustomerStep
+          customerId={linkFor}
+          onClose={() => setLinkFor(null)}
+          onLinked={() => {
+            setLinkFor(null);
+            void sendToQuickBooks();
+          }}
+        />
       )}
       {note ? <p className="max-w-sm text-right text-[13px] text-[var(--rf-green-600)]">{note}</p> : null}
       {error ? <p className="max-w-sm text-right text-[13px] text-accent">{error}</p> : null}

@@ -514,7 +514,7 @@ function blobToBase64(blob: Blob): Promise<string> {
 
 /** What the QuickBooks push needs beyond the invoice view: the connection's
  *  items and tax code, and the customer's QuickBooks id. */
-async function quickBooksInputs(
+export async function quickBooksInputs(
   supabase: SupabaseClient,
   orgId: string,
   view: InvoiceView,
@@ -574,7 +574,7 @@ async function quickBooksInputs(
  * attached, record the attachment, and hand back the pay link. Throws on any
  * failure, so the caller sends nothing.
  */
-async function pushToQuickBooks(
+export async function pushToQuickBooks(
   supabase: SupabaseClient,
   inputs: Omit<CustomerInvoicePushInputs, "billEmail">,
   to: string,

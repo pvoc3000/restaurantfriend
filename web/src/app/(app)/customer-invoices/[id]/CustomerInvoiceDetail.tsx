@@ -133,6 +133,7 @@ export async function CustomerInvoiceDetail({
           today={today}
           canWrite={canWrite}
           inQuickBooks={Boolean(qbo?.id)}
+          processor={processor}
           autoSend={typeof rawParams.send === "string" ? rawParams.send : null}
         />
       </div>
@@ -181,8 +182,10 @@ export async function CustomerInvoiceDetail({
           </Row>
           <Row label="Collect through">
             {/* 131: chosen per invoice, locked once sent — the customer then
-                holds that processor's link. */}
-            {canWrite && draft ? (
+                holds that processor's link — and once it is in QuickBooks,
+                which Send to QuickBooks can do before any send. Void it to
+                change its mind. */}
+            {canWrite && draft && !qbo?.id ? (
               <InlineValue boxed={BOXED_FIELDS} table="customer_invoices" id={id} column="processor"
                            kind="pick" nullable={false} value={processor}
                            options={PROCESSOR_OPTIONS} ariaLabel="Collect through" />
