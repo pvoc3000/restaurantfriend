@@ -29,7 +29,7 @@
    remembered in sessionStorage (`sendIntent`); (2) the sent PDF never reached
    the order's Documents tab — `send-special-order-email` now uploads a copy
    per order under `{org}/{order}/` and records an `invoice_document`
-   attachment (NEEDS A REDEPLOY). #10075's own copy was not backfilled.
+   attachment (deployed by Mark the same day). #10075's own copy was not backfilled.
 
    **Shipped 2026-09-23 — SEND ▸ INVOICE GOES THROUGH A CUSTOMER INVOICE, FOR
    EVERY ORDER.** Mark: "can we insert creating the invoice into the send
