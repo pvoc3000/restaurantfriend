@@ -20,6 +20,7 @@ import {
   readMenu,
   splitMessage,
   todayIn,
+  unassignedLetters,
   type Basket,
   type InquiryMenuItem,
   type InquiryRules,
@@ -111,9 +112,9 @@ test("alignAssign: storing never fills in a choice the customer did not make", (
   eq(alignAssign([], 3, ["l1"]), ["l1", "l1", "l1"], "pricing does");
 });
 
-test("per-letter mode after ticking one flavour, then a second: nothing pre-chosen", () => {
+test("after ticking one flavour, then a second: nothing pre-chosen", () => {
   // The browser bug: the first tick filled every letter with it.
-  const req = letters({ message: "ABC", flavors: ["l1", "l2"], perLetter: true, assign: [null, "l2", null] });
+  const req = letters({ message: "ABC", flavors: ["l1", "l2"], assign: [null, "l2", null] });
   eq(basketLines(basket({}, [req]), MENU).map((l) => [l.qty, l.unitPrice]), [
     [2, 5.6],
     [1, 4.6],
@@ -195,16 +196,17 @@ test("basketLines: one flavour means every letter is that flavour", () => {
   eq(lines.map((l) => [l.label, l.qty, l.unitPrice]), [["“HI MOM” letters — Angry Samoa", 10, 6.6]]);
 });
 
-test("basketLines: 'make it work' letters price at the flavours' average", () => {
+test("basketLines: letters not chosen yet keep the total honest at the average", () => {
   const lines = basketLines(basket({}, [letters({ message: "HELLO", flavors: ["l1", "l2"] })]), MENU);
-  eq(lines.map((l) => [l.qty, l.unitPrice, l.total]), [[5, 5.6, 28]]);
+  eq(lines.map((l) => [l.label, l.qty, l.unitPrice, l.total]), [
+    ["“HELLO” letters — flavor not chosen yet", 5, 5.6, 28],
+  ]);
 });
 
 test("basketLines: per-letter choices group by flavour; unchosen ones average", () => {
   const req = letters({
     message: "ABC",
     flavors: ["l1", "l2"],
-    perLetter: true,
     assign: ["l1", "l2", null],
   });
   eq(basketLines(basket({}, [req]), MENU).map((l) => [l.qty, l.unitPrice]), [
@@ -247,14 +249,32 @@ test("basketPayload: quantities only, never a price", () => {
   no(JSON.stringify(p).includes("price"), "no price on the wire");
 });
 
-test("basketPayload: 'make it work' sends no assignment; per-letter does", () => {
-  const loose = basketPayload(basket({}, [letters({ message: "hi<3", flavors: ["l1", "l2"] })]), MENU);
-  eq(loose.letters, [{ characters: ["H", "I", "<3"], flavors: ["l1", "l2"], assign: null, sets: 1 }]);
-  const exact = basketPayload(
-    basket({}, [letters({ message: "HI", flavors: ["l1", "l2"], perLetter: true, assign: ["l2"] })]),
+test("basketPayload: the assignment always goes; one flavour fills it", () => {
+  const one = basketPayload(basket({}, [letters({ message: "hi<3", flavors: ["l1"] })]), MENU);
+  eq(one.letters, [{ characters: ["H", "I", "<3"], flavors: ["l1"], assign: ["l1", "l1", "l1"], sets: 1 }]);
+  const two = basketPayload(
+    basket({}, [letters({ message: "HI", flavors: ["l1", "l2"], assign: ["l2", "l1"] })]),
     MENU
   );
-  eq(exact.letters[0].assign, ["l2", null]);
+  eq(two.letters[0].assign, ["l2", "l1"]);
+});
+
+test("EVERY LETTER NEEDS A FLAVOUR (Mark, 2026-09-24): with two flavours, each is chosen", () => {
+  const req = (assign: (string | null)[]) =>
+    letters({ message: "HAPPY 40TH!", flavors: ["l1", "l2"], assign });
+  eq(cats(basket({}, [req([])])), ["letter"], "none chosen");
+  const nine = ["l1", "l2", "l1", "l2", "l1", "l2", "l1", "l2", "l1", null];
+  const msg = basketProblems(basket({}, [req(nine)]), MENU, MINS).map((p) => p.message);
+  eq(msg, ["Choose a flavor for every letter of “HAPPY 40TH!” — 1 still to go."]);
+  eq(cats(basket({}, [req(["l1", "l2", "l1", "l2", "l1", "l2", "l1", "l2", "l1", "l2"])])), []);
+  eq(cats(basket({}, [letters({ message: "HAPPY 40TH!", flavors: ["l1"] })])), [], "one flavour needs no choosing");
+});
+
+test("unassignedLetters: counts what is left, and a lone flavour leaves nothing", () => {
+  const ids = new Set(["l1", "l2"]);
+  eq(unassignedLetters(letters({ message: "ABC", flavors: ["l1", "l2"], assign: ["l1"] }), ids), 2);
+  eq(unassignedLetters(letters({ message: "ABC", flavors: ["l1"] }), ids), 0);
+  eq(unassignedLetters(letters({ message: "ABC" }), ids), 3, "no flavour at all");
 });
 
 test("basketPayload: a request with no letters or no flavour is left off", () => {

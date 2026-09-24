@@ -367,14 +367,11 @@ export function InquiryForm({ orgId }: { orgId: string }) {
           </Field>
         )}
 
-        <Field
-          label="Address"
-          hint={
-            draft.fulfillment === "delivery"
-              ? "Where we’re delivering to."
-              : "Optional — helps us know where you are."
-          }
-        >
+        {/* DELIVERY ONLY (Mark, 2026-09-24: for pickup "not necessary"). What
+            was typed survives a switch back to pickup, but only a delivery
+            sends it (`inquiryPayload`). */}
+        {draft.fulfillment === "delivery" && (
+        <Field label="Address" hint="Where we’re delivering to.">
           <input
             type="text"
             value={draft.address}
@@ -384,6 +381,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
             className={inputClass()}
           />
         </Field>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           {/* `ui/DateField`, not a raw `<input type="date">`, and that is the

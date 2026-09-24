@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import {
   alignAssign,
   newLetterRequest,
+  unassignedLetters,
   money,
   splitMessage,
   type Basket,
@@ -374,6 +375,7 @@ function LetterRequestEditor({
   const { characters, invalid } = splitMessage(req.message);
   const byId = new Map(flavors.map((f) => [f.id, f]));
   const chosen = req.flavors.filter((f) => byId.has(f));
+  const left = unassignedLetters(req, new Set(chosen));
   const shown = filterItems(flavors, filter);
 
   function toggleFlavor(id: string) {
@@ -401,7 +403,7 @@ function LetterRequestEditor({
 
       <label className="block space-y-1.5">
         <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
-          Your message
+          1. Your message
         </span>
         <input
           type="text"
@@ -426,7 +428,7 @@ function LetterRequestEditor({
 
       <div className="space-y-1.5">
         <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
-          Flavors
+          2. Flavors
         </span>
         {chosen.length > 0 && (
           <ul className="flex flex-wrap gap-2">
@@ -447,8 +449,8 @@ function LetterRequestEditor({
         )}
         <span className="block text-[13px] text-muted">
           {chosen.length > 1
-            ? "Pick as many as you like — we’ll work out which letter is which, or choose below."
-            : "Pick one for the whole message, or several and we’ll mix them."}
+            ? "Pick as many as you like — then choose which letter is which below."
+            : "Pick one for the whole message, or several to mix them."}
         </span>
         <div className="border border-ink">
           {flavors.length >= FILTER_FROM && (
@@ -504,6 +506,89 @@ function LetterRequestEditor({
         </div>
       </div>
 
+      {/* STEP 3 — A FLAVOR FOR EVERY LETTER (Mark, 2026-09-24: "force the user
+          to set the flavor for each letter … type the phrase, choose the
+          flavors, then set the flavors for each letter"). One flavor is every
+          letter's and needs no choosing; with two or more, each row starts
+          empty and the basket will not send until every one is set. */}
+      {characters.length > 0 && chosen.length > 0 && (
+        <div className="space-y-3">
+          <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
+            3. A flavor for each letter
+          </span>
+          {chosen.length === 1 ? (
+            <p className="text-[14px] text-muted">
+              Every letter will be {byId.get(chosen[0])!.name}. Choose another flavor above to
+              mix them.
+            </p>
+          ) : (
+            <>
+              <p className="text-[14px] text-muted">
+                {left === 0
+                  ? "Every letter has a flavor."
+                  : `${left} of ${characters.length} still to choose.`}
+              </p>
+              {/* A SHORTCUT, NOT A DEFAULT: it fills every letter at once so a
+                  twenty-letter message is one pick and a few changes, and it is
+                  only ever the customer's own choice. */}
+              <label className="flex items-center gap-3">
+                <span className="shrink-0 text-[14px]">Set every letter to</span>
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) onChange({ assign: characters.map(() => e.target.value) });
+                  }}
+                  className="h-12 min-w-0 flex-1 border border-ink bg-white px-2 text-[16px] outline-none focus:border-2"
+                >
+                  <option value="">Choose…</option>
+                  {chosen.map((id) => (
+                    <option key={id} value={id}>
+                      {byId.get(id)!.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <ol className="divide-y divide-hairline border border-ink">
+                {characters.map((ch, i) => {
+                  const value = req.assign[i] ?? "";
+                  return (
+                    <li key={i} className="flex items-center gap-3 px-3 py-2">
+                      <span className="w-10 shrink-0 text-center text-[22px] font-bold">
+                        {/* U+FE0E: text presentation, so Apple devices draw a
+                            glyph rather than a red emoji heart (CLAUDE.md, ♥/★). */}
+                        {ch === "<3" ? "♥\uFE0E" : ch}
+                      </span>
+                      <select
+                        value={value}
+                        onChange={(e) => {
+                          const next = [...alignAssign(req.assign, characters.length, chosen, false)];
+                          next[i] = e.target.value || null;
+                          onChange({ assign: next });
+                        }}
+                        aria-label={`Flavor for letter ${i + 1}, ${ch === "<3" ? "heart" : ch}`}
+                        className={
+                          "h-12 min-w-0 flex-1 border bg-white px-2 text-[16px] outline-none focus:border-2 " +
+                          (value ? "border-ink" : "border-accent text-muted")
+                        }
+                      >
+                        <option value="" disabled>
+                          Choose a flavor
+                        </option>
+                        {chosen.map((id) => (
+                          <option key={id} value={id}>
+                            {byId.get(id)!.name}
+                          </option>
+                        ))}
+                      </select>
+                    </li>
+                  );
+                })}
+              </ol>
+            </>
+          )}
+        </div>
+      )}
+
       <label className="block space-y-1.5">
         <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
           How many sets?
@@ -521,50 +606,6 @@ function LetterRequestEditor({
           2 makes the whole message twice.
         </span>
       </label>
-
-      {chosen.length > 1 && characters.length > 0 && (
-        <div className="space-y-3">
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={req.perLetter}
-              onChange={(e) => onChange({ perLetter: e.target.checked })}
-              className="size-5 accent-black"
-            />
-            <span className="text-[15px]">Choose a flavor for each letter</span>
-          </label>
-          {req.perLetter && (
-            <ol className="divide-y divide-hairline border border-ink">
-              {characters.map((ch, i) => (
-                <li key={i} className="flex items-center gap-3 px-3 py-2">
-                  <span className="w-10 shrink-0 text-center text-[22px] font-bold">
-                    {/* U+FE0E: text presentation, so Apple devices draw a
-                        glyph rather than a red emoji heart (CLAUDE.md, ♥/★). */}
-                    {ch === "<3" ? "♥\uFE0E" : ch}
-                  </span>
-                  <select
-                    value={req.assign[i] ?? ""}
-                    onChange={(e) => {
-                      const next = [...alignAssign(req.assign, characters.length, chosen, false)];
-                      next[i] = e.target.value || null;
-                      onChange({ assign: next });
-                    }}
-                    aria-label={`Flavor for letter ${i + 1}, ${ch === "<3" ? "heart" : ch}`}
-                    className="h-12 min-w-0 flex-1 border border-ink bg-white px-2 text-[16px] outline-none focus:border-2"
-                  >
-                    <option value="">You choose</option>
-                    {chosen.map((id) => (
-                      <option key={id} value={id}>
-                        {byId.get(id)!.name}
-                      </option>
-                    ))}
-                  </select>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      )}
     </div>
   );
 }

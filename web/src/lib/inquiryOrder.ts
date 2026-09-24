@@ -152,24 +152,35 @@ export function splitMessage(text: string): { characters: string[]; invalid: str
 /**
  * One letters request: a message, the flavours for it, and how many sets.
  *
- * TWO WAYS TO SAY IT, because people do both (Mark): name the flavours and
- * let us "make it work", or choose a flavour per letter. `perLetter` false is
- * the first. `assign` is kept either way so switching modes does not lose what
- * somebody chose.
+ * EVERY LETTER GETS A FLAVOUR, CHOSEN BY THE CUSTOMER (Mark, 2026-09-24,
+ * after using the first version: "force the user to set the flavor for each
+ * letter, but in the stages you've set up already. Type the phrase, choose the
+ * flavors, then set the flavors for each letter"). The first version also let
+ * them leave it to us ("make it work"); that is gone from the page. One flavour
+ * is unambiguous and fills every letter by itself; with two or more, each
+ * letter starts unchosen and the basket is not sendable until all are chosen.
  */
 export type LetterRequest = {
   /** The page's key for the request; never sent. */
   key: string;
   message: string;
   flavors: string[];
-  perLetter: boolean;
-  /** One flavour id (or null) per character of `message`, when `perLetter`. */
+  /** One flavour id (or null = not chosen yet) per character of `message`. */
   assign: (string | null)[];
   sets: number;
 };
 
 export function newLetterRequest(key: string): LetterRequest {
-  return { key, message: "", flavors: [], perLetter: false, assign: [], sets: 1 };
+  return { key, message: "", flavors: [], assign: [], sets: 1 };
+}
+
+/** How many of a request's letters still have no flavour. A single flavour
+ *  leaves none, since it is every letter's. */
+export function unassignedLetters(req: LetterRequest, letterIds: Set<string>): number {
+  const { characters } = splitMessage(req.message);
+  const flavors = req.flavors.filter((f) => letterIds.has(f));
+  if (flavors.length === 0) return characters.length;
+  return alignAssign(req.assign, characters.length, flavors).filter((a) => a === null).length;
 }
 
 /**
@@ -274,10 +285,7 @@ export function basketLines(basket: Basket, menu: InquiryMenuItem[]): BasketLine
     const flavors = req.flavors.filter((f) => byId.has(f));
     if (characters.length === 0 || sets === 0 || flavors.length === 0) continue;
     const word = displayMessage(req.message);
-    const assign =
-      req.perLetter || flavors.length === 1
-        ? alignAssign(req.assign, characters.length, flavors)
-        : characters.map(() => null);
+    const assign = alignAssign(req.assign, characters.length, flavors);
     const counts = new Map<string | null, number>();
     for (const a of assign) counts.set(a, (counts.get(a) ?? 0) + 1);
     for (const [flavor, n] of counts) {
@@ -292,10 +300,13 @@ export function basketLines(basket: Basket, menu: InquiryMenuItem[]): BasketLine
           total: cents(qty * item.price),
         });
       } else {
+        // Letters whose flavour is not chosen YET — the basket cannot be sent
+        // like this (`basketProblems`), so this row only keeps the running
+        // total honest while somebody works down the list.
         const unit = averagePrice(flavors, byId);
         lines.push({
           category: "letter",
-          label: `“${word}” letters — ${flavors.map((f) => byId.get(f)!.name).join(" / ")}`,
+          label: `“${word}” letters — flavor not chosen yet`,
           qty,
           unitPrice: unit,
           total: cents(qty * unit),
@@ -373,8 +384,17 @@ export function basketProblems(
         } out, or tell us about it below.`,
       });
     }
-    if (characters.length > 0 && req.flavors.filter((f) => byId.has(f)).length === 0) {
+    const chosen = req.flavors.filter((f) => byId.has(f));
+    if (characters.length > 0 && chosen.length === 0) {
       problems.push({ category: "letter", message: `Choose at least one flavor for “${displayMessage(req.message)}”.` });
+    } else if (characters.length > 0) {
+      const left = unassignedLetters(req, new Set(chosen));
+      if (left > 0) {
+        problems.push({
+          category: "letter",
+          message: `Choose a flavor for every letter of “${displayMessage(req.message)}” — ${left} still to go.`,
+        });
+      }
     }
     if (characters.length > 0) letters += characters.length * Math.max(0, Math.floor(req.sets || 0));
   }
@@ -454,7 +474,7 @@ export function estimateTotals(args: {
  */
 export function basketPayload(basket: Basket, menu: InquiryMenuItem[]): {
   lines: { item_id: string; qty: number }[];
-  letters: { characters: string[]; flavors: string[]; assign: (string | null)[] | null; sets: number }[];
+  letters: { characters: string[]; flavors: string[]; assign: (string | null)[]; sets: number }[];
 } {
   const ids = new Set(menu.map((m) => m.id));
   const letterIds = new Set(menu.filter((m) => m.category === "letter").map((m) => m.id));
@@ -469,7 +489,8 @@ export function basketPayload(basket: Basket, menu: InquiryMenuItem[]): {
       return {
         characters,
         flavors,
-        assign: r.perLetter ? alignAssign(r.assign, characters.length, flavors) : null,
+        // Always sent now; a lone flavour fills it (`alignAssign`'s default).
+        assign: alignAssign(r.assign, characters.length, flavors),
         sets: Math.max(1, Math.floor(r.sets || 1)),
       };
     })

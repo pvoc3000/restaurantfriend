@@ -12,6 +12,21 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
+   **Also 2026-09-24, after Mark used it — EVERY LETTER GETS A FLAVOR, AND NO
+   ADDRESS ON A PICKUP.** (1) "force the user to set the flavor for each
+   letter, but in the stages you've set up already": the letters card is now
+   1. message → 2. flavors → 3. a flavor for each letter. One flavor is every
+   letter's; with two or more each row starts at "Choose a flavor" (outlined in
+   the accent colour) and the basket will not send until all are set ("3 of 10
+   still to choose"). "Set every letter to…" fills them all in one pick —
+   a shortcut the customer chooses, never a default. The "make it work"
+   option and its checkbox are gone from the PAGE; 133's gate still accepts an
+   unassigned letter (an unlinked line), which is now unreachable from the
+   form and was left rather than migrated for. (2) "hide the 'where are you'
+   field if it's a pickup order": the Address field shows for delivery only,
+   and `inquiryPayload` sends an address only for delivery (fixture-pinned).
+   Web only — no migration, no function redeploy.
+
    **2026-09-24 — 4b, BUILD YOUR ORDER ON `/inquiry` (migrations 132 + 133
    APPLIED by Mark; `submit-inquiry` v11 and `inquiry-delivery-quote` v1
    DEPLOYED the same day — probed: the live menu returns 229 items (80 regular,

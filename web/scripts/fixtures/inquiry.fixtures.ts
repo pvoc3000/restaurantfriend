@@ -211,6 +211,11 @@ test("the payload's keys are the ones `submit-inquiry` reads", () => {
   );
 });
 
+test("the address goes only with a DELIVERY (Mark, 2026-09-24: hidden for pickup)", () => {
+  eq(inquiryPayload(draft({ fulfillment: "pickup", address: "5107 York Blvd" }), "o", "").address, null);
+  eq(inquiryPayload(draft({ fulfillment: "delivery", address: " 5107 York Blvd " }), "o", "").address, "5107 York Blvd");
+});
+
 test("empty optional fields go as null, never as empty strings", () => {
   const p = inquiryPayload(draft({ occasion: "  " }), "org-1", "");
   eq(p.occasion, null, "whitespace is nothing");

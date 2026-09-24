@@ -305,7 +305,10 @@ export function inquiryPayload(
     phone: orNull(draft.phone),
     occasion: orNull(draft.occasion),
     fulfillment: draft.fulfillment,
-    address: orNull(draft.address),
+    // Only a DELIVERY sends an address (Mark, 2026-09-24: the field is hidden
+    // for pickup, "not necessary"). One typed before switching back to pickup
+    // stays in the draft, in case they switch again, but is not sent.
+    address: draft.fulfillment === "delivery" ? orNull(draft.address) : null,
     location_id: orNull(draft.locationId),
     event_date: orNull(draft.eventDate),
     event_time: orNull(draft.eventTime),
