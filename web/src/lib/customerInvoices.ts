@@ -27,6 +27,8 @@ export type CustomerInvoice = {
   paid_at: string | null;
   voided_at: string | null;
   document_path: string | null;
+  /** The latest send (128); `sent_at` stays the first. */
+  last_sent_at?: string | null;
 };
 
 /**
@@ -54,13 +56,16 @@ export type CustomerInvoiceLine = {
   amount: number;
   sort: number | null;
   square_item: SquareItem;
+  /** What this line said when the invoice was last sent (128); null before. */
+  sent_amount?: number | null;
 };
 
-export type InvoiceStatus = "draft" | "sent" | "overdue" | "paid" | "void";
+export type InvoiceStatus = "draft" | "sent" | "changed" | "overdue" | "paid" | "void";
 
 export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
   draft: "Draft",
   sent: "Sent",
+  changed: "Changed since sent",
   overdue: "Overdue",
   paid: "Paid",
   void: "Void",
@@ -69,14 +74,20 @@ export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
 /**
  * DERIVED, never stored — 124 keeps only the invoice's own dates. Void wins
  * over everything (a voided invoice that was paid is a refund to make, which
- * the screen says separately); paid over sent; overdue is a sent invoice past
- * its due date. Dates are ISO strings, so they compare as text.
+ * the screen says separately). CHANGED SINCE SENT (128) comes next, over paid
+ * as well: an order that shrank after payment leaves a paid invoice that owes
+ * the customer a credit, and the customer's copy is wrong either way until it
+ * is re-sent. Then paid over sent; overdue is a sent invoice past its due
+ * date. Dates are ISO strings, so they compare as text.
  */
 export function invoiceStatus(
   inv: Pick<CustomerInvoice, "sent_at" | "paid_at" | "voided_at" | "due_on">,
-  today: string
+  today: string,
+  /** `invoiceChanged(lines)` — false where the caller has no lines. */
+  changed = false
 ): InvoiceStatus {
   if (inv.voided_at) return "void";
+  if (inv.sent_at && changed) return "changed";
   if (inv.paid_at) return "paid";
   if (!inv.sent_at) return "draft";
   if (inv.due_on && inv.due_on < today) return "overdue";
@@ -123,15 +134,17 @@ export function orderLineDescription(o: {
 }
 
 /**
- * Whether a line's frozen amount no longer matches what its order now owes
- * — a day's quantity changed after the invoice was written. Said on the
- * screen, never corrected silently: a sent invoice is paper the customer has.
- * `owed` is the order's balance today PLUS whatever this invoice has already
- * collected on it, so a paid line does not read as drifted.
+ * WHETHER A LINE HAS MOVED SINCE THE CUSTOMER LAST SAW IT (128). The line
+ * follows its order automatically; what went out is `sent_amount`. A cent or
+ * more either way, and never before the first send.
  */
-export function lineDrift(amount: number, owed: number): number | null {
-  const d = cents(owed - amount);
-  return Math.abs(d) >= 0.01 ? d : null;
+export function lineChanged(line: { amount: number; sent_amount?: number | null }): boolean {
+  if (line.sent_amount === null || line.sent_amount === undefined) return false;
+  return Math.abs(cents(Number(line.amount) - Number(line.sent_amount))) >= 0.01;
+}
+
+export function invoiceChanged(lines: { amount: number; sent_amount?: number | null }[]): boolean {
+  return lines.some(lineChanged);
 }
 
 /* ==========================================================================

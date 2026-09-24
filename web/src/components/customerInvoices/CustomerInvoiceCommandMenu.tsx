@@ -14,19 +14,17 @@ import {
   DEFAULT_PAYMENT_TYPE,
   PAYMENT_TYPE_OPTIONS,
   money,
-  readSettings,
 } from "@/lib/specialOrders";
 import { downloadBlob, openWindowNow, showBlob } from "@/lib/poProcessing";
-import { fetchInvoiceView } from "@/lib/customerInvoiceQueries";
 import { invoiceFileName, type InvoiceStatus } from "@/lib/customerInvoices";
-import { SendCustomerInvoice, loadOrg, renderInvoicePdf } from "./SendCustomerInvoice";
+import { SendCustomerInvoice, renderInvoicePdf } from "./SendCustomerInvoice";
 
 /**
  * The invoice record's commands (migration 124), as ONE "Actions" menu level
  * with the title at the right margin — every record screen's shape (Mark,
  * 2026-09-23: "like every other page in the app"). Groups: the document
- * (Preview, Download, Send…), the money (Record Payment…), the draft (Update
- * Amounts), and the destructive pair (Void…, Delete).
+ * (Preview, Download, Send…), the money (Record Payment…), and the destructive
+ * pair (Void…, Delete).
  *
  * SEND is the one that matters, and it lives in `SendCustomerInvoice` — the
  * compose card with the PDF beside it, `SendDocument`'s shape. The rest:
@@ -35,8 +33,8 @@ import { SendCustomerInvoice, loadOrg, renderInvoicePdf } from "./SendCustomerIn
  *   link. `record_customer_invoice_payment` splits it across the orders oldest
  *   first, exactly as a pay-link payment is split, and refuses more than is
  *   owed.
- * - **Update Amounts** — a DRAFT only: rewrites each line from what its order
- *   owes now. A sent invoice's lines are frozen by the database.
+ * The lines follow their orders by themselves (128), so there is no Update
+ * Amounts: a sent invoice that has changed is re-sent with Send Again….
  * - **Void…** — the invoice stops asking for money, its link reads cancelled,
  *   and its orders are free to go on another invoice. Payments already taken
  *   stay on the orders; a refund is its own act on the order's Payments table.
@@ -108,40 +106,6 @@ export function CustomerInvoiceCommandMenu({
     run("download", async () => {
       const { blob, view } = await renderInvoicePdf(supabase, id, today);
       downloadBlob(blob, invoiceFileName(numberText, view.invoice.issued_on));
-    });
-
-  /** One statement: the lines are upserted together, so a half-updated
-   *  invoice cannot happen. */
-  const updateAmounts = () =>
-    run("amounts", async () => {
-      const { settings } = await loadOrg(supabase);
-      const view = await fetchInvoiceView(supabase, id, readSettings(settings).rush);
-      if (!view) throw new Error("That invoice is gone.");
-      const changed = view.lines.filter(
-        (l) => l.totals && Math.abs(l.totals.balance + l.collected - l.amount) >= 0.01
-      );
-      if (changed.length === 0) {
-        setNote("Every line already matches its order.");
-        return;
-      }
-      const { data, error: e } = await supabase
-        .from("customer_invoice_lines")
-        .upsert(
-          changed.map((l) => ({
-            id: l.id,
-            org_id: orgId,
-            invoice_id: id,
-            special_order_id: l.special_order_id,
-            description: l.description,
-            amount: Math.round((l.totals!.balance + l.collected) * 100) / 100,
-            sort: l.sort,
-          }))
-        )
-        .select("id");
-      if (e) throw new Error(e.message);
-      if (!data?.length) throw new Error("Nothing was updated — the database refused it and said nothing.");
-      setNote(`Updated ${data.length} line${data.length === 1 ? "" : "s"}.`);
-      router.refresh();
     });
 
   const voidInvoice = async () => {
@@ -241,10 +205,6 @@ export function CustomerInvoiceCommandMenu({
             },
           ]
         : [];
-    const draftRows: ActionMenuItem[] =
-      canWrite && draft
-        ? [{ label: busy === "amounts" ? "Updating…" : "Update Amounts", onSelect: () => void updateAmounts(), disabled: busy !== null }]
-        : [];
     const destructive: ActionMenuItem[] = [
       ...(canWrite && live
         ? [{ label: busy === "void" ? "Voiding…" : "Void…", onSelect: () => void voidInvoice(), danger: true, disabled: busy !== null }]
@@ -253,7 +213,7 @@ export function CustomerInvoiceCommandMenu({
         ? [{ label: "Delete…", onSelect: () => void remove(), danger: true, disabled: busy !== null }]
         : []),
     ];
-    const groups = [documents, moneyRows, draftRows, destructive].filter((g) => g.length > 0);
+    const groups = [documents, moneyRows, destructive].filter((g) => g.length > 0);
     return (
       <ActionMenu
         ariaLabel={`Actions for invoice ${numberText}`}

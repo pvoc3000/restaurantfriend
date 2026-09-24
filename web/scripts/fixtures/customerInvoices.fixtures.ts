@@ -16,7 +16,8 @@ import {
   invoiceNumberText,
   invoiceStatus,
   isCustomerInvoiceSnapshot,
-  lineDrift,
+  invoiceChanged,
+  lineChanged,
   orderLineDescription,
   readInvoiceTerms,
   sumBreakdowns,
@@ -96,11 +97,23 @@ test("invoiceBalance: tagged payments and refunds", () => {
   eq(invoiceBalance([{ amount: 0.1 }, { amount: 0.2 }], []).total, 0.3, "no floating-point dust");
 });
 
-test("lineDrift: a cent or more, either way", () => {
-  eq(lineDrift(613.5, 613.5), null);
-  eq(lineDrift(613.5, 613.504), null);
-  eq(lineDrift(613.5, 700), 86.5);
-  eq(lineDrift(613.5, 600), -13.5);
+test("lineChanged: a cent or more either way, and never before the first send", () => {
+  eq(lineChanged({ amount: 613.5, sent_amount: 613.5 }), false);
+  eq(lineChanged({ amount: 613.504, sent_amount: 613.5 }), false);
+  eq(lineChanged({ amount: 632.1, sent_amount: 613.5 }), true);
+  eq(lineChanged({ amount: 0, sent_amount: 613.5 }), true, "a cancelled day");
+  eq(lineChanged({ amount: 613.5, sent_amount: null }), false, "a draft has sent nothing");
+  eq(invoiceChanged([{ amount: 1, sent_amount: 1 }, { amount: 2, sent_amount: 3 }]), true);
+  eq(invoiceChanged([]), false);
+});
+
+test("invoiceStatus: changed since sent wins over paid, loses to void, needs a send", () => {
+  const base = { sent_at: "2026-10-04", paid_at: null, voided_at: null, due_on: "2026-10-08" };
+  eq(invoiceStatus(base, "2026-10-05", true), "changed");
+  eq(invoiceStatus({ ...base, paid_at: "2026-10-06" }, "2026-10-07", true), "changed", "shrank after payment: a credit to send");
+  eq(invoiceStatus({ ...base, voided_at: "2026-10-07" }, "2026-10-07", true), "void");
+  eq(invoiceStatus({ ...base, sent_at: null }, "2026-10-05", true), "draft");
+  eq(invoiceStatus(base, "2026-10-09", true), "changed", "changed says more than overdue");
 });
 
 test("readInvoiceTerms: settings, with defaults for what is missing", () => {

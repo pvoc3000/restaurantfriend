@@ -26,6 +26,7 @@ import { canEditPage } from "@/lib/pageAccess";
 import {
   INVOICE_STATUS_LABEL,
   invoiceBalance,
+  invoiceChanged,
   invoiceNumberText,
   invoiceStatus,
   readInvoiceTerms,
@@ -152,7 +153,7 @@ export async function CustomerDetail({
   // hides the section rather than breaking the record.
   const { data: invoiceRows } = await supabase
     .from("customer_invoices")
-    .select("id, number, issued_on, due_on, sent_at, paid_at, voided_at, customer_invoice_lines ( amount )")
+    .select("id, number, issued_on, due_on, sent_at, paid_at, voided_at, customer_invoice_lines ( amount, sent_amount )")
     .eq("customer_id", id)
     .order("number", { ascending: false });
   const invoiceIds = (invoiceRows ?? []).map((r) => r.id as string);
@@ -168,7 +169,7 @@ export async function CustomerDetail({
     id: r.id as string,
     number: invoiceNumberText(r.number as number, invoiceTerms),
     issued_on: r.issued_on as string,
-    status: invoiceStatus(r as never, today),
+    status: invoiceStatus(r as never, today, invoiceChanged((r.customer_invoice_lines ?? []) as { amount: number; sent_amount: number | null }[])),
     ...invoiceBalance(
       (r.customer_invoice_lines ?? []) as { amount: number }[],
       (invoicePays ?? []).filter((p) => p.customer_invoice_id === r.id) as { amount: number }[]

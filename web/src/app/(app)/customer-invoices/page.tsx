@@ -6,7 +6,7 @@ import type { RawSearchParams } from "@/lib/filterMenus";
 import { parseFilterSearch } from "@/lib/filterMenus";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { customerLabel } from "@/lib/specialOrders";
-import { invoiceBalance, invoiceStatus, readInvoiceTerms, invoiceNumberText } from "@/lib/customerInvoices";
+import { invoiceBalance, invoiceChanged, invoiceStatus, readInvoiceTerms, invoiceNumberText } from "@/lib/customerInvoices";
 import {
   CustomerInvoicesList,
   type CustomerInvoiceRow,
@@ -52,7 +52,7 @@ export default async function CustomerInvoicesPage({
   }
 
   const [lines, payments] = await Promise.all([
-    paged<{ invoice_id: string; amount: number }>(supabase, "customer_invoice_lines", "invoice_id, amount", orgId),
+    paged<{ invoice_id: string; amount: number; sent_amount: number | null }>(supabase, "customer_invoice_lines", "invoice_id, amount, sent_amount", orgId),
     paged<{ customer_invoice_id: string | null; amount: number }>(
       supabase,
       "special_order_payments",
@@ -77,7 +77,7 @@ export default async function CustomerInvoicesPage({
       customer: customerLabel(customer) || "—",
       issued_on: inv.issued_on as string,
       due_on: inv.due_on as string | null,
-      status: invoiceStatus(inv as never, today),
+      status: invoiceStatus(inv as never, today, invoiceChanged(mine)),
       orders: mine.length,
       ...money,
     };

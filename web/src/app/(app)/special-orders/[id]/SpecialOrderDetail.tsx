@@ -58,6 +58,7 @@ import {
 import { canEditPage } from "@/lib/pageAccess";
 import {
   INVOICE_STATUS_LABEL,
+  invoiceChanged,
   invoiceNumberText,
   invoiceStatus,
   readInvoiceTerms,
@@ -204,7 +205,7 @@ export async function SpecialOrderDetail({
     // a payment taken on an invoice later voided still names it.
     supabase
       .from("customer_invoice_lines")
-      .select("invoice_id, customer_invoices ( id, number, sent_at, paid_at, voided_at, due_on )")
+      .select("invoice_id, amount, sent_amount, customer_invoices ( id, number, sent_at, paid_at, voided_at, due_on )")
       .eq("special_order_id", id),
   ]);
 
@@ -306,7 +307,10 @@ export async function SpecialOrderDetail({
    */
   const invoiceTerms = readInvoiceTerms(session.orgSettings as Record<string, unknown>);
   type InvoiceRef = { id: string; number: number; sent_at: string | null; paid_at: string | null; voided_at: string | null; due_on: string | null };
-  const invoicesOnOrder = ((invoiceLinkRows ?? []) as unknown as { customer_invoices: InvoiceRef | null }[])
+  const invoiceLinks = (invoiceLinkRows ?? []) as unknown as {
+    amount: number; sent_amount: number | null; customer_invoices: InvoiceRef | null;
+  }[];
+  const invoicesOnOrder = invoiceLinks
     .map((l) => l.customer_invoices)
     .filter((i): i is InvoiceRef => i !== null);
   const invoiceHref = (invoiceId: string, from: string) =>
@@ -317,7 +321,15 @@ export async function SpecialOrderDetail({
     ? {
         id: liveInvoiceRow.id,
         label: invoiceLabel(liveInvoiceRow),
-        status: INVOICE_STATUS_LABEL[invoiceStatus(liveInvoiceRow, today)],
+        // THIS order's line moving since the send is what makes the invoice
+        // "changed" from here — it is the change somebody just made.
+        status: INVOICE_STATUS_LABEL[
+          invoiceStatus(
+            liveInvoiceRow,
+            today,
+            invoiceChanged(invoiceLinks.filter((l) => l.customer_invoices?.id === liveInvoiceRow.id))
+          )
+        ],
       }
     : null;
 

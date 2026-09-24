@@ -24,8 +24,9 @@ export type InvoiceLineRow = {
   tax: number;
   paid: number;
   balance: number;
-  /** The invoice's own frozen amount, shown only when the order has moved. */
-  invoiced: number | null;
+  /** What the customer was last sent for this line, shown only when the
+   *  line has moved since (128). */
+  sentAmount: number | null;
 };
 
 const figure = (v: number, negative = false) => (v ? `${negative ? "−" : ""}${money(v)}` : "—");
@@ -114,8 +115,8 @@ export function CustomerInvoiceLinesTable({
       render: (r) => (
         <span className="tabular-nums">
           {money(r.balance)}
-          {r.invoiced !== null ? (
-            <span className="block text-[12px] text-accent">invoiced {money(r.invoiced)}</span>
+          {r.sentAmount !== null ? (
+            <span className="block text-[12px] text-accent">sent as {money(r.sentAmount)}</span>
           ) : null}
         </span>
       ),

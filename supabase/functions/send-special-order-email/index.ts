@@ -483,9 +483,12 @@ async function sendCustomerInvoice(
     documentPath = null;
   }
 
+  // 128: every send is kept, with its PDF and who it went to; re-sending keeps
+  // the invoice's number and catches its "sent" amounts up.
   const { error: markError } = await supabase.rpc("mark_customer_invoice_sent", {
     p_invoice: invoice.id,
     p_document_path: documentPath,
+    p_sent_to: [to, cc].filter(Boolean).join(", "),
   });
   if (markError) {
     warnings.push(`the invoice and its orders were not marked sent: ${markError.message}`);

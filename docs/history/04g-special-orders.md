@@ -12,6 +12,60 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-23, MIGRATION 128 WRITTEN, NOT YET APPLIED — A CUSTOMER
+   INVOICE FOLLOWS ITS ORDERS, AND IS RE-SENT WHEN THEY CHANGE.** Mark: "the
+   case where an invoice is sent then the order is changed … needs to be
+   handled because it happens all the time", then "automatic updates, manual
+   re-send, build it now". It REPLACES 124's freeze (a changed order meant
+   void and re-invoice, a new number each time).
+   **The lines follow**: triggers on `special_order_items`, the money/status/
+   title/date/number/customer columns of `special_orders`, and
+   `special_order_payments` call `sync_customer_invoice_lines(order)`, which
+   re-derives every NON-VOID invoice line of that order — amount = the order's
+   total less payments NOT tagged with this invoice (a deposit), 0 when the
+   order is cancelled; description = "Order #n · title-or-customer · date".
+   Only the sync may write amount/description (`rf.invoice_line_sync`); a line
+   insert is filled by the trigger whatever the caller passed; Sold as stays
+   hand-editable until paid/void. The invoice's paid date is recomputed after
+   every change (`refresh_customer_invoice_paid`), so growth after payment
+   REOPENS it and a refund does too.
+   **The total in SQL**: `special_order_money(order)` is `orderTotals` line for
+   line IN JAVASCRIPT'S FLOATING POINT (`js_cents` = floor(x·100+0.5)/100 on
+   double precision) and summed in the record's line order (sort, id) — found
+   by generating orders through the real `orderTotals`: exact numeric
+   disagreed on 15 of 300 (65.105 is 65.10499… in a double), float summed by id
+   on 2 more (half-cent ties depend on addition order); with both, 0 of 2,000.
+   `migration/check-order-money-parity.cjs` repeats the check over real
+   orders once applied.
+   **Changed since sent**: `customer_invoice_lines.sent_amount` (what went out)
+   and `customer_invoices.last_sent_at`; `customer_invoice_sends` keeps every
+   send (date, to, total, PDF path). A line moving from its sent amount makes
+   the invoice "Changed since sent" (derived, `invoiceChanged`; it outranks
+   paid — a shrink after payment is a credit to send — and loses only to void)
+   and puts "Send Invoice" on that order's EMPTY to-do. **Re-send keeps the
+   number**: `mark_customer_invoice_sent(p_invoice, p_document_path, p_sent_to)`
+   (the old 2-arg overload dropped) stamps `last_sent_at`, catches `sent_amount`
+   up, records the send, clears "Send Invoice" on its orders (117 only clears
+   it on the first stamp) and logs "re-sent". `pay_token_state` answers
+   SUPERSEDED for an invoice token whose total no longer equals the invoice,
+   BEFORE the paid check.
+   **The app**: status "Changed since sent" on the record, list, customer
+   record and the order's Invoice row; a banner; "sent as $x" under a moved
+   line's Balance; a Sent section listing every send with its PDF; "Send
+   Again…" as before; Update Amounts REMOVED. `send-special-order-email`
+   passes who it went to (NEEDS A REDEPLOY — without it the To column is blank).
+   **Verified** on the throwaway Postgres (124–128 in order, 128 twice): create
+   ignores passed amounts/wording (613.50 from 370 × 1.55 + 40); hand amount
+   edit refused, Sold as allowed; send → sent amounts, 1 send, to-dos cleared;
+   +12 donuts → 632.10, changed, empty to-do → Send Invoice, old link
+   superseded; a typed to-do kept; retitle → wording follows; re-send → still
+   1001, 2 sends, 0 changed lines, to-do cleared, "re-sent" ×3; pay in full → 3
+   tagged rows, orders at Order; growth after payment → reopened, $20 due, the
+   paid link superseded; cancel → line 0; a refund reopens; an untagged
+   deposit shrinks its line; void → lines stop following; a sent invoice
+   refuses added/removed lines; a draft deletes. Fixtures 2,029; tsc; lint;
+   `deno check`.
+
    **Shipped 2026-09-23, MIGRATION 127 APPLIED (Mark, same day) — BOTH
    DOUBLE-PAY GAPS CLOSED** (Mark: "yes, close both gaps"). (1) The list's bulk
    **Record Payment…** skips orders a non-void customer invoice bills and says

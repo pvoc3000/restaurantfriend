@@ -11,7 +11,8 @@ import {
   INVOICE_STATUS_LABEL,
   invoiceNumberText,
   invoiceStatus,
-  lineDrift,
+  invoiceChanged,
+  lineChanged,
   readInvoiceTerms,
 } from "@/lib/customerInvoices";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -30,10 +31,10 @@ const INVOICES_CRUMB = { href: "/customer-invoices", label: "Invoices" };
  * One customer invoice (migration 124): what it bills, what has been paid on
  * it, and the commands — one Actions menu in the title row.
  *
- * THE LINES ARE THE PAPER. Each is frozen at the amount written when the
- * invoice was made (and frozen harder once it is sent — the database refuses
- * an edit). If an order has changed since, the row SAYS so beside the figure
- * rather than quietly re-deriving it: the customer is holding the old number.
+ * THE LINES FOLLOW THEIR ORDERS (128): the database re-derives each one on
+ * every change to its order. What the customer was SENT is kept per line, so
+ * a sent invoice that has moved says so — in the header, a banner, and "sent
+ * as $x" under the line — until it is sent again, keeping its number.
  */
 export async function CustomerInvoiceDetail({
   id,
@@ -69,14 +70,29 @@ export async function CustomerInvoiceDetail({
   }
 
   const { invoice, lines, payments } = view;
-  const status = invoiceStatus(invoice, today);
+  const status = invoiceStatus(invoice, today, invoiceChanged(lines));
   const numberText = invoiceNumberText(invoice.number, terms);
   const draft = !invoice.sent_at && !invoice.voided_at;
   const trail = parseTrail(rawParams, INVOICES_CRUMB);
   const here = `/customer-invoices/${id}`;
-  const drifted = lines.filter(
-    (l) => l.totals && lineDrift(l.amount, l.totals.balance + l.collected) !== null
-  );
+  const changed = invoiceChanged(lines);
+  const changedCount = lines.filter(lineChanged).length;
+
+  // Every send, with its PDF (128) — what the customer had, and when.
+  const { data: sendRows } = await supabase
+    .from("customer_invoice_sends")
+    .select("id, sent_on, sent_to, total, document_path, created_at")
+    .eq("invoice_id", id)
+    .order("created_at", { ascending: false });
+  const sends = (sendRows ?? []) as {
+    id: string; sent_on: string; sent_to: string | null; total: number | null;
+    document_path: string | null; created_at: string;
+  }[];
+  const paths = sends.map((x) => x.document_path).filter((x): x is string => !!x);
+  const { data: signed } = paths.length
+    ? await supabase.storage.from("special-order-attachments").createSignedUrls(paths, 60 * 60)
+    : { data: [] as { signedUrl: string | null }[] };
+  const urlOf = new Map(paths.map((path, i) => [path, signed?.[i]?.signedUrl ?? null]));
 
   return (
     <div className="space-y-12">
@@ -150,7 +166,12 @@ export async function CustomerInvoiceDetail({
             )}
           </Row>
           <Row label="Sent">
-            <span className={READ_ONLY_VALUE}>{invoice.sent_at ? usDate(invoice.sent_at) : "—"}</span>
+            <span className={READ_ONLY_VALUE}>
+              {invoice.sent_at ? usDate(invoice.sent_at) : "—"}
+              {invoice.last_sent_at && invoice.last_sent_at !== invoice.sent_at
+                ? ` · again ${usDate(invoice.last_sent_at)}`
+                : ""}
+            </span>
           </Row>
           <Row label={invoice.voided_at ? "Voided" : "Paid"}>
             <span className={READ_ONLY_VALUE}>
@@ -162,21 +183,18 @@ export async function CustomerInvoiceDetail({
 
       <section className="space-y-2">
         <SectionHeading count={lines.length}>Orders</SectionHeading>
-        {drifted.length > 0 ? (
+        {changed && status !== "void" ? (
           <p className="text-[13px]">
             <span className="box-decoration-clone bg-mark-fill px-1">
-              {drifted.length === 1 ? "One order has" : `${drifted.length} orders have`} changed since
-              this invoice was written.
-              {draft
-                ? " Update Amounts rewrites the lines from the orders as they are now."
-                : " It has been sent, so its lines stay as the customer has them — void it and invoice again to change them."}
+              {changedCount === 1 ? "One order has" : `${changedCount} orders have`} changed since this
+              invoice was sent, and its lines have followed. Send it again so the customer has the new
+              figures — the link they hold no longer works.
             </span>
           </p>
         ) : null}
         <CustomerInvoiceLinesTable
           itemEditable={canWrite && !invoice.paid_at && !invoice.voided_at}
           rows={lines.map((l, i) => {
-            const drift = l.totals ? lineDrift(l.amount, l.totals.balance + l.collected) : null;
             return {
               id: l.id,
               position: i,
@@ -191,11 +209,50 @@ export async function CustomerInvoiceDetail({
               tax: l.totals?.tax ?? 0,
               paid: l.totals?.paid ?? 0,
               balance: l.totals ? l.totals.balance : l.amount,
-              invoiced: drift !== null ? l.amount : null,
+              sentAmount: lineChanged(l) ? (l.sent_amount ?? null) : null,
             };
           })}
         />
       </section>
+
+      {sends.length > 0 ? (
+        <section className="space-y-2">
+          {/* EVERY SEND, NEWEST FIRST (128): re-sending keeps the number, so
+              this is where "what did they have, and when" is answered. */}
+          <SectionHeading count={sends.length}>Sent</SectionHeading>
+          <table className="w-full max-w-[60rem] border-collapse text-[14px]">
+            <thead>
+              <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
+                <th className="w-28 px-3 py-2 text-left">Date</th>
+                <th className="px-3 py-2 text-left">To</th>
+                <th className="w-32 px-3 py-2 text-right">Total</th>
+                <th className="w-24 px-3 py-2 text-left">PDF</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sends.map((x) => {
+                const url = x.document_path ? urlOf.get(x.document_path) : null;
+                return (
+                  <tr key={x.id}>
+                    <td className="px-3 py-2 tabular-nums text-muted">{usDate(x.sent_on)}</td>
+                    <td className="px-3 py-2 text-muted">{x.sent_to ?? "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{x.total === null ? "—" : money(Number(x.total))}</td>
+                    <td className="px-3 py-2">
+                      {url ? (
+                        <a href={url} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                          Open
+                        </a>
+                      ) : (
+                        <span className="text-faint">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
 
       <section className="space-y-2">
         <SectionHeading count={payments.length}>Payments</SectionHeading>

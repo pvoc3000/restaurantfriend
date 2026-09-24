@@ -74,7 +74,7 @@ export async function fetchInvoiceView(
   const { data: inv, error } = await supabase
     .from("customer_invoices")
     .select(
-      `id, org_id, number, customer_id, issued_on, due_on, notes, sent_at, paid_at, voided_at, document_path,
+      `id, org_id, number, customer_id, issued_on, due_on, notes, sent_at, paid_at, voided_at, document_path, last_sent_at,
        customers ( id, first_name, last_name, company, phone, email )`
     )
     .eq("id", id)
@@ -84,7 +84,7 @@ export async function fetchInvoiceView(
 
   const { data: lineRows, error: lineError } = await supabase
     .from("customer_invoice_lines")
-    .select("id, special_order_id, description, amount, sort, square_item")
+    .select("id, special_order_id, description, amount, sort, square_item, sent_amount")
     .eq("invoice_id", id)
     .order("sort", { ascending: true, nullsFirst: false });
   if (lineError) throw new Error(lineError.message);
@@ -156,6 +156,7 @@ export async function fetchInvoiceView(
     return {
       ...l,
       amount: Number(l.amount),
+      sent_amount: l.sent_amount === null || l.sent_amount === undefined ? null : Number(l.sent_amount),
       order: o
         ? {
             id: o.id,
