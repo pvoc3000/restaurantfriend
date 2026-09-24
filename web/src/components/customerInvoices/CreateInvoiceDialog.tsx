@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { DateField } from "@/components/ui/DateField";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { Radio } from "@/components/ui/Radio";
 import { money } from "@/lib/specialOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import {
@@ -196,11 +196,14 @@ export function CreateInvoiceDialog({
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                   Collect through
                 </span>
-                <TabPicker
-                  options={PROCESSOR_OPTIONS.map((o) => ({ key: o.value, label: o.label }))}
-                  value={processor}
-                  onChange={setProcessor}
-                />
+                <div className="flex h-9 items-center">
+                  <Radio
+                    options={PROCESSOR_OPTIONS}
+                    value={processor}
+                    onChange={setProcessor}
+                    ariaLabel="Collect through"
+                  />
+                </div>
               </div>
             </div>
           </>

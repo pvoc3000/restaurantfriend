@@ -30,6 +30,7 @@ import {
 import { useCalcField } from "@/components/ui/CalcPad";
 import { CalendarGrid } from "@/components/ui/CalendarGrid";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { Radio } from "@/components/ui/Radio";
 import { Switch } from "@/components/ui/Switch";
 import { ControlField } from "@/components/ui/ControlField";
 import { DateField } from "@/components/ui/DateField";
@@ -633,10 +634,46 @@ function TogglesBlock() {
   const [lg2, setLg2] = useState(false);
   const [sw, setSw] = useState(true);
   const [sw2, setSw2] = useState(true);
+  const [radio, setRadio] = useState<"square" | "quickbooks">("square");
+  const [radioV, setRadioV] = useState<"pickup" | "delivery" | "event">("pickup");
 
   return (
     <Block id="toggles" title="Toggles">
       <Grid>
+        <Specimen name="Radio (a one-of-N setting, answered once)">
+          <div className="flex flex-col items-start gap-4">
+            <Radio
+              ariaLabel="Collect through"
+              options={[
+                { value: "square", label: "Square" },
+                { value: "quickbooks", label: "QuickBooks" },
+              ]}
+              value={radio}
+              onChange={setRadio}
+            />
+            <Radio
+              vertical
+              ariaLabel="Fulfilment"
+              options={[
+                { value: "pickup", label: "Pickup at the shop" },
+                { value: "delivery", label: "Delivery" },
+                { value: "event", label: "At the event" },
+              ]}
+              value={radioV}
+              onChange={setRadioV}
+            />
+            <Radio
+              disabled
+              ariaLabel="Disabled"
+              options={[
+                { value: "a", label: "Disabled" },
+                { value: "b", label: "Disabled" },
+              ]}
+              value="a"
+              onChange={() => {}}
+            />
+          </div>
+        </Specimen>
         <Specimen name='Checkbox · size="md"'>
           <div className="flex flex-col items-start gap-3">
             <Checkbox checked={check} onChange={setCheck} label="Receive as ordered">
