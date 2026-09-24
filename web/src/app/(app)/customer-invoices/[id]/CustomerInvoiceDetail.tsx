@@ -197,6 +197,7 @@ export async function CustomerInvoiceDetail({
           rows={lines.map((l, i) => {
             return {
               id: l.id,
+              orderId: l.special_order_id,
               position: i,
               description: l.description,
               href: withFrom(`/special-orders/${l.special_order_id}`, { href: here, label: `Invoice ${numberText}` }),

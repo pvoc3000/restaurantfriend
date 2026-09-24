@@ -12,7 +12,31 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Shipped 2026-09-23, MIGRATION 128 WRITTEN, NOT YET APPLIED — A CUSTOMER
+   **Shipped 2026-09-23, MIGRATION 129 WRITTEN, NOT YET APPLIED — "SOLD AS"
+   LIVES ON THE ORDER, SO A ONE-OFF CAN BE WHOLESALE.** Mark, having asked how
+   the app tells regular from wholesale (answer: by ORIGIN — `kind = 'order'`
+   with or without a `standing_order_id`): "I feel like we need to be able to
+   create a one-off wholesale order. Like I want to do that now to test the
+   invoicing." `special_orders.square_item` ('special_order' | 'wholesale',
+   not null, default special_order), backfilled by 125's rule (standing orders
+   and their days wholesale). A BEFORE INSERT trigger gives a materialized day
+   its standing order's value, so 112's materializer is untouched; Duplicate
+   copies it (114 copies every column). The invoice line now FOLLOWS the
+   order's value through 128's sync while the invoice is unpaid and non-void,
+   is filled from the order on insert (a caller's choice is ignored), and is
+   no longer hand-editable; the order's own pay link sells as the order says
+   (`pay_link_token_variation`). UI: a "Sold as" row on the Info tab (orders
+   and standing orders — a standing order's value reaches days made AFTER the
+   change, like every field they inherit); the invoice's Sold as column edits
+   the ORDER. The Info tab's Made from comment had been split from its row by
+   the Invoice row — put back. **Verified** on the throwaway Postgres (on top
+   of 124–128, twice): backfill; a standing order's day takes wholesale, a hand
+   order special; a new line takes the order's value over the caller's; flips
+   both ways while unpaid, stays once paid; hand edit refused; the order link
+   SPECIAL → WHOLE when flipped; bad value refused. tsc, lint, fixtures.
+   **The order screen now selects `square_item`, so the web push waits for 129.**
+
+   **Shipped 2026-09-23, MIGRATION 128 APPLIED (Mark, same day; the order-money parity check over 1,096 real orders — every 2026 order and every 12th older — found 0 mismatches once the script paged its lines past PostgREST's 1,000-row cap) — A CUSTOMER
    INVOICE FOLLOWS ITS ORDERS, AND IS RE-SENT WHEN THEY CHANGE.** Mark: "the
    case where an invoice is sent then the order is changed … needs to be
    handled because it happens all the time", then "automatic updates, manual

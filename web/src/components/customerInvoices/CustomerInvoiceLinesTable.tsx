@@ -11,6 +11,8 @@ import { SQUARE_ITEM_LABEL, SQUARE_ITEM_OPTIONS, type SquareItem } from "@/lib/c
  *  the server. */
 export type InvoiceLineRow = {
   id: string;
+  /** The order the line bills — Sold as is the ORDER's field (129). */
+  orderId: string;
   /** The line's place on the invoice, the default order. */
   position: number;
   description: string;
@@ -39,7 +41,8 @@ const sum = (rows: InvoiceLineRow[], pick: (r: InvoiceLineRow) => number) =>
  *
  * The money columns are the ORDER's payments figures today (Mark: "Items,
  * Discount, Delivery, Tax, Paid, Balance", then rush fee), so a row reads
- * across. Sold as (126) is a picker until the invoice is paid or void.
+ * across. Sold as is the ORDER's field (129), edited here too until the
+ * invoice is paid or void — the line follows it.
  */
 export function CustomerInvoiceLinesTable({
   rows,
@@ -87,8 +90,8 @@ export function CustomerInvoiceLinesTable({
       render: (r) =>
         itemEditable ? (
           <InlineValue
-            table="customer_invoice_lines"
-            id={r.id}
+            table="special_orders"
+            id={r.orderId}
             column="square_item"
             kind="pick"
             nullable={false}

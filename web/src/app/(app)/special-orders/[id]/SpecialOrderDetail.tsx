@@ -58,6 +58,7 @@ import {
 import { canEditPage } from "@/lib/pageAccess";
 import {
   INVOICE_STATUS_LABEL,
+  SQUARE_ITEM_OPTIONS,
   invoiceChanged,
   invoiceNumberText,
   invoiceStatus,
@@ -88,7 +89,7 @@ const ORDER_COLUMNS = `
   delivery_company_phone, delivery_tracking, delivery_window_start,
   delivery_window_end, delivery_boxes, delivery_weight_lbs,
   tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
-  ignore_balance, taken_by, taken_by_employee_id,
+  ignore_balance, square_item, taken_by, taken_by_employee_id,
   notes_general, notes_quote, notes_production, notes_invoice, notes_receipt,
   standing_days, starts_on, ends_on, paused, standing_order_id,
   date_initiated, quote_sent_at, quote_returned_at, invoice_sent_at,
@@ -885,6 +886,18 @@ export async function SpecialOrderDetail({
                             value={row.allergen_info as string | null} canWrite={canWrite}
                             ariaLabel="Allergen information" />
                     </Row>
+                    {/* WHICH SQUARE ITEM ITS MONEY IS SOLD AS (129, Mark
+                        2026-09-23: "we need to be able to create a one-off
+                        wholesale order"). A standing order's days take its
+                        value when they are made; a hand-made order starts as
+                        Special Order. An unpaid invoice line follows it. */}
+                    {kind === "order" || kind === "standing_order" ? (
+                      <Row label="Sold as">
+                        <Cell table="special_orders" id={id} column="square_item" kind="pick"
+                              options={SQUARE_ITEM_OPTIONS} value={row.square_item as string}
+                              canWrite={canWrite} ariaLabel="Sold as" />
+                      </Row>
+                    ) : null}
                     {/* WHY THIS ORDER EXISTS, on the days nobody typed.
                         `standing_order_id` has been a column since 051 and had
                         no reader anywhere, so a materialized day was
@@ -894,20 +907,6 @@ export async function SpecialOrderDetail({
                         names is where the recurrence is changed, and repointing
                         a day at a different standing order is not a thing
                         anybody should be able to do by picking from a list. */}
-                    {/* THE INVOICE THAT BILLS IT, when a customer invoice
-                        does (124) — shown only then, like Made from, so the
-                        8,000 orders billed on their own say nothing new. */}
-                    {liveInvoice ? (
-                      <Row label="Invoice">
-                        <Link
-                          href={invoiceHref(liveInvoice.id, orderTabHref(id, "info", rawParams))}
-                          className="underline underline-offset-2"
-                        >
-                          {liveInvoice.label}
-                        </Link>
-                        <span className="text-muted"> · {liveInvoice.status}</span>
-                      </Row>
-                    ) : null}
                     {madeFrom ? (
                       <Row label="Made from">
                         <Link
@@ -920,6 +919,20 @@ export async function SpecialOrderDetail({
                           {madeFrom.number}
                           {madeFrom.title ? ` — ${madeFrom.title}` : ""}
                         </Link>
+                      </Row>
+                    ) : null}
+                    {/* THE INVOICE THAT BILLS IT, when a customer invoice
+                        does (124) — shown only then, like Made from, so the
+                        8,000 orders billed on their own say nothing new. */}
+                    {liveInvoice ? (
+                      <Row label="Invoice">
+                        <Link
+                          href={invoiceHref(liveInvoice.id, orderTabHref(id, "info", rawParams))}
+                          className="underline underline-offset-2"
+                        >
+                          {liveInvoice.label}
+                        </Link>
+                        <span className="text-muted"> · {liveInvoice.status}</span>
                       </Row>
                     ) : null}
                   </div>
