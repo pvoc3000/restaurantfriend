@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { TextInput } from "@/components/ui/TextInput";
+import { SQUARE_ITEM_OPTIONS, type SquareItem } from "@/lib/customerInvoices";
 import { PickList } from "@/components/ui/PickList";
 import { DateField } from "@/components/ui/DateField";
 import { TimePicker } from "@/components/ui/TimePicker";
@@ -95,8 +96,8 @@ export function NewSpecialOrder({
   const [title, setTitle] = useState("");
   const [eventDate, setEventDate] = useState<string | null>(null);
   const [eventTime, setEventTime] = useState<string | null>(null);
-  const [kitchenId, setKitchenId] = useState("");
   const [fulfillment, setFulfillment] = useState("pickup");
+  const [squareItem, setSquareItem] = useState<SquareItem>("special_order");
   const [address, setAddress] = useState("");
   const [locationId, setLocationId] = useState(defaultLocationId ?? "");
   const [customer, setCustomer] = useState<CustomerChoice>(null);
@@ -139,8 +140,8 @@ export function NewSpecialOrder({
     setTitle("");
     setEventDate(null);
     setEventTime(null);
-    setKitchenId("");
     setFulfillment("pickup");
+    setSquareItem("special_order");
     setAddress("");
     setLocationId(defaultLocationId ?? "");
     setCustomer(null);
@@ -168,7 +169,12 @@ export function NewSpecialOrder({
         today,
         takenBy,
         locationId,
-        kitchenLocationId: kitchenId,
+        // THE KITCHEN IS THE SHOP YOU ARE WORKING AT (Mark, 2026-09-23:
+        // "remove the kitchen picklist and automatically set it to whatever
+        // the location is when the order is created"). Changed afterwards on
+        // the record's Info tab when another shop bakes it.
+        kitchenLocationId: defaultLocationId,
+        squareItem,
         fulfillment,
         // Kept in state through a flip back to Pickup, and dropped on the way
         // to the database — `deliveryFields` owns that rule, not this form.
@@ -262,7 +268,14 @@ export function NewSpecialOrder({
               <Field label="Kind">
                 <PickList
                   value={kind}
-                  onPick={(next) => setKind((next || "order") as SpecialOrderKind)}
+                  onPick={(next) => {
+                    const k = (next || "order") as SpecialOrderKind;
+                    setKind(k);
+                    // A standing order is how wholesale is made, so it
+                    // proposes Wholesale; the pick beside Pickup shop can
+                    // still say otherwise.
+                    if (k === "standing_order") setSquareItem("wholesale");
+                  }}
                   variant="field"
                   ariaLabel="Kind of record"
                   options={(["order", "template", "standing_order"] as SpecialOrderKind[]).map((k) => ({
@@ -330,11 +343,11 @@ export function NewSpecialOrder({
                 and the LOCATION line on the quote — and the KITCHEN is where
                 it gets made.
 
-                Pickup DEFAULTS to the shop you are standing in and the kitchen
-                does not, and that asymmetry is deliberate: an order taken at
-                DF01 is usually collected at DF01, while which kitchen bakes it
-                is a decision somebody makes later. Leaving pickup empty was
-                not neutral — it meant no tax and org-grid prices. */}
+                Pickup DEFAULTS to the shop you are standing in. The KITCHEN is
+                no longer asked at all (Mark, 2026-09-23): it is set to the shop
+                you are working at, and changed on the record when another shop
+                bakes it. Leaving pickup empty was not neutral — it meant no tax
+                and org-grid prices. */}
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
               <Field label="Pickup shop">
                 <PickList
@@ -350,17 +363,18 @@ export function NewSpecialOrder({
                   className="w-full"
                 />
               </Field>
-              <Field label="Kitchen">
+              {/* WHICH SQUARE ITEM ITS MONEY IS SOLD AS (129; Mark,
+                  2026-09-23: "add the ability to set if the order is a special
+                  order or wholesale order"). The same field as the record's
+                  Info tab, asked here so a one-off wholesale order is one
+                  dialog, not a dialog and an edit. */}
+              <Field label="Sold as">
                 <PickList
-                  value={kitchenId}
-                  onPick={setKitchenId}
+                  value={squareItem}
+                  onPick={(next) => setSquareItem((next || "special_order") as SquareItem)}
                   variant="field"
-                  placeholder="Not decided"
-                  ariaLabel="Kitchen"
-                  options={[
-                    { value: "", label: "Not decided" },
-                    ...kitchens.map((k) => ({ value: k.id, label: k.code })),
-                  ]}
+                  ariaLabel="Sold as"
+                  options={SQUARE_ITEM_OPTIONS}
                   className="w-full"
                 />
               </Field>

@@ -51,8 +51,11 @@ export type NewSpecialOrderInput = {
   /** Decision 8: where the customer COLLECTS. Drives the tax rate, the menu's
    *  prices and the LOCATION line on the quote. */
   locationId?: string | null;
-  /** Decision 8: where it is MADE. Genuinely undecided on most new leads. */
+  /** Decision 8: where it is MADE. Both create doors pass the shop you are
+   *  working at (Mark, 2026-09-23); the record's Info tab changes it. */
   kitchenLocationId?: string | null;
+  /** Which Square item its money is sold as (129). Absent → Special Order. */
+  squareItem?: "special_order" | "wholesale";
   /**
    * Pickup or delivery (Mark, 2026-09-20: "give the user the option for pickup
    * or delivery. If delivery, allow the user to enter the delivery address").
@@ -438,6 +441,7 @@ export async function createSpecialOrder(
       event_time: input.eventTime ?? null,
       location_id: locationId,
       kitchen_location_id: orNull(input.kitchenLocationId),
+      square_item: input.squareItem ?? "special_order",
       ...deliveryFields(input.fulfillment, input.deliveryAddress),
       tax_rate: taxRate,
       rush_rate: rushRate,

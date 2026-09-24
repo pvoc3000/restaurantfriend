@@ -71,6 +71,9 @@ export function CustomerActions({
         title: `New order for ${name}`,
         customerId: id,
         locationId: defaultLocationId,
+        // The kitchen is the shop you are working at, as the list's dialog
+        // sets it (2026-09-23).
+        kitchenLocationId: defaultLocationId,
         takenBy,
         // Their name, phone and email become the order's day-of contact —
         // `createSpecialOrder` reads the row, so this door and the list's

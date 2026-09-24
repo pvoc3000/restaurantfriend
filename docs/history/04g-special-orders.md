@@ -12,7 +12,20 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Shipped 2026-09-23, MIGRATION 130 WRITTEN, NOT YET APPLIED — AN ORDER'S
+   **Also 2026-09-23 — THE NEW-ORDER DIALOG AND THE INFO TAB'S TOP.** Mark:
+   "when creating a new special order, remove the kitchen picklist and
+   automatically set it to whatever the location is when the order is
+   created" — both create doors (the dialog and the customer record's "New
+   order for them") now pass the WORKING location as `kitchen_location_id`;
+   the dialog's Kitchen field is gone and "Sold as" (129) takes its place
+   beside Pickup shop ("add the ability to set if the order is a special order
+   or wholesale order"), defaulting to Special Order and to Wholesale when Kind
+   is set to Standing order; `createSpecialOrder` takes `squareItem`. The Info
+   tab's Details now open with two pairs — Order name | Status, Order number |
+   Sold as (the name no longer spans the row; a template, which has no Sold
+   as, keeps an empty cell so the pairs below do not shift).
+
+   **Shipped 2026-09-23, MIGRATION 130 APPLIED (Mark, same day) — AN ORDER'S
    LOG SAYS WHEN IT LEAVES AN INVOICE.** Mark deleted draft 1001; its orders'
    logs ended at "Added to invoice 1001". "yes, add the removed-from-invoice
    log." A BEFORE DELETE trigger on `customer_invoices` (the cascade reaches

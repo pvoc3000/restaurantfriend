@@ -777,15 +777,14 @@ export async function SpecialOrderDetail({
                 <section className="space-y-3">
                   <SectionHeading>Details</SectionHeading>
                   <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-                    {/* ORDER NAME SPANS THE ROW so the ORDER NUMBER (Mark,
-                        2026-09-16) can pair with Status without shifting every
-                        pair below it along by one. */}
-                    <Row label="Order name" wide>
+                    {/* TWO PAIRS UP TOP (Mark, 2026-09-23): Order name beside
+                        Status, Order number beside Sold as — the name no
+                        longer spans the row. A template has no Sold as, so an
+                        empty cell holds its place and the pairs below do not
+                        shift along by one. */}
+                    <Row label="Order name">
                       <Cell table="special_orders" id={id} column="title" value={row.title as string | null}
                             canWrite={canWrite} ariaLabel="What the order is for" />
-                    </Row>
-                    <Row label="Order number">
-                      <OrderNumberCell id={id} value={row.number as string} canWrite={canWrite} />
                     </Row>
                     <Row label="Status">
                       {kind === "order" ? (
@@ -824,6 +823,23 @@ export async function SpecialOrderDetail({
                         <span className={READ_ONLY_VALUE}>{KIND_LABEL[kind]}</span>
                       )}
                     </Row>
+                    <Row label="Order number">
+                      <OrderNumberCell id={id} value={row.number as string} canWrite={canWrite} />
+                    </Row>
+                    {/* WHICH SQUARE ITEM ITS MONEY IS SOLD AS (129, Mark
+                        2026-09-23: "we need to be able to create a one-off
+                        wholesale order"). A standing order's days take its
+                        value when they are made; a hand-made order starts as
+                        Special Order. An unpaid invoice line follows it. */}
+                    {kind === "order" || kind === "standing_order" ? (
+                      <Row label="Sold as">
+                        <Cell table="special_orders" id={id} column="square_item" kind="pick"
+                              options={SQUARE_ITEM_OPTIONS} value={row.square_item as string}
+                              canWrite={canWrite} ariaLabel="Sold as" />
+                      </Row>
+                    ) : (
+                      <div aria-hidden />
+                    )}
                     <Row label="Event date">
                       <Cell table="special_orders" id={id} column="event_date" kind="date"
                             value={row.event_date as string | null} canWrite={canEditItems}
@@ -886,18 +902,6 @@ export async function SpecialOrderDetail({
                             value={row.allergen_info as string | null} canWrite={canWrite}
                             ariaLabel="Allergen information" />
                     </Row>
-                    {/* WHICH SQUARE ITEM ITS MONEY IS SOLD AS (129, Mark
-                        2026-09-23: "we need to be able to create a one-off
-                        wholesale order"). A standing order's days take its
-                        value when they are made; a hand-made order starts as
-                        Special Order. An unpaid invoice line follows it. */}
-                    {kind === "order" || kind === "standing_order" ? (
-                      <Row label="Sold as">
-                        <Cell table="special_orders" id={id} column="square_item" kind="pick"
-                              options={SQUARE_ITEM_OPTIONS} value={row.square_item as string}
-                              canWrite={canWrite} ariaLabel="Sold as" />
-                      </Row>
-                    ) : null}
                     {/* WHY THIS ORDER EXISTS, on the days nobody typed.
                         `standing_order_id` has been a column since 051 and had
                         no reader anywhere, so a materialized day was
