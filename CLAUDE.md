@@ -57,7 +57,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 4d. 🚧 Bills (vendor bills, approval, financials lock, filing on close) — `docs/history/04d-invoices.md` (named Invoices until 2026-09-20; see Table naming)
 4e. ✅ Employee events (`employee_events`, `/events`) — `docs/history/04e-employee-events.md`
 4f. 🚧 Production (elements, recipes, items, price grid, plans, schedules, batch logs, costing) — `docs/history/04f-production.md`
-4g. 🚧 Special orders (quotes, documents, /q approval, /inquiry, standing orders, scheduling, /pay link via Square, customer invoices — 124 applied, 125 written) — `docs/history/04g-special-orders.md`
+4g. 🚧 Special orders (quotes, documents, /q approval, /inquiry, standing orders, scheduling, /pay link via Square, customer invoices — 124 + 125 applied) — `docs/history/04g-special-orders.md`
 4h. ✅ Supervisor shift report (runner, email, reopen) — `docs/history/04h-shift-report.md`
 4i. ✅ Which shops a member may work at (migration 073) — `docs/history/04i-location-access.md`
 4j. ✅ Password reset (migration 074 + `request-password-reset`) — `docs/history/04j-password-reset.md`
@@ -454,8 +454,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   Phase 1 is a pay link on today's per-order invoice (balance due; card, Apple
   Pay, Google Pay, gift card); ACH + webhook, loyalty, the QBO Payment push and
   `customer_invoices` follow. Plan: `docs/history/04g-special-orders.md`.
-  **`customer_invoices` IS BUILT (2026-09-23, migration 124 — written, not yet
-  applied; three edge functions need a redeploy after it).** The open questions
+  **`customer_invoices` IS BUILT (2026-09-23, migrations 124 + 125 applied,
+  functions deployed).** The open questions
   above are answered: Knotted is NOT taxable (resale certificate; their orders
   already carry `tax_rate = 0`), and an invoice carries ONE LINE PER ORDER
   (Mark), delivery inside each order's amount — so not fourteen lines and not

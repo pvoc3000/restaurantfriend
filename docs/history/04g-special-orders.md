@@ -12,7 +12,7 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Shipped 2026-09-23, MIGRATION 125 WRITTEN, NOT YET APPLIED — THE INVOICE'S
+   **Shipped 2026-09-23, MIGRATION 125 APPLIED, `square-catalog` DEPLOYED (Mark, same day) — THE INVOICE'S
    COMMANDS ARE ONE ACTIONS MENU; A WHOLESALE PAYMENT IS SOLD AS "WHOLESALE
    ORDER"; SQUARE ITEMS ARE PICKED, NOT PASTED.** Mark applied 124, redeployed
    the three functions and made invoice 1001 (three Knotted days, 3 × $613.50,
@@ -50,7 +50,7 @@
    square-catalog`. NOT verified: the menu or the pickers in the pane (PIN
    screen), a real catalog response.
 
-   **Shipped 2026-09-23, MIGRATION 124 WRITTEN, NOT YET APPLIED — CUSTOMER
+   **Shipped 2026-09-23, MIGRATION 124 APPLIED, THREE FUNCTIONS REDEPLOYED (Mark, same day) — CUSTOMER
    INVOICES: ONE INVOICE, MANY ORDERS, ONE PAY LINK.** Mark: "what's the next
    step … to get closer to our customer invoices page?", then, answering the
    open questions: Knotted has a RESALE CERTIFICATE (no tax); **one line per
