@@ -12,8 +12,18 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
-   **Also 2026-09-24 — REQUIRED FIELDS, MARKED (migration 135 WRITTEN, NOT
-   YET APPLIED).** Mark: "I don't see any indications that any fields are
+   **Also 2026-09-24 — A DELIVERY NEEDS AN ADDRESS (migration 136 WRITTEN,
+   NOT YET APPLIED).** Mark: "yes, require the address for delivery". 136
+   reproduces 135's gate with one check, `address_required` when the
+   fulfillment is delivery and the address blank; the page marks Address
+   (shown only for delivery) with the same `*` and says "Where are we
+   delivering to?". A pickup still needs none. Harness: delivery with no or
+   blank address refused, with one created, pickup created, honeypot
+   `received`, rerun. Browser: an empty delivery Send marks the address and
+   posts nothing.
+
+   **Also 2026-09-24 — REQUIRED FIELDS, MARKED (migration 135 APPLIED by Mark
+   — probed: a name-and-email-only call answers `phone_required`).** Mark: "I don't see any indications that any fields are
    required" — true: only the name and ONE of email/phone were, and nothing
    said so. Now "make both email and phone number required. Make Occasion
    required. make date and time required", each label marked "with a symbol

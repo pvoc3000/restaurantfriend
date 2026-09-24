@@ -380,14 +380,15 @@ export function InquiryForm({ orgId }: { orgId: string }) {
             was typed survives a switch back to pickup, but only a delivery
             sends it (`inquiryPayload`). */}
         {draft.fulfillment === "delivery" && (
-        <Field label="Address" hint="Where we’re delivering to.">
+        <Field label="Address" required hint="Where we’re delivering to." error={shown.address}>
           <input
             type="text"
             value={draft.address}
             autoComplete="street-address"
             onChange={(e) => set("address", e.target.value)}
             onBlur={() => void quoteDelivery()}
-            className={inputClass()}
+            aria-required
+            className={inputClass(shown.address)}
           />
         </Field>
         )}

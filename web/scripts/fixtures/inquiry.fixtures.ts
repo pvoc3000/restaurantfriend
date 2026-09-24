@@ -145,6 +145,13 @@ test("everything else stays optional", () => {
   eq(validateInquiry(full({ address: "", locationId: "", description: "", allergies: "", interest: "" })), {});
 });
 
+test("a DELIVERY needs an address (136); a pickup never does", () => {
+  eq(Object.keys(validateInquiry(full({ fulfillment: "delivery", address: "" }))), ["address"]);
+  eq(Object.keys(validateInquiry(full({ fulfillment: "delivery", address: "  " }))), ["address"]);
+  eq(validateInquiry(full({ fulfillment: "delivery", address: "5107 York Blvd" })), {});
+  eq(validateInquiry(full({ fulfillment: "pickup", address: "" })), {});
+});
+
 test("email and phone are each their OWN problem now", () => {
   eq(Object.keys(validateInquiry(full({ email: "", phone: "" }))).sort(), ["email", "phone"]);
 });
@@ -180,7 +187,7 @@ test("every refusal has its own words, and none of them is a code", () => {
     "unknown_org", "name_required", "contact_required",
     "email_invalid", "date_invalid", "time_invalid", "fulfillment_invalid",
     "email_required", "phone_required", "phone_invalid", "occasion_required",
-    "date_required", "time_required",
+    "date_required", "time_required", "address_required",
   ];
   for (const s of states) {
     const m = inquiryStateMessage(s);

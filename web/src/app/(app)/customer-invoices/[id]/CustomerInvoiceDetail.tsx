@@ -8,8 +8,6 @@ import { STATUS_LABEL, money, readSettings } from "@/lib/specialOrders";
 import { usDate } from "@/lib/specialOrderDocs";
 import { fetchInvoiceView } from "@/lib/customerInvoiceQueries";
 import {
-  INVOICE_STATUS_CLASS,
-  INVOICE_STATUS_LABEL,
   PROCESSOR_LABEL,
   PROCESSOR_OPTIONS,
   invoiceNumberText,
@@ -25,6 +23,7 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { CustomerInvoiceCommandMenu } from "@/components/customerInvoices/CustomerInvoiceCommandMenu";
 import { CustomerInvoiceLinesTable } from "@/components/customerInvoices/CustomerInvoiceLinesTable";
+import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { canEditPage } from "@/lib/pageAccess";
 
@@ -115,11 +114,7 @@ export async function CustomerInvoiceDetail({
             <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
               Invoice {numberText}
             </h1>
-            <span
-              className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${INVOICE_STATUS_CLASS[status]}`}
-            >
-              {INVOICE_STATUS_LABEL[status]}
-            </span>
+            <InvoiceStatusChip status={status} />
           </div>
           <p className="text-sm text-muted">
             {lines.length} order{lines.length === 1 ? "" : "s"} · {money(view.total)}

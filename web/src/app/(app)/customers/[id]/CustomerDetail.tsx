@@ -24,7 +24,6 @@ import { CustomerAccounting } from "@/components/specialOrders/CustomerAccountin
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { canEditPage } from "@/lib/pageAccess";
 import {
-  INVOICE_STATUS_LABEL,
   invoiceBalance,
   invoiceChanged,
   invoiceNumberText,
@@ -32,6 +31,7 @@ import {
   readInvoiceTerms,
 } from "@/lib/customerInvoices";
 import { usDate } from "@/lib/specialOrderDocs";
+import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
 
 const CUSTOMERS_CRUMB = { href: "/customers", label: "Customers" };
 
@@ -297,8 +297,8 @@ export async function CustomerDetail({
                     </Link>
                   </td>
                   <td className="px-3 py-2 tabular-nums text-muted">{usDate(inv.issued_on)}</td>
-                  <td className={`px-3 py-2 ${inv.status === "overdue" ? "text-accent" : "text-muted"}`}>
-                    {INVOICE_STATUS_LABEL[inv.status]}
+                  <td className="px-3 py-2">
+                    <InvoiceStatusChip status={inv.status} />
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{money(inv.total)}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-accent">

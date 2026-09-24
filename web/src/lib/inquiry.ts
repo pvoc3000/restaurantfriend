@@ -34,6 +34,8 @@ export type InquiryState =
   | "occasion_required"
   | "date_required"
   | "time_required"
+  // Migration 136: a delivery needs an address.
+  | "address_required"
   | "email_invalid"
   | "date_invalid"
   | "time_invalid"
@@ -203,6 +205,12 @@ export function validateInquiry(draft: InquiryDraft): InquiryErrors {
     errors.phone = "That doesn’t look like a phone number.";
   }
 
+  // A DELIVERY needs an address (Mark, 2026-09-24; migration 136). The field
+  // only shows for a delivery, and a pickup never sends one.
+  if (draft.fulfillment === "delivery" && !draft.address.trim()) {
+    errors.address = "Where are we delivering to?";
+  }
+
   if (!draft.occasion.trim()) {
     errors.occasion = "Tell us what it’s for — a birthday, a wedding, an office party…";
   }
@@ -286,6 +294,8 @@ export function inquiryStateMessage(state: InquiryState | string): {
       return { ok: false, title: "That phone number doesn’t look right", body: "Have another look at it." };
     case "occasion_required":
       return { ok: false, title: "What’s the occasion?", body: "A birthday, a wedding, an office party — tell us what it’s for." };
+    case "address_required":
+      return { ok: false, title: "Where are we delivering to?", body: "Add the delivery address, or choose pickup." };
     case "date_required":
       return { ok: false, title: "When do you need it?", body: "Choose a date." };
     case "time_required":

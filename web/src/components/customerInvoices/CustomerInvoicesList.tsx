@@ -24,10 +24,10 @@ import {
   type RawSearchParams,
 } from "@/lib/filterMenus";
 import { sortRows } from "@/lib/tableSort";
+import { InvoiceStatusChip } from "./InvoiceStatusChip";
 import { money } from "@/lib/specialOrders";
 import { usDate } from "@/lib/specialOrderDocs";
 import {
-  INVOICE_STATUS_CLASS,
   INVOICE_STATUS_LABEL,
   INVOICE_STATUS_ORDER,
   PROCESSOR_LABEL,
@@ -167,11 +167,7 @@ export function CustomerInvoicesList({
       sortTiebreaks: [(r) => String(r.number).padStart(9, "0")],
       // The PO list's chip: colour is record STATE.
       render: (r) => (
-        <span
-          className={`inline-flex h-6 items-center whitespace-nowrap px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${INVOICE_STATUS_CLASS[r.status]}`}
-        >
-          {INVOICE_STATUS_LABEL[r.status]}
-        </span>
+        <InvoiceStatusChip status={r.status} />
       ),
     },
     {

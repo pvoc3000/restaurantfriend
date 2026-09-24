@@ -57,7 +57,6 @@ import {
 } from "@/lib/specialOrderAttachments";
 import { canEditPage } from "@/lib/pageAccess";
 import {
-  INVOICE_STATUS_LABEL,
   SQUARE_ITEM_OPTIONS,
   type InvoiceCandidate,
   invoiceChanged,
@@ -66,6 +65,7 @@ import {
   readInvoiceTerms,
 } from "@/lib/customerInvoices";
 import { canRefundPayments, canScheduleProduction } from "@/lib/roles";
+import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
 
 const SPECIAL_ORDERS_CRUMB = { href: "/special-orders", label: "Orders" };
 
@@ -325,13 +325,11 @@ export async function SpecialOrderDetail({
         label: invoiceLabel(liveInvoiceRow),
         // THIS order's line moving since the send is what makes the invoice
         // "changed" from here — it is the change somebody just made.
-        status: INVOICE_STATUS_LABEL[
-          invoiceStatus(
-            liveInvoiceRow,
-            today,
-            invoiceChanged(invoiceLinks.filter((l) => l.customer_invoices?.id === liveInvoiceRow.id))
-          )
-        ],
+        status: invoiceStatus(
+          liveInvoiceRow,
+          today,
+          invoiceChanged(invoiceLinks.filter((l) => l.customer_invoices?.id === liveInvoiceRow.id))
+        ),
       }
     : null;
 
@@ -949,7 +947,9 @@ export async function SpecialOrderDetail({
                         >
                           {liveInvoice.label}
                         </Link>
-                        <span className="text-muted"> · {liveInvoice.status}</span>
+                        <span className="ml-3 align-middle">
+                          <InvoiceStatusChip status={liveInvoice.status} />
+                        </span>
                       </Row>
                     ) : null}
                   </div>
