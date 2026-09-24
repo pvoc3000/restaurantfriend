@@ -12,7 +12,7 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Shipped 2026-09-23, MIGRATION 127 WRITTEN, NOT YET APPLIED — BOTH
+   **Shipped 2026-09-23, MIGRATION 127 APPLIED (Mark, same day) — BOTH
    DOUBLE-PAY GAPS CLOSED** (Mark: "yes, close both gaps"). (1) The list's bulk
    **Record Payment…** skips orders a non-void customer invoice bills and says
    how many ("record those payments on the invoice"); the list page reads
