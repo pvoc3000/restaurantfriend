@@ -89,6 +89,25 @@ export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
   void: "Void",
 };
 
+export const INVOICE_STATUS_ORDER: InvoiceStatus[] = ["draft", "sent", "changed", "overdue", "paid", "void"];
+
+/**
+ * The status chip's colours (Mark, 2026-09-24: "an invoice chip class like
+ * BILL_STAGE_CLASS or PO_STATUS_CLASS"), on those two maps' terms. Outstanding
+ * wears the warm marks — sent yellow, changed-since-sent orange (it needs
+ * sending again), overdue red (it needs a person); paid is the quiet white a
+ * paid bill wears, finished business; draft and void keep the neutral and the
+ * faint ones a PO's draft and void have.
+ */
+export const INVOICE_STATUS_CLASS: Record<InvoiceStatus, string> = {
+  draft: "border border-neutral-300 bg-neutral-100 text-muted",
+  sent: "border border-ink bg-[var(--rf-yellow-200)] text-ink",
+  changed: "border border-ink bg-[var(--rf-orange-200)] text-ink",
+  overdue: "border border-ink bg-[var(--rf-red-200)] text-ink",
+  paid: "border border-ink bg-white text-ink",
+  void: "border border-neutral-300 bg-white text-faint",
+};
+
 /**
  * DERIVED, never stored — 124 keeps only the invoice's own dates. Void wins
  * over everything (a voided invoice that was paid is a refund to make, which

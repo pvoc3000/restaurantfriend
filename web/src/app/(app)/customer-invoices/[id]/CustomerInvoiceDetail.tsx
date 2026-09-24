@@ -8,6 +8,7 @@ import { STATUS_LABEL, money, readSettings } from "@/lib/specialOrders";
 import { usDate } from "@/lib/specialOrderDocs";
 import { fetchInvoiceView } from "@/lib/customerInvoiceQueries";
 import {
+  INVOICE_STATUS_CLASS,
   INVOICE_STATUS_LABEL,
   PROCESSOR_LABEL,
   PROCESSOR_OPTIONS,
@@ -109,21 +110,18 @@ export async function CustomerInvoiceDetail({
           the right margin — every record screen's shape. */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-3">
+          {/* The status chip beside the title — the PO record's shape. */}
+          <div className="flex flex-wrap items-center gap-4">
             <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
               Invoice {numberText}
             </h1>
-            {invoice.voided_at ? (
-              <span className="border border-ink px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.12em]">
-                Voided
-              </span>
-            ) : null}
-          </div>
-          <p className="text-sm text-muted">
-            <span className={status === "overdue" ? "text-accent" : undefined}>
+            <span
+              className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${INVOICE_STATUS_CLASS[status]}`}
+            >
               {INVOICE_STATUS_LABEL[status]}
             </span>
-            {" · "}
+          </div>
+          <p className="text-sm text-muted">
             {lines.length} order{lines.length === 1 ? "" : "s"} · {money(view.total)}
             {status !== "void" && view.balance > 0.005 ? (
               <span className="text-accent"> · {money(view.balance)} due</span>

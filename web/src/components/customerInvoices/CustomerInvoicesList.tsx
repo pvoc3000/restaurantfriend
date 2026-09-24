@@ -27,7 +27,9 @@ import { sortRows } from "@/lib/tableSort";
 import { money } from "@/lib/specialOrders";
 import { usDate } from "@/lib/specialOrderDocs";
 import {
+  INVOICE_STATUS_CLASS,
   INVOICE_STATUS_LABEL,
+  INVOICE_STATUS_ORDER,
   PROCESSOR_LABEL,
   type InvoiceProcessor,
   type InvoiceStatus,
@@ -159,12 +161,15 @@ export function CustomerInvoicesList({
     {
       key: "status",
       label: "Status",
-      width: 110,
-      sortValue: (r) => r.status,
+      // Room for the longest chip, CHANGED SINCE SENT, without clipping.
+      width: 200,
+      sortValue: (r) => INVOICE_STATUS_ORDER.indexOf(r.status),
       sortTiebreaks: [(r) => String(r.number).padStart(9, "0")],
-      // Colour is record STATE: overdue is the one that needs a person.
+      // The PO list's chip: colour is record STATE.
       render: (r) => (
-        <span className={r.status === "overdue" ? "text-accent" : r.status === "void" ? "text-faint" : "text-muted"}>
+        <span
+          className={`inline-flex h-6 items-center whitespace-nowrap px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${INVOICE_STATUS_CLASS[r.status]}`}
+        >
           {INVOICE_STATUS_LABEL[r.status]}
         </span>
       ),

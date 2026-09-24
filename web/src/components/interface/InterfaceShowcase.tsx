@@ -71,6 +71,7 @@ import { applyListFilters, type FilterDimension, type FilterValues } from "@/lib
 import { BILL_STAGE_CLASS, BILL_STAGE_LABEL, BILL_STAGE_ORDER } from "@/lib/bills";
 import { PAY_PERIOD_STATUS } from "@/lib/payPeriods";
 import { PO_STATUS_CLASS, PO_STATUS_LABEL, PO_STATUS_ORDER } from "@/lib/purchaseOrders";
+import { INVOICE_STATUS_CLASS, INVOICE_STATUS_LABEL, INVOICE_STATUS_ORDER } from "@/lib/customerInvoices";
 import { usePublishRecordSet } from "@/lib/recordSet";
 
 /**
@@ -1531,6 +1532,15 @@ function StatusBlock() {
             {BILL_STAGE_ORDER.map((s) => (
               <span key={s} className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${BILL_STAGE_CLASS[s]}`}>
                 {BILL_STAGE_LABEL[s]}
+              </span>
+            ))}
+          </div>
+        </Specimen>
+        <Specimen name="INVOICE_STATUS_CLASS">
+          <div className="flex flex-wrap gap-2">
+            {INVOICE_STATUS_ORDER.map((s) => (
+              <span key={s} className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${INVOICE_STATUS_CLASS[s]}`}>
+                {INVOICE_STATUS_LABEL[s]}
               </span>
             ))}
           </div>
