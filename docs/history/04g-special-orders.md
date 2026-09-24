@@ -12,6 +12,18 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Also 2026-09-23 — THE ORDER'S MENU AND SPACING.** (1) "disable 'Send to
+   quickbooks...'" — `quickbooks={null}` on the order record, so the row is
+   gone; `PushOrderToQuickBooks` is kept (orders are now invoiced and collected
+   through Square, and a pay-link sale must not also be pushed to QBO as an
+   invoice). (2) "We need a way to create an invoice from the special order
+   detail page" — the documents group gains ONE row that changes: "Create
+   Invoice…" (the same `CreateInvoiceDialog`, `thenSend={false}` — "Create
+   $x", stops at the draft and opens it) or "Open Invoice 1001" when a live
+   invoice bills the order; Send ▸ Invoice still creates-and-sends. (3) more
+   room under the Order number | Sold as pair (`Row` takes a `className`;
+   `sm:pb-4`), ending the top block before Event date | Event time.
+
    **Also 2026-09-23 — "ORDERS", AND THE KIND FILTER BY SOLD AS.** Mark:
    rename the Kind filter's "Regular Orders" → "Special Orders", "Standing
    Orders" → "Wholesale Orders", "Regular Order Templates" → "Special Order

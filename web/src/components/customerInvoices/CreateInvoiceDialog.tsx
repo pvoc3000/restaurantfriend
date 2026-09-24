@@ -39,6 +39,7 @@ export function CreateInvoiceDialog({
   today,
   onClose,
   from,
+  thenSend = true,
 }: {
   candidates: InvoiceCandidate[];
   orgId: string;
@@ -47,6 +48,12 @@ export function CreateInvoiceDialog({
   onClose: () => void;
   /** Where the new invoice's breadcrumb leads back to. */
   from?: { href: string; label: string };
+  /**
+   * Open the new invoice's Send card on arrival (the default — Send ▸ Invoice
+   * and the list). False for the order's Create Invoice…, which stops at the
+   * draft so it can be checked before anything goes out.
+   */
+  thenSend?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -94,7 +101,9 @@ export function CreateInvoiceDialog({
       setError(e.message);
       return;
     }
-    const href = `/customer-invoices/${data as string}?send=${sendIntent()}`;
+    const href = thenSend
+      ? `/customer-invoices/${data as string}?send=${sendIntent()}`
+      : `/customer-invoices/${data as string}`;
     router.push(from ? withFrom(href, from) : href);
   }
 
@@ -118,7 +127,7 @@ export function CreateInvoiceDialog({
             Cancel
           </button>
           <button type="button" className={DIALOG_COMMIT_CLASS} onClick={() => void create()} disabled={!ready}>
-            {busy ? "Creating…" : `Create and Send ${money(total)}`}
+            {busy ? "Creating…" : `${thenSend ? "Create and Send" : "Create"} ${money(total)}`}
           </button>
         </div>
       }
@@ -136,8 +145,10 @@ export function CreateInvoiceDialog({
           <>
             <p className="text-[13px] text-muted">
               {candidates[0]?.customer_name} · {count} {count === 1 ? "order" : "orders"}
-              {count === 1 ? "" : ", one line each"}. Next comes the email — cancel it and the
-              invoice stays a draft.
+              {count === 1 ? "" : ", one line each"}.{" "}
+              {thenSend
+                ? "Next comes the email — cancel it and the invoice stays a draft."
+                : "It opens as a draft; nothing is sent."}
             </p>
             <table className="w-full border-collapse text-[14px]">
               <tbody>

@@ -649,6 +649,7 @@ export async function SpecialOrderDetail({
                       today,
                       invoice: {
                         liveInvoiceId: liveInvoice?.id ?? null,
+                        liveInvoiceLabel: liveInvoice?.label ?? null,
                         candidate: {
                           id,
                           number: row.number as string,
@@ -667,24 +668,12 @@ export async function SpecialOrderDetail({
                     }
                   : null
               }
-              quickbooks={
-                kind === "order"
-                  ? {
-                      orderId: id,
-                      orgId: row.org_id as string,
-                      number: (row.number as string | null) ?? null,
-                      kind,
-                      status: (row.status as string | null) ?? null,
-                      ignoreBalance: Boolean(row.ignore_balance),
-                      invoiceDate: (row.date_initiated as string | null) ?? null,
-                      today,
-                      customerId: (row.customer_id as string | null) ?? null,
-                      customerName: customerLabel(row.customers as never) || "this customer",
-                      totals,
-                      canWrite,
-                    }
-                  : null
-              }
+              // OFF (Mark, 2026-09-23: "disable 'Send to quickbooks...'"). An
+              // order is billed on a customer invoice now, collected through
+              // Square, and a pay-link sale must NOT also be pushed to QBO as an
+              // invoice (CLAUDE.md). `PushOrderToQuickBooks` is kept; restore by
+              // passing its props here again.
+              quickbooks={null}
               schedule={
                 kind === "order" && status !== "cancelled" && canScheduleProduction(session.membership.role)
                   ? {
@@ -848,7 +837,7 @@ export async function SpecialOrderDetail({
                             options={TODO_OPTIONS} value={row.todo as string | null}
                             canWrite={canWrite} ariaLabel="To-do" />
                     </Row>
-                    <Row label="Order number">
+                    <Row label="Order number" className="sm:pb-4">
                       <OrderNumberCell id={id} value={row.number as string} canWrite={canWrite} />
                     </Row>
                     {/* WHICH SQUARE ITEM ITS MONEY IS SOLD AS (129, Mark
@@ -857,7 +846,7 @@ export async function SpecialOrderDetail({
                         value when they are made; a hand-made order starts as
                         Special Order. An unpaid invoice line follows it. */}
                     {kind === "order" || kind === "standing_order" ? (
-                      <Row label="Sold as">
+                      <Row label="Sold as" className="sm:pb-4">
                         <Cell table="special_orders" id={id} column="square_item" kind="pick"
                               options={SQUARE_ITEM_OPTIONS} value={row.square_item as string}
                               canWrite={canWrite} ariaLabel="Sold as" />
@@ -1276,14 +1265,17 @@ export async function SpecialOrderDetail({
 function Row({
   label,
   wide = false,
+  className = "",
   children,
 }: {
   label: string;
   wide?: boolean;
+  /** Extra room under a row — the gap that ends the top block (2026-09-23). */
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className={wide ? "space-y-1 sm:col-span-2" : "space-y-1"}>
+    <div className={`${wide ? "space-y-1 sm:col-span-2" : "space-y-1"} ${className}`}>
       <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{label}</dt>
       <dd>{children}</dd>
     </div>

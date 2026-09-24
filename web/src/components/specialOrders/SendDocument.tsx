@@ -128,12 +128,16 @@ export function SendDocument({
    */
   invoice?: {
     liveInvoiceId: string | null;
+    /** "Invoice 1001", for the Open row. */
+    liveInvoiceLabel?: string | null;
     candidate: InvoiceCandidate;
     from: { href: string; label: string };
   } | null;
 }) {
   const router = useRouter();
-  const [creatingInvoice, setCreatingInvoice] = useState(false);
+  /** The dialog is open, and whether it goes on to Send (Send ▸ Invoice) or
+   *  stops at the draft (Create Invoice…). */
+  const [creatingInvoice, setCreatingInvoice] = useState<"send" | "draft" | null>(null);
   const supabase = createClient();
   const [kind, setKind] = useState<DocumentKind>("quote");
   const [busy, setBusy] = useState<string | null>(null);
@@ -373,7 +377,7 @@ export function SendDocument({
       router.push(withFrom(`/customer-invoices/${invoice.liveInvoiceId}?send=${sendIntent()}`, invoice.from));
       return;
     }
-    setCreatingInvoice(true);
+    setCreatingInvoice("send");
   };
 
   /** One verb's menu: the same four documents, each doing that verb. */
@@ -407,6 +411,24 @@ export function SendDocument({
     { label: "Preview", items: submenu(preview) },
     { label: "Download", items: submenu(download) },
     { label: "Send…", items: submenu(sendAct) },
+    // THE ORDER'S INVOICE, AS A RECORD (Mark, 2026-09-23: "We need a way to
+    // create an invoice from the special order detail page"). Create stops at
+    // a draft to check; when one already bills the order, this opens it.
+    ...(invoice
+      ? [
+          invoice.liveInvoiceId
+            ? {
+                label: `Open ${invoice.liveInvoiceLabel ?? "Invoice"}`,
+                onSelect: () =>
+                  router.push(withFrom(`/customer-invoices/${invoice.liveInvoiceId}`, invoice.from)),
+              }
+            : {
+                label: "Create Invoice…",
+                onSelect: () => setCreatingInvoice("draft"),
+                disabled: busy !== null,
+              },
+        ]
+      : []),
   ];
 
   return (
@@ -570,8 +592,9 @@ export function SendDocument({
           candidates={[invoice.candidate]}
           orgId={orgId}
           today={today}
-          onClose={() => setCreatingInvoice(false)}
+          onClose={() => setCreatingInvoice(null)}
           from={invoice.from}
+          thenSend={creatingInvoice === "send"}
         />
       )}
 
