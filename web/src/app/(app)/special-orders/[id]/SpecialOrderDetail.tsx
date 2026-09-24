@@ -56,6 +56,12 @@ import {
   type SoAttachment,
 } from "@/lib/specialOrderAttachments";
 import { canEditPage } from "@/lib/pageAccess";
+import {
+  INVOICE_STATUS_LABEL,
+  invoiceNumberText,
+  invoiceStatus,
+  readInvoiceTerms,
+} from "@/lib/customerInvoices";
 import { canRefundPayments, canScheduleProduction } from "@/lib/roles";
 
 const SPECIAL_ORDERS_CRUMB = { href: "/special-orders", label: "Special Orders" };
@@ -141,6 +147,7 @@ export async function SpecialOrderDetail({
     { data: gridRows },
     { data: gridOverrideRows },
     { data: itemOverrideRows },
+    { data: invoiceLinkRows },
   ] = await Promise.all([
     supabase.from("special_orders").select(ORDER_COLUMNS).eq("id", id).maybeSingle(),
     wantsLines
@@ -154,7 +161,7 @@ export async function SpecialOrderDetail({
       : SKIP,
     supabase
       .from("special_order_payments")
-      .select("id, paid_on, amount, payment_type, note, external_ref")
+      .select("id, paid_on, amount, payment_type, note, external_ref, customer_invoice_id")
       .eq("order_id", id)
       .order("paid_on", { ascending: true, nullsFirst: false }),
     wantsLog
@@ -193,6 +200,12 @@ export async function SpecialOrderDetail({
     wantsMenu
       ? supabase.from("production_item_locations").select("item_id, location_id, price_override")
       : SKIP_MENU,
+    // THE CUSTOMER INVOICES THIS ORDER IS A LINE ON (124), void ones included —
+    // a payment taken on an invoice later voided still names it.
+    supabase
+      .from("customer_invoice_lines")
+      .select("invoice_id, customer_invoices ( id, number, sent_at, paid_at, voided_at, due_on )")
+      .eq("special_order_id", id),
   ]);
 
   if (error) {
@@ -284,7 +297,41 @@ export async function SpecialOrderDetail({
   }
 
   const lines: OrderLineRow[] = ((lineRows ?? []) as unknown as OrderLineRow[]);
-  const payments: PaymentRow[] = ((paymentRows ?? []) as unknown as PaymentRow[]);
+  /**
+   * WHICH CUSTOMER INVOICE BILLS THIS ORDER (Mark, 2026-09-23: "we need to put
+   * the invoice in the payments area … remove the take a payment button from
+   * special orders that are part of a customer invoice … try adding the
+   * invoice field on the orders info tab"). `liveInvoice` is the one not
+   * voided — an order is on at most one — and the rest only name payments.
+   */
+  const invoiceTerms = readInvoiceTerms(session.orgSettings as Record<string, unknown>);
+  type InvoiceRef = { id: string; number: number; sent_at: string | null; paid_at: string | null; voided_at: string | null; due_on: string | null };
+  const invoicesOnOrder = ((invoiceLinkRows ?? []) as unknown as { customer_invoices: InvoiceRef | null }[])
+    .map((l) => l.customer_invoices)
+    .filter((i): i is InvoiceRef => i !== null);
+  const invoiceHref = (invoiceId: string, from: string) =>
+    withFrom(`/customer-invoices/${invoiceId}`, { href: from, label: `#${row.number as string}` });
+  const invoiceLabel = (i: InvoiceRef) => `Invoice ${invoiceNumberText(i.number, invoiceTerms)}`;
+  const liveInvoiceRow = invoicesOnOrder.find((i) => !i.voided_at) ?? null;
+  const liveInvoice = liveInvoiceRow
+    ? {
+        id: liveInvoiceRow.id,
+        label: invoiceLabel(liveInvoiceRow),
+        status: INVOICE_STATUS_LABEL[invoiceStatus(liveInvoiceRow, today)],
+      }
+    : null;
+
+  const payments: PaymentRow[] = ((paymentRows ?? []) as unknown as (PaymentRow & {
+    customer_invoice_id: string | null;
+  })[]).map((p) => {
+    const inv = invoicesOnOrder.find((i) => i.id === p.customer_invoice_id);
+    return {
+      ...p,
+      invoice: inv
+        ? { label: invoiceLabel(inv), href: invoiceHref(inv.id, orderTabHref(id, "payments", rawParams)) }
+        : null,
+    };
+  });
 
   const moneyInputs = {
     tax_rate: row.tax_rate as number | null,
@@ -834,6 +881,20 @@ export async function SpecialOrderDetail({
                         names is where the recurrence is changed, and repointing
                         a day at a different standing order is not a thing
                         anybody should be able to do by picking from a list. */}
+                    {/* THE INVOICE THAT BILLS IT, when a customer invoice
+                        does (124) — shown only then, like Made from, so the
+                        8,000 orders billed on their own say nothing new. */}
+                    {liveInvoice ? (
+                      <Row label="Invoice">
+                        <Link
+                          href={invoiceHref(liveInvoice.id, orderTabHref(id, "info", rawParams))}
+                          className="underline underline-offset-2"
+                        >
+                          {liveInvoice.label}
+                        </Link>
+                        <span className="text-muted"> · {liveInvoice.status}</span>
+                      </Row>
+                    ) : null}
                     {madeFrom ? (
                       <Row label="Made from">
                         <Link
@@ -1098,6 +1159,14 @@ export async function SpecialOrderDetail({
                     orderId={id}
                     orgId={row.org_id as string}
                     rows={payments}
+                    invoice={
+                      liveInvoice
+                        ? {
+                            label: liveInvoice.label,
+                            href: invoiceHref(liveInvoice.id, orderTabHref(id, "payments", rawParams)),
+                          }
+                        : null
+                    }
                     balance={totals.balance}
                     canWrite={canWrite}
                     canRefund={canRefundPayments(session.membership.role)}

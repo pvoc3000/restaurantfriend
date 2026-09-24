@@ -12,6 +12,21 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **And (same day) — THE ORDER KNOWS ITS INVOICE.** Mark: "we need to put the
+   invoice in the payments area of the payments tab … remove the take a
+   payment button from special orders that are part of a customer invoice …
+   try adding the invoice field on the orders info tab". The order record now
+   reads `customer_invoice_lines` → `customer_invoices` (void ones too) in its
+   first batch of queries. **Payments tab:** an Invoice column — shown only when
+   some payment carries `customer_invoice_id` — linking "Invoice 1001"; and
+   while a NON-VOID invoice bills the order, "Take a payment" is replaced by
+   "Billed on Invoice 1001 — payments are recorded there", because a payment
+   typed on the order is untagged and the invoice would go on asking for it.
+   **Info tab:** an "Invoice" row after the Details (like Made from, present
+   only when there is one): the link and its derived status. NOT yet: the
+   list's bulk Record Payment still takes a payment on an invoiced order, and
+   the per-order pay-link double-pay gap is still open.
+
    **And (same day) — THE ORDERS TABLE IS A `DataTable`** (Mark: "the order
    table should be a datatable"): `customerInvoices/CustomerInvoiceLinesTable`,
    a client component fed plain rows by the server page — sortable, hideable

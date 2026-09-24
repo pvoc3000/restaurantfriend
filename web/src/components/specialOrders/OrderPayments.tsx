@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { useRouter } from "next/navigation";
 
@@ -34,6 +35,8 @@ export type PaymentRow = {
   payment_type: string | null;
   note: string | null;
   external_ref: string | null;
+  /** The customer invoice this payment was taken on (124), if any. */
+  invoice?: { label: string; href: string } | null;
 };
 
 /**
@@ -51,6 +54,7 @@ export function OrderPayments({
   orderId,
   orgId,
   rows,
+  invoice = null,
   balance,
   canWrite,
   canRefund = false,
@@ -60,6 +64,13 @@ export function OrderPayments({
   orderId: string;
   orgId: string;
   rows: PaymentRow[];
+  /**
+   * The customer invoice that bills this order (124). While there is one, the
+   * money is taken ON THE INVOICE — split across its orders — so this section
+   * offers no Take a payment of its own (Mark, 2026-09-23): a payment typed
+   * here would not count against the invoice, which would go on asking for it.
+   */
+  invoice?: { label: string; href: string } | null;
   balance: number;
   canWrite: boolean;
   /** Manager and up — `canRefundPayments`. Offers Refund… on pay-link rows. */
@@ -162,6 +173,10 @@ export function OrderPayments({
     });
   }
 
+  // The Invoice column only where some payment has one — the thousands of
+  // orders billed on their own keep the table they had.
+  const showInvoice = rows.some((p) => p.invoice);
+
   return (
     <section className="space-y-2">
       <SectionHeading count={rows.length}>Payments</SectionHeading>
@@ -175,6 +190,7 @@ export function OrderPayments({
               <th className="w-36 px-3 py-2 text-left">Date</th>
               <th className="w-28 px-3 py-2 text-right">Amount</th>
               <th className="w-44 px-3 py-2 text-left">How</th>
+              {showInvoice ? <th className="w-32 px-3 py-2 text-left">Invoice</th> : null}
               <th className="px-3 py-2 text-left">Note</th>
               {canWrite ? <th className="w-8 px-1 py-2" /> : null}
             </tr>
@@ -208,6 +224,17 @@ export function OrderPayments({
                     <span className="text-muted">{p.payment_type ?? "—"}</span>
                   )}
                 </td>
+                {showInvoice ? (
+                  <td className="px-3 py-2">
+                    {p.invoice ? (
+                      <Link href={p.invoice.href} className="underline underline-offset-2">
+                        {p.invoice.label}
+                      </Link>
+                    ) : (
+                      <span className="text-faint">—</span>
+                    )}
+                  </td>
+                ) : null}
                 <td className="px-3 py-2">
                   {canWrite ? (
                     <InlineValue boxed={BOXED_FIELDS} table="special_order_payments" id={p.id} column="note" value={p.note}
@@ -245,7 +272,15 @@ export function OrderPayments({
         </table>
       )}
 
-      {canWrite ? (
+      {invoice ? (
+        <p className="text-[13px] text-muted">
+          Billed on{" "}
+          <Link href={invoice.href} className="text-ink underline underline-offset-2">
+            {invoice.label}
+          </Link>{" "}
+          — payments are recorded there.
+        </p>
+      ) : canWrite ? (
         adding ? (
           <div className="flex flex-wrap items-end gap-3 border border-hairline p-4">
             <Field label="Amount">
