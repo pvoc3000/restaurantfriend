@@ -18,10 +18,12 @@ const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_R
   let checked = 0, mismatch = [];
   for (let i = 0; i < sample.length; i += 200) {
     const ids = sample.slice(i, i + 200);
-    const [{ data: orders }, { data: items }] = await Promise.all([
+    const [{ data: orders }] = await Promise.all([
       sb.from('special_orders').select('id, number, tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate').in('id', ids),
-      sb.from('special_order_items').select('order_id, qty, unit_price, taxable, sort, id').in('order_id', ids).order('sort', { ascending: true, nullsFirst: false }).order('id').limit(10000),
+      Promise.resolve({ data: null }),
     ]);
+    // PostgREST returns at most 1,000 rows and says nothing — page the lines.
+    const items = await pick(() => sb.from('special_order_items').select('order_id, qty, unit_price, taxable, sort, id').in('order_id', ids).order('sort', { ascending: true, nullsFirst: false }).order('id'));
     for (const o of orders) {
       const lines = items.filter((l) => l.order_id === o.id);
       const t = orderTotals(o, lines, [], { cutoffBusinessDays: 2, minimum, rate: 0.3 });
