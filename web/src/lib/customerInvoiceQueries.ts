@@ -42,6 +42,8 @@ export type InvoiceViewLine = CustomerInvoiceLine & {
   totals: OrderTotals | null;
   /** What THIS invoice has collected on the order. */
   collected: number;
+  /** The order's item lines, in its own order — the one-order PDF lists them. */
+  items: { name: string; qty: number; unit_price: number }[];
 };
 
 export type InvoiceViewPayment = {
@@ -101,7 +103,7 @@ export async function fetchInvoiceView(
     ignore_balance: boolean | null;
   };
   let orders: OrderRow[] = [];
-  const items = new Map<string, { qty: number | null; unit_price: number | null; taxable: boolean }[]>();
+  const items = new Map<string, { qty: number | null; unit_price: number | null; taxable: boolean; name: string }[]>();
   const pays = new Map<string, { amount: number | null }[]>();
   let tagged: InvoiceViewPayment[] = [];
 
@@ -116,8 +118,10 @@ export async function fetchInvoiceView(
         .in("id", orderIds),
       supabase
         .from("special_order_items")
-        .select("order_id, qty, unit_price, taxable")
-        .in("order_id", orderIds),
+        .select("order_id, name, qty, unit_price, taxable, sort, id")
+        .in("order_id", orderIds)
+        .order("sort", { ascending: true, nullsFirst: false })
+        .order("id"),
       supabase
         .from("special_order_payments")
         .select("id, order_id, customer_invoice_id, paid_on, amount, payment_type, note, external_ref")
@@ -127,7 +131,12 @@ export async function fetchInvoiceView(
     orders = (o ?? []) as unknown as OrderRow[];
     for (const l of it ?? []) {
       const list = items.get(l.order_id as string) ?? [];
-      list.push({ qty: l.qty as number, unit_price: l.unit_price as number, taxable: l.taxable as boolean });
+      list.push({
+        qty: l.qty as number,
+        unit_price: l.unit_price as number,
+        taxable: l.taxable as boolean,
+        name: (l.name as string) ?? "",
+      });
       items.set(l.order_id as string, list);
     }
     for (const row of p ?? []) {
@@ -173,6 +182,11 @@ export async function fetchInvoiceView(
       collected: tagged
         .filter((p) => p.order_id === l.special_order_id)
         .reduce((a, p) => a + p.amount, 0),
+      items: (o ? items.get(o.id) ?? [] : []).map((i) => ({
+        name: i.name,
+        qty: Number(i.qty ?? 0),
+        unit_price: Number(i.unit_price ?? 0),
+      })),
     };
   });
 

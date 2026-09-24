@@ -23,13 +23,8 @@ import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
 import { TextInput } from "@/components/ui/TextInput";
 import type { SpecialOrderRow } from "./SpecialOrdersList";
-import {
-  addDays,
-  createRefusals,
-  invoiceLinesFor,
-  readInvoiceTerms,
-  type InvoiceCandidate,
-} from "@/lib/customerInvoices";
+import type { InvoiceCandidate } from "@/lib/customerInvoices";
+import { CreateInvoiceDialog } from "@/components/customerInvoices/CreateInvoiceDialog";
 
 /**
  * What you can do to a handful of special orders at once.
@@ -110,7 +105,7 @@ export function SpecialOrderBatchActions({
   const supabase = createClient();
   const router = useRouter();
   const [busy, setBusy] = useState<
-    "status" | "cancel" | "flags" | "paid" | "todo" | "dates" | "delete" | "invoice" | null
+    "status" | "cancel" | "flags" | "paid" | "todo" | "dates" | "delete" | null
   >(null);
 
   /**
@@ -121,8 +116,6 @@ export function SpecialOrderBatchActions({
    * already on an invoice).
    */
   const [invoicing, setInvoicing] = useState(false);
-  const [invoiceDue, setInvoiceDue] = useState<string | null>(null);
-  const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const candidates: InvoiceCandidate[] = selected.map((r) => ({
     id: r.id,
     number: r.number,
@@ -136,36 +129,6 @@ export function SpecialOrderBatchActions({
     on_invoice: r.invoice_id !== null,
     balance: r.totals.balance,
   }));
-  const invoiceRefusals = createRefusals(candidates);
-  const invoiceLines = invoiceRefusals.length ? [] : invoiceLinesFor(candidates);
-  const invoiceTotal = invoiceLines.reduce((a, l) => a + l.amount, 0);
-
-  async function openInvoice() {
-    setInvoiceError(null);
-    setInvoiceDue(null);
-    setInvoicing(true);
-    // The org's terms (design rule 2), read when the dialog opens: Sunday's
-    // invoice due Thursday is four days, and that is a setting, not code.
-    const { data } = await supabase.from("orgs").select("settings").eq("id", orgId).maybeSingle();
-    const terms = readInvoiceTerms((data?.settings ?? {}) as Record<string, unknown>);
-    setInvoiceDue(addDays(today, terms.termsDays));
-  }
-
-  async function createInvoice() {
-    setBusy("invoice");
-    setInvoiceError(null);
-    const { data, error } = await supabase.rpc("create_customer_invoice", {
-      p_org_id: orgId,
-      p_lines: invoiceLines,
-      p_issued_on: today,
-      p_due_on: invoiceDue,
-      p_notes: null,
-    });
-    setBusy(null);
-    if (error) return setInvoiceError(error.message);
-    setInvoicing(false);
-    router.push(`/customer-invoices/${data as string}`);
-  }
 
   /**
    * THE RECORD-PAYMENT DIALOG's state (Mark, 2026-09-20: "instead of 'mark
@@ -779,8 +742,8 @@ export function SpecialOrderBatchActions({
         {
           // Beside Record Payment: the other thing you do with a week of
           // wholesale days is bill them.
-          label: busy === "invoice" ? "Creating…" : `Create Invoice… (${selected.length})`,
-          onSelect: () => void openInvoice(),
+          label: `Create Invoice… (${selected.length})`,
+          onSelect: () => setInvoicing(true),
           disabled: busy !== null || selected.length === 0,
         },
         {
@@ -953,79 +916,13 @@ export function SpecialOrderBatchActions({
       )}
 
       {invoicing && (
-        <Dialog
-          title="Create an invoice"
-          onClose={() => {
-            if (busy === null) setInvoicing(false);
-          }}
-          busy={busy === "invoice"}
-          width="max-w-xl"
-          onSubmit={() => {
-            if (!invoiceRefusals.length && invoiceDue && busy === null) void createInvoice();
-          }}
-          footer={
-            <div className="flex items-center justify-end gap-4">
-              <button
-                type="button"
-                className={DIALOG_CANCEL_CLASS}
-                onClick={() => setInvoicing(false)}
-                disabled={busy !== null}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={DIALOG_COMMIT_CLASS}
-                onClick={() => void createInvoice()}
-                disabled={invoiceRefusals.length > 0 || !invoiceDue || busy !== null}
-              >
-                {busy === "invoice" ? "Creating…" : `Create ${money(invoiceTotal)}`}
-              </button>
-            </div>
-          }
-        >
-          <div className="space-y-5">
-            {invoiceRefusals.length > 0 ? (
-              <ul className="space-y-1 text-[13px]">
-                {invoiceRefusals.map((r) => (
-                  <li key={r}>
-                    <span className="box-decoration-clone bg-mark-fill px-1">{r}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <>
-                <p className="text-[13px] text-muted">
-                  {candidates[0]?.customer_name} · {plural(invoiceLines.length, "order")}, one line each.
-                  Nothing is sent yet — the invoice opens as a draft.
-                </p>
-                <table className="w-full border-collapse text-[14px]">
-                  <tbody>
-                    {invoiceLines.map((l) => (
-                      <tr key={l.order_id} className="border-b border-hairline">
-                        <td className="py-1.5 pr-3">{l.description}</td>
-                        <td className="py-1.5 text-right tabular-nums">{money(l.amount)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 border-ink font-semibold">
-                      <td className="py-1.5">Total</td>
-                      <td className="py-1.5 text-right tabular-nums">{money(invoiceTotal)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-                <label className="block max-w-[14rem] space-y-1.5">
-                  <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                    Due
-                  </span>
-                  <DateField value={invoiceDue} onChange={setInvoiceDue} ariaLabel="Due date" boxed />
-                </label>
-              </>
-            )}
-            {invoiceError && <p className="text-sm text-accent">{invoiceError}</p>}
-          </div>
-        </Dialog>
+        <CreateInvoiceDialog
+          candidates={candidates}
+          orgId={orgId}
+          today={today}
+          onClose={() => setInvoicing(false)}
+          from={{ href: "/special-orders", label: "Special Orders" }}
+        />
       )}
 
       {dating && (

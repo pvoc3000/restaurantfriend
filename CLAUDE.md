@@ -463,10 +463,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   order keeps `status` / `invoice_sent_at` / `invoice_paid_at`, and the invoice
   stamps them (sent) and settles each order its payment covers, through
   `settle_special_order_paid` — the same function the per-order link uses.
-  Mark's direction for what comes next: regular special orders move onto this
-  record too, "so we have one workflow for everything" — a one-order invoice
-  is one line, and nothing in 124 assumes a week. Don't build that move
-  without asking.
+  **THE ONE-WORKFLOW MOVE HAS STARTED (Mark, 2026-09-23, "every order"):** an
+  order's Send ▸ Invoice now creates (or reuses) a customer invoice and opens
+  its Send; one-order invoices print itemized. Lines follow their orders and
+  re-send keeps the number (128); "Sold as" is the order's (129). What is NOT
+  yet moved: receipts, deposits as their own invoice, "who owes us" read from
+  invoices, and retiring the per-order pay path — ask before each.
   Read `docs/history/04g-special-orders.md` and `docs/bill-rename-sweep.md` first.
 
 

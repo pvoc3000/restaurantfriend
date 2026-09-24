@@ -128,6 +128,7 @@ export async function CustomerInvoiceDetail({
           paid={view.paid}
           today={today}
           canWrite={canWrite}
+          autoSend={rawParams.send === "1"}
         />
       </div>
 

@@ -49,6 +49,7 @@ export function CustomerInvoiceCommandMenu({
   paid,
   today,
   canWrite,
+  autoSend = false,
 }: {
   id: string;
   orgId: string;
@@ -59,6 +60,8 @@ export function CustomerInvoiceCommandMenu({
   /** The ORG's calendar day — what a payment and a void are dated. */
   today: string;
   canWrite: boolean;
+  /** Reached with `?send=1`: open Send at once (Create and Send). */
+  autoSend?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -232,6 +235,7 @@ export function CustomerInvoiceCommandMenu({
           today={today}
           resend={!draft}
           disabled={busy !== null}
+          autoOpen={autoSend}
         >
           {menu}
         </SendCustomerInvoice>

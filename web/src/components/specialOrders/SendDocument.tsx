@@ -41,6 +41,9 @@ import {
   type WorkflowOrder,
 } from "@/lib/orderWorkflow";
 import { WorkflowOffer } from "./WorkflowOffer";
+import { CreateInvoiceDialog } from "@/components/customerInvoices/CreateInvoiceDialog";
+import type { InvoiceCandidate } from "@/lib/customerInvoices";
+import { withFrom } from "@/lib/breadcrumbs";
 import { renderOrderDocument } from "./renderOrderDocument";
 
 /**
@@ -92,6 +95,7 @@ export function SendDocument({
   today,
   children,
   onCustomerInvoice = false,
+  invoice = null,
 }: {
   /**
    * Render the three verbs as rows of an `ui/ActionMenu` instead of three
@@ -113,8 +117,23 @@ export function SendDocument({
    * too (127); this keeps a dead one out of the email.
    */
   onCustomerInvoice?: boolean;
+  /**
+   * SEND ▸ INVOICE GOES THROUGH A CUSTOMER INVOICE (Mark, 2026-09-23, for
+   * every order: "the user chooses send invoice, the create invoice dialogue
+   * appears … and the user is then taken to the send invoice screen"). With
+   * this set, the Invoice row under Send opens `CreateInvoiceDialog` — or,
+   * when a live invoice already bills the order, goes straight to that
+   * invoice's Send. Preview and Download ▸ Invoice still render the order's
+   * own paper.
+   */
+  invoice?: {
+    liveInvoiceId: string | null;
+    candidate: InvoiceCandidate;
+    from: { href: string; label: string };
+  } | null;
 }) {
   const router = useRouter();
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
   const supabase = createClient();
   const [kind, setKind] = useState<DocumentKind>("quote");
   const [busy, setBusy] = useState<string | null>(null);
@@ -347,6 +366,16 @@ export function SendDocument({
     { kind: "order", hint: "no prices; grouped by size" },
   ];
 
+  /** Send, with Invoice routed through a customer invoice when one is wired. */
+  const sendAct = (k: DocumentKind) => {
+    if (k !== "invoice" || !invoice) return void openCompose(k);
+    if (invoice.liveInvoiceId) {
+      router.push(withFrom(`/customer-invoices/${invoice.liveInvoiceId}?send=1`, invoice.from));
+      return;
+    }
+    setCreatingInvoice(true);
+  };
+
   /** One verb's menu: the same four documents, each doing that verb. */
   const menu = (act: (k: DocumentKind) => void) =>
     DOCUMENTS.map((d) => ({
@@ -377,7 +406,7 @@ export function SendDocument({
   const documentItems: ActionMenuItem[] = [
     { label: "Preview", items: submenu(preview) },
     { label: "Download", items: submenu(download) },
-    { label: "Send…", items: submenu(openCompose) },
+    { label: "Send…", items: submenu(sendAct) },
   ];
 
   return (
@@ -423,7 +452,7 @@ export function SendDocument({
           triggerClassName={BUTTON_CLASS}
           caret
           disabled={busy !== null}
-          items={menu(openCompose)}
+          items={menu(sendAct)}
         />
 
         {sentNote && <p className="text-[13px] text-[var(--rf-green-600)]">{sentNote}</p>}
@@ -536,6 +565,16 @@ export function SendDocument({
       {/* Asked AFTER the document has gone, and only about the ladder — the
           date is already recorded by then, by the edge function on the email
           path and by `download` on the other. */}
+      {creatingInvoice && invoice && (
+        <CreateInvoiceDialog
+          candidates={[invoice.candidate]}
+          orgId={orgId}
+          today={today}
+          onClose={() => setCreatingInvoice(false)}
+          from={invoice.from}
+        />
+      )}
+
       {offer && (
         <WorkflowOffer
           orderId={orderId}

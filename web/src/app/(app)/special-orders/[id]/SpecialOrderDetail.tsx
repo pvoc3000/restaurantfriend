@@ -647,6 +647,23 @@ export async function SpecialOrderDetail({
                       orgSettings: session.orgSettings,
                       onCustomerInvoice: liveInvoice !== null,
                       today,
+                      invoice: {
+                        liveInvoiceId: liveInvoice?.id ?? null,
+                        candidate: {
+                          id,
+                          number: row.number as string,
+                          kind,
+                          status: status,
+                          title: (row.title as string | null) ?? null,
+                          event_date: (row.event_date as string | null) ?? null,
+                          customer_id: customer?.id ?? null,
+                          customer_name: customer ? customerLabel(customer) : "",
+                          shop: codeFor(kitchenId),
+                          balance: totals.balance,
+                          on_invoice: liveInvoice !== null,
+                        },
+                        from: { href: orderTabHref(id, activeTab, rawParams), label: `#${row.number as string}` },
+                      },
                     }
                   : null
               }

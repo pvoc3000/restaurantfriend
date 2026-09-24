@@ -12,6 +12,35 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-23 — SEND ▸ INVOICE GOES THROUGH A CUSTOMER INVOICE, FOR
+   EVERY ORDER.** Mark: "can we insert creating the invoice into the send
+   invoice... workflow. i.e., the user chooses send invoice, the create invoice
+   dialogue appears, the user sets it up to their liking, the invoice is
+   created, and the user is then taken to the send invoice screen". Asked
+   three things, he chose: EVERY order (not wholesale only — the "one
+   workflow" step, knowingly: regular customers now get invoice numbers from
+   1001, an order needs a linked customer, and once invoiced its money is taken
+   on the invoice); the list's Create Invoice… ALSO goes straight to Send; an
+   order already on a live invoice goes to THAT invoice's Send.
+   `customerInvoices/CreateInvoiceDialog` is the one dialog for both doors
+   (moved out of `SpecialOrderBatchActions`): refusals first, due date from
+   terms, "Create and Send $x", then `/customer-invoices/[id]?send=1` with the
+   door as the breadcrumb. The invoice page opens `SendCustomerInvoice`'s
+   compose card on arrival when `send=1` and strips the param so a reload does
+   not reopen it; cancelling leaves a draft. On the order, `SendDocument` takes
+   `invoice: { liveInvoiceId, candidate, from }` and routes ONLY Send ▸ Invoice
+   (Preview/Download ▸ Invoice still render the order's own paper; quote,
+   receipt and kitchen order are untouched). The per-order invoice send path
+   in `SendDocument` (its own pay token, `onCustomerInvoice`) is now
+   unreachable from the menu and was left in place, not deleted.
+   **A ONE-ORDER INVOICE'S PDF IS ITEMIZED**: under the order's row, each item
+   (qty × name @ price), then its discount, delivery, rush and tax, then "Paid
+   before this invoice" (a deposit) or "Order cancelled", then "This order" =
+   the line — so a regular customer still sees what they bought. Multi-order
+   invoices stay one row per order. The invoice read now carries each order's
+   items. Checked by tsc/lint/fixtures only; the PDF was not rendered (no
+   bundler here, and the pane cannot show PDFs).
+
    **Also 2026-09-23 — THE NEW-ORDER DIALOG AND THE INFO TAB'S TOP.** Mark:
    "when creating a new special order, remove the kitchen picklist and
    automatically set it to whatever the location is when the order is

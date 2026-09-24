@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -69,7 +69,11 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
           phone: view.customer?.phone ?? null,
           email: view.customer?.email ?? null,
         },
-        lines: view.lines.map((l) => ({ description: l.description, amount: l.amount })),
+        lines: view.lines.map((l) => ({
+          description: l.description,
+          amount: l.amount,
+          detail: view.lines.length === 1 ? itemDetail(l) : undefined,
+        })),
         total: view.total,
         paid: view.paid,
         balance: view.balance,
@@ -77,6 +81,34 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
     />
   ).toBlob();
   return { blob, view, settings, doc, terms };
+}
+
+/**
+ * A one-order invoice's itemization (2026-09-23): each item, then the order's
+ * own money in the order its record shows it, then anything paid before the
+ * invoice — so the rows add up to the line's amount.
+ */
+function itemDetail(l: InvoiceView["lines"][number]): { rows: { label: string; amount: number }[] } | undefined {
+  if (!l.totals) return undefined;
+  const rows: { label: string; amount: number }[] = l.items.map((i) => ({
+    label: `${i.qty % 1 === 0 ? i.qty : i.qty.toFixed(2)} × ${i.name} @ ${money(i.unit_price)}`,
+    amount: Math.round(i.qty * i.unit_price * 100) / 100,
+  }));
+  const t = l.totals;
+  if (t.discount) rows.push({ label: "Discount", amount: -t.discount });
+  if (t.deliveryCharge) rows.push({ label: "Delivery", amount: t.deliveryCharge });
+  if (t.rushFee) rows.push({ label: "Rush fee", amount: t.rushFee });
+  if (t.tax) rows.push({ label: "Tax", amount: t.tax });
+  const earlier = Math.round((t.total - l.amount) * 100) / 100;
+  if (Math.abs(earlier) >= 0.01) {
+    // A cancelled order bills nothing (128); anything else in the gap is money
+    // taken before the invoice, a deposit.
+    rows.push({
+      label: l.order?.status === "cancelled" ? "Order cancelled" : "Paid before this invoice",
+      amount: -earlier,
+    });
+  }
+  return { rows };
 }
 
 type Compose = { to: string; cc: string; subject: string; body: string };
@@ -104,6 +136,7 @@ export function SendCustomerInvoice({
   resend,
   disabled,
   children,
+  autoOpen = false,
 }: {
   id: string;
   orgId: string;
@@ -114,6 +147,12 @@ export function SendCustomerInvoice({
   /** Hands its row UP to the record's one Actions menu and keeps drawing its
    *  own compose card — `SendDocument`'s render-prop shape. */
   children: (items: ActionMenuItem[]) => ReactNode;
+  /**
+   * Open the compose card on arrival — the page was reached with `?send=1`
+   * from Create and Send, or from an order's Send ▸ Invoice (2026-09-23).
+   * Once: the param is stripped so a reload does not open it again.
+   */
+  autoOpen?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -186,6 +225,18 @@ export function SendCustomerInvoice({
       setBusy(null);
     }
   };
+
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (!autoOpen || autoOpened.current) return;
+    autoOpened.current = true;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("send");
+    window.history.replaceState(null, "", url.toString());
+    void open();
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpen]);
 
   const send = async () => {
     if (!compose || !pending) return;

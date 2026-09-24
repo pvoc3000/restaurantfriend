@@ -846,7 +846,18 @@ export type CustomerInvoiceDoc = {
   due_on: string | null;
   notes: string | null;
   customer: { name: string; phone: string | null; email: string | null };
-  lines: { description: string; amount: number }[];
+  lines: {
+    description: string;
+    amount: number;
+    /**
+     * ITEMIZED, ON A ONE-ORDER INVOICE (Mark, 2026-09-23: every order's Send ▸
+     * Invoice now goes through a customer invoice, and a regular customer was
+     * used to seeing what they ordered). The items, then the order's own
+     * discount, delivery, rush and tax, then anything paid before invoicing.
+     * Absent on a multi-order invoice, which stays one row per order.
+     */
+    detail?: { rows: { label: string; amount: number }[] };
+  }[];
   total: number;
   paid: number;
   balance: number;
@@ -892,9 +903,29 @@ export function CustomerInvoicePdf({ invoice, org }: { invoice: CustomerInvoiceD
         </View>
 
         {invoice.lines.map((l, i) => (
-          <View key={i} style={styles.row} wrap={false}>
-            <Text style={[styles.colNotes, { paddingLeft: 0 }]}>{l.description}</Text>
-            <Text style={[styles.colCost, { width: 72 }]}>{money(l.amount)}</Text>
+          <View key={i} wrap={false}>
+            <View style={styles.row}>
+              <Text style={[styles.colNotes, { paddingLeft: 0 }]}>{l.description}</Text>
+              <Text style={[styles.colCost, { width: 72 }]}>{l.detail ? "" : money(l.amount)}</Text>
+            </View>
+            {l.detail
+              ? [
+                  ...l.detail.rows.map((r, j) => (
+                    <View key={j} style={styles.row}>
+                      <Text style={[styles.colNotes, { paddingLeft: 14 }]}>{r.label}</Text>
+                      <Text style={[styles.colCost, { width: 72 }]}>{money(r.amount)}</Text>
+                    </View>
+                  )),
+                  <View key="sum" style={styles.row}>
+                    <Text style={[styles.colNotes, { paddingLeft: 14, fontFamily: "Helvetica-Bold" }]}>
+                      This order
+                    </Text>
+                    <Text style={[styles.colCost, { width: 72, fontFamily: "Helvetica-Bold" }]}>
+                      {money(l.amount)}
+                    </Text>
+                  </View>,
+                ]
+              : null}
           </View>
         ))}
 
