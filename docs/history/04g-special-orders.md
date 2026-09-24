@@ -19,8 +19,10 @@
    redeployed function records recipients), paid with a Visa: one $1.50
    `Square Online` row tagged to the invoice with Square's id; invoice paid;
    #10075 Lead → Invoice at send, → Order + Print Order at payment; the token's
-   per-line breakdown split $0.75 goods / $0.75 delivery, so Square should show
-   a Wholesale Order line and a Delivery service charge. Two faults found,
+   per-line breakdown split $0.75 goods / $0.75 delivery — CONFIRMED in Square's
+   Sales summary for DF02 DTLA (Mark's screenshot): Items $0.75, Service charges ▸
+   Delivery $0.75, Taxes $0.00, Card $1.50, Square fees ($0.34), and the item
+   categorized correctly (Mark). Two faults found,
    fixed next: (1) coming BACK to the invoice reopened the Send card — Next
    restores the page from its router cache with the original `?send=1` props,
    and a fresh mount re-ran the effect; `?send=<one-time code>` now, each code
