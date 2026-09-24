@@ -109,9 +109,16 @@ export async function CustomerInvoiceDetail({
           the right margin — every record screen's shape. */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            Invoice {numberText}
-          </h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+              Invoice {numberText}
+            </h1>
+            {invoice.voided_at ? (
+              <span className="border border-ink px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.12em]">
+                Voided
+              </span>
+            ) : null}
+          </div>
           <p className="text-sm text-muted">
             <span className={status === "overdue" ? "text-accent" : undefined}>
               {INVOICE_STATUS_LABEL[status]}
