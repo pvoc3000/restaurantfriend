@@ -438,16 +438,13 @@ export function InquiryForm({ orgId }: { orgId: string }) {
 
         {/* THE FALLBACK, always here (Mark: "If they want something we don't
             have the ability to model in this page, we should have a fall back
-            option for them"). "Anything else?" whether or not there is a basket
-            (Mark, 2026-09-24); the HINT still changes, since with nothing built
-            it is where the whole order gets described. */}
+            option for them"). "Details", with one hint (Mark, 2026-09-24): "We
+            definitely want customers to build their order rather than describe
+            it" — so the box is worded as support for the build, and as the
+            place for what the builder does not have. */}
         <Field
-          label="Anything else?"
-          hint={
-            empty
-              ? "Flavours, colours, wording on letter donuts — as much detail as you have."
-              : "Something we don’t list, colours, decorations, how to lay out the letters — anything the order above doesn’t say."
-          }
+          label="Details"
+          hint="More info on what you selected above, or if you couldn’t find what you were looking for, you can describe it here."
         >
           <textarea
             value={draft.description}
