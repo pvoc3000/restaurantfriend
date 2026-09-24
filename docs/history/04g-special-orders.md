@@ -22,7 +22,11 @@
    $x", stops at the draft and opens it) or "Open Invoice 1001" when a live
    invoice bills the order; Send ▸ Invoice still creates-and-sends. (3) more
    room under the Order number | Sold as pair (`Row` takes a `className`;
-   `sm:pb-4`), ending the top block before Event date | Event time.
+   `sm:pb-4`, then `sm:pb-8` — "even more padding"), ending the top block
+   before Event date | Event time. (4) A "Create invoice…" button LEFT of Take a
+   payment on the Payments tab, orders only and only while no invoice bills the
+   order (the same dialog, stopping at the draft); the candidate the dialog
+   needs is built once on the page (`invoiceCandidate`) for both doors.
 
    **Also 2026-09-23 — "ORDERS", AND THE KIND FILTER BY SOLD AS.** Mark:
    rename the Kind filter's "Regular Orders" → "Special Orders", "Standing

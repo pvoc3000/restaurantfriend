@@ -12,6 +12,8 @@ import {
 } from "@/lib/orderWorkflow";
 import { WorkflowOffer } from "./WorkflowOffer";
 import { RefundPayment } from "./RefundPayment";
+import { CreateInvoiceDialog } from "@/components/customerInvoices/CreateInvoiceDialog";
+import type { InvoiceCandidate } from "@/lib/customerInvoices";
 
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
@@ -55,6 +57,7 @@ export function OrderPayments({
   orgId,
   rows,
   invoice = null,
+  createInvoice = null,
   balance,
   canWrite,
   canRefund = false,
@@ -71,6 +74,12 @@ export function OrderPayments({
    * here would not count against the invoice, which would go on asking for it.
    */
   invoice?: { label: string; href: string } | null;
+  /**
+   * CREATE INVOICE, beside Take a payment (Mark, 2026-09-23) — the same
+   * dialog as the Actions menu's Create Invoice…, stopping at the draft.
+   * Offered only while no invoice bills the order.
+   */
+  createInvoice?: { candidate: InvoiceCandidate; from: { href: string; label: string } } | null;
   balance: number;
   canWrite: boolean;
   /** Manager and up — `canRefundPayments`. Offers Refund… on pay-link rows. */
@@ -87,6 +96,7 @@ export function OrderPayments({
   const [offer, setOffer] = useState<Consequence[] | null>(null);
   const [refunding, setRefunding] = useState<PaymentRow | null>(null);
   const [adding, setAdding] = useState(false);
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [amount, setAmount] = useState("");
   const [paidOn, setPaidOn] = useState<string | null>(today);
   const [type, setType] = useState(DEFAULT_PAYMENT_TYPE);
@@ -334,13 +344,30 @@ export function OrderPayments({
             ) : null}
           </div>
         ) : (
-          <button type="button" className={BUTTON_CLASS} onClick={() => setAdding(true)}>
-            Take a payment
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            {createInvoice ? (
+              <button type="button" className={BUTTON_CLASS} onClick={() => setCreatingInvoice(true)}>
+                Create invoice…
+              </button>
+            ) : null}
+            <button type="button" className={BUTTON_CLASS} onClick={() => setAdding(true)}>
+              Take a payment
+            </button>
+          </div>
         )
       ) : null}
 
       {error ? <p className="text-[13px] text-accent">{error}</p> : null}
+      {creatingInvoice && createInvoice && (
+        <CreateInvoiceDialog
+          candidates={[createInvoice.candidate]}
+          orgId={orgId}
+          today={today}
+          onClose={() => setCreatingInvoice(false)}
+          from={createInvoice.from}
+          thenSend={false}
+        />
+      )}
       {refunding && (
         <RefundPayment
           paymentId={refunding.id}

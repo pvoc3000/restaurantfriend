@@ -59,6 +59,7 @@ import { canEditPage } from "@/lib/pageAccess";
 import {
   INVOICE_STATUS_LABEL,
   SQUARE_ITEM_OPTIONS,
+  type InvoiceCandidate,
   invoiceChanged,
   invoiceNumberText,
   invoiceStatus,
@@ -434,6 +435,23 @@ export async function SpecialOrderDetail({
   const codeFor = (loc: string | null) =>
     session.locations.find((l) => l.id === loc)?.code ?? null;
 
+  /** This order as Create Invoice sees it — the Actions menu's rows and the
+   *  Payments tab's button both open the dialog with it (2026-09-23). */
+  const invoiceCandidate: InvoiceCandidate = {
+    id,
+    number: row.number as string,
+    kind,
+    status,
+    title: (row.title as string | null) ?? null,
+    event_date: (row.event_date as string | null) ?? null,
+    customer_id: customer?.id ?? null,
+    customer_name: customer ? customerLabel(customer) : "",
+    shop: codeFor(kitchenId),
+    balance: totals.balance,
+    on_invoice: liveInvoice !== null,
+  };
+  const invoiceFrom = { href: orderTabHref(id, "payments", rawParams), label: `#${row.number as string}` };
+
   // A HEAD count, and only when there is a schedule to count. It cannot join
   // the wave above: it depends on `production_schedule_id`, which arrives in
   // it. `head: true` fetches no rows — the number is all either the link's
@@ -650,19 +668,7 @@ export async function SpecialOrderDetail({
                       invoice: {
                         liveInvoiceId: liveInvoice?.id ?? null,
                         liveInvoiceLabel: liveInvoice?.label ?? null,
-                        candidate: {
-                          id,
-                          number: row.number as string,
-                          kind,
-                          status: status,
-                          title: (row.title as string | null) ?? null,
-                          event_date: (row.event_date as string | null) ?? null,
-                          customer_id: customer?.id ?? null,
-                          customer_name: customer ? customerLabel(customer) : "",
-                          shop: codeFor(kitchenId),
-                          balance: totals.balance,
-                          on_invoice: liveInvoice !== null,
-                        },
+                        candidate: invoiceCandidate,
                         from: { href: orderTabHref(id, activeTab, rawParams), label: `#${row.number as string}` },
                       },
                     }
@@ -837,7 +843,7 @@ export async function SpecialOrderDetail({
                             options={TODO_OPTIONS} value={row.todo as string | null}
                             canWrite={canWrite} ariaLabel="To-do" />
                     </Row>
-                    <Row label="Order number" className="sm:pb-4">
+                    <Row label="Order number" className="sm:pb-8">
                       <OrderNumberCell id={id} value={row.number as string} canWrite={canWrite} />
                     </Row>
                     {/* WHICH SQUARE ITEM ITS MONEY IS SOLD AS (129, Mark
@@ -846,7 +852,7 @@ export async function SpecialOrderDetail({
                         value when they are made; a hand-made order starts as
                         Special Order. An unpaid invoice line follows it. */}
                     {kind === "order" || kind === "standing_order" ? (
-                      <Row label="Sold as" className="sm:pb-4">
+                      <Row label="Sold as" className="sm:pb-8">
                         <Cell table="special_orders" id={id} column="square_item" kind="pick"
                               options={SQUARE_ITEM_OPTIONS} value={row.square_item as string}
                               canWrite={canWrite} ariaLabel="Sold as" />
@@ -1196,6 +1202,7 @@ export async function SpecialOrderDetail({
                     orderId={id}
                     orgId={row.org_id as string}
                     rows={payments}
+                    createInvoice={kind === "order" ? { candidate: invoiceCandidate, from: invoiceFrom } : null}
                     invoice={
                       liveInvoice
                         ? {
