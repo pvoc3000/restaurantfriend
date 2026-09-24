@@ -41,6 +41,7 @@ export function QuickBooksCustomerStep({
 }) {
   const supabase = createClient();
   const [customer, setCustomer] = useState<OurCustomer | null>(null);
+  const [orgName, setOrgName] = useState("");
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,12 +49,16 @@ export function QuickBooksCustomerStep({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const { data, error: e } = await supabase
-        .from("customers")
-        .select("id, legacy_id, first_name, last_name, company, email, phone, address")
-        .eq("id", customerId)
-        .maybeSingle();
+      const [{ data, error: e }, { data: org }] = await Promise.all([
+        supabase
+          .from("customers")
+          .select("id, legacy_id, first_name, last_name, company, email, phone, address")
+          .eq("id", customerId)
+          .maybeSingle(),
+        supabase.from("orgs").select("name").maybeSingle(),
+      ]);
       if (cancelled) return;
+      setOrgName((org?.name as string | undefined) ?? "");
       if (e || !data) {
         setError(e?.message ?? "That customer is gone.");
         return;
@@ -93,14 +98,14 @@ export function QuickBooksCustomerStep({
     let res = await invokeQbo(supabase, {
       mode: "create_customer",
       customer_id: customerId,
-      payload: buildQboCustomerPayload(customer),
+      payload: buildQboCustomerPayload(customer, orgName),
     });
     // The name is taken in QuickBooks: once more, with our tag on it.
     if (res.message && /6240|duplicate name|already (been )?used/i.test(res.message)) {
       res = await invokeQbo(supabase, {
         mode: "create_customer",
         customer_id: customerId,
-        payload: buildQboCustomerPayload(customer, true),
+        payload: buildQboCustomerPayload(customer, orgName, true),
       });
     }
     setBusy(false);

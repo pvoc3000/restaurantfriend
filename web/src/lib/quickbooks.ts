@@ -945,15 +945,23 @@ export function qboDisplayName(c: OurCustomer, disambiguate = false): string {
   return (disambiguate ? `${base} (${tag})` : base).slice(0, 500);
 }
 
-/** A new QuickBooks customer from our record. Blank parts are left out. */
-export function buildQboCustomerPayload(c: OurCustomer, disambiguate = false): Record<string, unknown> {
+/**
+ * A new QuickBooks customer from our record. Blank parts are left out. The
+ * note names the ORG, not this app (Mark, 2026-09-24) — design rule 2, the
+ * name read from `orgs.name`.
+ */
+export function buildQboCustomerPayload(
+  c: OurCustomer,
+  orgName: string,
+  disambiguate = false
+): Record<string, unknown> {
   const refusals = customerLinkRefusals(c);
   if (refusals.length > 0) throw new Error(refusals[0]);
   const t = (v: unknown) => (typeof v === "string" ? v.trim() : "");
   const body: Record<string, unknown> = {
     DisplayName: qboDisplayName(c, disambiguate),
     PrimaryEmailAddr: { Address: t(c.email) },
-    Notes: `restaurantfriend customer ${c.id}`,
+    Notes: [orgName.trim(), "customer", c.id].filter(Boolean).join(" "),
   };
   if (t(c.first_name)) body.GivenName = t(c.first_name).slice(0, 100);
   if (t(c.last_name)) body.FamilyName = t(c.last_name).slice(0, 100);

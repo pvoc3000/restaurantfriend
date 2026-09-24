@@ -1045,18 +1045,20 @@ test("the display name is ours, and disambiguates with a short tag of ours", () 
 });
 
 test("the new customer carries our record, blanks left out", () => {
-  const body = buildQboCustomerPayload(dana);
+  const body = buildQboCustomerPayload(dana, "Donut Friend");
   eq(body.DisplayName, "Dana Reyes", "name");
   eq(body.PrimaryEmailAddr, { Address: "Dana@Example.com" }, "email, trimmed");
   eq(body.GivenName, "Dana", "given");
   eq(body.CompanyName, undefined, "no company");
   eq(body.BillAddr, { Line1: "12 Elm St", City: "Los Angeles", CountrySubDivisionCode: "CA", PostalCode: "90026" }, "address");
   eq(body.Id, undefined, "a create names no Id");
+  eq(body.Notes, "Donut Friend customer 5b1e0c2a-1111-2222-3333-444455556666", "the org's name, not the app's");
+  eq(buildQboCustomerPayload(dana, " ").Notes, "customer 5b1e0c2a-1111-2222-3333-444455556666", "no name, no prefix");
 });
 
 test("no email, no QuickBooks customer", () => {
   ok(customerLinkRefusals({ email: "  " }).length === 1, "refused");
   let threw = false;
-  try { buildQboCustomerPayload({ ...dana, email: null }); } catch { threw = true; }
+  try { buildQboCustomerPayload({ ...dana, email: null }, "Donut Friend"); } catch { threw = true; }
   ok(threw, "the builder refuses too");
 });
