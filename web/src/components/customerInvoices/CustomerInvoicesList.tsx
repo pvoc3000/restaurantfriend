@@ -248,6 +248,8 @@ export function CustomerInvoicesList({
         defaultSort={{ key: "number", dir: "desc" }}
         columns={columns}
         rowKey={(r) => r.id}
+        // A void invoice struck through — the Orders list's cancelled row.
+        rowClassName={(r) => (r.status === "void" ? "text-faint line-through" : "")}
         storageKey="customer-invoices.v1"
         columnChooser
         empty={
