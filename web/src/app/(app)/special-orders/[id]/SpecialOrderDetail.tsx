@@ -777,12 +777,13 @@ export async function SpecialOrderDetail({
                 <section className="space-y-3">
                   <SectionHeading>Details</SectionHeading>
                   <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-                    {/* TWO PAIRS UP TOP (Mark, 2026-09-23): Order name beside
-                        Status, Order number beside Sold as — the name no
-                        longer spans the row. A template has no Sold as, so an
-                        empty cell holds its place and the pairs below do not
-                        shift along by one. */}
-                    <Row label="Order name">
+                    {/* THE TOP (Mark, 2026-09-23, second arrangement): Order
+                        name across the row, then Status | To-do — the two
+                        fields that say where the order stands and what is
+                        next — then Order number | Sold as. A template has no
+                        Sold as, so an empty cell holds its place and the pairs
+                        below do not shift along by one. */}
+                    <Row label="Order name" wide>
                       <Cell table="special_orders" id={id} column="title" value={row.title as string | null}
                             canWrite={canWrite} ariaLabel="What the order is for" />
                     </Row>
@@ -822,6 +823,13 @@ export async function SpecialOrderDetail({
                            is the one refusal an InlineValue cannot explain. */
                         <span className={READ_ONLY_VALUE}>{KIND_LABEL[kind]}</span>
                       )}
+                    </Row>
+                    <Row label="To-do">
+                      {/* Decision 4: MANUAL, with `allowNew` — the real data
+                          holds "ON HOLD" and "Adjust time to 9am or later". */}
+                      <Cell table="special_orders" id={id} column="todo" kind="pick" allowNew clearable
+                            options={TODO_OPTIONS} value={row.todo as string | null}
+                            canWrite={canWrite} ariaLabel="To-do" />
                     </Row>
                     <Row label="Order number">
                       <OrderNumberCell id={id} value={row.number as string} canWrite={canWrite} />
@@ -889,13 +897,6 @@ export async function SpecialOrderDetail({
                       <Cell table="special_orders" id={id} column="fulfillment" kind="pick"
                             options={FULFILLMENT_OPTIONS} value={(row.fulfillment as string) ?? "pickup"}
                             canWrite={canWrite} ariaLabel="Pickup or delivery" />
-                    </Row>
-                    <Row label="To-do">
-                      {/* Decision 4: MANUAL, with `allowNew` — the real data
-                          holds "ON HOLD" and "Adjust time to 9am or later". */}
-                      <Cell table="special_orders" id={id} column="todo" kind="pick" allowNew clearable
-                            options={TODO_OPTIONS} value={row.todo as string | null}
-                            canWrite={canWrite} ariaLabel="To-do" />
                     </Row>
                     <Row label="Allergies">
                       <Cell table="special_orders" id={id} column="allergen_info"
