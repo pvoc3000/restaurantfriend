@@ -582,7 +582,8 @@
    decided, applied to a circle: a native input TRANSPARENT over the drawn
    ring so it keeps focus and arrow keys, the label as the hit target, a 1px
    black ring that thickens to 2px on hover or while held (on the ROW, the
-   checkbox's measured reason), and the mark in the checkbox X's grey. */
+   checkbox's measured reason), and a BLACK dot (Mark, 2026-09-24: "the inner
+   circle … should be black" — the checkbox's X stays grey). */
 .mac-radio {
   position: relative;
   display: inline-flex;
@@ -625,7 +626,7 @@
 
 /* Chosen: a solid dot, centred, 8px across whichever edge is drawn. */
 .mac-radio input:checked + label::before {
-  background: radial-gradient(circle closest-side, #b0b0b0 0 calc(100% - 3px), #fff calc(100% - 2.5px));
+  background: radial-gradient(circle closest-side, #000 0 calc(100% - 3px), #fff calc(100% - 2.5px));
 }
 
 .mac-radio:hover label::before,
@@ -637,7 +638,7 @@
    inside of the border, which moves in by the pixel the ring gains. */
 .mac-radio:hover input:checked + label::before,
 .mac-radio:active input:checked + label::before {
-  background: radial-gradient(circle closest-side, #b0b0b0 0 calc(100% - 2px), #fff calc(100% - 1.5px));
+  background: radial-gradient(circle closest-side, #000 0 calc(100% - 2px), #fff calc(100% - 1.5px));
 }
 
 .mac-radio input:focus-visible + label::before {
@@ -656,7 +657,7 @@
 }
 
 .mac-radio input:disabled:checked + label::before {
-  background: radial-gradient(circle closest-side, #b0b0b0 0 calc(100% - 3px), #fff calc(100% - 2.5px));
+  background: radial-gradient(circle closest-side, #000 0 calc(100% - 3px), #fff calc(100% - 2.5px));
 }
 
 /* ---- .mac-stipple: the calculator's desk-accessory ground ------------------ */
