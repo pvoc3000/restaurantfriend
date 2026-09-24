@@ -36,6 +36,7 @@ const TITLES: Record<InquiryCategory, { title: string; unit: string; units: stri
   mini: { title: "Mini donuts", unit: "mini", units: "minis" },
   giant: { title: "Giant donuts", unit: "giant donut", units: "giant donuts" },
   letter: { title: "Donut letters", unit: "letter", units: "letters" },
+  extra: { title: "Extras", unit: "extra", units: "extras" },
 };
 
 /**
@@ -44,7 +45,7 @@ const TITLES: Record<InquiryCategory, { title: string; unit: string; units: stri
  * saves taps. A giant is one at a time. The number box takes ANY quantity —
  * the step is a convenience, never a rule.
  */
-const STEP: Record<Exclude<InquiryCategory, "letter">, number> = { regular: 6, mini: 6, giant: 1 };
+const STEP: Record<Exclude<InquiryCategory, "letter">, number> = { regular: 6, mini: 6, giant: 1, extra: 1 };
 
 /** A letters request's React key — never sent, only has to be unique here. */
 let keySeq = 0;
@@ -101,6 +102,7 @@ export function OrderBuilder({
   }
 
   function minimumText(cat: InquiryCategory): string {
+    if (cat === "extra") return "";
     if (cat === "mini") {
       return `${minimums.mini} minimum, ${minimums.mini_per_flavor} per flavor`;
     }
@@ -109,7 +111,9 @@ export function OrderBuilder({
     return `${n} minimum`;
   }
 
-  const categories = (["regular", "mini", "giant", "letter"] as const).filter(
+  // EXTRAS LAST (Mark, 2026-09-24: "a section at the end of the inquiry form
+  // for misc items like catering platters, utensils") — migration 134.
+  const categories = (["regular", "mini", "giant", "letter", "extra"] as const).filter(
     (c) => (byCategory.get(c) ?? []).length > 0
   );
 
@@ -129,8 +133,13 @@ export function OrderBuilder({
         const items = byCategory.get(cat) ?? [];
         const count = countOf(cat);
         const isOpen = open.has(cat);
-        const from = Math.min(...items.map((i) => i.price));
+        const priced = items.filter((i) => !i.quoted);
+        const from = priced.length ? Math.min(...priced.map((i) => i.price)) : null;
         const min = minimumText(cat);
+        const subtitle =
+          cat === "extra"
+            ? "Platters, utensils and more"
+            : `from ${money(from ?? 0)} each${min ? ` · ${min}` : ""}`;
         return (
           <div key={cat} className="border border-ink">
             <button
@@ -143,9 +152,7 @@ export function OrderBuilder({
                 <span className="block text-[16px] font-semibold uppercase tracking-[0.04em]">
                   {TITLES[cat].title}
                 </span>
-                <span className="block text-[13px] text-muted">
-                  from {money(from)} each{min ? ` · ${min}` : ""}
-                </span>
+                <span className="block text-[13px] text-muted">{subtitle}</span>
               </span>
               {count > 0 && (
                 <span className="shrink-0 bg-ink px-2 py-0.5 text-[13px] font-semibold tabular-nums text-white">
@@ -218,7 +225,9 @@ function FlavorList({
           <li key={item.id} className="flex items-start gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">
               <div className="text-[16px] leading-snug">{item.name}</div>
-              <div className="text-[14px] tabular-nums text-muted">{money(item.price)} each</div>
+              <div className="text-[14px] tabular-nums text-muted">
+                {item.quoted ? "Priced in your quote" : `${money(item.price)} each`}
+              </div>
               {item.description && (
                 <p className="mt-1 text-[13px] leading-snug text-muted">{item.description}</p>
               )}
@@ -653,7 +662,9 @@ export function BasketSummary({
             <li key={i} className="flex items-baseline gap-3 text-[15px]">
               <span className="w-10 shrink-0 text-right tabular-nums">{l.qty}×</span>
               <span className="min-w-0 flex-1 leading-snug">{l.label}</span>
-              <span className="shrink-0 tabular-nums">{money(l.total)}</span>
+              <span className="shrink-0 tabular-nums">
+                {l.quoted ? "in your quote" : money(l.total)}
+              </span>
             </li>
           ))}
         </ul>
@@ -698,6 +709,10 @@ export function BasketSummary({
             <dd className="tabular-nums">{money(estimate.total)}</dd>
           </div>
         </dl>
+      )}
+
+      {lines.some((l) => l.quoted) && (
+        <p className="text-[13px] text-muted">Plus the extras priced in your quote.</p>
       )}
 
       {lines.length > 0 && (

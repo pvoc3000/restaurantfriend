@@ -22,18 +22,24 @@
 import { LETTER_CHARACTERS } from "./specialOrderLines";
 import { DEFAULT_RUSH_TERMS, suggestedRushFee } from "./specialOrders";
 
-/** The four things the form sells. `inquiry_category` in 132 decides which an
- *  item is: a Letter cut is a letter whatever its size; otherwise the size. */
-export type InquiryCategory = "regular" | "mini" | "giant" | "letter";
+/** What the form sells. `inquiry_category` (134) decides which an item is: a
+ *  `Misc` item is an EXTRA whatever its size (platters, utensils); a Letter
+ *  cut is a letter; otherwise the size. */
+export type InquiryCategory = "regular" | "mini" | "giant" | "letter" | "extra";
 
-export const INQUIRY_CATEGORIES: InquiryCategory[] = ["regular", "mini", "giant", "letter"];
+export const INQUIRY_CATEGORIES: InquiryCategory[] = ["regular", "mini", "giant", "letter", "extra"];
 
-/** One row of `inquiry_menu` — exactly the five fields it returns. */
+/** One row of `inquiry_menu` — the five fields it returns, plus `quoted`. */
 export type InquiryMenuItem = {
   id: string;
   name: string;
   category: InquiryCategory;
+  /** 0 when `quoted`. */
   price: number;
+  /** No price yet — an EXTRA staff price by hand ("priced in your quote",
+   *  migration 134). The gate writes it at $0 with "Price to be quoted". A
+   *  donut is never offered unpriced. */
+  quoted: boolean;
   description: string | null;
 };
 
@@ -79,13 +85,19 @@ export function readMenu(raw: unknown): { items: InquiryMenuItem[]; rules: Inqui
   const items: InquiryMenuItem[] = Array.isArray(r.items)
     ? (r.items as Record<string, unknown>[])
         .filter((i) => INQUIRY_CATEGORIES.includes(i.category as InquiryCategory))
-        .map((i) => ({
-          id: String(i.id),
-          name: String(i.name),
-          category: i.category as InquiryCategory,
-          price: num(i.price, 0),
-          description: typeof i.description === "string" && i.description.trim() ? i.description : null,
-        }))
+        // Only an extra may arrive unpriced; a donut without one is not on the menu.
+        .filter((i) => i.category === "extra" || (i.price !== null && i.price !== undefined))
+        .map((i) => {
+          const quoted = i.price === null || i.price === undefined;
+          return {
+            id: String(i.id),
+            name: String(i.name),
+            category: i.category as InquiryCategory,
+            price: quoted ? 0 : num(i.price, 0),
+            quoted,
+            description: typeof i.description === "string" && i.description.trim() ? i.description : null,
+          };
+        })
     : [];
   const rules = r.rules ?? {};
   const m = (rules.minimums ?? {}) as Record<string, unknown>;
@@ -232,7 +244,7 @@ export function letterCount(req: Pick<LetterRequest, "message" | "sets">): numbe
  * ========================================================================== */
 
 export type Basket = {
-  /** Donuts, minis and giants: item id → quantity. */
+  /** Donuts, minis, giants and extras: item id → quantity. */
   qty: Record<string, number>;
   letters: LetterRequest[];
 };
@@ -247,6 +259,8 @@ export type BasketLine = {
   qty: number;
   unitPrice: number;
   total: number;
+  /** Priced in the quote, not here — shown as words, counted as $0. */
+  quoted?: boolean;
 };
 
 const cents = (x: number) => Math.round(x * 100) / 100;
@@ -313,6 +327,20 @@ export function basketLines(basket: Basket, menu: InquiryMenuItem[]): BasketLine
         });
       }
     }
+  }
+  // EXTRAS LAST (134): platters, utensils — the end of the form, as on it.
+  for (const item of menu) {
+    if (item.category !== "extra") continue;
+    const qty = Math.floor(basket.qty[item.id] ?? 0);
+    if (qty <= 0) continue;
+    lines.push({
+      category: "extra",
+      label: item.name,
+      qty,
+      unitPrice: item.price,
+      total: cents(qty * item.price),
+      ...(item.quoted ? { quoted: true } : {}),
+    });
   }
   return lines;
 }

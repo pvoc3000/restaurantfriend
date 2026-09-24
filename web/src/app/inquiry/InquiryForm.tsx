@@ -7,7 +7,6 @@ import { TimePicker } from "@/components/ui/TimePicker";
 import { createClient } from "@/lib/supabase/client";
 import {
   EMPTY_INQUIRY,
-  INQUIRY_INTEREST_OPTIONS,
   inquiryPayload,
   inquiryStateMessage,
   validateInquiry,
@@ -432,24 +431,10 @@ export function InquiryForm({ orgId }: { orgId: string }) {
           </>
         )}
 
-        {/* The coarse "interested in" question is for somebody DESCRIBING an
-            order; once they have built one, the basket says it better. */}
-        {empty && (
-          <Field label="What are you interested in?">
-            <select
-              value={draft.interest}
-              onChange={(e) => set("interest", e.target.value)}
-              className={inputClass()}
-            >
-              <option value="">Not sure yet</option>
-              {INQUIRY_INTEREST_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-          </Field>
-        )}
+        {/* NO "What are you interested in?" any more (Mark, 2026-09-24: "seems
+            unnecessary now") — the builder says it, and the box below says the
+            rest. `interest` still travels as null, so 058's column and the v1
+            form keep working. */}
 
         {/* THE FALLBACK, always here (Mark: "If they want something we don't
             have the ability to model in this page, we should have a fall back

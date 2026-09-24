@@ -28,13 +28,15 @@ import {
 } from "../../src/lib/inquiryOrder";
 
 const MENU: InquiryMenuItem[] = [
-  { id: "r1", name: "Angry Samoa", category: "regular", price: 5.45, description: null },
-  { id: "r2", name: "Promise Ring - Glazed", category: "regular", price: 3.45, description: null },
-  { id: "m1", name: "Angry Samoa", category: "mini", price: 1.9, description: null },
-  { id: "m2", name: "Mint Town", category: "mini", price: 2.25, description: null },
-  { id: "g1", name: "Angry Samoa", category: "giant", price: 15.5, description: null },
-  { id: "l1", name: "Angry Samoa", category: "letter", price: 6.6, description: null },
-  { id: "l2", name: "Promise Ring - Glazed", category: "letter", price: 4.6, description: null },
+  { id: "r1", name: "Angry Samoa", category: "regular", price: 5.45, quoted: false, description: null },
+  { id: "r2", name: "Promise Ring - Glazed", category: "regular", price: 3.45, quoted: false, description: null },
+  { id: "m1", name: "Angry Samoa", category: "mini", price: 1.9, quoted: false, description: null },
+  { id: "m2", name: "Mint Town", category: "mini", price: 2.25, quoted: false, description: null },
+  { id: "g1", name: "Angry Samoa", category: "giant", price: 15.5, quoted: false, description: null },
+  { id: "l1", name: "Angry Samoa", category: "letter", price: 6.6, quoted: false, description: null },
+  { id: "l2", name: "Promise Ring - Glazed", category: "letter", price: 4.6, quoted: false, description: null },
+  { id: "x1", name: "Catering Platter", category: "extra", price: 0, quoted: true, description: null },
+  { id: "x2", name: "Ice Cream Container - 3 Gallons", category: "extra", price: 9, quoted: false, description: null },
 ];
 
 const MINS = { regular: 24, mini: 24, mini_per_flavor: 6, letter: 10, giant: 1 };
@@ -293,9 +295,31 @@ test("readMenu: numeric strings become numbers; unknown categories drop", () => 
     ],
     rules: { minimums: { regular: "24" }, tax_rate: "0.0975", delivery_estimate: true },
   });
-  eq(m.items, [{ id: "a", name: "A", category: "regular", price: 3.45, description: null }]);
+  eq(m.items, [{ id: "a", name: "A", category: "regular", price: 3.45, quoted: false, description: null }]);
   eq([m.rules.minimums.regular, m.rules.minimums.mini, m.rules.tax_rate, m.rules.delivery_estimate], [24, 0, 0.0975, true]);
   eq(readMenu(null).items, []);
+});
+
+test("EXTRAS (134): no minimum, last in the summary, unpriced ones flagged quoted", () => {
+  eq(cats(basket({ x1: 1 })), [], "an extras-only order is fine");
+  eq(cats(basket({ r1: 12, x1: 1 })), ["regular"], "an extra does not help the donut minimum");
+  const lines = basketLines(basket({ x1: 2, x2: 1, r1: 24 }), MENU);
+  eq(lines.map((l) => [l.label, l.qty, l.total, l.quoted ?? false]), [
+    ["Angry Samoa", 24, 130.8, false],
+    ["Catering Platter", 2, 0, true],
+    ["Ice Cream Container - 3 Gallons", 1, 9, false],
+  ]);
+  eq(basketPayload(basket({ x1: 2 }), MENU).lines, [{ item_id: "x1", qty: 2 }]);
+});
+
+test("readMenu: an unpriced EXTRA stays as quoted; an unpriced donut is dropped", () => {
+  const m = readMenu({
+    items: [
+      { id: "p", name: "Catering Platter", category: "extra", price: null },
+      { id: "d", name: "Mystery Donut", category: "regular", price: null },
+    ],
+  });
+  eq(m.items.map((i) => [i.id, i.price, i.quoted]), [["p", 0, true]]);
 });
 
 test("todayIn: the org's day, not the host's", () => {

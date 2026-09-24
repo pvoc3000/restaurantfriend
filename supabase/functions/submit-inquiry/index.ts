@@ -121,10 +121,15 @@ async function itemsBlock(
 ): Promise<string> {
   const { data } = await admin
     .from("special_order_items")
-    .select("name, qty, unit_price")
+    .select("name, qty, unit_price, notes")
     .eq("order_id", orderId)
     .order("sort");
-  const lines = (data ?? []) as { name: string; qty: number | string; unit_price: number | string }[];
+  const lines = (data ?? []) as {
+    name: string;
+    qty: number | string;
+    unit_price: number | string;
+    notes: string | null;
+  }[];
   if (lines.length === 0) return "";
   const usd = (x: number) =>
     x.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -133,6 +138,9 @@ async function itemsBlock(
     const qty = Number(l.qty);
     const total = qty * Number(l.unit_price);
     subtotal += total;
+    // An unpriced EXTRA (134) is written at $0 with this note; "$0.00" in a
+    // customer's email would read as free.
+    if ((l.notes ?? "").startsWith("Price to be quoted")) return `  ${qty} × ${l.name} — priced in your quote`;
     return `  ${qty} × ${l.name} — ${usd(total)}`;
   });
   return [

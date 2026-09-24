@@ -12,6 +12,37 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
+   **Also 2026-09-24 — EXTRAS, AND NO "INTERESTED IN" (migration 134 WRITTEN,
+   NOT YET APPLIED; `submit-inquiry` changed, NOT YET REDEPLOYED).** Mark: "add
+   a section at the end of the inquiry form for misc items like catering
+   platters, utensils, etc" and "the 'what are you interested in?' field …
+   seems unnecessary now".
+   · A fifth category, `extra` = item TYPE `Misc`, and the type WINS over size —
+     which fixes a latent fault: the two 3-gallon ice cream items are Misc but
+     sized Regular, so switched on they would have been offered as DONUTS
+     (proved in the harness: `inquiry_category('Other','Regular')` was
+     'regular' before 134). `inquiry_category` takes the type as a third
+     argument; the two-argument one is dropped after the menu and the gate
+     (reproduced whole, `<<< 134`) stop calling it.
+   · None of the Misc items has a price class/tier — staff price them by hand
+     (since 2025: Catering Platter $5 on 64 of 74 lines; Utensils $0.25 to
+     $28.95; Menu Card $0–$2.50). So an EXTRA may be offered UNPRICED: the page
+     says "Priced in your quote", the summary "in your quote" plus "Plus the
+     extras priced in your quote", the gate writes $0 with the note "Price to
+     be quoted", and `{items}` in the confirmation email says "priced in your
+     quote" rather than "$0.00". A donut is still never offered unpriced. Give
+     an extra a price class and tier and it prices like anything else.
+   · No minimum on an extra; it counts toward none. Catering Platter and
+     Utensils (ea) are switched on by 134; Menu Card, the donut cakes and the
+     ice cream stay off.
+   · "What are you interested in?" is gone from the page; `interest` still
+     travels as null, so the column and the v1 form are untouched.
+   Harness (001–134 replayed): menu with an unpriced and a priced extra, an
+   extras-only basket created, 12 donuts + an extra still refused, a hidden
+   extra refused, an extra refused as a letter flavour, the v1 call, 134 rerun.
+   Browser: the live menu with two extras appended in the pane only; submits
+   intercepted.
+
    **Also 2026-09-24 — DESCRIPTIONS FROM SQUARE** (Mark: "pull the
    descriptions for the donuts … the same description is fine for the giant,
    mini, and letter version"). A one-off, local, service-role fill of
