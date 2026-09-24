@@ -75,6 +75,18 @@ export async function CustomerInvoiceDetail({
   const draft = !invoice.sent_at && !invoice.voided_at;
   const trail = parseTrail(rawParams, INVOICES_CRUMB);
   const here = `/customer-invoices/${id}`;
+  // The orders' money as it stands now, beside the frozen amount (Mark,
+  // 2026-09-23). Summed for the footer; "—" where there is none.
+  const part = (pick: (t: NonNullable<(typeof lines)[number]["totals"]>) => number) =>
+    Math.round(lines.reduce((a, l) => a + (l.totals ? pick(l.totals) : 0), 0) * 100) / 100;
+  const sums = {
+    discount: part((t) => t.discount),
+    delivery: part((t) => t.deliveryCharge),
+    tax: part((t) => t.tax),
+  };
+  const figure = (v: number | undefined, negative = false) =>
+    v ? `${negative ? "−" : ""}${money(v)}` : "—";
+
   const drifted = lines.filter(
     (l) => l.totals && lineDrift(l.amount, l.totals.balance + l.collected) !== null
   );
@@ -174,7 +186,7 @@ export async function CustomerInvoiceDetail({
             </span>
           </p>
         ) : null}
-        <table className="w-full max-w-[60rem] border-collapse text-[14px]">
+        <table className="w-full max-w-[80rem] border-collapse text-[14px]">
           <thead>
             <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
               <th className="px-3 py-2 text-left">Line</th>
@@ -184,6 +196,12 @@ export async function CustomerInvoiceDetail({
                   until the invoice is paid — it is not on the customer's
                   paper, so a sent invoice still lets it through. */}
               <th className="w-44 px-3 py-2 text-left">Sold as</th>
+              {/* The ORDER's figures today, from `orderTotals`, where Amount is
+                  the invoice's own frozen line — so when an order changes after
+                  the invoice was written, these move and Amount does not. */}
+              <th className="w-28 px-3 py-2 text-right">Discount</th>
+              <th className="w-28 px-3 py-2 text-right">Delivery</th>
+              <th className="w-28 px-3 py-2 text-right">Tax</th>
               <th className="w-32 px-3 py-2 text-right">Amount</th>
               <th className="w-32 px-3 py-2 text-right">Paid</th>
             </tr>
@@ -220,6 +238,15 @@ export async function CustomerInvoiceDetail({
                       <span className="text-muted">{SQUARE_ITEM_LABEL[l.square_item]}</span>
                     )}
                   </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-muted">
+                    {figure(l.totals?.discount, true)}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-muted">
+                    {figure(l.totals?.deliveryCharge)}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-muted">
+                    {figure(l.totals?.tax)}
+                  </td>
                   <td className="px-3 py-2 text-right tabular-nums">
                     {money(l.amount)}
                     {drift !== null ? (
@@ -238,6 +265,9 @@ export async function CustomerInvoiceDetail({
           <tfoot>
             <tr className="border-t-2 border-ink font-semibold">
               <td className="px-3 py-2" colSpan={3}>Total</td>
+              <td className="px-3 py-2 text-right tabular-nums">{figure(sums.discount, true)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{figure(sums.delivery)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{figure(sums.tax)}</td>
               <td className="px-3 py-2 text-right tabular-nums">{money(view.total)}</td>
               <td className="px-3 py-2 text-right tabular-nums">{view.paid !== 0 ? money(view.paid) : "—"}</td>
             </tr>

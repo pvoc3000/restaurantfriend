@@ -12,7 +12,12 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
-   **Shipped 2026-09-23, MIGRATION 126 WRITTEN, NOT YET APPLIED — EACH
+   **Also 2026-09-23 — THE ORDERS TABLE SHOWS DISCOUNT, DELIVERY AND TAX** beside
+   Amount and Paid (Mark: "can we also display the other payments fields"). They
+   are each ORDER's figures today from `orderTotals`, summed in the footer; Amount
+   stays the frozen line, so after an order changes those move and it does not.
+
+   **Shipped 2026-09-23, MIGRATION 126 APPLIED, `square-pay` REDEPLOYED (Mark, same day) — EACH
    INVOICE LINE SAYS WHICH SQUARE ITEM IT IS SOLD AS.** Mark, once 125 was in:
    "since we can select the wholesale or special order item with a picklist
    now, why don't we allow the user to set/change it on the invoice. It could
