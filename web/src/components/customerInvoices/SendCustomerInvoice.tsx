@@ -136,7 +136,7 @@ export function SendCustomerInvoice({
   resend,
   disabled,
   children,
-  autoOpen = false,
+  autoOpen = null,
 }: {
   id: string;
   orgId: string;
@@ -148,11 +148,13 @@ export function SendCustomerInvoice({
    *  own compose card — `SendDocument`'s render-prop shape. */
   children: (items: ActionMenuItem[]) => ReactNode;
   /**
-   * Open the compose card on arrival — the page was reached with `?send=1`
-   * from Create and Send, or from an order's Send ▸ Invoice (2026-09-23).
-   * Once: the param is stripped so a reload does not open it again.
+   * Open the compose card on arrival — the page was reached with
+   * `?send=<code>` from Create and Send, or from an order's Send ▸ Invoice
+   * (2026-09-23). ONCE PER CODE: the code is remembered in sessionStorage, so
+   * coming back to the page from Next's cache — which still carries the
+   * original URL's props — does not open it again.
    */
-  autoOpen?: boolean;
+  autoOpen?: string | null;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -230,10 +232,21 @@ export function SendCustomerInvoice({
   useEffect(() => {
     if (!autoOpen || autoOpened.current) return;
     autoOpened.current = true;
+    const key = `rf.invoice-send.${autoOpen}`;
+    try {
+      if (window.sessionStorage.getItem(key)) return;
+      window.sessionStorage.setItem(key, "1");
+    } catch {
+      // Storage unavailable (private window): the ref still stops a repeat
+      // within this mount, which is the best available.
+    }
     const url = new URL(window.location.href);
     url.searchParams.delete("send");
     window.history.replaceState(null, "", url.toString());
-    void open();
+    // A tick later, outside the effect body (React's set-state-in-effect
+    // rule). Not cancelled on cleanup: development's double effect run would
+    // cancel the only opening, since the ref already stops the second.
+    queueMicrotask(() => void open());
     // Once, on arrival.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpen]);

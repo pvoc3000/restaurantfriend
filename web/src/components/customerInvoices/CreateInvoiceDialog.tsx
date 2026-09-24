@@ -13,6 +13,7 @@ import {
   createRefusals,
   invoiceLinesFor,
   readInvoiceTerms,
+  sendIntent,
   type InvoiceCandidate,
 } from "@/lib/customerInvoices";
 
@@ -93,7 +94,7 @@ export function CreateInvoiceDialog({
       setError(e.message);
       return;
     }
-    const href = `/customer-invoices/${data as string}?send=1`;
+    const href = `/customer-invoices/${data as string}?send=${sendIntent()}`;
     router.push(from ? withFrom(href, from) : href);
   }
 

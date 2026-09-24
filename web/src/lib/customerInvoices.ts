@@ -221,6 +221,17 @@ export function invoiceLinesFor(
     }));
 }
 
+/**
+ * A ONE-TIME CODE FOR "OPEN SEND ON ARRIVAL" (`?send=<code>`). A bare
+ * `?send=1` reopened the card every time the page came back from Next's
+ * cache — Mark, 2026-09-23: "I navigated away from the invoice, then back
+ * again and … the send invoice by email panel popped up". The invoice page
+ * remembers each code it has acted on, for the tab's lifetime.
+ */
+export function sendIntent(): string {
+  return Math.random().toString(36).slice(2, 10);
+}
+
 /* ==========================================================================
  * TERMS AND NAMES — `orgs.settings.customer_invoices`, design rule 2
  * ========================================================================== */

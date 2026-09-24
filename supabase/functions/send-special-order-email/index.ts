@@ -494,6 +494,40 @@ async function sendCustomerInvoice(
     warnings.push(`the invoice and its orders were not marked sent: ${markError.message}`);
   }
 
+  // A COPY ON EACH ORDER'S DOCUMENTS TAB (Mark, 2026-09-23: "a copy of the
+  // invoice should be added to the special order document after sending it").
+  // Its OWN object per order, under the order's folder like every document
+  // there, so deleting it from one order cannot take it from another or from
+  // the invoice's Sent history.
+  const { data: invoiceLines } = await supabase
+    .from("customer_invoice_lines")
+    .select("special_order_id")
+    .eq("invoice_id", invoice.id);
+  for (const orderId of [...new Set((invoiceLines ?? []).map((l) => l.special_order_id as string))]) {
+    const copyPath = `${invoice.org_id}/${orderId}/${crypto.randomUUID()}.pdf`;
+    const { error: copyError } = await supabase.storage
+      .from("special-order-attachments")
+      .upload(copyPath, bytes, { contentType: "application/pdf" });
+    if (copyError) {
+      warnings.push(`the invoice was not filed on an order: ${copyError.message}`);
+      continue;
+    }
+    const { error: rowError } = await supabase.from("special_order_attachments").insert({
+      org_id: invoice.org_id,
+      order_id: orderId,
+      kind: "invoice_document",
+      storage_path: copyPath,
+      file_name: filename,
+      content_type: "application/pdf",
+      byte_size: bytes.byteLength,
+      uploaded_by: user.id,
+    });
+    if (rowError) {
+      await supabase.storage.from("special-order-attachments").remove([copyPath]);
+      warnings.push(`the invoice was not recorded on an order: ${rowError.message}`);
+    }
+  }
+
   if (pay_token) {
     const { error: supersedeError } = await supabase
       .from("special_order_pay_tokens")

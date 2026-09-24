@@ -12,6 +12,23 @@
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Verified live 2026-09-23 — THE FIRST CUSTOMER INVOICE, SENT AND PAID.**
+   Invoice 1001 (a new 1001 after the draft was deleted) for one-off wholesale
+   order #10075 ($0.75 goods untaxed + $0.75 delivery): created from the order,
+   sent to mark@ and specialorders@ (the Sent row carries both — so the
+   redeployed function records recipients), paid with a Visa: one $1.50
+   `Square Online` row tagged to the invoice with Square's id; invoice paid;
+   #10075 Lead → Invoice at send, → Order + Print Order at payment; the token's
+   per-line breakdown split $0.75 goods / $0.75 delivery, so Square should show
+   a Wholesale Order line and a Delivery service charge. Two faults found,
+   fixed next: (1) coming BACK to the invoice reopened the Send card — Next
+   restores the page from its router cache with the original `?send=1` props,
+   and a fresh mount re-ran the effect; `?send=<one-time code>` now, each code
+   remembered in sessionStorage (`sendIntent`); (2) the sent PDF never reached
+   the order's Documents tab — `send-special-order-email` now uploads a copy
+   per order under `{org}/{order}/` and records an `invoice_document`
+   attachment (NEEDS A REDEPLOY). #10075's own copy was not backfilled.
+
    **Shipped 2026-09-23 — SEND ▸ INVOICE GOES THROUGH A CUSTOMER INVOICE, FOR
    EVERY ORDER.** Mark: "can we insert creating the invoice into the send
    invoice... workflow. i.e., the user chooses send invoice, the create invoice

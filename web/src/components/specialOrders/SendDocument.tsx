@@ -42,7 +42,7 @@ import {
 } from "@/lib/orderWorkflow";
 import { WorkflowOffer } from "./WorkflowOffer";
 import { CreateInvoiceDialog } from "@/components/customerInvoices/CreateInvoiceDialog";
-import type { InvoiceCandidate } from "@/lib/customerInvoices";
+import { sendIntent, type InvoiceCandidate } from "@/lib/customerInvoices";
 import { withFrom } from "@/lib/breadcrumbs";
 import { renderOrderDocument } from "./renderOrderDocument";
 
@@ -370,7 +370,7 @@ export function SendDocument({
   const sendAct = (k: DocumentKind) => {
     if (k !== "invoice" || !invoice) return void openCompose(k);
     if (invoice.liveInvoiceId) {
-      router.push(withFrom(`/customer-invoices/${invoice.liveInvoiceId}?send=1`, invoice.from));
+      router.push(withFrom(`/customer-invoices/${invoice.liveInvoiceId}?send=${sendIntent()}`, invoice.from));
       return;
     }
     setCreatingInvoice(true);

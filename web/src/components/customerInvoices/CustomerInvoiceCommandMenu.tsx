@@ -49,7 +49,7 @@ export function CustomerInvoiceCommandMenu({
   paid,
   today,
   canWrite,
-  autoSend = false,
+  autoSend = null,
 }: {
   id: string;
   orgId: string;
@@ -60,8 +60,8 @@ export function CustomerInvoiceCommandMenu({
   /** The ORG's calendar day — what a payment and a void are dated. */
   today: string;
   canWrite: boolean;
-  /** Reached with `?send=1`: open Send at once (Create and Send). */
-  autoSend?: boolean;
+  /** Reached with `?send=<code>`: open Send once for that code. */
+  autoSend?: string | null;
 }) {
   const supabase = createClient();
   const router = useRouter();
