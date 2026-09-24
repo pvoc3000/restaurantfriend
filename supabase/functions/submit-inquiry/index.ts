@@ -49,6 +49,7 @@ import {
   type ProviderConfig,
 } from "../_shared/email.ts";
 import { quoteDelivery } from "../_shared/deliveryQuote.ts";
+import { buildInquiryNotice } from "../_shared/inquiryNotice.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -209,6 +210,113 @@ async function estimateDelivery(
   }
 }
 
+/**
+ * THE NEW-INQUIRY NOTICE to the shop (Mark, 2026-09-24): an HTML email with
+ * everything submitted, to `special_orders.inquiry_notify` (one address or
+ * several, comma-separated; empty turns it off). Read from the LEAD, so it
+ * shows what the gate wrote — its prices, the delivery estimate, and no
+ * address on a pickup. Sent from the module's own mailbox with the CUSTOMER
+ * as Reply-To, so answering it reaches them. Logs where it went, or why not.
+ */
+async function notifyShop(orgId: string, orderId: string): Promise<string> {
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!serviceKey) return "none";
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+  const log = (message: string) =>
+    admin.from("special_order_events").insert({
+      org_id: orgId,
+      order_id: orderId,
+      message,
+      author: "Website",
+      source: "app",
+    });
+  try {
+    const { data: org } = await admin.from("orgs").select("name, settings").eq("id", orgId).maybeSingle();
+    const settings = (org?.settings ?? {}) as {
+      email_provider?: ProviderConfig;
+      special_orders?: { email_provider?: ProviderConfig; reply_to?: string; inquiry_notify?: string };
+      billing?: { email?: string };
+    };
+    const to = (settings.special_orders?.inquiry_notify ?? "")
+      .split(/[,;]/)
+      .map((a) => a.trim())
+      .filter(Boolean);
+    if (to.length === 0) return "off";
+
+    const { data: o, error } = await admin
+      .from("special_orders")
+      .select(
+        "number, title, contact_name, contact_email, contact_phone, event_date, event_time, fulfillment, " +
+          "delivery_address, delivery_distance, delivery_charge, allergen_info, source_payload, " +
+          "locations(name, public_name)"
+      )
+      .eq("id", orderId)
+      .maybeSingle();
+    if (error || !o) throw new Error(error?.message ?? "the lead could not be read back");
+    const row = o as unknown as Record<string, unknown> & {
+      locations: { name: string; public_name: string | null } | null;
+      source_payload: { inquiry?: { description?: string | null } } | null;
+    };
+    const { data: lines } = await admin
+      .from("special_order_items")
+      .select("name, qty, unit_price, notes")
+      .eq("order_id", orderId)
+      .order("sort");
+
+    const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+    const appUrl = (Deno.env.get("APP_URL") ?? "").replace(/\/+$/, "");
+    const notice = buildInquiryNotice(
+      {
+        number: String(row.number),
+        title: (row.title as string | null) ?? null,
+        contact_name: (row.contact_name as string | null) ?? null,
+        contact_email: (row.contact_email as string | null) ?? null,
+        contact_phone: (row.contact_phone as string | null) ?? null,
+        event_date: (row.event_date as string | null) ?? null,
+        event_time: (row.event_time as string | null) ?? null,
+        fulfillment: (row.fulfillment as string | null) ?? null,
+        delivery_address: (row.delivery_address as string | null) ?? null,
+        delivery_distance: num(row.delivery_distance),
+        delivery_charge: num(row.delivery_charge),
+        shop: row.locations ? row.locations.public_name?.trim() || row.locations.name : null,
+        allergen_info: (row.allergen_info as string | null) ?? null,
+        details: row.source_payload?.inquiry?.description?.trim() || null,
+      },
+      ((lines ?? []) as { name: string; qty: unknown; unit_price: unknown; notes: string | null }[]).map((l) => ({
+        name: l.name,
+        qty: Number(l.qty),
+        unit_price: Number(l.unit_price),
+        notes: l.notes,
+      })),
+      appUrl ? `${appUrl}/special-orders/${orderId}` : null
+    );
+
+    const transport = resolveTransport({
+      explicit: settings.special_orders?.email_provider,
+      orgProvider: settings.email_provider,
+      orgName: org?.name ?? "Orders",
+      replyToFallbacks: [settings.special_orders?.reply_to, settings.billing?.email],
+    });
+    await sendMail(transport, {
+      // The first address as To and any others as Cc: Resend reads `to` as ONE
+      // address, while `cc` is split on commas by both providers.
+      to: to[0],
+      cc: to.length > 1 ? to.slice(1).join(", ") : undefined,
+      subject: notice.subject,
+      text: notice.text,
+      html: notice.html,
+      replyTo: (row.contact_email as string | null) ?? undefined,
+    });
+    await log(`New-inquiry notice emailed to ${to.join(", ")}`);
+    return "sent";
+  } catch (e) {
+    const why = e instanceof Error ? e.message : String(e);
+    console.error("submit-inquiry notice", why);
+    await log(`Inquiry recorded, but the new-inquiry notice was not sent: ${why}`);
+    return "error";
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -298,12 +406,19 @@ Deno.serve(async (req) => {
     // Like the email, a failure here is bookkeeping and never an error.
     const deliveryNote = await estimateDelivery(state.org_id, state.order_id, fulfillment, address);
 
+    /* ---- 1c. TELL THE SHOP --------------------------------------------- */
+
+    // Every created lead, phone-only included, and AFTER the delivery estimate
+    // so the notice carries it. Bookkeeping like the confirmation: a failure is
+    // a warning in the order's log, never an error to the customer.
+    const noticeNote = await notifyShop(state.org_id, state.order_id);
+
     /* ---- 2. THE CONFIRMATION, AND THE THREAD ROOT ----------------------- */
 
     if (!state.contact_email) {
       // A phone-only inquiry is a real submission and there is nobody to write
       // to. Not a failure, and not worth a warning in the log either.
-      return json(200, { ...state, delivery: deliveryNote });
+      return json(200, { ...state, delivery: deliveryNote, notice: noticeNote });
     }
 
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -407,6 +522,7 @@ Deno.serve(async (req) => {
     return json(200, {
       ...state,
       delivery: deliveryNote,
+      notice: noticeNote,
       warning: warnings.length ? warnings.join("; ") : undefined,
     });
   } catch (e) {

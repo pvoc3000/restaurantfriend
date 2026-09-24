@@ -12,8 +12,28 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
-   **Also 2026-09-24 — A DELIVERY NEEDS AN ADDRESS (migration 136 WRITTEN,
-   NOT YET APPLIED).** Mark: "yes, require the address for delivery". 136
+   **Also 2026-09-24 — THE SHOP IS TOLD (migration 137 WRITTEN, NOT YET
+   APPLIED; `submit-inquiry` changed, NOT YET REDEPLOYED).** Mark: "create a
+   nice html email that includes all the submitted info and send it to
+   specialorders@donutfriend.com so we know". `_shared/inquiryNotice.ts`
+   (pure, fixture-tested) builds it from the LEAD as the gate wrote it — the
+   server's prices, the delivery estimate, no address on a pickup: a header
+   with the number, name, occasion and when; an "Open inquiry" button
+   (`APP_URL/special-orders/{id}`, omitted without the secret); who and when
+   (mailto/tel links); the order with an estimated subtotal, unpriced extras
+   "to be quoted" and a letter line's own `"H"` note hidden; details; and a
+   plain-text part. Email-safe HTML (tables, inline styles). Sent by
+   `notifyShop` for every created lead, phone-only included, AFTER the
+   delivery estimate, from the module's mailbox with the CUSTOMER as
+   Reply-To; logged on the order either way. The address is
+   `special_orders.inquiry_notify` (design rule 2), seeded by 137 from the
+   module's own `email_cc` (specialorders@) so no migration names a mailbox;
+   Settings ▸ Messages ▸ "Tell us about new inquiries at"; several addresses
+   → the first is To and the rest Cc (Resend reads `to` as ONE address);
+   empty turns it off. Looked at rendered in the browser pane.
+
+   **Also 2026-09-24 — A DELIVERY NEEDS AN ADDRESS (migration 136 APPLIED by
+   Mark).** Mark: "yes, require the address for delivery". 136
    reproduces 135's gate with one check, `address_required` when the
    fulfillment is delivery and the address blank; the page marks Address
    (shown only for delivery) with the same `*` and says "Where are we

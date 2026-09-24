@@ -446,6 +446,28 @@ export function SpecialOrderSettings({
               : <span>{text(so.approval_cc) ?? "the sending mailbox"}</span>}
           </dd>
         </div>
+
+        {/* THE NEW-INQUIRY NOTICE (Mark, 2026-09-24; migration 137). Not a
+            copy of anything the customer receives — its own message, with
+            everything they submitted, sent the moment the website creates the
+            lead. Empty really is nobody here: the notice is not sent. */}
+        <div className="max-w-2xl space-y-1 border-t border-hairline pt-5">
+          <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+            Tell us about new inquiries at
+          </dt>
+          <dd>
+            {editable
+              ? cell(["special_orders", "inquiry_notify"], text(so.inquiry_notify), {
+                  placeholder: "nobody",
+                  ariaLabel: "New-inquiry notice goes to",
+                })
+              : <span>{text(so.inquiry_notify) ?? "nobody"}</span>}
+          </dd>
+          <p className="text-[12px] text-subtle">
+            Everything a customer submits on the website, as one email. Several
+            addresses are separated by commas; leave empty for none.
+          </p>
+        </div>
       </section>
       {/* ---- the public form ---------------------------------------- */}
       <section className="space-y-4">
