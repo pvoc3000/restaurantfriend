@@ -25,6 +25,7 @@ import {
 } from "@/lib/filterMenus";
 import { sortRows } from "@/lib/tableSort";
 import { InvoiceStatusChip } from "./InvoiceStatusChip";
+import { CheckQuickBooksPayments } from "./QuickBooksPaymentCheck";
 import { money } from "@/lib/specialOrders";
 import { usDate } from "@/lib/specialOrderDocs";
 import {
@@ -224,6 +225,12 @@ export function CustomerInvoicesList({
         values={filters}
         onChange={changeFilters}
         showCount={false}
+        trailing={
+          // Only while there is a QuickBooks invoice still waiting on money.
+          rows.some((r) => r.processor === "quickbooks" && (r.status === "sent" || r.status === "overdue" || r.status === "changed"))
+            ? <CheckQuickBooksPayments />
+            : undefined
+        }
         leading={
           <div className={`${SEARCH_PEN} space-y-1.5`}>
             <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">

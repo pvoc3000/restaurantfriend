@@ -357,3 +357,20 @@
    PDF attached, the link step for an unlinked customer — and NO email, and the
    invoice is not marked sent. Once an invoice is in QuickBooks its Collect
    through is read-only even as a draft; void it to change its mind.
+
+   **THE WEBHOOK GOT A BACKUP: `sync_qbo_payments` (2026-09-24).** Two paid
+   test invoices (1006 and the next) and not one invocation of `qbo-webhook` —
+   the first because Payment was not subscribed in Intuit's portal, the second
+   with it subscribed and still nothing. Intuit's own guidance is that
+   notifications can be missed, so the app now also ASKS: `qbo-sync`
+   `sync_qbo_payments` reads each open, pushed QuickBooks invoice's LinkedTxn
+   (`select *` — named properties are not always queryable), reads those
+   payments, and records each one's share through `record_qbo_invoice_payment`,
+   the webhook's own step, so whichever arrives first wins. Run when an open
+   QuickBooks invoice is opened (`QuickBooksPaymentCheck`, silent unless it
+   records something) and from **Check QuickBooks for Payments** on the
+   Invoices list, shown while a QuickBooks invoice is waiting on money. Both
+   query shapes were checked read-only against 1006/550739 before deploying.
+   This is the "A/R pull" killed on 2026-09-02, reopened with the experiment:
+   it still stores nothing QuickBooks-side — the payment row here is the one
+   record.

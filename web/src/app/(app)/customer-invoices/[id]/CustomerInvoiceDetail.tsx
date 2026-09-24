@@ -24,6 +24,7 @@ import { CustomerInvoiceCommandMenu } from "@/components/customerInvoices/Custom
 import { CustomerInvoiceLinesTable } from "@/components/customerInvoices/CustomerInvoiceLinesTable";
 import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
 import { ProcessorField } from "@/components/customerInvoices/ProcessorField";
+import { QuickBooksPaymentCheck } from "@/components/customerInvoices/QuickBooksPaymentCheck";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { canEditPage } from "@/lib/pageAccess";
 
@@ -300,6 +301,9 @@ export async function CustomerInvoiceDetail({
 
       <section className="space-y-2">
         <SectionHeading count={payments.length}>Payments</SectionHeading>
+        {canWrite && processor === "quickbooks" && qbo?.id && !invoice.paid_at && !invoice.voided_at ? (
+          <QuickBooksPaymentCheck id={id} />
+        ) : null}
         {payments.length === 0 ? (
           <p className="text-sm text-muted">Nothing paid yet.</p>
         ) : (

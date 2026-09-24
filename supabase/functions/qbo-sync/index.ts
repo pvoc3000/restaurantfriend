@@ -25,6 +25,8 @@
 //   customers      → QBO customers, for the mapping picker on a customer
 //   tax_codes      → QBO tax codes, for the settings picker (084)
 //   push_invoice   → send one special order to QuickBooks as an Invoice
+//   sync_qbo_payments → record what QuickBooks Payments took on our open
+//                    QuickBooks invoices (the webhook's backup)
 //   push_customer_invoice → send one customer invoice routed to QuickBooks
 //                    (131), and hand back its pay link (InvoiceLink)
 //   void_customer_invoice → void that invoice in QuickBooks
@@ -1748,6 +1750,97 @@ Deno.serve(async (req) => {
         // is not an update, it is a CREATE, which duplicates the invoice.
         ref,
       });
+    }
+
+    // -----------------------------------------------------------------------
+    // sync_qbo_payments — what QuickBooks Payments took on our invoices
+    // -----------------------------------------------------------------------
+    //
+    // The webhook's BACKUP (Mark, 2026-09-24, after two paid test invoices and
+    // no notice from Intuit at all). Intuit's own guidance is that webhooks can
+    // be missed and a poll should catch up; this is that poll, run when an
+    // invoice is opened and from the Invoices list. It records through
+    // `record_qbo_invoice_payment`, the webhook's own step, so whichever gets
+    // there first wins and the other finds a duplicate. The amounts, dates and
+    // links are QuickBooks'; this app still holds the only record of who paid.
+    //
+    // Only OPEN invoices routed to QuickBooks and pushed there are asked about:
+    // the invoice's LinkedTxn names its payments, and each payment is read for
+    // the share it applied to THIS invoice (one payment can cover several).
+    if (mode === "sync_qbo_payments") {
+      const writers = ["owner", "admin", "purchaser", "supervisor"];
+      if (!writers.includes(role)) {
+        return json(403, { error: "Recording payments needs supervisor access or above." });
+      }
+      const req = body as unknown as { customer_invoice_id?: string };
+      let q = supabase
+        .from("customer_invoices")
+        .select("id, number, external_ref")
+        .eq("processor", "quickbooks")
+        .is("voided_at", null)
+        .is("paid_at", null)
+        .not("external_ref->qbo->>id", "is", null);
+      if (req.customer_invoice_id) q = q.eq("id", req.customer_invoice_id);
+      const { data: open, error: openErr } = await q;
+      if (openErr) return json(500, { error: openErr.message });
+
+      const ours = new Map<string, { id: string; number: number }>();
+      for (const r of open ?? []) {
+        const qid = (r.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id;
+        if (qid) ours.set(String(qid), { id: r.id as string, number: r.number as number });
+      }
+      const recorded: { number: number; amount: number; payment: string }[] = [];
+      const problems: string[] = [];
+      const ids = [...ours.keys()];
+
+      for (let i = 0; i < ids.length; i += 30) {
+        const chunk = ids.slice(i, i + 30);
+        // `select *`: a property QuickBooks returns is not therefore one it
+        // lets you NAME (the VendorCredit Balance lesson).
+        const invQ = `select * from Invoice where Id in (${chunk.map(qboQuote).join(", ")})`;
+        const invRes = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(invQ)}`)) as {
+          QueryResponse?: { Invoice?: { Id?: unknown; LinkedTxn?: { TxnId?: unknown; TxnType?: unknown }[] }[] };
+        };
+        const paymentIds = new Set<string>();
+        for (const inv of invRes.QueryResponse?.Invoice ?? []) {
+          for (const t of inv.LinkedTxn ?? []) {
+            if (t.TxnType === "Payment" && t.TxnId) paymentIds.add(String(t.TxnId));
+          }
+        }
+        if (paymentIds.size === 0) continue;
+
+        const payQ = `select * from Payment where Id in (${[...paymentIds].map(qboQuote).join(", ")})`;
+        const payRes = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(payQ)}`)) as {
+          QueryResponse?: {
+            Payment?: {
+              Id?: unknown;
+              TxnDate?: string;
+              Line?: { Amount?: unknown; LinkedTxn?: { TxnId?: unknown; TxnType?: unknown }[] }[];
+            }[];
+          };
+        };
+        for (const p of payRes.QueryResponse?.Payment ?? []) {
+          for (const line of p.Line ?? []) {
+            for (const t of line.LinkedTxn ?? []) {
+              if (t.TxnType !== "Invoice") continue;
+              const mine = ours.get(String(t.TxnId));
+              if (!mine) continue;
+              const amount = Number(line.Amount ?? 0);
+              const { data: said, error: recErr } = await admin.rpc("record_qbo_invoice_payment", {
+                p_realm: conn.realm_id,
+                p_qbo_invoice: String(t.TxnId),
+                p_amount: amount,
+                p_payment_id: String(p.Id),
+                p_paid_on: p.TxnDate ?? null,
+              });
+              if (recErr) problems.push(`Invoice ${mine.number}: ${recErr.message}`);
+              else if (said === "recorded") recorded.push({ number: mine.number, amount, payment: String(p.Id) });
+            }
+          }
+        }
+      }
+
+      return json(200, { checked: ids.length, recorded, problems });
     }
 
     // -----------------------------------------------------------------------
