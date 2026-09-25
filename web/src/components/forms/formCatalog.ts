@@ -13,6 +13,7 @@ export const FORM_GROUPS = [
       { key: "signed-quote-app", label: "Signed quote · app style (draft)" },
       { key: "signed-quote", label: "Signed quote" },
       { key: "kitchen-order", label: "Kitchen order" },
+      { key: "kitchen-order-app", label: "Kitchen order · app style (draft)" },
       { key: "invoice", label: "Invoice (order)" },
       { key: "invoice-app", label: "Invoice · app style (draft)" },
       { key: "receipt", label: "Receipt" },

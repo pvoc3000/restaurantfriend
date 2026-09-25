@@ -139,6 +139,10 @@ async function buildElement(
         />
       );
     }
+    case "kitchen-order-app": {
+      const { KitchenOrderAppStylePdf } = await import("./pdf/OrderDocumentAppStylePdf");
+      return <KitchenOrderAppStylePdf orders={[s.sampleQuoteOrder]} org={docOrg} printedOn="2026-09-25" />;
+    }
     case "kitchen-order": {
       const { KitchenOrderPdf } = await import("@/components/specialOrders/pdf/SpecialOrderPdfs");
       return <KitchenOrderPdf orders={[s.sampleQuoteOrder]} org={docOrg} printedOn="2026-09-25" />;

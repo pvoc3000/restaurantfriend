@@ -35,7 +35,10 @@
 import { Document, Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
   DOCUMENT_LABEL,
+  sizeClassGroups,
+  taxonomyLine,
   usTime,
+  usWeekday,
   type DocOrg,
   type OrderDocData,
 } from "@/lib/specialOrderDocs";
@@ -52,6 +55,7 @@ const MUTED = "#545454"; // --rf-neutral-600, secondary text
 const SUBTLE = "#757575"; // --rf-neutral-500, captions and labels
 const HAIRLINE = "#e4e4e4"; // --rf-neutral-200
 const MARK_FILL = "#ffe98a"; // --rf-yellow-200
+const STOP_FILL = "#ffcfc9"; // --rf-red-200, "stop"
 
 /* Tracking, as the app sets it: +0.06em for names and commands, +0.12em for
    labels. react-pdf takes letterSpacing in points, so it is per size. */
@@ -221,6 +225,37 @@ const s = StyleSheet.create({
     paddingTop: 6,
   },
   footerText: { ...caps(6.5, 0.12), color: SUBTLE },
+
+  /* ---- kitchen order ---- */
+  stats: { flexDirection: "row", gap: 22, marginTop: 20 },
+  stat: { flexGrow: 1, flexBasis: 0 },
+  statValue: { fontSize: 20, fontFamily: "Helvetica-Bold", marginTop: 2 },
+  statSub: { ...caps(7.5, 0.12), color: SUBTLE, marginTop: 3 },
+  statMarked: { backgroundColor: MARK_FILL, paddingHorizontal: 6, paddingVertical: 3, alignSelf: "flex-start" },
+  /* DataTable's group band: black, white caps. */
+  groupBand: {
+    ...caps(7.5, 0.12),
+    fontFamily: "Helvetica-Bold",
+    color: "#fff",
+    backgroundColor: INK,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    marginTop: 8,
+  },
+  kRow: { flexDirection: "row", paddingVertical: 5, alignItems: "flex-start" },
+  kQty: { width: 44, fontSize: 13, fontFamily: "Helvetica-Bold", paddingLeft: 6 },
+  kItem: { width: 250, paddingRight: 12 },
+  kNotes: { flexGrow: 1, flexBasis: 0, color: MUTED },
+  taxonomy: { fontSize: 7.5, color: SUBTLE, marginTop: 2 },
+  endOfList: { flexDirection: "row", alignItems: "center", marginTop: 16 },
+  endRule: { flexGrow: 1, borderTopWidth: 0.75, borderTopColor: HAIRLINE },
+  endText: { ...caps(7, 0.12), color: SUBTLE, marginHorizontal: 10 },
+  allergen: { flexDirection: "row", marginTop: 18, paddingHorizontal: 10, paddingVertical: 8 },
+  allergenLabel: { ...caps(7, 0.12), fontFamily: "Helvetica-Bold", width: 118, paddingTop: 1.5 },
+  allergenText: { flexGrow: 1, flexBasis: 0, fontSize: 10, fontFamily: "Helvetica-Bold" },
+  handoff: { marginTop: 22 },
+  boxGrid: { flexDirection: "row", gap: 16, marginBottom: 10 },
+  boxCell: { flexGrow: 1, flexBasis: 0 },
 });
 
 function money(value: number): string {
@@ -458,6 +493,202 @@ export function OrderDocumentAppStylePdf({
             <View style={s.footer} fixed>
               <Text style={s.footerText}>
                 {org.name} · {label} {order.number}
+              </Text>
+              <Text
+                style={s.footerText}
+                render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+              />
+            </View>
+          </Page>
+        );
+      })}
+    </Document>
+  );
+}
+
+/* ==========================================================================
+ * THE KITCHEN ORDER
+ * ========================================================================== */
+
+/** A box somebody writes in — the signature box's dress, with an optional
+ *  value already printed where the record knows it. */
+function WriteBox({ label, value }: { label: string; value?: string | number | null }) {
+  const v = value === null || value === undefined ? "" : String(value);
+  return (
+    <View style={s.boxCell}>
+      <Text style={s.signLabel}>{label}</Text>
+      <View style={s.signBox}>{v ? <Text style={s.signValue}>{v}</Text> : null}</View>
+    </View>
+  );
+}
+
+/**
+ * The production sheet in the app's language (Mark, 2026-09-25). NO MONEY, as
+ * on the original — a decorator is being told what to make — and `Misc` lines
+ * never reach it (`sizeClassGroups`).
+ *
+ * What the record KNOWS prints as fields; what the kitchen WRITES is a box
+ * (completed by, received, and the tracking number and box count when the
+ * record does not have them yet). The size classes are `DataTable`'s black
+ * group bands. The pickup time keeps the sheet's one yellow fill — it is the
+ * fact somebody misses — and an allergen warning takes the red "stop" fill,
+ * because it is one.
+ */
+export function KitchenOrderAppStylePdf({
+  orders,
+  org,
+  printedOn,
+}: {
+  orders: OrderDocData[];
+  org: DocOrg;
+  /** The org's today, `YYYY-MM-DD` — what AS OF means (see `KitchenOrderPdf`). */
+  printedOn?: string;
+}) {
+  return (
+    <Document>
+      {orders.map((order) => {
+        const groups = sizeClassGroups(order.lines);
+        const delivery = order.fulfillment === "delivery";
+        const time = usTime(order.ready_by_time ?? order.event_time);
+        const asOf = printedOn ?? order.event_date;
+        return (
+          <Page key={order.id} size="LETTER" style={s.page}>
+            <View style={s.masthead} fixed>
+              <Text style={s.wordmark}>{org.name}</Text>
+              <View style={s.mastheadRight}>
+                <Text style={s.mastheadLine}>Kitchen order {order.number}</Text>
+                {asOf ? <Text style={s.mastheadLine}>As of {asOf}</Text> : null}
+              </View>
+            </View>
+
+            <View style={s.body}>
+              <View style={s.headingRow}>
+                <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
+                  <Text style={s.kicker}>Kitchen order</Text>
+                  <Text style={s.h1}>{order.title || isoDay(order.event_date) || "Special order"}</Text>
+                  <Text style={s.caption}>{order.location_name ?? ""}</Text>
+                </View>
+                <View style={s.numberBlock}>
+                  <Text style={s.kicker}>No.</Text>
+                  <Text style={s.number}>{order.number}</Text>
+                </View>
+              </View>
+
+              <View style={s.stats}>
+                <View style={s.stat}>
+                  <Text style={s.sectionHead}>Kitchen</Text>
+                  <Text style={s.statValue}>{order.kitchen_code ?? "—"}</Text>
+                </View>
+                <View style={s.stat}>
+                  <Text style={s.sectionHead}>Day</Text>
+                  <Text style={s.statValue}>{usWeekday(order.event_date).toUpperCase() || "—"}</Text>
+                  <Text style={s.statSub}>{order.event_date ?? ""}</Text>
+                </View>
+                <View style={s.stat}>
+                  <Text style={s.sectionHead}>{delivery ? "Delivery time" : "Pickup time"}</Text>
+                  <View style={s.statMarked}>
+                    <Text style={[s.statValue, { marginTop: 0 }]}>{time || "—"}</Text>
+                  </View>
+                  <Text style={s.statSub}>{order.location_code ?? ""}</Text>
+                </View>
+              </View>
+
+              {/* UP HERE, not after the list where the original prints it: on
+                  a two-page order that put it on page 2, and it is the one line
+                  on the sheet nobody can afford to miss. */}
+              <View
+                style={
+                  order.allergen_info
+                    ? [s.allergen, { backgroundColor: STOP_FILL }]
+                    : [s.allergen, { borderWidth: 0.75, borderColor: HAIRLINE }]
+                }
+              >
+                <Text style={s.allergenLabel}>Allergen warning</Text>
+                <Text style={order.allergen_info ? s.allergenText : [s.allergenText, s.empty]}>
+                  {order.allergen_info || "None"}
+                </Text>
+              </View>
+
+              <View style={s.blocks}>
+                <View style={s.block}>
+                  <Text style={s.sectionHead}>Order</Text>
+                  <Field label="Taken by" value={order.taken_by} />
+                  <Field label="Taken" value={order.date_initiated} />
+                  <Field label="Handoff" value={delivery ? "Delivery" : "Pickup"} />
+                </View>
+                <View style={s.block}>
+                  <Text style={s.sectionHead}>Contact</Text>
+                  <Field label="Name" value={order.contact_name ?? customerLabel(order.customer)} />
+                  <Field label="Phone" value={order.contact_phone ?? order.customer?.phone} />
+                  <Field label="Email" value={order.contact_email ?? order.customer?.email} />
+                </View>
+                <View style={s.block}>
+                  <Text style={s.sectionHead}>Event</Text>
+                  <Field label="Date" value={isoDay(order.event_date)} />
+                  <Field label="Time" value={usTime(order.event_time)} />
+                  {delivery ? <Field label="Address" value={order.delivery_address} /> : null}
+                </View>
+              </View>
+
+              <View style={s.items}>
+                <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
+                  Items{" "}
+                  <Text style={s.sectionCount}>{groups.reduce((a, g) => a + g.lines.length, 0)}</Text>
+                </Text>
+                <View style={s.tableHead} fixed>
+                  <Text style={[s.th, { width: 44, paddingLeft: 6 }]}>Qty</Text>
+                  <Text style={[s.th, s.kItem]}>Item</Text>
+                  <Text style={[s.th, s.kNotes]}>Notes</Text>
+                </View>
+                {groups.map((group) => (
+                  <View key={group.label}>
+                    <Text style={s.groupBand}>{group.label}</Text>
+                    {group.lines.map((line) => (
+                      <View key={line.id} style={s.kRow} wrap={false}>
+                        <Text style={s.kQty}>{qtyText(line.qty)}</Text>
+                        <View style={s.kItem}>
+                          <Text style={s.itemName}>{line.name}</Text>
+                          <Text style={s.taxonomy}>{taxonomyLine(line)}</Text>
+                        </View>
+                        <Text style={s.kNotes}>{line.notes ?? ""}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ))}
+
+                <View style={s.endOfList}>
+                  <View style={s.endRule} />
+                  <Text style={s.endText}>End of list</Text>
+                  <View style={s.endRule} />
+                </View>
+              </View>
+
+              <View wrap={false}>
+                {order.notes_production ? (
+                  <View style={{ marginTop: 16 }}>
+                    <Text style={s.sectionHead}>Notes</Text>
+                    <Text style={s.prose}>{order.notes_production}</Text>
+                  </View>
+                ) : null}
+
+                <View style={s.handoff}>
+                  <Text style={s.sectionHead}>Handoff</Text>
+                  <View style={s.boxGrid}>
+                    <WriteBox label="Order completed by" />
+                    <WriteBox label="Number of boxes" value={order.delivery_boxes} />
+                    <WriteBox label="Delivery tracking #" value={order.delivery_tracking} />
+                  </View>
+                  <View style={s.boxGrid}>
+                    <WriteBox label="Received" />
+                    <WriteBox label="Date & time" />
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            <View style={s.footer} fixed>
+              <Text style={s.footerText}>
+                {org.name} · Kitchen order {order.number}
               </Text>
               <Text
                 style={s.footerText}
