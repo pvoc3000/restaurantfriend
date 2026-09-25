@@ -12,7 +12,10 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
-   **Also 2026-09-24 — THREE SHOP NOTICES, AND NO MORE CC.** Mark asked which
+   **Also 2026-09-24 — THREE SHOP NOTICES, AND NO MORE CC (DEPLOYED the same
+   day: submit-inquiry v14, approve-quote v13, square-pay v9, qbo-sync v35,
+   qbo-webhook v3 — the last with `--no-verify-jwt`, checked afterwards; a
+   plain deploy would have turned verification on and bounced Intuit).** Mark asked which
    emails we should get at each step, then: "build the approval and
    paid-online emails, and stop the cc". The rule: the SHOP gets its own email
    only when a CUSTOMER acts without anybody here pressing a button — a new
