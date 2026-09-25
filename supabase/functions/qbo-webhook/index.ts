@@ -32,6 +32,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { QboError, loadConnection, qboFetch } from "../_shared/qbo.ts";
+import { notifyInvoicePaid, qboInvoice } from "../_shared/shopNotify.ts";
 
 type Event = { realm: string; entity: string; id: string; operation: string };
 
@@ -121,6 +122,19 @@ async function handlePayment(admin: SupabaseClient, ev: Event): Promise<void> {
         amount: line.Amount,
         ...(error ? { error: error.message } : {}),
       });
+      // THE SHOP IS TOLD, once: only the path that RECORDED the payment sends
+      // the paid-online notice — the poll in qbo-sync finds a "duplicate".
+      if (!error && data === "recorded") {
+        const inv = await qboInvoice(admin, ev.realm, String(t.TxnId));
+        if (inv) {
+          await notifyInvoicePaid(admin, {
+            ...inv,
+            amount: Number(line.Amount ?? 0),
+            method: "QuickBooks Payments",
+            processor: "QuickBooks",
+          });
+        }
+      }
     }
   }
 }

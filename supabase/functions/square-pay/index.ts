@@ -30,6 +30,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { resolveTransport, sendMail, type ProviderConfig } from "../_shared/email.ts";
+import { buildPaymentNotice } from "../_shared/shopNotices.ts";
+import { appLink, notifyInvoicePaid, sendShopNotice } from "../_shared/shopNotify.ts";
 import { buildSquareOrder, type PayBreakdown } from "../_shared/squareOrder.ts";
 
 const CORS = {
@@ -378,7 +380,7 @@ Deno.serve(async (req) => {
       : await admin
           .from("special_orders")
           .select(
-            "number, title, contact_name, contact_email, inbound_message_id, taken_by, taken_by_employee_id, customers(first_name, last_name, company, email)"
+            "number, title, event_date, contact_name, contact_email, inbound_message_id, taken_by, taken_by_employee_id, customers(first_name, last_name, company, email)"
           )
           .eq("id", claim.order_id!)
           .maybeSingle();
@@ -399,7 +401,6 @@ Deno.serve(async (req) => {
       special_orders?: {
         email_provider?: ProviderConfig;
         reply_to?: string;
-        email_cc?: string;
         email?: {
           payment?: { subject?: string; body?: string };
           invoice_payment?: { subject?: string; body?: string };
@@ -415,14 +416,13 @@ Deno.serve(async (req) => {
       email?: string | null;
     } | null;
 
-    // `documentRecipient` / `documentCc` in lib/specialOrderDocs: the CUSTOMER
-    // first (Mark, 2026-09-21), the standing Cc, and the day-of contact when
-    // they are a different address.
+    // `documentRecipient` in lib/specialOrderDocs: the CUSTOMER first (Mark,
+    // 2026-09-21), and the day-of contact when they are a different address.
+    // NO LONGER the standing `email_cc` (Mark, 2026-09-24: "stop the cc") —
+    // the shop gets its own paid-online notice below instead of a copy of the
+    // customer's receipt.
     const to = (customer?.email ?? order?.contact_email ?? "").trim();
-    const ccList = (orgSettings.special_orders?.email_cc ?? "")
-      .split(",")
-      .map((a) => a.trim())
-      .filter(Boolean);
+    const ccList: string[] = [];
     const contactEmail = (order?.contact_email ?? "").trim();
     if (
       contactEmail &&
@@ -499,6 +499,45 @@ Deno.serve(async (req) => {
         });
       } catch (e) {
         warnings.push(`the payment confirmation email was not sent: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
+    /* ---- 6. THE SHOP'S PAID-ONLINE NOTICE -------------------------------- */
+
+    // Only for a payment recorded NOW: `already_recorded` is a retried request
+    // for a payment the shop was already told about.
+    if ((recorded as { state?: string } | null)?.state === "recorded") {
+      if (isInvoice) {
+        await notifyInvoicePaid(admin, {
+          orgId: claim.org_id,
+          invoiceId: claim.customer_invoice_id!,
+          amount,
+          method,
+          processor: "Square",
+        });
+      } else if (claim.order_id) {
+        const person = [customer?.first_name, customer?.last_name].filter(Boolean).join(" ").trim();
+        const remaining = Number((recorded as { balance?: number | string } | null)?.balance ?? 0);
+        await sendShopNotice(admin, {
+          orgId: claim.org_id,
+          notice: buildPaymentNotice(
+            {
+              kind: "order",
+              number: String(order?.number ?? claim.number ?? ""),
+              title: order?.title ?? null,
+              customer: person || (customer?.company ?? "").trim() || (order?.contact_name ?? "").trim() || null,
+              amount,
+              method,
+              processor: "Square",
+              balance: Math.max(remaining, 0),
+              event_date: order?.event_date ?? null,
+            },
+            appLink(`/special-orders/${claim.order_id}`)
+          ),
+          orderIds: [claim.order_id],
+          what: "Paid-online notice",
+          replyTo: to || null,
+        });
       }
     }
 

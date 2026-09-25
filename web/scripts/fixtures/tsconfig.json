@@ -44,6 +44,6 @@
     "../../src/lib/squareSalesCsv.ts",
     "../../../supabase/functions/_shared/squareOrder.ts",
     "../../../supabase/functions/_shared/deliveryFee.ts",
-    "../../../supabase/functions/_shared/inquiryNotice.ts"
+    "../../../supabase/functions/_shared/shopNotices.ts"
   ]
 }

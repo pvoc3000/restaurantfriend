@@ -31,6 +31,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { resolveTransport, sendMail, TransportError, type ProviderConfig } from "../_shared/email.ts";
+import { buildApprovalNotice } from "../_shared/shopNotices.ts";
+import { appLink, sendShopNotice } from "../_shared/shopNotify.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -43,21 +45,6 @@ function json(status: number, body: unknown): Response {
     status,
     headers: { ...CORS, "Content-Type": "application/json" },
   });
-}
-
-/**
- * `Donut Friend <specialorders@donutfriend.com>` -> `specialorders@donutfriend.com`.
- *
- * The display name is dropped rather than carried, and not only for tidiness:
- * the Resend path splits a Cc field on COMMAS, so a sender ever configured as
- * `Donut Friend, Inc. <…>` would arrive as two addresses, both malformed. A
- * bare address cannot be torn in half.
- */
-function bareAddress(from: string | null | undefined): string | null {
-  const value = (from ?? "").trim();
-  if (!value) return null;
-  const angled = value.match(/<([^>]+)>/);
-  return (angled ? angled[1] : value).trim() || null;
 }
 
 Deno.serve(async (req) => {
@@ -158,7 +145,7 @@ Deno.serve(async (req) => {
     // so they come from the same mailbox and land in the same thread.
     const { data: order } = await admin
       .from("special_orders")
-      .select("number, title, contact_email, contact_name, inbound_message_id, customers(email)")
+      .select("number, title, contact_email, contact_name, contact_phone, event_date, event_time, fulfillment, delivery_address, inbound_message_id, customers(email), locations(name, public_name)")
       .eq("id", state.order_id)
       .maybeSingle();
     const { data: org } = await admin
@@ -172,7 +159,6 @@ Deno.serve(async (req) => {
       special_orders?: {
         email_provider?: ProviderConfig;
         reply_to?: string;
-        approval_cc?: string;
       };
       billing?: { email?: string };
     };
@@ -197,31 +183,16 @@ Deno.serve(async (req) => {
         (order?.customers as { email?: string } | null)?.email ??
         null;
 
-      // ONE MESSAGE, not two sends: the customer's confirmation with the shop
-      // on Cc. That is what makes it land in the same conversation for both of
-      // them, and it means a customer replying "actually, can we make it 11am"
-      // reaches somebody rather than an unmonitored no-reply.
-      //
-      // THE MODULE'S OWN MAILBOX BEFORE THE BILLING ONE (Mark, 2026-09-22: "it
-      // should cc specialorders@donutfriend.com"). It was falling all the way
-      // through to `billing.email` — measured on the live org, where
-      // `approval_cc` and `reply_to` are both unset and billing is
-      // info@donutfriend.com — so a quote approval was copied to accounts
-      // while the message it was answering had gone out FROM specialorders@.
-      // The sending mailbox is the one that should see the reply to its own
-      // letter, and reading it off the transport keeps the address in settings
-      // where design rule 2 wants it rather than in this file.
-      const internal =
-        orgSettings.special_orders?.approval_cc ??
-        orgSettings.special_orders?.reply_to ??
-        bareAddress(transport.cfg.from) ??
-        orgSettings.billing?.email ??
-        null;
-
-      if (customerEmail || internal) {
+      // THE CUSTOMER'S CONFIRMATION, AND ONLY THE CUSTOMER'S (Mark,
+      // 2026-09-24: "stop the cc"). It used to Cc the shop — `approval_cc`,
+      // else the sending mailbox — which put the shop's copy inside the
+      // customer's thread, sent from specialorders@ to itself, where it was
+      // easy to miss. The shop now gets its OWN message below, with the signed
+      // quote attached. No customer email, no confirmation: the shop notice
+      // still goes.
+      if (customerEmail) {
         await sendMail(transport, {
-          to: customerEmail ?? internal!,
-          cc: customerEmail && internal ? internal : undefined,
+          to: customerEmail,
           subject: `Quote #${order?.number ?? ""} approved${order?.title ? ` — ${order.title}` : ""}`,
           text:
             `Thank you — we have your approval for quote #${order?.number ?? ""}.\n\n` +
@@ -243,6 +214,59 @@ Deno.serve(async (req) => {
       warnings.push(
         `the confirmation email was not sent: ${e instanceof Error ? e.message : String(e)}`
       );
+    }
+
+    /* ---- 3. THE SHOP'S OWN NOTICE -------------------------------------- */
+
+    // "Quote approved #10079 — Traci T", with the signed PDF, the order's
+    // lines and a button into the app. Delivered and logged by `shopNotify`;
+    // never an error on the customer's phone.
+    {
+      const { data: lines } = await admin
+        .from("special_order_items")
+        .select("name, qty, unit_price, notes")
+        .eq("order_id", state.order_id)
+        .order("sort");
+      const loc = (order as unknown as { locations?: { name: string; public_name: string | null } | null } | null)
+        ?.locations ?? null;
+      const notice = buildApprovalNotice(
+        {
+          number: String(order?.number ?? ""),
+          title: order?.title ?? null,
+          contact_name: order?.contact_name ?? null,
+          contact_email: order?.contact_email ?? null,
+          contact_phone: order?.contact_phone ?? null,
+          event_date: order?.event_date ?? null,
+          event_time: order?.event_time ?? null,
+          fulfillment: order?.fulfillment ?? null,
+          delivery_address: order?.delivery_address ?? null,
+          shop: loc ? loc.public_name?.trim() || loc.name : null,
+        },
+        ((lines ?? []) as { name: string; qty: unknown; unit_price: unknown; notes: string | null }[]).map((l) => ({
+          name: l.name,
+          qty: Number(l.qty),
+          unit_price: Number(l.unit_price),
+          notes: l.notes,
+        })),
+        {
+          name: state.approved_name ?? null,
+          at: state.approved_at ?? null,
+          timeZone: ((org?.settings ?? {}) as { timezone?: string }).timezone ?? "UTC",
+          signedAttached: !!(pdf_base64 && filed),
+        },
+        appLink(`/special-orders/${state.order_id}`)
+      );
+      await sendShopNotice(admin, {
+        orgId: state.org_id,
+        notice,
+        orderIds: [state.order_id],
+        what: "Quote-approved notice",
+        replyTo: order?.contact_email ?? (order?.customers as { email?: string } | null)?.email ?? null,
+        attachment:
+          pdf_base64 && filed
+            ? { filename: `Signed quote ${order?.number ?? ""}.pdf`, base64: pdf_base64 }
+            : undefined,
+      });
     }
 
     if (warnings.length) {

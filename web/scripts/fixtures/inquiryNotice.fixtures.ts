@@ -3,11 +3,13 @@
 
 import { test, eq, ok, no } from "./harness";
 import {
+  buildApprovalNotice,
   buildInquiryNotice,
+  buildPaymentNotice,
   clockTime,
   longDate,
   type NoticeOrder,
-} from "../../../supabase/functions/_shared/inquiryNotice";
+} from "../../../supabase/functions/_shared/shopNotices";
 
 const ORDER: NoticeOrder = {
   number: "10123",
@@ -70,7 +72,7 @@ test("notice: a delivery shows the address and the estimate, not a shop", () => 
 
 test("notice: no order built, no link, no details — it still reads", () => {
   const n = buildInquiryNotice({ ...ORDER, details: null, allergen_info: null }, [], null);
-  ok(n.text.includes("They didn't build an order."));
+  ok(n.text.includes("They didn’t build an order"));
   no(n.html.includes("Open inquiry"), "no button without APP_URL");
   no(n.text.includes("Allergies"));
 });
@@ -95,4 +97,59 @@ test("dates and times read off the string", () => {
   eq(clockTime("00:30"), "12:30 AM");
   eq(clockTime("12:00:00"), "12:00 PM");
   eq(clockTime("18:45"), "6:45 PM");
+});
+
+/* -------------------------------------------------------------------------
+ * The approval and paid-online notices (same file, same layout)
+ * ---------------------------------------------------------------------- */
+
+test("approval: signer, stamp in the org's zone, the lines, the attachment said", () => {
+  const n = buildApprovalNotice(
+    { number: "10079", title: "Birthday", contact_name: "Traci Trombino", contact_email: "t@example.com",
+      contact_phone: "(323) 555-0100", event_date: "2026-10-30", event_time: "09:00:00",
+      fulfillment: "pickup", delivery_address: null, shop: "Highland Park" },
+    [{ name: "Angry Samoa", qty: 24, unit_price: 5.45, notes: null }],
+    { name: "Traci T", at: "2026-09-24T22:41:00Z", timeZone: "America/Los_Angeles", signedAttached: true },
+    "https://app.example.com/special-orders/x"
+  );
+  eq(n.subject, "Quote approved #10079 — Traci T, Birthday (2026-10-30)");
+  ok(n.text.includes("Signed by: Traci T"));
+  ok(n.text.includes("Approved: Thursday, September 24, 2026 at 3:41 PM"), "22:41Z is 3:41 PM in Los Angeles");
+  ok(n.text.includes("Pickup at: Highland Park"));
+  ok(n.text.includes("Subtotal: $130.80"));
+  ok(n.text.includes("The signed quote is attached."));
+  ok(n.html.includes('href="https://app.example.com/special-orders/x"'));
+});
+
+test("approval: no signed copy says so rather than pretending", () => {
+  const n = buildApprovalNotice(
+    { number: "1", title: null, contact_name: null, contact_email: null, contact_phone: null, event_date: null,
+      event_time: null, fulfillment: null, delivery_address: null, shop: null },
+    [], { name: null, at: null, timeZone: "UTC", signedAttached: false }, null
+  );
+  ok(n.text.includes("No signed copy was produced."));
+  no(n.html.includes("Open order"));
+});
+
+test("paid online: amount, method with processor, balance or paid in full", () => {
+  const full = buildPaymentNotice(
+    { kind: "order", number: "10079", title: "Birthday", customer: "Traci Trombino", amount: 248,
+      method: "visa ending 1111", processor: "Square", balance: 0, event_date: "2026-10-30" },
+    "https://app.example.com/special-orders/x"
+  );
+  eq(full.subject, "Paid online #10079 — $248.00 from Traci Trombino (paid in full)");
+  ok(full.text.includes("Method: visa ending 1111 (Square)"));
+  ok(full.text.includes("Balance: Paid in full"));
+  ok(full.text.includes("For: Order #10079 — Birthday"));
+
+  const part = buildPaymentNotice(
+    { kind: "invoice", number: "1001", title: null, customer: "Cafe Knotted", amount: 100,
+      method: "QuickBooks Payments", processor: "QuickBooks", balance: 48.5, event_date: null,
+      orders: ["#10075 — Mon", "#10076 — Tue"] },
+    null
+  );
+  eq(part.subject, "Paid online Invoice 1001 — $100.00 from Cafe Knotted");
+  ok(part.text.includes("Balance: $48.50 still owed"));
+  ok(part.text.includes("Covers: #10075 — Mon; #10076 — Tue"));
+  no(part.html.includes("Open invoice"), "no button without APP_URL");
 });

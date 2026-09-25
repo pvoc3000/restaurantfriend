@@ -57,6 +57,7 @@ import {
   redirectUri,
   revokeToken,
 } from "../_shared/qbo.ts";
+import { notifyInvoicePaid } from "../_shared/shopNotify.ts";
 
 /**
  * One file to put on the QuickBooks document that was just written.
@@ -1834,7 +1835,18 @@ Deno.serve(async (req) => {
                 p_paid_on: p.TxnDate ?? null,
               });
               if (recErr) problems.push(`Invoice ${mine.number}: ${recErr.message}`);
-              else if (said === "recorded") recorded.push({ number: mine.number, amount, payment: String(p.Id) });
+              else if (said === "recorded") {
+                recorded.push({ number: mine.number, amount, payment: String(p.Id) });
+                // The shop's paid-online notice, sent by whichever path
+                // RECORDED the payment — here, when the webhook never came.
+                await notifyInvoicePaid(admin, {
+                  orgId: conn.org_id,
+                  invoiceId: mine.id,
+                  amount,
+                  method: "QuickBooks Payments",
+                  processor: "QuickBooks",
+                });
+              }
             }
           }
         }

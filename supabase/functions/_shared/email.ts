@@ -246,6 +246,40 @@ function buildMime(mail: Mail & { from: string }): string {
     ].join("\r\n");
   }
 
+  // HTML AND a PDF (2026-09-24, the quote-approved shop notice): mixed, whose
+  // first part is the text/html alternative pair and whose second is the PDF.
+  // Before this the attachment branch below sent text only and dropped the
+  // HTML without a word. The three cases above are untouched.
+  if (mail.html) {
+    const inner = `${boundary}-alt`;
+    return [
+      ...headers,
+      "",
+      `--${boundary}`,
+      `Content-Type: multipart/alternative; boundary="${inner}"`,
+      "",
+      `--${inner}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      fold(base64FromUtf8(mail.text)),
+      `--${inner}`,
+      'Content-Type: text/html; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      fold(base64FromUtf8(mail.html)),
+      `--${inner}--`,
+      `--${boundary}`,
+      `Content-Type: application/pdf; name="${mail.attachment.filename}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; filename="${mail.attachment.filename}"`,
+      "",
+      fold(mail.attachment.base64),
+      `--${boundary}--`,
+      "",
+    ].join("\r\n");
+  }
+
   return [
     ...headers,
     "",

@@ -422,50 +422,39 @@ export function SpecialOrderSettings({
               : <span>{text(so.email_cc) ?? "nobody"}</span>}
           </dd>
           <p className="text-[12px] text-subtle">
-            Quotes, invoices and receipts. Leave empty for none — the sent copy
-            is already in the specialorders@ mailbox either way.
+            Quotes, invoices and receipts staff send. Empty since 2026-09-24 —
+            the sent copy is already in the specialorders@ mailbox, and the shop
+            is told separately when a customer acts (below).
           </p>
         </div>
 
-        {/* A SECOND ADDRESS, because it is a different message (Mark,
-            2026-09-22). The one above is Cc'd on documents somebody here
-            chooses to send; this one rides the confirmation the APPROVAL PAGE
-            sends by itself, which nobody is standing over. Empty is not
-            "nobody" here — it is the mailbox the message went out from, which
-            is why the resting word says so. */}
+        {/* "Copy quote approvals to" (`approval_cc`) IS GONE (2026-09-24): the
+            approval confirmation no longer Cc's the shop, which gets its own
+            quote-approved notice at the address below. The key is left in
+            the settings document, unread. */}
+        {/* THE SHOP NOTICES (Mark, 2026-09-24; migration 137). Not copies of
+            anything the customer receives — the shop's own emails, sent the
+            moment a customer acts without anybody here pressing a button: a
+            new inquiry, a quote approved (with the signed PDF), a payment
+            taken online (Square or QuickBooks). The key is still called
+            `inquiry_notify`, from when it was only the first of the three.
+            Empty really is nobody: none of them is sent. */}
         <div className="max-w-2xl space-y-1 border-t border-hairline pt-5">
           <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
-            Copy quote approvals to
-          </dt>
-          <dd>
-            {editable
-              ? cell(["special_orders", "approval_cc"], text(so.approval_cc), {
-                  placeholder: "the sending mailbox",
-                  ariaLabel: "Cc on quote approvals",
-                })
-              : <span>{text(so.approval_cc) ?? "the sending mailbox"}</span>}
-          </dd>
-        </div>
-
-        {/* THE NEW-INQUIRY NOTICE (Mark, 2026-09-24; migration 137). Not a
-            copy of anything the customer receives — its own message, with
-            everything they submitted, sent the moment the website creates the
-            lead. Empty really is nobody here: the notice is not sent. */}
-        <div className="max-w-2xl space-y-1 border-t border-hairline pt-5">
-          <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
-            Tell us about new inquiries at
+            Tell us when a customer acts, at
           </dt>
           <dd>
             {editable
               ? cell(["special_orders", "inquiry_notify"], text(so.inquiry_notify), {
                   placeholder: "nobody",
-                  ariaLabel: "New-inquiry notice goes to",
+                  ariaLabel: "Shop notices go to",
                 })
               : <span>{text(so.inquiry_notify) ?? "nobody"}</span>}
           </dd>
           <p className="text-[12px] text-subtle">
-            Everything a customer submits on the website, as one email. Several
-            addresses are separated by commas; leave empty for none.
+            One email each for a new inquiry, an approved quote (with the signed
+            PDF) and a payment taken online. Several addresses are separated by
+            commas; leave empty for none.
           </p>
         </div>
       </section>

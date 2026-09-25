@@ -12,6 +12,48 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
+   **Also 2026-09-24 — THREE SHOP NOTICES, AND NO MORE CC.** Mark asked which
+   emails we should get at each step, then: "build the approval and
+   paid-online emails, and stop the cc". The rule: the SHOP gets its own email
+   only when a CUSTOMER acts without anybody here pressing a button — a new
+   inquiry, a quote approved, a payment taken online — and no copy of what
+   staff send themselves (the sent copy is in specialorders@ already).
+   · `_shared/shopNotices.ts` — ONE pure, fixture-tested file holding the
+     shared layout and all three builders (`buildInquiryNotice`,
+     `buildApprovalNotice`, `buildPaymentNotice`). One file on purpose: Deno
+     needs an import's `.ts` and the fixtures' CommonJS build cannot load one.
+     `inquiryNotice.ts` folded into it.
+   · `_shared/shopNotify.ts` — the delivery: `sendShopNotice` (recipient
+     `special_orders.inquiry_notify`, the module mailbox, Reply-To the
+     customer, a log line on each order either way, never throws),
+     `notifyInvoicePaid` (a customer invoice's payment: balance = its lines
+     less its payments, the orders it covers) and `qboInvoice` (realm + QBO id
+     → our invoice), and `appLink` (the `APP_URL` button, or none).
+   · QUOTE APPROVED (`approve-quote`): its own email with the signed PDF
+     attached, the lines, who signed and when in the org's zone. The
+     customer's confirmation NO LONGER Cc's the shop (`approval_cc`, the
+     sending-mailbox fallback and `bareAddress` are gone; "Copy quote
+     approvals to" left Settings; the key stays, unread).
+   · PAID ONLINE: `square-pay` (order or invoice) and BOTH QuickBooks paths —
+     `qbo-webhook` and `qbo-sync`'s `sync_qbo_payments` poll — send it only
+     when their recording step answered `recorded`, which each of
+     `record_pay_link_payment` / `record_qbo_invoice_payment` says exactly once
+     per payment, so whichever path gets there first is the one that tells the
+     shop. `square-pay`'s customer receipt no longer Cc's `email_cc`.
+   · `_shared/email.ts` gained the one MIME case it lacked: HTML AND a PDF
+     (mixed wrapping an alternative pair). Before, an attachment made the
+     Gmail path send text only and drop the HTML silently. The three existing
+     cases are unchanged.
+   · STOP THE CC on staff-sent documents: `special_orders.email_cc` was
+     removed from the live org's settings (it was specialorders@donutfriend.com);
+     "Copy every customer message to" now rests at "nobody" and says why.
+     `approval_cc` (also specialorders@) is left in the document, unread.
+   · Settings: the recipient row is now "Tell us when a customer acts, at",
+     covering all three.
+   Fixtures for both new builders (the org-zone stamp: 22:41Z is 3:41 PM in
+   Los Angeles; "no signed copy" said, not hidden; paid in full vs still
+   owed; an invoice's orders). Both rendered and looked at in the pane.
+
    **Also 2026-09-24 — THE SHOP IS TOLD (migration 137 APPLIED by Mark —
    probed: `inquiry_notify` = specialorders@donutfriend.com; `submit-inquiry`
    REDEPLOYED as v13 the same day).** Mark: "create a

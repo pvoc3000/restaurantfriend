@@ -49,7 +49,8 @@ import {
   type ProviderConfig,
 } from "../_shared/email.ts";
 import { quoteDelivery } from "../_shared/deliveryQuote.ts";
-import { buildInquiryNotice } from "../_shared/inquiryNotice.ts";
+import { buildInquiryNotice } from "../_shared/shopNotices.ts";
+import { appLink, sendShopNotice } from "../_shared/shopNotify.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -212,37 +213,16 @@ async function estimateDelivery(
 
 /**
  * THE NEW-INQUIRY NOTICE to the shop (Mark, 2026-09-24): an HTML email with
- * everything submitted, to `special_orders.inquiry_notify` (one address or
- * several, comma-separated; empty turns it off). Read from the LEAD, so it
- * shows what the gate wrote — its prices, the delivery estimate, and no
- * address on a pickup. Sent from the module's own mailbox with the CUSTOMER
- * as Reply-To, so answering it reaches them. Logs where it went, or why not.
+ * everything submitted. Read from the LEAD, so it shows what the gate wrote —
+ * its prices, the delivery estimate, and no address on a pickup. Delivered by
+ * `_shared/shopNotify` (the recipient setting, the mailbox, the log line), with
+ * the CUSTOMER as Reply-To so answering it reaches them.
  */
 async function notifyShop(orgId: string, orderId: string): Promise<string> {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!serviceKey) return "none";
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
-  const log = (message: string) =>
-    admin.from("special_order_events").insert({
-      org_id: orgId,
-      order_id: orderId,
-      message,
-      author: "Website",
-      source: "app",
-    });
   try {
-    const { data: org } = await admin.from("orgs").select("name, settings").eq("id", orgId).maybeSingle();
-    const settings = (org?.settings ?? {}) as {
-      email_provider?: ProviderConfig;
-      special_orders?: { email_provider?: ProviderConfig; reply_to?: string; inquiry_notify?: string };
-      billing?: { email?: string };
-    };
-    const to = (settings.special_orders?.inquiry_notify ?? "")
-      .split(/[,;]/)
-      .map((a) => a.trim())
-      .filter(Boolean);
-    if (to.length === 0) return "off";
-
     const { data: o, error } = await admin
       .from("special_orders")
       .select(
@@ -264,7 +244,6 @@ async function notifyShop(orgId: string, orderId: string): Promise<string> {
       .order("sort");
 
     const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
-    const appUrl = (Deno.env.get("APP_URL") ?? "").replace(/\/+$/, "");
     const notice = buildInquiryNotice(
       {
         number: String(row.number),
@@ -288,31 +267,25 @@ async function notifyShop(orgId: string, orderId: string): Promise<string> {
         unit_price: Number(l.unit_price),
         notes: l.notes,
       })),
-      appUrl ? `${appUrl}/special-orders/${orderId}` : null
+      appLink(`/special-orders/${orderId}`)
     );
-
-    const transport = resolveTransport({
-      explicit: settings.special_orders?.email_provider,
-      orgProvider: settings.email_provider,
-      orgName: org?.name ?? "Orders",
-      replyToFallbacks: [settings.special_orders?.reply_to, settings.billing?.email],
+    return await sendShopNotice(admin, {
+      orgId,
+      notice,
+      orderIds: [orderId],
+      what: "New-inquiry notice",
+      replyTo: (row.contact_email as string | null) ?? null,
     });
-    await sendMail(transport, {
-      // The first address as To and any others as Cc: Resend reads `to` as ONE
-      // address, while `cc` is split on commas by both providers.
-      to: to[0],
-      cc: to.length > 1 ? to.slice(1).join(", ") : undefined,
-      subject: notice.subject,
-      text: notice.text,
-      html: notice.html,
-      replyTo: (row.contact_email as string | null) ?? undefined,
-    });
-    await log(`New-inquiry notice emailed to ${to.join(", ")}`);
-    return "sent";
   } catch (e) {
     const why = e instanceof Error ? e.message : String(e);
     console.error("submit-inquiry notice", why);
-    await log(`Inquiry recorded, but the new-inquiry notice was not sent: ${why}`);
+    await admin.from("special_order_events").insert({
+      org_id: orgId,
+      order_id: orderId,
+      message: `Inquiry recorded, but the new-inquiry notice was not sent: ${why}`,
+      author: "Website",
+      source: "app",
+    });
     return "error";
   }
 }
