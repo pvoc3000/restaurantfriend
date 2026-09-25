@@ -109,7 +109,8 @@ export const config = {
     // everything except static assets — and `/.well-known/`, which holds
     // files OTHER services fetch signed out: Apple Pay's domain-association
     // file (Square → Apple Pay → verify domain, 2026-09-22) is fetched by
-    // Apple's verifier, and a redirect to /login would fail the check.
-    "/((?!_next/static|_next/image|favicon.ico|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Apple's verifier, and a redirect to /login would fail the check. The
+    // web-app manifest likewise: iPadOS fetches it when the icon is added.
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

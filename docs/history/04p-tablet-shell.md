@@ -259,3 +259,17 @@ two (`ICON_SETTINGS`, Material Symbols `settings` filled). It also replaced the
 unregistered tablet's person-icon **Account** cell, so both kinds of tablet say it
 the same way. Note that `/account` still refuses a PIN change in a PIN-minted
 session (097), so on the shared iPad the PIN is set while signed in with a password.
+
+**THE HOME-SCREEN WEB APP IS BUILT (Mark, 2026-09-25)** — the manifest the
+"NOT BUILT" note above deferred. `app/manifest.ts` (`display: standalone`,
+served signed out: `proxy.ts`'s matcher skips `manifest.webmanifest`), the
+Donut Friend artwork Mark supplied (512×512, scaled by `sips` to
+`public/apple-touch-icon.png` 180, `icon-192.png`, `icon-512.png`), and
+`appleWebApp` + `themeColor` in the root layout with status bar `black` — not
+translucent, so nothing needs safe-area padding. **The PDF → share sheet
+question is STILL UNTESTED**; Mark tests it on the iPad. If a PDF strands the
+user, change `display` to `"browser"` and the icon stays.
+The icon is NOT `app/apple-icon.png` (Next's file convention): adding it there
+500'd every page in the running dev server with `require is not defined`.
+The artwork is a static file, not `orgs.settings` — the manifest is fetched
+with no session, so it has no org to read. A second org would need this moved.
