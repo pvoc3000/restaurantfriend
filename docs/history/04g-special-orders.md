@@ -12,8 +12,9 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
-   **Also 2026-09-24 — THE SHOP IS TOLD (migration 137 WRITTEN, NOT YET
-   APPLIED; `submit-inquiry` changed, NOT YET REDEPLOYED).** Mark: "create a
+   **Also 2026-09-24 — THE SHOP IS TOLD (migration 137 APPLIED by Mark —
+   probed: `inquiry_notify` = specialorders@donutfriend.com; `submit-inquiry`
+   REDEPLOYED as v13 the same day).** Mark: "create a
    nice html email that includes all the submitted info and send it to
    specialorders@donutfriend.com so we know". `_shared/inquiryNotice.ts`
    (pure, fixture-tested) builds it from the LEAD as the gate wrote it — the
