@@ -50,8 +50,8 @@ const caps = (size: number, em: number) => ({
 
 const PAGE_X = 40;
 
-/** Width ÷ height of `public/logo-mark-white.png` (800 × 334). */
-const LOGO_ASPECT = 800 / 334;
+/** Width ÷ height of `public/logo-wordmark-white.png` (2000 × 216 as drawn). */
+const LOGO_ASPECT = 2000 / 216;
 
 const s = StyleSheet.create({
   page: {
@@ -86,13 +86,12 @@ const s = StyleSheet.create({
 
   /* ---- page heading ---- */
   headingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  /* The mark sits on the band beside the org's name. It is WHITE ON
-     TRANSPARENT artwork made for a dark ground (Mark, 2026-09-25) — the square
-     app icon was a black tile and melted into the band. Height is fixed and
-     width follows the artwork (`LOGO_ASPECT`), so a different mark only needs
-     its own ratio. */
-  brand: { flexDirection: "row", alignItems: "center" },
-  logo: { height: 24, width: 24 * LOGO_ASPECT, marginRight: 12 },
+  /* The org's WORDMARK takes the typed name's place on the band (Mark,
+     2026-09-25: "use this in place of the mark and remove the text"). WHITE
+     ON TRANSPARENT artwork made for a dark ground — the square app icon was a
+     black tile and melted into the band. Height is fixed and width follows the
+     artwork (`LOGO_ASPECT`), so a different wordmark only needs its ratio. */
+  logo: { height: 14, width: 14 * LOGO_ASPECT },
   kicker: { ...caps(7.5, 0.12), color: SUBTLE },
   h1: {
     ...caps(22, -0.02),
@@ -264,10 +263,11 @@ export function QuoteAppStylePdf({
   org: DocOrg;
   approval?: { name: string; at: string; reference: string } | null;
   /**
-   * The org's mark for a dark ground, as a URL or `data:` URI the renderer
-   * can fetch (PNG or JPG — @react-pdf reads no WebP or SVG file). Optional:
-   * without one the masthead carries the name alone. Today /forms passes
-   * `public/logo-mark-white.png`, Donut Friend's own artwork; when orgs get
+   * The org's wordmark for a dark ground, as a URL or `data:` URI the
+   * renderer can fetch (PNG or JPG — @react-pdf reads no WebP or SVG file). It
+   * REPLACES the typed name; without one the masthead sets the name in type.
+   * Today /forms passes `public/logo-wordmark-white.png`, Donut Friend's own
+   * artwork; when orgs get
    * their own logo (planned 2026-09-25, docs/history/04p-tablet-shell.md) it
    * comes from there instead.
    */
@@ -281,11 +281,12 @@ export function QuoteAppStylePdf({
         return (
           <Page key={order.id} size="LETTER" style={s.page}>
             <View style={s.masthead} fixed>
-              <View style={s.brand}>
-                {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf's Image has no alt */}
-                {logoUrl ? <Image src={logoUrl} style={s.logo} /> : null}
+              {logoUrl ? (
+                // eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf's Image has no alt
+                <Image src={logoUrl} style={s.logo} />
+              ) : (
                 <Text style={s.wordmark}>{org.name}</Text>
-              </View>
+              )}
               <View style={s.mastheadRight}>
                 {org.addressLine ? <Text style={s.mastheadLine}>{org.addressLine}</Text> : null}
                 {org.contactLine ? <Text style={s.mastheadLine}>{org.contactLine}</Text> : null}
