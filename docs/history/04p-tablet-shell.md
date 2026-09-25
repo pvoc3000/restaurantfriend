@@ -251,3 +251,11 @@
    task or document lists, and the runners' footers carry no
    `env(safe-area-inset-bottom)` yet.
 
+
+**SETTINGS ON THE HOME BAR (Mark, 2026-09-25).** A supervisor sets their PIN on
+`/account`, and a REGISTERED iPad gave no route there — its home screen had only
+the shop picker and Switch user. A gear cell, **Settings**, now sits between the
+two (`ICON_SETTINGS`, Material Symbols `settings` filled). It also replaced the
+unregistered tablet's person-icon **Account** cell, so both kinds of tablet say it
+the same way. Note that `/account` still refuses a PIN change in a PIN-minted
+session (097), so on the shared iPad the PIN is set while signed in with a password.

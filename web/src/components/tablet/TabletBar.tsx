@@ -12,7 +12,7 @@ import { TABLET_HOME } from "@/lib/shell";
 import { usePublishedHeight } from "@/lib/tableHead";
 import { BAR_CELL } from "./barCell";
 import { BarActions } from "./BarActions";
-import { BarLabel, ICON_HOME, ICON_LOGOUT, ICON_PERSON } from "./BarLabel";
+import { BarLabel, ICON_HOME, ICON_LOGOUT, ICON_SETTINGS } from "./BarLabel";
 import { BarRecordNav } from "./BarRecordNav";
 import { TabletBack } from "./TabletBack";
 
@@ -23,7 +23,7 @@ import { TabletBack } from "./TabletBack";
  * in a detail view the nav buttons to go to next/last would be helpful.")
  *
  * Back · Home · [screen commands] · [record book], and — ON THE LANDING PAGE
- * ONLY — the shop picker and Switch user (Mark, 2026-09-09: "to make room for
+ * ONLY — the shop picker, Settings and Switch user (Mark, 2026-09-09: "to make room for
  * other controls, location switching and the account button only need to be on
  * the landing/home page. I don't think we need the title of the page in the
  * menu bar, either"). Every cell is a 64px box with the icon over its word, the
@@ -80,13 +80,19 @@ export function TabletBar({
         {atHome && (
           <div className="flex items-center gap-4 px-3">
             <WorkingLocation locations={locations} working={working} size="lg" />
+            {/* SETTINGS, ON EVERY TABLET (Mark, 2026-09-25): a supervisor
+                sets their PIN on /account, and a REGISTERED iPad offered no
+                way there — its home screen had only the picker and Switch
+                user. The desk masthead's gear, in the bar's dress. It
+                replaced the unregistered tablet's "Account" cell, so both
+                kinds of tablet say it the same way. */}
+            <Link href="/account" className={BAR_CELL}>
+              <BarLabel icon={ICON_SETTINGS} word="Settings" />
+            </Link>
             {registeredDevice ? (
               <SwitchUser size="lg" />
             ) : (
               <>
-                <Link href="/account" className={BAR_CELL}>
-                  <BarLabel icon={ICON_PERSON} word="Account" />
-                </Link>
                 {/* AN UNREGISTERED TABLET GETS SIGN OUT ON ITS HOME SCREEN
                     (Mark, 2026-09-24). With no device cookie there is no idle
                     lock and no PIN picker, so whoever signed in last stays
