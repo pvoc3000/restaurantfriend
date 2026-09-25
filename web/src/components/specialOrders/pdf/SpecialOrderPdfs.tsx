@@ -57,6 +57,7 @@ import {
 } from "@/lib/specialOrderDocs";
 
 import { customerLabel, lineTotal } from "@/lib/specialOrders";
+import { dateInTimeZone, serverTimeZone } from "@/lib/today";
 
 /** The three customer documents — the kitchen order is a different layout. */
 export type CustomerDocumentKind = Exclude<DocumentKind, "order">;
@@ -314,6 +315,34 @@ function isoDay(iso: string | null | undefined): string {
   return `${WEEKDAY[day]} ${m[0]}`;
 }
 
+/**
+ * An approval instant as the shop reads it: `2026-09-19` and `10:42 AM PDT`,
+ * in the org's zone. The signed quote is rendered in the CUSTOMER's browser,
+ * so without the org's zone this printed the raw UTC instant and dated an
+ * evening approval in Los Angeles the next day (fixed 2026-09-25). Falls back
+ * to the rendering host's zone when the org has not set one, and to the raw
+ * string if it will not parse.
+ */
+function approvalStamp(at: string, timeZone: string | null): { date: string; time: string } {
+  const instant = new Date(at);
+  if (Number.isNaN(instant.getTime())) return { date: at.slice(0, 10), time: at };
+  const zone = timeZone || serverTimeZone();
+  try {
+    return {
+      date: dateInTimeZone(at, zone),
+      time: new Intl.DateTimeFormat("en-US", {
+        timeZone: zone,
+        hour: "numeric",
+        minute: "2-digit",
+        timeZoneName: "short",
+      }).format(instant),
+    };
+  } catch {
+    // An unknown zone name in settings — say so in UTC rather than throw.
+    return { date: at.slice(0, 10), time: `${at.slice(11, 16)} UTC` };
+  }
+}
+
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   const v = (value ?? "").trim();
   return (
@@ -358,6 +387,7 @@ export function OrderDocumentPdf({
           kind === "quote" ? order.notes_quote : kind === "invoice" ? order.notes_invoice : order.notes_receipt;
         const grand = kind === "quote" ? t.total : t.balance;
         const marked = !(kind === "receipt" && t.balance <= 0);
+        const stamp = approval ? approvalStamp(approval.at, org.timeZone) : null;
         return (
           <Page key={order.id} size="LETTER" style={s.page}>
             <View style={s.masthead} fixed>
@@ -508,7 +538,7 @@ export function OrderDocumentPdf({
                           <>
                             <Text style={s.signValue}>Approved online by {approval.name}</Text>
                             <Text style={s.signSub}>
-                              {approval.at} · reference {approval.reference}
+                              {stamp?.date} · {stamp?.time} · reference {approval.reference}
                             </Text>
                           </>
                         ) : null}
@@ -517,7 +547,7 @@ export function OrderDocumentPdf({
                     <View style={s.signDate}>
                       <Text style={s.signLabel}>Date</Text>
                       <View style={s.signBox}>
-                        {approval ? <Text style={s.signValue}>{approval.at.slice(0, 10)}</Text> : null}
+                        {stamp ? <Text style={s.signValue}>{stamp.date}</Text> : null}
                       </View>
                     </View>
                   </View>

@@ -157,13 +157,14 @@ export type QuoteSnapshot = {
   }[];
   totals: OrderDocData["totals"];
   notes_quote: string | null;
-  org: { name: string; addressLine: string; contactLine: string; terms: string };
+  /** `timeZone` is absent on snapshots written before 2026-09-25. */
+  org: { name: string; addressLine: string; contactLine: string; terms: string; timeZone?: string | null };
   sent_on: string;
 };
 
 export function quoteSnapshot(
   order: OrderDocData,
-  org: { name: string; addressLine: string; contactLine: string; terms: string },
+  org: QuoteSnapshot["org"],
   today: string
 ): QuoteSnapshot {
   return {
@@ -239,7 +240,7 @@ export function offersPayLink(
  *  page renders one field for "what the paper said underneath". */
 export function invoiceSnapshot(
   order: OrderDocData,
-  org: { name: string; addressLine: string; contactLine: string; terms: string },
+  org: QuoteSnapshot["org"],
   today: string
 ): QuoteSnapshot {
   return { ...quoteSnapshot(order, org, today), notes_quote: order.notes_invoice };

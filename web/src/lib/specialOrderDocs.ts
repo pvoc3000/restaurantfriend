@@ -280,6 +280,11 @@ export type DocOrg = {
   /** Where a customer reply should go — the statement and quote emails use it,
    *  and the approval page prints it. */
   replyTo: string | null;
+  /** `orgs.settings.timezone`. It rides into the quote snapshot, so the signed
+   *  quote — rendered in the CUSTOMER's browser — can date the approval in the
+   *  shop's zone rather than UTC (2026-09-25: an evening approval in Los
+   *  Angeles was dated the next day). Null when the org has not set one. */
+  timeZone: string | null;
 };
 
 export type OrderDocData = {
@@ -602,6 +607,7 @@ export function docOrgFrom(orgName: string, settings: Record<string, unknown>): 
   const soSettings = (settings?.special_orders ?? {}) as Record<string, unknown>;
   return {
     ...orgDocHeader(orgName, settings),
+    timeZone: typeof settings?.timezone === "string" && settings.timezone ? settings.timezone : null,
     terms: typeof soSettings.terms === "string" ? soSettings.terms : "",
     invoiceFooter: typeof soSettings.invoice_footer === "string" ? soSettings.invoice_footer : "",
   };

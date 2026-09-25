@@ -11,7 +11,7 @@ import {
   documentFileName,
   fetchStatementData,
   lastWeek,
-  orgDocHeader,
+  docOrgFrom,
   usDate,
   type StatementData,
 } from "@/lib/specialOrderDocs";
@@ -81,17 +81,11 @@ export function CustomerStatement({
    * The org header comes from the SAME assembler the documents use, which
    * needs an order to hang off. A customer with no orders in range still has
    * orders somewhere; with none at all the masthead falls back to the org's
-   * own settings, which is what `orgDocHeader` reads anyway.
+   * own settings, which is what `docOrgFrom` reads anyway.
    */
   async function orgHeader() {
     const { data: org } = await supabase.from("orgs").select("name, settings").maybeSingle();
-    const settings = (org?.settings ?? {}) as Record<string, unknown>;
-    const so = (settings.special_orders ?? {}) as Record<string, unknown>;
-    return {
-      ...orgDocHeader((org?.name as string) ?? "", settings),
-      terms: typeof so.terms === "string" ? so.terms : "",
-      invoiceFooter: typeof so.invoice_footer === "string" ? so.invoice_footer : "",
-    };
+    return docOrgFrom((org?.name as string) ?? "", (org?.settings ?? {}) as Record<string, unknown>);
   }
 
   async function render() {

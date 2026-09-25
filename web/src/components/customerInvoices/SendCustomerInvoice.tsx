@@ -13,7 +13,7 @@ import { customerLabel, money, readSettings } from "@/lib/specialOrders";
 import {
   DEFAULT_TEMPLATES,
   fillTemplate,
-  orgDocHeader,
+  docOrgFrom,
   usDate,
   type DocOrg,
 } from "@/lib/specialOrderDocs";
@@ -53,12 +53,7 @@ import {
 export async function loadOrg(supabase: SupabaseClient) {
   const { data: org } = await supabase.from("orgs").select("name, settings").maybeSingle();
   const settings = (org?.settings ?? {}) as Record<string, unknown>;
-  const so = (settings.special_orders ?? {}) as Record<string, unknown>;
-  const doc: DocOrg = {
-    ...orgDocHeader((org?.name as string) ?? "", settings),
-    terms: typeof so.terms === "string" ? so.terms : "",
-    invoiceFooter: typeof so.invoice_footer === "string" ? so.invoice_footer : "",
-  };
+  const doc: DocOrg = docOrgFrom((org?.name as string) ?? "", settings);
   return { settings, doc };
 }
 

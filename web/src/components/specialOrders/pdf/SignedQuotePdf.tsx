@@ -109,6 +109,9 @@ export function SignedQuotePdf({
         ...quote.org,
         invoiceFooter: "",
         replyTo: null,
+        // Carried by snapshots sent since 2026-09-25; an older one dates the
+        // approval in the rendering browser's zone (see `approvalStamp`).
+        timeZone: quote.org.timeZone ?? null,
       }}
       kind="quote"
       approval={{
