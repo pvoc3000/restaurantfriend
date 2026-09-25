@@ -720,30 +720,21 @@ export default async function RunShiftReportPage({
    * premades. A special-order schedule with no lines has nothing to count and
    * gets no page.
    */
-  const premadePages: { title: string; body: React.ReactNode }[] = [];
+  const premadeSections: {
+    title: string;
+    key: string;
+    scheduleTitle: string | null;
+    rows: PremadeRow[];
+  }[] = [];
   if (wants("premades")) {
     const special = (t: Record<string, unknown>) => t.source === "special_order";
     const planSchedules = todayScheduleRows.filter((t) => !special(t));
     const orderSchedules = todayScheduleRows.filter(
       (t) => special(t) && premadeRows.some((r) => r.scheduleId === t.id)
     );
-    const pageFor = (title: string, key: string, scheduleTitle: string | null, rows: PremadeRow[]) =>
-      premadePages.push({
-        title,
-        body: (
-          <PremadesPage
-            key={key}
-            reportId={id}
-            orgId={report.org_id as string}
-            locationId={report.location_id as string}
-            reportDate={reportDate}
-            scheduleTitle={scheduleTitle}
-            rows={rows}
-            editable={editable}
-          />
-        ),
-      });
-    if (planSchedules.length === 0) pageFor("Premades", "premades", null, []);
+    if (planSchedules.length === 0) {
+      premadeSections.push({ title: "Premades", key: "premades", scheduleTitle: null, rows: [] });
+    }
     for (const t of planSchedules) {
       const title = (t.title as string | null) ?? null;
       // Two plan schedules on one day are two KITCHENS feeding this shop, so
@@ -751,23 +742,38 @@ export default async function RunShiftReportPage({
       const kitchenCode =
         session.locations.find((l) => l.id === t.kitchen_location_id)?.code ?? null;
       const label = title ?? (planSchedules.length > 1 && kitchenCode ? `made at ${kitchenCode}` : null);
-      pageFor(
-        label ? `Premades — ${label}` : "Premades",
-        `premades-${t.id as string}`,
-        title,
-        premadeRows.filter((r) => r.scheduleId === t.id)
-      );
+      premadeSections.push({
+        title: label ? `Premades — ${label}` : "Premades",
+        key: `premades-${t.id as string}`,
+        scheduleTitle: title,
+        rows: premadeRows.filter((r) => r.scheduleId === t.id),
+      });
     }
     for (const t of orderSchedules) {
       const title = (t.title as string | null) ?? "Special order";
-      pageFor(
-        `Special order — ${title}`,
-        `premades-${t.id as string}`,
-        title,
-        premadeRows.filter((r) => r.scheduleId === t.id)
-      );
+      premadeSections.push({
+        title: `Special order — ${title}`,
+        key: `premades-${t.id as string}`,
+        scheduleTitle: title,
+        rows: premadeRows.filter((r) => r.scheduleId === t.id),
+      });
     }
   }
+  const premadePages: { title: string; body: React.ReactNode }[] = premadeSections.map((s) => ({
+    title: s.title,
+    body: (
+      <PremadesPage
+        key={s.key}
+        reportId={id}
+        orgId={report.org_id as string}
+        locationId={report.location_id as string}
+        reportDate={reportDate}
+        scheduleTitle={s.scheduleTitle}
+        rows={s.rows}
+        editable={editable}
+      />
+    ),
+  }));
 
   if (wants("elements")) {
     bodies.elements = (
@@ -858,15 +864,22 @@ export default async function RunShiftReportPage({
     salesAreProvisional: settledToday === null && storedToday !== null,
     lastWeekNetCents: salesByDate.get(lastWeekDate)?.netCents ?? null,
     lastYearNetCents: salesByDate.get(lastYearDate)?.netCents ?? null,
-    premades: premadeRows.map((r) => ({
-      name: r.name,
-      par: r.par,
-      made: r.made,
-      leftover: r.leftover,
-      // The SUPERVISOR's note, not the schedule's instruction: the email
-      // reports the night, and what the kitchen was asked to do is already on
-      // the packet they were handed.
-      note: r.countNote,
+    // ONE SECTION PER SCHEDULE, headed by the runner's own page title (Mark,
+    // 2026-09-25: "the shop's premades in one section, and each special order
+    // or wholesale order separated by itself"). The same list the pages are
+    // built from, so the email and the screen cannot name a schedule twice.
+    premades: premadeSections.map((s) => ({
+      title: s.title,
+      lines: s.rows.map((r) => ({
+        name: r.name,
+        par: r.par,
+        made: r.made,
+        leftover: r.leftover,
+        // The SUPERVISOR's note, not the schedule's instruction: the email
+        // reports the night, and what the kitchen was asked to do is already on
+        // the packet they were handed.
+        note: r.countNote,
+      })),
     })),
     elements: elementRows.map((r) => ({
       name: r.elementName,

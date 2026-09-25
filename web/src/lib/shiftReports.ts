@@ -431,13 +431,21 @@ export type EmailReport = {
   salesAreProvisional: boolean;
   lastWeekNetCents: number | null;
   lastYearNetCents: number | null;
+  /**
+   * One section per production schedule, in the runner's page order: the
+   * shop's own premades, then each special or wholesale order by itself (Mark,
+   * 2026-09-25). `title` is the runner's page title and becomes the heading.
+   */
   premades: {
-    name: string;
-    par: number | null;
-    made: number | null;
-    leftover: number | null;
-    /** The supervisor's note about this count — migration 081. */
-    note: string | null;
+    title: string;
+    lines: {
+      name: string;
+      par: number | null;
+      made: number | null;
+      leftover: number | null;
+      /** The supervisor's note about this count — migration 081. */
+      note: string | null;
+    }[];
   }[];
   elements: { name: string; yield: string | null; status: string | null }[];
   ratings: EmailRating[];
@@ -715,14 +723,17 @@ export function supervisorBody(report: EmailReport): string {
   parts.push(`<h3 style="${S.h3}">Sales</h3>`);
   parts.push(salesLine(report));
 
-  if (report.premades.length > 0) {
+  // A section with no lines is left out: the empty Premades page exists for
+  // its Generate button, and there is nothing to report from it.
+  for (const section of report.premades) {
+    if (section.lines.length === 0) continue;
     parts.push(
-      `<h3 style="${S.h3}">Premades</h3><table style="${S.table}"><tr>` +
+      `<h3 style="${S.h3}">${esc(section.title)}</h3><table style="${S.table}"><tr>` +
         `<th style="${S.th}">Item</th><th style="${S.thr}">Par</th>` +
         `<th style="${S.thr}">Made</th><th style="${S.thr}">Left</th>` +
         `<th style="${S.th}">Note</th></tr>`
     );
-    for (const p of report.premades) {
+    for (const p of section.lines) {
       parts.push(
         `<tr><td style="${S.td}">${esc(p.name)}</td><td style="${S.tdr}">${p.par ?? "—"}</td>` +
           `<td style="${S.tdr}">${p.made ?? "—"}</td><td style="${S.tdr}">${p.leftover ?? "—"}</td>` +

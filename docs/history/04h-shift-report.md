@@ -639,3 +639,13 @@
    following — the iOS failure mode — onto a calculator field, an InlineValue
    cell and a plain text field: one tap each, and a typed 73 saved on the way.
    Still to confirm on the iPad itself.
+
+   **THE EMAIL'S PREMADES ARE ONE SECTION PER SCHEDULE** (Mark, 2026-09-25:
+   "I want to see the shop's premades in one section, and each special order or
+   wholesale order separated by itself"). `EmailReport.premades` is now a list
+   of `{ title, lines }`, and each is its own heading + table. The titles are
+   the runner's page titles — the page builds one `premadeSections` list and
+   both the pages and the email read it, so the screen and the inbox name a
+   schedule the same way ("Premades", "Special order — #9761 · Cafe Knotted").
+   A section with no lines (the empty Premades page kept for its Generate
+   button) is left out of the email. Fixture pins order and placement.

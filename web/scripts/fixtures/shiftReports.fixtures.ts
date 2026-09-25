@@ -407,7 +407,18 @@ const REPORT: EmailReport = {
   lastWeekNetCents: 181519,
   lastYearNetCents: 171399,
   premades: [
-    { name: "Angry Samoa", par: 12, made: 12, leftover: 3, note: "Dropped a tray, re-fried" },
+    {
+      title: "Premades",
+      lines: [
+        { name: "Angry Samoa", par: 12, made: 12, leftover: 3, note: "Dropped a tray, re-fried" },
+      ],
+    },
+    {
+      title: "Special order — #9761 · Cafe Knotted",
+      lines: [{ name: "Glazed", par: 24, made: 24, leftover: 0, note: null }],
+    },
+    // The empty Premades page a day with no plan schedule still gets.
+    { title: "Premades — made at DF01", lines: [] },
   ],
   elements: [],
   // A realistic outstanding list, ON THE SHARED REPORT for the same reason the
@@ -513,6 +524,19 @@ test("both emails carry the shift facts a supervisor needs", () => {
     ok(body.includes("Compressor icing again"), "the flagged issue");
     ok(body.includes("expected 34–40 °F"), "the bound it missed");
   }
+});
+
+test("premades are one section per schedule, headed by its name", () => {
+  // Mark, 2026-09-25: the shop's premades together, each special or wholesale
+  // order by itself.
+  const body = supervisorBody(REPORT);
+  const shop = body.indexOf(">Premades</h3>");
+  const order = body.indexOf(">Special order — #9761 · Cafe Knotted</h3>");
+  ok(shop >= 0, "the shop's premades heading");
+  ok(order > shop, "the special order after the shop's premades");
+  ok(body.indexOf("Angry Samoa") > shop && body.indexOf("Angry Samoa") < order, "shop line under its heading");
+  ok(body.indexOf("Glazed") > order, "order line under its own heading");
+  no(body.includes("made at DF01"), "an empty schedule gets no section");
 });
 
 test("the supervisor's note on a count reaches the email", () => {
