@@ -23,7 +23,7 @@
 //   · The totals sit in a Classic Mac window (black title bar, hard shadow),
 //     the CalcPad's frame, and the grand total wears the ONE yellow fill.
 
-import { Document, Font, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
   usTime,
   type DocOrg,
@@ -49,9 +49,6 @@ const caps = (size: number, em: number) => ({
 });
 
 const PAGE_X = 40;
-
-/** Width ÷ height of `public/logo-wordmark-white.png` (2000 × 216 as drawn). */
-const LOGO_ASPECT = 2000 / 216;
 
 const s = StyleSheet.create({
   page: {
@@ -86,12 +83,6 @@ const s = StyleSheet.create({
 
   /* ---- page heading ---- */
   headingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  /* The org's WORDMARK takes the typed name's place on the band (Mark,
-     2026-09-25: "use this in place of the mark and remove the text"). WHITE
-     ON TRANSPARENT artwork made for a dark ground — the square app icon was a
-     black tile and melted into the band. Height is fixed and width follows the
-     artwork (`LOGO_ASPECT`), so a different wordmark only needs its ratio. */
-  logo: { height: 14, width: 14 * LOGO_ASPECT },
   kicker: { ...caps(7.5, 0.12), color: SUBTLE },
   h1: {
     ...caps(22, -0.02),
@@ -257,21 +248,10 @@ export function QuoteAppStylePdf({
   orders,
   org,
   approval,
-  logoUrl,
 }: {
   orders: OrderDocData[];
   org: DocOrg;
   approval?: { name: string; at: string; reference: string } | null;
-  /**
-   * The org's wordmark for a dark ground, as a URL or `data:` URI the
-   * renderer can fetch (PNG or JPG — @react-pdf reads no WebP or SVG file). It
-   * REPLACES the typed name; without one the masthead sets the name in type.
-   * Today /forms passes `public/logo-wordmark-white.png`, Donut Friend's own
-   * artwork; when orgs get
-   * their own logo (planned 2026-09-25, docs/history/04p-tablet-shell.md) it
-   * comes from there instead.
-   */
-  logoUrl?: string | null;
 }) {
   return (
     <Document>
@@ -281,12 +261,7 @@ export function QuoteAppStylePdf({
         return (
           <Page key={order.id} size="LETTER" style={s.page}>
             <View style={s.masthead} fixed>
-              {logoUrl ? (
-                // eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf's Image has no alt
-                <Image src={logoUrl} style={s.logo} />
-              ) : (
-                <Text style={s.wordmark}>{org.name}</Text>
-              )}
+              <Text style={s.wordmark}>{org.name}</Text>
               <View style={s.mastheadRight}>
                 {org.addressLine ? <Text style={s.mastheadLine}>{org.addressLine}</Text> : null}
                 {org.contactLine ? <Text style={s.mastheadLine}>{org.contactLine}</Text> : null}

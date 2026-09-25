@@ -130,7 +130,6 @@ async function buildElement(
           orders={[s.sampleQuoteOrder]}
           org={docOrg}
           approval={form === "signed-quote-app" ? s.sampleApproval : null}
-          logoUrl={`${window.location.origin}/logo-wordmark-white.png`}
         />
       );
     }
