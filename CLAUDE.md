@@ -474,7 +474,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   re-send keeps the number (128); "Sold as" is the order's (129). What is NOT
   yet moved: receipts, "who owes us" read from invoices, and retiring the
   per-order pay path — ask before each.
-  **DEPOSITS (Mark, 2026-09-25, migration 138 WRITTEN):** opt-in per ORDER
+  **DEPOSITS (Mark, 2026-09-25, migration 138 APPLIED, square-pay v10):** opt-in per ORDER
   (`special_orders.deposit_rate`, Settings' 10% copied on when switched on);
   the invoice's pay link offers "Deposit" OR "Pay in full"; approving a quote
   that asks for one makes the order's invoice as a draft, no payment. Every

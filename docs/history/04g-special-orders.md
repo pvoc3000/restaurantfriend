@@ -12,7 +12,7 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
-   **Shipped 2026-09-25, MIGRATION 138 WRITTEN, NOT YET APPLIED — DEPOSITS,
+   **Shipped 2026-09-25, MIGRATION 138 APPLIED (Mark, same day), `square-pay` v10 DEPLOYED — DEPOSITS,
    AS A PART OF THE ORDER'S ONE INVOICE.** Mark: "Being able to place a deposit
    is my next priority here. I want to get it right." First the research he
    asked for: QuickBooks has two deposit flows — a deposit requested on the
@@ -80,7 +80,7 @@
    claim. Fixtures 2,104 (`deposits.fixtures.ts`; the cap and the
    strict-less-than each broken to see red). tsc, lint. NOT verified in the
    pane — the hosted DB has no 138 yet — and no `deno check` (no Deno here).
-   **Deploy order:** apply 138 (safe with today's `square-pay`: the new claim
+   **Deploy order (done):** apply 138 (safe with the old `square-pay`: the new claim
    defaults to the balance), THEN redeploy `square-pay`. The order screen and
    the invoice read `deposit_rate`, so they fail until 138 is applied.
    **Open:** the invoice made on approval takes the org's terms as its due
