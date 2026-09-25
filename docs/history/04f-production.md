@@ -1688,3 +1688,18 @@ data (`generate`), since a server page cannot hand the menu functions.
 Gating unchanged: the ticks and Print are supervisor+ (`stampable`), Delete
 also needs purchaser+ (`editable`), Generate needs purchaser+ and a working
 kitchen.
+
+**THE RECIPE SHEET IS REDRAWN IN THE APP'S OWN DESIGN LANGUAGE (2026-09-25).**
+Mark: "now do the recipe sheet in the same style". From the shared
+`components/pdf/appDocument` parts: the black masthead band ("Recipe · Printed
+…"), the recipe's name as the page heading with its VERSION large where a
+record's number sits (FileMaker's centred "NAME V10" banner is gone), the two
+bordered header panels as Recipe and Keeping field blocks, `DataTable`'s head
+over the ingredients with the batch labels as column heads and NO vertical
+rules, section heads with counts for Ingredients and Procedure, bold grey step
+numbers, and "Page n of N" in the footer. What the sheet carries and omits (no
+money, no notes, no percentages; the mixer/yield/prep rows), the quantity/unit
+split, the group gaps from the sort-number holes and the photo beside its step
+are all unchanged. Two small corrections on the way: the unit now sits on its
+number's line instead of riding high like a superscript, and PrintRecipe passes
+ISO dates (Created, Printed) instead of the browser's locale format.

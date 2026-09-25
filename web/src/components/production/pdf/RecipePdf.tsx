@@ -31,8 +31,24 @@
 // single figure sat above a row saying 0.5 / 0.5 / 0.6 / 0.7 hr, and where the
 // two disagree only the row can say which batch it means.
 
+// DRAWN IN THE APP'S OWN DESIGN LANGUAGE since 2026-09-25 (Mark: "now do the
+// recipe sheet in the same style"), from the shared `components/pdf/appDocument`
+// parts every other document uses: the black masthead band, the recipe's name
+// as the page heading with its version where a record's number sits, the two
+// header panels as field blocks, `DataTable`'s head over the ingredients (no
+// vertical rules — the app draws none), and section heads for Ingredients and
+// Procedure. Everything above about what the sheet carries and omits, and the
+// batch columns, the quantity/unit split, the group gaps and the step photos,
+// is unchanged. The previous look is in git history at f6690601.
+
 import React from "react";
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import {
+  DocFooter,
+  Field,
+  SUBTLE,
+  docStyles,
+} from "@/components/pdf/appDocument";
 import { scaleColumns, columnCell, formatCell, type ScaleColumn } from "@/lib/production";
 
 export type RecipePdfLine = {
@@ -83,76 +99,39 @@ export type RecipePdfData = {
   printedOn: string;
 };
 
-const RULE = "#111";
-const HAIR = "#bbb";
-const MUTED = "#666";
+const styles = {
+  ...docStyles,
+  ...StyleSheet.create({
+    /* Ingredients. Name on the LEFT and the batch columns on the right — Mark's
+       preference over FileMaker's, which puts the amounts first. */
+    colName: { flexGrow: 1, flexBasis: 0, paddingRight: 8 },
+    // Bottom-aligned so the smaller unit sits on the number's line rather
+    // than riding at its cap height like a superscript.
+    colAmount: { width: 76, flexDirection: "row", alignItems: "flex-end", paddingLeft: 6, paddingRight: 4 },
+    // The label sits over the NUMBER, not the unit: the unit's 22pt is padded
+    // off its right edge so the two right edges meet.
+    headAmount: { width: 76, paddingLeft: 6, paddingRight: 26, textAlign: "right" },
+    amountQty: { flexGrow: 1, flexBasis: 0, textAlign: "right", paddingRight: 4, fontSize: 10 },
+    /* Same ink as the number, a size down. FileMaker sets them this way and it
+       is right: the unit is part of the amount, not an annotation on it, and
+       greying it made a column of "g" and "kg" read as decoration — which is
+       exactly the difference between 780 g and 1.56 kg. */
+    amountUnit: { width: 22, fontSize: 8, paddingBottom: 0.5 },
 
-const styles = StyleSheet.create({
-  page: { paddingHorizontal: 32, paddingTop: 28, paddingBottom: 54, fontSize: 9, fontFamily: "Helvetica", color: "#111" },
+    row: { flexDirection: "row", paddingVertical: 3.5, alignItems: "flex-end" },
+    name: { fontSize: 10 },
+    /* The gap where FileMaker had a separator row. Height, not a rule: the
+       source grouped with white space and so does this. */
+    gap: { height: 9 },
 
-  /* The banner. Black, full width, the name and version centred in it —
-     FileMaker sets it in green and Mark's note says white is fine, which is
-     also the only colour this app's design system allows on a black band. */
-  banner: { backgroundColor: "#111", paddingVertical: 8, paddingHorizontal: 10 },
-  bannerText: { color: "#fff", fontSize: 15, fontFamily: "Helvetica-Bold", textAlign: "center", letterSpacing: 0.5 },
-
-  /* The header block: two bordered panels under the banner. */
-  header: { flexDirection: "row", borderWidth: 1, borderColor: RULE, borderTopWidth: 0 },
-  panel: { flexGrow: 1, flexBasis: 0, padding: 8 },
-  panelDivider: { borderLeftWidth: 1, borderLeftColor: RULE },
-  factRow: { flexDirection: "row", marginBottom: 4 },
-  factLabel: { width: 74, fontSize: 8, fontFamily: "Helvetica-Bold", textAlign: "right", paddingRight: 8 },
-  factValue: { flexGrow: 1, flexBasis: 0, fontSize: 9 },
-
-  sectionTitle: {
-    fontSize: 11,
-    fontFamily: "Helvetica-Bold",
-    marginTop: 16,
-    marginBottom: 6,
-    paddingBottom: 2,
-    borderBottomWidth: 1,
-    borderBottomColor: RULE,
-    alignSelf: "flex-start",
-  },
-
-  /* Ingredients. Name on the LEFT and the batch columns on the right — Mark's
-     preference over FileMaker's, which puts the amounts first. */
-  headRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: RULE, paddingBottom: 3, marginBottom: 3 },
-  colName: { flexGrow: 1, flexBasis: 0, paddingRight: 8 },
-  colAmount: { width: 76, flexDirection: "row", paddingLeft: 6, paddingRight: 4, borderLeftWidth: 1, borderLeftColor: HAIR },
-  headAmount: { width: 76, paddingLeft: 6, paddingRight: 26, fontSize: 9, fontFamily: "Helvetica-Bold", textAlign: "right" },
-  amountQty: { flexGrow: 1, flexBasis: 0, textAlign: "right", paddingRight: 4, fontSize: 10 },
-  /* Same ink as the number, a size down. FileMaker sets them this way and it is
-     right: the unit is part of the amount, not an annotation on it, and greying
-     it made a column of "g" and "kg" read as decoration — which is exactly the
-     difference between 780 g and 1.56 kg. */
-  amountUnit: { width: 22, fontSize: 8 },
-
-  row: { flexDirection: "row", paddingVertical: 3, alignItems: "flex-end" },
-  name: { fontSize: 10 },
-  /* The gap where FileMaker had a separator row. Height, not a rule: the source
-     grouped with white space and so does this. */
-  gap: { height: 9 },
-
-  /* Procedure. */
-  step: { flexDirection: "row", marginBottom: 8 },
-  stepNumber: { width: 18, fontSize: 10, color: MUTED },
-  stepBody: { flexGrow: 1, flexBasis: 0, fontSize: 10, lineHeight: 1.35, paddingRight: 10 },
-  stepImage: { width: 96, objectFit: "contain" },
-
-  footer: {
-    position: "absolute",
-    bottom: 22,
-    left: 32,
-    right: 32,
-    fontSize: 8,
-    color: MUTED,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  footerSide: { flexGrow: 1, flexBasis: 0 },
-  footerOrg: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "#111", textAlign: "center" },
-});
+    /* Procedure. */
+    procedure: { marginTop: 22 },
+    step: { flexDirection: "row", marginBottom: 9 },
+    stepNumber: { width: 20, fontSize: 10, fontFamily: "Helvetica-Bold", color: SUBTLE },
+    stepBody: { flexGrow: 1, flexBasis: 0, fontSize: 10, lineHeight: 1.35, paddingRight: 10 },
+    stepImage: { width: 96, objectFit: "contain" },
+  }),
+};
 
 export function RecipePdf({ data }: { data: RecipePdfData }) {
   const columns = scaleColumns(data.scaleLabels, data.scaleMultipliers);
@@ -167,14 +146,29 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
   return (
     <Document title={`${data.recipeName} v${data.versionLabel}`}>
       <Page size="LETTER" style={styles.page}>
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>
-            {data.recipeName.toUpperCase()} V{data.versionLabel}
-          </Text>
+        <View style={styles.masthead} fixed>
+          <Text style={styles.wordmark}>{data.orgName}</Text>
+          <View style={styles.mastheadRight}>
+            <Text style={styles.mastheadLine}>Recipe</Text>
+            <Text style={styles.mastheadLine}>Printed {data.printedOn}</Text>
+          </View>
         </View>
 
-        <View style={styles.header}>
-          <View style={styles.panel}>
+        <View style={styles.body}>
+        <View style={styles.headingRow}>
+          <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
+            <Text style={styles.kicker}>Recipe</Text>
+            <Text style={styles.h1}>{data.recipeName}</Text>
+          </View>
+          <View style={styles.numberBlock}>
+            <Text style={styles.kicker}>Version</Text>
+            <Text style={styles.number}>{data.versionLabel}</Text>
+          </View>
+        </View>
+
+        <View style={styles.blocks}>
+          <View style={styles.block}>
+            <Text style={styles.sectionHead}>Recipe</Text>
             {/* CREATED but not MODIFIED, which is the one place this departs
                 from FileMaker's block on purpose. `updated_at` is maintained by
                 a trigger and says when the ROW last changed — for every
@@ -185,23 +179,27 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
                 how settled this recipe is. `backfill-recipe-created.mjs` keeps
                 FMP's modification date in `source_payload` for the day it earns
                 a column. */}
-            <Fact label="Created">{data.createdAt ?? "—"}</Fact>
-            {data.author ? <Fact label="Author">{data.author}</Fact> : null}
-            {data.info ? <Fact label="Info">{data.info}</Fact> : null}
+            <Field label="Created" value={data.createdAt} />
+            {data.author ? <Field label="Author" value={data.author} /> : null}
+            {data.info ? <Field label="Info" value={data.info} /> : null}
           </View>
-          <View style={[styles.panel, styles.panelDivider]}>
-            <Fact label="Shelf life">{data.shelfLife ?? "—"}</Fact>
-            <Fact label="Storage">{data.storage ?? "—"}</Fact>
-            {data.tools ? <Fact label="Tools">{data.tools}</Fact> : null}
+          <View style={styles.block}>
+            <Text style={styles.sectionHead}>Keeping</Text>
+            <Field label="Shelf life" value={data.shelfLife} />
+            <Field label="Storage" value={data.storage} />
+            {data.tools ? <Field label="Tools" value={data.tools} /> : null}
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>INGREDIENTS</Text>
+        <View style={styles.items}>
+        <Text style={[styles.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
+          Ingredients <Text style={styles.sectionCount}>{printed.length}</Text>
+        </Text>
 
-        <View style={styles.headRow}>
-          <View style={styles.colName} />
+        <View style={styles.tableHead} fixed>
+          <Text style={[styles.th, styles.colName]}>Ingredient</Text>
           {amountColumns.map((c) => (
-            <Text key={c.index} style={styles.headAmount}>
+            <Text key={c.index} style={[styles.th, styles.headAmount]}>
               {c.label}
             </Text>
           ))}
@@ -220,10 +218,13 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
             </View>
           </React.Fragment>
         ))}
+        </View>
 
         {data.steps.length ? (
-          <>
-            <Text style={styles.sectionTitle}>PROCEDURE</Text>
+          <View style={styles.procedure}>
+            <Text style={styles.sectionHead}>
+              Procedure <Text style={styles.sectionCount}>{data.steps.length}</Text>
+            </Text>
             {data.steps.map((s, i) => (
               <View key={i} style={styles.step} wrap={false}>
                 <Text style={styles.stepNumber}>{i + 1}</Text>
@@ -236,17 +237,11 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
                 {s.imageUrl ? <Image src={s.imageUrl} style={styles.stepImage} /> : null}
               </View>
             ))}
-          </>
+          </View>
         ) : null}
-
-        <View style={styles.footer} fixed>
-          <Text style={styles.footerSide}>printed: {data.printedOn}</Text>
-          <Text style={[styles.footerSide, styles.footerOrg]}>{data.orgName}</Text>
-          <Text
-            style={[styles.footerSide, { textAlign: "right" }]}
-            render={({ pageNumber }) => `P${pageNumber}`}
-          />
         </View>
+
+        <DocFooter>{`${data.orgName} · ${data.recipeName} · Version ${data.versionLabel}`}</DocFooter>
       </Page>
     </Document>
   );
@@ -313,15 +308,6 @@ function opensGroup(rows: RecipePdfLine[], i: number): boolean {
   const current = rows[i].sort;
   if (previous === null || current === null) return false;
   return current - previous > 1;
-}
-
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.factRow}>
-      <Text style={styles.factLabel}>{label.toUpperCase()}:</Text>
-      <Text style={styles.factValue}>{children}</Text>
-    </View>
-  );
 }
 
 /** Named so a caller can keep the type without importing the component. */

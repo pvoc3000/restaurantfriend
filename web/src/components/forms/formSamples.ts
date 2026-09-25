@@ -364,7 +364,7 @@ export function sampleRecipe(orgName: string): RecipePdfData {
   return {
     orgName,
     recipeName: "Raised Dough",
-    versionLabel: "v3",
+    versionLabel: "3",
     createdAt: "2025-03-14",
     author: "Sam",
     info: "The base dough for every raised donut. Mix cold; proof warm.",

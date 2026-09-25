@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { openWindowNow, showBlob } from "@/lib/poProcessing";
+import { dateInTimeZone, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { SheetVersion } from "./RecipeVersionSheet";
 import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 
@@ -76,7 +77,7 @@ export function PrintRecipe({
                 sort: l.sort,
               })),
               steps: version.steps.map((s) => ({ body: s.body, imageUrl: s.imageUrl })),
-              printedOn: new Date().toLocaleDateString(),
+              printedOn: todayInTimeZone(serverTimeZone()),
             }}
           />
         ).toBlob();
@@ -118,8 +119,10 @@ export function PrintRecipe({
  * not an ISO string. This is the one page in the app read by somebody who has
  * never seen a database.
  */
+/** The day a stamp fell on, ISO (`2025-03-14`) — the app's form for a date,
+ *  in this browser's zone, which at the shop is the shop's. */
 function formatStamp(value: string | null): string | null {
   if (!value) return null;
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toLocaleString();
+  return Number.isNaN(d.getTime()) ? null : dateInTimeZone(value, serverTimeZone());
 }
