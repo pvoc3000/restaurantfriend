@@ -498,8 +498,6 @@ export async function fetchOrderDocData(
   );
 
   const settings = (org.settings ?? {}) as Record<string, unknown>;
-  const soSettings = (settings.special_orders ?? {}) as Record<string, unknown>;
-  const header = orgDocHeader(org.name as string, settings);
 
   const orders: OrderDocData[] = rows.map((row) => {
     const lines = ((lineRows ?? []) as unknown as (DocumentLine & { order_id: string })[])
@@ -594,14 +592,18 @@ export async function fetchOrderDocData(
   // should come out in the order they were selected.
   orders.sort((a, b) => orderIds.indexOf(a.id) - orderIds.indexOf(b.id));
 
+  return { org: docOrgFrom(org.name as string, settings), orders };
+}
+
+/** The whole `DocOrg` from the org's name and settings — the masthead plus
+ *  decision 11's terms and invoice footer. Shared with /forms, so its samples
+ *  wear the header a customer is actually sent. */
+export function docOrgFrom(orgName: string, settings: Record<string, unknown>): DocOrg {
+  const soSettings = (settings?.special_orders ?? {}) as Record<string, unknown>;
   return {
-    org: {
-      ...header,
-      terms: typeof soSettings.terms === "string" ? soSettings.terms : "",
-      invoiceFooter:
-        typeof soSettings.invoice_footer === "string" ? soSettings.invoice_footer : "",
-    },
-    orders,
+    ...orgDocHeader(orgName, settings),
+    terms: typeof soSettings.terms === "string" ? soSettings.terms : "",
+    invoiceFooter: typeof soSettings.invoice_footer === "string" ? soSettings.invoice_footer : "",
   };
 }
 

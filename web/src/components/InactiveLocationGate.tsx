@@ -45,6 +45,8 @@ const UNSCOPED_ROUTES = [
   "/account",
   // Every control on one page, with fake data — nothing on it is a shop's.
   "/interface",
+  // Every printed document, with sample data — likewise nobody's shop.
+  "/forms",
 ];
 
 function isUnscopedRoute(pathname: string): boolean {

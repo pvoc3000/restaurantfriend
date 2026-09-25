@@ -39,6 +39,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   to get a login. Its labels are copied from the screens, so a relabelled button
   is also an edit to `app/guides/shift-report/page.tsx`; add a row to
   `app/guides/page.tsx` when a guide ships.
+  **`/forms` shows every printed document** (Mark, 2026-09-25) — the real
+  PDF components over `components/forms/formSamples.ts`, for layout work; URL
+  only, like `/interface`. A new PDF gets a row in `forms/formCatalog.ts`.
 - **Migration** (`migration/`): FMP data is LOADED to the hosted DB — 80 vendors,
   790 items, 2,888 vendor items, 1,237 item-locations, full PO history. Loader
   is `migration/load.mjs` (service_role, local only). Transformed JSON lives

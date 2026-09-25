@@ -63,7 +63,7 @@ const SAMPLE_LINES: DocumentLine[] = [
   line(6, "Mini Jelly", 36, 1.75, { item_donut: "Jelly", item_type: "Raised", item_finish: "Powdered", item_size: "Mini" }),
   line(7, "Giant Birthday Donut", 1, 45, { item_donut: "Birthday", item_type: "Raised", item_finish: "Sprinkles", item_size: "Giant" }, "“Happy 40th, Dana!” in white script"),
   line(8, "Vegan Cinnamon Sugar", 12, 3.5, { item_donut: "Cinnamon Sugar", item_type: "Vegan" }, "No size recorded — should still print on the kitchen sheet"),
-  line(9, "Delivery Fee - Zone 2", 1, 0, { item_type: "Misc" }, null, false),
+  line(9, "Window Box Upgrade", 12, 2, { item_type: "Misc" }, "Misc — kept off the kitchen sheet", false),
 ];
 
 const SAMPLE_MONEY: MoneyOrder = {
@@ -91,7 +91,7 @@ function sampleOrder(paid: number): OrderDocData {
     ready_by_time: "09:00",
     fulfillment: "delivery",
     allergen_info: "One guest has a tree-nut allergy — keep the vegan dozen boxed separately.",
-    taken_by: null,
+    taken_by: "Sam",
     taken_by_name: "Sam",
     date_initiated: "2026-09-18",
     contact_name: "Jordan Reyes",
@@ -513,12 +513,12 @@ export function sampleChecklist(orgName: string): ChecklistPdfData {
     shiftLabel: "AM",
     status: "submitted",
     walkedBy: "Sam",
-    submittedAt: "2026-09-25T06:12:00-07:00",
+    submittedAt: "2026-09-25",
     printedOn: "2026-09-25",
     items: [
       item("done", "Front of house", "Lights and music on"),
       item("done", "Front of house", "Case glass wiped, inside and out"),
-      item("issue", "Front of house", "Register drawer counted", { note: "Short $2.15 against last night’s close", valueNumber: 197.85, unit: "$", expected: "200.00" }),
+      item("issue", "Front of house", "Register drawer counted", { note: "Short $2.15 against last night’s close", valueText: "$197.85", expected: "$200.00" }),
       item("done", "Kitchen", "Walk-in temperature", { equipmentName: "Walk-in cooler", valueNumber: 37, unit: "°F", expected: "≤ 41" }),
       item("done", "Kitchen", "Fryer oil checked", { equipmentName: "Fryer 1", guidance: "Replace if dark or foaming" }),
       item("na", "Kitchen", "Ice machine descaled", { note: "Monthly — not due" }),
