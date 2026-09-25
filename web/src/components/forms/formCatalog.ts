@@ -9,6 +9,8 @@ export const FORM_GROUPS = [
     label: "Special orders",
     forms: [
       { key: "quote", label: "Quote" },
+      { key: "quote-app", label: "Quote · app style (draft)" },
+      { key: "signed-quote-app", label: "Signed quote · app style (draft)" },
       { key: "signed-quote", label: "Signed quote" },
       { key: "kitchen-order", label: "Kitchen order" },
       { key: "invoice", label: "Invoice (order)" },

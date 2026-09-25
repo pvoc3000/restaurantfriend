@@ -122,6 +122,17 @@ async function buildElement(
         />
       );
     }
+    case "quote-app":
+    case "signed-quote-app": {
+      const { QuoteAppStylePdf } = await import("./pdf/QuoteAppStylePdf");
+      return (
+        <QuoteAppStylePdf
+          orders={[s.sampleQuoteOrder]}
+          org={docOrg}
+          approval={form === "signed-quote-app" ? s.sampleApproval : null}
+        />
+      );
+    }
     case "kitchen-order": {
       const { KitchenOrderPdf } = await import("@/components/specialOrders/pdf/SpecialOrderPdfs");
       return <KitchenOrderPdf orders={[s.sampleQuoteOrder]} org={docOrg} printedOn="2026-09-25" />;
