@@ -90,11 +90,17 @@ export const docStyles = StyleSheet.create({
   blocks: { flexDirection: "row", gap: 22, marginTop: 20 },
   block: { flexGrow: 1, flexBasis: 0 },
   field: { flexDirection: "row", marginBottom: 4 },
+  // paddingTop sets the label's baseline level with the value's first line.
+  // react-pdf puts a value's extra leading BELOW each line, not split above
+  // and below, so the value's leading does not move this.
   label: { ...caps(6.5, 0.12), color: SUBTLE, width: 54, paddingTop: 1.5 },
-  // NO lineHeight on a flexBasis-0 column: react-pdf then reserves an extra
-  // line of height under it (measured 2026-09-25), which opened a blank line
-  // under every item that carried a note.
-  value: { flexGrow: 1, flexBasis: 0, fontSize: 9 },
+  // 8.5pt with 1.35 leading (Mark, 2026-09-25: the values at 9pt with no
+  // leading looked "a little too big/cramped", worst on a wrapped address).
+  // The leading is safe HERE: the extra blank line react-pdf once reserved
+  // came from `lineHeight` on a TABLE cell's flexBasis-0 column (the item
+  // notes), and a field's value measured clean at every wrap — checked on the
+  // PO's addresses and the quote's contact block.
+  value: { flexGrow: 1, flexBasis: 0, fontSize: 8.5, lineHeight: 1.35 },
   empty: { color: SUBTLE },
 
   /* ---- tables (DataTable) ---- */
