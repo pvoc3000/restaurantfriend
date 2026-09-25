@@ -275,3 +275,13 @@ The icon is NOT `app/apple-icon.png` (Next's file convention): adding it there
 500'd every page in the running dev server with `require is not defined`.
 The artwork is a static file, not `orgs.settings` — the manifest is fetched
 with no session, so it has no org to read. A second org would need this moved.
+
+**PLANNED, NOT BUILT (Mark, 2026-09-25): a Restaurant Friend icon by default,
+which an org can replace with its own.** Notes for when it is built. The
+Donut Friend artwork above becomes the org's override rather than the default.
+The home-screen icon iPadOS keeps is `apple-touch-icon`, read from the PAGE
+when "Add to Home Screen" is tapped — normally signed in — so the root layout
+can point that link at the working org's logo (an upload in Storage, a field
+in `orgs.settings`). The manifest is the part that cannot: it is fetched with no
+session, so its icons stay the product default unless orgs get their own
+hostnames. An icon already on a home screen never updates; people re-add it.
