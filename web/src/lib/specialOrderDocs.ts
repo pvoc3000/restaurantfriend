@@ -430,7 +430,7 @@ export async function fetchOrderDocData(
            delivery_window_start, delivery_window_end,
            location_id, kitchen_location_id,
            tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
-           ignore_balance,
+           deposit_rate, ignore_balance,
            notes_quote, notes_production, notes_invoice, notes_receipt,
            customers ( id, first_name, last_name, company, phone, email )`
         )
@@ -544,6 +544,7 @@ export async function fetchOrderDocData(
       rush_fee: row.rush_fee as number | null,
       rush_rate: row.rush_rate as number | null,
       ignore_balance: Boolean(row.ignore_balance),
+      deposit_rate: row.deposit_rate as number | null,
     };
 
     const pickup = row.location_id ? locations.get(row.location_id) : undefined;

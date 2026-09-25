@@ -69,6 +69,7 @@ import "./deliveryFee.fixtures";
 import "./inquiryNotice.fixtures";
 import "./payLink.fixtures";
 import "./customerInvoices.fixtures";
+import "./deposits.fixtures";
 import "./squareCatalog.fixtures";
 import "./squareOrder.fixtures";
 import "./inspections.fixtures";

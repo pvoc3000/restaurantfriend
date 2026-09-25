@@ -150,7 +150,7 @@ const TEMPLATES: {
   {
     key: "customer_invoice",
     label: "Customer invoice",
-    when: "Sent with a customer invoice — several orders billed at once, like a wholesale week. {pay_line} is the pay link.",
+    when: "Sent with a customer invoice — several orders billed at once, like a wholesale week. {pay_line} is the pay link, led by the deposit when an order asks for one.",
     vars: ["number", "first_name", "full_name", "total", "due_on", "orders", "pay_line"],
   },
   {
@@ -578,6 +578,8 @@ export function SpecialOrderSettings({
           <Num label="Rush fee applies within (business days)" path={["special_orders", "rush_cutoff_business_days"]} v={num(so.rush_cutoff_business_days)} {...{ cell, editable }} />
           <Num label="Rush fee minimum ($)" path={["special_orders", "rush_minimum"]} v={num(so.rush_minimum)} {...{ cell, editable }} />
           <Num label="Rush fee rate (%)" path={["special_orders", "rush_rate"]} v={num(so.rush_rate)} percent
+               orgId={orgId} settings={settings} {...{ cell, editable }} />
+          <Num label="Deposit, when an order asks for one (%)" path={["special_orders", "deposit_rate"]} v={num(so.deposit_rate)} percent
                orgId={orgId} settings={settings} {...{ cell, editable }} />
           <Num label="Chase a quote after (days)" path={["special_orders", "attention_quote_unanswered_days"]} v={num(so.attention_quote_unanswered_days)} {...{ cell, editable }} />
           <Num label="Flag unpaid within (days of the event)" path={["special_orders", "attention_unpaid_within_days"]} v={num(so.attention_unpaid_within_days)} {...{ cell, editable }} />

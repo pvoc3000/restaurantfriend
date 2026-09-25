@@ -23,7 +23,8 @@ import {
   mintPayToken,
   resolveAppBase,
 } from "@/lib/specialOrderSend";
-import { payLine, payUrl, quickBooksPayLine } from "@/lib/payLink";
+import { depositSentence, payLine, payUrl, quickBooksPayLine } from "@/lib/payLink";
+import { percentLabel, toPercent } from "@/lib/percent";
 import { invokeQbo } from "@/lib/qboClient";
 import {
   INVOICE_SHEET_KEY,
@@ -88,6 +89,13 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
         total: view.total,
         paid: view.paid,
         balance: view.balance,
+        deposit:
+          view.deposit.due > 0
+            ? {
+                due: view.deposit.due,
+                rateLabel: view.deposit.rate !== null ? percentLabel(toPercent(view.deposit.rate)) : null,
+              }
+            : undefined,
       }}
     />
   ).toBlob();
@@ -488,7 +496,15 @@ function invoiceEmail(
     due_on: view.invoice.due_on ? usDate(view.invoice.due_on) : "on receipt",
     orders: view.lines.map((l) => `${l.description} — ${money(l.amount)}`).join("\n"),
     pay_url: pay,
-    pay_line: viaQbo ? quickBooksPayLine(pay) : payLine(pay),
+    // 138: a deposit asked for and not yet paid leads the paragraph — on
+    // QuickBooks' page too, where the customer types the amount themselves.
+    pay_line:
+      (pay && view.deposit.due > 0
+        ? depositSentence(
+            view.deposit.due,
+            view.deposit.rate !== null ? percentLabel(toPercent(view.deposit.rate)) : null
+          )
+        : "") + (viaQbo ? quickBooksPayLine(pay) : payLine(pay)),
   };
   return {
     to: (view.customer?.email ?? "").trim(),

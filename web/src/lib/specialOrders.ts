@@ -377,6 +377,10 @@ export type MoneyOrder = {
    */
   rush_rate: number | null;
   ignore_balance?: boolean | null;
+  /** 138: the deposit asked for, as a fraction. Optional, unlike `rush_rate`:
+   *  it changes no total, so a construction site that forgets it prints no
+   *  deposit rather than a wrong figure. */
+  deposit_rate?: number | null;
 };
 
 export type MoneyPayment = { amount: number | null };
@@ -1116,6 +1120,9 @@ export type SpecialOrderSettings = {
   attention: AttentionThresholds;
   invoiceFooter: string;
   terms: string;
+  /** The deposit an order asks for when somebody switches one on, as a
+   *  FRACTION (0.1 is 10%) — `special_orders.deposit_rate` (migration 138). */
+  depositRate: number;
 };
 
 export const DEFAULT_SETTINGS: SpecialOrderSettings = {
@@ -1124,6 +1131,7 @@ export const DEFAULT_SETTINGS: SpecialOrderSettings = {
   attention: DEFAULT_ATTENTION,
   invoiceFooter: "We appreciate your business!",
   terms: "",
+  depositRate: 0.1,
 };
 
 /**
@@ -1154,7 +1162,35 @@ export function readSettings(orgSettings: Record<string, unknown>): SpecialOrder
     },
     invoiceFooter: str(raw.invoice_footer, DEFAULT_SETTINGS.invoiceFooter),
     terms: str(raw.terms, DEFAULT_SETTINGS.terms),
+    depositRate: validDepositRate(num(raw.deposit_rate, DEFAULT_SETTINGS.depositRate))
+      ?? DEFAULT_SETTINGS.depositRate,
   };
+}
+
+/* ==========================================================================
+ * DEPOSITS (migration 138)
+ * ========================================================================== */
+
+/**
+ * A deposit rate the database will take: a fraction strictly between 0 and 1
+ * (the column's check). Anything else is null — no deposit — rather than a
+ * figure somebody did not mean.
+ */
+export function validDepositRate(rate: unknown): number | null {
+  const x = typeof rate === "string" ? Number(rate) : rate;
+  return typeof x === "number" && Number.isFinite(x) && x > 0 && x < 1 ? x : null;
+}
+
+/**
+ * WHAT A DEPOSIT COMES TO: the order's total × its rate, to the cent. The
+ * SAME rounding as `special_order_deposit` in SQL — `js_cents`, which is
+ * floor(x·100 + 0.5)/100 in double precision — so the order's screen, the
+ * paper and what the pay link charges agree. Zero when no deposit is asked.
+ */
+export function depositAmount(total: number, rate: number | null | undefined): number {
+  const r = validDepositRate(rate);
+  if (r === null || !(total > 0)) return 0;
+  return Math.floor(total * r * 100 + 0.5) / 100;
 }
 
 /* ==========================================================================

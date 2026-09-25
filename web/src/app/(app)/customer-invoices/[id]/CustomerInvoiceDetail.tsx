@@ -27,6 +27,7 @@ import { ProcessorField } from "@/components/customerInvoices/ProcessorField";
 import { QuickBooksPaymentCheck } from "@/components/customerInvoices/QuickBooksPaymentCheck";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { canEditPage } from "@/lib/pageAccess";
+import { percentLabel, toPercent } from "@/lib/percent";
 
 const INVOICES_CRUMB = { href: "/customer-invoices", label: "Invoices" };
 
@@ -192,6 +193,21 @@ export async function CustomerInvoiceDetail({
               <span className={READ_ONLY_VALUE}>{PROCESSOR_LABEL[processor]}</span>
             )}
           </Row>
+          {/* 138: present only when an order asks for one. Set on the ORDER
+              (its Money section), so it reads here rather than edits. */}
+          {view.deposit.deposit > 0 ? (
+            <Row label="Deposit">
+              <span className={READ_ONLY_VALUE}>
+                {money(view.deposit.deposit)}
+                {view.deposit.rate !== null ? ` (${percentLabel(toPercent(view.deposit.rate))})` : ""}
+                {view.paid + 0.005 >= view.deposit.deposit
+                  ? " · paid"
+                  : view.deposit.due > 0
+                    ? ` · ${money(view.deposit.due)} still to pay`
+                    : ""}
+              </span>
+            </Row>
+          ) : null}
           {processor === "quickbooks" ? (
             <Row label="In QuickBooks">
               <span className={READ_ONLY_VALUE}>

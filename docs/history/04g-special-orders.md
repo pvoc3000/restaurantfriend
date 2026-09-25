@@ -12,6 +12,82 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
+   **Shipped 2026-09-25, MIGRATION 138 WRITTEN, NOT YET APPLIED — DEPOSITS,
+   AS A PART OF THE ORDER'S ONE INVOICE.** Mark: "Being able to place a deposit
+   is my next priority here. I want to get it right." First the research he
+   asked for: QuickBooks has two deposit flows — a deposit requested on the
+   INVOICE (the customer part-pays it; QBO's pay page always lets the customer
+   type the amount, and that cannot be turned off), and a deposit requested on
+   the ESTIMATE, which on payment converts the estimate to an invoice with the
+   deposit as its first payment (held in a liability account until then).
+   Square's invoices are one invoice with a DEPOSIT and a BALANCE request.
+   Neither makes a second invoice, so 124's "a deposit invoice + a balance
+   invoice, later" is WITHDRAWN — it was my inference, never asked for.
+   Mark's model: "the payments area on a special order should just be payments
+   made to invoices linked to the order", with a link to each — which the
+   Payments tab already does for tagged payments (124).
+   **His answers:** built as #1 (a deposit on the invoice) and #2 (asked for on
+   the quote); a PERCENTAGE SETTING, 10%
+   (`orgs.settings.special_orders.deposit_rate`, a fraction like `rush_rate`,
+   seeded by 138, on Settings under Timing and limits); "most orders will just
+   pay all at once … we need to be able to take a deposit, without having to
+   take a deposit" — so it is OPT-IN PER ORDER; the switch lives on the ORDER,
+   not the invoice (one fact, and the quote needs it before any invoice
+   exists); the customer may pay the deposit OR in full; and approving a quote
+   that asks for one makes the invoice with NO payment yet ("Invoice made, no
+   payment yet"). Deposits are income today (Mark), booked like any pay-link
+   payment; existing orders' payments are ignored — this is for go-live.
+   **138:** `special_orders.deposit_rate` (null = none; check 0 < r < 1; on the
+   log's watch list, 118's function copied in full plus one row).
+   `special_order_deposit(order)` = `js_cents(total × rate)` in DOUBLE
+   PRECISION like the screen; `customer_invoice_deposit(invoice)` sums them,
+   each capped at its line. `pay_token_state` (131's body in full) adds
+   `deposit_due` to an open invoice link — the deposit less what the invoice
+   has collected — ONLY when that is more than nothing and less than the
+   balance. `claim_pay_token(p_token, p_pay default 'balance')` replaces the
+   one-argument version (dropped, so PostgREST has one to choose): 'deposit'
+   charges `deposit_due`, falling back to the balance when none is due any
+   more; `is_deposit` says which. An AFTER UPDATE OF approved_at trigger on
+   `special_order_quote_tokens` makes the order's DRAFT invoice (org terms for
+   the due date; lines filled by 128/129's triggers) when the order asks for a
+   deposit — skipped, with a log line, for an order with no linked customer or
+   one already on a live invoice; the approval itself never fails for it.
+   **Nothing else moves**: a deposit does not settle the order or stamp a paid
+   date (allocate's `v_share >= v_owed`), and the quote stays a quote.
+   **The app:** the order's Money section has a "Deposit" switch ("Ask for a
+   10% deposit", orders only, not templates or standing orders) and a
+   "Deposit (10%)" figure under Total. The quote PDF, the signed copy and
+   `/q` print "Deposit to hold your date (10%)" under the total (the quote
+   snapshot carries `deposit`). The invoice record has a Deposit row (amount,
+   rate, paid or still to pay); its PDF prints the deposit still due under
+   Amount due; its email's `{pay_line}` is led by a sentence naming the
+   deposit and saying paying in full is fine — on QuickBooks' page too, where
+   the customer types the amount. `/pay` offers two choices, "Deposit, to hold
+   your date" (selected first, because it is what the email named) and "Pay in
+   full"; the page sends WHICH, never a figure; changing it updates the
+   wallets' total without rebuilding the card fields. `square-pay` passes the
+   choice to the claim and labels a deposit in Square's order, note and the
+   payment row. `lib/customerInvoices.invoiceDeposit` is the SQL's rule in TS.
+   **Verified:** every migration 001–138 replayed on a throwaway Postgres, 138
+   twice. $368.50 at 10% → $36.85 (100.05 → 10.01 in both); 150% refused;
+   approval → draft 1001 due in 4 days, line $368.50, Sold as special order;
+   re-approval → already_approved, no second invoice; no customer → no
+   invoice, the log says why; the link says `deposit_due` 36.85; claim
+   'deposit' → 36.85, second claim busy, default → 368.50; after the deposit
+   the order is unchanged (status, paid date, to-do) and the link offers only
+   the balance, and a 'deposit' claim falls back to it; the rest → order
+   settled at Order + Print Order, two tagged payments; anon can call the new
+   claim. Fixtures 2,104 (`deposits.fixtures.ts`; the cap and the
+   strict-less-than each broken to see red). tsc, lint. NOT verified in the
+   pane — the hosted DB has no 138 yet — and no `deno check` (no Deno here).
+   **Deploy order:** apply 138 (safe with today's `square-pay`: the new claim
+   defaults to the balance), THEN redeploy `square-pay`. The order screen and
+   the invoice read `deposit_rate`, so they fail until 138 is applied.
+   **Open:** the invoice made on approval takes the org's terms as its due
+   date, which suits the deposit rather than a balance due near the event;
+   whether an order becomes status `order` when its deposit is paid (a held
+   date) is untouched — 121's "a deposit moves nothing" stands.
+
    **Also 2026-09-24 — THREE SHOP NOTICES, AND NO MORE CC (DEPLOYED the same
    day: submit-inquiry v14, approve-quote v13, square-pay v9, qbo-sync v35,
    qbo-webhook v3 — the last with `--no-verify-jwt`, checked afterwards; a

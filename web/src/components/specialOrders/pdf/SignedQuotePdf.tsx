@@ -86,6 +86,8 @@ function asDocData(quote: QuoteSnapshot): OrderDocData {
       delivery_charge: null,
       rush_fee: null,
       rush_rate: null,
+      // 138: the deposit as quoted, so the signed copy says it too.
+      deposit_rate: quote.deposit?.rate ?? null,
     },
     // The totals travel WHOLE rather than being recomputed. The customer signed
     // these figures; re-deriving them here would mean the artifact could

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/specialOrders";
+import { percentLabel, toPercent } from "@/lib/percent";
 import { usDate, usTime } from "@/lib/specialOrderDocs";
 import { quoteStateMessage, type QuoteTokenState } from "@/lib/specialOrderSend";
 
@@ -189,6 +190,12 @@ export function ApproveQuote({ token }: { token: string }) {
           <span>Total</span>
           <span>{money(quote.totals.total)}</span>
         </div>
+        {quote.deposit && (
+          <Total
+            label={`Deposit to hold your date (${percentLabel(toPercent(quote.deposit.rate))})`}
+            value={quote.deposit.amount}
+          />
+        )}
       </section>
 
       {quote.notes_quote && (

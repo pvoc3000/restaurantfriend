@@ -117,6 +117,20 @@ export function PayInvoice({ token }: { token: string }) {
   const open = state?.state === "open" ? state : null;
   const square = open?.square ?? null;
   const balance = open?.balance ?? 0;
+  // 138: a deposit is a CHOICE, never a requirement — Mark: "most orders will
+  // just pay all at once". Offered first when asked for, because that is what
+  // the email told them about; the full balance is one tap away.
+  const depositDue = open?.deposit_due && open.deposit_due > 0 ? open.deposit_due : null;
+  const [choice, setChoice] = useState<"deposit" | "balance">("deposit");
+  const payingDeposit = depositDue !== null && choice === "deposit";
+  const amount = payingDeposit ? depositDue : balance;
+  const walletRequest = useRef<{ update?: (r: Record<string, unknown>) => unknown } | null>(null);
+  // Read by the wallets' set-up, which must not re-run when the choice moves.
+  // Declared (and kept current) BEFORE that effect, which runs after it.
+  const amountRef = useRef(amount);
+  useEffect(() => {
+    amountRef.current = amount;
+  }, [amount]);
 
   /* ---- 2. Square's fields, once the invoice says what to charge ---------- */
 
@@ -141,8 +155,9 @@ export function PayInvoice({ token }: { token: string }) {
       const request = p.paymentRequest({
         countryCode: "US",
         currencyCode: "USD",
-        total: { amount: balance.toFixed(2), label: "Amount due" },
+        total: { amount: amountRef.current.toFixed(2), label: "Amount due" },
       });
+      walletRequest.current = request as typeof walletRequest.current;
 
       // Each method is optional: Apple Pay exists only in Safari on Apple
       // hardware with a registered domain, Google Pay only where Google says
@@ -178,7 +193,16 @@ export function PayInvoice({ token }: { token: string }) {
       }
       m.applePay = null;
     };
-  }, [square, balance, result]);
+    // The CHOICE between deposit and balance does not rebuild the fields (a
+    // half-typed card would be lost); the wallets' total is updated below.
+  }, [square, result]);
+
+  // What Apple Pay and Google Pay show follows the choice.
+  useEffect(() => {
+    walletRequest.current?.update?.({
+      total: { amount: amount.toFixed(2), label: payingDeposit ? "Deposit" : "Amount due" },
+    });
+  }, [amount, payingDeposit]);
 
   // The gift-card field is attached only when asked for: most customers pay by
   // card, and a second set of empty boxes reads as "fill in both".
@@ -217,7 +241,7 @@ export function PayInvoice({ token }: { token: string }) {
       const tokenized =
         kind === "card"
           ? await method.tokenize({
-              amount: balance.toFixed(2),
+              amount: amount.toFixed(2),
               currencyCode: "USD",
               intent: "CHARGE",
               customerInitiated: true,
@@ -242,6 +266,8 @@ export function PayInvoice({ token }: { token: string }) {
           // and the server's claim stops two DIFFERENT presses both charging.
           idempotency_key: crypto.randomUUID(),
           source_type: kind === "giftCard" ? "gift_card" : kind,
+          // WHICH amount (138), never a figure — the server works it out.
+          pay: payingDeposit ? "deposit" : "balance",
         },
       });
       if (e) {
@@ -362,6 +388,28 @@ export function PayInvoice({ token }: { token: string }) {
         </div>
       </section>
 
+      {depositDue !== null && (
+        <fieldset className="space-y-2">
+          <legend className="pb-2 text-[12px] uppercase tracking-[0.12em] text-subtle">
+            How much would you like to pay?
+          </legend>
+          <PayChoice
+            checked={choice === "deposit"}
+            onChange={() => setChoice("deposit")}
+            label="Deposit, to hold your date"
+            value={depositDue}
+            disabled={busy}
+          />
+          <PayChoice
+            checked={choice === "balance"}
+            onChange={() => setChoice("balance")}
+            label="Pay in full"
+            value={balance}
+            disabled={busy}
+          />
+        </fieldset>
+      )}
+
       {invoice.notes_quote && (
         <p className="whitespace-pre-wrap text-[14px] text-muted">{invoice.notes_quote}</p>
       )}
@@ -400,7 +448,7 @@ export function PayInvoice({ token }: { token: string }) {
                 onClick={() => void pay("card")}
                 className="h-12 w-full border-2 border-ink bg-ink text-[14px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:opacity-35"
               >
-                {busy ? "Paying…" : `Pay ${money(balance)}`}
+                {busy ? "Paying…" : `Pay ${money(amount)}`}
               </button>
             </div>
 
@@ -414,7 +462,7 @@ export function PayInvoice({ token }: { token: string }) {
                   onClick={() => void pay("giftCard")}
                   className="h-12 w-full border-2 border-ink bg-white text-[14px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-neutral-100 disabled:opacity-35"
                 >
-                  {busy ? "Paying…" : `Pay ${money(balance)} with gift card`}
+                  {busy ? "Paying…" : `Pay ${money(amount)} with gift card`}
                 </button>
               </div>
             ) : (
@@ -432,6 +480,41 @@ export function PayInvoice({ token }: { token: string }) {
         )}
       </section>
     </Shell>
+  );
+}
+
+/** One of the two amounts. Raw inputs at `h-12`, `/q`'s rule for the public
+ *  pages: a thumb on a phone, not the app's dense controls. */
+function PayChoice({
+  checked,
+  onChange,
+  label,
+  value,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+  value: number;
+  disabled: boolean;
+}) {
+  return (
+    <label
+      className={`flex h-12 cursor-pointer items-center gap-3 border-2 px-3 text-[15px] ${
+        checked ? "border-ink" : "border-neutral-300"
+      }`}
+    >
+      <input
+        type="radio"
+        name="pay-amount"
+        checked={checked}
+        onChange={onChange}
+        disabled={disabled}
+        className="h-5 w-5 accent-black"
+      />
+      <span className="min-w-0 flex-1">{label}</span>
+      <span className="shrink-0 font-semibold tabular-nums">{money(value)}</span>
+    </label>
   );
 }
 

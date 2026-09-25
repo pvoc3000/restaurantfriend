@@ -11,7 +11,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { invoiceSplit } from "./quickbooks";
-import { customerLabel } from "./specialOrders";
+import { customerLabel, depositAmount, validDepositRate } from "./specialOrders";
 import type { OrderDocData } from "./specialOrderDocs";
 
 /* ==========================================================================
@@ -160,6 +160,8 @@ export type QuoteSnapshot = {
   /** `timeZone` is absent on snapshots written before 2026-09-25. */
   org: { name: string; addressLine: string; contactLine: string; terms: string; timeZone?: string | null };
   sent_on: string;
+  /** 138: the deposit the order asks for, as quoted — absent when none. */
+  deposit?: { amount: number; rate: number };
 };
 
 export function quoteSnapshot(
@@ -187,7 +189,16 @@ export function quoteSnapshot(
     notes_quote: order.notes_quote,
     org,
     sent_on: today,
+    ...depositOf(order),
   };
+}
+
+/** 138: `{ deposit }` when the order asks for one, else nothing — so a
+ *  snapshot without a deposit is byte-for-byte what it was before. */
+function depositOf(order: OrderDocData): { deposit?: QuoteSnapshot["deposit"] } {
+  const rate = validDepositRate(order.money.deposit_rate);
+  const amount = depositAmount(order.totals.total, rate);
+  return rate !== null && amount > 0 ? { deposit: { amount, rate } } : {};
 }
 
 /**

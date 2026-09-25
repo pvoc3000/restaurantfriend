@@ -90,7 +90,7 @@ const ORDER_COLUMNS = `
   delivery_company_phone, delivery_tracking, delivery_window_start,
   delivery_window_end, delivery_boxes, delivery_weight_lbs,
   tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
-  ignore_balance, square_item, taken_by, taken_by_employee_id,
+  deposit_rate, ignore_balance, square_item, taken_by, taken_by_employee_id,
   notes_general, notes_quote, notes_production, notes_invoice, notes_receipt,
   standing_days, starts_on, ends_on, paused, standing_order_id,
   date_initiated, quote_sent_at, quote_returned_at, invoice_sent_at,
@@ -1193,6 +1193,8 @@ export async function SpecialOrderDetail({
                     totals={totals}
                     inputs={moneyInputs}
                     rushSuggestion={rushSuggestion}
+                    depositRate={row.deposit_rate as number | null}
+                    defaultDepositRate={row.kind === "order" ? settings.depositRate : null}
                     canWrite={canWrite}
                   />
                 </div>

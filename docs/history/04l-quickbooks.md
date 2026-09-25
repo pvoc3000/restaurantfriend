@@ -290,6 +290,11 @@
    - **Refused for now**: an order with a payment taken outside the invoice (a
      deposit) — the line is short of the order's total and QBO would bill the
      whole of it.
+   - **QuickBooks' pay page lets the CUSTOMER CHOOSE THE AMOUNT** (Mark,
+     2026-09-25) — unlike `/pay`, which always charges the balance due. So a
+     QuickBooks invoice can be part-paid by the customer, and any payment that
+     comes back may be less than the invoice; `allocate_customer_invoice_payment`
+     splits whatever arrives, oldest event first.
    - **Void** (and Delete of a draft that reached QBO) voids it in QuickBooks
      first; QBO's own refusal (a payment applied) stops it here too.
    - **Payment comes back by WEBHOOK**: `qbo-webhook` (deployed

@@ -11,6 +11,7 @@
  */
 
 import { usDate } from "./specialOrderDocs";
+import { depositAmount, validDepositRate } from "./specialOrders";
 
 /* ==========================================================================
  * THE RECORD
@@ -147,6 +148,48 @@ export function invoiceBalance(
   const total = invoiceTotal(lines);
   const paid = cents(payments.reduce((a, p) => a + Number(p.amount || 0), 0));
   return { total, paid, balance: cents(total - paid) };
+}
+
+/* ==========================================================================
+ * THE DEPOSIT (migration 138)
+ * ========================================================================== */
+
+export type InvoiceDeposit = {
+  /** What the invoice's orders ask for, in all. 0 when none asks. */
+  deposit: number;
+  /** Still owed toward it, when paying it is a real choice — more than
+   *  nothing and less than the balance. 0 otherwise. `pay_token_state`'s
+   *  `deposit_due`, the same rule. */
+  due: number;
+  /** The one rate its orders share, for "(10%)"; null when none, or mixed. */
+  rate: number | null;
+};
+
+/**
+ * An invoice's deposit: each order's (`depositAmount` of its TOTAL at its
+ * rate), capped at what the order's line bills — `customer_invoice_deposit`
+ * in SQL, line for line. `paid` is what the invoice has collected.
+ */
+export function invoiceDeposit(
+  lines: { amount: number; orderTotal: number | null; depositRate: number | null }[],
+  paid: number,
+  balance: number
+): InvoiceDeposit {
+  let deposit = 0;
+  const rates = new Set<number>();
+  for (const l of lines) {
+    const rate = validDepositRate(l.depositRate);
+    if (rate === null) continue;
+    rates.add(rate);
+    deposit += Math.min(depositAmount(Number(l.orderTotal ?? 0), rate), Math.max(Number(l.amount), 0));
+  }
+  deposit = cents(deposit);
+  const left = cents(deposit - paid);
+  return {
+    deposit,
+    due: left > 0 && left < balance ? left : 0,
+    rate: rates.size === 1 ? [...rates][0] : null,
+  };
 }
 
 /* ==========================================================================

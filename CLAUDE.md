@@ -398,8 +398,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   for each day's delivery, 14 lines, **sent Sunday and due Thursday or service
   stops**. Mark wants to select the week's seven standing orders and have them
   become one invoice. So the shape is SEVEN ORDERS BILLED ONCE, which no view
-  over `special_orders` can express. Deposits on far-out bookings ("take a
-  deposit to hold the date") are the other direction — one order billed twice.
+  over `special_orders` can express. ~~Deposits … one order billed twice~~ —
+  withdrawn 2026-09-25: a deposit is the FIRST PAYMENT on the order's one
+  invoice, never an invoice of its own (138, below; QuickBooks and Square both
+  work that way).
   **THE MODEL IS ALREADY DESIGNED, on the A/P side.** 025 put the PO join on the
   LINE and said why: "split and merge need no schema at all — one invoice across
   two orders is lines pointing at two orders, and one order invoiced in two
@@ -470,8 +472,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   order's Send ▸ Invoice now creates (or reuses) a customer invoice and opens
   its Send; one-order invoices print itemized. Lines follow their orders and
   re-send keeps the number (128); "Sold as" is the order's (129). What is NOT
-  yet moved: receipts, deposits as their own invoice, "who owes us" read from
-  invoices, and retiring the per-order pay path — ask before each.
+  yet moved: receipts, "who owes us" read from invoices, and retiring the
+  per-order pay path — ask before each.
+  **DEPOSITS (Mark, 2026-09-25, migration 138 WRITTEN):** opt-in per ORDER
+  (`special_orders.deposit_rate`, Settings' 10% copied on when switched on);
+  the invoice's pay link offers "Deposit" OR "Pay in full"; approving a quote
+  that asks for one makes the order's invoice as a draft, no payment. Every
+  payment stays on that one invoice. See 04g.
   Read `docs/history/04g-special-orders.md` and `docs/bill-rename-sweep.md` first.
 
 
