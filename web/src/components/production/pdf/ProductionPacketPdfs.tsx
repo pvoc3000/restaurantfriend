@@ -235,7 +235,7 @@ export function ProductionPacketPdf({
   return (
     <Document title={`Production packet ${packet.printedOn}`}>
       {want.has("special") && orders.length > 0
-        ? kitchenOrderPages(orders, packet.printedOn)
+        ? kitchenOrderPages(orders, packet.orgName, packet.printedOn)
         : null}
 
       {want.has("premade")

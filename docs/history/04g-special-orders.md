@@ -4380,3 +4380,24 @@ email carries QuickBooks' pay link instead of `/pay`; the payment returns by
 Intuit webhook and settles the orders through `allocate_customer_invoice_payment`
 exactly as a pay-link payment does. The full decisions and setup are in
 `docs/history/04l-quickbooks.md`.
+
+**THE DOCUMENTS ARE REDRAWN IN THE APP'S OWN DESIGN LANGUAGE (2026-09-25).**
+Mark drafted them on `/forms` one at a time — quote, invoice, receipt, kitchen
+order, customer invoice (one order and weekly), statement — and then: "these
+are all superior to what we are currently using. Wire them to send." The new
+set REPLACED `components/specialOrders/pdf/SpecialOrderPdfs.tsx` under the same
+export names, so Send, the `/q` signed quote, the customer invoice's Send, the
+statement, the QuickBooks attachment and the production packet's kitchen
+sheets all switched at once. The FileMaker-faithful set (and its verification
+against order 9885's four PDFs) is in git history at `ac727f0c`.
+Same data and fields; what changed is the look — black masthead band, page
+and section headings, grey caps labels over black values, rule-free rows,
+size classes as black group bands, ISO dates, terms in sentence case (they
+were upper-cased), boxes only where somebody writes, totals in a Classic Mac
+window with the one yellow fill on what is owed (gone once settled).
+**Two deliberate changes of CONTENT, not just look:** the kitchen sheet's
+allergen warning moved from after the list to under the pickup time (on a
+two-page order it had landed on page 2), in the red "stop" fill; and the
+kitchen sheet's facts vs. blanks split — what the record knows prints as
+fields, what the kitchen writes (completed by, boxes, tracking, received) is a
+box. `kitchenOrderPages` now takes the org name, for the masthead.

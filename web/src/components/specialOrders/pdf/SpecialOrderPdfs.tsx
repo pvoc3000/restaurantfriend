@@ -3,234 +3,294 @@
 // a click handler — the renderer is heavy and nothing on a normal page load
 // needs it. (The `PoPdfDocs` idiom, and the same reasons.)
 //
-// FIVE documents from THREE renderers (decision 11):
+// DRAWN IN THE APP'S OWN DESIGN LANGUAGE since 2026-09-25 (Mark: "these are
+// all superior to what we are currently using. Wire them to send"). They were
+// drafted on /forms beside the FileMaker-faithful set they replaced; that set
+// — verified against FileMaker's own PDFs for order 9885, and its notes on why
+// — is in git history at ac727f0c, `SpecialOrderPdfs.tsx`.
 //
-//   OrderDocumentPdf   quote · invoice · receipt — ONE layout at three moments.
-//                      The quote adds the terms and the signature lines; the
-//                      invoice adds the payments block and TOTAL DUE; the
-//                      receipt is the invoice with the balance settled.
-//   KitchenOrderPdf    the production sheet: no money at all, grouped by SIZE
-//                      CLASS, printing the customized name over the full
-//                      taxonomy, and ending in the signature bands.
-//   StatementPdf       decision 21 — one customer's orders over a period.
+//   OrderDocumentPdf    quote · invoice · receipt — ONE layout at three
+//                       moments (decision 11). The invoice and receipt add a
+//                       PAYMENTS block, a Payments line in the totals, the
+//                       invoice footer, and a grand total that is the BALANCE
+//                       ("Total due"); the quote has the terms and the
+//                       signature boxes instead. `approval` fills those boxes
+//                       for decision 17's signed quote (`SignedQuotePdf`).
+//   KitchenOrderPdf     the production sheet: no money, grouped by size class.
+//                       `kitchenOrderPages` is the same pages without a
+//                       Document, for the production packet.
+//   CustomerInvoicePdf  migration 124 — one row per order, itemized on a
+//                       one-order invoice.
+//   StatementPdf        decision 21 — one customer's orders over a period.
 //
-// SignedQuotePdf is `OrderDocumentPdf` with decision 17's approval block, which
-// is why it is a flag on the quote rather than a fourth renderer: the artifact
-// the approval files must BE the quote that was approved.
-//
-// ---------------------------------------------------------------------------
-// VERIFIED against FileMaker's own four PDFs for order 9885 (in
-// `DF Operations Screenshots/desktop/Special Orders/`) by rendering ours in
-// Node over the real live rows — the recipe-sheet verification pattern.
-//
-// ONE DELIBERATE DEVIATION, and it is worth stating because it looks like a
-// mistake next to the reference: FileMaker prints the quote's terms and
-// signature lines at the foot of PAGE ONE, above two dozen items and two pages
-// before the total. That is its body/footer layout showing through rather than
-// a decision — nobody signs a total they have not reached yet. Ours prints
-// them after the totals, at the end of the document.
-//
-// AND ONE DISAGREEMENT WE ARE RIGHT ABOUT: the reference invoice for 9885 says
-// TOTAL DUE $0.00 on an unpaid $161.77 quote. That is FileMaker's stored-total
-// drift (decision 6's whole reason). Ours derives the balance and prints
-// $161.77.
-// ---------------------------------------------------------------------------
+// Each look is a rule the app already keeps on screen:
+//   · The masthead is a BLACK BAND with the org's name in white tracked caps —
+//     the app's masthead, not a 40pt letterhead.
+//   · The record's name is the PAGE HEADING (`ui/PageHeading`: big bold caps,
+//     a tracked caption under it), and each block has a SECTION HEADING.
+//   · Labels are small grey tracked caps ABOVE or BESIDE black values — a
+//     detail screen's `dl`. Read-only, so no boxes.
+//   · The item table is `DataTable`: caption-grey column labels over a 2px
+//     black rule, and NO rule between rows.
+//   · Empty money is an em dash, never blank and never $0.00.
+//   · Dates are ISO with the weekday (`SAT 2026-10-03`), the app's form.
+//   · Prose is SENTENCE CASE — the terms were printed in capitals, which the
+//     design system forbids ("never set a sentence in caps").
+//   · The one BOX on the page is where the customer writes — signature and
+//     date — because a box means "you fill this in".
+//   · The totals sit in a Classic Mac window (black title bar, hard shadow),
+//     the CalcPad's frame, and the grand total wears the ONE yellow fill —
+//     EXCEPT on a settled receipt. Yellow means "look at this", and a balance
+//     of $0.00 is nothing to look at; a receipt still owing keeps it.
 
 import { Document, Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
-
 import {
-  DOCUMENT_TITLE,
+  DOCUMENT_LABEL,
   sizeClassGroups,
   taxonomyLine,
-  usDate,
   usTime,
   usWeekday,
   type DocOrg,
   type DocumentKind,
-  type DocumentLine,
   type OrderDocData,
   type StatementData,
 } from "@/lib/specialOrderDocs";
-import { customerLabel, isProductionLine, lineTotal } from "@/lib/specialOrders";
 
-/**
- * NO HYPHENATION, ANYWHERE.
- *
- * @react-pdf hyphenates by default, which on a narrow meta column broke a real
- * customer's address into `alexlan-dayan@gmail.com` — an email that cannot be
- * copied off the page and reads as a typo. Nothing on these documents is
- * justified prose, so there is nothing hyphenation buys; a long value wraps
- * whole or overflows its column, both of which are honest.
- *
- * Registered at module scope because the callback is GLOBAL to the renderer —
- * doing it per-document would be a second place to forget.
- */
+import { customerLabel, lineTotal } from "@/lib/specialOrders";
+
+/** The three customer documents — the kitchen order is a different layout. */
+export type CustomerDocumentKind = Exclude<DocumentKind, "order">;
+
 Font.registerHyphenationCallback((word) => [word]);
 
-/**
- * THE MASTHEAD IS THE ORG'S NAME AT 40PT, which is not a flourish — it is what
- * makes a printed quote recognisable across a kitchen, and it is what twelve
- * years of these look like.
- *
- * Sizes, and nothing else (the `PoPdf` rule — four sizes and two greys):
- *
- *   40  Helvetica-Bold   the org name
- *   12  Helvetica-Bold   the address and contact lines under it; band labels
- *   11  Helvetica-Bold   the document's own name, top right
- *    9  Helvetica[-Bold] everything you read: lines, meta values, totals
- *    8  Helvetica        secondary — the terms paragraph, footers, taxonomy
- *
- *   #000  ink — this design system's one colour
- *   #666  secondary
- *   #ffe98a  the mark (--rf-yellow-200), used on exactly ONE thing: the
- *            kitchen sheet's pickup time. Colour means "worth your eye" here
- *            as everywhere else in the app, and on a production sheet the time
- *            is the fact somebody misses.
- */
-const styles = StyleSheet.create({
+/* The app's tokens, in print. */
+const INK = "#000000";
+const MUTED = "#545454"; // --rf-neutral-600, secondary text
+const SUBTLE = "#757575"; // --rf-neutral-500, captions and labels
+const HAIRLINE = "#e4e4e4"; // --rf-neutral-200
+const MARK_FILL = "#ffe98a"; // --rf-yellow-200
+const STOP_FILL = "#ffcfc9"; // --rf-red-200, "stop"
+
+/* Tracking, as the app sets it: +0.06em for names and commands, +0.12em for
+   labels. react-pdf takes letterSpacing in points, so it is per size. */
+const caps = (size: number, em: number) => ({
+  fontSize: size,
+  letterSpacing: size * em,
+  textTransform: "uppercase" as const,
+});
+
+const PAGE_X = 40;
+
+const s = StyleSheet.create({
   page: {
-    paddingTop: 30,
-    paddingBottom: 36,
-    paddingHorizontal: 34,
-    fontSize: 9,
+    // The masthead is ABSOLUTE and fixed, so it sits on every page without
+    // pushing the flow; the page's own top padding clears it.
+    paddingTop: 40 + 20,
+    paddingBottom: 44,
+    paddingHorizontal: 0,
     fontFamily: "Helvetica",
-    color: "#000",
+    fontSize: 9,
+    color: INK,
   },
 
   /* ---- masthead ---- */
-  masthead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  orgName: { fontSize: 40, fontFamily: "Helvetica-Bold", letterSpacing: -1 },
-  orgLine: { fontSize: 12, fontFamily: "Helvetica-Bold" },
-  docTitle: { fontSize: 11, fontFamily: "Helvetica-Bold", textAlign: "right" },
-  docPage: { fontSize: 8, fontFamily: "Helvetica-Bold", textAlign: "right" },
-  eventLine: {
-    fontSize: 11,
-    fontFamily: "Helvetica-BoldOblique",
-    textAlign: "right",
-    marginTop: 8,
+  masthead: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: INK,
+    paddingHorizontal: PAGE_X,
+    height: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
+  wordmark: { ...caps(13, 0.06), fontFamily: "Helvetica-Bold", color: "#fff" },
+  mastheadRight: { alignItems: "flex-end" },
+  mastheadLine: { ...caps(6.5, 0.12), color: "#fff", marginTop: 1.5 },
 
-  /* ---- the black header bands ---- */
-  bandRow: { flexDirection: "row", gap: 12, marginTop: 18 },
-  bandBlock: { flexGrow: 1, flexBasis: 0 },
-  band: {
-    backgroundColor: "#000",
-    color: "#fff",
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    textAlign: "center",
-    paddingVertical: 3,
-  },
-  metaRow: { flexDirection: "row", marginTop: 4, gap: 6 },
-  metaLabel: {
-    width: 74,
-    fontSize: 8,
-    fontFamily: "Helvetica-Bold",
-    textAlign: "right",
-    textTransform: "uppercase",
-  },
-  metaValue: { flexGrow: 1, flexBasis: 0, fontSize: 9 },
-  metaValueUnderlined: {
-    flexGrow: 1,
-    flexBasis: 0,
-    fontSize: 9,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#000",
-  },
+  body: { paddingHorizontal: PAGE_X },
 
-  /* ---- the item table ---- */
-  itemsHead: { flexDirection: "row", marginTop: 26, marginBottom: 4 },
-  headCell: {
-    fontSize: 8,
+  /* ---- page heading ---- */
+  headingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  kicker: { ...caps(7.5, 0.12), color: SUBTLE },
+  h1: {
+    ...caps(22, -0.02),
     fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    borderBottomWidth: 0.75,
-    borderBottomColor: "#000",
+    marginTop: 3,
+    lineHeight: 1.1,
   },
-  row: { flexDirection: "row", paddingVertical: 3.5, alignItems: "flex-start" },
-  colIndex: { width: 22, fontSize: 9, textAlign: "right", paddingRight: 6 },
-  colItem: { width: 176, fontSize: 9 },
-  colQty: { width: 26, fontSize: 9, textAlign: "right" },
-  colPrice: { width: 40, fontSize: 9, textAlign: "right" },
-  colNotes: { flexGrow: 1, flexBasis: 0, fontSize: 9, paddingLeft: 14 },
-  colCost: { width: 52, fontSize: 9, textAlign: "right" },
+  caption: { ...caps(7.5, 0.12), color: SUBTLE, marginTop: 5 },
+  numberBlock: { alignItems: "flex-end" },
+  number: { fontSize: 22, fontFamily: "Helvetica-Bold", marginTop: 3 },
 
-  /* ---- totals ---- */
-  footRow: { flexDirection: "row", marginTop: 18, gap: 24 },
-  footCol: { flexGrow: 1, flexBasis: 0 },
-  totalLine: { flexDirection: "row", marginTop: 3 },
-  totalLabel: {
-    flexGrow: 1,
-    flexBasis: 0,
-    fontSize: 9,
+  /* ---- section heading (ui/SectionHeading) ---- */
+  sectionHead: {
+    ...caps(9, 0.08),
     fontFamily: "Helvetica-Bold",
-    textAlign: "right",
-    paddingRight: 10,
+    paddingBottom: 4,
+    borderBottomWidth: 2,
+    borderBottomColor: INK,
+    marginBottom: 7,
   },
-  totalValue: { width: 66, fontSize: 9, textAlign: "right" },
-  grandLabel: {
-    flexGrow: 1,
-    flexBasis: 0,
-    fontSize: 11,
-    fontFamily: "Helvetica-Bold",
-    textAlign: "right",
-    paddingRight: 10,
-  },
-  grandValue: { width: 66, fontSize: 11, fontFamily: "Helvetica-Bold", textAlign: "right" },
+  sectionCount: { color: SUBTLE, fontFamily: "Helvetica" },
 
-  /* ---- terms and signature ---- */
-  termsHead: { fontSize: 8, fontFamily: "Helvetica-Bold", marginTop: 26 },
-  terms: { fontSize: 7, marginTop: 4, lineHeight: 1.35, textAlign: "justify" },
-  signRow: { flexDirection: "row", gap: 30, marginTop: 34 },
-  signLine: { borderTopWidth: 0.75, borderTopColor: "#000", paddingTop: 2 },
-  signLabel: { fontSize: 7, textTransform: "uppercase" },
+  /* ---- field blocks ---- */
+  blocks: { flexDirection: "row", gap: 22, marginTop: 20 },
+  block: { flexGrow: 1, flexBasis: 0 },
+  field: { flexDirection: "row", marginBottom: 4 },
+  label: { ...caps(6.5, 0.12), color: SUBTLE, width: 54, paddingTop: 1.5 },
+  // NO lineHeight on a flexBasis-0 column: react-pdf then reserves an extra
+  // line of height under it (measured 2026-09-25), which opened a blank line
+  // under every item that carried a note.
+  value: { flexGrow: 1, flexBasis: 0, fontSize: 9 },
+  empty: { color: SUBTLE },
 
-  /* ---- kitchen sheet ---- */
-  kitchenHeadRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
-  kitchenBoxes: { flexDirection: "row", gap: 8, flexShrink: 0 },
-  kitchenBox: { width: 112 },
-  kitchenValue: { fontSize: 14, fontFamily: "Helvetica-Bold", textAlign: "center", marginTop: 2 },
-  kitchenSub: { fontSize: 9, textAlign: "center" },
-  mark: { backgroundColor: "#ffe98a" },
-  orderNumber: { fontSize: 20, fontFamily: "Helvetica-Bold", textAlign: "right" },
-  asOf: { fontSize: 9, fontFamily: "Helvetica-Bold", textAlign: "right", marginTop: 4 },
-  sizeClass: { fontSize: 9, fontFamily: "Helvetica-Bold", marginTop: 10, marginBottom: 2 },
-  kitchenRow: { flexDirection: "row", paddingVertical: 5, alignItems: "flex-start" },
-  kQty: { width: 34, fontSize: 9 },
-  kItem: { width: 300, fontSize: 9 },
-  taxonomy: { fontSize: 8, fontFamily: "Helvetica-Oblique", color: "#666", marginTop: 2 },
-  kNotes: { flexGrow: 1, flexBasis: 0, fontSize: 9 },
-  endOfList: {
-    fontSize: 12,
-    fontFamily: "Helvetica-Bold",
-    textAlign: "center",
-    marginTop: 12,
+  /* ---- items (DataTable) ---- */
+  items: { marginTop: 20 },
+  tableHead: {
+    flexDirection: "row",
+    borderBottomWidth: 2,
+    borderBottomColor: INK,
+    paddingBottom: 4,
   },
-  allergen: { fontSize: 8, fontFamily: "Helvetica-Bold", textAlign: "center", marginTop: 8 },
-  signBandRow: { flexDirection: "row", marginTop: 20 },
-  signBand: {
-    flexGrow: 1,
-    flexBasis: 0,
-    backgroundColor: "#000",
-    color: "#fff",
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    textAlign: "center",
-    paddingVertical: 3,
-    marginRight: 1,
-  },
-  signBandValue: { flexGrow: 1, flexBasis: 0, fontSize: 10, textAlign: "center", paddingVertical: 5 },
+  th: { ...caps(6.5, 0.12), color: SUBTLE },
+  row: { flexDirection: "row", paddingVertical: 4, alignItems: "flex-start" },
+  cIndex: { width: 20, color: SUBTLE },
+  cItem: { width: 170, paddingRight: 8 },
+  cQty: { width: 30, textAlign: "right" },
+  cPrice: { width: 48, textAlign: "right" },
+  cNotes: { flexGrow: 1, flexBasis: 0, paddingLeft: 16, color: MUTED },
+  cCost: { width: 60, textAlign: "right" },
+  itemName: { ...caps(8.5, 0.06), fontFamily: "Helvetica-Bold" },
 
-  note: { fontSize: 8, marginTop: 6, lineHeight: 1.4 },
+  /* ---- notes + totals ---- */
+  foot: { flexDirection: "row", gap: 28, marginTop: 18, alignItems: "flex-start" },
+  notes: { flexGrow: 1, flexBasis: 0 },
+  prose: { fontSize: 9, color: INK },
+
+  /* The Mac window: 1.5pt frame, black title bar, a hard 3pt shadow drawn as
+     an offset black box behind it. */
+  windowWrap: { width: 212, position: "relative", marginRight: 3, marginBottom: 3 },
+  windowShadow: {
+    position: "absolute",
+    top: 3,
+    left: 3,
+    right: -3,
+    bottom: -3,
+    backgroundColor: INK,
+  },
+  window: { borderWidth: 1.5, borderColor: INK, backgroundColor: "#fff" },
+  titleBar: {
+    backgroundColor: INK,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  titleBarText: { ...caps(7, 0.12), fontFamily: "Helvetica-Bold", color: "#fff" },
+  totals: { paddingHorizontal: 10, paddingTop: 6, paddingBottom: 4 },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
+  totalLabel: { ...caps(6.5, 0.12), color: SUBTLE, paddingTop: 1.5 },
+  totalValue: { fontSize: 9, textAlign: "right" },
+  grand: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 2,
+    borderTopColor: INK,
+    backgroundColor: MARK_FILL,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  grandLabel: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold" },
+  grandValue: { fontSize: 15, fontFamily: "Helvetica-Bold" },
+
+  /* ---- payments (invoice, receipt) ---- */
+  payments: { marginBottom: 16 },
+  payRow: { flexDirection: "row", paddingVertical: 2.5 },
+  payDate: { width: 86 },
+  payWhat: { flexGrow: 1, flexBasis: 0, color: MUTED },
+  payAmount: { width: 60, textAlign: "right" },
+  invoiceFooter: { fontSize: 9, color: MUTED, marginTop: 22 },
+
+  /* ---- terms + signature ---- */
+  terms: { marginTop: 20 },
+  lead: { fontSize: 9, fontFamily: "Helvetica-Bold", marginBottom: 5 },
+  termsText: { fontSize: 7.5, lineHeight: 1.45, color: MUTED },
+  signRow: { flexDirection: "row", gap: 16, marginTop: 14 },
+  signField: { flexGrow: 1, flexBasis: 0 },
+  signDate: { width: 150 },
+  signLabel: { ...caps(6.5, 0.12), color: SUBTLE, marginBottom: 4 },
+  signBox: { borderWidth: 1, borderColor: INK, height: 32, paddingHorizontal: 8, justifyContent: "center" },
+  signValue: { fontSize: 10, fontFamily: "Helvetica-Bold" },
+  signSub: { fontSize: 7, color: MUTED, marginTop: 2 },
+
+  /* ---- footer ---- */
   footer: {
     position: "absolute",
-    bottom: 18,
-    left: 34,
-    right: 34,
-    fontSize: 7,
-    color: "#666",
-    textAlign: "center",
+    bottom: 20,
+    left: PAGE_X,
+    right: PAGE_X,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderTopWidth: 0.75,
+    borderTopColor: HAIRLINE,
+    paddingTop: 6,
   },
+  footerText: { ...caps(6.5, 0.12), color: SUBTLE },
+
+  /* ---- kitchen order ---- */
+  stats: { flexDirection: "row", gap: 22, marginTop: 20 },
+  stat: { flexGrow: 1, flexBasis: 0 },
+  statValue: { fontSize: 20, fontFamily: "Helvetica-Bold", marginTop: 2 },
+  statSub: { ...caps(7.5, 0.12), color: SUBTLE, marginTop: 3 },
+  statMarked: { backgroundColor: MARK_FILL, paddingHorizontal: 6, paddingVertical: 3, alignSelf: "flex-start" },
+  /* DataTable's group band: black, white caps. */
+  groupBand: {
+    ...caps(7.5, 0.12),
+    fontFamily: "Helvetica-Bold",
+    color: "#fff",
+    backgroundColor: INK,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    marginTop: 8,
+  },
+  kRow: { flexDirection: "row", paddingVertical: 5, alignItems: "flex-start" },
+  kQty: { width: 44, fontSize: 13, fontFamily: "Helvetica-Bold", paddingLeft: 6 },
+  kItem: { width: 250, paddingRight: 12 },
+  kNotes: { flexGrow: 1, flexBasis: 0, color: MUTED },
+  taxonomy: { fontSize: 7.5, color: SUBTLE, marginTop: 2 },
+  endOfList: { flexDirection: "row", alignItems: "center", marginTop: 16 },
+  endRule: { flexGrow: 1, borderTopWidth: 0.75, borderTopColor: HAIRLINE },
+  endText: { ...caps(7, 0.12), color: SUBTLE, marginHorizontal: 10 },
+  allergen: { flexDirection: "row", marginTop: 18, paddingHorizontal: 10, paddingVertical: 8 },
+  allergenLabel: { ...caps(7, 0.12), fontFamily: "Helvetica-Bold", width: 118, paddingTop: 1.5 },
+  allergenText: { flexGrow: 1, flexBasis: 0, fontSize: 10, fontFamily: "Helvetica-Bold" },
+  handoff: { marginTop: 22 },
+  boxGrid: { flexDirection: "row", gap: 16, marginBottom: 10 },
+  boxCell: { flexGrow: 1, flexBasis: 0 },
+
+  /* ---- customer invoice ---- */
+  invRow: { flexDirection: "row", paddingVertical: 4, alignItems: "flex-start" },
+  invDesc: { flexGrow: 1, flexBasis: 0, paddingRight: 12 },
+  invAmount: { width: 80, textAlign: "right" },
+  invBand: {
+    flexDirection: "row",
+    backgroundColor: INK,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    marginTop: 8,
+  },
+  invBandText: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold", color: "#fff" },
+  invDetail: { paddingLeft: 12 },
+  invSum: { borderTopWidth: 1, borderTopColor: INK, marginTop: 2 },
+
+  /* ---- statement ---- */
+  stNo: { width: 48, color: SUBTLE },
+  stDate: { width: 96 },
+  stTitle: { flexGrow: 1, flexBasis: 0, paddingRight: 12 },
+  stMoney: { width: 70, textAlign: "right" },
 });
 
 function money(value: number): string {
@@ -240,283 +300,240 @@ function money(value: number): string {
   })}`;
 }
 
-/** Quantities print as integers where they are integers — "1", never "1.00". */
 function qtyText(qty: number): string {
   return Number.isInteger(qty) ? String(qty) : String(Number(qty.toFixed(2)));
 }
 
-/**
- * A totals row that prints NOTHING when the figure is zero.
- *
- * FileMaker's own behaviour, and it is right: a quote for a pickup order should
- * not carry a line reading "DELIVERY: $0.00", which invites the question of
- * what the delivery was. The label still prints — the block's shape is
- * constant, so the eye finds SUBTOTAL and TOTAL in the same place on every
- * document — and only the number is withheld.
- */
-function TotalRow({ label, value }: { label: string; value: number | null }) {
+const WEEKDAY = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+/** `2026-10-03` → `SAT 2026-10-03` — the app's ISO date with its weekday. */
+function isoDay(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
+  if (!m) return "";
+  const day = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay();
+  return `${WEEKDAY[day]} ${m[0]}`;
+}
+
+function Field({ label, value }: { label: string; value: string | null | undefined }) {
+  const v = (value ?? "").trim();
   return (
-    <View style={styles.totalLine}>
-      <Text style={styles.totalLabel}>{label}</Text>
-      <Text style={styles.totalValue}>{value === null || value === 0 ? "" : money(value)}</Text>
+    <View style={s.field}>
+      <Text style={s.label}>{label}</Text>
+      <Text style={v ? s.value : [s.value, s.empty]}>{v || "—"}</Text>
     </View>
   );
 }
 
-function Meta({
-  label,
-  value,
-  underlined = false,
-}: {
-  label: string;
-  value: string;
-  underlined?: boolean;
-}) {
+function TotalRow({ label, value }: { label: string; value: number }) {
   return (
-    <View style={styles.metaRow}>
-      <Text style={styles.metaLabel}>{label}</Text>
-      <Text style={underlined ? styles.metaValueUnderlined : styles.metaValue}>{value}</Text>
-    </View>
-  );
-}
-
-function Masthead({
-  org,
-  order,
-  title,
-}: {
-  org: DocOrg;
-  order: OrderDocData;
-  title: string;
-}) {
-  return (
-    <>
-      <View style={styles.masthead} fixed>
-        <View>
-          <Text style={styles.orgName}>{org.name}</Text>
-          <Text style={styles.orgLine}>{org.addressLine}</Text>
-          <Text style={styles.orgLine}>{org.contactLine}</Text>
-        </View>
-        <View>
-          <Text style={styles.docTitle}>{title}</Text>
-          <Text
-            style={styles.docPage}
-            render={({ pageNumber, totalPages }) => `p ${pageNumber} OF ${totalPages}`}
-          />
-        </View>
-      </View>
-      {/* The event line repeats on every page — on a four-page order it is the
-          only thing that says which event these items belong to.
-
-          IT PRINTS THE TITLE ALONE, falling back to the date. Printing both
-          read "Pregnanacy Revela 8/16/2026 8/16/2026" on the very first real
-          order rendered, because Mark's titles routinely END with the date —
-          which is also why FileMaker prints just the title here. The date has
-          its own labelled row in the block below. */}
-      <Text style={styles.eventLine} fixed>
-        {order.title || usDate(order.event_date)}
+    <View style={s.totalRow}>
+      <Text style={s.totalLabel}>{label}</Text>
+      <Text style={value ? s.totalValue : [s.totalValue, s.empty]}>
+        {value ? money(value) : "—"}
       </Text>
-    </>
+    </View>
   );
 }
 
-/* ==========================================================================
- * QUOTE · INVOICE · RECEIPT
- * ========================================================================== */
-
-/**
- * One layout at three moments (decision 11).
- *
- * What varies is small and named here rather than in three near-identical
- * components, which is how the two of them that were meant to stay in step
- * would stop being: the invoice and receipt show the payments block and label
- * the grand total TOTAL DUE; the quote labels it TOTAL QUOTE and carries the
- * terms and the signature lines.
- */
 export function OrderDocumentPdf({
   orders,
   org,
   kind,
-  /** Decision 17: an approved quote is the quote it approved, plus who signed
-   *  it and when. Never passed for anything else. */
   approval,
 }: {
   orders: OrderDocData[];
   org: DocOrg;
-  kind: DocumentKind;
+  kind: CustomerDocumentKind;
+  /** Decision 17's approval, on a quote only. */
   approval?: { name: string; at: string; reference: string } | null;
 }) {
-  const showsPayments = kind === "invoice" || kind === "receipt";
-  const grandLabel =
-    kind === "quote" ? "TOTAL QUOTE:" : kind === "receipt" ? "TOTAL DUE:" : "TOTAL DUE:";
-
+  const label = DOCUMENT_LABEL[kind];
+  const showsPayments = kind !== "quote";
   return (
     <Document>
       {orders.map((order) => {
-        const note =
-          kind === "quote"
-            ? order.notes_quote
-            : kind === "invoice"
-              ? order.notes_invoice
-              : order.notes_receipt;
         const t = order.totals;
+        const delivery = order.fulfillment === "delivery";
+        const note =
+          kind === "quote" ? order.notes_quote : kind === "invoice" ? order.notes_invoice : order.notes_receipt;
+        const grand = kind === "quote" ? t.total : t.balance;
+        const marked = !(kind === "receipt" && t.balance <= 0);
         return (
-          <Page key={order.id} size="LETTER" style={styles.page}>
-            <Masthead org={org} order={order} title={DOCUMENT_TITLE[kind]} />
-
-            <View style={styles.bandRow}>
-              <View style={styles.bandBlock}>
-                <Text style={styles.band}>{DOCUMENT_TITLE[kind]}</Text>
-                <Meta label={DOCUMENT_TITLE[kind]} value={order.number} />
-                <Meta label="Event date" value={usDate(order.event_date)} />
-                <Meta
-                  label={order.fulfillment === "delivery" ? "Delivery" : "Pickup"}
-                  value={order.event_time ? `after ${usTime(order.event_time)}` : ""}
-                />
-                <Meta label="Location" value={order.location_name ?? ""} underlined />
-              </View>
-
-              <View style={styles.bandBlock}>
-                <Text style={styles.band}>CUSTOMER</Text>
-                {/* LAST NAME FIRST — the roster reading, and what FileMaker
-                    prints. `customerLabel` is the app's one implementation. */}
-                <Meta label="Name" value={customerLabel(order.customer)} />
-                <Meta label="Phone" value={order.customer?.phone ?? ""} />
-                <Meta label="Email" value={order.customer?.email ?? ""} />
-              </View>
-
-              <View style={styles.bandBlock}>
-                <Text style={styles.band}>CONTACT</Text>
-                <Meta label="Name" value={order.contact_name ?? ""} />
-                <Meta label="Phone" value={order.contact_phone ?? ""} />
-                <Meta label="Email" value={order.contact_email ?? ""} />
-                <Meta label="Event address" value={order.delivery_address ?? ""} />
+          <Page key={order.id} size="LETTER" style={s.page}>
+            <View style={s.masthead} fixed>
+              <Text style={s.wordmark}>{org.name}</Text>
+              <View style={s.mastheadRight}>
+                {org.addressLine ? <Text style={s.mastheadLine}>{org.addressLine}</Text> : null}
+                {org.contactLine ? <Text style={s.mastheadLine}>{org.contactLine}</Text> : null}
               </View>
             </View>
 
-            {/* NOT `fixed`, unlike the kitchen sheet's.
-
-                A fixed header repeats on EVERY page, including one that holds
-                only the totals — which is what a two-page quote is, since our
-                rows are tighter than FileMaker's and 29 of them fit on page
-                one. That printed an empty ITEM/QTY/PRICE header directly above
-                the TOTALS band, which reads as a table that failed to render.
-                The kitchen sheet keeps its fixed header because its list
-                genuinely runs over pages and nothing but the list is on them. */}
-            <View style={styles.itemsHead}>
-              <Text style={styles.colIndex}> </Text>
-              <Text style={[styles.colItem, styles.headCell]}>Item</Text>
-              <Text style={[styles.colQty, styles.headCell]}>Qty</Text>
-              <Text style={[styles.colPrice, styles.headCell]}>Price</Text>
-              <Text style={[styles.colNotes, styles.headCell]}>Notes</Text>
-              <Text style={[styles.colCost, styles.headCell]}>Cost</Text>
-            </View>
-
-            {order.lines.map((line, i) => (
-              <View key={line.id} style={styles.row} wrap={false}>
-                <Text style={styles.colIndex}>{i + 1}.</Text>
-                <Text style={styles.colItem}>{line.name}</Text>
-                <Text style={styles.colQty}>{qtyText(line.qty)}</Text>
-                <Text style={styles.colPrice}>{money(line.unit_price)}</Text>
-                <Text style={styles.colNotes}>{line.notes ?? ""}</Text>
-                <Text style={styles.colCost}>{money(lineTotal(line))}</Text>
-              </View>
-            ))}
-
-            <View style={styles.footRow}>
-              <View style={styles.footCol}>
-                {showsPayments ? (
-                  <>
-                    <Text style={styles.band}>PAYMENTS</Text>
-                    {order.payments.map((p, i) => (
-                      <View key={i} style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>{usDate(p.paid_on)}</Text>
-                        <Text style={styles.metaValue}>
-                          {[p.payment_type, p.note].filter(Boolean).join(" · ")}
-                        </Text>
-                        <Text style={styles.totalValue}>{money(Number(p.amount) || 0)}</Text>
-                      </View>
-                    ))}
-                  </>
-                ) : (
-                  <Text style={styles.headCell}>NOTES</Text>
-                )}
-                {note ? <Text style={styles.note}>{note}</Text> : null}
-              </View>
-
-              <View style={styles.footCol}>
-                <Text style={styles.band}>TOTALS</Text>
-                <TotalRow label="SUBTOTAL:" value={t.subtotal} />
-                <TotalRow label="TAX:" value={t.tax} />
-                <TotalRow label="DISCOUNT:" value={t.discount} />
-                <TotalRow label="DELIVERY:" value={t.deliveryCharge} />
-                <TotalRow label="RUSH FEE:" value={t.rushFee} />
-                {showsPayments ? <TotalRow label="PAYMENTS:" value={t.paid} /> : null}
-                <View style={styles.totalLine}>
-                  <Text style={styles.grandLabel}>{grandLabel}</Text>
-                  {/* THE QUOTE PRINTS THE TOTAL; THE INVOICE PRINTS WHAT IS
-                      STILL OWED. Two different questions, and the reference
-                      invoice answers the second one wrong — see the header. */}
-                  <Text style={styles.grandValue}>
-                    {money(kind === "quote" ? t.total : t.balance)}
+            <View style={s.body}>
+              <View style={s.headingRow}>
+                <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
+                  <Text style={s.kicker}>{label}</Text>
+                  <Text style={s.h1}>{order.title || isoDay(order.event_date) || "Special order"}</Text>
+                  <Text style={s.caption}>
+                    {[
+                      order.location_name,
+                      kind === "quote" && order.date_initiated ? `Quoted ${order.date_initiated}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </Text>
                 </View>
+                <View style={s.numberBlock}>
+                  <Text style={s.kicker}>No.</Text>
+                  <Text style={s.number}>{order.number}</Text>
+                </View>
               </View>
+
+              <View style={s.blocks}>
+                <View style={s.block}>
+                  <Text style={s.sectionHead}>Event</Text>
+                  <Field label="Date" value={isoDay(order.event_date)} />
+                  <Field
+                    label={delivery ? "Delivery" : "Pickup"}
+                    value={order.event_time ? `After ${usTime(order.event_time)}` : null}
+                  />
+                  <Field label="Location" value={order.location_name} />
+                </View>
+                <View style={s.block}>
+                  <Text style={s.sectionHead}>Customer</Text>
+                  <Field label="Name" value={order.customer ? customerLabel(order.customer) : null} />
+                  <Field label="Phone" value={order.customer?.phone} />
+                  <Field label="Email" value={order.customer?.email} />
+                </View>
+                <View style={s.block}>
+                  <Text style={s.sectionHead}>Contact</Text>
+                  <Field label="Name" value={order.contact_name} />
+                  <Field label="Phone" value={order.contact_phone} />
+                  <Field label="Email" value={order.contact_email} />
+                  <Field label="Address" value={order.delivery_address} />
+                </View>
+              </View>
+
+              <View style={s.items}>
+                <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
+                  Items <Text style={s.sectionCount}>{order.lines.length}</Text>
+                </Text>
+                <View style={s.tableHead}>
+                  <Text style={[s.th, s.cIndex]}> </Text>
+                  <Text style={[s.th, s.cItem]}>Item</Text>
+                  <Text style={[s.th, s.cQty]}>Qty</Text>
+                  <Text style={[s.th, s.cPrice]}>Price</Text>
+                  <Text style={[s.th, s.cNotes]}>Notes</Text>
+                  <Text style={[s.th, s.cCost]}>Cost</Text>
+                </View>
+                {order.lines.map((line, i) => (
+                  <View key={line.id} style={s.row} wrap={false}>
+                    <Text style={s.cIndex}>{i + 1}</Text>
+                    <Text style={[s.cItem, s.itemName]}>{line.name}</Text>
+                    <Text style={s.cQty}>{qtyText(line.qty)}</Text>
+                    <Text style={s.cPrice}>{money(line.unit_price)}</Text>
+                    <Text style={s.cNotes}>{line.notes ?? ""}</Text>
+                    <Text style={s.cCost}>{money(lineTotal(line))}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={s.foot} wrap={false}>
+                <View style={s.notes}>
+                  {showsPayments ? (
+                    <View style={s.payments}>
+                      <Text style={s.sectionHead}>
+                        Payments <Text style={s.sectionCount}>{order.payments.length}</Text>
+                      </Text>
+                      {order.payments.length === 0 ? (
+                        <Text style={[s.prose, s.empty]}>—</Text>
+                      ) : (
+                        order.payments.map((p, i) => (
+                          <View key={i} style={s.payRow}>
+                            <Text style={s.payDate}>{isoDay(p.paid_on) || "—"}</Text>
+                            <Text style={s.payWhat}>
+                              {[p.payment_type, p.note].filter(Boolean).join(" · ")}
+                            </Text>
+                            <Text style={s.payAmount}>{money(Number(p.amount) || 0)}</Text>
+                          </View>
+                        ))
+                      )}
+                    </View>
+                  ) : null}
+                  <Text style={s.sectionHead}>Notes</Text>
+                  {note ? (
+                    <Text style={s.prose}>{note}</Text>
+                  ) : (
+                    <Text style={[s.prose, s.empty]}>—</Text>
+                  )}
+                </View>
+                <View style={s.windowWrap}>
+                  <View style={s.windowShadow} />
+                  <View style={s.window}>
+                    <View style={s.titleBar}>
+                      <Text style={s.titleBarText}>Totals</Text>
+                    </View>
+                    <View style={s.totals}>
+                      <TotalRow label="Subtotal" value={t.subtotal} />
+                      <TotalRow label="Discount" value={t.discount ? -t.discount : 0} />
+                      <TotalRow label="Delivery" value={t.deliveryCharge} />
+                      <TotalRow label="Rush fee" value={t.rushFee} />
+                      <TotalRow label="Tax" value={t.tax} />
+                      {showsPayments ? (
+                        <TotalRow label="Payments" value={t.paid ? -t.paid : 0} />
+                      ) : null}
+                    </View>
+                    <View style={marked ? s.grand : [s.grand, { backgroundColor: "#fff" }]}>
+                      <Text style={s.grandLabel}>{kind === "quote" ? "Total quote" : "Total due"}</Text>
+                      <Text style={s.grandValue}>{money(grand)}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {showsPayments && org.invoiceFooter ? (
+                <Text style={s.invoiceFooter}>{org.invoiceFooter}</Text>
+              ) : null}
+
+              {kind === "quote" && org.terms ? (
+                <View style={s.terms} wrap={false}>
+                  <Text style={s.sectionHead}>Terms</Text>
+                  <Text style={s.lead}>To go ahead with your order, please read and sign below.</Text>
+                  <Text style={s.termsText}>{org.terms}</Text>
+
+                  <View style={s.signRow}>
+                    <View style={s.signField}>
+                      <Text style={s.signLabel}>Signature</Text>
+                      <View style={s.signBox}>
+                        {approval ? (
+                          <>
+                            <Text style={s.signValue}>Approved online by {approval.name}</Text>
+                            <Text style={s.signSub}>
+                              {approval.at} · reference {approval.reference}
+                            </Text>
+                          </>
+                        ) : null}
+                      </View>
+                    </View>
+                    <View style={s.signDate}>
+                      <Text style={s.signLabel}>Date</Text>
+                      <View style={s.signBox}>
+                        {approval ? <Text style={s.signValue}>{approval.at.slice(0, 10)}</Text> : null}
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              ) : null}
             </View>
 
-            {kind === "invoice" || kind === "receipt" ? (
-              org.invoiceFooter ? (
-                <Text style={styles.note}>{org.invoiceFooter}</Text>
-              ) : null
-            ) : null}
-
-            {kind === "quote" && org.terms ? (
-              <>
-                <Text style={styles.termsHead}>
-                  IN ORDER TO PROCEED WITH YOUR ORDER, PLEASE READ AND SIGN BELOW:
-                </Text>
-                <Text style={styles.terms}>{org.terms.toUpperCase()}</Text>
-
-                {approval ? (
-                  /* THE APPROVED ARTIFACT (decision 17). It is the quote with
-                     the approval written where the pen would have gone —
-                     typed-name clickwrap is legally equivalent for this class
-                     of agreement, and the token identity is what makes it
-                     auditable afterwards. */
-                  <View style={styles.signRow}>
-                    <View style={[styles.signLine, { flexGrow: 1, flexBasis: 0 }]}>
-                      <Text style={styles.signLabel}>
-                        Signature — approved online by {approval.name}
-                      </Text>
-                      <Text style={styles.note}>
-                        {approval.at} · reference {approval.reference}
-                      </Text>
-                    </View>
-                    <View style={[styles.signLine, { width: 150 }]}>
-                      <Text style={styles.signLabel}>Date</Text>
-                      <Text style={styles.note}>{approval.at.slice(0, 10)}</Text>
-                    </View>
-                  </View>
-                ) : (
-                  <View style={styles.signRow}>
-                    <View style={[styles.signLine, { flexGrow: 1, flexBasis: 0 }]}>
-                      <Text style={styles.signLabel}>Signature</Text>
-                    </View>
-                    <View style={[styles.signLine, { width: 150 }]}>
-                      <Text style={styles.signLabel}>Date</Text>
-                    </View>
-                  </View>
-                )}
-              </>
-            ) : null}
-
-            <Text
-              style={styles.footer}
-              render={({ pageNumber, totalPages }) =>
-                `${DOCUMENT_TITLE[kind]} #${order.number} · ${pageNumber} / ${totalPages}`
-              }
-              fixed
-            />
+            <View style={s.footer} fixed>
+              <Text style={s.footerText}>
+                {org.name} · {label} {order.number}
+              </Text>
+              <Text
+                style={s.footerText}
+                render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+              />
+            </View>
           </Page>
         );
       })}
@@ -528,309 +545,216 @@ export function OrderDocumentPdf({
  * THE KITCHEN ORDER
  * ========================================================================== */
 
-function KitchenBox({
-  label,
-  value,
-  sub,
-  marked = false,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  marked?: boolean;
-}) {
+/** A box somebody writes in — the signature box's dress, with an optional
+ *  value already printed where the record knows it. */
+function WriteBox({ label, value }: { label: string; value?: string | number | null }) {
+  const v = value === null || value === undefined ? "" : String(value);
   return (
-    <View style={styles.kitchenBox}>
-      <Text style={styles.band}>{label}</Text>
-      <Text style={[styles.kitchenValue, ...(marked ? [styles.mark] : [])]}>{value}</Text>
-      {sub ? (
-        <Text style={[styles.kitchenSub, ...(marked ? [styles.mark] : [])]}>{sub}</Text>
-      ) : null}
+    <View style={s.boxCell}>
+      <Text style={s.signLabel}>{label}</Text>
+      <View style={s.signBox}>{v ? <Text style={s.signValue}>{v}</Text> : null}</View>
     </View>
   );
 }
 
 /**
- * The production sheet — the one document with NO MONEY ON IT AT ALL, which is
- * the point: a decorator holding this is being told what to make, and a price
- * beside a donut is a question they cannot answer.
+ * The production sheet in the app's language (Mark, 2026-09-25). NO MONEY, as
+ * on the original — a decorator is being told what to make — and `Misc` lines
+ * never reach it (`sizeClassGroups`).
  *
- * `Misc` lines never reach it (decision 5, enforced in `sizeClassGroups`), so
- * an order carrying a $75 delivery fee prints its donuts and not the fee.
+ * What the record KNOWS prints as fields; what the kitchen WRITES is a box
+ * (completed by, received, and the tracking number and box count when the
+ * record does not have them yet). The size classes are `DataTable`'s black
+ * group bands. The pickup time keeps the sheet's one yellow fill — it is the
+ * fact somebody misses — and an allergen warning takes the red "stop" fill,
+ * because it is one.
  */
 export function KitchenOrderPdf({
   orders,
+  org,
   printedOn,
 }: {
   orders: OrderDocData[];
-  org?: DocOrg;
+  org: DocOrg;
   /**
-   * The org's calendar day, as `YYYY-MM-DD` — what AS OF means.
-   *
-   * Passed in rather than taken from `new Date()` here, for `lib/today`'s
-   * reason: a browser in another zone, or a UTC host, dates the sheet to
-   * tomorrow after 4pm Pacific. Every caller already holds the org's own today.
+   * The org's calendar day, as `YYYY-MM-DD` — what AS OF means: the day this
+   * came off the printer, so a decorator holding two copies knows which is
+   * later. Passed in rather than taken from `new Date()` here, for
+   * `lib/today`'s reason: a browser in another zone dates the sheet wrong.
    */
   printedOn?: string;
 }) {
-  return <Document>{kitchenOrderPages(orders, printedOn)}</Document>;
+  return <Document>{kitchenOrderPages(orders, org.name, printedOn)}</Document>;
 }
 
 /**
- * The same pages, WITHOUT a `<Document>` around them — so the production packet
- * can carry them (Mark, 2026-09-01: "why not include a 'Special Orders' option
- * … so we don't need to do it as a separate process?").
- *
- * A FUNCTION RETURNING AN ARRAY, not a component. `<Document>` accepts Pages
- * and arrays of them, and `ProductionPacketPdfs` already documents that a real
- * Fragment confuses the reconciler on some versions — which is why that file
- * flattens its children by hand. Returning the array sidesteps the question
- * rather than betting on it.
+ * The same pages WITHOUT a `<Document>` around them, so the production packet
+ * can carry them. A FUNCTION RETURNING AN ARRAY, not a component: `<Document>`
+ * accepts arrays of Pages, and `ProductionPacketPdfs` documents that a real
+ * Fragment confuses the reconciler on some versions.
  */
 export function kitchenOrderPages(
   orders: OrderDocData[],
+  orgName: string,
   printedOn?: string
 ): React.ReactElement[] {
   return orders.map((order) => {
         const groups = sizeClassGroups(order.lines);
-        const pickupTime = usTime(order.ready_by_time ?? order.event_time);
+        const delivery = order.fulfillment === "delivery";
+        const time = usTime(order.ready_by_time ?? order.event_time);
+        const asOf = printedOn ?? order.event_date;
         return (
-          <Page key={order.id} size="LETTER" style={styles.page}>
-            <View style={styles.kitchenHeadRow} fixed>
-              <View style={styles.kitchenBoxes}>
-                <KitchenBox label="KITCHEN" value={order.kitchen_code ?? "—"} />
-                <KitchenBox
-                  label="DAY OF WEEK"
-                  value={usWeekday(order.event_date)}
-                  sub={usDate(order.event_date)}
-                />
-                <KitchenBox
-                  label={order.fulfillment === "delivery" ? "DELIVERY TIME" : "PICK UP TIME"}
-                  value={pickupTime || "—"}
-                  sub={order.location_code ?? undefined}
-                  marked
-                />
-              </View>
-              <View>
-                <Text style={styles.orderNumber}>ORDER #{order.number}</Text>
-                {/* AS OF IS THE DAY THIS CAME OFF THE PRINTER (Mark,
-                    2026-09-01), not the day of the event. The event date is on
-                    this page twice already — in the DAY OF WEEK box on the left
-                    and in EVENT INFO below — so printing it a third time under
-                    the order number said nothing, while the question AS OF
-                    actually answers is "how current is the sheet in my hand?".
-                    An order is a working document and its lines change; a
-                    decorator holding two copies needs to know which is the
-                    later one. */}
-                <Text style={styles.asOf}>AS OF {usDate(printedOn ?? order.event_date)}</Text>
+          <Page key={order.id} size="LETTER" style={s.page}>
+            <View style={s.masthead} fixed>
+              <Text style={s.wordmark}>{orgName}</Text>
+              <View style={s.mastheadRight}>
+                <Text style={s.mastheadLine}>Kitchen order {order.number}</Text>
+                {asOf ? <Text style={s.mastheadLine}>As of {asOf}</Text> : null}
               </View>
             </View>
 
-            <View style={styles.bandRow}>
-              <View style={styles.bandBlock}>
-                <Text style={styles.band}>CONTACT INFO</Text>
-                <Text style={styles.note}>{order.contact_name ?? customerLabel(order.customer)}</Text>
-                <Text style={styles.note}>{order.contact_phone ?? order.customer?.phone ?? ""}</Text>
-                <Text style={styles.note}>{order.contact_email ?? order.customer?.email ?? ""}</Text>
+            <View style={s.body}>
+              <View style={s.headingRow}>
+                <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
+                  <Text style={s.kicker}>Kitchen order</Text>
+                  <Text style={s.h1}>{order.title || isoDay(order.event_date) || "Special order"}</Text>
+                  <Text style={s.caption}>{order.location_name ?? ""}</Text>
+                </View>
+                <View style={s.numberBlock}>
+                  <Text style={s.kicker}>No.</Text>
+                  <Text style={s.number}>{order.number}</Text>
+                </View>
               </View>
-              <View style={styles.bandBlock}>
-                <Text style={styles.band}>EVENT INFO</Text>
-                {/* The title alone — see the masthead's event line for why. */}
-                <Text style={[styles.note, { fontFamily: "Helvetica-Bold" }]}>
-                  {order.title || usDate(order.event_date)}
+
+              <View style={s.stats}>
+                <View style={s.stat}>
+                  <Text style={s.sectionHead}>Kitchen</Text>
+                  <Text style={s.statValue}>{order.kitchen_code ?? "—"}</Text>
+                </View>
+                <View style={s.stat}>
+                  <Text style={s.sectionHead}>Day</Text>
+                  <Text style={s.statValue}>{usWeekday(order.event_date).toUpperCase() || "—"}</Text>
+                  <Text style={s.statSub}>{order.event_date ?? ""}</Text>
+                </View>
+                <View style={s.stat}>
+                  <Text style={s.sectionHead}>{delivery ? "Delivery time" : "Pickup time"}</Text>
+                  <View style={s.statMarked}>
+                    <Text style={[s.statValue, { marginTop: 0 }]}>{time || "—"}</Text>
+                  </View>
+                  <Text style={s.statSub}>{order.location_code ?? ""}</Text>
+                </View>
+              </View>
+
+              {/* UP HERE, not after the list where the original prints it: on
+                  a two-page order that put it on page 2, and it is the one line
+                  on the sheet nobody can afford to miss. */}
+              <View
+                style={
+                  order.allergen_info
+                    ? [s.allergen, { backgroundColor: STOP_FILL }]
+                    : [s.allergen, { borderWidth: 0.75, borderColor: HAIRLINE }]
+                }
+              >
+                <Text style={s.allergenLabel}>Allergen warning</Text>
+                <Text style={order.allergen_info ? s.allergenText : [s.allergenText, s.empty]}>
+                  {order.allergen_info || "None"}
                 </Text>
-                <Text style={styles.note}>
-                  {[usDate(order.event_date), usTime(order.event_time)].filter(Boolean).join("  ")}
-                </Text>
-                {order.fulfillment === "delivery" && order.delivery_address ? (
-                  <Text style={styles.note}>{order.delivery_address}</Text>
-                ) : null}
               </View>
-            </View>
 
-            <View style={styles.itemsHead} fixed>
-              <Text style={[styles.kQty, styles.headCell]}>Qty</Text>
-              <Text style={[styles.kItem, styles.headCell]}>Item</Text>
-              <Text style={[styles.kNotes, styles.headCell]}>Notes</Text>
-            </View>
+              <View style={s.blocks}>
+                <View style={s.block}>
+                  <Text style={s.sectionHead}>Order</Text>
+                  <Field label="Taken by" value={order.taken_by} />
+                  <Field label="Taken" value={order.date_initiated} />
+                  <Field label="Handoff" value={delivery ? "Delivery" : "Pickup"} />
+                </View>
+                <View style={s.block}>
+                  <Text style={s.sectionHead}>Contact</Text>
+                  <Field label="Name" value={order.contact_name ?? customerLabel(order.customer)} />
+                  <Field label="Phone" value={order.contact_phone ?? order.customer?.phone} />
+                  <Field label="Email" value={order.contact_email ?? order.customer?.email} />
+                </View>
+                <View style={s.block}>
+                  <Text style={s.sectionHead}>Event</Text>
+                  <Field label="Date" value={isoDay(order.event_date)} />
+                  <Field label="Time" value={usTime(order.event_time)} />
+                  {delivery ? <Field label="Address" value={order.delivery_address} /> : null}
+                </View>
+              </View>
 
-            {groups.map((group) => (
-              <View key={group.label}>
-                <Text style={styles.sizeClass}>{group.label}</Text>
-                {group.lines.map((line) => (
-                  <View key={line.id} style={styles.kitchenRow} wrap={false}>
-                    <Text style={styles.kQty}>{qtyText(line.qty)}</Text>
-                    <View style={styles.kItem}>
-                      <Text>{line.name}</Text>
-                      {/* WHAT IT ACTUALLY IS, under what somebody called it.
-                          The name is an edited copy; this is the taxonomy. */}
-                      <Text style={styles.taxonomy}>{taxonomyLine(line)}</Text>
-                    </View>
-                    <Text style={styles.kNotes}>{line.notes ?? ""}</Text>
+              <View style={s.items}>
+                <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
+                  Items{" "}
+                  <Text style={s.sectionCount}>{groups.reduce((a, g) => a + g.lines.length, 0)}</Text>
+                </Text>
+                <View style={s.tableHead} fixed>
+                  <Text style={[s.th, { width: 44, paddingLeft: 6 }]}>Qty</Text>
+                  <Text style={[s.th, s.kItem]}>Item</Text>
+                  <Text style={[s.th, s.kNotes]}>Notes</Text>
+                </View>
+                {groups.map((group) => (
+                  <View key={group.label}>
+                    <Text style={s.groupBand}>{group.label}</Text>
+                    {group.lines.map((line) => (
+                      <View key={line.id} style={s.kRow} wrap={false}>
+                        <Text style={s.kQty}>{qtyText(line.qty)}</Text>
+                        <View style={s.kItem}>
+                          <Text style={s.itemName}>{line.name}</Text>
+                          <Text style={s.taxonomy}>{taxonomyLine(line)}</Text>
+                        </View>
+                        <Text style={s.kNotes}>{line.notes ?? ""}</Text>
+                      </View>
+                    ))}
                   </View>
                 ))}
+
+                <View style={s.endOfList}>
+                  <View style={s.endRule} />
+                  <Text style={s.endText}>End of list</Text>
+                  <View style={s.endRule} />
+                </View>
               </View>
-            ))}
 
-            {order.notes_production ? (
-              <Text style={styles.note}>{order.notes_production}</Text>
-            ) : null}
+              <View wrap={false}>
+                {order.notes_production ? (
+                  <View style={{ marginTop: 16 }}>
+                    <Text style={s.sectionHead}>Notes</Text>
+                    <Text style={s.prose}>{order.notes_production}</Text>
+                  </View>
+                ) : null}
 
-            <Text style={styles.endOfList}>*** END OF LIST ***</Text>
-            <Text style={styles.allergen}>
-              ALLERGEN WARNING:   {order.allergen_info || "None"}
-            </Text>
-
-            <View style={styles.signBandRow}>
-              <Text style={styles.signBand}>ORDER TAKEN BY</Text>
-              <Text style={styles.signBand}>DATE / TIME</Text>
-              <Text style={styles.signBand}>PICKUP / DELIVERY</Text>
+                <View style={s.handoff}>
+                  <Text style={s.sectionHead}>Handoff</Text>
+                  <View style={s.boxGrid}>
+                    <WriteBox label="Order completed by" />
+                    <WriteBox label="Number of boxes" value={order.delivery_boxes} />
+                    <WriteBox label="Delivery tracking #" value={order.delivery_tracking} />
+                  </View>
+                  <View style={s.boxGrid}>
+                    <WriteBox label="Received" />
+                    <WriteBox label="Date & time" />
+                  </View>
+                </View>
+              </View>
             </View>
-            <View style={styles.signBandRow}>
-              <Text style={styles.signBandValue}>{order.taken_by ?? ""}</Text>
-              <Text style={styles.signBandValue}>{usDate(order.date_initiated)}</Text>
-              <Text style={styles.signBandValue}>
-                {order.fulfillment === "delivery" ? "Delivery" : "Pickup"}
+
+            <View style={s.footer} fixed>
+              <Text style={s.footerText}>
+                {orgName} · Kitchen order {order.number}
               </Text>
+              <Text
+                style={s.footerText}
+                render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+              />
             </View>
-            <View style={styles.signBandRow}>
-              <Text style={styles.signBand}>DELIVERY TRACKING #</Text>
-              <Text style={styles.signBand}>ORDER COMPLETED BY</Text>
-              <Text style={styles.signBand}>NUMBER OF BOXES</Text>
-            </View>
-            <View style={styles.signBandRow}>
-              <Text style={styles.signBandValue}>{order.delivery_tracking ?? ""}</Text>
-              <Text style={styles.signBandValue}> </Text>
-              <Text style={styles.signBandValue}>{order.delivery_boxes ?? ""}</Text>
-            </View>
-            <View style={[styles.signBandRow, { marginTop: 14 }]}>
-              <Text style={styles.signBand}>RECEIVED</Text>
-              <Text style={styles.signBand}>DATE &amp; TIME</Text>
-            </View>
-            <View style={styles.signBandRow}>
-              <Text style={[styles.signBandValue, { textAlign: "left", paddingLeft: 6 }]}>X</Text>
-              <Text style={styles.signBandValue}> </Text>
-            </View>
-
-            <Text
-              style={styles.footer}
-              render={({ pageNumber, totalPages }) =>
-                `ORDER #${order.number} · ${pageNumber} / ${totalPages}`
-              }
-              fixed
-            />
           </Page>
     );
   });
 }
 
 /* ==========================================================================
- * THE WHOLESALE STATEMENT (decision 21)
+ * THE CUSTOMER INVOICE (migration 124)
  * ========================================================================== */
-
-/**
- * One customer, one period, one line per order — the weekly chore Mark does by
- * hand for Cafe Knotted.
- *
- * ITS LINE GRAIN IS DELIBERATE: one row per ORDER, not per donut. That is what
- * a customer checks a bill against (they know what they ordered on Tuesday),
- * and it is what an accounting export will want when the QBO era arrives —
- * decision 21's other half.
- */
-export function StatementPdf({
-  statement,
-  org,
-}: {
-  statement: StatementData;
-  org: DocOrg;
-}) {
-  const period = `${usDate(statement.from)} – ${usDate(statement.to)}`;
-  return (
-    <Document>
-      <Page size="LETTER" style={styles.page}>
-        <View style={styles.masthead} fixed>
-          <View>
-            <Text style={styles.orgName}>{org.name}</Text>
-            <Text style={styles.orgLine}>{org.addressLine}</Text>
-            <Text style={styles.orgLine}>{org.contactLine}</Text>
-          </View>
-          <View>
-            <Text style={styles.docTitle}>STATEMENT</Text>
-            <Text
-              style={styles.docPage}
-              render={({ pageNumber, totalPages }) => `p ${pageNumber} OF ${totalPages}`}
-            />
-          </View>
-        </View>
-        <Text style={styles.eventLine} fixed>
-          {period}
-        </Text>
-
-        <View style={styles.bandRow}>
-          <View style={styles.bandBlock}>
-            <Text style={styles.band}>CUSTOMER</Text>
-            <Meta label="Name" value={customerLabel(statement.customer)} />
-            <Meta label="Phone" value={statement.customer?.phone ?? ""} />
-            <Meta label="Email" value={statement.customer?.email ?? ""} />
-          </View>
-          <View style={styles.bandBlock}>
-            <Text style={styles.band}>PERIOD</Text>
-            <Meta label="From" value={usDate(statement.from)} />
-            <Meta label="To" value={usDate(statement.to)} />
-            <Meta label="Orders" value={String(statement.orders.length)} />
-          </View>
-        </View>
-
-        <View style={styles.itemsHead} fixed>
-          <Text style={[styles.colIndex, styles.headCell]}>#</Text>
-          <Text style={[styles.colItem, styles.headCell]}>Date</Text>
-          <Text style={[styles.colNotes, styles.headCell]}>Order</Text>
-          <Text style={[styles.colCost, styles.headCell]}>Paid</Text>
-          <Text style={[styles.colCost, styles.headCell]}>Total</Text>
-        </View>
-
-        {statement.orders.map((o) => (
-          <View key={o.id} style={styles.row} wrap={false}>
-            <Text style={styles.colIndex}>{o.number}</Text>
-            <Text style={styles.colItem}>{usDate(o.event_date)}</Text>
-            <Text style={styles.colNotes}>{o.title ?? ""}</Text>
-            <Text style={styles.colCost}>
-              {o.totals.paid === 0 ? "" : money(o.totals.paid)}
-            </Text>
-            <Text style={styles.colCost}>{money(o.totals.total)}</Text>
-          </View>
-        ))}
-
-        {statement.orders.length === 0 ? (
-          <Text style={styles.note}>No orders in this period.</Text>
-        ) : null}
-
-        <View style={styles.footRow}>
-          <View style={styles.footCol} />
-          <View style={styles.footCol}>
-            <Text style={styles.band}>TOTALS</Text>
-            <TotalRow label="ORDERS:" value={statement.total} />
-            <TotalRow label="PAYMENTS:" value={statement.paid} />
-            <View style={styles.totalLine}>
-              <Text style={styles.grandLabel}>TOTAL DUE:</Text>
-              <Text style={styles.grandValue}>{money(statement.balance)}</Text>
-            </View>
-          </View>
-        </View>
-
-        {org.invoiceFooter ? <Text style={styles.note}>{org.invoiceFooter}</Text> : null}
-
-        <Text
-          style={styles.footer}
-          render={({ pageNumber, totalPages }) =>
-            `STATEMENT ${period} · ${pageNumber} / ${totalPages}`
-          }
-          fixed
-        />
-      </Page>
-    </Document>
-  );
-}
 
 /**
  * THE CUSTOMER INVOICE (migration 124) — one invoice, one row per ORDER, the
@@ -863,96 +787,268 @@ export type CustomerInvoiceDoc = {
   balance: number;
 };
 
-export function CustomerInvoicePdf({ invoice, org }: { invoice: CustomerInvoiceDoc; org: DocOrg }) {
+
+/**
+ * The customer invoice in the app's language (Mark, 2026-09-25):
+ * one row per ORDER on a weekly invoice; on a one-order invoice that order is
+ * ITEMIZED — here under `DataTable`'s black group band, its items, discount,
+ * delivery, rush, tax and earlier payments beneath, closed by "This order".
+ * The customer is the heading, because an invoice is addressed to someone.
+ * Amount due wears the one yellow fill, which leaves once it is settled — the
+ * receipt's rule.
+ */
+export function CustomerInvoicePdf({
+  invoice,
+  org,
+}: {
+  invoice: CustomerInvoiceDoc;
+  org: DocOrg;
+}) {
+  const settled = invoice.balance <= 0;
+  const orderCount = invoice.lines.length;
   return (
     <Document>
-      <Page size="LETTER" style={styles.page}>
-        <View style={styles.masthead} fixed>
-          <View>
-            <Text style={styles.orgName}>{org.name}</Text>
-            <Text style={styles.orgLine}>{org.addressLine}</Text>
-            <Text style={styles.orgLine}>{org.contactLine}</Text>
-          </View>
-          <View>
-            <Text style={styles.docTitle}>INVOICE #{invoice.number}</Text>
-            <Text
-              style={styles.docPage}
-              render={({ pageNumber, totalPages }) => `p ${pageNumber} OF ${totalPages}`}
-            />
+      <Page size="LETTER" style={s.page}>
+        <View style={s.masthead} fixed>
+          <Text style={s.wordmark}>{org.name}</Text>
+          <View style={s.mastheadRight}>
+            {org.addressLine ? <Text style={s.mastheadLine}>{org.addressLine}</Text> : null}
+            {org.contactLine ? <Text style={s.mastheadLine}>{org.contactLine}</Text> : null}
           </View>
         </View>
 
-        <View style={styles.bandRow}>
-          <View style={styles.bandBlock}>
-            <Text style={styles.band}>BILL TO</Text>
-            <Meta label="Name" value={invoice.customer.name} />
-            <Meta label="Phone" value={invoice.customer.phone ?? ""} />
-            <Meta label="Email" value={invoice.customer.email ?? ""} />
-          </View>
-          <View style={styles.bandBlock}>
-            <Text style={styles.band}>INVOICE</Text>
-            <Meta label="Number" value={invoice.number} />
-            <Meta label="Date" value={usDate(invoice.issued_on)} />
-            <Meta label="Due" value={usDate(invoice.due_on)} />
-          </View>
-        </View>
-
-        <View style={styles.itemsHead} fixed>
-          <Text style={[styles.colNotes, styles.headCell, { paddingLeft: 0 }]}>Order</Text>
-          <Text style={[styles.colCost, styles.headCell, { width: 72 }]}>Amount</Text>
-        </View>
-
-        {invoice.lines.map((l, i) => (
-          <View key={i} wrap={false}>
-            <View style={styles.row}>
-              <Text style={[styles.colNotes, { paddingLeft: 0 }]}>{l.description}</Text>
-              <Text style={[styles.colCost, { width: 72 }]}>{l.detail ? "" : money(l.amount)}</Text>
-            </View>
-            {l.detail
-              ? [
-                  ...l.detail.rows.map((r, j) => (
-                    <View key={j} style={styles.row}>
-                      <Text style={[styles.colNotes, { paddingLeft: 14 }]}>{r.label}</Text>
-                      <Text style={[styles.colCost, { width: 72 }]}>{money(r.amount)}</Text>
-                    </View>
-                  )),
-                  <View key="sum" style={styles.row}>
-                    <Text style={[styles.colNotes, { paddingLeft: 14, fontFamily: "Helvetica-Bold" }]}>
-                      This order
-                    </Text>
-                    <Text style={[styles.colCost, { width: 72, fontFamily: "Helvetica-Bold" }]}>
-                      {money(l.amount)}
-                    </Text>
-                  </View>,
+        <View style={s.body}>
+          <View style={s.headingRow}>
+            <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
+              <Text style={s.kicker}>Invoice</Text>
+              <Text style={s.h1}>{invoice.customer.name}</Text>
+              <Text style={s.caption}>
+                {[
+                  invoice.issued_on ? `Issued ${invoice.issued_on}` : null,
+                  invoice.due_on ? `Due ${isoDay(invoice.due_on)}` : null,
                 ]
-              : null}
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
+            </View>
+            <View style={s.numberBlock}>
+              <Text style={s.kicker}>No.</Text>
+              <Text style={s.number}>{invoice.number}</Text>
+            </View>
           </View>
-        ))}
 
-        <View style={styles.footRow}>
-          <View style={styles.footCol}>
-            {invoice.notes ? <Text style={styles.note}>{invoice.notes}</Text> : null}
+          <View style={s.blocks}>
+            <View style={s.block}>
+              <Text style={s.sectionHead}>Bill to</Text>
+              <Field label="Name" value={invoice.customer.name} />
+              <Field label="Phone" value={invoice.customer.phone} />
+              <Field label="Email" value={invoice.customer.email} />
+            </View>
+            <View style={s.block}>
+              <Text style={s.sectionHead}>Invoice</Text>
+              <Field label="Number" value={invoice.number} />
+              <Field label="Issued" value={isoDay(invoice.issued_on)} />
+              <Field label="Due" value={isoDay(invoice.due_on)} />
+            </View>
           </View>
-          <View style={styles.footCol}>
-            <Text style={styles.band}>TOTALS</Text>
-            <TotalRow label="TOTAL:" value={invoice.total} />
-            {invoice.paid !== 0 ? <TotalRow label="PAYMENTS:" value={invoice.paid} /> : null}
-            <View style={styles.totalLine}>
-              <Text style={styles.grandLabel}>AMOUNT DUE:</Text>
-              <Text style={styles.grandValue}>{money(invoice.balance)}</Text>
+
+          <View style={s.items}>
+            <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
+              {orderCount === 1 ? "Order" : "Orders"} <Text style={s.sectionCount}>{orderCount}</Text>
+            </Text>
+            <View style={s.tableHead} fixed>
+              <Text style={[s.th, s.invDesc]}>{orderCount === 1 ? "Item" : "Order"}</Text>
+              <Text style={[s.th, s.invAmount]}>Amount</Text>
+            </View>
+            {invoice.lines.map((l, i) =>
+              l.detail ? (
+                <View key={i}>
+                  <View style={s.invBand} wrap={false}>
+                    <Text style={[s.invBandText, s.invDesc]}>{l.description}</Text>
+                  </View>
+                  {l.detail.rows.map((r, j) => (
+                    <View key={j} style={[s.invRow, s.invDetail]} wrap={false}>
+                      <Text style={[s.invDesc, r.amount < 0 ? { color: MUTED } : {}]}>{r.label}</Text>
+                      <Text style={[s.invAmount, r.amount < 0 ? { color: MUTED } : {}]}>
+                        {r.amount ? money(r.amount) : "—"}
+                      </Text>
+                    </View>
+                  ))}
+                  <View style={[s.invRow, s.invDetail, s.invSum]} wrap={false}>
+                    <Text style={[s.invDesc, s.itemName]}>This order</Text>
+                    <Text style={[s.invAmount, { fontFamily: "Helvetica-Bold" }]}>{money(l.amount)}</Text>
+                  </View>
+                </View>
+              ) : (
+                <View key={i} style={s.invRow} wrap={false}>
+                  <Text style={s.invDesc}>{l.description}</Text>
+                  <Text style={s.invAmount}>{money(l.amount)}</Text>
+                </View>
+              )
+            )}
+          </View>
+
+          <View style={s.foot} wrap={false}>
+            <View style={s.notes}>
+              <Text style={s.sectionHead}>Notes</Text>
+              {invoice.notes ? (
+                <Text style={s.prose}>{invoice.notes}</Text>
+              ) : (
+                <Text style={[s.prose, s.empty]}>—</Text>
+              )}
+            </View>
+            <View style={s.windowWrap}>
+              <View style={s.windowShadow} />
+              <View style={s.window}>
+                <View style={s.titleBar}>
+                  <Text style={s.titleBarText}>Totals</Text>
+                </View>
+                <View style={s.totals}>
+                  <TotalRow label="Total" value={invoice.total} />
+                  <TotalRow label="Payments" value={invoice.paid ? -invoice.paid : 0} />
+                </View>
+                <View style={settled ? [s.grand, { backgroundColor: "#fff" }] : s.grand}>
+                  <Text style={s.grandLabel}>Amount due</Text>
+                  <Text style={s.grandValue}>{money(invoice.balance)}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {org.invoiceFooter ? <Text style={s.invoiceFooter}>{org.invoiceFooter}</Text> : null}
+        </View>
+
+        <View style={s.footer} fixed>
+          <Text style={s.footerText}>
+            {org.name} · Invoice {invoice.number}
+          </Text>
+          <Text
+            style={s.footerText}
+            render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+          />
+        </View>
+      </Page>
+    </Document>
+  );
+}
+
+/* ==========================================================================
+ * THE STATEMENT (decision 21)
+ * ========================================================================== */
+
+/**
+ * The statement in the app's language (Mark, 2026-09-25): one customer's
+ * orders over a period. The customer is the heading and the period its
+ * caption; each order a row, rule-free like a list. There are no notes on a
+ * statement, so the invoice footer takes the column beside the totals instead
+ * of a line of its own below them. Total due keeps the yellow until settled.
+ */
+export function StatementPdf({
+  statement,
+  org,
+}: {
+  statement: StatementData;
+  org: DocOrg;
+}) {
+  const period = `${statement.from} – ${statement.to}`;
+  const settled = statement.balance <= 0;
+  const count = statement.orders.length;
+  return (
+    <Document>
+      <Page size="LETTER" style={s.page}>
+        <View style={s.masthead} fixed>
+          <Text style={s.wordmark}>{org.name}</Text>
+          <View style={s.mastheadRight}>
+            {org.addressLine ? <Text style={s.mastheadLine}>{org.addressLine}</Text> : null}
+            {org.contactLine ? <Text style={s.mastheadLine}>{org.contactLine}</Text> : null}
+          </View>
+        </View>
+
+        <View style={s.body}>
+          <View>
+            <Text style={s.kicker}>Statement</Text>
+            <Text style={s.h1}>{customerLabel(statement.customer)}</Text>
+            <Text style={s.caption}>
+              {period} · {count} {count === 1 ? "order" : "orders"}
+            </Text>
+          </View>
+
+          <View style={s.blocks}>
+            <View style={s.block}>
+              <Text style={s.sectionHead}>Customer</Text>
+              <Field label="Name" value={customerLabel(statement.customer)} />
+              <Field label="Phone" value={statement.customer?.phone} />
+              <Field label="Email" value={statement.customer?.email} />
+            </View>
+            <View style={s.block}>
+              <Text style={s.sectionHead}>Period</Text>
+              <Field label="From" value={isoDay(statement.from)} />
+              <Field label="To" value={isoDay(statement.to)} />
+              <Field label="Orders" value={String(count)} />
+            </View>
+          </View>
+
+          <View style={s.items}>
+            <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
+              Orders <Text style={s.sectionCount}>{count}</Text>
+            </Text>
+            <View style={s.tableHead} fixed>
+              <Text style={[s.th, s.stNo]}>No.</Text>
+              <Text style={[s.th, s.stDate]}>Date</Text>
+              <Text style={[s.th, s.stTitle]}>Order</Text>
+              <Text style={[s.th, s.stMoney]}>Paid</Text>
+              <Text style={[s.th, s.stMoney]}>Total</Text>
+            </View>
+            {statement.orders.map((o) => (
+              <View key={o.id} style={s.invRow} wrap={false}>
+                <Text style={s.stNo}>{o.number}</Text>
+                <Text style={s.stDate}>{isoDay(o.event_date) || "—"}</Text>
+                <Text style={s.stTitle}>{o.title ?? ""}</Text>
+                <Text style={o.totals.paid ? s.stMoney : [s.stMoney, s.empty]}>
+                  {o.totals.paid ? money(o.totals.paid) : "—"}
+                </Text>
+                <Text style={s.stMoney}>{money(o.totals.total)}</Text>
+              </View>
+            ))}
+            {count === 0 ? (
+              <Text style={[s.prose, s.empty, { marginTop: 8 }]}>No orders in this period.</Text>
+            ) : null}
+          </View>
+
+          <View style={s.foot} wrap={false}>
+            <View style={s.notes}>
+              {org.invoiceFooter ? (
+                <Text style={[s.prose, { color: MUTED }]}>{org.invoiceFooter}</Text>
+              ) : null}
+            </View>
+            <View style={s.windowWrap}>
+              <View style={s.windowShadow} />
+              <View style={s.window}>
+                <View style={s.titleBar}>
+                  <Text style={s.titleBarText}>Totals</Text>
+                </View>
+                <View style={s.totals}>
+                  <TotalRow label="Orders" value={statement.total} />
+                  <TotalRow label="Payments" value={statement.paid ? -statement.paid : 0} />
+                </View>
+                <View style={settled ? [s.grand, { backgroundColor: "#fff" }] : s.grand}>
+                  <Text style={s.grandLabel}>Total due</Text>
+                  <Text style={s.grandValue}>{money(statement.balance)}</Text>
+                </View>
+              </View>
             </View>
           </View>
         </View>
 
-        {org.invoiceFooter ? <Text style={styles.note}>{org.invoiceFooter}</Text> : null}
-
-        <Text
-          style={styles.footer}
-          render={({ pageNumber, totalPages }) =>
-            `INVOICE #${invoice.number} · ${pageNumber} / ${totalPages}`
-          }
-          fixed
-        />
+        <View style={s.footer} fixed>
+          <Text style={s.footerText}>
+            {org.name} · Statement {period}
+          </Text>
+          <Text
+            style={s.footerText}
+            render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+          />
+        </View>
       </Page>
     </Document>
   );
@@ -967,10 +1063,6 @@ export function documentElement(
   /** The org's today, for the kitchen sheet's AS OF line. */
   printedOn?: string
 ) {
-  if (kind === "order")
-    return <KitchenOrderPdf orders={orders} org={org} printedOn={printedOn} />;
+  if (kind === "order") return <KitchenOrderPdf orders={orders} org={org} printedOn={printedOn} />;
   return <OrderDocumentPdf orders={orders} org={org} kind={kind} approval={approval} />;
 }
-
-export type { DocumentLine };
-export { isProductionLine };

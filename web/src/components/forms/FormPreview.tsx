@@ -122,46 +122,15 @@ async function buildElement(
         />
       );
     }
-    case "quote-app":
-    case "signed-quote-app":
-    case "invoice-app":
-    case "receipt-app": {
-      const { OrderDocumentAppStylePdf } = await import("./pdf/OrderDocumentAppStylePdf");
-      const kind = form === "invoice-app" ? "invoice" : form === "receipt-app" ? "receipt" : "quote";
-      const order =
-        kind === "invoice" ? s.sampleInvoiceOrder : kind === "receipt" ? s.sampleReceiptOrder : s.sampleQuoteOrder;
-      return (
-        <OrderDocumentAppStylePdf
-          orders={[order]}
-          org={docOrg}
-          kind={kind}
-          approval={form === "signed-quote-app" ? s.sampleApproval : null}
-        />
-      );
-    }
-    case "kitchen-order-app": {
-      const { KitchenOrderAppStylePdf } = await import("./pdf/OrderDocumentAppStylePdf");
-      return <KitchenOrderAppStylePdf orders={[s.sampleQuoteOrder]} org={docOrg} printedOn="2026-09-25" />;
-    }
     case "kitchen-order": {
       const { KitchenOrderPdf } = await import("@/components/specialOrders/pdf/SpecialOrderPdfs");
       return <KitchenOrderPdf orders={[s.sampleQuoteOrder]} org={docOrg} printedOn="2026-09-25" />;
-    }
-    case "customer-invoice-app":
-    case "customer-invoice-one-app": {
-      const { CustomerInvoiceAppStylePdf } = await import("./pdf/OrderDocumentAppStylePdf");
-      const invoice = form === "customer-invoice-app" ? s.sampleCustomerInvoice : s.sampleItemizedInvoice;
-      return <CustomerInvoiceAppStylePdf invoice={invoice} org={docOrg} />;
     }
     case "customer-invoice":
     case "customer-invoice-one": {
       const { CustomerInvoicePdf } = await import("@/components/specialOrders/pdf/SpecialOrderPdfs");
       const invoice = form === "customer-invoice" ? s.sampleCustomerInvoice : s.sampleItemizedInvoice;
       return <CustomerInvoicePdf invoice={invoice} org={docOrg} />;
-    }
-    case "statement-app": {
-      const { StatementAppStylePdf } = await import("./pdf/OrderDocumentAppStylePdf");
-      return <StatementAppStylePdf statement={s.sampleStatement} org={docOrg} />;
     }
     case "statement": {
       const { StatementPdf } = await import("@/components/specialOrders/pdf/SpecialOrderPdfs");
