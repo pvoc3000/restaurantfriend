@@ -18,6 +18,7 @@ export const INK = "#000000";
 export const MUTED = "#545454"; // --rf-neutral-600, secondary text
 export const SUBTLE = "#757575"; // --rf-neutral-500, captions and labels
 export const HAIRLINE = "#e4e4e4"; // --rf-neutral-200
+export const STRIP_FILL = "#f1f1f1"; // --rf-neutral-100, a group strip
 export const MARK_FILL = "#ffe98a"; // --rf-yellow-200
 export const STOP_FILL = "#ffcfc9"; // --rf-red-200, "stop"
 

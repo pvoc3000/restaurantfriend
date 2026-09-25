@@ -1654,3 +1654,22 @@ walked in the browser (the pane was signed out) — the insert is `createRow`'s
 plus the one column. Remember the inquiry form prices at the pickup shop (or
 the delivery origin), so an override at one shop only leaves the item
 "priced in your quote" at the other.
+
+**THE PRODUCTION PACKET IS REDRAWN IN THE APP'S OWN DESIGN LANGUAGE
+(2026-09-25).** Mark: "now do the production packet", after the special-order
+documents, the PO and the shopping list went the same way that day. Every
+page — premade schedule, the three tray guides, and the donut / AB / weekly
+element sheets the dialog no longer offers — now builds from the shared
+`components/pdf/appDocument` parts: the black masthead band ("Production
+packet · Printed …") on every page, the kitchen above the sheet's name as the
+page heading, the night's date beside it, type bands black and size bands the
+app's light-grey group strip, cut names in bold caps instead of underlined,
+`DataTable`'s table head on the element sheets, and "Page n of N" across the
+packet in the footer. The tally strip's and tray ruler's filled cells went
+from orange and green to that same grey: colour is state in the app, and
+those were not states.
+**Nothing structural changed** — every count, subtotal, night total, write-in
+box, tray cell and the "AT LEAST" wording are as they were. The premade band's
+TOTAL / L/O labels still sit exactly over their write-in boxes (the band lost
+its right padding to keep that). The special-order pages in the packet were
+already the new kitchen order. Previous look at `b727828a`.

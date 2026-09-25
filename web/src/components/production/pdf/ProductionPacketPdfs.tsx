@@ -8,14 +8,32 @@
 // with a page run per part, which is `PoPdfDocs`' multi-document idiom — a
 // packet is one print job, not seven downloads.
 //
-// Two rules inherited from the sheets already in this folder:
-//   * the same four sizes and two greys, because a kitchen sheet is read at
-//     arm's length, on a shelf, in a hurry;
+// DRAWN IN THE APP'S OWN DESIGN LANGUAGE since 2026-09-25 (Mark: "now do the
+// production packet"), from the shared `components/pdf/appDocument` parts the
+// special-order documents and the PO use: the black masthead band, the sheet's
+// name as the page heading with the night's date beside it, type bands black
+// and size bands the light-grey group strip. The tally strip's and tray
+// ruler's filled cells are that same grey — the orange and green they wore
+// meant nothing in the app's palette, where colour is state. Every count,
+// total, write-in box and rule is unchanged; the previous look is in git
+// history at b727828a.
+//
+// One rule inherited from the sheets already in this folder:
 //   * NO `≥` GLYPH. @react-pdf's built-in Helvetica is WinAnsi-encoded and
 //     renders it as a stray "e" — which does not merely lose the claim, it
 //     replaces it with a typo. Lower bounds are spelled "AT LEAST" in words.
 
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import {
+  HAIRLINE,
+  INK,
+  MUTED,
+  STRIP_FILL,
+  SUBTLE,
+  caps,
+  docStyles,
+  isoDay,
+} from "@/components/pdf/appDocument";
 import {
   countTotals,
   rollUp,
@@ -71,141 +89,168 @@ export const PACKET_PARTS: { key: PacketPart; label: string }[] = [
   { key: "decorator", label: "Decorator tray guide" },
 ];
 
-const INK = "#111";
-const MUTED = "#666";
-const FAINT = "#aaa";
+const styles = {
+  ...docStyles,
+  ...StyleSheet.create({
+    // The night, large, where a record's number sits on the other documents.
+    nightDate: { fontSize: 16, fontFamily: "Helvetica-Bold", marginTop: 3 },
+    blurb: { fontSize: 8, color: MUTED, marginTop: 6 },
 
-const styles = StyleSheet.create({
-  page: { padding: 28, fontSize: 9, fontFamily: "Helvetica", color: INK },
+    // A black band DELIMITS — the app's own rule for a group heading.
+    typeBand: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: INK,
+      paddingVertical: 4,
+      // No right padding: the premade band's TOTAL and L/O labels must sit
+      // exactly over the write-in boxes, which run to the margin.
+      paddingLeft: 6,
+      paddingRight: 0,
+      marginTop: 12,
+    },
+    typeBandText: { ...caps(8, 0.12), fontFamily: "Helvetica-Bold", color: "#fff" },
+    typeBandTotal: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "#fff", marginLeft: 10 },
+    typeBandRight: { marginLeft: "auto", flexDirection: "row" },
+    bandLabel: { ...caps(6, 0.12), color: "#fff", width: 34, textAlign: "center", marginLeft: 4 },
 
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 10,
-  },
-  title: { fontSize: 16, fontFamily: "Helvetica-Bold" },
-  // marginLeft, not leading spaces in the Text: @react-pdf collapses those.
-  titleAside: { fontSize: 9, fontFamily: "Helvetica-Bold", marginTop: 4, marginLeft: 8 },
-  subtitle: { fontSize: 8, color: MUTED, marginTop: 2 },
-  dateBig: { fontSize: 14, fontFamily: "Helvetica-Bold", textAlign: "right" },
-  dateAside: { fontSize: 8, color: MUTED, textAlign: "right", marginTop: 2 },
+    // The app's group STRIP, one step below the band.
+    sizeBand: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: STRIP_FILL,
+      paddingVertical: 3,
+      paddingHorizontal: 6,
+    },
+    sizeBandText: { ...caps(7, 0.12), fontFamily: "Helvetica-Bold" },
+    sizeBandTotal: { fontSize: 8, fontFamily: "Helvetica-Bold", marginLeft: 10 },
 
-  // A black band DELIMITS — the app's own rule for a group heading.
-  typeBand: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: INK,
-    color: "#fff",
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    marginTop: 10,
-  },
-  typeBandText: { fontSize: 11, fontFamily: "Helvetica-Bold", color: "#fff" },
-  typeBandTotal: { fontSize: 11, fontFamily: "Helvetica-Bold", color: "#fff", marginLeft: 10 },
-  typeBandRight: { marginLeft: "auto", flexDirection: "row" },
-  bandLabel: { fontSize: 8, color: "#fff", width: 34, textAlign: "center" },
+    subtypeHead: { flexDirection: "row", alignItems: "baseline", marginTop: 7 },
+    subtypeName: { ...caps(7.5, 0.08), fontFamily: "Helvetica-Bold" },
+    subtypeSize: { ...caps(6, 0.12), color: SUBTLE, marginLeft: 5 },
 
-  sizeBand: {
-    flexDirection: "row",
-    backgroundColor: "#eee",
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-  },
-  sizeBandText: { fontSize: 9, fontFamily: "Helvetica-Bold" },
-  sizeBandTotal: { fontSize: 9, fontFamily: "Helvetica-Bold", marginLeft: 10 },
+    row: { flexDirection: "row", alignItems: "center", marginTop: 3 },
+    rowLabel: { width: 118, paddingRight: 4 },
+    rowName: { fontSize: 8 },
+    rowSub: { fontSize: 6.5, color: SUBTLE },
+    rowPar: { width: 28, fontSize: 8.5, fontFamily: "Helvetica-Bold", textAlign: "right", paddingRight: 6 },
+    rowCount: { width: 28, fontSize: 8.5, fontFamily: "Helvetica-Bold", textAlign: "right", paddingRight: 6 },
 
-  subtypeHead: { flexDirection: "row", alignItems: "baseline", marginTop: 6 },
-  subtypeName: {
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    textDecoration: "underline",
-  },
-  subtypeSize: { fontSize: 7, color: MUTED, marginLeft: 4 },
+    strip: { flexDirection: "row", borderWidth: 1, borderColor: INK, flexGrow: 1 },
+    box: {
+      flexGrow: 1,
+      flexBasis: 0,
+      borderRightWidth: 0.5,
+      borderRightColor: HAIRLINE,
+      paddingVertical: 3,
+      alignItems: "center",
+    },
+    boxOn: { backgroundColor: STRIP_FILL },
+    boxText: { fontSize: 7, color: INK },
+    boxTextOff: { fontSize: 7, color: HAIRLINE },
 
-  row: { flexDirection: "row", alignItems: "center", marginTop: 3 },
-  rowLabel: { width: 118, paddingRight: 4 },
-  rowName: { fontSize: 8 },
-  rowSub: { fontSize: 6, color: FAINT },
-  rowPar: { width: 26, fontSize: 8, fontFamily: "Helvetica-Bold", textAlign: "right", paddingRight: 6 },
-  rowCount: { width: 26, fontSize: 8, textAlign: "right", paddingRight: 6 },
+    // A box somebody writes in — the app's 1px box, as on every document.
+    writeIn: { width: 34, height: 14, borderWidth: 1, borderColor: INK, marginLeft: 4 },
 
-  strip: { flexDirection: "row", borderWidth: 1, borderColor: INK, flexGrow: 1 },
-  box: {
-    flexGrow: 1,
-    flexBasis: 0,
-    borderRightWidth: 0.5,
-    borderRightColor: "#ddd",
-    paddingVertical: 3,
-    alignItems: "center",
-  },
-  boxOn: { backgroundColor: "#fdf6e3" },
-  boxText: { fontSize: 7, color: "#d08a00" },
-  boxTextOff: { fontSize: 7, color: "#e8e8e8" },
+    // The tray ruler: a cell per tray NUMBER, the count written inside the ones
+    // the run fills. NOT the counting strip — answered question 3 says so.
+    trayCell: {
+      flexGrow: 1,
+      flexBasis: 0,
+      borderRightWidth: 0.5,
+      borderRightColor: HAIRLINE,
+      minHeight: 18,
+    },
+    trayIndex: { fontSize: 5, color: SUBTLE, paddingLeft: 1 },
+    trayCount: { fontSize: 7.5, fontFamily: "Helvetica-Bold", textAlign: "center" },
+    trayOn: { backgroundColor: STRIP_FILL },
 
-  writeIn: { width: 34, height: 14, borderWidth: 1, borderColor: INK, marginLeft: 4 },
+    subtotal: { flexDirection: "row", marginTop: 4, marginLeft: 118 },
+    subtotalText: { ...caps(6, 0.12), color: SUBTLE },
+    subtotalBatch: { ...caps(6, 0.12), color: SUBTLE, marginLeft: 24 },
+    grandTotal: { flexDirection: "row", marginTop: 5, marginLeft: 118 },
+    grandTotalText: { ...caps(7.5, 0.08), fontFamily: "Helvetica-Bold" },
+    // A total row's counts, each under the write-in box it sums — the row's own
+    // `writeIn` geometry, so the figure sits under the column it adds up.
+    countCell: { width: 34, marginLeft: 4, textAlign: "center" },
+    nightTotal: {
+      flexDirection: "row",
+      marginTop: 12,
+      paddingTop: 5,
+      borderTopWidth: 2,
+      borderTopColor: INK,
+      marginLeft: 118,
+    },
+    grandBatch: { fontSize: 9, fontFamily: "Helvetica-Bold", marginLeft: 24 },
 
-  // The tray ruler: a cell per tray NUMBER, the count written inside the ones
-  // the run fills. NOT the counting strip — answered question 3 says so.
-  trayCell: {
-    flexGrow: 1,
-    flexBasis: 0,
-    borderRightWidth: 0.5,
-    borderRightColor: "#ccc",
-    minHeight: 18,
-  },
-  trayIndex: { fontSize: 5, color: FAINT, paddingLeft: 1 },
-  trayCount: { fontSize: 7, textAlign: "center" },
-  trayOn: { backgroundColor: "#eef6ea" },
+    sheetHeadLabel: { ...caps(7.5, 0.08), fontFamily: "Helvetica-Bold", marginTop: 16, marginBottom: 4 },
+    sheetRow: { flexDirection: "row", alignItems: "center", paddingVertical: 4 },
+    colElement: { flexGrow: 1, flexBasis: 0, paddingRight: 6 },
+    colAmount: { width: 70, textAlign: "right", paddingRight: 8 },
+    colShift: { width: 56 },
+    colStock: { width: 70 },
+    colMade: { width: 60 },
+    cell: { fontSize: 8.5 },
+    cellMuted: { fontSize: 7.5, color: MUTED },
 
-  subtotal: { flexDirection: "row", marginTop: 3, marginLeft: 118 },
-  subtotalText: { fontSize: 7, color: MUTED },
-  subtotalBatch: { fontSize: 7, color: MUTED, marginLeft: 24 },
-  grandTotal: { flexDirection: "row", marginTop: 5, marginLeft: 118 },
-  grandTotalText: { fontSize: 9, fontFamily: "Helvetica-Bold" },
-  // A total row's counts, each under the write-in box it sums — the row's own
-  // `writeIn` geometry, so the figure sits under the column it adds up.
-  countCell: { width: 34, marginLeft: 4, textAlign: "center" },
-  nightTotal: {
-    flexDirection: "row",
-    marginTop: 10,
-    paddingTop: 4,
-    borderTopWidth: 1.5,
-    borderTopColor: INK,
-    marginLeft: 118,
-  },
-  grandBatch: { fontSize: 9, fontFamily: "Helvetica-Bold", marginLeft: 24 },
+    emptyNote: { fontSize: 9, color: SUBTLE, marginTop: 12 },
+  }),
+};
 
-  sheetHead: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: INK,
-    paddingBottom: 3,
-    marginTop: 8,
-  },
-  sheetHeadCell: { fontSize: 7, fontFamily: "Helvetica-Bold" },
-  sheetRow: { flexDirection: "row", alignItems: "center", paddingVertical: 3, borderBottomWidth: 0.5, borderBottomColor: "#eee" },
-  colElement: { flexGrow: 1, flexBasis: 0, paddingRight: 6 },
-  colAmount: { width: 70, textAlign: "right", paddingRight: 8 },
-  colShift: { width: 56 },
-  colStock: { width: 70 },
-  colMade: { width: 60 },
-  cell: { fontSize: 8 },
-  cellMuted: { fontSize: 7, color: MUTED },
+/** The packet's masthead band, on every page: the org, and what this is. */
+function PacketMasthead({ packet }: { packet: PacketData }) {
+  return (
+    <View style={styles.masthead} fixed>
+      <Text style={styles.wordmark}>{packet.orgName}</Text>
+      <View style={styles.mastheadRight}>
+        <Text style={styles.mastheadLine}>Production packet</Text>
+        <Text style={styles.mastheadLine}>Printed {packet.printedOn}</Text>
+      </View>
+    </View>
+  );
+}
 
-  empty: { fontSize: 8, color: MUTED, marginTop: 10 },
+/** A sheet's heading: the kitchen above the sheet's name, the night beside it. */
+function SheetHeading({
+  kicker,
+  title,
+  caption,
+  date,
+  children,
+}: {
+  kicker: string;
+  title: string;
+  caption?: string | null;
+  date: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <View style={styles.headingRow}>
+      <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
+        <Text style={styles.kicker}>{kicker}</Text>
+        <Text style={styles.h1}>{title}</Text>
+        {caption ? <Text style={styles.caption}>{caption}</Text> : null}
+        {children}
+      </View>
+      <View style={styles.numberBlock}>
+        <Text style={styles.kicker}>Night</Text>
+        <Text style={styles.nightDate}>{isoDay(date) || date}</Text>
+      </View>
+    </View>
+  );
+}
 
-  footer: {
-    position: "absolute",
-    bottom: 16,
-    left: 28,
-    right: 28,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    fontSize: 7,
-    color: MUTED,
-  },
-});
+/** The fixed footer: what this sheet is, and the page within the packet. */
+function PacketFooter({ children }: { children: string }) {
+  return (
+    <View style={styles.footer} fixed>
+      <Text style={styles.footerText}>{children}</Text>
+      <Text
+        style={styles.footerText}
+        render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+      />
+    </View>
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 
@@ -273,22 +318,23 @@ function PremadePage({ schedule, packet }: { schedule: PacketSchedule; packet: P
 
   return (
     <Page size="LETTER" style={styles.page} wrap>
-      <View style={styles.headerRow}>
-        <View>
-          <View style={{ flexDirection: "row", alignItems: "baseline" }}>
-            <Text style={styles.title}>{heading}</Text>
-            <Text style={styles.titleAside}>*** KITCHEN: {schedule.kitchenCode} ***</Text>
-          </View>
-          {/* The order's own name, under the order's number. The NOTE below is
-              a different fact somebody typed and is kept either way. */}
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-          {schedule.note ? <Text style={styles.subtitle}>{schedule.note}</Text> : null}
-        </View>
-        <Text style={styles.dateBig}>{packetDate(schedule.date)}</Text>
-      </View>
+      <PacketMasthead packet={packet} />
+      <View style={styles.body}>
+      {/* The order's own name, under the order's number. The NOTE below is a
+          different fact somebody typed and is kept either way. The kitchen
+          leads, as FileMaker's "*** KITCHEN: DF01 ***" did: it is the first
+          thing a baker checks. */}
+      <SheetHeading
+        kicker={`Kitchen ${schedule.kitchenCode}`}
+        title={heading}
+        caption={subtitle}
+        date={schedule.date}
+      >
+        {schedule.note ? <Text style={styles.blurb}>{schedule.note}</Text> : null}
+      </SheetHeading>
 
       {rolled.length === 0 ? (
-        <Text style={styles.empty}>Nothing on this schedule.</Text>
+        <Text style={styles.emptyNote}>Nothing on this schedule.</Text>
       ) : (
         <>
           {rolled.map((type) => <PremadeType key={type.itemType} type={type} />)}
@@ -303,14 +349,16 @@ function PremadePage({ schedule, packet }: { schedule: PacketSchedule; packet: P
           </View>
         </>
       )}
-
-      <View style={styles.footer} fixed>
-        <Text>
-          generated{schedule.generatedAt ? ` on ${schedule.generatedAt.slice(0, 10)}` : ""}
-          {schedule.generatedByName ? ` by ${schedule.generatedByName}` : ""}
-        </Text>
-        <Text>printed on {packet.printedOn}</Text>
       </View>
+
+      <PacketFooter>
+        {[
+          `${heading}`,
+          `Generated${schedule.generatedAt ? ` ${schedule.generatedAt.slice(0, 10)}` : ""}${
+            schedule.generatedByName ? ` by ${schedule.generatedByName}` : ""
+          }`,
+        ].join(" · ")}
+      </PacketFooter>
     </Page>
   );
 }
@@ -322,7 +370,7 @@ function PremadeType({ type }: { type: RollType }) {
         <Text style={styles.typeBandText}>{(type.itemType || "(no type)").toUpperCase()}</Text>
         <Text style={styles.typeBandTotal}>{fmt(type.total)}</Text>
         <View style={styles.typeBandRight}>
-          <Text style={styles.bandLabel}>total</Text>
+          <Text style={styles.bandLabel}>Total</Text>
           <Text style={styles.bandLabel}>L/O</Text>
         </View>
       </View>
@@ -456,27 +504,26 @@ function TrayGuidePage({
   const total = totalDonuts(kitchen.lines);
   return (
     <Page size="LETTER" style={styles.page} wrap>
-      <View style={styles.headerRow}>
-        <View>
-          <View style={{ flexDirection: "row", alignItems: "baseline" }}>
-            <Text style={styles.title}>{GUIDE_TITLE[grain]}</Text>
-            <Text style={styles.titleAside}>({kitchen.kitchenCode})</Text>
-          </View>
-          <Text style={styles.subtitle}>{GUIDE_BLURB[grain]}</Text>
-          {kitchen.shopCodes.length > 1 ? (
-            // The thing FileMaker could not say: this kitchen is filling more
-            // than one shop's case tonight.
-            <Text style={styles.subtitle}>for {kitchen.shopCodes.join(", ")}</Text>
-          ) : null}
-        </View>
-        <View>
-          <Text style={styles.dateBig}>{packetDate(kitchen.date)}</Text>
-          <Text style={styles.dateAside}>{fmt(total)} total donuts</Text>
-        </View>
-      </View>
+      <PacketMasthead packet={packet} />
+      <View style={styles.body}>
+      {/* The shops in the caption are the thing FileMaker could not say: this
+          kitchen is filling more than one shop's case tonight. */}
+      <SheetHeading
+        kicker={`Kitchen ${kitchen.kitchenCode}`}
+        title={GUIDE_TITLE[grain]}
+        caption={[
+          kitchen.shopCodes.length > 1 ? `For ${kitchen.shopCodes.join(", ")}` : null,
+          `${fmt(total)} donuts`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        date={kitchen.date}
+      >
+        <Text style={styles.blurb}>{GUIDE_BLURB[grain]}</Text>
+      </SheetHeading>
 
       {rolled.length === 0 ? (
-        <Text style={styles.empty}>Nothing to make in this kitchen tonight.</Text>
+        <Text style={styles.emptyNote}>Nothing to make in this kitchen tonight.</Text>
       ) : (
         rolled.map((type) => (
           <View key={type.itemType}>
@@ -498,7 +545,7 @@ function TrayGuidePage({
                       <Text style={styles.subtypeName}>
                         {(sub.subtype || "(no cut)").toUpperCase()}
                       </Text>
-                      <Text style={styles.subtypeSize}>({(size.size || "—").toUpperCase()})</Text>
+                      <Text style={styles.subtypeSize}>{size.size || "—"}</Text>
                     </View>
 
                     {sub.rows.map((row) => (
@@ -529,11 +576,9 @@ function TrayGuidePage({
           </View>
         ))
       )}
-
-      <View style={styles.footer} fixed>
-        <Text>{packet.orgName}</Text>
-        <Text>printed on {packet.printedOn}</Text>
       </View>
+
+      <PacketFooter>{`${GUIDE_TITLE[grain]} · Kitchen ${kitchen.kitchenCode}`}</PacketFooter>
     </Page>
   );
 }
@@ -561,6 +606,8 @@ function DonutSheetPage({ kitchen, packet }: { kitchen: PacketKitchen; packet: P
   const dough = kitchen.demand.filter((d) => d.batches !== null);
   return (
     <Page size="LETTER" style={styles.page} wrap>
+      <PacketMasthead packet={packet} />
+      <View style={styles.body}>
       <SheetHeader
         title="DONUT ELEMENT SHEET"
         kitchen={kitchen}
@@ -568,17 +615,17 @@ function DonutSheetPage({ kitchen, packet }: { kitchen: PacketKitchen; packet: P
       />
 
       {dough.length === 0 ? (
-        <Text style={styles.empty}>
+        <Text style={styles.emptyNote}>
           Nothing made resolved for tonight. An element whose recipe does not
           say how much a batch yields contributes
           nothing and is listed below rather than counted as zero.
         </Text>
       ) : (
         <>
-          <View style={styles.sheetHead}>
-            <Text style={[styles.sheetHeadCell, styles.colElement]}>Element</Text>
-            <Text style={[styles.sheetHeadCell, styles.colAmount]}>Batches</Text>
-            <Text style={[styles.sheetHeadCell, styles.colMade]}>Made</Text>
+          <View style={[styles.tableHead, { marginTop: 16 }]}>
+            <Text style={[styles.th, styles.colElement]}>Element</Text>
+            <Text style={[styles.th, styles.colAmount]}>Batches</Text>
+            <Text style={[styles.th, styles.colMade]}>Made</Text>
           </View>
           {dough.map((d) => (
             <View key={d.elementId} style={styles.sheetRow} wrap={false}>
@@ -602,11 +649,11 @@ function DonutSheetPage({ kitchen, packet }: { kitchen: PacketKitchen; packet: P
 
       {kitchen.demand.some((d) => d.quantity !== null) ? (
         <>
-          <Text style={[styles.sheetHeadCell, { marginTop: 14 }]}>COMPONENTS</Text>
-          <View style={styles.sheetHead}>
-            <Text style={[styles.sheetHeadCell, styles.colElement]}>Element</Text>
-            <Text style={[styles.sheetHeadCell, styles.colAmount]}>Needed</Text>
-            <Text style={[styles.sheetHeadCell, styles.colMade]}>Made</Text>
+          <Text style={styles.sheetHeadLabel}>Components</Text>
+          <View style={styles.tableHead}>
+            <Text style={[styles.th, styles.colElement]}>Element</Text>
+            <Text style={[styles.th, styles.colAmount]}>Needed</Text>
+            <Text style={[styles.th, styles.colMade]}>Made</Text>
           </View>
           {kitchen.demand
             .filter((d) => d.quantity !== null)
@@ -623,11 +670,9 @@ function DonutSheetPage({ kitchen, packet }: { kitchen: PacketKitchen; packet: P
             ))}
         </>
       ) : null}
-
-      <View style={styles.footer} fixed>
-        <Text>{packet.orgName}</Text>
-        <Text>printed on {packet.printedOn}</Text>
       </View>
+
+      <PacketFooter>{`Donut element sheet · Kitchen ${kitchen.kitchenCode}`}</PacketFooter>
     </Page>
   );
 }
@@ -644,6 +689,8 @@ function RhythmSheetPage({
   const rows: SheetElement[] = kind === "ab" ? kitchen.ab : kitchen.weekly;
   return (
     <Page size="LETTER" style={styles.page} wrap>
+      <PacketMasthead packet={packet} />
+      <View style={styles.body}>
       <SheetHeader
         title={kind === "ab" ? "AB ELEMENT SHEET" : "WEEKLY ELEMENT SHEET"}
         kitchen={kitchen}
@@ -651,18 +698,18 @@ function RhythmSheetPage({
       />
 
       {rows.length === 0 ? (
-        <Text style={styles.empty}>
+        <Text style={styles.emptyNote}>
           Nothing on the {kind === "ab" ? "AB" : "weekly"} rhythm for {kitchen.kitchenCode} on{" "}
           {packetDate(kitchen.date)}.
         </Text>
       ) : (
         <>
-          <View style={styles.sheetHead}>
-            <Text style={[styles.sheetHeadCell, styles.colElement]}>Element</Text>
-            <Text style={[styles.sheetHeadCell, styles.colShift]}>Shift</Text>
-            <Text style={[styles.sheetHeadCell, styles.colAmount]}>Batch</Text>
-            <Text style={[styles.sheetHeadCell, styles.colStock]}>Par</Text>
-            <Text style={[styles.sheetHeadCell, styles.colMade]}>Made</Text>
+          <View style={[styles.tableHead, { marginTop: 16 }]}>
+            <Text style={[styles.th, styles.colElement]}>Element</Text>
+            <Text style={[styles.th, styles.colShift]}>Shift</Text>
+            <Text style={[styles.th, styles.colAmount]}>Batch</Text>
+            <Text style={[styles.th, styles.colStock]}>Par</Text>
+            <Text style={[styles.th, styles.colMade]}>Made</Text>
           </View>
           {rows.map((e) => (
             <View key={e.id} style={styles.sheetRow} wrap={false}>
@@ -685,11 +732,9 @@ function RhythmSheetPage({
           ))}
         </>
       )}
-
-      <View style={styles.footer} fixed>
-        <Text>{packet.orgName}</Text>
-        <Text>printed on {packet.printedOn}</Text>
       </View>
+
+      <PacketFooter>{`${kind === "ab" ? "AB" : "Weekly"} element sheet · Kitchen ${kitchen.kitchenCode}`}</PacketFooter>
     </Page>
   );
 }
@@ -704,19 +749,14 @@ function SheetHeader({
   blurb: string;
 }) {
   return (
-    <View style={styles.headerRow}>
-      <View>
-        <View style={{ flexDirection: "row", alignItems: "baseline" }}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.titleAside}>  ({kitchen.kitchenCode})</Text>
-        </View>
-        <Text style={styles.subtitle}>{blurb}</Text>
-        {kitchen.shopCodes.length > 1 ? (
-          <Text style={styles.subtitle}>for {kitchen.shopCodes.join(", ")}</Text>
-        ) : null}
-      </View>
-      <Text style={styles.dateBig}>{packetDate(kitchen.date)}</Text>
-    </View>
+    <SheetHeading
+      kicker={`Kitchen ${kitchen.kitchenCode}`}
+      title={title}
+      caption={kitchen.shopCodes.length > 1 ? `For ${kitchen.shopCodes.join(", ")}` : null}
+      date={kitchen.date}
+    >
+      <Text style={styles.blurb}>{blurb}</Text>
+    </SheetHeading>
   );
 }
 
