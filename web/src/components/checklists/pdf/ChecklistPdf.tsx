@@ -12,7 +12,25 @@
 // question is what went wrong, and burying three findings among seventy ticks
 // makes a reader hunt for them.
 
+// DRAWN IN THE APP'S OWN DESIGN LANGUAGE since 2026-09-25 (Mark: "finally,
+// do the checklist in the same style"), from the shared
+// `components/pdf/appDocument` parts every other document uses: the black
+// masthead band, the list's title as the page heading with how much was
+// answered beside it, Run and Sign-off field blocks, section heads with counts
+// for What was found and What was checked, the walk's sections as `DataTable`'s
+// black group bands, and no rules between rows. Issues still lead, a finding
+// still wears the one yellow mark, and every value still goes through
+// `pdfText`. The previous look is in git history at 63451a21.
+
 import { Document, Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import {
+  DocFooter,
+  Field,
+  MARK_FILL,
+  MUTED,
+  caps,
+  docStyles,
+} from "@/components/pdf/appDocument";
 
 /**
  * NO HYPHENATION, ANYWHERE.
@@ -89,94 +107,21 @@ export type ChecklistPdfData = {
   items: ChecklistPdfItem[];
 };
 
-/**
- * Sizes, and nothing else — `PoPdf`'s rule, four sizes and two greys.
- *
- *   22  Helvetica-Bold   the org name
- *   11  Helvetica-Bold   the document's own name and the section bands
- *    9  Helvetica[-Bold] everything you read
- *    8  Helvetica        secondary: guidance, whose job it is, the footer
- *
- *   #000 ink · #666 secondary · #ffe98a the mark, on a finding and nothing else
- */
-const styles = StyleSheet.create({
-  page: {
-    paddingTop: 30,
-    paddingBottom: 40,
-    paddingHorizontal: 34,
-    fontSize: 9,
-    fontFamily: "Helvetica",
-    color: "#000",
-  },
-  masthead: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  orgName: { fontSize: 22, fontFamily: "Helvetica-Bold", letterSpacing: -0.5 },
-  docTitle: { fontSize: 11, fontFamily: "Helvetica-Bold", textAlign: "right" },
-  docMeta: { fontSize: 8, color: "#666", textAlign: "right", marginTop: 2 },
-
-  rule: { borderBottomWidth: 1, borderBottomColor: "#000", marginTop: 10 },
-
-  metaRow: { flexDirection: "row", marginTop: 10, gap: 24 },
-  metaLabel: {
-    fontSize: 8,
-    fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    color: "#666",
-  },
-  metaValue: { fontSize: 9, marginTop: 1 },
-
-  band: {
-    backgroundColor: "#000",
-    color: "#fff",
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    marginTop: 16,
-  },
-  sectionHeading: {
-    fontSize: 11,
-    fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginTop: 18,
-    marginBottom: 4,
-    borderBottomWidth: 0.75,
-    borderBottomColor: "#000",
-    paddingBottom: 2,
-  },
-
-  row: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: 3.5,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#ddd",
-  },
-  cellStatus: { width: 46, fontSize: 8, fontFamily: "Helvetica-Bold" },
-  cellPrompt: { flexGrow: 1, flexBasis: 0, paddingRight: 8 },
-  cellAnswer: { width: 130 },
-  sub: { fontSize: 8, color: "#666", marginTop: 1 },
-  mark: { backgroundColor: "#ffe98a" },
-  finding: { fontSize: 9, fontFamily: "Helvetica-Bold" },
-
-  empty: { fontSize: 9, color: "#666", marginTop: 6 },
-  footer: {
-    position: "absolute",
-    bottom: 20,
-    left: 34,
-    right: 34,
-    fontSize: 8,
-    color: "#666",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-});
+const styles = {
+  ...docStyles,
+  ...StyleSheet.create({
+    section: { marginTop: 20 },
+    row: { flexDirection: "row", alignItems: "flex-start", paddingVertical: 4 },
+    cellStatus: { width: 46, paddingLeft: 6, ...caps(7, 0.12), fontFamily: "Helvetica-Bold", paddingTop: 1.5 },
+    cellPrompt: { flexGrow: 1, flexBasis: 0, paddingRight: 8 },
+    cellAnswer: { width: 130 },
+    sub: { fontSize: 8, color: MUTED, marginTop: 1.5 },
+    // The one mark on the page: a finding, and nothing else.
+    mark: { backgroundColor: MARK_FILL, paddingHorizontal: 5, paddingVertical: 1.5, alignSelf: "flex-start" },
+    finding: { ...caps(8.5, 0.06), fontFamily: "Helvetica-Bold" },
+    emptyNote: { fontSize: 9, color: MUTED, marginTop: 2 },
+  }),
+};
 
 const STATUS_WORD: Record<ChecklistPdfItem["status"], string> = {
   pending: "—",
@@ -229,63 +174,72 @@ export function ChecklistPdf({ data }: { data: ChecklistPdfData }) {
   return (
     <Document title={`${data.title} ${data.businessDate}`}>
       <Page size="LETTER" style={styles.page}>
-        <View style={styles.masthead}>
-          <Text style={styles.orgName}>{pdfText(data.orgName)}</Text>
-          <View>
-            <Text style={styles.docTitle}>{pdfText(data.kindLabel.toUpperCase())}</Text>
-            <Text style={styles.docMeta}>{pdfText(data.title)}</Text>
+        <View style={styles.masthead} fixed>
+          <Text style={styles.wordmark}>{pdfText(data.orgName)}</Text>
+          <View style={styles.mastheadRight}>
+            <Text style={styles.mastheadLine}>{pdfText(data.kindLabel)}</Text>
+            <Text style={styles.mastheadLine}>Printed {data.printedOn}</Text>
           </View>
         </View>
-        <View style={styles.rule} />
 
-        <View style={styles.metaRow}>
-          <View>
-            <Text style={styles.metaLabel}>Shop</Text>
-            <Text style={styles.metaValue}>{data.locationCode || "—"}</Text>
-          </View>
-          <View>
-            <Text style={styles.metaLabel}>Date</Text>
-            <Text style={styles.metaValue}>
-              {data.businessDate}
-              {data.shiftLabel ? ` - ${data.shiftLabel}` : ""}
+        <View style={styles.body}>
+        <View style={styles.headingRow}>
+          <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
+            <Text style={styles.kicker}>{pdfText(data.kindLabel)}</Text>
+            <Text style={styles.h1}>{pdfText(data.title)}</Text>
+            <Text style={styles.caption}>
+              {[data.locationCode, data.businessDate, data.shiftLabel ? pdfText(data.shiftLabel) : null]
+                .filter(Boolean)
+                .join(" · ")}
             </Text>
           </View>
-          <View>
-            <Text style={styles.metaLabel}>Checked by</Text>
-            <Text style={styles.metaValue}>{data.walkedBy ? pdfText(data.walkedBy) : "-"}</Text>
-          </View>
-          <View>
-            <Text style={styles.metaLabel}>Answered</Text>
-            <Text style={styles.metaValue}>
+          <View style={styles.numberBlock}>
+            <Text style={styles.kicker}>Answered</Text>
+            <Text style={styles.number}>
               {looked} of {data.items.length}
             </Text>
           </View>
-          <View>
-            <Text style={styles.metaLabel}>Finished</Text>
-            <Text style={styles.metaValue}>
-              {data.status === "submitted" ? (data.submittedAt ?? "yes") : "not finished"}
-            </Text>
+        </View>
+
+        <View style={styles.blocks}>
+          <View style={styles.block}>
+            <Text style={styles.sectionHead}>Run</Text>
+            <Field label="Shop" value={data.locationCode} />
+            <Field label="Date" value={data.businessDate} />
+            <Field label="Shift" value={data.shiftLabel ? pdfText(data.shiftLabel) : null} />
+          </View>
+          <View style={styles.block}>
+            <Text style={styles.sectionHead}>Sign-off</Text>
+            <Field label="Checked by" value={data.walkedBy ? pdfText(data.walkedBy) : null} />
+            <Field label="Answered" value={`${looked} of ${data.items.length}`} />
+            <Field
+              label="Finished"
+              value={data.status === "submitted" ? (data.submittedAt ?? "Yes") : "Not finished"}
+            />
           </View>
         </View>
 
         {/* ISSUES FIRST. A clean run SAYS SO rather than omitting the band —
             an absent section cannot be told from a section that was never
             rendered, which is `checklistSection`'s argument in the email. */}
-        <Text style={styles.band}>What was found</Text>
+        <View style={styles.section}>
+        <Text style={styles.sectionHead}>
+          What was found <Text style={styles.sectionCount}>{issues.length}</Text>
+        </Text>
         {issues.length === 0 ? (
-          <Text style={styles.empty}>Nothing was flagged.</Text>
+          <Text style={styles.emptyNote}>Nothing was flagged.</Text>
         ) : (
           issues.map((i, n) => (
             <View key={`issue-${n}`} style={styles.row} wrap={false}>
-              <Text style={styles.cellStatus}>
-                <Text style={styles.mark}> ! </Text>
-              </Text>
+              <View style={[styles.cellStatus, { paddingTop: 0 }]}>
+                <Text style={styles.mark}>Issue</Text>
+              </View>
               <View style={styles.cellPrompt}>
                 <Text style={styles.finding}>{pdfText(i.prompt)}</Text>
                 {i.note ? <Text style={styles.sub}>{pdfText(i.note)}</Text> : null}
                 <Text style={styles.sub}>
                   {pdfText(i.sectionName ?? "No section")}
-                  {i.equipmentName ? ` - ${pdfText(i.equipmentName)}` : ""}
+                  {i.equipmentName ? ` · ${pdfText(i.equipmentName)}` : ""}
                 </Text>
               </View>
               <View style={styles.cellAnswer}>
@@ -295,31 +249,34 @@ export function ChecklistPdf({ data }: { data: ChecklistPdfData }) {
             </View>
           ))
         )}
+        </View>
 
-        <Text style={styles.band}>What was checked</Text>
+        <View style={styles.section}>
+        <Text style={styles.sectionHead}>
+          What was checked <Text style={styles.sectionCount}>{data.items.length}</Text>
+        </Text>
         {/* NO `fixed` HEADER ON THIS TABLE. A repeated header lands on any page
             that holds only the tail of a section, which on a 70-item list is
-            most of them. The section heading below repeats where it matters. */}
+            most of them. Each section's black band marks where it starts. */}
         {bands.map((band, n) => (
           <View key={`band-${n}`}>
-            <Text style={styles.sectionHeading}>{pdfText(band.section)}</Text>
+            <Text style={styles.groupBand}>{pdfText(band.section)}</Text>
             {band.rows.map((i, m) => (
               <Line key={`row-${n}-${m}`} item={i} />
             ))}
           </View>
         ))}
         {data.items.length === 0 ? (
-          <Text style={styles.empty}>This list had no items.</Text>
+          <Text style={styles.emptyNote}>This list had no items.</Text>
         ) : null}
-
-        <View style={styles.footer} fixed>
-          <Text>
-            {pdfText(data.orgName)} - {data.locationCode} - printed {data.printedOn}
-          </Text>
-          <Text
-            render={({ pageNumber, totalPages }) => `${pageNumber} of ${totalPages}`}
-          />
         </View>
+        </View>
+
+        <DocFooter>
+          {[pdfText(data.orgName), data.locationCode, pdfText(data.title), data.businessDate]
+            .filter(Boolean)
+            .join(" · ")}
+        </DocFooter>
       </Page>
     </Document>
   );

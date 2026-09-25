@@ -920,3 +920,19 @@ First row, above Attach File… and Delete Document…: all the record's files i
 one tab, merged when there are several — the list's Open, moved into
 `components/documents/openDocumentFiles.ts` so both call one function. Dimmed
 when the record has no files. The per-file Open on each file row is unchanged.
+
+**THE PRINTED CHECKLIST IS REDRAWN IN THE APP'S OWN DESIGN LANGUAGE
+(2026-09-25).** Mark: "finally, do the checklist in the same style" — the last
+of the day's documents after the special-order set, the PO, the shopping list,
+the production packet and the recipe sheet. From the shared
+`components/pdf/appDocument` parts: the black masthead band (the list's kind
+and "Printed …"), the list's title as the page heading with "Answered 6 of 7"
+where a record's number sits, Run (shop, date, shift) and Sign-off (checked by,
+answered, finished) field blocks, section heads with counts for What was found
+and What was checked, the walk's sections as `DataTable`'s black group bands
+instead of underlined headings, and no rules between rows. What did NOT change:
+issues still lead, a clean run still says "Nothing was flagged", a finding
+still carries the page's one yellow mark (now a small "ISSUE" chip rather than
+"!"), there is still no repeating table header, and every value still goes
+through `pdfText` — "expected 34–40 °F" was re-checked in the extracted text
+and still prints as "34-40". Previous look at `63451a21`.
