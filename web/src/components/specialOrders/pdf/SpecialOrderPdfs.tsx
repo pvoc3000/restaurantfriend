@@ -58,105 +58,30 @@ import {
 
 import { customerLabel, lineTotal } from "@/lib/specialOrders";
 import { dateInTimeZone, serverTimeZone } from "@/lib/today";
+import {
+  Field,
+  HAIRLINE,
+  INK,
+  MARK_FILL,
+  MUTED,
+  STOP_FILL,
+  SUBTLE,
+  caps,
+  docStyles,
+  isoDay,
+  qtyText,
+} from "@/components/pdf/appDocument";
 
 /** The three customer documents — the kitchen order is a different layout. */
 export type CustomerDocumentKind = Exclude<DocumentKind, "order">;
 
 Font.registerHyphenationCallback((word) => [word]);
 
-/* The app's tokens, in print. */
-const INK = "#000000";
-const MUTED = "#545454"; // --rf-neutral-600, secondary text
-const SUBTLE = "#757575"; // --rf-neutral-500, captions and labels
-const HAIRLINE = "#e4e4e4"; // --rf-neutral-200
-const MARK_FILL = "#ffe98a"; // --rf-yellow-200
-const STOP_FILL = "#ffcfc9"; // --rf-red-200, "stop"
-
-/* Tracking, as the app sets it: +0.06em for names and commands, +0.12em for
-   labels. react-pdf takes letterSpacing in points, so it is per size. */
-const caps = (size: number, em: number) => ({
-  fontSize: size,
-  letterSpacing: size * em,
-  textTransform: "uppercase" as const,
-});
-
-const PAGE_X = 40;
-
-const s = StyleSheet.create({
-  page: {
-    // The masthead is ABSOLUTE and fixed, so it sits on every page without
-    // pushing the flow; the page's own top padding clears it.
-    paddingTop: 40 + 20,
-    paddingBottom: 44,
-    paddingHorizontal: 0,
-    fontFamily: "Helvetica",
-    fontSize: 9,
-    color: INK,
-  },
-
-  /* ---- masthead ---- */
-  masthead: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: INK,
-    paddingHorizontal: PAGE_X,
-    height: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  wordmark: { ...caps(13, 0.06), fontFamily: "Helvetica-Bold", color: "#fff" },
-  mastheadRight: { alignItems: "flex-end" },
-  mastheadLine: { ...caps(6.5, 0.12), color: "#fff", marginTop: 1.5 },
-
-  body: { paddingHorizontal: PAGE_X },
-
-  /* ---- page heading ---- */
-  headingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  kicker: { ...caps(7.5, 0.12), color: SUBTLE },
-  h1: {
-    ...caps(22, -0.02),
-    fontFamily: "Helvetica-Bold",
-    marginTop: 3,
-    lineHeight: 1.1,
-  },
-  caption: { ...caps(7.5, 0.12), color: SUBTLE, marginTop: 5 },
-  numberBlock: { alignItems: "flex-end" },
-  number: { fontSize: 22, fontFamily: "Helvetica-Bold", marginTop: 3 },
-
-  /* ---- section heading (ui/SectionHeading) ---- */
-  sectionHead: {
-    ...caps(9, 0.08),
-    fontFamily: "Helvetica-Bold",
-    paddingBottom: 4,
-    borderBottomWidth: 2,
-    borderBottomColor: INK,
-    marginBottom: 7,
-  },
-  sectionCount: { color: SUBTLE, fontFamily: "Helvetica" },
-
-  /* ---- field blocks ---- */
-  blocks: { flexDirection: "row", gap: 22, marginTop: 20 },
-  block: { flexGrow: 1, flexBasis: 0 },
-  field: { flexDirection: "row", marginBottom: 4 },
-  label: { ...caps(6.5, 0.12), color: SUBTLE, width: 54, paddingTop: 1.5 },
-  // NO lineHeight on a flexBasis-0 column: react-pdf then reserves an extra
-  // line of height under it (measured 2026-09-25), which opened a blank line
-  // under every item that carried a note.
-  value: { flexGrow: 1, flexBasis: 0, fontSize: 9 },
-  empty: { color: SUBTLE },
+const s = {
+  ...docStyles,
+  ...StyleSheet.create({
 
   /* ---- items (DataTable) ---- */
-  items: { marginTop: 20 },
-  tableHead: {
-    flexDirection: "row",
-    borderBottomWidth: 2,
-    borderBottomColor: INK,
-    paddingBottom: 4,
-  },
-  th: { ...caps(6.5, 0.12), color: SUBTLE },
   row: { flexDirection: "row", paddingVertical: 4, alignItems: "flex-start" },
   cIndex: { width: 20, color: SUBTLE },
   cItem: { width: 170, paddingRight: 8 },
@@ -164,12 +89,10 @@ const s = StyleSheet.create({
   cPrice: { width: 48, textAlign: "right" },
   cNotes: { flexGrow: 1, flexBasis: 0, paddingLeft: 16, color: MUTED },
   cCost: { width: 60, textAlign: "right" },
-  itemName: { ...caps(8.5, 0.06), fontFamily: "Helvetica-Bold" },
 
   /* ---- notes + totals ---- */
   foot: { flexDirection: "row", gap: 28, marginTop: 18, alignItems: "flex-start" },
   notes: { flexGrow: 1, flexBasis: 0 },
-  prose: { fontSize: 9, color: INK },
 
   /* The Mac window: 1.5pt frame, black title bar, a hard 3pt shadow drawn as
      an offset black box behind it. */
@@ -227,36 +150,12 @@ const s = StyleSheet.create({
   signValue: { fontSize: 10, fontFamily: "Helvetica-Bold" },
   signSub: { fontSize: 7, color: MUTED, marginTop: 2 },
 
-  /* ---- footer ---- */
-  footer: {
-    position: "absolute",
-    bottom: 20,
-    left: PAGE_X,
-    right: PAGE_X,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    borderTopWidth: 0.75,
-    borderTopColor: HAIRLINE,
-    paddingTop: 6,
-  },
-  footerText: { ...caps(6.5, 0.12), color: SUBTLE },
-
   /* ---- kitchen order ---- */
   stats: { flexDirection: "row", gap: 22, marginTop: 20 },
   stat: { flexGrow: 1, flexBasis: 0 },
   statValue: { fontSize: 20, fontFamily: "Helvetica-Bold", marginTop: 2 },
   statSub: { ...caps(7.5, 0.12), color: SUBTLE, marginTop: 3 },
   statMarked: { backgroundColor: MARK_FILL, paddingHorizontal: 6, paddingVertical: 3, alignSelf: "flex-start" },
-  /* DataTable's group band: black, white caps. */
-  groupBand: {
-    ...caps(7.5, 0.12),
-    fontFamily: "Helvetica-Bold",
-    color: "#fff",
-    backgroundColor: INK,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    marginTop: 8,
-  },
   kRow: { flexDirection: "row", paddingVertical: 5, alignItems: "flex-start" },
   kQty: { width: 44, fontSize: 13, fontFamily: "Helvetica-Bold", paddingLeft: 6 },
   kItem: { width: 250, paddingRight: 12 },
@@ -292,27 +191,14 @@ const s = StyleSheet.create({
   stDate: { width: 96 },
   stTitle: { flexGrow: 1, flexBasis: 0, paddingRight: 12 },
   stMoney: { width: 70, textAlign: "right" },
-});
+  }),
+};
 
 function money(value: number): string {
   return `${value < 0 ? "-" : ""}$${Math.abs(value).toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
-}
-
-function qtyText(qty: number): string {
-  return Number.isInteger(qty) ? String(qty) : String(Number(qty.toFixed(2)));
-}
-
-const WEEKDAY = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-
-/** `2026-10-03` → `SAT 2026-10-03` — the app's ISO date with its weekday. */
-function isoDay(iso: string | null | undefined): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
-  if (!m) return "";
-  const day = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay();
-  return `${WEEKDAY[day]} ${m[0]}`;
 }
 
 /**
@@ -341,16 +227,6 @@ function approvalStamp(at: string, timeZone: string | null): { date: string; tim
     // An unknown zone name in settings — say so in UTC rather than throw.
     return { date: at.slice(0, 10), time: `${at.slice(11, 16)} UTC` };
   }
-}
-
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
-  const v = (value ?? "").trim();
-  return (
-    <View style={s.field}>
-      <Text style={s.label}>{label}</Text>
-      <Text style={v ? s.value : [s.value, s.empty]}>{v || "—"}</Text>
-    </View>
-  );
 }
 
 function TotalRow({ label, value }: { label: string; value: number }) {
