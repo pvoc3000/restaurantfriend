@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { canEditPage } from "@/lib/pageAccess";
 import { canDeleteInspection } from "@/lib/roles";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
@@ -121,6 +122,7 @@ export default async function DocumentPage({
             title={row.title}
             fileCount={paths.length}
             orgId={orgId}
+            today={todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone())}
             editable={editable}
             canDelete={canDeleteInspection(session.membership.role)}
           />

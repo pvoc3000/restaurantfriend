@@ -914,3 +914,9 @@
    fails the 00:00–00:59 sliver, and hardcoding UTC fails that and the
    org-timezone case.
 
+
+**OPEN DOCUMENT ON THE DOCUMENT RECORD'S ACTIONS MENU (Mark, 2026-09-25).**
+First row, above Attach File… and Delete Document…: all the record's files in
+one tab, merged when there are several — the list's Open, moved into
+`components/documents/openDocumentFiles.ts` so both call one function. Dimmed
+when the record has no files. The per-file Open on each file row is unchanged.
