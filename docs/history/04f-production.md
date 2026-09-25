@@ -1673,3 +1673,18 @@ box, tray cell and the "AT LEAST" wording are as they were. The premade band's
 TOTAL / L/O labels still sit exactly over their write-in boxes (the band lost
 its right padding to keep that). The special-order pages in the packet were
 already the new kitchen order. Previous look at `b727828a`.
+
+**`/schedules` HAS AN ACTIONS MENU (2026-09-25).** Mark: "move 'generate
+schedules' into an actionmenu, and add an option to print the production
+packet for the selected schedules". The purchase order list's arrangement: one
+always-live Actions menu in the header — Generate Schedules…, Print Production
+Packet (n)…, Delete (n) in red, Clear Selection — and it SWALLOWED the
+selection bar under the table, whose Print and Delete were its two commands.
+Rows that read the selection grey out with none ticked and carry the count in
+the label. `GenerateSchedules` gained `PrintPacket`'s `children` render prop
+(hand back a menu row, keep the dialog); the shift report's Tomorrow page
+still draws both as buttons. The page now passes Generate's settings as plain
+data (`generate`), since a server page cannot hand the menu functions.
+Gating unchanged: the ticks and Print are supervisor+ (`stampable`), Delete
+also needs purchaser+ (`editable`), Generate needs purchaser+ and a working
+kitchen.

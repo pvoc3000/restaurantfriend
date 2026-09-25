@@ -23,6 +23,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
 import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import {
   Dialog,
   DIALOG_CANCEL_CLASS,
@@ -137,6 +138,7 @@ export function GenerateSchedules({
   plans,
   startDate,
   primary = false,
+  children,
 }: {
   orgId: string;
   /**
@@ -172,6 +174,12 @@ export function GenerateSchedules({
    * right CONDITIONALLY — never as a standing "primary".
    */
   primary?: boolean;
+  /**
+   * Hand the command out as an Actions menu row instead of drawing a button —
+   * `PrintPacket`'s arrangement, which `/schedules` puts beside it (Mark,
+   * 2026-09-25). The dialog stays here either way.
+   */
+  children?: (row: ActionMenuItem) => React.ReactNode;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -528,13 +536,17 @@ export function GenerateSchedules({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={openDialog}
-        className={`${primary ? PRIMARY_BUTTON_CLASS : BUTTON_CLASS} shrink-0`}
-      >
-        Generate schedules…
-      </button>
+      {children ? (
+        children({ label: "Generate Schedules…", onSelect: openDialog })
+      ) : (
+        <button
+          type="button"
+          onClick={openDialog}
+          className={`${primary ? PRIMARY_BUTTON_CLASS : BUTTON_CLASS} shrink-0`}
+        >
+          Generate schedules…
+        </button>
+      )}
 
       {open && (
         <Dialog

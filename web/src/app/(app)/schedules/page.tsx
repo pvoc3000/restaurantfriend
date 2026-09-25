@@ -4,7 +4,6 @@ import { canEnterCounts } from "@/lib/roles";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SchedulesList, type ScheduleRow } from "@/components/production/SchedulesList";
 import { SCHEDULE_WINDOW_DAYS, type SchedulePlan } from "@/lib/productionSchedule";
-import { GenerateSchedules } from "@/components/production/GenerateSchedules";
 import { canEditPage } from "@/lib/pageAccess";
 import { readSettings } from "@/lib/specialOrders";
 
@@ -162,25 +161,25 @@ export default async function SchedulesPage() {
           today={today}
           locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
           kitchenId={kitchen?.id ?? null}
-          action={
-            editable && kitchen ? (
-              <GenerateSchedules
-                orgId={session.membership.org_id}
-                horizonDays={readSettings(session.orgSettings).horizonDays}
-                locations={session.activeLocations.map((l) => ({
-                  id: l.id,
-                  code: l.code,
-                  name: l.name,
-                }))}
-                today={today}
-                kitchenId={kitchen.id}
-                kitchenCode={kitchen.code}
-                // Every plan, not the active ones: `sellingShopsForKitchen`
-                // decides that itself, and the dialog re-asks as the date range
-                // moves.
-                plans={plans}
-              />
-            ) : null
+          generate={
+            editable && kitchen
+              ? {
+                  orgId: session.membership.org_id,
+                  horizonDays: readSettings(session.orgSettings).horizonDays,
+                  locations: session.activeLocations.map((l) => ({
+                    id: l.id,
+                    code: l.code,
+                    name: l.name,
+                  })),
+                  today,
+                  kitchenId: kitchen.id,
+                  kitchenCode: kitchen.code,
+                  // Every plan, not the active ones: `sellingShopsForKitchen`
+                  // decides that itself, and the dialog re-asks as the date
+                  // range moves.
+                  plans,
+                }
+              : null
           }
         />
     </div>

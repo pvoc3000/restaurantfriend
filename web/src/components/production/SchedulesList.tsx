@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
@@ -26,10 +26,11 @@ import {
   type SchedulePlan,
 } from "@/lib/productionSchedule";
 import { PrintPacket } from "@/components/production/PrintPacket";
+import { GenerateSchedules } from "@/components/production/GenerateSchedules";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { deleteSchedules, deleteSchedulesMessage } from "@/components/production/scheduleWrites";
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
-import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 
 export type ScheduleRow = {
   id: string;
@@ -107,7 +108,7 @@ export function SchedulesList({
   today,
   locations,
   kitchenId,
-  action,
+  generate,
 }: {
   rows: ScheduleRow[];
   /** Every plan, active or not — `plansInForce` decides which are in force. */
@@ -125,8 +126,12 @@ export function SchedulesList({
   locations: { id: string; code: string }[];
   /** The working location, which the Show filter starts ticked on as KITCHEN. */
   kitchenId: string | null;
-  /** The screen's create command, beside the title. */
-  action?: ReactNode;
+  /**
+   * What Generate Schedules needs, when this member may generate (purchaser+)
+   * and has a working kitchen — plain data, because the server page cannot
+   * hand a client component the menu's functions. Null hides the row.
+   */
+  generate?: Omit<ComponentProps<typeof GenerateSchedules>, "children"> | null;
 }) {
   const router = useRouter();
   const [range, setRange] = useState<DateRange | null>(() => ({
@@ -436,6 +441,80 @@ export function SchedulesList({
           }),
         };
 
+  /**
+   * ONE ACTIONS MENU FOR THE SCREEN (Mark, 2026-09-25: "move 'generate
+   * schedules' into an actionmenu, and add an option to print the production
+   * packet for the selected schedules") — the purchase order list's
+   * arrangement, and on a list it SWALLOWS THE SELECTION BAR: Print and Delete
+   * were that bar's two commands, and they are rows here now.
+   *
+   * ALWAYS LIVE, the PO list's rule: the rows that read the selection grey out
+   * with none ticked, and their counts in the label ("Delete (0)") say why on
+   * an iPad, which has no hover to explain a greyed row. The trigger only
+   * greys while a delete is running.
+   *
+   * `GenerateSchedules` and `PrintPacket` keep owning their commands — each
+   * hands back a row through its `children` and still draws its own dialog.
+   */
+  const n = checked.size;
+  const menu = (generateRow: ActionMenuItem | null, printRow: ActionMenuItem | null) => {
+    const items: ActionMenuItem[] = [];
+    if (generateRow) items.push(generateRow);
+    if (printRow) {
+      items.push({
+        ...printRow,
+        label: `Print Production Packet (${n})…`,
+        disabled: n === 0,
+        separatorBefore: items.length > 0,
+      });
+    }
+    if (editable && stampable) {
+      items.push({
+        label: `Delete (${n})`,
+        danger: true,
+        separatorBefore: true,
+        disabled: n === 0,
+        onSelect: () => void removeChecked(),
+      });
+    }
+    if (stampable) {
+      items.push({
+        label: "Clear Selection",
+        disabled: n === 0,
+        onSelect: () => setChecked(new Set()),
+      });
+    }
+    if (items.length === 0) return null;
+    return (
+      <ActionMenu
+        label={deleting ? "Deleting…" : "Actions"}
+        ariaLabel={n === 0 ? "Actions for schedules" : `Actions for ${n} selected schedules`}
+        disabled={deleting}
+        minWidth={240}
+        items={items}
+      />
+    );
+  };
+  // The selection column exists only for `stampable` (see `columns`), so the
+  // print row does too; Delete additionally needs `editable`, as before.
+  const withPrint = (generateRow: ActionMenuItem | null) =>
+    stampable ? (
+      <PrintPacket
+        scheduleIds={[...checked]}
+        stampable={stampable}
+        onPrinted={() => setChecked(new Set())}
+      >
+        {(printRow) => menu(generateRow, printRow)}
+      </PrintPacket>
+    ) : (
+      menu(generateRow, null)
+    );
+  const actions = generate ? (
+    <GenerateSchedules {...generate}>{(generateRow) => withPrint(generateRow)}</GenerateSchedules>
+  ) : (
+    withPrint(null)
+  );
+
   return (
     <div className="space-y-4">
       <PageHeading
@@ -444,8 +523,9 @@ export function SchedulesList({
         visible={visible.length}
         total={rows.length}
         noun="schedules"
-        action={action}
+        action={actions}
       />
+      {failed ? <p className="text-sm text-accent">{failed}</p> : null}
 
       {/* Its own filter row, above the table — `PlansList`'s change and for its
           reason: in `DataTable`'s `leading` it shared a strip with the columns
@@ -514,42 +594,6 @@ export function SchedulesList({
         onSortChange={setSort}
       />
 
-      {stampable && checked.size > 0 ? (
-        <div className="flex flex-wrap items-center gap-4 border border-ink bg-white px-4 py-3 text-sm">
-          <span className="font-medium">
-            {checked.size} {checked.size === 1 ? "night" : "nights"} selected
-          </span>
-          <PrintPacket
-            scheduleIds={[...checked]}
-            stampable={stampable}
-            onPrinted={() => setChecked(new Set())}
-          />
-          {/* RED, like the record's own Delete and every other destructive
-              command out on a screen — a reader cannot tell "opens a confirm"
-              from "destroys" by looking. Gated on `editable`, not on
-              `stampable`: printing STAMPS a night and is supervisor+ (044),
-              where deleting one is a purchaser's write, so the bar can exist
-              for somebody who may print and not delete. */}
-          {editable ? (
-            <button
-              type="button"
-              onClick={removeChecked}
-              disabled={deleting}
-              className={DANGER_BUTTON_CLASS}
-            >
-              {deleting ? "Deleting…" : "Delete"}
-            </button>
-          ) : null}
-          {failed ? <span className="text-accent">{failed}</span> : null}
-          <button
-            type="button"
-            onClick={() => setChecked(new Set())}
-            className="ml-auto text-muted underline underline-offset-[3px] hover:text-ink"
-          >
-            Clear
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }
