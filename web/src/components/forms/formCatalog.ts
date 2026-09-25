@@ -23,6 +23,7 @@ export const FORM_GROUPS = [
       { key: "customer-invoice", label: "Customer invoice · weekly" },
       { key: "customer-invoice-app", label: "Customer invoice · weekly · app style (draft)" },
       { key: "statement", label: "Statement" },
+      { key: "statement-app", label: "Statement · app style (draft)" },
     ],
   },
   {

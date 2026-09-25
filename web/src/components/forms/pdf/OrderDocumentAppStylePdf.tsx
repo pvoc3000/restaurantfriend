@@ -41,6 +41,7 @@ import {
   usWeekday,
   type DocOrg,
   type OrderDocData,
+  type StatementData,
 } from "@/lib/specialOrderDocs";
 
 /** The three customer documents — the kitchen order is a different layout. */
@@ -272,6 +273,12 @@ const s = StyleSheet.create({
   invBandText: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold", color: "#fff" },
   invDetail: { paddingLeft: 12 },
   invSum: { borderTopWidth: 1, borderTopColor: INK, marginTop: 2 },
+
+  /* ---- statement ---- */
+  stNo: { width: 48, color: SUBTLE },
+  stDate: { width: 96 },
+  stTitle: { flexGrow: 1, flexBasis: 0, paddingRight: 12 },
+  stMoney: { width: 70, textAlign: "right" },
 });
 
 function money(value: number): string {
@@ -855,6 +862,128 @@ export function CustomerInvoiceAppStylePdf({
         <View style={s.footer} fixed>
           <Text style={s.footerText}>
             {org.name} · Invoice {invoice.number}
+          </Text>
+          <Text
+            style={s.footerText}
+            render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+          />
+        </View>
+      </Page>
+    </Document>
+  );
+}
+
+/* ==========================================================================
+ * THE STATEMENT (decision 21)
+ * ========================================================================== */
+
+/**
+ * `StatementPdf` in the app's language (Mark, 2026-09-25): one customer's
+ * orders over a period. The customer is the heading and the period its
+ * caption; each order a row, rule-free like a list. There are no notes on a
+ * statement, so the invoice footer takes the column beside the totals instead
+ * of a line of its own below them. Total due keeps the yellow until settled.
+ */
+export function StatementAppStylePdf({
+  statement,
+  org,
+}: {
+  statement: StatementData;
+  org: DocOrg;
+}) {
+  const period = `${statement.from} – ${statement.to}`;
+  const settled = statement.balance <= 0;
+  const count = statement.orders.length;
+  return (
+    <Document>
+      <Page size="LETTER" style={s.page}>
+        <View style={s.masthead} fixed>
+          <Text style={s.wordmark}>{org.name}</Text>
+          <View style={s.mastheadRight}>
+            {org.addressLine ? <Text style={s.mastheadLine}>{org.addressLine}</Text> : null}
+            {org.contactLine ? <Text style={s.mastheadLine}>{org.contactLine}</Text> : null}
+          </View>
+        </View>
+
+        <View style={s.body}>
+          <View>
+            <Text style={s.kicker}>Statement</Text>
+            <Text style={s.h1}>{customerLabel(statement.customer)}</Text>
+            <Text style={s.caption}>
+              {period} · {count} {count === 1 ? "order" : "orders"}
+            </Text>
+          </View>
+
+          <View style={s.blocks}>
+            <View style={s.block}>
+              <Text style={s.sectionHead}>Customer</Text>
+              <Field label="Name" value={customerLabel(statement.customer)} />
+              <Field label="Phone" value={statement.customer?.phone} />
+              <Field label="Email" value={statement.customer?.email} />
+            </View>
+            <View style={s.block}>
+              <Text style={s.sectionHead}>Period</Text>
+              <Field label="From" value={isoDay(statement.from)} />
+              <Field label="To" value={isoDay(statement.to)} />
+              <Field label="Orders" value={String(count)} />
+            </View>
+          </View>
+
+          <View style={s.items}>
+            <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
+              Orders <Text style={s.sectionCount}>{count}</Text>
+            </Text>
+            <View style={s.tableHead} fixed>
+              <Text style={[s.th, s.stNo]}>No.</Text>
+              <Text style={[s.th, s.stDate]}>Date</Text>
+              <Text style={[s.th, s.stTitle]}>Order</Text>
+              <Text style={[s.th, s.stMoney]}>Paid</Text>
+              <Text style={[s.th, s.stMoney]}>Total</Text>
+            </View>
+            {statement.orders.map((o) => (
+              <View key={o.id} style={s.invRow} wrap={false}>
+                <Text style={s.stNo}>{o.number}</Text>
+                <Text style={s.stDate}>{isoDay(o.event_date) || "—"}</Text>
+                <Text style={s.stTitle}>{o.title ?? ""}</Text>
+                <Text style={o.totals.paid ? s.stMoney : [s.stMoney, s.empty]}>
+                  {o.totals.paid ? money(o.totals.paid) : "—"}
+                </Text>
+                <Text style={s.stMoney}>{money(o.totals.total)}</Text>
+              </View>
+            ))}
+            {count === 0 ? (
+              <Text style={[s.prose, s.empty, { marginTop: 8 }]}>No orders in this period.</Text>
+            ) : null}
+          </View>
+
+          <View style={s.foot} wrap={false}>
+            <View style={s.notes}>
+              {org.invoiceFooter ? (
+                <Text style={[s.prose, { color: MUTED }]}>{org.invoiceFooter}</Text>
+              ) : null}
+            </View>
+            <View style={s.windowWrap}>
+              <View style={s.windowShadow} />
+              <View style={s.window}>
+                <View style={s.titleBar}>
+                  <Text style={s.titleBarText}>Totals</Text>
+                </View>
+                <View style={s.totals}>
+                  <TotalRow label="Orders" value={statement.total} />
+                  <TotalRow label="Payments" value={statement.paid ? -statement.paid : 0} />
+                </View>
+                <View style={settled ? [s.grand, { backgroundColor: "#fff" }] : s.grand}>
+                  <Text style={s.grandLabel}>Total due</Text>
+                  <Text style={s.grandValue}>{money(statement.balance)}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={s.footer} fixed>
+          <Text style={s.footerText}>
+            {org.name} · Statement {period}
           </Text>
           <Text
             style={s.footerText}

@@ -159,6 +159,10 @@ async function buildElement(
       const invoice = form === "customer-invoice" ? s.sampleCustomerInvoice : s.sampleItemizedInvoice;
       return <CustomerInvoicePdf invoice={invoice} org={docOrg} />;
     }
+    case "statement-app": {
+      const { StatementAppStylePdf } = await import("./pdf/OrderDocumentAppStylePdf");
+      return <StatementAppStylePdf statement={s.sampleStatement} org={docOrg} />;
+    }
     case "statement": {
       const { StatementPdf } = await import("@/components/specialOrders/pdf/SpecialOrderPdfs");
       return <StatementPdf statement={s.sampleStatement} org={docOrg} />;
