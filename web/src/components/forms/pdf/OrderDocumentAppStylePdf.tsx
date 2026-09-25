@@ -46,6 +46,7 @@ import {
 /** The three customer documents — the kitchen order is a different layout. */
 export type AppStyleKind = "quote" | "invoice" | "receipt";
 import { customerLabel, lineTotal } from "@/lib/specialOrders";
+import type { CustomerInvoiceDoc } from "@/components/specialOrders/pdf/SpecialOrderPdfs";
 
 Font.registerHyphenationCallback((word) => [word]);
 
@@ -256,6 +257,21 @@ const s = StyleSheet.create({
   handoff: { marginTop: 22 },
   boxGrid: { flexDirection: "row", gap: 16, marginBottom: 10 },
   boxCell: { flexGrow: 1, flexBasis: 0 },
+
+  /* ---- customer invoice ---- */
+  invRow: { flexDirection: "row", paddingVertical: 4, alignItems: "flex-start" },
+  invDesc: { flexGrow: 1, flexBasis: 0, paddingRight: 12 },
+  invAmount: { width: 80, textAlign: "right" },
+  invBand: {
+    flexDirection: "row",
+    backgroundColor: INK,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    marginTop: 8,
+  },
+  invBandText: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold", color: "#fff" },
+  invDetail: { paddingLeft: 12 },
+  invSum: { borderTopWidth: 1, borderTopColor: INK, marginTop: 2 },
 });
 
 function money(value: number): string {
@@ -698,6 +714,154 @@ export function KitchenOrderAppStylePdf({
           </Page>
         );
       })}
+    </Document>
+  );
+}
+
+/* ==========================================================================
+ * THE CUSTOMER INVOICE (migration 124)
+ * ========================================================================== */
+
+/**
+ * `CustomerInvoicePdf` in the app's language (Mark, 2026-09-25). Same data:
+ * one row per ORDER on a weekly invoice; on a one-order invoice that order is
+ * ITEMIZED — here under `DataTable`'s black group band, its items, discount,
+ * delivery, rush, tax and earlier payments beneath, closed by "This order".
+ * The customer is the heading, because an invoice is addressed to someone.
+ * Amount due wears the one yellow fill, which leaves once it is settled — the
+ * receipt's rule.
+ */
+export function CustomerInvoiceAppStylePdf({
+  invoice,
+  org,
+}: {
+  invoice: CustomerInvoiceDoc;
+  org: DocOrg;
+}) {
+  const settled = invoice.balance <= 0;
+  const orderCount = invoice.lines.length;
+  return (
+    <Document>
+      <Page size="LETTER" style={s.page}>
+        <View style={s.masthead} fixed>
+          <Text style={s.wordmark}>{org.name}</Text>
+          <View style={s.mastheadRight}>
+            {org.addressLine ? <Text style={s.mastheadLine}>{org.addressLine}</Text> : null}
+            {org.contactLine ? <Text style={s.mastheadLine}>{org.contactLine}</Text> : null}
+          </View>
+        </View>
+
+        <View style={s.body}>
+          <View style={s.headingRow}>
+            <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
+              <Text style={s.kicker}>Invoice</Text>
+              <Text style={s.h1}>{invoice.customer.name}</Text>
+              <Text style={s.caption}>
+                {[
+                  invoice.issued_on ? `Issued ${invoice.issued_on}` : null,
+                  invoice.due_on ? `Due ${isoDay(invoice.due_on)}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
+            </View>
+            <View style={s.numberBlock}>
+              <Text style={s.kicker}>No.</Text>
+              <Text style={s.number}>{invoice.number}</Text>
+            </View>
+          </View>
+
+          <View style={s.blocks}>
+            <View style={s.block}>
+              <Text style={s.sectionHead}>Bill to</Text>
+              <Field label="Name" value={invoice.customer.name} />
+              <Field label="Phone" value={invoice.customer.phone} />
+              <Field label="Email" value={invoice.customer.email} />
+            </View>
+            <View style={s.block}>
+              <Text style={s.sectionHead}>Invoice</Text>
+              <Field label="Number" value={invoice.number} />
+              <Field label="Issued" value={isoDay(invoice.issued_on)} />
+              <Field label="Due" value={isoDay(invoice.due_on)} />
+            </View>
+          </View>
+
+          <View style={s.items}>
+            <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
+              {orderCount === 1 ? "Order" : "Orders"} <Text style={s.sectionCount}>{orderCount}</Text>
+            </Text>
+            <View style={s.tableHead} fixed>
+              <Text style={[s.th, s.invDesc]}>{orderCount === 1 ? "Item" : "Order"}</Text>
+              <Text style={[s.th, s.invAmount]}>Amount</Text>
+            </View>
+            {invoice.lines.map((l, i) =>
+              l.detail ? (
+                <View key={i}>
+                  <View style={s.invBand} wrap={false}>
+                    <Text style={[s.invBandText, s.invDesc]}>{l.description}</Text>
+                  </View>
+                  {l.detail.rows.map((r, j) => (
+                    <View key={j} style={[s.invRow, s.invDetail]} wrap={false}>
+                      <Text style={[s.invDesc, r.amount < 0 ? { color: MUTED } : {}]}>{r.label}</Text>
+                      <Text style={[s.invAmount, r.amount < 0 ? { color: MUTED } : {}]}>
+                        {r.amount ? money(r.amount) : "—"}
+                      </Text>
+                    </View>
+                  ))}
+                  <View style={[s.invRow, s.invDetail, s.invSum]} wrap={false}>
+                    <Text style={[s.invDesc, s.itemName]}>This order</Text>
+                    <Text style={[s.invAmount, { fontFamily: "Helvetica-Bold" }]}>{money(l.amount)}</Text>
+                  </View>
+                </View>
+              ) : (
+                <View key={i} style={s.invRow} wrap={false}>
+                  <Text style={s.invDesc}>{l.description}</Text>
+                  <Text style={s.invAmount}>{money(l.amount)}</Text>
+                </View>
+              )
+            )}
+          </View>
+
+          <View style={s.foot} wrap={false}>
+            <View style={s.notes}>
+              <Text style={s.sectionHead}>Notes</Text>
+              {invoice.notes ? (
+                <Text style={s.prose}>{invoice.notes}</Text>
+              ) : (
+                <Text style={[s.prose, s.empty]}>—</Text>
+              )}
+            </View>
+            <View style={s.windowWrap}>
+              <View style={s.windowShadow} />
+              <View style={s.window}>
+                <View style={s.titleBar}>
+                  <Text style={s.titleBarText}>Totals</Text>
+                </View>
+                <View style={s.totals}>
+                  <TotalRow label="Total" value={invoice.total} />
+                  <TotalRow label="Payments" value={invoice.paid ? -invoice.paid : 0} />
+                </View>
+                <View style={settled ? [s.grand, { backgroundColor: "#fff" }] : s.grand}>
+                  <Text style={s.grandLabel}>Amount due</Text>
+                  <Text style={s.grandValue}>{money(invoice.balance)}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {org.invoiceFooter ? <Text style={s.invoiceFooter}>{org.invoiceFooter}</Text> : null}
+        </View>
+
+        <View style={s.footer} fixed>
+          <Text style={s.footerText}>
+            {org.name} · Invoice {invoice.number}
+          </Text>
+          <Text
+            style={s.footerText}
+            render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+          />
+        </View>
+      </Page>
     </Document>
   );
 }

@@ -147,6 +147,12 @@ async function buildElement(
       const { KitchenOrderPdf } = await import("@/components/specialOrders/pdf/SpecialOrderPdfs");
       return <KitchenOrderPdf orders={[s.sampleQuoteOrder]} org={docOrg} printedOn="2026-09-25" />;
     }
+    case "customer-invoice-app":
+    case "customer-invoice-one-app": {
+      const { CustomerInvoiceAppStylePdf } = await import("./pdf/OrderDocumentAppStylePdf");
+      const invoice = form === "customer-invoice-app" ? s.sampleCustomerInvoice : s.sampleItemizedInvoice;
+      return <CustomerInvoiceAppStylePdf invoice={invoice} org={docOrg} />;
+    }
     case "customer-invoice":
     case "customer-invoice-one": {
       const { CustomerInvoicePdf } = await import("@/components/specialOrders/pdf/SpecialOrderPdfs");
