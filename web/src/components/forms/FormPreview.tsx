@@ -123,12 +123,18 @@ async function buildElement(
       );
     }
     case "quote-app":
-    case "signed-quote-app": {
-      const { QuoteAppStylePdf } = await import("./pdf/QuoteAppStylePdf");
+    case "signed-quote-app":
+    case "invoice-app":
+    case "receipt-app": {
+      const { OrderDocumentAppStylePdf } = await import("./pdf/OrderDocumentAppStylePdf");
+      const kind = form === "invoice-app" ? "invoice" : form === "receipt-app" ? "receipt" : "quote";
+      const order =
+        kind === "invoice" ? s.sampleInvoiceOrder : kind === "receipt" ? s.sampleReceiptOrder : s.sampleQuoteOrder;
       return (
-        <QuoteAppStylePdf
-          orders={[s.sampleQuoteOrder]}
+        <OrderDocumentAppStylePdf
+          orders={[order]}
           org={docOrg}
+          kind={kind}
           approval={form === "signed-quote-app" ? s.sampleApproval : null}
         />
       );

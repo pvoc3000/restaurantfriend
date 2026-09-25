@@ -75,9 +75,9 @@ const SAMPLE_MONEY: MoneyOrder = {
   rush_rate: 0.1,
 };
 
-function sampleOrder(paid: number): OrderDocData {
+function sampleOrder(paid: number, paymentNote = "Deposit"): OrderDocData {
   const payments = paid
-    ? [{ amount: paid, paid_on: "2026-09-20", payment_type: "Card", note: "Deposit" }]
+    ? [{ amount: paid, paid_on: "2026-09-20", payment_type: "Card", note: paymentNote }]
     : [];
   return {
     id: "sample-order",
@@ -130,7 +130,7 @@ export const sampleQuoteOrder = sampleOrder(0);
 /** The invoice: a deposit taken, a balance left. */
 export const sampleInvoiceOrder = sampleOrder(200);
 /** The receipt: paid in full. */
-export const sampleReceiptOrder = sampleOrder(sampleQuoteOrder.totals.total);
+export const sampleReceiptOrder = sampleOrder(sampleQuoteOrder.totals.total, "Paid in full");
 
 export const sampleApproval = {
   name: "Dana Whitfield",

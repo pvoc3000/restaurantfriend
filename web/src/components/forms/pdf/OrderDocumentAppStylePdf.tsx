@@ -1,9 +1,16 @@
-// THE QUOTE, REDRAWN IN THE APP'S OWN LANGUAGE — a proposal on /forms (Mark,
-// 2026-09-25: "using the design language of the app … make it look like our
-// app"). NOT wired to Send; `OrderDocumentPdf` is still what customers get.
+// THE QUOTE, INVOICE AND RECEIPT, REDRAWN IN THE APP'S OWN LANGUAGE — a
+// proposal on /forms (Mark, 2026-09-25: "using the design language of the app
+// … make it look like our app", the quote first, then "the invoice and receipt
+// in the same style"). NOT wired to Send; `OrderDocumentPdf` is still what
+// customers get.
+//
+// ONE LAYOUT AT THREE MOMENTS, as there (decision 11), and varying in the same
+// places: the invoice and receipt add a PAYMENTS block, a Payments line in the
+// totals, the invoice footer, and a grand total that is the BALANCE ("Total
+// due"); the quote has the terms and the signature boxes instead.
 //
 // Same data, same fields, same order of reading as the FileMaker-faithful
-// quote. What changes is how it looks, and each change is a rule the app
+// documents. What changes is how they look, and each change is a rule the app
 // already keeps on screen:
 //
 //   · The masthead is a BLACK BAND with the org's name in white tracked caps —
@@ -21,14 +28,20 @@
 //   · The one BOX on the page is where the customer writes — signature and
 //     date — because a box means "you fill this in".
 //   · The totals sit in a Classic Mac window (black title bar, hard shadow),
-//     the CalcPad's frame, and the grand total wears the ONE yellow fill.
+//     the CalcPad's frame, and the grand total wears the ONE yellow fill —
+//     EXCEPT on a settled receipt. Yellow means "look at this", and a balance
+//     of $0.00 is nothing to look at; a receipt still owing keeps it.
 
 import { Document, Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
+  DOCUMENT_LABEL,
   usTime,
   type DocOrg,
   type OrderDocData,
 } from "@/lib/specialOrderDocs";
+
+/** The three customer documents — the kitchen order is a different layout. */
+export type AppStyleKind = "quote" | "invoice" | "receipt";
 import { customerLabel, lineTotal } from "@/lib/specialOrders";
 
 Font.registerHyphenationCallback((word) => [word]);
@@ -175,6 +188,14 @@ const s = StyleSheet.create({
   grandLabel: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold" },
   grandValue: { fontSize: 15, fontFamily: "Helvetica-Bold" },
 
+  /* ---- payments (invoice, receipt) ---- */
+  payments: { marginBottom: 16 },
+  payRow: { flexDirection: "row", paddingVertical: 2.5 },
+  payDate: { width: 86 },
+  payWhat: { flexGrow: 1, flexBasis: 0, color: MUTED },
+  payAmount: { width: 60, textAlign: "right" },
+  invoiceFooter: { fontSize: 9, color: MUTED, marginTop: 22 },
+
   /* ---- terms + signature ---- */
   terms: { marginTop: 20 },
   lead: { fontSize: 9, fontFamily: "Helvetica-Bold", marginBottom: 5 },
@@ -244,20 +265,29 @@ function TotalRow({ label, value }: { label: string; value: number }) {
   );
 }
 
-export function QuoteAppStylePdf({
+export function OrderDocumentAppStylePdf({
   orders,
   org,
+  kind,
   approval,
 }: {
   orders: OrderDocData[];
   org: DocOrg;
+  kind: AppStyleKind;
+  /** Decision 17's approval, on a quote only. */
   approval?: { name: string; at: string; reference: string } | null;
 }) {
+  const label = DOCUMENT_LABEL[kind];
+  const showsPayments = kind !== "quote";
   return (
     <Document>
       {orders.map((order) => {
         const t = order.totals;
         const delivery = order.fulfillment === "delivery";
+        const note =
+          kind === "quote" ? order.notes_quote : kind === "invoice" ? order.notes_invoice : order.notes_receipt;
+        const grand = kind === "quote" ? t.total : t.balance;
+        const marked = !(kind === "receipt" && t.balance <= 0);
         return (
           <Page key={order.id} size="LETTER" style={s.page}>
             <View style={s.masthead} fixed>
@@ -271,10 +301,13 @@ export function QuoteAppStylePdf({
             <View style={s.body}>
               <View style={s.headingRow}>
                 <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
-                  <Text style={s.kicker}>Quote</Text>
+                  <Text style={s.kicker}>{label}</Text>
                   <Text style={s.h1}>{order.title || isoDay(order.event_date) || "Special order"}</Text>
                   <Text style={s.caption}>
-                    {[order.location_name, order.date_initiated ? `Quoted ${order.date_initiated}` : null]
+                    {[
+                      order.location_name,
+                      kind === "quote" && order.date_initiated ? `Quoted ${order.date_initiated}` : null,
+                    ]
                       .filter(Boolean)
                       .join(" · ")}
                   </Text>
@@ -336,9 +369,29 @@ export function QuoteAppStylePdf({
 
               <View style={s.foot} wrap={false}>
                 <View style={s.notes}>
+                  {showsPayments ? (
+                    <View style={s.payments}>
+                      <Text style={s.sectionHead}>
+                        Payments <Text style={s.sectionCount}>{order.payments.length}</Text>
+                      </Text>
+                      {order.payments.length === 0 ? (
+                        <Text style={[s.prose, s.empty]}>—</Text>
+                      ) : (
+                        order.payments.map((p, i) => (
+                          <View key={i} style={s.payRow}>
+                            <Text style={s.payDate}>{isoDay(p.paid_on) || "—"}</Text>
+                            <Text style={s.payWhat}>
+                              {[p.payment_type, p.note].filter(Boolean).join(" · ")}
+                            </Text>
+                            <Text style={s.payAmount}>{money(Number(p.amount) || 0)}</Text>
+                          </View>
+                        ))
+                      )}
+                    </View>
+                  ) : null}
                   <Text style={s.sectionHead}>Notes</Text>
-                  {order.notes_quote ? (
-                    <Text style={s.prose}>{order.notes_quote}</Text>
+                  {note ? (
+                    <Text style={s.prose}>{note}</Text>
                   ) : (
                     <Text style={[s.prose, s.empty]}>—</Text>
                   )}
@@ -355,16 +408,23 @@ export function QuoteAppStylePdf({
                       <TotalRow label="Delivery" value={t.deliveryCharge} />
                       <TotalRow label="Rush fee" value={t.rushFee} />
                       <TotalRow label="Tax" value={t.tax} />
+                      {showsPayments ? (
+                        <TotalRow label="Payments" value={t.paid ? -t.paid : 0} />
+                      ) : null}
                     </View>
-                    <View style={s.grand}>
-                      <Text style={s.grandLabel}>Total quote</Text>
-                      <Text style={s.grandValue}>{money(t.total)}</Text>
+                    <View style={marked ? s.grand : [s.grand, { backgroundColor: "#fff" }]}>
+                      <Text style={s.grandLabel}>{kind === "quote" ? "Total quote" : "Total due"}</Text>
+                      <Text style={s.grandValue}>{money(grand)}</Text>
                     </View>
                   </View>
                 </View>
               </View>
 
-              {org.terms ? (
+              {showsPayments && org.invoiceFooter ? (
+                <Text style={s.invoiceFooter}>{org.invoiceFooter}</Text>
+              ) : null}
+
+              {kind === "quote" && org.terms ? (
                 <View style={s.terms} wrap={false}>
                   <Text style={s.sectionHead}>Terms</Text>
                   <Text style={s.lead}>To go ahead with your order, please read and sign below.</Text>
@@ -397,7 +457,7 @@ export function QuoteAppStylePdf({
 
             <View style={s.footer} fixed>
               <Text style={s.footerText}>
-                {org.name} · Quote {order.number}
+                {org.name} · {label} {order.number}
               </Text>
               <Text
                 style={s.footerText}
