@@ -50,6 +50,9 @@ const caps = (size: number, em: number) => ({
 
 const PAGE_X = 40;
 
+/** Width ÷ height of `public/logo-mark-white.png` (800 × 334). */
+const LOGO_ASPECT = 800 / 334;
+
 const s = StyleSheet.create({
   page: {
     // The masthead is ABSOLUTE and fixed, so it sits on every page without
@@ -83,9 +86,13 @@ const s = StyleSheet.create({
 
   /* ---- page heading ---- */
   headingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  /* The logo leads the heading, square, as tall as the three lines beside it,
-     so its top meets QUOTE and its foot meets the caption. */
-  logo: { width: 47, height: 47, marginRight: 12 },
+  /* The mark sits on the band beside the org's name. It is WHITE ON
+     TRANSPARENT artwork made for a dark ground (Mark, 2026-09-25) — the square
+     app icon was a black tile and melted into the band. Height is fixed and
+     width follows the artwork (`LOGO_ASPECT`), so a different mark only needs
+     its own ratio. */
+  brand: { flexDirection: "row", alignItems: "center" },
+  logo: { height: 24, width: 24 * LOGO_ASPECT, marginRight: 12 },
   kicker: { ...caps(7.5, 0.12), color: SUBTLE },
   h1: {
     ...caps(22, -0.02),
@@ -257,11 +264,12 @@ export function QuoteAppStylePdf({
   org: DocOrg;
   approval?: { name: string; at: string; reference: string } | null;
   /**
-   * The org's square logo, as a URL or `data:` URI the renderer can fetch.
-   * Optional: without one the heading starts at the margin. Today /forms
-   * passes the home-screen icon (`public/icon-512.png`), which is Donut
-   * Friend's own artwork; when orgs get their own logo (planned 2026-09-25,
-   * docs/history/04p-tablet-shell.md) it comes from there instead.
+   * The org's mark for a dark ground, as a URL or `data:` URI the renderer
+   * can fetch (PNG or JPG — @react-pdf reads no WebP or SVG file). Optional:
+   * without one the masthead carries the name alone. Today /forms passes
+   * `public/logo-mark-white.png`, Donut Friend's own artwork; when orgs get
+   * their own logo (planned 2026-09-25, docs/history/04p-tablet-shell.md) it
+   * comes from there instead.
    */
   logoUrl?: string | null;
 }) {
@@ -273,7 +281,11 @@ export function QuoteAppStylePdf({
         return (
           <Page key={order.id} size="LETTER" style={s.page}>
             <View style={s.masthead} fixed>
-              <Text style={s.wordmark}>{org.name}</Text>
+              <View style={s.brand}>
+                {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf's Image has no alt */}
+                {logoUrl ? <Image src={logoUrl} style={s.logo} /> : null}
+                <Text style={s.wordmark}>{org.name}</Text>
+              </View>
               <View style={s.mastheadRight}>
                 {org.addressLine ? <Text style={s.mastheadLine}>{org.addressLine}</Text> : null}
                 {org.contactLine ? <Text style={s.mastheadLine}>{org.contactLine}</Text> : null}
@@ -282,8 +294,6 @@ export function QuoteAppStylePdf({
 
             <View style={s.body}>
               <View style={s.headingRow}>
-                {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf's Image has no alt */}
-                {logoUrl ? <Image src={logoUrl} style={s.logo} /> : null}
                 <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
                   <Text style={s.kicker}>Quote</Text>
                   <Text style={s.h1}>{order.title || isoDay(order.event_date) || "Special order"}</Text>
