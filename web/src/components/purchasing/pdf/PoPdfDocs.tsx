@@ -170,7 +170,7 @@ function money(value: number | null): string {
  *
  * `money` is still used by the shopping list, which is internal.
  */
-function composedDescription(line: DocLine): string {
+export function composedDescription(line: DocLine): string {
   return [
     // The VENDOR's description leads; our catalog name is the fallback, not a
     // prefix (Mark, 2026-07-28). They're filling this order off their own
@@ -199,7 +199,7 @@ function composedDescription(line: DocLine): string {
  *
  * Empty keys sink, matching lib/tableSort's rule for every list in the app.
  */
-function groupBy<T>(
+export function groupBy<T>(
   items: T[],
   key: (item: T) => string,
   sort: (a: T) => number | string,

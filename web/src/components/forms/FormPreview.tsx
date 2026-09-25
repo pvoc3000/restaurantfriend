@@ -136,6 +136,10 @@ async function buildElement(
       const { StatementPdf } = await import("@/components/specialOrders/pdf/SpecialOrderPdfs");
       return <StatementPdf statement={s.sampleStatement} org={docOrg} />;
     }
+    case "purchase-order-app": {
+      const { PoAppStylePdf } = await import("./pdf/PoAppStylePdf");
+      return <PoAppStylePdf pos={[s.samplePo]} org={s.poOrgFrom(orgName, poSettings)} />;
+    }
     case "purchase-order":
     case "shopping-list": {
       const { PoPdf, ShoppingListPdf } = await import("@/components/purchasing/pdf/PoPdfDocs");
