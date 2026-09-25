@@ -1364,3 +1364,23 @@ price, billed on two lines, came back fully "matched" by description, 6↔$300 a
 those quantities just as confidently had they been reversed. The manual route
 out of a real ambiguity is unchanged: copy the vendor's number onto ONE line,
 which makes it unique, and both sides join properly.
+
+**THE PO AND THE SHOPPING LIST ARE REDRAWN IN THE APP'S OWN DESIGN LANGUAGE
+(2026-09-25).** Mark: "remake the purchase order using this same style", then
+"wire it up and do the shopping list too" — after the special-order documents
+went the same way that day (`docs/history/04g-special-orders.md`). Both now
+build from the shared `components/pdf/appDocument` parts, under the same export
+names in `purchasing/pdf/PoPdfDocs.tsx`, so Process PO, the PO list's batch
+print and the emailed PDF all switched at once. The previous look is in git
+history at `5467116c`.
+**Every §4.9 rule is unchanged** — no prices on the vendor PO, the vendor's
+description first then brand then composed pack (`composedDescription`, still
+joined with `//`), the vendor's unit of sale in the Pack column, categories
+alphabetical inside (`groupBy` + `compareDocumentLines`), the line's own note
+under it. What changed is the look: the billing entity on a black band, the
+VENDOR as the page heading, Order / Ship to / Bill to fields, categories as
+black group bands, a real tick box per line, column labels repeated on every
+page. The shopping list keeps its internal content — our item name first,
+the composed pack, unit prices and the estimated total (in the special-order
+documents' Mac-window frame, no yellow: an estimate is nothing to chase) —
+grouped by shop section in walk order.

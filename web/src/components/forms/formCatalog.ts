@@ -22,7 +22,6 @@ export const FORM_GROUPS = [
     label: "Purchasing",
     forms: [
       { key: "purchase-order", label: "Purchase order" },
-      { key: "purchase-order-app", label: "Purchase order · app style (draft)" },
       { key: "shopping-list", label: "Shopping list" },
       { key: "vendor-item-list", label: "Vendor item list" },
     ],

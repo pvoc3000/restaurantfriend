@@ -2,155 +2,45 @@
 // Import this module DYNAMICALLY (await import(...)) from a click handler —
 // the renderer is heavy and nothing on a normal page load needs it.
 //
-// Two documents share the visual language:
-// - PoPdf — the vendor-facing purchase order (spec §4.9, modelled on sent PO
-//   112-18008-01). NO PRICES AT ALL (Mark, 2026-07-28) — not unit prices, not
-//   extended prices, not a total. The vendor quotes us; we don't quote them
-//   back. Money lives on the PO detail screen, which is internal.
-// - ShoppingListPdf — the in_person processing mode: same lines sorted by shop
-//   section for walking a store. Internal document, so prices and a running
-//   total ARE here.
+// DRAWN IN THE APP'S OWN DESIGN LANGUAGE since 2026-09-25 (Mark: "wire it up
+// and do the shopping list too"), from the shared `components/pdf/appDocument`
+// parts the special-order documents use. The previous look — "four sizes and
+// two greys", modelled on sent PO 112-18008-01 — is in git history at
+// 5467116c.
+//
+// Two documents:
+// - PoPdf — the vendor-facing purchase order (spec §4.9). NO PRICES AT ALL
+//   (Mark, 2026-07-28) — not unit prices, not extended prices, not a total.
+//   The vendor quotes us; we don't quote them back. Money lives on the PO
+//   detail screen, which is internal. The VENDOR is the page heading, because
+//   that is who the paper is for; categories are `DataTable`'s black group
+//   bands; each line's tick box is a real 1px box, ticked at receiving.
+// - ShoppingListPdf — the in_person processing mode: the same lines walked by
+//   SHOP SECTION for a store run. Internal, so unit prices and an estimated
+//   total ARE here, our own item name leads (you are finding it on a shelf,
+//   not reading the vendor's list), and the Pack column is the composed pack
+//   ("12 × 2 lb") because its size is what you pick.
 
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
+  DocFooter,
+  Field,
+  INK,
+  MUTED,
+  SUBTLE,
+  caps,
+  docStyles,
+  isoDay,
+  qtyText,
+} from "@/components/pdf/appDocument";
+import {
   formatAddress,
   summaryLine,
-  trimNumber,
   type DocLine,
   type OrgDocData,
   type PoDocData,
 } from "@/lib/poProcessing";
 import { compareDocumentLines } from "@/lib/purchaseOrders";
-
-/**
- * FOUR sizes and TWO greys, and nothing else (Mark, 2026-07-27 — "I want to
- * simplify it"). The document had drifted to seven sizes and four greys, most
- * of them one-offs:
- *
- *   16  Helvetica-Bold     the document's name — org, or "Shopping list"
- *   14  Helvetica-Bold     "PURCHASE ORDER"; regular for the number beside it
- *    9  Helvetica[-Bold]   everything you read: lines, meta values, totals
- *    8  Helvetica[-Bold]   secondary — addresses, notes, footer; and the
- *                          header block labels, which are 8pt bold in BODY
- *                          black (they name the document's structure)
- *
- *   #111  body
- *   #666  secondary
- *
- * 7pt and 8pt were indistinguishable in print but split across four styles,
- * and 10 and 12 each appeared exactly once. Weight and colour carry the
- * hierarchy instead — a printed order is read at arm's length on a shelf, so
- * fewer, larger steps beat a fine-grained scale.
- */
-const styles = StyleSheet.create({
-  page: {
-    padding: 36,
-    fontSize: 9,
-    fontFamily: "Helvetica",
-    color: "#111",
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 14,
-  },
-  orgName: { fontSize: 16, fontFamily: "Helvetica-Bold" },
-  orgLine: { fontSize: 8, color: "#666" },
-  poTitle: { fontSize: 14, fontFamily: "Helvetica-Bold", textAlign: "right" },
-  // Same size as the title, regular weight: the number is the other half of
-  // the heading, not a caption under it. Was the only 12pt in the document.
-  poNumber: { fontSize: 14, textAlign: "right", marginTop: 2 },
-  metaGrid: {
-    flexDirection: "row",
-    gap: 24,
-    marginBottom: 12,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#111",
-  },
-  metaBlock: { flexGrow: 1, flexBasis: 0 },
-  metaLabel: {
-    fontSize: 8,
-    fontFamily: "Helvetica-Bold",
-    // Body black, not the secondary grey (Mark, 2026-07-28). These five label
-    // the header blocks a vendor navigates by — DATE, VENDOR, DELIVERY, SHIP
-    // TO, BILL TO — so they're structure, not caption. Still 8pt bold caps:
-    // size and weight already separate them from the values beneath.
-    color: "#111",
-    textTransform: "uppercase",
-    marginBottom: 2,
-  },
-  metaValue: { fontSize: 9 },
-  summary: {
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 10,
-    textAlign: "right",
-  },
-  category: {
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    backgroundColor: "#eee",
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    marginTop: 8,
-    marginBottom: 2,
-  },
-  line: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: 3,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#ccc",
-  },
-  checkbox: {
-    width: 9,
-    height: 9,
-    borderWidth: 1,
-    borderColor: "#111",
-    marginRight: 6,
-    marginTop: 1,
-  },
-  // 48pt fits a 9-character product ID on one line — p90 of the real data,
-  // where the median is 5 (Mark, 2026-07-28: "too wide"). The dozen-character
-  // outliers ("IGL-M243308N") wrapped at 60 too, so nothing got worse.
-  colProduct: { width: 48, color: "#666" },
-  colQty: { width: 40, fontFamily: "Helvetica-Bold", textAlign: "right", paddingRight: 8 },
-  // The vendor PO prints a package TYPE now, and the longest in the catalog is
-  // four characters ("FLAT", "ROLL"). The shopping list keeps the wide column
-  // because it still prints the composed pack.
-  // Bold, like the quantity beside it (Mark, 2026-07-28): "2 CS" is the
-  // instruction — the two words are one fact, and they should carry the same
-  // weight when the order is read off a shelf.
-  colPack: { width: 36, paddingRight: 6, fontFamily: "Helvetica-Bold" },
-  colPackWide: { width: 70, paddingRight: 6 },
-  // Shopping-list only: "$32.50 ea" needs the width the product column used to
-  // have, and it isn't a product ID — it had been borrowing that style.
-  colPrice: { width: 60, color: "#666" },
-  colDesc: { flexGrow: 1, flexBasis: 0 },
-  instructions: { color: "#666", fontSize: 8, marginTop: 1 },
-  notes: { marginTop: 12, fontSize: 8, color: "#666" },
-  footer: {
-    position: "absolute",
-    bottom: 20,
-    left: 36,
-    right: 36,
-    fontSize: 8,
-    color: "#666",
-    textAlign: "center",
-  },
-  totalRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginTop: 8,
-    // Body size, bold — same treatment as the summary line at the top, which
-    // is the other number that sums the page. Was the only 10pt.
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-  },
-});
 
 function money(value: number | null): string {
   if (value === null) return "";
@@ -222,206 +112,277 @@ export function groupBy<T>(
     );
 }
 
+const s = {
+  ...docStyles,
+  ...StyleSheet.create({
+    headRight: { alignItems: "flex-end" },
+    summary: { ...caps(6.5, 0.12), color: SUBTLE },
+    itemsHeadRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-end",
+      marginBottom: 6,
+    },
+    row: { flexDirection: "row", paddingVertical: 4.5, alignItems: "flex-start" },
+    cBox: { width: 22, paddingLeft: 6, paddingTop: 1 },
+    box: { width: 9, height: 9, borderWidth: 1, borderColor: INK },
+    cProduct: { width: 58, color: MUTED },
+    cQty: { width: 36, textAlign: "right", paddingRight: 10, fontSize: 11, fontFamily: "Helvetica-Bold" },
+    cPack: { width: 40, ...caps(8, 0.06), fontFamily: "Helvetica-Bold", paddingTop: 1.5 },
+    cDesc: { flexGrow: 1, flexBasis: 0 },
+    note: { fontSize: 8, color: MUTED, marginTop: 2 },
+    notes: { marginTop: 20 },
 
-function OrgBlock({ org }: { org: OrgDocData }) {
-  const billing = org.billing;
-  return (
-    <View>
-      <Text style={styles.orgName}>{billing?.entity_name ?? org.name}</Text>
-      {[billing?.address1 ?? billing?.street1,
-        [billing?.city, [billing?.state, billing?.zip].filter(Boolean).join(" ")]
-          .filter(Boolean)
-          .join(", "),
-        billing?.phone,
-        billing?.email]
-        .filter(Boolean)
-        .map((line, i) => (
-          <Text key={i} style={styles.orgLine}>
-            {line}
-          </Text>
-        ))}
-    </View>
-  );
-}
+    /* ---- shopping list ---- */
+    cPackWide: { width: 70, paddingRight: 6, paddingTop: 1 },
+    cPrice: { width: 70, textAlign: "right", color: MUTED },
+    vendorDesc: { fontSize: 8, color: MUTED, marginTop: 2 },
+    totalWrap: { flexDirection: "row", justifyContent: "flex-end", marginTop: 18 },
+    /* The special-order totals' Classic Mac window: frame, black title bar,
+       and a hard 3pt shadow drawn as an offset black box behind it. */
+    totalWindow: { width: 212, position: "relative", marginRight: 3, marginBottom: 3 },
+    totalShadow: { position: "absolute", top: 3, left: 3, right: -3, bottom: -3, backgroundColor: INK },
+    totalBox: { borderWidth: 1.5, borderColor: INK, backgroundColor: "#fff" },
+    totalBar: { backgroundColor: INK, height: 16, justifyContent: "center", alignItems: "center" },
+    totalBarText: { ...caps(7, 0.12), fontFamily: "Helvetica-Bold", color: "#fff" },
+    totalLine: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    totalLabel: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold" },
+    totalValue: { fontSize: 15, fontFamily: "Helvetica-Bold" },
+  }),
+};
 
-function Meta({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.metaBlock}>
-      <Text style={styles.metaLabel}>{label}</Text>
-      {children}
-    </View>
-  );
+/** The billing entity's name — what the vendor bills — falling back to the org. */
+function entityName(org: OrgDocData): string {
+  return org.billing?.entity_name ?? org.name;
 }
 
 /** The vendor-facing PO (spec §4.9). One PO per <Page> group; pass several
  *  POs to batch-print them as one file. */
 export function PoPdf({ pos, org }: { pos: PoDocData[]; org: OrgDocData }) {
+  const billing = org.billing;
+  const billAddress = formatAddress(billing ? { ...billing, street1: billing.address1 ?? billing.street1 } : null);
+  // The masthead's right side, as the special-order documents set it: the
+  // address on one line, then how to reach us.
+  const mastheadLines = [
+    [billing?.address1 ?? billing?.street1, billing?.city, billing?.state, billing?.zip]
+      .filter(Boolean)
+      .join(" "),
+    [billing?.phone, billing?.email].filter(Boolean).join(" / "),
+  ].filter(Boolean);
+
   return (
     <Document>
-      {pos.map((po) => (
-        <Page key={po.id} size="LETTER" style={styles.page}>
-          <View style={styles.headerRow}>
-            <OrgBlock org={org} />
-            <View>
-              <Text style={styles.poTitle}>PURCHASE ORDER</Text>
-              <Text style={styles.poNumber}>{po.po_number}</Text>
+      {pos.map((po) => {
+        const shipTo = formatAddress(po.ship_to);
+        return (
+          <Page key={po.id} size="LETTER" style={s.page}>
+            <View style={s.masthead} fixed>
+              <Text style={s.wordmark}>{entityName(org)}</Text>
+              <View style={s.mastheadRight}>
+                {mastheadLines.map((l, i) => (
+                  <Text key={i} style={s.mastheadLine}>
+                    {l}
+                  </Text>
+                ))}
+              </View>
             </View>
-          </View>
 
-          <View style={styles.metaGrid}>
-            <Meta label="Date">
-              <Text style={styles.metaValue}>{po.order_date}</Text>
-            </Meta>
-            <Meta label="Vendor">
-              <Text style={styles.metaValue}>{po.vendor_name}</Text>
-              {po.account_number && (
-                <Text style={styles.metaValue}>Account # {po.account_number}</Text>
-              )}
-            </Meta>
-            <Meta label="Delivery">
-              <Text style={styles.metaValue}>{po.delivery_date ?? "—"}</Text>
-            </Meta>
-            <Meta label={`Ship to — ${po.location_code}`}>
-              {(formatAddress(po.ship_to).length > 0
-                ? formatAddress(po.ship_to)
-                : [po.location_name]
-              ).map((line, i) => (
-                <Text key={i} style={styles.metaValue}>
-                  {line}
-                </Text>
-              ))}
-            </Meta>
-            <Meta label="Bill to">
-              <Text style={styles.metaValue}>
-                {org.billing?.entity_name ?? org.name}
-              </Text>
-              {formatAddress(
-                org.billing
-                  ? { ...org.billing, street1: org.billing.address1 }
-                  : null
-              ).map((line, i) => (
-                <Text key={i} style={styles.metaValue}>
-                  {line}
-                </Text>
-              ))}
-            </Meta>
-          </View>
-
-          <Text style={styles.summary}>{summaryLine(po.lines)}</Text>
-
-          {groupBy(
-            po.lines,
-            (l) => l.category ?? "Other",
-            (l) => l.category ?? "zzz",
-            compareDocumentLines
-          ).map((group) => (
-            <View key={group.label}>
-              <Text style={styles.category}>{group.label}</Text>
-              {group.items.map((line) => (
-                <View key={line.id} style={styles.line} wrap={false}>
-                  <View style={styles.checkbox} />
-                  <Text style={styles.colProduct}>{line.product_id ?? ""}</Text>
-                  <Text style={styles.colQty}>{trimNumber(line.qty)}</Text>
-                  <Text style={styles.colPack}>{line.pack_type ?? ""}</Text>
-                  <View style={styles.colDesc}>
-                    <Text>{composedDescription(line)}</Text>
-                    {/* The line's own note (migration 015) — a snapshot the
-                        human can strike off this order, not a live read of the
-                        catalog entry every future order inherits. */}
-                    {line.notes && (
-                      <Text style={styles.instructions}>{line.notes}</Text>
-                    )}
-                  </View>
+            <View style={s.body}>
+              <View style={s.headingRow}>
+                <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
+                  <Text style={s.kicker}>Purchase order</Text>
+                  <Text style={s.h1}>{po.vendor_name}</Text>
+                  <Text style={s.caption}>
+                    {[po.account_number ? `Account # ${po.account_number}` : null, `${po.location_code} ${po.location_name}`]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Text>
                 </View>
-              ))}
+                <View style={s.numberBlock}>
+                  <Text style={s.kicker}>No.</Text>
+                  <Text style={s.number}>{po.po_number}</Text>
+                </View>
+              </View>
+
+              <View style={s.blocks}>
+                <View style={s.block}>
+                  <Text style={s.sectionHead}>Order</Text>
+                  <Field label="Date" value={isoDay(po.order_date)} />
+                  <Field label="Delivery" value={isoDay(po.delivery_date)} />
+                  <Field label="Account" value={po.account_number} />
+                </View>
+                <View style={s.block}>
+                  <Text style={s.sectionHead}>Ship to</Text>
+                  <Field label="Shop" value={`${po.location_code} ${po.location_name}`} />
+                  <Field label="Address" value={shipTo.join("\n")} />
+                </View>
+                <View style={s.block}>
+                  <Text style={s.sectionHead}>Bill to</Text>
+                  <Field label="Name" value={entityName(org)} />
+                  <Field label="Address" value={billAddress.join("\n")} />
+                </View>
+              </View>
+
+              <View style={s.items}>
+                <View style={s.itemsHeadRow}>
+                  <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 0, paddingBottom: 0 }]}>
+                    Items <Text style={s.sectionCount}>{po.lines.length}</Text>
+                  </Text>
+                  <Text style={s.summary}>{summaryLine(po.lines)}</Text>
+                </View>
+                <View style={s.tableHead} fixed>
+                  <Text style={[s.th, s.cBox]}> </Text>
+                  <Text style={[s.th, s.cProduct]}>Product #</Text>
+                  <Text style={[s.th, { width: 36, textAlign: "right", paddingRight: 10 }]}>Qty</Text>
+                  <Text style={[s.th, { width: 40 }]}>Pack</Text>
+                  <Text style={[s.th, s.cDesc]}>Description</Text>
+                </View>
+                {groupBy(
+                  po.lines,
+                  (l) => l.category ?? "Other",
+                  (l) => l.category ?? "zzz",
+                  compareDocumentLines
+                ).map((group) => (
+                  <View key={group.label}>
+                    <Text style={s.groupBand}>{group.label}</Text>
+                    {group.items.map((line) => (
+                      <View key={line.id} style={s.row} wrap={false}>
+                        <View style={s.cBox}>
+                          <View style={s.box} />
+                        </View>
+                        <Text style={s.cProduct}>{line.product_id ?? ""}</Text>
+                        <Text style={s.cQty}>{qtyText(line.qty)}</Text>
+                        <Text style={s.cPack}>{line.pack_type ?? ""}</Text>
+                        <View style={s.cDesc}>
+                          <Text>{composedDescription(line)}</Text>
+                          {line.notes ? <Text style={s.note}>{line.notes}</Text> : null}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </View>
+
+              {po.notes ? (
+                <View style={s.notes} wrap={false}>
+                  <Text style={s.sectionHead}>Notes</Text>
+                  <Text style={s.prose}>{po.notes}</Text>
+                </View>
+              ) : null}
             </View>
-          ))}
 
-          {po.notes && <Text style={styles.notes}>Notes: {po.notes}</Text>}
-
-          <Text
-            style={styles.footer}
-            render={({ pageNumber, totalPages }) =>
-              `${po.po_number} · ${pageNumber} / ${totalPages}`
-            }
-            fixed
-          />
-        </Page>
-      ))}
+            <DocFooter>{`${entityName(org)} · PO ${po.po_number}`}</DocFooter>
+          </Page>
+        );
+      })}
     </Document>
   );
 }
 
 /** The in_person mode: same lines, walked by shop section. Internal, so
- *  prices and the total are included. Takes `org` unused so the two documents
- *  are call-compatible for the list's batch handler. */
-export function ShoppingListPdf({ pos }: { pos: PoDocData[]; org: OrgDocData }) {
+ *  prices and the estimated total are included. Takes `org` for the masthead,
+ *  and so the two documents are call-compatible for the list's batch handler. */
+export function ShoppingListPdf({ pos, org }: { pos: PoDocData[]; org: OrgDocData }) {
   return (
     <Document>
       {pos.map((po) => {
-        const total = po.lines.reduce(
-          (sum, l) => sum + l.qty * (l.unit_price ?? 0),
-          0
-        );
+        const total = po.lines.reduce((sum, l) => sum + l.qty * (l.unit_price ?? 0), 0);
         return (
-          <Page key={po.id} size="LETTER" style={styles.page}>
-            <View style={styles.headerRow}>
-              <View>
-                <Text style={styles.orgName}>Shopping list</Text>
-                <Text style={styles.orgLine}>
-                  {po.vendor_name} · {po.location_code} · {po.order_date} ·{" "}
-                  {po.po_number}
-                </Text>
+          <Page key={po.id} size="LETTER" style={s.page}>
+            <View style={s.masthead} fixed>
+              <Text style={s.wordmark}>{entityName(org)}</Text>
+              <View style={s.mastheadRight}>
+                <Text style={s.mastheadLine}>Shopping list</Text>
+                <Text style={s.mastheadLine}>{po.po_number}</Text>
               </View>
-              <Text style={styles.summary}>{summaryLine(po.lines)}</Text>
             </View>
 
-            {groupBy(
-              po.lines,
-              (l) => l.shop_section ?? "No section",
-              (l) => l.shop_section_sort ?? Number.MAX_SAFE_INTEGER,
-              compareDocumentLines
-            ).map((group) => (
-              <View key={group.label}>
-                <Text style={styles.category}>{group.label}</Text>
-                {group.items.map((line) => (
-                  <View key={line.id} style={styles.line} wrap={false}>
-                    <View style={styles.checkbox} />
-                    <Text style={styles.colQty}>{trimNumber(line.qty)}</Text>
-                    {/* The internal document keeps the composed pack — you're
-                        picking the case off a shelf, so its size is the point. */}
-                    <Text style={styles.colPackWide}>{line.pack ?? ""}</Text>
-                    <View style={styles.colDesc}>
-                      <Text>
-                        {[line.item_name ?? line.description, line.brand]
-                          .filter(Boolean)
-                          .join("  //  ")}
-                      </Text>
-                      {line.description && line.description !== line.item_name && (
-                        <Text style={styles.instructions}>{line.description}</Text>
-                      )}
-                    </View>
-                    <Text style={styles.colPrice}>
-                      {line.unit_price !== null
-                        ? `${money(line.unit_price)} ea`
-                        : ""}
-                    </Text>
+            <View style={s.body}>
+              <View style={s.headingRow}>
+                <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
+                  <Text style={s.kicker}>Shopping list</Text>
+                  <Text style={s.h1}>{po.vendor_name}</Text>
+                  <Text style={s.caption}>
+                    {[`${po.location_code} ${po.location_name}`, isoDay(po.order_date)]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Text>
+                </View>
+                <View style={s.numberBlock}>
+                  <Text style={s.kicker}>No.</Text>
+                  <Text style={s.number}>{po.po_number}</Text>
+                </View>
+              </View>
+
+              <View style={s.items}>
+                <View style={s.itemsHeadRow}>
+                  <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 0, paddingBottom: 0 }]}>
+                    Items <Text style={s.sectionCount}>{po.lines.length}</Text>
+                  </Text>
+                  <Text style={s.summary}>{summaryLine(po.lines)}</Text>
+                </View>
+                <View style={s.tableHead} fixed>
+                  <Text style={[s.th, s.cBox]}> </Text>
+                  <Text style={[s.th, { width: 36, textAlign: "right", paddingRight: 10 }]}>Qty</Text>
+                  <Text style={[s.th, { width: 70 }]}>Pack</Text>
+                  <Text style={[s.th, s.cDesc]}>Item</Text>
+                  <Text style={[s.th, { width: 70, textAlign: "right" }]}>Price</Text>
+                </View>
+                {groupBy(
+                  po.lines,
+                  (l) => l.shop_section ?? "No section",
+                  (l) => l.shop_section_sort ?? Number.MAX_SAFE_INTEGER,
+                  compareDocumentLines
+                ).map((group) => (
+                  <View key={group.label}>
+                    <Text style={s.groupBand}>{group.label}</Text>
+                    {group.items.map((line) => (
+                      <View key={line.id} style={s.row} wrap={false}>
+                        <View style={s.cBox}>
+                          <View style={s.box} />
+                        </View>
+                        <Text style={s.cQty}>{qtyText(line.qty)}</Text>
+                        <Text style={s.cPackWide}>{line.pack ?? ""}</Text>
+                        <View style={s.cDesc}>
+                          <Text style={s.itemName}>
+                            {[line.item_name ?? line.description, line.brand].filter(Boolean).join("  //  ")}
+                          </Text>
+                          {line.description && line.description !== line.item_name ? (
+                            <Text style={s.vendorDesc}>{line.description}</Text>
+                          ) : null}
+                        </View>
+                        <Text style={line.unit_price !== null ? s.cPrice : [s.cPrice, s.empty]}>
+                          {line.unit_price !== null ? `${money(line.unit_price)} ea` : "—"}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
                 ))}
               </View>
-            ))}
 
-            <View style={styles.totalRow}>
-              <Text>Estimated total {money(total)}</Text>
+              <View style={s.totalWrap} wrap={false}>
+                <View style={s.totalWindow}>
+                <View style={s.totalShadow} />
+                <View style={s.totalBox}>
+                  <View style={s.totalBar}>
+                    <Text style={s.totalBarText}>Estimate</Text>
+                  </View>
+                  <View style={s.totalLine}>
+                    <Text style={s.totalLabel}>Estimated total</Text>
+                    <Text style={s.totalValue}>{money(total)}</Text>
+                  </View>
+                </View>
+                </View>
+              </View>
             </View>
 
-            <Text
-              style={styles.footer}
-              render={({ pageNumber, totalPages }) =>
-                `${po.po_number} · ${pageNumber} / ${totalPages}`
-              }
-              fixed
-            />
+            <DocFooter>{`${entityName(org)} · Shopping list ${po.po_number}`}</DocFooter>
           </Page>
         );
       })}
