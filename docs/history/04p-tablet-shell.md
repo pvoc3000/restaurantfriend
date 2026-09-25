@@ -267,8 +267,10 @@ Donut Friend artwork Mark supplied (512×512, scaled by `sips` to
 `public/apple-touch-icon.png` 180, `icon-192.png`, `icon-512.png`), and
 `appleWebApp` + `themeColor` in the root layout with status bar `black` — not
 translucent, so nothing needs safe-area padding. **The PDF → share sheet
-question is STILL UNTESTED**; Mark tests it on the iPad. If a PDF strands the
-user, change `display` to `"browser"` and the icon stays.
+question is ANSWERED (Mark, 2026-09-25, on the iPad):** a PDF opened from the
+Documents page opens in a new in-app Safari view with its own back and close
+controls at the top, and that is acceptable. Standalone stays. Should a PDF
+ever strand the user, change `display` to `"browser"` and the icon stays.
 The icon is NOT `app/apple-icon.png` (Next's file convention): adding it there
 500'd every page in the running dev server with `require is not defined`.
 The artwork is a static file, not `orgs.settings` — the manifest is fetched
