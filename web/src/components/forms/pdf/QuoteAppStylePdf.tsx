@@ -23,7 +23,7 @@
 //   · The totals sit in a Classic Mac window (black title bar, hard shadow),
 //     the CalcPad's frame, and the grand total wears the ONE yellow fill.
 
-import { Document, Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Font, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
   usTime,
   type DocOrg,
@@ -83,6 +83,9 @@ const s = StyleSheet.create({
 
   /* ---- page heading ---- */
   headingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  /* The logo leads the heading, square, as tall as the three lines beside it,
+     so its top meets QUOTE and its foot meets the caption. */
+  logo: { width: 47, height: 47, marginRight: 12 },
   kicker: { ...caps(7.5, 0.12), color: SUBTLE },
   h1: {
     ...caps(22, -0.02),
@@ -248,10 +251,19 @@ export function QuoteAppStylePdf({
   orders,
   org,
   approval,
+  logoUrl,
 }: {
   orders: OrderDocData[];
   org: DocOrg;
   approval?: { name: string; at: string; reference: string } | null;
+  /**
+   * The org's square logo, as a URL or `data:` URI the renderer can fetch.
+   * Optional: without one the heading starts at the margin. Today /forms
+   * passes the home-screen icon (`public/icon-512.png`), which is Donut
+   * Friend's own artwork; when orgs get their own logo (planned 2026-09-25,
+   * docs/history/04p-tablet-shell.md) it comes from there instead.
+   */
+  logoUrl?: string | null;
 }) {
   return (
     <Document>
@@ -270,6 +282,8 @@ export function QuoteAppStylePdf({
 
             <View style={s.body}>
               <View style={s.headingRow}>
+                {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf's Image has no alt */}
+                {logoUrl ? <Image src={logoUrl} style={s.logo} /> : null}
                 <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
                   <Text style={s.kicker}>Quote</Text>
                   <Text style={s.h1}>{order.title || isoDay(order.event_date) || "Special order"}</Text>
