@@ -37,7 +37,7 @@ import {
  * and sends cash.
  */
 /** One width for the labels, so the amount boxes line up in a column. */
-const LABEL = "inline-block w-[8.5rem]";
+const LABEL = "inline-block w-[10.5rem]";
 
 export function NewPaymentDialog({
   orderId,
@@ -195,7 +195,18 @@ export function NewPaymentDialog({
               label: <span className={LABEL}>{NEW_PAYMENT_LABEL.cash}:</span>,
               after: box(cash, setCash, "Cash amount", "cash"),
             },
-            { value: "balance", label: NEW_PAYMENT_LABEL.balance },
+            {
+              value: "balance",
+              label: <span className={LABEL}>{NEW_PAYMENT_LABEL.balance}:</span>,
+              // What the balance invoice would bill — read, not typed, so no
+              // box. Padded as a TextInput is inside its border (12 + 1 left,
+              // 36 for the clear button + 1 right) so the digits line up.
+              after: (
+                <span className="inline-block w-28 pl-[13px] pr-[37px] text-right tabular-nums">
+                  {money(Math.max(uninvoiced, 0))}
+                </span>
+              ),
+            },
             {
               value: "deposit",
               label: <span className={LABEL}>{NEW_PAYMENT_LABEL.deposit}:</span>,
@@ -222,8 +233,10 @@ export function NewPaymentDialog({
         />
 
         <label className="block space-y-1.5">
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">Note</span>
-          <TextInput value={note} onValueChange={setNote} aria-label="Note" fullWidth disabled={busy} />
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Note on the Invoice
+          </span>
+          <TextInput value={note} onValueChange={setNote} aria-label="Note on the Invoice" fullWidth disabled={busy} />
         </label>
 
         {problem && (amountText.trim() || choice === "balance" || choice !== "cash" && !hasCustomer) ? (
