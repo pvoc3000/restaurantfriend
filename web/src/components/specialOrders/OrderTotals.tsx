@@ -124,7 +124,11 @@ export function OrderTotals({
           back the ~60px they never used: measured, the whole block went from
           505px to 483px and Payments beside it gained the difference. The
           `max-w` cap stays as a backstop for the day a label grows. */}
-      <div className="grid max-w-[32rem] gap-x-8 gap-y-6 md:grid-cols-[auto_auto]">
+      {/* A WIDE GUTTER, 96px (Mark, 2026-09-25: "add quite a bit of padding
+          between the two columns in Money"), once the block had the row to
+          itself above Invoices and Payments. The cap grows by the same 64px
+          so neither column is squeezed to pay for it. */}
+      <div className="grid max-w-[36rem] gap-x-24 gap-y-6 md:grid-cols-[auto_auto]">
         {/* --------- the inputs --------- */}
         <dl className="space-y-3 text-[14px]">
           <Line label="Tax rate">
