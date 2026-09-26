@@ -1216,40 +1216,16 @@ export async function SpecialOrderDetail({
               from under the lines on Items, keeping their arrangement. */}
           {activeTab === "payments" && (
             <>
-              {/* MONEY FIRST, THEN PAYMENTS (Mark, 2026-09-16, on the new
-                  Payments tab) — what the order comes to, then what has been
-                  paid against it. Money stays sized to its content and
-                  Payments takes the rest of the row. The note below is how the
-                  pair was arranged under the lines on Items, right to left. */}
-              {/* PAYMENTS LEFT, MONEY RIGHT (Mark, 2026-08-19: "move the
-                  'money' section on the items tab so it's all the way to the
-                  right of the page, and the payment is all the way to the
-                  left"). They shipped the other way round the same day and this
-                  is better: the lines above END in a money column against the
-                  right margin, and Money's own figures are a column of amounts
-                  against a right margin too, so on this side they continue the
-                  page's one vertical rule of numbers instead of starting a
-                  second one 400px to its left.
-
-                  MONEY IS SIZED TO ITS CONTENT AND PAYMENTS TAKES THE REST,
-                  which is what puts each against its own edge — the recipe
-                  record's Costs pane and its reason. Money is label/value pairs
-                  set `justify-between`, so given half of a 1150px column it
-                  becomes 500px of white space between "Delivery charge" and
-                  "$49.50"; Payments is a four-column table with a free-text
-                  Note, which uses every pixel it is given. Payments being the
-                  flexible one is also what holds Money on the right margin when
-                  its table stops at its own `max-w`.
-
-                  ONE DOM ORDER AT EVERY WIDTH — no `order-*` classes. Stacked
-                  below `xl` you read Payments then Money, which is the price of
-                  keeping the visual order and the tab order the same thing.
-
-                  `min-w-0` on the payments track and NOT behind a breakpoint: a
-                  flex item's min-width defaults to min-content, so a long note
-                  would push the PAGE sideways instead of the cell wrapping. */}
-              <div className="flex flex-col gap-12 xl:flex-row xl:items-start xl:gap-12">
-                <div className="shrink-0">
+              {/* MONEY ON TOP, INVOICES AND PAYMENTS BELOW IT, at every width
+                  (Mark, 2026-09-25: "the payments tab looks crowded. Can we
+                  try moving invoices and payments below Money?"). Side by side
+                  above `xl` (2026-08-19) held one Payments table; since New
+                  Payment it holds two tables, and beside Money both were
+                  squeezed. Money keeps its own width; the tables below take the
+                  whole row. `min-w-0` still keeps a long note from pushing the
+                  page sideways. */}
+              <div className="flex flex-col gap-12">
+                <div>
                   <OrderTotals
                     id={id}
                     totals={totals}
@@ -1259,7 +1235,7 @@ export async function SpecialOrderDetail({
                   />
                 </div>
 
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0">
                   <OrderPayments
                     orderId={id}
                     orgId={row.org_id as string}
