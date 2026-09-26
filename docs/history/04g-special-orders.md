@@ -12,7 +12,7 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
-   **Shipped 2026-09-25, MIGRATION 139 WRITTEN, NOT YET APPLIED — NEW
+   **Shipped 2026-09-25, MIGRATION 139 APPLIED (Mark, same day), `square-pay` v11 (the pre-138 source) DEPLOYED — NEW
    PAYMENT: ONE INVOICE PER PAYMENT ASKED FOR. SUPERSEDES 138's SHAPE** (below,
    kept as history). Mark, before testing 138: "imagine a fresh order with no
    payments yet. It's for a wedding in December. We press [New Payment] …

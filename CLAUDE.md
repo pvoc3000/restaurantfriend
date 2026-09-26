@@ -473,7 +473,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   re-send keeps the number (128); "Sold as" is the order's (129). What is NOT
   yet moved: receipts, "who owes us" read from invoices, and retiring the
   per-order pay path — ask before each.
-  **NEW PAYMENT (Mark, 2026-09-25, migration 139 WRITTEN; replaces 138's
+  **NEW PAYMENT (Mark, 2026-09-25, migration 139 APPLIED; replaces 138's
   deposit-on-the-order):** the order's Payments tab has one door — Cash, or an
   invoice of its own for the Balance Due, a Deposit ($ or %) or Other. An
   order may be on several live invoices; they never overlap (a balance line
