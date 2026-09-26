@@ -192,6 +192,11 @@ export async function CustomerInvoiceDetail({
               <span className={READ_ONLY_VALUE}>{PROCESSOR_LABEL[processor]}</span>
             )}
           </Row>
+          <Row label={invoice.voided_at ? "Voided" : "Paid"}>
+            <span className={READ_ONLY_VALUE}>
+              {invoice.voided_at ? usDate(invoice.voided_at) : invoice.paid_at ? usDate(invoice.paid_at) : "—"}
+            </span>
+          </Row>
           {processor === "quickbooks" ? (
             <Row label="In QuickBooks">
               <span className={READ_ONLY_VALUE}>
@@ -217,11 +222,6 @@ export async function CustomerInvoiceDetail({
               </span>
             </Row>
           ) : null}
-          <Row label={invoice.voided_at ? "Voided" : "Paid"}>
-            <span className={READ_ONLY_VALUE}>
-              {invoice.voided_at ? usDate(invoice.voided_at) : invoice.paid_at ? usDate(invoice.paid_at) : "—"}
-            </span>
-          </Row>
         </dl>
       </section>
 
