@@ -31,7 +31,9 @@ export function Radio<K extends string>({
   disabled = false,
   className = "",
 }: {
-  options: readonly { value: K; label: ReactNode }[];
+  /** `after` sits beside the label, OUTSIDE it — a field that belongs to that
+   *  option (New Payment's amounts). A label must not contain another input. */
+  options: readonly { value: K; label: ReactNode; after?: ReactNode }[];
   value: K;
   onChange: (next: K) => void;
   /** Names the group for a screen reader — the caption above it, usually. */
@@ -61,6 +63,7 @@ export function Radio<K extends string>({
               onChange={() => onChange(o.value)}
             />
             <label htmlFor={id}>{o.label}</label>
+            {o.after ? <span className="ml-2 inline-flex flex-wrap items-center gap-2">{o.after}</span> : null}
           </span>
         );
       })}

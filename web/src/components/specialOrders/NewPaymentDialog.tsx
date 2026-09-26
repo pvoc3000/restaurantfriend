@@ -36,6 +36,9 @@ import {
  * Typing into an option's box chooses that option, so nobody types a deposit
  * and sends cash.
  */
+/** One width for the labels, so the amount boxes line up in a column. */
+const LABEL = "inline-block w-[8.5rem]";
+
 export function NewPaymentDialog({
   orderId,
   orgId,
@@ -154,13 +157,6 @@ export function NewPaymentDialog({
     />
   );
 
-  const row = (text: string, children?: React.ReactNode) => (
-    <span className="inline-flex flex-wrap items-center gap-2">
-      <span>{text}{children ? ":" : ""}</span>
-      {children}
-    </span>
-  );
-
   return (
     <Dialog
       title={`New Payment — Order #${orderNumber}`}
@@ -196,19 +192,20 @@ export function NewPaymentDialog({
           options={[
             {
               value: "cash",
-              label: row(NEW_PAYMENT_LABEL.cash, box(cash, setCash, "Cash amount", "cash")),
+              label: <span className={LABEL}>{NEW_PAYMENT_LABEL.cash}:</span>,
+              after: box(cash, setCash, "Cash amount", "cash"),
             },
-            { value: "balance", label: row(NEW_PAYMENT_LABEL.balance) },
+            { value: "balance", label: NEW_PAYMENT_LABEL.balance },
             {
               value: "deposit",
-              label: row(
-                NEW_PAYMENT_LABEL.deposit,
+              label: <span className={LABEL}>{NEW_PAYMENT_LABEL.deposit}:</span>,
+              after: (
                 <>
                   {box(depositAmount, setDepositAmount, "Deposit amount", "deposit", "w-28", (v) =>
                     setDepositPercent(percentFromAmount(total, v))
                   )}
                   <span className="inline-flex items-center gap-1">
-                    {box(depositPercent, setDepositPercent, "Deposit percentage", "deposit", "w-16", (v) =>
+                    {box(depositPercent, setDepositPercent, "Deposit percentage", "deposit", "w-20", (v) =>
                       setDepositAmount(amountFromPercent(total, v))
                     )}
                     <span className="text-muted">%</span>
@@ -218,7 +215,8 @@ export function NewPaymentDialog({
             },
             {
               value: "other",
-              label: row(NEW_PAYMENT_LABEL.other, box(other, setOther, "Other amount", "other")),
+              label: <span className={LABEL}>{NEW_PAYMENT_LABEL.other}:</span>,
+              after: box(other, setOther, "Other amount", "other"),
             },
           ]}
         />

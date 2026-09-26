@@ -591,7 +591,10 @@
   min-height: 24px;
 }
 
-.mac-radio input {
+/* `>` throughout (2026-09-25): an option may carry its own field beside the
+   label (New Payment's amounts), and a descendant selector hid those inputs
+   too — transparent, 16px, absolutely placed over the ring. */
+.mac-radio > input {
   position: absolute;
   left: 0;
   top: 50%;
@@ -601,11 +604,11 @@
   opacity: 0;
 }
 
-.mac-radio input:not(:disabled) {
+.mac-radio > input:not(:disabled) {
   cursor: pointer;
 }
 
-.mac-radio label {
+.mac-radio > label {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -613,7 +616,7 @@
   user-select: none;
 }
 
-.mac-radio label::before {
+.mac-radio > label::before {
   content: "";
   flex: none;
   box-sizing: border-box;
@@ -625,38 +628,38 @@
 }
 
 /* Chosen: a solid dot, centred, 8px across whichever edge is drawn. */
-.mac-radio input:checked + label::before {
+.mac-radio > input:checked + label::before {
   background: radial-gradient(circle closest-side, #000 0 calc(100% - 3px), #fff calc(100% - 2.5px));
 }
 
-.mac-radio:hover label::before,
-.mac-radio:active label::before {
+.mac-radio:hover > label::before,
+.mac-radio:active > label::before {
   border-width: 2px;
 }
 
 /* The dot stays 8px when the ring thickens: closest-side measures to the
    inside of the border, which moves in by the pixel the ring gains. */
-.mac-radio:hover input:checked + label::before,
-.mac-radio:active input:checked + label::before {
+.mac-radio:hover > input:checked + label::before,
+.mac-radio:active > input:checked + label::before {
   background: radial-gradient(circle closest-side, #000 0 calc(100% - 2px), #fff calc(100% - 1.5px));
 }
 
-.mac-radio input:focus-visible + label::before {
+.mac-radio > input:focus-visible + label::before {
   outline: 1px dotted #000;
   outline-offset: 2px;
 }
 
-.mac-radio input:disabled + label {
+.mac-radio > input:disabled + label {
   cursor: default;
   opacity: 0.35;
 }
 
 /* A disabled ring does not thicken, and its dot keeps the 1px ring's size. */
-.mac-radio input:disabled + label::before {
+.mac-radio > input:disabled + label::before {
   border-width: 1px;
 }
 
-.mac-radio input:disabled:checked + label::before {
+.mac-radio > input:disabled:checked + label::before {
   background: radial-gradient(circle closest-side, #000 0 calc(100% - 3px), #fff calc(100% - 2.5px));
 }
 
