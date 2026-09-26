@@ -39,11 +39,11 @@ import { OrderNumberCell } from "@/components/specialOrders/OrderNumberCell";
 import type { MenuItem } from "@/components/specialOrders/AddOrderLine";
 import {
   OrderPayments,
-  type NewPaymentContext,
+  type OrderMoneyContext,
   type OrderInvoiceRow,
   type PaymentRow,
 } from "@/components/specialOrders/OrderPayments";
-import { uninvoicedAmount } from "@/lib/newPayment";
+import { uninvoicedAmount, type OpenInvoice } from "@/lib/newPayment";
 import { CompletionDates } from "@/components/specialOrders/CompletionDates";
 import { StatusCatchUp } from "@/components/specialOrders/StatusCatchUp";
 import { OrderTotals } from "@/components/specialOrders/OrderTotals";
@@ -491,8 +491,54 @@ export async function SpecialOrderDetail({
     on_invoice: liveInvoice !== null,
   };
   const invoiceFrom = { href: orderTabHref(id, "payments", rawParams), label: `#${row.number as string}` };
-  // NEW PAYMENT (139) — the Payments tab's button and the Actions menu's row.
-  const newPayment: NewPaymentContext | null =
+
+  // A HEAD count, and only when there is a schedule to count. It cannot join
+  // the wave above: it depends on `production_schedule_id`, which arrives in
+  // it. `head: true` fetches no rows — the number is all either the link's
+  // label or the unschedule confirm needs, and naming what goes is the whole
+  // point of that confirm.
+  //
+  // WHAT EACH OPEN INVOICE STILL ASKS FOR, in the same wave — New Payment's
+  // Apply to (2026-09-25). The WHOLE invoice's due, since a weekly invoice's
+  // payment is split across its orders by the database; this order's own line
+  // is not the figure. Read only when an invoice is open.
+  const openInvoiceIds = [
+    ...new Set(liveInvoices.filter((l) => !l.customer_invoices!.paid_at).map((l) => l.customer_invoices!.id)),
+  ];
+  const [{ count: scheduleLines }, openLineRows, openPaymentRows] = await Promise.all([
+    scheduleId
+      ? supabase
+          .from("production_schedule_items")
+          .select("id", { count: "exact", head: true })
+          .eq("schedule_id", scheduleId)
+      : Promise.resolve({ count: 0 }),
+    openInvoiceIds.length
+      ? supabase.from("customer_invoice_lines").select("invoice_id, amount").in("invoice_id", openInvoiceIds)
+      : Promise.resolve({ data: [] as { invoice_id: string; amount: number }[] }),
+    openInvoiceIds.length
+      ? supabase
+          .from("special_order_payments")
+          .select("customer_invoice_id, amount")
+          .in("customer_invoice_id", openInvoiceIds)
+      : Promise.resolve({ data: [] as { customer_invoice_id: string; amount: number }[] }),
+  ]);
+  const scheduleLineCount = scheduleLines ?? 0;
+  const openInvoices: OpenInvoice[] = openInvoiceIds
+    .map((invoiceId) => {
+      const inv = orderInvoices.find((o) => o.id === invoiceId)!;
+      const billed = (openLineRows.data ?? [])
+        .filter((l) => l.invoice_id === invoiceId)
+        .reduce((a, l) => a + Number(l.amount), 0);
+      const paid = (openPaymentRows.data ?? [])
+        .filter((p) => p.customer_invoice_id === invoiceId)
+        .reduce((a, p) => a + Number(p.amount), 0);
+      const number = liveInvoices.find((l) => l.customer_invoices!.id === invoiceId)!.customer_invoices!.number;
+      return { id: invoiceId, number, label: inv.label, what: inv.what, due: Math.round((billed - paid) * 100) / 100 };
+    })
+    .filter((i) => i.due > 0.005);
+  // NEW INVOICE and NEW PAYMENT (139) — the Payments tab's buttons and the
+  // Actions menu's rows.
+  const orderMoney: OrderMoneyContext | null =
     kind === "order" && row.status !== "cancelled"
       ? {
           orderNumber: row.number as string,
@@ -502,21 +548,9 @@ export async function SpecialOrderDetail({
           hasCustomer: !!customer,
           defaultDepositRate: settings.depositRate,
           from: invoiceFrom,
+          openInvoices,
         }
       : null;
-
-  // A HEAD count, and only when there is a schedule to count. It cannot join
-  // the wave above: it depends on `production_schedule_id`, which arrives in
-  // it. `head: true` fetches no rows — the number is all either the link's
-  // label or the unschedule confirm needs, and naming what goes is the whole
-  // point of that confirm.
-  const { count: scheduleLines } = scheduleId
-    ? await supabase
-        .from("production_schedule_items")
-        .select("id", { count: "exact", head: true })
-        .eq("schedule_id", scheduleId)
-    : { count: 0 };
-  const scheduleLineCount = scheduleLines ?? 0;
   const trail = parseTrail(rawParams, SPECIAL_ORDERS_CRUMB);
   const tabs = tabsFor(kind, (row.fulfillment as string | null) ?? "pickup");
   const tabOptions = tabs.map((t) => ({
@@ -723,7 +757,7 @@ export async function SpecialOrderDetail({
                         liveInvoiceLabel: liveInvoice?.label ?? null,
                         candidate: invoiceCandidate,
                         from: { href: orderTabHref(id, activeTab, rawParams), label: `#${row.number as string}` },
-                        newPayment,
+                        money: orderMoney,
                         balance: totals.balance,
                       },
                     }
@@ -1241,7 +1275,7 @@ export async function SpecialOrderDetail({
                     orgId={row.org_id as string}
                     rows={payments}
                     invoices={orderInvoices}
-                    newPayment={newPayment}
+                    money={orderMoney}
                     balance={totals.balance}
                     canWrite={canWrite}
                     canRefund={canRefundPayments(session.membership.role)}

@@ -43,7 +43,8 @@ import {
 } from "@/lib/orderWorkflow";
 import { WorkflowOffer } from "./WorkflowOffer";
 import { NewPaymentDialog } from "./NewPaymentDialog";
-import type { NewPaymentContext } from "./OrderPayments";
+import { NewInvoiceDialog } from "./NewInvoiceDialog";
+import type { OrderMoneyContext } from "./OrderPayments";
 import { CreateInvoiceDialog } from "@/components/customerInvoices/CreateInvoiceDialog";
 import { sendIntent, type InvoiceCandidate } from "@/lib/customerInvoices";
 import { withFrom } from "@/lib/breadcrumbs";
@@ -135,10 +136,9 @@ export function SendDocument({
     liveInvoiceLabel?: string | null;
     candidate: InvoiceCandidate;
     from: { href: string; label: string };
-    /** NEW PAYMENT… in the Actions menu (Mark, 2026-09-25: "replace create
-     *  invoice… in the special order action menu with our New Payment
-     *  method") — the Payments tab's dialog. Null for a cancelled order. */
-    newPayment?: NewPaymentContext | null;
+    /** NEW INVOICE… and NEW PAYMENT… in the Actions menu (Mark, 2026-09-25)
+     *  — the Payments tab's two dialogs. Null for a cancelled order. */
+    money?: OrderMoneyContext | null;
     /** The order's balance now, to ask Paid in full when cash clears it. */
     balance?: number;
   } | null;
@@ -147,7 +147,7 @@ export function SendDocument({
   /** The dialog is open, and whether it goes on to Send (Send ▸ Invoice) or
    *  stops at the draft (Create Invoice…). */
   const [creatingInvoice, setCreatingInvoice] = useState<"send" | "draft" | null>(null);
-  const [newPaymentOpen, setNewPaymentOpen] = useState(false);
+  const [moneyOpen, setMoneyOpen] = useState<"invoice" | "payment" | null>(null);
   const [offerTitle, setOfferTitle] = useState<string | undefined>(undefined);
   const supabase = createClient();
   const [kind, setKind] = useState<DocumentKind>("quote");
@@ -434,11 +434,16 @@ export function SendDocument({
           },
         ]
       : []),
-    ...(invoice?.newPayment
+    ...(invoice?.money
       ? [
           {
+            label: "New Invoice…",
+            onSelect: () => setMoneyOpen("invoice"),
+            disabled: busy !== null,
+          },
+          {
             label: "New Payment…",
-            onSelect: () => setNewPaymentOpen(true),
+            onSelect: () => setMoneyOpen("payment"),
             disabled: busy !== null,
           },
         ]
@@ -612,21 +617,30 @@ export function SendDocument({
         />
       )}
 
-      {newPaymentOpen && invoice?.newPayment && (
+      {moneyOpen === "invoice" && invoice?.money && (
+        <NewInvoiceDialog
+          orderId={orderId}
+          orderNumber={invoice.money.orderNumber}
+          total={invoice.money.total}
+          uninvoiced={invoice.money.uninvoiced}
+          hasBalanceInvoice={invoice.money.hasBalanceInvoice}
+          hasCustomer={invoice.money.hasCustomer}
+          defaultDepositRate={invoice.money.defaultDepositRate}
+          from={invoice.money.from}
+          onClose={() => setMoneyOpen(null)}
+        />
+      )}
+      {moneyOpen === "payment" && invoice?.money && (
         <NewPaymentDialog
           orderId={orderId}
           orgId={orgId}
-          orderNumber={invoice.newPayment.orderNumber}
-          total={invoice.newPayment.total}
-          uninvoiced={invoice.newPayment.uninvoiced}
-          hasBalanceInvoice={invoice.newPayment.hasBalanceInvoice}
-          hasCustomer={invoice.newPayment.hasCustomer}
-          defaultDepositRate={invoice.newPayment.defaultDepositRate}
+          orderNumber={invoice.money.orderNumber}
+          openInvoices={invoice.money.openInvoices}
           today={today}
-          from={invoice.newPayment.from}
-          onClose={() => setNewPaymentOpen(false)}
-          onCash={(amount) => {
-            // OrderPayments' rule: asked only when the cash clears the order.
+          onClose={() => setMoneyOpen(null)}
+          onOrderPayment={(amount) => {
+            // OrderPayments' rule: asked only when a payment on the order
+            // clears it.
             if ((invoice.balance ?? Infinity) - amount <= 0.005) {
               const cs = afterPaymentSettled(workflow, today);
               if (cs.length > 0) {

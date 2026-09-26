@@ -88,6 +88,27 @@
    kind`, so it fails until then. `square-pay`'s source is back to v9; the
    deployed v10 is compatible (it asks for the balance) — redeploy to match.
 
+   **Then (same day) — NEW INVOICE AND NEW PAYMENT ARE TWO DOORS.** Mark:
+   "Now that we have both invoice and payment sections, I kinda feel like we
+   should have dedicated New Invoice and New Payment buttons." **New
+   Invoice…** under the Payments tab's Invoices section (always shown on an
+   order that can take money, "No invoices yet." when empty): Balance Due (its
+   figure, unboxed, aligned with the boxes), Deposit [$][%], Other [$], "Note on
+   the Invoice"; Continue makes the draft and opens it. **New Payment…** under
+   Payments: **Apply to** — each OPEN invoice with its whole due ("Invoice
+   1010 · Deposit · $3.80 due"), the oldest chosen, then "The order — no
+   invoice" — then Amount, How (the payment-type list, starting at Cash),
+   Date, Note. On an invoice it is `record_customer_invoice_payment`, so the
+   invoice closes when met and the database settles the order; on the order it
+   is a plain row and asks Paid in full when it clears it. Without Apply to, a
+   deposit paid in cash would have left its invoice asking for money already
+   received while the balance invoice shrank. The order's Actions menu carries
+   both rows. The page reads each open invoice's lines and tagged payments in
+   the same wave as the schedule count. Also that day: Money on top of the
+   tab with Invoices and Payments below it at every width, a 96px gutter
+   between Money's columns, `.mac-radio`'s rules `>`-scoped and `ui/Radio`'s
+   `after` slot (the amount boxes had been invisible).
+
    **SUPERSEDED BY 139 (above). Shipped 2026-09-25, MIGRATION 138 APPLIED (Mark, same day), `square-pay` v10 DEPLOYED — DEPOSITS,
    AS A PART OF THE ORDER'S ONE INVOICE.** Mark: "Being able to place a deposit
    is my next priority here. I want to get it right." First the research he

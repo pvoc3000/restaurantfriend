@@ -1,24 +1,31 @@
 /**
- * NEW PAYMENT — the order's one door for money (Mark, 2026-09-25, migration
- * 139): take cash now, or ask for money with an invoice of its own — the
- * balance, a deposit, or another amount.
+ * NEW INVOICE and NEW PAYMENT — the order's two doors for money (Mark,
+ * 2026-09-25, migration 139; split into two the same day: "It's a little
+ * strange to combine payments and invoices now"). An INVOICE asks for money —
+ * the balance, a deposit, another amount. A PAYMENT records money received,
+ * applied to one of the order's open invoices or to the order itself.
  *
  * Pure, so it is fixture-tested and imports nothing that talks to a server.
- * The database is the authority (`create_payment_invoice` and the line
- * trigger refuse the same things in words); this is the dialog saying them
- * first, and the % ↔ $ pair a deposit is typed in.
+ * The database is the authority (`create_payment_invoice`, the line trigger
+ * and `record_customer_invoice_payment` refuse the same things in words);
+ * this is the dialogs saying them first, and the % ↔ $ pair a deposit is
+ * typed in.
  */
 
 import { depositAmount, money } from "./specialOrders";
 
-export type NewPaymentChoice = "cash" | "balance" | "deposit" | "other";
+export type NewInvoiceChoice = "balance" | "deposit" | "other";
 
-export const NEW_PAYMENT_LABEL: Record<NewPaymentChoice, string> = {
-  cash: "Cash Payment",
-  balance: "Invoice Balance Due",
-  deposit: "Invoice Deposit",
-  other: "Invoice Other",
+export const NEW_INVOICE_LABEL: Record<NewInvoiceChoice, string> = {
+  balance: "Balance Due",
+  deposit: "Deposit",
+  other: "Other",
 };
+
+/** An open invoice a payment can be applied to: not void, not paid. `due` is
+ *  the WHOLE invoice's — a weekly invoice's payment is split across its
+ *  orders by the database. */
+export type OpenInvoice = { id: string; number: number; label: string; what: string; due: number };
 
 const cents = (v: number) => Math.round(v * 100) / 100;
 
@@ -69,20 +76,18 @@ export function percentFromAmount(total: number, amountText: string): string {
 }
 
 /**
- * Why Continue cannot go ahead, in words — or null when it can. `amountText`
- * is the chosen option's own box (none for the balance).
+ * Why New Invoice's Continue cannot go ahead, in words — or null when it can.
+ * `amountText` is the chosen option's own box (none for the balance).
  */
-export function newPaymentProblem(args: {
-  choice: NewPaymentChoice;
+export function newInvoiceProblem(args: {
+  choice: NewInvoiceChoice;
   amountText: string;
   uninvoiced: number;
   hasBalanceInvoice: boolean;
   hasCustomer: boolean;
 }): string | null {
   const { choice, uninvoiced } = args;
-  if (choice !== "cash" && !args.hasCustomer) {
-    return "Link a customer to this order before invoicing it.";
-  }
+  if (!args.hasCustomer) return "Link a customer to this order before invoicing it.";
   if (choice === "balance") {
     if (args.hasBalanceInvoice) return "An invoice already bills this order's balance.";
     if (uninvoiced <= 0.005) return "Nothing is left to invoice on this order.";
@@ -90,8 +95,29 @@ export function newPaymentProblem(args: {
   }
   const amount = parseMoney(args.amountText);
   if (amount === null) return "Enter an amount.";
-  if (choice !== "cash" && amount > uninvoiced + 0.005) {
+  if (amount > uninvoiced + 0.005) {
     return `That is more than the ${money(Math.max(uninvoiced, 0))} not yet invoiced.`;
   }
   return null;
+}
+
+/**
+ * Why New Payment's Record cannot go ahead — or null. A payment applied to an
+ * invoice may not be more than that invoice still asks for
+ * (`record_customer_invoice_payment` refuses it too); one on the order itself
+ * has no ceiling, the old Take a payment's rule.
+ */
+export function newPaymentProblem(args: { amountText: string; applyTo: OpenInvoice | null }): string | null {
+  const amount = parseMoney(args.amountText);
+  if (amount === null) return "Enter an amount.";
+  if (args.applyTo && amount > args.applyTo.due + 0.005) {
+    return `That is more than the ${money(args.applyTo.due)} due on ${args.applyTo.label}.`;
+  }
+  return null;
+}
+
+/** Where a new payment goes unless somebody says otherwise: the OLDEST open
+ *  invoice — a deposit before the balance — or the order when none is open. */
+export function defaultApplyTo(open: OpenInvoice[]): OpenInvoice | null {
+  return [...open].sort((a, b) => a.number - b.number)[0] ?? null;
 }

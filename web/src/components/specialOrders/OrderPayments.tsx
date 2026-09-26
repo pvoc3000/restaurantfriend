@@ -13,6 +13,8 @@ import {
 import { WorkflowOffer } from "./WorkflowOffer";
 import { RefundPayment } from "./RefundPayment";
 import { NewPaymentDialog } from "./NewPaymentDialog";
+import { NewInvoiceDialog } from "./NewInvoiceDialog";
+import type { OpenInvoice } from "@/lib/newPayment";
 import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
 import type { InvoiceStatus } from "@/lib/customerInvoices";
 
@@ -51,8 +53,8 @@ export type OrderInvoiceRow = {
   status: InvoiceStatus;
 };
 
-/** What New Payment… needs to know about the order. */
-export type NewPaymentContext = {
+/** What New Invoice… and New Payment… need to know about the order. */
+export type OrderMoneyContext = {
   orderNumber: string;
   total: number;
   uninvoiced: number;
@@ -60,6 +62,8 @@ export type NewPaymentContext = {
   hasCustomer: boolean;
   defaultDepositRate: number;
   from: { href: string; label: string };
+  /** The invoices a payment can be applied to — open, with what each is due. */
+  openInvoices: OpenInvoice[];
 };
 
 /**
@@ -78,7 +82,7 @@ export function OrderPayments({
   orgId,
   rows,
   invoices = [],
-  newPayment = null,
+  money: ctx = null,
   balance,
   canWrite,
   canRefund = false,
@@ -91,11 +95,12 @@ export function OrderPayments({
   /** Its invoices, void ones left out (139). */
   invoices?: OrderInvoiceRow[];
   /**
-   * NEW PAYMENT… (Mark, 2026-09-25) — the one door for money: cash now, or an
-   * invoice for the balance, a deposit or another amount. Null where an order
-   * cannot take one (a template, a standing order).
+   * NEW INVOICE… under Invoices and NEW PAYMENT… under Payments (Mark,
+   * 2026-09-25: "we should have dedicated New Invoice and New Payment
+   * buttons"). Null where an order cannot take either — a template, a
+   * standing order, a cancelled order.
    */
-  newPayment?: NewPaymentContext | null;
+  money?: OrderMoneyContext | null;
   balance: number;
   canWrite: boolean;
   /** Manager and up — `canRefundPayments`. Offers Refund… on pay-link rows. */
@@ -111,16 +116,16 @@ export function OrderPayments({
 
   const [offer, setOffer] = useState<Consequence[] | null>(null);
   const [refunding, setRefunding] = useState<PaymentRow | null>(null);
-  const [opening, setOpening] = useState(false);
+  const [opening, setOpening] = useState<"invoice" | "payment" | null>(null);
 
   /**
    * RECORDING THE MONEY IS THE PAID EVENT (Mark, 2026-08-21) — asked only
-   * when cash SETTLES the order, which is why it reads the balance rather than
+   * when a payment on the ORDER settles it, which is why it reads the balance rather than
    * the payment. `balance` is the figure BEFORE this payment; the server has
    * not re-rendered yet. An invoice's payment settles the order in the
    * database instead (139's allocate).
    */
-  function afterCash(amount: number) {
+  function afterOrderPayment(amount: number) {
     if (balance - amount <= 0.005) {
       const cs = afterPaymentSettled(workflow, today);
       if (cs.length > 0) setOffer(cs);
@@ -158,7 +163,7 @@ export function OrderPayments({
 
   return (
     <div className="space-y-8">
-    {invoices.length > 0 || newPayment ? (
+    {invoices.length > 0 || ctx ? (
       <section className="space-y-2">
         {/* THE ORDER'S INVOICES, then what they collected (Mark, 2026-09-25:
             "Back on the special order page, the invoice is shown along with
@@ -195,6 +200,13 @@ export function OrderPayments({
           </tbody>
         </table>
         )}
+        {canWrite && ctx ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" className={BUTTON_CLASS} onClick={() => setOpening("invoice")}>
+              New Invoice…
+            </button>
+          </div>
+        ) : null}
       </section>
     ) : null}
     <section className="space-y-2">
@@ -291,29 +303,37 @@ export function OrderPayments({
         </table>
       )}
 
-      {canWrite && newPayment ? (
+      {canWrite && ctx ? (
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" className={BUTTON_CLASS} onClick={() => setOpening(true)}>
+          <button type="button" className={BUTTON_CLASS} onClick={() => setOpening("payment")}>
             New Payment…
           </button>
         </div>
       ) : null}
 
       {error ? <p className="text-[13px] text-accent">{error}</p> : null}
-      {opening && newPayment && (
+      {opening === "invoice" && ctx && (
+        <NewInvoiceDialog
+          orderId={orderId}
+          orderNumber={ctx.orderNumber}
+          total={ctx.total}
+          uninvoiced={ctx.uninvoiced}
+          hasBalanceInvoice={ctx.hasBalanceInvoice}
+          hasCustomer={ctx.hasCustomer}
+          defaultDepositRate={ctx.defaultDepositRate}
+          from={ctx.from}
+          onClose={() => setOpening(null)}
+        />
+      )}
+      {opening === "payment" && ctx && (
         <NewPaymentDialog
           orderId={orderId}
           orgId={orgId}
-          orderNumber={newPayment.orderNumber}
-          total={newPayment.total}
-          uninvoiced={newPayment.uninvoiced}
-          hasBalanceInvoice={newPayment.hasBalanceInvoice}
-          hasCustomer={newPayment.hasCustomer}
-          defaultDepositRate={newPayment.defaultDepositRate}
+          orderNumber={ctx.orderNumber}
+          openInvoices={ctx.openInvoices}
           today={today}
-          from={newPayment.from}
-          onClose={() => setOpening(false)}
-          onCash={afterCash}
+          onClose={() => setOpening(null)}
+          onOrderPayment={afterOrderPayment}
         />
       )}
       {refunding && (
@@ -324,7 +344,7 @@ export function OrderPayments({
           onClose={() => setRefunding(null)}
         />
       )}
-      {/* Asked only once the balance is clear — see `afterCash`. */}
+      {/* Asked only once the balance is clear — see `afterOrderPayment`. */}
       {offer && (
         <WorkflowOffer
           orderId={orderId}

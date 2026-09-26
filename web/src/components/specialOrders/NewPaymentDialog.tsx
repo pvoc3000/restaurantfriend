@@ -7,154 +7,117 @@ import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { Radio } from "@/components/ui/Radio";
 import { TextInput } from "@/components/ui/TextInput";
-import { money } from "@/lib/specialOrders";
-import { withFrom } from "@/lib/breadcrumbs";
-import { toPercent } from "@/lib/percent";
+import { PickList } from "@/components/ui/PickList";
+import { DateField } from "@/components/ui/DateField";
+import { PAYMENT_TYPE_OPTIONS, money } from "@/lib/specialOrders";
 import {
-  NEW_PAYMENT_LABEL,
-  amountFromPercent,
+  defaultApplyTo,
   newPaymentProblem,
   parseMoney,
-  percentFromAmount,
-  type NewPaymentChoice,
+  type OpenInvoice,
 } from "@/lib/newPayment";
 
-/**
- * NEW PAYMENT (Mark, 2026-09-25, migration 139) — the order's one door for
- * money, four choices as VERTICAL radios, each carrying its own box:
- *
- *   (•) Cash Payment: [$]
- *   ( ) Invoice Balance Due
- *   ( ) Invoice Deposit: [$] [%]
- *   ( ) Invoice Other: [$]
- *
- * Cash is recorded on the order there and then. The other three make an
- * invoice of their own — a DRAFT, carrying the note — and open it, "where they
- * can edit it or press Send". A deposit's % is of the order's total and starts
- * at Settings' rate; typing either box fills the other.
- *
- * Typing into an option's box chooses that option, so nobody types a deposit
- * and sends cash.
- */
-/** One width for the labels, so the amount boxes line up in a column. */
-const LABEL = "inline-block w-[10.5rem]";
+/** "The order" in the Apply to radios — no invoice. */
+const ORDER = "order";
 
+/**
+ * NEW PAYMENT (Mark, 2026-09-25) — money RECEIVED: how much, how, when, a
+ * note, and what it pays. Asking for money is New Invoice's.
+ *
+ * APPLY TO is the point of the split. A payment on an order with an open
+ * invoice must be ON that invoice, or the invoice goes on asking for money
+ * already paid and the balance invoice shrinks instead. So each open invoice
+ * is a choice ("Invoice 1010 · Deposit · $3.80 due"), the OLDEST first and
+ * chosen, then "The order — no invoice". On an invoice it goes through
+ * `record_customer_invoice_payment` — the invoice record's own Record
+ * Payment, which closes the invoice when met and settles the order when ITS
+ * balance reaches zero (139). On the order it is a plain payment row, the
+ * old Take a payment.
+ */
 export function NewPaymentDialog({
   orderId,
   orgId,
   orderNumber,
-  total,
-  uninvoiced,
-  hasBalanceInvoice,
-  hasCustomer,
-  defaultDepositRate,
+  openInvoices,
   today,
-  from,
   onClose,
-  onCash,
+  onOrderPayment,
 }: {
   orderId: string;
   orgId: string;
   orderNumber: string;
-  /** The order's total — what a deposit's % is of. */
-  total: number;
-  /** `uninvoicedAmount` — what an invoice may still ask for. */
-  uninvoiced: number;
-  hasBalanceInvoice: boolean;
-  hasCustomer: boolean;
-  /** Settings' deposit rate, a fraction. */
-  defaultDepositRate: number;
-  /** The org's calendar day — a cash payment's date. */
+  openInvoices: OpenInvoice[];
+  /** The org's calendar day — the payment date it starts at. */
   today: string;
-  /** The invoice's breadcrumb back to this order. */
-  from: { href: string; label: string };
   onClose: () => void;
-  /** After cash is recorded — the caller asks whether it settled the order. */
-  onCash: (amount: number) => void;
+  /** After a payment on the ORDER — the caller asks whether it settled it. An
+   *  invoice payment settles the order in the database instead. */
+  onOrderPayment: (amount: number) => void;
 }) {
   const supabase = createClient();
   const router = useRouter();
-  const [choice, setChoice] = useState<NewPaymentChoice>("cash");
-  const [cash, setCash] = useState("");
-  const [depositAmount, setDepositAmount] = useState(() =>
-    amountFromPercent(total, String(toPercent(defaultDepositRate)))
-  );
-  const [depositPercent, setDepositPercent] = useState(() => String(toPercent(defaultDepositRate)));
-  const [other, setOther] = useState("");
+  const sorted = [...openInvoices].sort((a, b) => a.number - b.number);
+  const [applyTo, setApplyTo] = useState<string>(defaultApplyTo(sorted)?.id ?? ORDER);
+  const [amount, setAmount] = useState("");
+  const [how, setHow] = useState("cash");
+  const [paidOn, setPaidOn] = useState<string | null>(today);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const amountText =
-    choice === "cash" ? cash : choice === "deposit" ? depositAmount : choice === "other" ? other : "";
-  const problem = newPaymentProblem({ choice, amountText, uninvoiced, hasBalanceInvoice, hasCustomer });
-  const ready = problem === null && !busy;
+  const invoice = sorted.find((i) => i.id === applyTo) ?? null;
+  const problem = newPaymentProblem({ amountText: amount, applyTo: invoice });
+  const ready = problem === null && !busy && !!paidOn;
+  const value = parseMoney(amount);
 
   async function go() {
-    if (!ready) return;
+    if (!ready || value === null) return;
     setBusy(true);
     setError(null);
 
-    if (choice === "cash") {
-      const amount = parseMoney(cash)!;
-      const { data, error: e } = await supabase
-        .from("special_order_payments")
-        .insert({
-          // Explicit — design rule 1.
-          org_id: orgId,
-          order_id: orderId,
-          amount,
-          paid_on: today,
-          payment_type: "Cash",
-          note: note.trim() || null,
-        })
-        .select("id");
+    if (invoice) {
+      const { error: e } = await supabase.rpc("record_customer_invoice_payment", {
+        p_invoice: invoice.id,
+        p_amount: value,
+        p_type: how || null,
+        p_paid_on: paidOn,
+        p_note: note.trim() || null,
+        p_ref: null,
+      });
       setBusy(false);
-      if (e || !data?.length) {
-        setError(e?.message ?? "Nothing was recorded — the database refused it and said nothing.");
+      if (e) {
+        setError(e.message);
         return;
       }
       onClose();
       router.refresh();
-      onCash(amount);
       return;
     }
 
-    const { data, error: e } = await supabase.rpc("create_payment_invoice", {
-      p_order: orderId,
-      p_kind: choice,
-      p_amount: choice === "balance" ? null : parseMoney(amountText),
-      p_note: note.trim() || null,
-    });
-    if (e || !data) {
-      setBusy(false);
-      setError(e?.message ?? "The invoice was not created.");
+    const { data, error: e } = await supabase
+      .from("special_order_payments")
+      .insert({
+        // Explicit — design rule 1.
+        org_id: orgId,
+        order_id: orderId,
+        amount: value,
+        paid_on: paidOn,
+        payment_type: how || null,
+        note: note.trim() || null,
+      })
+      .select("id");
+    setBusy(false);
+    if (e || !data?.length) {
+      setError(e?.message ?? "Nothing was recorded — the database refused it and said nothing.");
       return;
     }
-    router.push(withFrom(`/customer-invoices/${data as string}`, from));
+    onClose();
+    router.refresh();
+    onOrderPayment(value);
   }
 
-  const box = (
-    value: string,
-    set: (v: string) => void,
-    label: string,
-    pick: NewPaymentChoice,
-    width = "w-28",
-    after?: (v: string) => void
-  ) => (
-    <TextInput
-      value={value}
-      onValueChange={(v) => {
-        set(v);
-        after?.(v);
-        setChoice(pick);
-      }}
-      onFocus={() => setChoice(pick)}
-      inputMode="decimal"
-      aria-label={label}
-      className={`${width} text-right tabular-nums`}
-      disabled={busy}
-    />
+  const caption = (text: string) => (
+    <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{text}</span>
   );
 
   return (
@@ -172,74 +135,72 @@ export function NewPaymentDialog({
             Cancel
           </button>
           <button type="button" className={DIALOG_COMMIT_CLASS} onClick={() => void go()} disabled={!ready}>
-            {busy ? "Working…" : "Continue"}
+            {busy ? "Recording…" : value !== null ? `Record ${money(value)}` : "Record"}
           </button>
         </div>
       }
     >
       <div className="space-y-5">
-        <p className="text-[13px] text-muted">
-          Order total {money(total)} · not yet invoiced {money(Math.max(uninvoiced, 0))}
-        </p>
+        <div className="space-y-1.5">
+          {caption("Apply to")}
+          <Radio
+            vertical
+            ariaLabel="Apply to"
+            value={applyTo}
+            onChange={setApplyTo}
+            disabled={busy}
+            className="gap-2"
+            options={[
+              ...sorted.map((i) => ({
+                value: i.id,
+                label: `${[i.label, i.what].filter(Boolean).join(" · ")} · ${money(i.due)} due`,
+              })),
+              { value: ORDER, label: "The order — no invoice" },
+            ]}
+          />
+        </div>
 
-        <Radio
-          vertical
-          ariaLabel="New payment"
-          value={choice}
-          onChange={setChoice}
-          disabled={busy}
-          className="gap-3"
-          options={[
-            {
-              value: "cash",
-              label: <span className={LABEL}>{NEW_PAYMENT_LABEL.cash}:</span>,
-              after: box(cash, setCash, "Cash amount", "cash"),
-            },
-            {
-              value: "balance",
-              label: <span className={LABEL}>{NEW_PAYMENT_LABEL.balance}:</span>,
-              // What the balance invoice would bill — read, not typed, so no
-              // box. Padded as a TextInput is inside its border (12 + 1 left,
-              // 36 for the clear button + 1 right) so the digits line up.
-              after: (
-                <span className="inline-block w-28 pl-[13px] pr-[37px] text-right tabular-nums">
-                  {money(Math.max(uninvoiced, 0))}
-                </span>
-              ),
-            },
-            {
-              value: "deposit",
-              label: <span className={LABEL}>{NEW_PAYMENT_LABEL.deposit}:</span>,
-              after: (
-                <>
-                  {box(depositAmount, setDepositAmount, "Deposit amount", "deposit", "w-28", (v) =>
-                    setDepositPercent(percentFromAmount(total, v))
-                  )}
-                  <span className="inline-flex items-center gap-1">
-                    {box(depositPercent, setDepositPercent, "Deposit percentage", "deposit", "w-20", (v) =>
-                      setDepositAmount(amountFromPercent(total, v))
-                    )}
-                    <span className="text-muted">%</span>
-                  </span>
-                </>
-              ),
-            },
-            {
-              value: "other",
-              label: <span className={LABEL}>{NEW_PAYMENT_LABEL.other}:</span>,
-              after: box(other, setOther, "Other amount", "other"),
-            },
-          ]}
-        />
+        <div className="flex flex-wrap items-end gap-4">
+          <label className="block space-y-1.5">
+            {caption("Amount")}
+            <TextInput
+              value={amount}
+              onValueChange={setAmount}
+              inputMode="decimal"
+              aria-label="Amount received"
+              className="w-32 text-right tabular-nums"
+              disabled={busy}
+              autoFocus
+            />
+          </label>
+          <div className="space-y-1.5">
+            {caption("How")}
+            <PickList
+              value={how}
+              onPick={setHow}
+              variant="field"
+              allowNew
+              ariaLabel="How it was paid"
+              options={PAYMENT_TYPE_OPTIONS}
+              className="w-44"
+            />
+          </div>
+          <div className="space-y-1.5">
+            {caption("Date")}
+            {/* The bordered box; `boxed` fills its track, so the width is the
+                wrapper's. */}
+            <div className="w-40">
+              <DateField value={paidOn} onChange={setPaidOn} ariaLabel="Payment date" boxed />
+            </div>
+          </div>
+        </div>
 
         <label className="block space-y-1.5">
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-            Note on the Invoice
-          </span>
-          <TextInput value={note} onValueChange={setNote} aria-label="Note on the Invoice" fullWidth disabled={busy} />
+          {caption("Note")}
+          <TextInput value={note} onValueChange={setNote} aria-label="Payment note" fullWidth disabled={busy} />
         </label>
 
-        {problem && (amountText.trim() || choice === "balance" || choice !== "cash" && !hasCustomer) ? (
+        {problem && amount.trim() ? (
           <p className="text-[13px]">
             <span className="box-decoration-clone bg-mark-fill px-1">{problem}</span>
           </p>

@@ -1,5 +1,6 @@
-// New Payment (migration 139) — the pure half: what is not yet invoiced, the
-// deposit's % ↔ $ pair, and what Continue refuses, in words.
+// New Invoice and New Payment (migration 139) — the pure half: what is not
+// yet invoiced, the deposit's % ↔ $ pair, what each dialog refuses in words,
+// and where a payment goes by default.
 //
 // The figures are the throwaway-Postgres run's: a $368.50 order, a $36.85
 // deposit invoice, then a Balance Due invoice for $331.65; 10 more donuts
@@ -7,12 +8,15 @@
 //
 // Checked by breaking: counting a LIVE invoice's payments as off-invoice in
 // `uninvoicedAmount` turns "a paid deposit is not subtracted twice" red;
-// dropping the `hasBalanceInvoice` test turns "one balance invoice" red.
+// dropping the `hasBalanceInvoice` test turns "one balance invoice" red;
+// letting a payment exceed its invoice's due turns "no more than it asks" red.
 
 import { test, eq } from "./harness";
 import { depositAmount, readSettings, validDepositRate } from "../../src/lib/specialOrders";
 import {
   amountFromPercent,
+  defaultApplyTo,
+  newInvoiceProblem,
   newPaymentProblem,
   parseMoney,
   percentFromAmount,
@@ -95,19 +99,32 @@ test("deposit % ↔ $: each box fills the other, of the order's total", () => {
 
 const base = { uninvoiced: 331.65, hasBalanceInvoice: false, hasCustomer: true };
 
-test("newPaymentProblem: each option's refusal, in words", () => {
-  eq(newPaymentProblem({ ...base, choice: "cash", amountText: "20" }), null);
-  eq(newPaymentProblem({ ...base, choice: "cash", amountText: "" }), "Enter an amount.");
-  eq(newPaymentProblem({ ...base, choice: "cash", amountText: "5000", hasCustomer: false }), null,
-     "cash needs no customer and no invoice headroom");
-  eq(newPaymentProblem({ ...base, choice: "balance", amountText: "" }), null);
-  eq(newPaymentProblem({ ...base, choice: "balance", amountText: "", hasBalanceInvoice: true }),
+test("newInvoiceProblem: each option's refusal, in words", () => {
+  eq(newInvoiceProblem({ ...base, choice: "balance", amountText: "" }), null);
+  eq(newInvoiceProblem({ ...base, choice: "balance", amountText: "", hasBalanceInvoice: true }),
      "An invoice already bills this order's balance.", "one balance invoice");
-  eq(newPaymentProblem({ ...base, choice: "balance", amountText: "", uninvoiced: 0 }),
+  eq(newInvoiceProblem({ ...base, choice: "balance", amountText: "", uninvoiced: 0 }),
      "Nothing is left to invoice on this order.");
-  eq(newPaymentProblem({ ...base, choice: "deposit", amountText: "36.85" }), null);
-  eq(newPaymentProblem({ ...base, choice: "other", amountText: "400" }),
+  eq(newInvoiceProblem({ ...base, choice: "deposit", amountText: "36.85" }), null);
+  eq(newInvoiceProblem({ ...base, choice: "deposit", amountText: "" }), "Enter an amount.");
+  eq(newInvoiceProblem({ ...base, choice: "other", amountText: "400" }),
      "That is more than the $331.65 not yet invoiced.");
-  eq(newPaymentProblem({ ...base, choice: "deposit", amountText: "10", hasCustomer: false }),
+  eq(newInvoiceProblem({ ...base, choice: "deposit", amountText: "10", hasCustomer: false }),
      "Link a customer to this order before invoicing it.");
+});
+
+const deposit = { id: "a", number: 1010, label: "Invoice 1010", what: "Deposit", due: 3.8 };
+const balance = { id: "b", number: 1011, label: "Invoice 1011", what: "Balance due", due: 34.17 };
+
+test("newPaymentProblem: no more than the invoice asks; the order has no ceiling", () => {
+  eq(newPaymentProblem({ amountText: "3.80", applyTo: deposit }), null);
+  eq(newPaymentProblem({ amountText: "5", applyTo: deposit }),
+     "That is more than the $3.80 due on Invoice 1010.", "no more than it asks");
+  eq(newPaymentProblem({ amountText: "500", applyTo: null }), null);
+  eq(newPaymentProblem({ amountText: "", applyTo: null }), "Enter an amount.");
+});
+
+test("defaultApplyTo: the oldest open invoice — the deposit before the balance", () => {
+  eq(defaultApplyTo([balance, deposit])?.id, "a");
+  eq(defaultApplyTo([]), null, "nothing open: the order itself");
 });
