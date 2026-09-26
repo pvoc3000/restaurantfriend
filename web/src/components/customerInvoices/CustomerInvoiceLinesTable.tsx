@@ -29,6 +29,12 @@ export type InvoiceLineRow = {
   /** What the customer was last sent for this line, shown only when the
    *  line has moved since (128). */
   sentAmount: number | null;
+  /** What THIS invoice bills for the order (139: a deposit or part payment is
+   *  less than the order's balance). */
+  amount: number;
+  /** A deposit or part payment on a draft — its amount may be changed here;
+   *  the database checks it against what is not yet invoiced. */
+  amountEditable: boolean;
 };
 
 const figure = (v: number, negative = false) => (v ? `${negative ? "−" : ""}${money(v)}` : "—");
@@ -124,6 +130,30 @@ export function CustomerInvoiceLinesTable({
         </span>
       ),
     },
+    {
+      key: "amount",
+      label: "This invoice",
+      width: 130,
+      align: "right",
+      sortValue: (r) => r.amount,
+      render: (r) =>
+        r.amountEditable ? (
+          <InlineValue
+            table="customer_invoice_lines"
+            id={r.id}
+            column="amount"
+            kind="number"
+            nullable={false}
+            value={r.amount}
+            align="right"
+            className="text-right"
+            ariaLabel={`Amount for ${r.description}`}
+            format={(v) => money(Number(v))}
+          />
+        ) : (
+          <span className="tabular-nums font-semibold">{money(r.amount)}</span>
+        ),
+    },
   ];
 
   return (
@@ -143,6 +173,7 @@ export function CustomerInvoiceLinesTable({
         tax: <span className="tabular-nums">{figure(sum(shown, (r) => r.tax))}</span>,
         paid: <span className="tabular-nums">{figure(sum(shown, (r) => r.paid))}</span>,
         balance: <span className="tabular-nums">{money(sum(shown, (r) => r.balance))}</span>,
+        amount: <span className="tabular-nums font-semibold">{money(sum(shown, (r) => r.amount))}</span>,
       })}
       empty={<p className="text-sm text-muted">No orders on this invoice.</p>}
     />

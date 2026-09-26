@@ -37,7 +37,8 @@ import { resolveItemPrice } from "@/lib/productionPrice";
 import { OrderLines, type OrderLineRow } from "@/components/specialOrders/OrderLines";
 import { OrderNumberCell } from "@/components/specialOrders/OrderNumberCell";
 import type { MenuItem } from "@/components/specialOrders/AddOrderLine";
-import { OrderPayments, type PaymentRow } from "@/components/specialOrders/OrderPayments";
+import { OrderPayments, type OrderInvoiceRow, type PaymentRow } from "@/components/specialOrders/OrderPayments";
+import { uninvoicedAmount } from "@/lib/newPayment";
 import { CompletionDates } from "@/components/specialOrders/CompletionDates";
 import { StatusCatchUp } from "@/components/specialOrders/StatusCatchUp";
 import { OrderTotals } from "@/components/specialOrders/OrderTotals";
@@ -57,8 +58,10 @@ import {
 } from "@/lib/specialOrderAttachments";
 import { canEditPage } from "@/lib/pageAccess";
 import {
+  LINE_KIND_LABEL,
   SQUARE_ITEM_OPTIONS,
   type InvoiceCandidate,
+  type InvoiceLineKind,
   invoiceChanged,
   invoiceNumberText,
   invoiceStatus,
@@ -90,7 +93,7 @@ const ORDER_COLUMNS = `
   delivery_company_phone, delivery_tracking, delivery_window_start,
   delivery_window_end, delivery_boxes, delivery_weight_lbs,
   tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
-  deposit_rate, ignore_balance, square_item, taken_by, taken_by_employee_id,
+  ignore_balance, square_item, taken_by, taken_by_employee_id,
   notes_general, notes_quote, notes_production, notes_invoice, notes_receipt,
   standing_days, starts_on, ends_on, paused, standing_order_id,
   date_initiated, quote_sent_at, quote_returned_at, invoice_sent_at,
@@ -207,7 +210,7 @@ export async function SpecialOrderDetail({
     // a payment taken on an invoice later voided still names it.
     supabase
       .from("customer_invoice_lines")
-      .select("invoice_id, amount, sent_amount, customer_invoices ( id, number, sent_at, paid_at, voided_at, due_on )")
+      .select("invoice_id, amount, sent_amount, kind, customer_invoices ( id, number, sent_at, paid_at, voided_at, due_on )")
       .eq("special_order_id", id),
   ]);
 
@@ -301,16 +304,15 @@ export async function SpecialOrderDetail({
 
   const lines: OrderLineRow[] = ((lineRows ?? []) as unknown as OrderLineRow[]);
   /**
-   * WHICH CUSTOMER INVOICE BILLS THIS ORDER (Mark, 2026-09-23: "we need to put
-   * the invoice in the payments area … remove the take a payment button from
-   * special orders that are part of a customer invoice … try adding the
-   * invoice field on the orders info tab"). `liveInvoice` is the one not
-   * voided — an order is on at most one — and the rest only name payments.
+   * THE CUSTOMER INVOICES THIS ORDER IS ON (124; several since 139 — a
+   * deposit, a part payment, the balance). `liveInvoice` is the one billing
+   * its BALANCE, where Send ▸ Invoice goes; every live one is listed on the
+   * Payments tab and the Info tab; void ones only name payments.
    */
   const invoiceTerms = readInvoiceTerms(session.orgSettings as Record<string, unknown>);
   type InvoiceRef = { id: string; number: number; sent_at: string | null; paid_at: string | null; voided_at: string | null; due_on: string | null };
   const invoiceLinks = (invoiceLinkRows ?? []) as unknown as {
-    amount: number; sent_amount: number | null; customer_invoices: InvoiceRef | null;
+    amount: number; sent_amount: number | null; kind: InvoiceLineKind | null; customer_invoices: InvoiceRef | null;
   }[];
   const invoicesOnOrder = invoiceLinks
     .map((l) => l.customer_invoices)
@@ -318,7 +320,14 @@ export async function SpecialOrderDetail({
   const invoiceHref = (invoiceId: string, from: string) =>
     withFrom(`/customer-invoices/${invoiceId}`, { href: from, label: `#${row.number as string}` });
   const invoiceLabel = (i: InvoiceRef) => `Invoice ${invoiceNumberText(i.number, invoiceTerms)}`;
-  const liveInvoiceRow = invoicesOnOrder.find((i) => !i.voided_at) ?? null;
+  const liveInvoiceRow =
+    invoiceLinks.find((l) => l.customer_invoices && !l.customer_invoices.voided_at && (l.kind ?? "balance") === "balance")
+      ?.customer_invoices ?? null;
+  const statusOf = (i: InvoiceRef) =>
+    invoiceStatus(i, today, invoiceChanged(invoiceLinks.filter((l) => l.customer_invoices?.id === i.id)));
+  const liveInvoices = invoiceLinks
+    .filter((l) => l.customer_invoices && !l.customer_invoices.voided_at)
+    .sort((a, b) => a.customer_invoices!.number - b.customer_invoices!.number);
   const liveInvoice = liveInvoiceRow
     ? {
         id: liveInvoiceRow.id,
@@ -345,6 +354,25 @@ export async function SpecialOrderDetail({
     };
   });
 
+  // What New Payment may still invoice (139) — `special_order_uninvoiced`.
+  const voidInvoiceIds = new Set(invoicesOnOrder.filter((i) => i.voided_at).map((i) => i.id));
+  const orderInvoices: OrderInvoiceRow[] = liveInvoices.map((l) => {
+    const i = l.customer_invoices!;
+    return {
+      id: i.id,
+      label: invoiceLabel(i),
+      href: invoiceHref(i.id, orderTabHref(id, "payments", rawParams)),
+      // A balance line alone is just the order; beside a deposit it is the
+      // balance due, as its own wording says.
+      what:
+        (l.kind ?? "balance") === "balance"
+          ? liveInvoices.length > 1 ? "Balance due" : ""
+          : LINE_KIND_LABEL[l.kind!],
+      amount: Number(l.amount),
+      status: statusOf(i),
+    };
+  });
+
   const moneyInputs = {
     tax_rate: row.tax_rate as number | null,
     discount_amount: row.discount_amount as number | null,
@@ -355,6 +383,15 @@ export async function SpecialOrderDetail({
     ignore_balance: Boolean(row.ignore_balance),
   };
   const totals = orderTotals(moneyInputs, lines, payments, settings.rush);
+  const uninvoiced = uninvoicedAmount({
+    total: totals.total,
+    cancelled: row.status === "cancelled",
+    payments: payments.map((p) => {
+      const invoiceId = (p as unknown as { customer_invoice_id: string | null }).customer_invoice_id;
+      return { amount: p.amount, invoiceLive: !!invoiceId && !voidInvoiceIds.has(invoiceId) };
+    }),
+    liveLines: liveInvoices.map((l) => ({ amount: Number(l.amount) })),
+  });
 
   const attention = needsAttention(row as never, today, totals, settings.attention);
 
@@ -939,17 +976,22 @@ export async function SpecialOrderDetail({
                     {/* THE INVOICE THAT BILLS IT, when a customer invoice
                         does (124) — shown only then, like Made from, so the
                         8,000 orders billed on their own say nothing new. */}
-                    {liveInvoice ? (
-                      <Row label="Invoice">
-                        <Link
-                          href={invoiceHref(liveInvoice.id, orderTabHref(id, "info", rawParams))}
-                          className="underline underline-offset-2"
-                        >
-                          {liveInvoice.label}
-                        </Link>
-                        <span className="ml-3 align-middle">
-                          <InvoiceStatusChip status={liveInvoice.status} />
-                        </span>
+                    {orderInvoices.length > 0 ? (
+                      <Row label={orderInvoices.length === 1 ? "Invoice" : "Invoices"}>
+                        {orderInvoices.map((i) => (
+                          <span key={i.id} className="block">
+                            <Link
+                              href={invoiceHref(i.id, orderTabHref(id, "info", rawParams))}
+                              className="underline underline-offset-2"
+                            >
+                              {i.label}
+                            </Link>
+                            {i.what ? <span className="ml-2 text-muted">{i.what}</span> : null}
+                            <span className="ml-3 align-middle">
+                              <InvoiceStatusChip status={i.status} />
+                            </span>
+                          </span>
+                        ))}
                       </Row>
                     ) : null}
                   </div>
@@ -1193,8 +1235,6 @@ export async function SpecialOrderDetail({
                     totals={totals}
                     inputs={moneyInputs}
                     rushSuggestion={rushSuggestion}
-                    depositRate={row.deposit_rate as number | null}
-                    defaultDepositRate={row.kind === "order" ? settings.depositRate : null}
                     canWrite={canWrite}
                   />
                 </div>
@@ -1204,12 +1244,17 @@ export async function SpecialOrderDetail({
                     orderId={id}
                     orgId={row.org_id as string}
                     rows={payments}
-                    createInvoice={kind === "order" ? { candidate: invoiceCandidate, from: invoiceFrom } : null}
-                    invoice={
-                      liveInvoice
+                    invoices={orderInvoices}
+                    newPayment={
+                      kind === "order" && row.status !== "cancelled"
                         ? {
-                            label: liveInvoice.label,
-                            href: invoiceHref(liveInvoice.id, orderTabHref(id, "payments", rawParams)),
+                            orderNumber: row.number as string,
+                            total: totals.total,
+                            uninvoiced,
+                            hasBalanceInvoice: liveInvoice !== null,
+                            hasCustomer: !!customer,
+                            defaultDepositRate: settings.depositRate,
+                            from: invoiceFrom,
                           }
                         : null
                     }

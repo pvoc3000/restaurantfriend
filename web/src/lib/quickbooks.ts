@@ -830,13 +830,15 @@ export function customerInvoiceRefusals(inputs: CustomerInvoicePushInputs): stri
       out.push(`${l.description} could not be read.`);
       continue;
     }
-    // A deposit taken before the order was invoiced leaves the line short of
-    // the order's total. QuickBooks would tax and bill the whole order, so the
-    // figures would disagree with the customer's copy. Not modelled yet.
+    // A line for PART of its order — a deposit, a part payment, or the
+    // balance after one (139), or an order with money taken off the invoice —
+    // is short of the order's total. QuickBooks would tax and bill the whole
+    // order, so the figures would disagree with the customer's copy. Not
+    // modelled yet: such an invoice collects through Square.
     if (Math.abs(round2(l.amount) - round2(l.totals.total)) >= 0.005) {
       out.push(
-        `${l.description} has a payment taken outside this invoice (a deposit), ` +
-          "which a QuickBooks invoice cannot show yet."
+        `${l.description} bills part of its order (a deposit, a part payment, or what is left after one), ` +
+          "which a QuickBooks invoice cannot show yet — collect this invoice through Square."
       );
     }
   }

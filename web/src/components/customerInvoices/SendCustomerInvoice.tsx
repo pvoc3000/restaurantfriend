@@ -23,8 +23,7 @@ import {
   mintPayToken,
   resolveAppBase,
 } from "@/lib/specialOrderSend";
-import { depositSentence, payLine, payUrl, quickBooksPayLine } from "@/lib/payLink";
-import { percentLabel, toPercent } from "@/lib/percent";
+import { payLine, payUrl, quickBooksPayLine } from "@/lib/payLink";
 import { invokeQbo } from "@/lib/qboClient";
 import {
   INVOICE_SHEET_KEY,
@@ -84,18 +83,13 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
         lines: view.lines.map((l) => ({
           description: l.description,
           amount: l.amount,
-          detail: view.lines.length === 1 ? itemDetail(l) : undefined,
+          // Itemized only for a balance line: a deposit or part payment is
+          // one figure, and the order's items would not add up to it (139).
+          detail: view.lines.length === 1 && (l.kind ?? "balance") === "balance" ? itemDetail(l) : undefined,
         })),
         total: view.total,
         paid: view.paid,
         balance: view.balance,
-        deposit:
-          view.deposit.due > 0
-            ? {
-                due: view.deposit.due,
-                rateLabel: view.deposit.rate !== null ? percentLabel(toPercent(view.deposit.rate)) : null,
-              }
-            : undefined,
       }}
     />
   ).toBlob();
@@ -121,9 +115,10 @@ function itemDetail(l: InvoiceView["lines"][number]): { rows: { label: string; a
   const earlier = Math.round((t.total - l.amount) * 100) / 100;
   if (Math.abs(earlier) >= 0.01) {
     // A cancelled order bills nothing (128); anything else in the gap is money
-    // taken before the invoice, a deposit.
+    // taken before this invoice, or asked for on another — a deposit invoice
+    // (139), paid or not.
     rows.push({
-      label: l.order?.status === "cancelled" ? "Order cancelled" : "Paid before this invoice",
+      label: l.order?.status === "cancelled" ? "Order cancelled" : "Deposits and earlier payments",
       amount: -earlier,
     });
   }
@@ -496,15 +491,7 @@ function invoiceEmail(
     due_on: view.invoice.due_on ? usDate(view.invoice.due_on) : "on receipt",
     orders: view.lines.map((l) => `${l.description} — ${money(l.amount)}`).join("\n"),
     pay_url: pay,
-    // 138: a deposit asked for and not yet paid leads the paragraph — on
-    // QuickBooks' page too, where the customer types the amount themselves.
-    pay_line:
-      (pay && view.deposit.due > 0
-        ? depositSentence(
-            view.deposit.due,
-            view.deposit.rate !== null ? percentLabel(toPercent(view.deposit.rate)) : null
-          )
-        : "") + (viaQbo ? quickBooksPayLine(pay) : payLine(pay)),
+    pay_line: viaQbo ? quickBooksPayLine(pay) : payLine(pay),
   };
   return {
     to: (view.customer?.email ?? "").trim(),

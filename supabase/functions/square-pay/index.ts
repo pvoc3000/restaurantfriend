@@ -135,8 +135,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
-    // `pay` (138) is WHICH amount — "deposit" or "balance" — never a figure.
-    const { token, source_id, idempotency_key, verification_token, source_type, pay } =
+    const { token, source_id, idempotency_key, verification_token, source_type } =
       await req.json();
     if (!token || !source_id || !idempotency_key) {
       return json(400, { error: "missing token, source_id or idempotency_key" });
@@ -170,7 +169,6 @@ Deno.serve(async (req) => {
 
     const { data: claimData, error: claimError } = await anon.rpc("claim_pay_token", {
       p_token: token,
-      p_pay: pay === "deposit" ? "deposit" : "balance",
     });
     if (claimError) return json(400, { error: claimError.message });
 
@@ -182,9 +180,7 @@ Deno.serve(async (req) => {
       customer_invoice_id?: string | null;
       kind?: "order" | "customer_invoice";
       number?: string;
-      /** What to charge: the deposit when that was chosen and is due (138). */
       balance?: number | string;
-      is_deposit?: boolean;
       location_id?: string;
       title?: string | null;
       /** 126: an invoice's breakdown also carries `lines`, keyed by line id. */
@@ -216,7 +212,7 @@ Deno.serve(async (req) => {
     // What the money WAS, in Square's own terms — Special Orders goods, sales
     // tax, delivery. See `_shared/squareOrder.ts` (migration 123).
     const reference = `${isInvoice ? "Invoice" : "Order"} ${claim.number ?? ""}`.trim();
-    const label = `${claim.is_deposit ? "Deposit — " : ""}${isInvoice ? "Invoice" : "Order"} #${claim.number ?? ""}${claim.title ? ` — ${claim.title}` : ""}`.slice(0, 500);
+    const label = `${isInvoice ? "Invoice" : "Order"} #${claim.number ?? ""}${claim.title ? ` — ${claim.title}` : ""}`.slice(0, 500);
     // 126: an invoice whose lines are sold as different items gets Square
     // lines per item — only when every line's money was snapshotted, or the
     // one-item order it always was.
@@ -295,7 +291,7 @@ Deno.serve(async (req) => {
       order_id: orderId,
       autocomplete: true,
       reference_id: reference.slice(0, 40),
-      note: `${isInvoice ? reference : `Invoice ${reference}`} — pay link${claim.is_deposit ? " (deposit)" : ""}`.slice(0, 500),
+      note: `${isInvoice ? reference : `Invoice ${reference}`} — pay link`.slice(0, 500),
       ...(verification_token ? { verification_token } : {}),
     };
 
@@ -365,7 +361,7 @@ Deno.serve(async (req) => {
       p_token: token,
       p_amount: amount,
       p_square_payment_id: payment.id,
-      p_note: `${claim.is_deposit ? "Deposit · " : ""}Pay link · ${method}`,
+      p_note: `Pay link · ${method}`,
     });
     if (recordError || !["recorded", "already_recorded"].includes((recorded as { state?: string })?.state ?? "")) {
       warnings.push(

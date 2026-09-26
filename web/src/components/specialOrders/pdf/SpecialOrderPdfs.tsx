@@ -56,8 +56,7 @@ import {
   type StatementData,
 } from "@/lib/specialOrderDocs";
 
-import { customerLabel, depositAmount, lineTotal } from "@/lib/specialOrders";
-import { percentLabel, toPercent } from "@/lib/percent";
+import { customerLabel, lineTotal } from "@/lib/specialOrders";
 import { dateInTimeZone, serverTimeZone } from "@/lib/today";
 import {
   Field,
@@ -393,16 +392,6 @@ export function OrderDocumentPdf({
                       <Text style={s.grandLabel}>{kind === "quote" ? "Total quote" : "Total due"}</Text>
                       <Text style={s.grandValue}>{money(grand)}</Text>
                     </View>
-                    {/* 138: the quote says what holds the date, when the
-                        order asks for a deposit. */}
-                    {kind === "quote" && depositAmount(t.total, order.money.deposit_rate) > 0 ? (
-                      <View style={s.totals}>
-                        <TotalRow
-                          label={`Deposit to hold your date (${percentLabel(toPercent(order.money.deposit_rate ?? 0))})`}
-                          value={depositAmount(t.total, order.money.deposit_rate)}
-                        />
-                      </View>
-                    ) : null}
                   </View>
                 </View>
               </View>
@@ -702,9 +691,6 @@ export type CustomerInvoiceDoc = {
   total: number;
   paid: number;
   balance: number;
-  /** 138: a deposit asked for and not yet paid — printed under Amount due as
-   *  the part that holds the date. Absent otherwise. */
-  deposit?: { due: number; rateLabel: string | null };
 };
 
 
@@ -831,14 +817,6 @@ export function CustomerInvoicePdf({
                   <Text style={s.grandLabel}>Amount due</Text>
                   <Text style={s.grandValue}>{money(invoice.balance)}</Text>
                 </View>
-                {invoice.deposit ? (
-                  <View style={s.totals}>
-                    <TotalRow
-                      label={`Deposit to hold your date${invoice.deposit.rateLabel ? ` (${invoice.deposit.rateLabel})` : ""}`}
-                      value={invoice.deposit.due}
-                    />
-                  </View>
-                ) : null}
               </View>
             </View>
           </View>

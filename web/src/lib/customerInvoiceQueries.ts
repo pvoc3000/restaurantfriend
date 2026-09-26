@@ -9,9 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   invoiceBalance,
-  invoiceDeposit,
   type CustomerInvoice,
-  type InvoiceDeposit,
   type CustomerInvoiceLine,
 } from "./customerInvoices";
 import {
@@ -68,8 +66,6 @@ export type InvoiceView = {
   total: number;
   paid: number;
   balance: number;
-  /** 138: what its orders ask for as a deposit, and what is still due on it. */
-  deposit: InvoiceDeposit;
 };
 
 export async function fetchInvoiceView(
@@ -90,7 +86,7 @@ export async function fetchInvoiceView(
 
   const { data: lineRows, error: lineError } = await supabase
     .from("customer_invoice_lines")
-    .select("id, special_order_id, description, amount, sort, square_item, sent_amount")
+    .select("id, special_order_id, description, amount, sort, square_item, sent_amount, kind")
     .eq("invoice_id", id)
     .order("sort", { ascending: true, nullsFirst: false });
   if (lineError) throw new Error(lineError.message);
@@ -104,7 +100,6 @@ export async function fetchInvoiceView(
     delivery_charge: number | null;
     rush_fee: number | null;
     rush_rate: number | null;
-    deposit_rate: number | null;
     ignore_balance: boolean | null;
   };
   let orders: OrderRow[] = [];
@@ -118,7 +113,7 @@ export async function fetchInvoiceView(
         .from("special_orders")
         .select(
           `id, number, title, event_date, status, tax_rate, discount_amount, discount_rate,
-           delivery_charge, rush_fee, rush_rate, deposit_rate, ignore_balance`
+           delivery_charge, rush_fee, rush_rate, ignore_balance`
         )
         .in("id", orderIds),
       supabase
@@ -196,15 +191,6 @@ export async function fetchInvoiceView(
   });
 
   const money = invoiceBalance(viewLines, tagged);
-  const deposit = invoiceDeposit(
-    viewLines.map((l) => ({
-      amount: l.amount,
-      orderTotal: l.totals?.total ?? null,
-      depositRate: orderById.get(l.special_order_id)?.deposit_rate ?? null,
-    })),
-    money.paid,
-    money.balance
-  );
   const customer = ((inv as unknown as { customers: InvoiceCustomer | null }).customers ?? null);
 
   return {
@@ -214,6 +200,5 @@ export async function fetchInvoiceView(
     lines: viewLines,
     payments: tagged,
     ...money,
-    deposit,
   };
 }

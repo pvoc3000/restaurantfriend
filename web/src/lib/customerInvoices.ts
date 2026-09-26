@@ -11,7 +11,6 @@
  */
 
 import { usDate } from "./specialOrderDocs";
-import { depositAmount, validDepositRate } from "./specialOrders";
 
 /* ==========================================================================
  * THE RECORD
@@ -68,6 +67,21 @@ export const SQUARE_ITEM_LABEL: Record<SquareItem, string> = {
   wholesale: "Wholesale Order",
 };
 
+/**
+ * WHAT A LINE ASKS FOR (migration 139). `balance` bills what is not yet
+ * invoiced on its order and follows the order (128); `deposit` and `other`
+ * are a fixed amount somebody asked for with New Payment.
+ */
+export type InvoiceLineKind = "balance" | "deposit" | "other";
+
+/** "" for a plain balance line, so a one-invoice order reads as it did. The
+ *  line's own wording says "Balance due" once the order has other invoices. */
+export const LINE_KIND_LABEL: Record<InvoiceLineKind, string> = {
+  balance: "",
+  deposit: "Deposit",
+  other: "Part payment",
+};
+
 export type CustomerInvoiceLine = {
   id: string;
   special_order_id: string;
@@ -75,6 +89,8 @@ export type CustomerInvoiceLine = {
   amount: number;
   sort: number | null;
   square_item: SquareItem;
+  /** 139 — absent on reads that do not ask, which are balance lines. */
+  kind?: InvoiceLineKind;
   /** What this line said when the invoice was last sent (128); null before. */
   sent_amount?: number | null;
 };
@@ -148,48 +164,6 @@ export function invoiceBalance(
   const total = invoiceTotal(lines);
   const paid = cents(payments.reduce((a, p) => a + Number(p.amount || 0), 0));
   return { total, paid, balance: cents(total - paid) };
-}
-
-/* ==========================================================================
- * THE DEPOSIT (migration 138)
- * ========================================================================== */
-
-export type InvoiceDeposit = {
-  /** What the invoice's orders ask for, in all. 0 when none asks. */
-  deposit: number;
-  /** Still owed toward it, when paying it is a real choice — more than
-   *  nothing and less than the balance. 0 otherwise. `pay_token_state`'s
-   *  `deposit_due`, the same rule. */
-  due: number;
-  /** The one rate its orders share, for "(10%)"; null when none, or mixed. */
-  rate: number | null;
-};
-
-/**
- * An invoice's deposit: each order's (`depositAmount` of its TOTAL at its
- * rate), capped at what the order's line bills — `customer_invoice_deposit`
- * in SQL, line for line. `paid` is what the invoice has collected.
- */
-export function invoiceDeposit(
-  lines: { amount: number; orderTotal: number | null; depositRate: number | null }[],
-  paid: number,
-  balance: number
-): InvoiceDeposit {
-  let deposit = 0;
-  const rates = new Set<number>();
-  for (const l of lines) {
-    const rate = validDepositRate(l.depositRate);
-    if (rate === null) continue;
-    rates.add(rate);
-    deposit += Math.min(depositAmount(Number(l.orderTotal ?? 0), rate), Math.max(Number(l.amount), 0));
-  }
-  deposit = cents(deposit);
-  const left = cents(deposit - paid);
-  return {
-    deposit,
-    due: left > 0 && left < balance ? left : 0,
-    rate: rates.size === 1 ? [...rates][0] : null,
-  };
 }
 
 /* ==========================================================================

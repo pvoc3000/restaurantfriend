@@ -12,7 +12,83 @@
    itself**. The inquiry form's build-your-order picker (4b) was built
    2026-09-24 (below); what remains is the organic-email parser (4c).
 
-   **Shipped 2026-09-25, MIGRATION 138 APPLIED (Mark, same day), `square-pay` v10 DEPLOYED — DEPOSITS,
+   **Shipped 2026-09-25, MIGRATION 139 WRITTEN, NOT YET APPLIED — NEW
+   PAYMENT: ONE INVOICE PER PAYMENT ASKED FOR. SUPERSEDES 138's SHAPE** (below,
+   kept as history). Mark, before testing 138: "imagine a fresh order with no
+   payments yet. It's for a wedding in December. We press [New Payment] …
+   Balance Due, Deposit or Other … generates an invoice for the amount
+   indicated and a note. The user is taken to the invoice where they can edit
+   it or press Send … If it was a deposit, then when the event approaches we
+   could press [it] again … Balance Due … a second invoice … for the remaining
+   amount." Then: rename Take Payment to **New Payment**, add a **Cash**
+   option, VERTICAL radios — (•) Cash Payment [$] · ( ) Invoice Balance Due ·
+   ( ) Invoice Deposit [$] [%] · ( ) Invoice Other [$] — and "the deposit
+   should only exist once someone asks for it".
+   **The rule that makes several invoices per order safe — NO OVERLAP:** what
+   is not yet invoiced = the order's total − payments on no live invoice (cash;
+   a voided invoice's) − every line on its live invoices, paid or not
+   (`special_order_uninvoiced`; `lib/newPayment.uninvoicedAmount`). A deposit
+   or part payment may ask for at most that; a BALANCE line IS that, and still
+   follows the order (128) — add donuts and the balance invoice grows and says
+   Changed since sent; a deposit line keeps its figure. One live balance line
+   per order.
+   **139:** `customer_invoice_lines.kind` ('balance' default | 'deposit' |
+   'other'). The line trigger (129's in full): a balance line's amount is
+   worked out, a fixed one is checked (> 0, ≤ not yet invoiced), and a fixed
+   line's AMOUNT may be edited by hand while its invoice is a draft — nothing
+   else. Wording by `invoice_line_text`: "Deposit · Order #…", "Part payment ·
+   …", and "Balance due · …" only when the order is on another live invoice,
+   so a weekly wholesale invoice reads as before. The sync (129's in full)
+   moves only balance amounts; new triggers re-sync an order when a line
+   arrives, leaves or changes amount and when an invoice is voided (guarded
+   against the sync's own writes). **`allocate_customer_invoice_payment` now
+   settles the ORDER only when the order's balance reaches zero** — 124 settled
+   it when its line was met, which would have moved the December wedding to
+   Order and Print Order the moment its deposit was paid. `create_customer_
+   invoice` refuses only a second BALANCE invoice. New signed-in RPC
+   `create_payment_invoice(order, kind, amount, note)`: a draft, due on the
+   org's terms, the note on it, "Added to invoice N (deposit of $x)" in the
+   log; refuses in words (no customer, not a live order, a second balance
+   invoice, nothing left, more than is left). 138 withdrawn: the approval
+   trigger, `deposit_due`, `special_order_deposit` / `customer_invoice_deposit`
+   and the `deposit_rate` column are dropped (no order had one);
+   `claim_pay_token(p_token, p_pay)` is kept as is — with no `deposit_due` it
+   charges the balance, and keeping the signature means no `square-pay` deploy
+   is coupled to this file. `orgs.settings.special_orders.deposit_rate` stays,
+   as New Payment's starting percentage.
+   **The app:** the order's Payments tab has **New Payment…** in place of
+   Take a payment and Create invoice… (and the "Billed on Invoice N" stop is
+   gone — an invoiced order can still take cash or ask for more), and an
+   **Invoices** table above Payments: invoice, what for, amount, status chip.
+   The Info tab's Invoice row lists every live invoice. `NewPaymentDialog`:
+   typing in an option's box chooses it; the deposit's $ and % fill each other
+   (of the order's TOTAL, starting at Settings' 10%); Cash records a `Cash`
+   payment on the order and asks the Paid-in-full question when it settles
+   it; the others create the invoice and open it. The invoice record gained a
+   "This invoice" column (editable on a draft deposit or part payment). A
+   one-order invoice's PDF is itemized only for a balance line, and its gap
+   row now reads "Deposits and earlier payments". Send ▸ Invoice goes to the
+   order's BALANCE invoice; the list's Create Invoice… and Record Payment read
+   only balance lines. QuickBooks: any line for PART of an order is refused
+   with "collect this invoice through Square" (not modelled yet). 138's order
+   switch, `/pay` choice, quote/PDF/email deposit lines and `square-pay` change
+   are reverted in the source.
+   **Verified** on a throwaway Postgres (001–139, 139 twice): deposit $36.85 →
+   draft 1001, note, 4-day terms; refusals (over, zero, no customer); draft
+   amount edit to $50 allowed, $500 refused, wording refused; deposit paid by
+   the pay link → order unchanged (Quote, no paid date, no to-do); Balance Due
+   → $331.65 "Balance due · …"; a second balance refused, other of $1 refused
+   (nothing left); +10 donuts → $364.50, deposit still $36.85; $20 cash →
+   $344.50; balance paid by hand → Order, Print Order, $0.00; voiding a deposit
+   hands its $30 back to the balance line and drops its "Balance due" prefix;
+   a sent deposit's amount refused; Create Invoice… refuses an order with a
+   balance invoice. Fixtures 2,104 (`newPayment.fixtures.ts`; two breaks seen
+   red). tsc, lint. NOT verified in the pane (signed out; 139 not applied).
+   **Deploy:** apply 139 — the order screen reads `customer_invoice_lines.
+   kind`, so it fails until then. `square-pay`'s source is back to v9; the
+   deployed v10 is compatible (it asks for the balance) — redeploy to match.
+
+   **SUPERSEDED BY 139 (above). Shipped 2026-09-25, MIGRATION 138 APPLIED (Mark, same day), `square-pay` v10 DEPLOYED — DEPOSITS,
    AS A PART OF THE ORDER'S ONE INVOICE.** Mark: "Being able to place a deposit
    is my next priority here. I want to get it right." First the research he
    asked for: QuickBooks has two deposit flows — a deposit requested on the

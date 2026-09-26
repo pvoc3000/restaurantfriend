@@ -211,6 +211,9 @@ export default async function SpecialOrdersPage({
         .select("special_order_id, invoice_id, customer_invoices!inner ( voided_at )")
         .in("special_order_id", ids)
         .is("customer_invoices.voided_at", null)
+        // 139: the invoice billing its BALANCE — a deposit invoice does not
+        // stop the list's Create Invoice… or Record Payment.
+        .eq("kind", "balance")
         .order("id")
         .range(from, from + 999);
       if (invoiceError) break;

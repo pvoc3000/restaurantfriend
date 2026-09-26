@@ -38,11 +38,6 @@ export type PayTokenState =
       total: number;
       paid: number;
       balance: number;
-      /** 138: still owed toward a deposit the invoice asks for — present only
-       *  when that is a real choice (more than nothing, less than the balance).
-       *  The customer may pay it OR the balance; the server charges whichever
-       *  was chosen, never a figure from here. */
-      deposit_due?: number;
       /** Null when `orgs.settings.square_payments` is not filled in. */
       square: SquareConfig | null;
     };
@@ -92,17 +87,6 @@ export function payUrl(token: string, base: string): string {
  */
 export function payLine(link: string): string {
   return link ? `\nYou can pay online here by card, Apple Pay, Google Pay or our gift card:\n${link}\n` : "";
-}
-
-/**
- * The deposit sentence that leads `{pay_line}` when the invoice asks for one
- * (138): what it is, and that paying in full is just as welcome — most people
- * do. Empty with no deposit, so the email reads as it always has.
- */
-export function depositSentence(deposit: number, rateLabel: string | null): string {
-  if (!(deposit > 0)) return "";
-  const rate = rateLabel ? ` (${rateLabel})` : "";
-  return `\nA deposit of $${deposit.toFixed(2)}${rate} holds your date — you can pay that now and the rest later, or pay in full.\n`;
 }
 
 /** The same sentence for QuickBooks' own pay page (131), which takes cards and

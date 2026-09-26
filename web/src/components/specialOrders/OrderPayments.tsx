@@ -12,19 +12,16 @@ import {
 } from "@/lib/orderWorkflow";
 import { WorkflowOffer } from "./WorkflowOffer";
 import { RefundPayment } from "./RefundPayment";
-import { CreateInvoiceDialog } from "@/components/customerInvoices/CreateInvoiceDialog";
-import type { InvoiceCandidate } from "@/lib/customerInvoices";
+import { NewPaymentDialog } from "./NewPaymentDialog";
+import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
+import type { InvoiceStatus } from "@/lib/customerInvoices";
 
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
-import { PickList } from "@/components/ui/PickList";
-import { TextInput } from "@/components/ui/TextInput";
-import { DateField } from "@/components/ui/DateField";
 import {
-  DEFAULT_PAYMENT_TYPE,
   PAYMENT_TYPE_OPTIONS as PAYMENT_TYPES,
   isRefundablePayment,
   money,
@@ -39,6 +36,30 @@ export type PaymentRow = {
   external_ref: string | null;
   /** The customer invoice this payment was taken on (124), if any. */
   invoice?: { label: string; href: string } | null;
+};
+
+/** One of the order's invoices (139: an order can be on several — a deposit,
+ *  a part payment, the balance), as the Payments tab lists them. */
+export type OrderInvoiceRow = {
+  id: string;
+  label: string;
+  href: string;
+  /** "Deposit", "Balance due", "Part payment" — or "" for a plain one. */
+  what: string;
+  /** What it bills for THIS order. */
+  amount: number;
+  status: InvoiceStatus;
+};
+
+/** What New Payment… needs to know about the order. */
+export type NewPaymentContext = {
+  orderNumber: string;
+  total: number;
+  uninvoiced: number;
+  hasBalanceInvoice: boolean;
+  hasCustomer: boolean;
+  defaultDepositRate: number;
+  from: { href: string; label: string };
 };
 
 /**
@@ -56,8 +77,8 @@ export function OrderPayments({
   orderId,
   orgId,
   rows,
-  invoice = null,
-  createInvoice = null,
+  invoices = [],
+  newPayment = null,
   balance,
   canWrite,
   canRefund = false,
@@ -67,19 +88,14 @@ export function OrderPayments({
   orderId: string;
   orgId: string;
   rows: PaymentRow[];
+  /** Its invoices, void ones left out (139). */
+  invoices?: OrderInvoiceRow[];
   /**
-   * The customer invoice that bills this order (124). While there is one, the
-   * money is taken ON THE INVOICE — split across its orders — so this section
-   * offers no Take a payment of its own (Mark, 2026-09-23): a payment typed
-   * here would not count against the invoice, which would go on asking for it.
+   * NEW PAYMENT… (Mark, 2026-09-25) — the one door for money: cash now, or an
+   * invoice for the balance, a deposit or another amount. Null where an order
+   * cannot take one (a template, a standing order).
    */
-  invoice?: { label: string; href: string } | null;
-  /**
-   * CREATE INVOICE, beside Take a payment (Mark, 2026-09-23) — the same
-   * dialog as the Actions menu's Create Invoice…, stopping at the draft.
-   * Offered only while no invoice bills the order.
-   */
-  createInvoice?: { candidate: InvoiceCandidate; from: { href: string; label: string } } | null;
+  newPayment?: NewPaymentContext | null;
   balance: number;
   canWrite: boolean;
   /** Manager and up — `canRefundPayments`. Offers Refund… on pay-link rows. */
@@ -95,67 +111,20 @@ export function OrderPayments({
 
   const [offer, setOffer] = useState<Consequence[] | null>(null);
   const [refunding, setRefunding] = useState<PaymentRow | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [creatingInvoice, setCreatingInvoice] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [paidOn, setPaidOn] = useState<string | null>(today);
-  const [type, setType] = useState(DEFAULT_PAYMENT_TYPE);
-  const [note, setNote] = useState("");
+  const [opening, setOpening] = useState(false);
 
-  function reset() {
-    setAmount("");
-    setPaidOn(today);
-    setType(DEFAULT_PAYMENT_TYPE);
-    setNote("");
-  }
-
-  function take() {
-    const value = Number(amount);
-    if (!Number.isFinite(value) || value === 0) return;
-    setError(null);
-    start(async () => {
-      const { data, error: e } = await supabase
-        .from("special_order_payments")
-        .insert({
-          // Explicit — design rule 1.
-          org_id: orgId,
-          order_id: orderId,
-          amount: value,
-          paid_on: paidOn,
-          payment_type: type || null,
-          note: note.trim() || null,
-        })
-        .select("id");
-      if (e) {
-        setError(e.message);
-        return;
-      }
-      if (!data?.length) {
-        setError("Nothing was recorded — the database refused it and said nothing.");
-        return;
-      }
-      reset();
-      setAdding(false);
-      router.refresh();
-
-      /**
-       * RECORDING THE MONEY IS THE PAID EVENT (Mark, 2026-08-21).
-       *
-       * Asked only when this payment SETTLES the order, which is why it reads
-       * the balance rather than the payment: a deposit on a wedding order is
-       * not the moment an invoice is paid, and asking on every part-payment
-       * would teach somebody to dismiss the question by the time it mattered.
-       *
-       * `balance` is the figure BEFORE this payment — the server has not
-       * re-rendered yet — so the test subtracts what was just taken. A credit
-       * (a negative payment) can only move it the wrong way, which the
-       * comparison handles by being a comparison rather than a flag.
-       */
-      if (balance - value <= 0.005) {
-        const cs = afterPaymentSettled(workflow, paidOn ?? today);
-        if (cs.length > 0) setOffer(cs);
-      }
-    });
+  /**
+   * RECORDING THE MONEY IS THE PAID EVENT (Mark, 2026-08-21) — asked only
+   * when cash SETTLES the order, which is why it reads the balance rather than
+   * the payment. `balance` is the figure BEFORE this payment; the server has
+   * not re-rendered yet. An invoice's payment settles the order in the
+   * database instead (139's allocate).
+   */
+  function afterCash(amount: number) {
+    if (balance - amount <= 0.005) {
+      const cs = afterPaymentSettled(workflow, today);
+      if (cs.length > 0) setOffer(cs);
+    }
   }
 
   async function remove(row: PaymentRow) {
@@ -188,6 +157,41 @@ export function OrderPayments({
   const showInvoice = rows.some((p) => p.invoice);
 
   return (
+    <div className="space-y-8">
+    {invoices.length > 0 ? (
+      <section className="space-y-2">
+        {/* THE ORDER'S INVOICES, then what they collected (Mark, 2026-09-25:
+            "Back on the special order page, the invoice is shown along with
+            its status"). */}
+        <SectionHeading count={invoices.length}>Invoices</SectionHeading>
+        <table className="w-full max-w-[52rem] border-collapse text-[14px]">
+          <thead>
+            <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
+              <th className="w-36 px-3 py-2 text-left">Invoice</th>
+              <th className="px-3 py-2 text-left">For</th>
+              <th className="w-28 px-3 py-2 text-right">Amount</th>
+              <th className="w-44 px-3 py-2 text-left">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoices.map((i) => (
+              <tr key={i.id} className="hover:bg-neutral-50">
+                <td className="px-3 py-2">
+                  <Link href={i.href} className="underline underline-offset-2">
+                    {i.label}
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-muted">{i.what || "Order"}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{money(i.amount)}</td>
+                <td className="px-3 py-2">
+                  <InvoiceStatusChip status={i.status} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    ) : null}
     <section className="space-y-2">
       <SectionHeading count={rows.length}>Payments</SectionHeading>
 
@@ -282,90 +286,29 @@ export function OrderPayments({
         </table>
       )}
 
-      {invoice ? (
-        <p className="text-[13px] text-muted">
-          Billed on{" "}
-          <Link href={invoice.href} className="text-ink underline underline-offset-2">
-            {invoice.label}
-          </Link>{" "}
-          — payments are recorded there.
-        </p>
-      ) : canWrite ? (
-        adding ? (
-          <div className="flex flex-wrap items-end gap-3 border border-hairline p-4">
-            <Field label="Amount">
-              <TextInput
-                value={amount}
-                onValueChange={setAmount}
-                placeholder={balance > 0 ? balance.toFixed(2) : ""}
-                aria-label="Amount received"
-                className="w-32"
-                autoFocus
-              />
-            </Field>
-            <Field label="Date">
-              {/* The bordered box (Mark, 2026-09-16). `boxed` fills its track,
-                  so the width is the wrapper's — `className` reaches only the
-                  input inside. */}
-              <div className="w-40">
-                <DateField value={paidOn} onChange={setPaidOn} ariaLabel="Payment date" boxed />
-              </div>
-            </Field>
-            <Field label="How">
-              <PickList
-                value={type}
-                onPick={setType}
-                variant="field"
-                allowNew
-                ariaLabel="How it was paid"
-                options={PAYMENT_TYPES}
-                className="w-48"
-              />
-            </Field>
-            <Field label="Note">
-              <TextInput value={note} onValueChange={setNote} aria-label="Payment note" className="w-56" />
-            </Field>
-            <button type="button" className={BUTTON_CLASS} onClick={take} disabled={pending || !amount.trim()}>
-              {pending ? "Recording…" : "Record"}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setAdding(false); reset(); }}
-              className="text-[13px] text-muted underline underline-offset-2 hover:text-ink"
-            >
-              Cancel
-            </button>
-            {/* The balance is stated where the amount is typed, because "how
-                much is left" is the question this form exists to answer. It is
-                a PLACEHOLDER rather than a prefilled value: a deposit is the
-                normal case here (FMP's own notes are full of "10% deposit"). */}
-            {balance > 0 ? (
-              <span className="text-[12px] text-muted">{money(balance)} outstanding</span>
-            ) : null}
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            {createInvoice ? (
-              <button type="button" className={BUTTON_CLASS} onClick={() => setCreatingInvoice(true)}>
-                Create invoice…
-              </button>
-            ) : null}
-            <button type="button" className={BUTTON_CLASS} onClick={() => setAdding(true)}>
-              Take a payment
-            </button>
-          </div>
-        )
+      {canWrite && newPayment ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" className={BUTTON_CLASS} onClick={() => setOpening(true)}>
+            New Payment…
+          </button>
+        </div>
       ) : null}
 
       {error ? <p className="text-[13px] text-accent">{error}</p> : null}
-      {creatingInvoice && createInvoice && (
-        <CreateInvoiceDialog
-          candidates={[createInvoice.candidate]}
+      {opening && newPayment && (
+        <NewPaymentDialog
+          orderId={orderId}
           orgId={orgId}
+          orderNumber={newPayment.orderNumber}
+          total={newPayment.total}
+          uninvoiced={newPayment.uninvoiced}
+          hasBalanceInvoice={newPayment.hasBalanceInvoice}
+          hasCustomer={newPayment.hasCustomer}
+          defaultDepositRate={newPayment.defaultDepositRate}
           today={today}
-          onClose={() => setCreatingInvoice(false)}
-          from={createInvoice.from}
-          thenSend={false}
+          from={newPayment.from}
+          onClose={() => setOpening(false)}
+          onCash={afterCash}
         />
       )}
       {refunding && (
@@ -376,7 +319,7 @@ export function OrderPayments({
           onClose={() => setRefunding(null)}
         />
       )}
-      {/* Asked only once the balance is clear — see `take`. */}
+      {/* Asked only once the balance is clear — see `afterCash`. */}
       {offer && (
         <WorkflowOffer
           orderId={orderId}
@@ -387,16 +330,6 @@ export function OrderPayments({
         />
       )}
     </section>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-        {label}
-      </span>
-      {children}
-    </label>
+    </div>
   );
 }

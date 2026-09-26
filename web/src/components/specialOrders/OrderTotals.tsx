@@ -8,13 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Checkbox } from "@/components/ui/Checkbox";
-import {
-  depositAmount,
-  money,
-  validDepositRate,
-  type MoneyOrder,
-  type OrderTotals as Totals,
-} from "@/lib/specialOrders";
+import { money, type MoneyOrder, type OrderTotals as Totals } from "@/lib/specialOrders";
 import { PERCENT_SCALE, percentLabel, toPercent } from "@/lib/percent";
 
 /**
@@ -36,8 +30,6 @@ export function OrderTotals({
   totals,
   inputs,
   rushSuggestion,
-  depositRate,
-  defaultDepositRate,
   canWrite,
 }: {
   id: string;
@@ -45,11 +37,6 @@ export function OrderTotals({
   inputs: MoneyOrder;
   /** Decision 22's figure, or null outside the cutoff. */
   rushSuggestion: number | null;
-  /** The deposit this order asks for (138), or null — the usual case. */
-  depositRate: number | null;
-  /** Settings' rate, copied onto the order when the switch goes on. Null
-   *  where a deposit means nothing — a template or a standing order. */
-  defaultDepositRate: number | null;
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -86,27 +73,6 @@ export function OrderTotals({
       else router.refresh();
     });
   }
-
-  // A DEPOSIT IS OPT-IN PER ORDER (Mark, 2026-09-25: "We need to be able to
-  // take a deposit, without having to take a deposit"). Switching it on COPIES
-  // Settings' rate onto the order, so a later change to the setting does not
-  // move a deposit already quoted; off is null.
-  function setDeposit(next: boolean) {
-    setError(null);
-    start(async () => {
-      const { data, error: e } = await supabase
-        .from("special_orders")
-        .update({ deposit_rate: next ? validDepositRate(defaultDepositRate) : null })
-        .eq("id", id)
-        .select("id");
-      if (e) setError(e.message);
-      else if (!data?.length) setError("The change wasn't saved — the database refused it silently.");
-      else router.refresh();
-    });
-  }
-  const orderDepositRate = validDepositRate(depositRate);
-  const shownDepositRate = orderDepositRate ?? defaultDepositRate ?? 0;
-  const deposit = depositAmount(totals.total, orderDepositRate);
 
   // A RATE IS SET — `null` is no rate, and 0 is somebody saying "no rush fee on
   // this one", which is a rate and must keep the dollar box out of the answer.
@@ -252,17 +218,6 @@ export function OrderTotals({
               about somebody else's order. The switch's own accessible name still
               says what it does; it is the label that names the control, and the
               control is named. */}
-          {defaultDepositRate !== null || orderDepositRate !== null ? (
-          <Line label="Deposit">
-            <Checkbox
-              size="lg"
-              checked={orderDepositRate !== null}
-              disabled={!canWrite || pending}
-              onChange={() => setDeposit(orderDepositRate === null)}
-              label={`Ask for a ${percentLabel(toPercent(shownDepositRate))} deposit`}
-            />
-          </Line>
-          ) : null}
           <Line label="Ignore the balance">
             <Checkbox
               size="lg"
@@ -282,9 +237,6 @@ export function OrderTotals({
           {totals.rushFee > 0 ? <Figure label="Rush fee" value={totals.rushFee} /> : null}
           <Figure label="Tax" value={totals.tax} hint={`on ${money(totals.taxableSubtotal)} taxable`} />
           <Figure label="Total" value={totals.total} strong />
-          {deposit > 0 ? (
-            <Figure label={`Deposit (${percentLabel(toPercent(shownDepositRate))})`} value={deposit} />
-          ) : null}
           <Figure label="Paid" value={totals.paid} />
           <Figure
             label="Balance"
