@@ -158,12 +158,16 @@ export function OrderPayments({
 
   return (
     <div className="space-y-8">
-    {invoices.length > 0 ? (
+    {invoices.length > 0 || newPayment ? (
       <section className="space-y-2">
         {/* THE ORDER'S INVOICES, then what they collected (Mark, 2026-09-25:
             "Back on the special order page, the invoice is shown along with
-            its status"). */}
+            its status"). ALWAYS THERE on an order that can take a payment,
+            empty or not (Mark, same day) — like Payments below it. */}
         <SectionHeading count={invoices.length}>Invoices</SectionHeading>
+        {invoices.length === 0 ? (
+          <p className="text-sm text-muted">No invoices yet.</p>
+        ) : (
         <table className="w-full max-w-[52rem] border-collapse text-[14px]">
           <thead>
             <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
@@ -190,6 +194,7 @@ export function OrderPayments({
             ))}
           </tbody>
         </table>
+        )}
       </section>
     ) : null}
     <section className="space-y-2">
