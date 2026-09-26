@@ -22,7 +22,7 @@ import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
 import {
   PAYMENT_TYPE_OPTIONS as PAYMENT_TYPES,
   isRefundablePayment,
@@ -162,14 +162,23 @@ export function OrderPayments({
   const showInvoice = rows.some((p) => p.invoice);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-14">
     {invoices.length > 0 || ctx ? (
       <section className="space-y-2">
         {/* THE ORDER'S INVOICES, then what they collected (Mark, 2026-09-25:
             "Back on the special order page, the invoice is shown along with
             its status"). ALWAYS THERE on an order that can take a payment,
             empty or not (Mark, same day) — like Payments below it. */}
-        <SectionHeading count={invoices.length}>Invoices</SectionHeading>
+        {/* EACH COMMAND ON ITS HEADING'S LINE, at the right edge of the table
+            under it, small (Mark, 2026-09-25) — it acts on that section. */}
+        <div className="flex max-w-[52rem] items-center justify-between gap-4">
+          <SectionHeading count={invoices.length}>Invoices</SectionHeading>
+          {canWrite && ctx ? (
+            <button type="button" className={SMALL_BUTTON_CLASS} onClick={() => setOpening("invoice")}>
+              New Invoice…
+            </button>
+          ) : null}
+        </div>
         {invoices.length === 0 ? (
           <p className="text-sm text-muted">No invoices yet.</p>
         ) : (
@@ -200,17 +209,17 @@ export function OrderPayments({
           </tbody>
         </table>
         )}
-        {canWrite && ctx ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <button type="button" className={BUTTON_CLASS} onClick={() => setOpening("invoice")}>
-              New Invoice…
-            </button>
-          </div>
-        ) : null}
       </section>
     ) : null}
     <section className="space-y-2">
-      <SectionHeading count={rows.length}>Payments</SectionHeading>
+      <div className="flex max-w-[52rem] items-center justify-between gap-4">
+        <SectionHeading count={rows.length}>Payments</SectionHeading>
+        {canWrite && ctx ? (
+          <button type="button" className={SMALL_BUTTON_CLASS} onClick={() => setOpening("payment")}>
+            New Payment…
+          </button>
+        ) : null}
+      </div>
 
       {rows.length === 0 ? (
         <p className="text-sm text-muted">Nothing received yet.</p>
@@ -303,13 +312,6 @@ export function OrderPayments({
         </table>
       )}
 
-      {canWrite && ctx ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <button type="button" className={BUTTON_CLASS} onClick={() => setOpening("payment")}>
-            New Payment…
-          </button>
-        </div>
-      ) : null}
 
       {error ? <p className="text-[13px] text-accent">{error}</p> : null}
       {opening === "invoice" && ctx && (
