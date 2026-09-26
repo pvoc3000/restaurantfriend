@@ -37,7 +37,12 @@ import { resolveItemPrice } from "@/lib/productionPrice";
 import { OrderLines, type OrderLineRow } from "@/components/specialOrders/OrderLines";
 import { OrderNumberCell } from "@/components/specialOrders/OrderNumberCell";
 import type { MenuItem } from "@/components/specialOrders/AddOrderLine";
-import { OrderPayments, type OrderInvoiceRow, type PaymentRow } from "@/components/specialOrders/OrderPayments";
+import {
+  OrderPayments,
+  type NewPaymentContext,
+  type OrderInvoiceRow,
+  type PaymentRow,
+} from "@/components/specialOrders/OrderPayments";
 import { uninvoicedAmount } from "@/lib/newPayment";
 import { CompletionDates } from "@/components/specialOrders/CompletionDates";
 import { StatusCatchUp } from "@/components/specialOrders/StatusCatchUp";
@@ -486,6 +491,19 @@ export async function SpecialOrderDetail({
     on_invoice: liveInvoice !== null,
   };
   const invoiceFrom = { href: orderTabHref(id, "payments", rawParams), label: `#${row.number as string}` };
+  // NEW PAYMENT (139) — the Payments tab's button and the Actions menu's row.
+  const newPayment: NewPaymentContext | null =
+    kind === "order" && row.status !== "cancelled"
+      ? {
+          orderNumber: row.number as string,
+          total: totals.total,
+          uninvoiced,
+          hasBalanceInvoice: liveInvoice !== null,
+          hasCustomer: !!customer,
+          defaultDepositRate: settings.depositRate,
+          from: invoiceFrom,
+        }
+      : null;
 
   // A HEAD count, and only when there is a schedule to count. It cannot join
   // the wave above: it depends on `production_schedule_id`, which arrives in
@@ -705,6 +723,8 @@ export async function SpecialOrderDetail({
                         liveInvoiceLabel: liveInvoice?.label ?? null,
                         candidate: invoiceCandidate,
                         from: { href: orderTabHref(id, activeTab, rawParams), label: `#${row.number as string}` },
+                        newPayment,
+                        balance: totals.balance,
                       },
                     }
                   : null
@@ -1245,19 +1265,7 @@ export async function SpecialOrderDetail({
                     orgId={row.org_id as string}
                     rows={payments}
                     invoices={orderInvoices}
-                    newPayment={
-                      kind === "order" && row.status !== "cancelled"
-                        ? {
-                            orderNumber: row.number as string,
-                            total: totals.total,
-                            uninvoiced,
-                            hasBalanceInvoice: liveInvoice !== null,
-                            hasCustomer: !!customer,
-                            defaultDepositRate: settings.depositRate,
-                            from: invoiceFrom,
-                          }
-                        : null
-                    }
+                    newPayment={newPayment}
                     balance={totals.balance}
                     canWrite={canWrite}
                     canRefund={canRefundPayments(session.membership.role)}

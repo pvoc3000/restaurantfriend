@@ -37,10 +37,13 @@ import { downloadBlob, openWindowNow, showBlob } from "@/lib/poProcessing";
 import {
   DOCUMENT_STAMPS,
   afterDocumentSent,
+  afterPaymentSettled,
   type Consequence,
   type WorkflowOrder,
 } from "@/lib/orderWorkflow";
 import { WorkflowOffer } from "./WorkflowOffer";
+import { NewPaymentDialog } from "./NewPaymentDialog";
+import type { NewPaymentContext } from "./OrderPayments";
 import { CreateInvoiceDialog } from "@/components/customerInvoices/CreateInvoiceDialog";
 import { sendIntent, type InvoiceCandidate } from "@/lib/customerInvoices";
 import { withFrom } from "@/lib/breadcrumbs";
@@ -132,12 +135,20 @@ export function SendDocument({
     liveInvoiceLabel?: string | null;
     candidate: InvoiceCandidate;
     from: { href: string; label: string };
+    /** NEW PAYMENT… in the Actions menu (Mark, 2026-09-25: "replace create
+     *  invoice… in the special order action menu with our New Payment
+     *  method") — the Payments tab's dialog. Null for a cancelled order. */
+    newPayment?: NewPaymentContext | null;
+    /** The order's balance now, to ask Paid in full when cash clears it. */
+    balance?: number;
   } | null;
 }) {
   const router = useRouter();
   /** The dialog is open, and whether it goes on to Send (Send ▸ Invoice) or
    *  stops at the draft (Create Invoice…). */
   const [creatingInvoice, setCreatingInvoice] = useState<"send" | "draft" | null>(null);
+  const [newPaymentOpen, setNewPaymentOpen] = useState(false);
+  const [offerTitle, setOfferTitle] = useState<string | undefined>(undefined);
   const supabase = createClient();
   const [kind, setKind] = useState<DocumentKind>("quote");
   const [busy, setBusy] = useState<string | null>(null);
@@ -411,22 +422,25 @@ export function SendDocument({
     { label: "Preview", items: submenu(preview) },
     { label: "Download", items: submenu(download) },
     { label: "Send…", items: submenu(sendAct) },
-    // THE ORDER'S INVOICE, AS A RECORD (Mark, 2026-09-23: "We need a way to
-    // create an invoice from the special order detail page"). Create stops at
-    // a draft to check; when one already bills the order, this opens it.
-    ...(invoice
+    // THE ORDER'S MONEY (Mark, 2026-09-25: New Payment replaces Create
+    // Invoice… here, as it did on the Payments tab). The invoice billing its
+    // balance, when there is one, is still a row away.
+    ...(invoice?.liveInvoiceId
       ? [
-          invoice.liveInvoiceId
-            ? {
-                label: `Open ${invoice.liveInvoiceLabel ?? "Invoice"}`,
-                onSelect: () =>
-                  router.push(withFrom(`/customer-invoices/${invoice.liveInvoiceId}`, invoice.from)),
-              }
-            : {
-                label: "Create Invoice…",
-                onSelect: () => setCreatingInvoice("draft"),
-                disabled: busy !== null,
-              },
+          {
+            label: `Open ${invoice.liveInvoiceLabel ?? "Invoice"}`,
+            onSelect: () =>
+              router.push(withFrom(`/customer-invoices/${invoice.liveInvoiceId}`, invoice.from)),
+          },
+        ]
+      : []),
+    ...(invoice?.newPayment
+      ? [
+          {
+            label: "New Payment…",
+            onSelect: () => setNewPaymentOpen(true),
+            disabled: busy !== null,
+          },
         ]
       : []),
   ];
@@ -598,12 +612,42 @@ export function SendDocument({
         />
       )}
 
+      {newPaymentOpen && invoice?.newPayment && (
+        <NewPaymentDialog
+          orderId={orderId}
+          orgId={orgId}
+          orderNumber={invoice.newPayment.orderNumber}
+          total={invoice.newPayment.total}
+          uninvoiced={invoice.newPayment.uninvoiced}
+          hasBalanceInvoice={invoice.newPayment.hasBalanceInvoice}
+          hasCustomer={invoice.newPayment.hasCustomer}
+          defaultDepositRate={invoice.newPayment.defaultDepositRate}
+          today={today}
+          from={invoice.newPayment.from}
+          onClose={() => setNewPaymentOpen(false)}
+          onCash={(amount) => {
+            // OrderPayments' rule: asked only when the cash clears the order.
+            if ((invoice.balance ?? Infinity) - amount <= 0.005) {
+              const cs = afterPaymentSettled(workflow, today);
+              if (cs.length > 0) {
+                setOfferTitle("Paid in full");
+                setOffer(cs);
+              }
+            }
+          }}
+        />
+      )}
+
       {offer && (
         <WorkflowOffer
           orderId={orderId}
           orgId={orgId}
           consequences={offer}
-          onClose={() => setOffer(null)}
+          onClose={() => {
+            setOffer(null);
+            setOfferTitle(undefined);
+          }}
+          title={offerTitle}
         />
       )}
     </>
