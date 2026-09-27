@@ -4590,7 +4590,8 @@ one-order invoice: the itemized block now lists the ITEMS only and lost its
 would otherwise print twice — the order's own documents already work this way.
 
 **THE TEXTBOOK A/R MODEL — PHASE 1 OF 5: THE PAYMENTS LEDGER (migration 140,
-written and rehearsed 2026-09-27, NOT YET APPLIED).** Mark, 2026-09-27: "FMP
+APPLIED 2026-09-27; square-refund v4, square-pay v12, qbo-sync v36, qbo-webhook
+v4 `--no-verify-jwt` DEPLOYED the same day).** Mark, 2026-09-27: "FMP
 never had invoices and when we added them to Restaurant Friend we tried to make
 them fit an old, outdated model instead of starting from scratch. Make
 Restaurant Friend use the textbook model." The approved plan is five
@@ -4643,3 +4644,12 @@ amount and split delete refused; pay-link retry records nothing; refund capped
 per order and manager-only, reopens the invoice; QuickBooks two-invoice payment
 and replay; void releases; batch all-or-nothing). Read-only re-check after it
 is applied: `node --env-file=.env migration/check-ledger-parity.mjs`.
+**Verified on the hosted DB after Mark applied it:** `check-ledger-parity.mjs`
+→ 6,495 carried, 6,476 orders and 5 live invoices compared, parity holds; the
+app's own reads, run as a signed-in owner (one-off magic-link session, signed
+out after), see all 6,495 rows through RLS and are refused an insert into the
+frozen table; server renders of the order Payments tab, `/customer-invoices`
+and its record, `/customers` and a customer, `/special-orders` and `/start`
+all return 200 with the right figures, and a QuickBooks payment's amount
+renders read-only (0 editors) where an order's hand-typed ones stay editable
+(3). The browser pane itself had no session, so nothing was clicked.
