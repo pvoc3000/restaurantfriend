@@ -26,6 +26,7 @@ import {
 import { sortRows } from "@/lib/tableSort";
 import { InvoiceStatusChip } from "./InvoiceStatusChip";
 import { CheckQuickBooksPayments } from "./QuickBooksPaymentCheck";
+import { NewCustomerInvoice } from "./NewCustomerInvoice";
 import { money } from "@/lib/specialOrders";
 import { usDate } from "@/lib/specialOrderDocs";
 import {
@@ -57,19 +58,22 @@ const PATH = "/customer-invoices";
 const SORT_KEYS = ["number", "customer", "issued", "due", "status", "processor", "orders", "total", "balance"] as const;
 
 /**
- * Every customer invoice (migration 124). There is NO create command here:
- * an invoice is made from the orders it bills — select them on Special Orders
- * and choose Create Invoice… — so the only thing this screen could offer is a
- * dialog that asks you to go and pick orders.
+ * Every customer invoice (migration 124). NEW INVOICE… makes one for a
+ * customer at a shop with no orders yet (141, Mark 2026-09-27); Create
+ * Invoice… on a selection of Special Orders is still the quick way to bill a
+ * week.
  */
 export function CustomerInvoicesList({
   rows,
   initialFilters,
   initialSearch = "",
+  create = null,
 }: {
   rows: CustomerInvoiceRow[];
   initialFilters?: RawSearchParams;
   initialSearch?: string;
+  /** Supervisor+: what New Invoice… needs. Null hides it. */
+  create?: { orgId: string; shops: { id: string; code: string }[]; today: string; termsDays: number } | null;
 }) {
   const dimensions = useMemo<FilterDimension<CustomerInvoiceRow>[]>(
     () => [
@@ -225,11 +229,14 @@ export function CustomerInvoicesList({
         values={filters}
         onChange={changeFilters}
         showCount={false}
-        trailing={
-          // Only while there is a QuickBooks invoice still waiting on money.
-          rows.some((r) => r.processor === "quickbooks" && (r.status === "sent" || r.status === "overdue" || r.status === "changed"))
-            ? <CheckQuickBooksPayments />
-            : undefined
+        rowAction={
+          <div className="flex items-center gap-2">
+            {/* Only while there is a QuickBooks invoice still waiting on money. */}
+            {rows.some((r) => r.processor === "quickbooks" && (r.status === "sent" || r.status === "overdue")) ? (
+              <CheckQuickBooksPayments />
+            ) : null}
+            {create ? <NewCustomerInvoice {...create} /> : null}
+          </div>
         }
         leading={
           <div className={`${SEARCH_PEN} space-y-1.5`}>

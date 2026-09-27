@@ -43,7 +43,7 @@ import {
   type OrderInvoiceRow,
   type PaymentRow,
 } from "@/components/specialOrders/OrderPayments";
-import { uninvoicedAmount, type OpenInvoice } from "@/lib/newPayment";
+import { unbilledAmount, type OpenInvoice } from "@/lib/newPayment";
 import { applicationCounts, isSplitPayment, paymentsToCount, type LedgerRow } from "@/lib/customerPayments";
 import { CompletionDates } from "@/components/specialOrders/CompletionDates";
 import { StatusCatchUp } from "@/components/specialOrders/StatusCatchUp";
@@ -68,7 +68,6 @@ import {
   SQUARE_ITEM_OPTIONS,
   type InvoiceCandidate,
   type InvoiceLineKind,
-  invoiceChanged,
   invoiceNumberText,
   invoiceStatus,
   readInvoiceTerms,
@@ -216,7 +215,7 @@ export async function SpecialOrderDetail({
     // a payment taken on an invoice later voided still names it.
     supabase
       .from("customer_invoice_lines")
-      .select("invoice_id, amount, sent_amount, kind, customer_invoices ( id, number, sent_at, paid_at, voided_at, due_on )")
+      .select("invoice_id, amount, kind, line_type, customer_invoices ( id, number, sent_at, paid_at, voided_at, due_on )")
       .eq("special_order_id", id),
   ]);
 
@@ -317,35 +316,39 @@ export async function SpecialOrderDetail({
    */
   const invoiceTerms = readInvoiceTerms(session.orgSettings as Record<string, unknown>);
   type InvoiceRef = { id: string; number: number; sent_at: string | null; paid_at: string | null; voided_at: string | null; due_on: string | null };
+  // AN ORDER IS SEVERAL LINES ON AN INVOICE since 141 (its charges, copied),
+  // so the rows are summed per invoice: what THIS order bills on each, and
+  // whether that is a deposit or its charges.
   const invoiceLinks = (invoiceLinkRows ?? []) as unknown as {
-    amount: number; sent_amount: number | null; kind: InvoiceLineKind | null; customer_invoices: InvoiceRef | null;
+    amount: number; kind: InvoiceLineKind | null; line_type: string | null; customer_invoices: InvoiceRef | null;
   }[];
-  const invoicesOnOrder = invoiceLinks
-    .map((l) => l.customer_invoices)
-    .filter((i): i is InvoiceRef => i !== null);
+  const onInvoice = new Map<string, { invoice: InvoiceRef; amount: number; kind: InvoiceLineKind }>();
+  for (const l of invoiceLinks) {
+    if (!l.customer_invoices) continue;
+    const had = onInvoice.get(l.customer_invoices.id);
+    const kind: InvoiceLineKind = l.line_type === "deposit" ? l.kind ?? "deposit" : had?.kind ?? "balance";
+    onInvoice.set(l.customer_invoices.id, {
+      invoice: l.customer_invoices,
+      amount: Math.round(((had?.amount ?? 0) + Number(l.amount)) * 100) / 100,
+      kind: had && had.kind !== "balance" ? had.kind : kind,
+    });
+  }
+  const invoicesOnOrder = [...onInvoice.values()].map((x) => x.invoice);
   const invoiceHref = (invoiceId: string, from: string) =>
     withFrom(`/customer-invoices/${invoiceId}`, { href: from, label: `#${row.number as string}` });
   const invoiceLabel = (i: InvoiceRef) => `Invoice ${invoiceNumberText(i.number, invoiceTerms)}`;
+  const statusOf = (i: InvoiceRef) => invoiceStatus(i, today);
+  const liveInvoices = [...onInvoice.values()]
+    .filter((x) => !x.invoice.voided_at)
+    .sort((a, b) => a.invoice.number - b.invoice.number);
+  // Where Send ▸ Invoice goes: the newest live invoice billing this order's
+  // CHARGES (not a deposit), an unpaid one first.
+  const chargeInvoices = liveInvoices.filter((x) => x.kind === "balance");
   const liveInvoiceRow =
-    invoiceLinks.find((l) => l.customer_invoices && !l.customer_invoices.voided_at && (l.kind ?? "balance") === "balance")
-      ?.customer_invoices ?? null;
-  const statusOf = (i: InvoiceRef) =>
-    invoiceStatus(i, today, invoiceChanged(invoiceLinks.filter((l) => l.customer_invoices?.id === i.id)));
-  const liveInvoices = invoiceLinks
-    .filter((l) => l.customer_invoices && !l.customer_invoices.voided_at)
-    .sort((a, b) => a.customer_invoices!.number - b.customer_invoices!.number);
+    ([...chargeInvoices].reverse().find((x) => !x.invoice.paid_at) ?? chargeInvoices[chargeInvoices.length - 1])
+      ?.invoice ?? null;
   const liveInvoice = liveInvoiceRow
-    ? {
-        id: liveInvoiceRow.id,
-        label: invoiceLabel(liveInvoiceRow),
-        // THIS order's line moving since the send is what makes the invoice
-        // "changed" from here — it is the change somebody just made.
-        status: invoiceStatus(
-          liveInvoiceRow,
-          today,
-          invoiceChanged(invoiceLinks.filter((l) => l.customer_invoices?.id === liveInvoiceRow.id))
-        ),
-      }
+    ? { id: liveInvoiceRow.id, label: invoiceLabel(liveInvoiceRow), status: invoiceStatus(liveInvoiceRow, today) }
     : null;
 
   // A PAYMENT SPLIT ACROSS SEVERAL ORDERS OR INVOICES (140) is one payment:
@@ -369,21 +372,16 @@ export async function SpecialOrderDetail({
     };
   });
 
-  // What New Payment may still invoice (139) — `special_order_uninvoiced`.
-  const voidInvoiceIds = new Set(invoicesOnOrder.filter((i) => i.voided_at).map((i) => i.id));
   const orderInvoices: OrderInvoiceRow[] = liveInvoices.map((l) => {
-    const i = l.customer_invoices!;
+    const i = l.invoice;
     return {
       id: i.id,
       label: invoiceLabel(i),
       href: invoiceHref(i.id, orderTabHref(id, "payments", rawParams)),
-      // A balance line alone is just the order; beside a deposit it is the
-      // balance due, as its own wording says.
-      what:
-        (l.kind ?? "balance") === "balance"
-          ? liveInvoices.length > 1 ? "Balance due" : ""
-          : LINE_KIND_LABEL[l.kind!],
-      amount: Number(l.amount),
+      // The order's charges alone are just the order; beside a deposit they
+      // are the balance due.
+      what: l.kind === "balance" ? (liveInvoices.length > 1 ? "Balance due" : "") : LINE_KIND_LABEL[l.kind],
+      amount: l.amount,
       status: statusOf(i),
     };
   });
@@ -398,14 +396,11 @@ export async function SpecialOrderDetail({
     ignore_balance: Boolean(row.ignore_balance),
   };
   const totals = orderTotals(moneyInputs, lines, payments, settings.rush);
-  const uninvoiced = uninvoicedAmount({
+  // What New Invoice may still bill (141) — `special_order_unbilled`.
+  const unbilled = unbilledAmount({
     total: totals.total,
     cancelled: row.status === "cancelled",
-    payments: payments.map((p) => {
-      const invoiceId = (p as unknown as { customer_invoice_id: string | null }).customer_invoice_id;
-      return { amount: p.amount, invoiceLive: !!invoiceId && !voidInvoiceIds.has(invoiceId) };
-    }),
-    liveLines: liveInvoices.map((l) => ({ amount: Number(l.amount) })),
+    liveLines: liveInvoices.map((l) => ({ amount: l.amount })),
   });
 
   const attention = needsAttention(row as never, today, totals, settings.attention);
@@ -513,7 +508,7 @@ export async function SpecialOrderDetail({
   // payment is split across its orders by the database; this order's own line
   // is not the figure. Read only when an invoice is open.
   const openInvoiceIds = [
-    ...new Set(liveInvoices.filter((l) => !l.customer_invoices!.paid_at).map((l) => l.customer_invoices!.id)),
+    ...new Set(liveInvoices.filter((l) => !l.invoice.paid_at).map((l) => l.invoice.id)),
   ];
   const [{ count: scheduleLines }, openLineRows, openPaymentRows] = await Promise.all([
     scheduleId
@@ -542,7 +537,7 @@ export async function SpecialOrderDetail({
       const paid = (openPaymentRows.data ?? [])
         .filter((p) => p.customer_invoice_id === invoiceId)
         .reduce((a, p) => a + Number(p.amount), 0);
-      const number = liveInvoices.find((l) => l.customer_invoices!.id === invoiceId)!.customer_invoices!.number;
+      const number = liveInvoices.find((l) => l.invoice.id === invoiceId)!.invoice.number;
       return { id: invoiceId, number, label: inv.label, what: inv.what, due: Math.round((billed - paid) * 100) / 100 };
     })
     .filter((i) => i.due > 0.005);
@@ -553,8 +548,7 @@ export async function SpecialOrderDetail({
       ? {
           orderNumber: row.number as string,
           total: totals.total,
-          uninvoiced,
-          hasBalanceInvoice: liveInvoice !== null,
+          unbilled,
           hasCustomer: !!customer,
           defaultDepositRate: settings.depositRate,
           from: invoiceFrom,

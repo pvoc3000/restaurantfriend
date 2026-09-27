@@ -445,6 +445,16 @@ async function sendCustomerInvoice(
   const linkProblem = checkApprovalLink(body ?? "");
   if (linkProblem) return json(400, { error: linkProblem });
 
+  // WHAT STOPS IT GOING OUT (141) — asked BEFORE the mail, because
+  // `mark_customer_invoice_sent` runs after it and must never refuse: an order
+  // that changed since it was added, an empty invoice, lines QuickBooks cannot
+  // show. The Send button asked too; this is the one that holds.
+  const { data: problems, error: problemError } = await supabase.rpc("customer_invoice_send_problems", {
+    p_invoice: invoice.id,
+  });
+  if (problemError) return json(400, { error: problemError.message });
+  if (Array.isArray(problems) && problems.length) return json(400, { error: problems.join(" ") });
+
   const { data: org } = await supabase
     .from("orgs")
     .select("name, settings")
@@ -506,7 +516,12 @@ async function sendCustomerInvoice(
     .from("customer_invoice_lines")
     .select("special_order_id")
     .eq("invoice_id", invoice.id);
-  for (const orderId of [...new Set((invoiceLines ?? []).map((l) => l.special_order_id as string))]) {
+  // Each ORDER once (an order is several lines since 141); a free line is no
+  // order's and has nowhere to be filed.
+  const invoiceOrders = (invoiceLines ?? [])
+    .map((l) => l.special_order_id as string | null)
+    .filter((o): o is string => !!o);
+  for (const orderId of [...new Set(invoiceOrders)]) {
     const copyPath = `${invoice.org_id}/${orderId}/${crypto.randomUUID()}.pdf`;
     const { error: copyError } = await supabase.storage
       .from("special-order-attachments")

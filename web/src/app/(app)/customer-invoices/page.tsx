@@ -4,9 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import type { RawSearchParams } from "@/lib/filterMenus";
 import { parseFilterSearch } from "@/lib/filterMenus";
+import { canEditPage } from "@/lib/pageAccess";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { customerLabel } from "@/lib/specialOrders";
-import { invoiceBalance, invoiceChanged, invoiceStatus, readInvoiceTerms, invoiceNumberText } from "@/lib/customerInvoices";
+import { invoiceBalance, invoiceStatus, readInvoiceTerms, invoiceNumberText } from "@/lib/customerInvoices";
 import {
   CustomerInvoicesList,
   type CustomerInvoiceRow,
@@ -52,7 +53,7 @@ export default async function CustomerInvoicesPage({
   }
 
   const [lines, payments] = await Promise.all([
-    paged<{ invoice_id: string; amount: number; sent_amount: number | null }>(supabase, "customer_invoice_lines", "invoice_id, amount, sent_amount", orgId),
+    paged<{ invoice_id: string; amount: number; special_order_id: string | null }>(supabase, "customer_invoice_lines", "invoice_id, amount, special_order_id", orgId),
     paged<{ customer_invoice_id: string | null; amount: number }>(
       supabase,
       "payment_applications",
@@ -77,9 +78,10 @@ export default async function CustomerInvoicesPage({
       customer: customerLabel(customer) || "—",
       issued_on: inv.issued_on as string,
       due_on: inv.due_on as string | null,
-      status: invoiceStatus(inv as never, today, invoiceChanged(mine)),
+      status: invoiceStatus(inv as never, today),
       processor: ((inv as { processor?: string }).processor === "quickbooks" ? "quickbooks" : "square"),
-      orders: mine.length,
+      // Each order once — an order is several lines since 141.
+      orders: new Set(mine.map((l) => l.special_order_id).filter(Boolean)).size,
       ...money,
     };
   });
@@ -89,6 +91,16 @@ export default async function CustomerInvoicesPage({
       rows={rows}
       initialFilters={params}
       initialSearch={parseFilterSearch(params)}
+      create={
+        canEditPage(session.membership.role, "/customer-invoices")
+          ? {
+              orgId,
+              shops: session.activeLocations.map((l) => ({ id: l.id, code: l.code })),
+              today,
+              termsDays: terms.termsDays,
+            }
+          : null
+      }
     />
   );
 }

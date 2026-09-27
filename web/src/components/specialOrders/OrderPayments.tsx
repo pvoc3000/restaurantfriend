@@ -64,8 +64,8 @@ export type OrderInvoiceRow = {
 export type OrderMoneyContext = {
   orderNumber: string;
   total: number;
-  uninvoiced: number;
-  hasBalanceInvoice: boolean;
+  /** What is left to bill (141's `special_order_unbilled`). */
+  unbilled: number;
   hasCustomer: boolean;
   defaultDepositRate: number;
   from: { href: string; label: string };
@@ -190,6 +190,19 @@ export function OrderPayments({
             </button>
           ) : null}
         </div>
+        {/* WHAT ITS INVOICES DO NOT COVER (141): an invoice is a copy of the
+            order's charges when it was made, so an order that grew has some
+            left to bill, and one that shrank is billed for more than it now
+            comes to. */}
+        {ctx && invoices.length > 0 && Math.abs(ctx.unbilled) >= 0.01 ? (
+          <p className="text-[13px]">
+            <span className="box-decoration-clone bg-mark-fill px-1">
+              {ctx.unbilled > 0
+                ? `${money(ctx.unbilled)} of this order is not on an invoice yet.`
+                : `Its invoices bill ${money(-ctx.unbilled)} more than the order now comes to.`}
+            </span>
+          </p>
+        ) : null}
         {invoices.length === 0 ? (
           <p className="text-sm text-muted">No invoices yet.</p>
         ) : (
@@ -335,8 +348,7 @@ export function OrderPayments({
           orderId={orderId}
           orderNumber={ctx.orderNumber}
           total={ctx.total}
-          uninvoiced={ctx.uninvoiced}
-          hasBalanceInvoice={ctx.hasBalanceInvoice}
+          unbilled={ctx.unbilled}
           hasCustomer={ctx.hasCustomer}
           defaultDepositRate={ctx.defaultDepositRate}
           from={ctx.from}

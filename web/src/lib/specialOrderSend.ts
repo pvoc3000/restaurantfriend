@@ -283,10 +283,9 @@ export function payBreakdown(order: OrderDocData) {
   return breakdownFromTotals(order.totals, order.money.tax_rate);
 }
 
-/** The same split from an order's totals alone — what a customer invoice
- *  (124) sums across its orders, which it holds as list rows rather than as
- *  documents. */
-export function breakdownFromTotals(totals: OrderDocData["totals"], taxRate: number | null) {
+/** The same split from money in `orderTotals`' shape — an order's, or since
+ *  141 a customer invoice group's, summed from its own lines. */
+export function breakdownFromTotals(totals: Parameters<typeof invoiceSplit>[0], taxRate: number | null) {
   const { taxableNet, nonTaxableNet } = invoiceSplit(totals);
   const round2 = (v: number) => Math.round(v * 100) / 100;
   return {

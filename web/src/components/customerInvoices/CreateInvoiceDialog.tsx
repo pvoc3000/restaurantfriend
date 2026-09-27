@@ -32,9 +32,9 @@ import {
  * lands on the new invoice with its Send card already open (`?send=1`).
  * Cancelling that card leaves a draft, which is all an unsent invoice is.
  *
- * The amounts shown are the list's own `orderTotals`; the database derives
- * them again when it writes the lines (128), so the two cannot disagree for
- * long even if an order changes while this is open.
+ * The amounts shown are what each order still owes; the database copies each
+ * order's charges onto the invoice when it writes it (141), less anything its
+ * other invoices bill, and applies money already taken when it is sent.
  */
 export function CreateInvoiceDialog({
   candidates,
@@ -93,30 +93,22 @@ export function CreateInvoiceDialog({
   async function create() {
     setBusy(true);
     setError(null);
+    // 141: the customer and the shop are the first order's; each order's
+    // charges are copied onto it.
     const { data, error: e } = await supabase.rpc("create_customer_invoice", {
       p_org_id: orgId,
-      p_lines: lines,
+      p_customer: null,
+      p_location: null,
+      p_orders: lines.map((l) => l.order_id),
       p_issued_on: today,
       p_due_on: due,
       p_notes: null,
+      p_processor: processor,
     });
     if (e) {
       setBusy(false);
       setError(e.message);
       return;
-    }
-    // 131: Square is the column's default, so only QuickBooks needs a write.
-    if (processor !== "square") {
-      const { error: pe } = await supabase
-        .from("customer_invoices")
-        .update({ processor })
-        .eq("id", data as string)
-        .select("id");
-      if (pe) {
-        setBusy(false);
-        setError(`The invoice was created, but not set to collect through QuickBooks: ${pe.message}`);
-        return;
-      }
     }
     const href = thenSend
       ? `/customer-invoices/${data as string}?send=${sendIntent()}`
@@ -162,7 +154,7 @@ export function CreateInvoiceDialog({
           <>
             <p className="text-[13px] text-muted">
               {candidates[0]?.customer_name} · {count} {count === 1 ? "order" : "orders"}
-              {count === 1 ? "" : ", one line each"}.{" "}
+.{" "}
               {thenSend
                 ? "Next comes the email — cancel it and the invoice stays a draft."
                 : "It opens as a draft; nothing is sent."}

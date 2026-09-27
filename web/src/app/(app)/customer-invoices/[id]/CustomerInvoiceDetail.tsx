@@ -11,8 +11,6 @@ import {
   PROCESSOR_LABEL,
   invoiceNumberText,
   invoiceStatus,
-  invoiceChanged,
-  lineChanged,
   readInvoiceTerms,
 } from "@/lib/customerInvoices";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -21,7 +19,8 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { CustomerInvoiceCommandMenu } from "@/components/customerInvoices/CustomerInvoiceCommandMenu";
-import { CustomerInvoiceLinesTable } from "@/components/customerInvoices/CustomerInvoiceLinesTable";
+import { InvoiceOrders, type InvoiceOrderRow } from "@/components/customerInvoices/InvoiceOrders";
+import { InvoiceLines, type InvoiceLineRow } from "@/components/customerInvoices/InvoiceLines";
 import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
 import { ProcessorField } from "@/components/customerInvoices/ProcessorField";
 import { QuickBooksPaymentCheck } from "@/components/customerInvoices/QuickBooksPaymentCheck";
@@ -34,10 +33,10 @@ const INVOICES_CRUMB = { href: "/customer-invoices", label: "Invoices" };
  * One customer invoice (migration 124): what it bills, what has been paid on
  * it, and the commands — one Actions menu in the title row.
  *
- * THE LINES FOLLOW THEIR ORDERS (128): the database re-derives each one on
- * every change to its order. What the customer was SENT is kept per line, so
- * a sent invoice that has moved says so — in the header, a banner, and "sent
- * as $x" under the line — until it is sent again, keeping its number.
+ * THE INVOICE OWNS ITS LINES (141): its orders' charges, copied when they were
+ * added, and lines of its own. While it is a draft, orders are added, updated
+ * from their order or removed, and free lines edited; once it has gone out or
+ * holds money it is settled, and every send's PDF is kept below.
  */
 export async function CustomerInvoiceDetail({
   id,
@@ -72,14 +71,45 @@ export async function CustomerInvoiceDetail({
     return <p className="text-sm text-muted">That invoice does not exist, or is not yours to see.</p>;
   }
 
-  const { invoice, lines, payments } = view;
-  const status = invoiceStatus(invoice, today, invoiceChanged(lines));
+  const { invoice, payments, groups } = view;
+  const status = invoiceStatus(invoice, today);
   const numberText = invoiceNumberText(invoice.number, terms);
-  const draft = !invoice.sent_at && !invoice.voided_at;
+  // Editable: nothing sent, nothing void, no money on it (141).
+  const draft = !view.frozen;
   const trail = parseTrail(rawParams, INVOICES_CRUMB);
   const here = `/customer-invoices/${id}`;
-  const changed = invoiceChanged(lines);
-  const changedCount = lines.filter(lineChanged).length;
+  const orderGroups = groups.filter((g) => g.orderId);
+  const shop = session.locations.find((l) => l.id === invoice.location_id)?.code ?? null;
+  const backHere = { href: here, label: `Invoice ${numberText}` };
+
+  const orderRows: InvoiceOrderRow[] = orderGroups.map((g) => {
+    const order = view.orders.get(g.orderId!);
+    const state = view.groupState.get(g.orderId!);
+    return {
+      orderId: g.orderId!,
+      label: g.label,
+      href: withFrom(`/special-orders/${g.orderId}`, backHere),
+      status: order?.status ? STATUS_LABEL[order.status] : "—",
+      kind: g.kind,
+      soldAs: order?.square_item ?? g.lines[0]?.square_item ?? "special_order",
+      billed: g.net,
+      expected: state?.expected ?? g.net,
+      stale: draft && Boolean(state?.stale),
+    };
+  });
+  let position = 0;
+  const lineRows: InvoiceLineRow[] = groups.flatMap((g) =>
+    g.lines.map((l) => ({
+      id: l.id,
+      position: position++,
+      group: g.label,
+      description: l.description,
+      qty: l.qty,
+      unitPrice: l.unit_price,
+      amount: l.amount,
+      free: !l.special_order_id,
+    }))
+  );
   const processor = invoice.processor ?? "square";
   const qbo = (invoice.external_ref as { qbo?: { id?: string; doc_number?: string | null; invoice_link?: string | null } } | null)?.qbo;
 
@@ -118,7 +148,7 @@ export async function CustomerInvoiceDetail({
             <InvoiceStatusChip status={status} />
           </div>
           <p className="text-sm text-muted">
-            {lines.length} order{lines.length === 1 ? "" : "s"} · {money(view.total)}
+            {orderGroups.length} order{orderGroups.length === 1 ? "" : "s"} · {money(view.total)}
             {status !== "void" && view.balance > 0.005 ? (
               <span className="text-accent"> · {money(view.balance)} due</span>
             ) : null}
@@ -156,6 +186,11 @@ export async function CustomerInvoiceDetail({
           </Row>
           <Row label="Email">
             <span className={READ_ONLY_VALUE}>{view.customer?.email ?? "—"}</span>
+          </Row>
+          <Row label="Shop">
+            {/* The shop whose Square location collects (141) — the orders
+                added must be made there. */}
+            <span className={READ_ONLY_VALUE}>{shop ?? "—"}</span>
           </Row>
           <Row label="Issued">
             {canWrite && draft ? (
@@ -225,42 +260,16 @@ export async function CustomerInvoiceDetail({
         </dl>
       </section>
 
-      <section className="space-y-2">
-        <SectionHeading count={lines.length}>Orders</SectionHeading>
-        {changed && status !== "void" ? (
-          <p className="text-[13px]">
-            <span className="box-decoration-clone bg-mark-fill px-1">
-              {changedCount === 1 ? "One order has" : `${changedCount} orders have`} changed since this
-              invoice was sent, and its lines have followed. Send it again so the customer has the new
-              figures — the link they hold no longer works.
-            </span>
-          </p>
-        ) : null}
-        <CustomerInvoiceLinesTable
-          itemEditable={canWrite && !invoice.paid_at && !invoice.voided_at}
-          rows={lines.map((l, i) => {
-            return {
-              id: l.id,
-              orderId: l.special_order_id,
-              position: i,
-              description: l.description,
-              href: withFrom(`/special-orders/${l.special_order_id}`, { href: here, label: `Invoice ${numberText}` }),
-              orderStatus: l.order?.status ? STATUS_LABEL[l.order.status] : "—",
-              square_item: l.square_item,
-              items: l.totals?.subtotal ?? 0,
-              discount: l.totals?.discount ?? 0,
-              delivery: l.totals?.deliveryCharge ?? 0,
-              rush: l.totals?.rushFee ?? 0,
-              tax: l.totals?.tax ?? 0,
-              paid: l.totals?.paid ?? 0,
-              balance: l.totals ? l.totals.balance : l.amount,
-              sentAmount: lineChanged(l) ? (l.sent_amount ?? null) : null,
-              amount: l.amount,
-              amountEditable: canWrite && draft && (l.kind ?? "balance") !== "balance",
-            };
-          })}
-        />
-      </section>
+      <InvoiceOrders
+        invoiceId={id}
+        customerId={invoice.customer_id as string}
+        locationId={invoice.location_id}
+        rows={orderRows}
+        draft={canWrite && draft}
+        soldAsEditable={canWrite && !invoice.paid_at && !invoice.voided_at}
+      />
+
+      <InvoiceLines invoiceId={id} orgId={invoice.org_id} rows={lineRows} draft={canWrite && draft} />
 
       {sends.length > 0 ? (
         <section className="space-y-2">
@@ -323,7 +332,7 @@ export async function CustomerInvoiceDetail({
               {payments.map((p) => (
                 <tr key={p.id}>
                   <td className="px-3 py-2 tabular-nums text-muted">{usDate(p.paid_on)}</td>
-                  <td className="px-3 py-2 tabular-nums text-muted">{p.order_number ?? "—"}</td>
+                  <td className="px-3 py-2 tabular-nums text-muted">{p.order_number ?? "Other charges"}</td>
                   <td className="px-3 py-2 text-muted">{p.payment_type ?? "—"}</td>
                   <td className="px-3 py-2 text-muted">{p.note ?? ""}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{money(p.amount)}</td>

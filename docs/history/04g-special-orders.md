@@ -4653,3 +4653,70 @@ and its record, `/customers` and a customer, `/special-orders` and `/start`
 all return 200 with the right figures, and a QuickBooks payment's amount
 renders read-only (0 editors) where an order's hand-typed ones stay editable
 (3). The browser pane itself had no session, so nothing was clicked.
+
+**THE TEXTBOOK A/R MODEL — PHASE 2 OF 5: AN INVOICE OWNS ITS LINES (migration
+141, written and rehearsed 2026-09-27, NOT YET APPLIED).** Mark's three asks,
+built: an invoice with no order (**New Invoice…** on `/customer-invoices`, in
+the filter row: customer — `CustomerPicker`, a new one allowed — the shop that
+collects, due date, processor); orders added to it later (**Add Orders…**, the
+customer's orders at that shop with something left to bill,
+`customer_unbilled_orders`); and a line of its own (**Add Line…**, Delivery or
+Item, qty × price, untaxed in v1 — his "Delivery Fee").
+**THE LINES ARE COPIES.** `order_invoice_lines(order, invoice)` is the one
+place an order becomes lines: each item (qty × price, any rounding penny on the
+largest item so the group nets to `special_order_money`'s total exactly), then
+discount, delivery, rush, tax, then **"Less invoice N"** (`prior_billing`) for
+what the order's other live invoices bill. Balance Due is that copy; a deposit
+is one fixed `deposit` line. SQL refuses over-billing in words ("Order #10074 is
+billed $25.00 more than it now comes to — revise the invoice that bills it").
+Free lines are `item`/`delivery` with no order, written directly under RLS; the
+line trigger normalises them (untaxed, amount = qty × price) and refuses any
+direct write to an ORDER's lines. **FROZEN = SENT, VOID, OR HOLDING MONEY** — two
+of the live drafts (1012, 1013) had been paid before they were sent. 128/139's
+follow-the-order triggers are GONE (`sync_customer_invoice_lines` and the
+item/order/line/void triggers); only "Sold as" still follows to unpaid lines. A
+draft whose order changed shows "The order has changed — it now comes to $x
+here" with an **Update** button (`customer_invoice_groups` compares the copy to
+a fresh one with EXCEPT both ways), and **Send refuses** it —
+`customer_invoice_send_problems`, asked by the Send button AND by
+`send-special-order-email` BEFORE it mails, since `mark_customer_invoice_sent`
+runs after the email and must never refuse. The "Changed since sent" status is
+retired with `sent_amount`'s meaning.
+**THE HEADER OWNS ITS CUSTOMER AND SHOP**: `customer_id` not null (restrict),
+`location_id` = 120's rule as a column (`special_order_collecting_location`:
+the kitchen with a Square location, else the pickup shop), required unless
+void — order #10081 has neither, and sits only on void invoices. The pay link
+reads the header's shop; `claim_pay_token` emits one Square item per ORDER
+(keyed by order id, free lines 'free') and the send keys the breakdown the same
+way, each group's split cut from its own lines and scaled to what it bills
+here, so `square-pay` and `_shared/squareOrder` are unchanged.
+**CASH HELD ON AN ORDER APPLIES AT SEND** (moved or split onto the invoice,
+oldest first, logged as one line "$x already paid applied to invoice N"; not on
+a QuickBooks invoice, which send refuses along with deposit and "Less invoice"
+lines). So "unbilled" no longer subtracts cash (`unbilledAmount`,
+`special_order_unbilled`), and a paid-in-full order is settled on send.
+Payments split orders oldest first, then the invoice's own lines last with an
+application naming no order.
+**Screens:** the invoice record has an Orders section (billed here, Sold as,
+Update / Remove, a deposit's amount inline) and a Lines section (a `DataTable`
+banded by order like the paper, free lines inline-editable on a draft, ×). The
+PDF is drawn from the lines — one row per order, itemized when it is the only
+order, free lines as themselves, "Invoiced earlier" in the Totals window when
+non-zero. The order's Preview/Download ▸ Invoice opens its live invoice's PDF;
+its Payments tab says when its invoices don't bill what it comes to. The
+QuickBooks push is one line per order from its own lines (Knotted's payload
+unchanged) and a line per free line.
+**Verified:** 141 applies twice on the harness after 140; seventeen scenarios as
+real roles (empty invoice, add orders, every refusal, free line by supervisor
+refused to staff, stale → Update, held cash applied at send, frozen after,
+pay link splitting orders then the free line, deposit → "Less invoice 1004",
+QuickBooks refusal, over-billed refusal, Sold as following, picker, remove,
+create from orders, empty-invoice send refusal, anon grants). Three bugs it
+caught before Mark saw them: a `text[] || 'literal'` read as an array literal;
+deleting an order ITEM blocked by a paid line pointing at it (the FK's set
+null); the re-copy check "before = after" wrong wherever cash was held (the
+invariant is after = before + held). **Real-data rehearsal**: every one of the
+13 invoices totals what it did; #1014 re-copies to 15 lines, still $5,288.00.
+Fixtures: grouping (oldest event first; free lines last — a "~" sentinel had
+sorted them FIRST under locale collation), group totals, scaling to the cent,
+snapshot rows, the Totals window — each claim proved by breaking the code.

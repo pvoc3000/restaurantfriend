@@ -1,11 +1,12 @@
 /**
  * CUSTOMER INVOICES (migration 124) — the pure half.
  *
- * One invoice, one line per order, one pay link. Cafe Knotted's week is the
- * first user: seven standing-order days billed once, sent Sunday, due
- * Thursday. Weekly is Knotted's arrangement rather than a rule, and regular
- * special orders are meant to move onto this record later — a one-order
- * invoice is simply one line — so nothing here assumes a week.
+ * Since 141 an invoice OWNS its lines: adding an order copies its charges —
+ * items, discount, delivery, rush, tax, and "Less invoice N" for what its
+ * other invoices bill — and a FREE line ("Delivery Fee") belongs to no order.
+ * A sent invoice, or one holding money, is frozen. The lines group by order
+ * for the paper, the pay link and QuickBooks; this module does the grouping.
+ * Cafe Knotted's week is the first user, and nothing here assumes a week.
  *
  * Fixture-tested; imports nothing that talks to a server.
  */
@@ -68,11 +69,33 @@ export const SQUARE_ITEM_LABEL: Record<SquareItem, string> = {
 };
 
 /**
- * WHAT A LINE ASKS FOR (migration 139). `balance` bills what is not yet
- * invoiced on its order and follows the order (128); `deposit` and `other`
- * are a fixed amount somebody asked for with New Payment.
+ * WHAT A LINE ASKS FOR (migration 139). `balance` is an order's charges;
+ * `deposit` and `other` are a fixed amount somebody asked for with New
+ * Invoice. Since 141 the line's TYPE says what it is; this says why.
  */
 export type InvoiceLineKind = "balance" | "deposit" | "other";
+
+/**
+ * WHAT A LINE IS (141). An order's charges are `item` … `tax`, less
+ * `prior_billing` ("Less invoice 1015"); `deposit` is a fixed figure;
+ * `order_total` is one line for a whole order, the shape invoices sent before
+ * 141 have. A FREE line — no order — is an `item` or a `delivery`.
+ */
+export type InvoiceLineType =
+  | "item"
+  | "discount"
+  | "delivery"
+  | "rush"
+  | "tax"
+  | "deposit"
+  | "prior_billing"
+  | "order_total";
+
+/** What a free line can be, for Add Line…. */
+export const FREE_LINE_TYPES: { value: "item" | "delivery"; label: string }[] = [
+  { value: "delivery", label: "Delivery" },
+  { value: "item", label: "Item" },
+];
 
 /** "" for a plain balance line, so a one-invoice order reads as it did. The
  *  line's own wording says "Balance due" once the order has other invoices. */
@@ -84,42 +107,47 @@ export const LINE_KIND_LABEL: Record<InvoiceLineKind, string> = {
 
 export type CustomerInvoiceLine = {
   id: string;
-  special_order_id: string;
+  /** Null on a FREE line, which belongs to the invoice alone (141). */
+  special_order_id: string | null;
+  line_type: InvoiceLineType;
   description: string;
+  qty: number | null;
+  unit_price: number | null;
   amount: number;
+  taxable: boolean;
+  /** On a tax line, the order's rate. */
+  tax_rate: number | null;
+  /** "Order #10057 · Cafe Knotted SO (M-Th) · 10/5/2026", frozen when copied. */
+  order_label: string | null;
   sort: number | null;
   square_item: SquareItem;
-  /** 139 — absent on reads that do not ask, which are balance lines. */
+  /** 139 — why an order's line is here; see `InvoiceLineKind`. */
   kind?: InvoiceLineKind;
-  /** What this line said when the invoice was last sent (128); null before. */
-  sent_amount?: number | null;
 };
 
-export type InvoiceStatus = "draft" | "sent" | "changed" | "overdue" | "paid" | "void";
+export type InvoiceStatus = "draft" | "sent" | "overdue" | "paid" | "void";
 
 export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
   draft: "Draft",
   sent: "Sent",
-  changed: "Changed since sent",
   overdue: "Overdue",
   paid: "Paid",
   void: "Void",
 };
 
-export const INVOICE_STATUS_ORDER: InvoiceStatus[] = ["draft", "sent", "changed", "overdue", "paid", "void"];
+export const INVOICE_STATUS_ORDER: InvoiceStatus[] = ["draft", "sent", "overdue", "paid", "void"];
 
 /**
  * The status chip's colours (Mark, 2026-09-24: "an invoice chip class like
  * BILL_STAGE_CLASS or PO_STATUS_CLASS"), on those two maps' terms. Outstanding
- * wears the warm marks — sent yellow, changed-since-sent orange (it needs
- * sending again), overdue red (it needs a person); paid is the quiet white a
- * paid bill wears, finished business; draft and void keep the neutral and the
- * faint ones a PO's draft and void have.
+ * wears the warm marks — sent yellow, overdue red (it needs a person); paid is
+ * the quiet white a paid bill wears, finished business; draft and void keep
+ * the neutral and the faint ones a PO's draft and void have. (128's orange
+ * "changed since sent" went with 141: a sent invoice no longer changes.)
  */
 export const INVOICE_STATUS_CLASS: Record<InvoiceStatus, string> = {
   draft: "border border-neutral-300 bg-neutral-100 text-muted",
   sent: "border border-ink bg-[var(--rf-yellow-200)] text-ink",
-  changed: "border border-ink bg-[var(--rf-orange-200)] text-ink",
   overdue: "border border-ink bg-[var(--rf-red-200)] text-ink",
   paid: "border border-ink bg-white text-ink",
   void: "border border-neutral-300 bg-white text-faint",
@@ -128,20 +156,14 @@ export const INVOICE_STATUS_CLASS: Record<InvoiceStatus, string> = {
 /**
  * DERIVED, never stored — 124 keeps only the invoice's own dates. Void wins
  * over everything (a voided invoice that was paid is a refund to make, which
- * the screen says separately). CHANGED SINCE SENT (128) comes next, over paid
- * as well: an order that shrank after payment leaves a paid invoice that owes
- * the customer a credit, and the customer's copy is wrong either way until it
- * is re-sent. Then paid over sent; overdue is a sent invoice past its due
- * date. Dates are ISO strings, so they compare as text.
+ * the screen says separately). Then paid over sent; overdue is a sent invoice
+ * past its due date. Dates are ISO strings, so they compare as text.
  */
 export function invoiceStatus(
   inv: Pick<CustomerInvoice, "sent_at" | "paid_at" | "voided_at" | "due_on">,
-  today: string,
-  /** `invoiceChanged(lines)` — false where the caller has no lines. */
-  changed = false
+  today: string
 ): InvoiceStatus {
   if (inv.voided_at) return "void";
-  if (inv.sent_at && changed) return "changed";
   if (inv.paid_at) return "paid";
   if (!inv.sent_at) return "draft";
   if (inv.due_on && inv.due_on < today) return "overdue";
@@ -154,9 +176,9 @@ export function invoiceTotal(lines: Pick<CustomerInvoiceLine, "amount">[]): numb
   return cents(lines.reduce((a, l) => a + Number(l.amount || 0), 0));
 }
 
-/** Payments TAGGED WITH THIS INVOICE only — an order's other payments (a
- *  deposit taken before it was invoiced) were netted out of its line when the
- *  line was written. Refunds are negative rows and count. */
+/** Money APPLIED TO THIS INVOICE (140's applications) — an order's money
+ *  held elsewhere is not this invoice's until it is sent (141). Refunds are
+ *  negative and count. */
 export function invoiceBalance(
   lines: Pick<CustomerInvoiceLine, "amount">[],
   payments: { amount: number | null }[]
@@ -173,52 +195,172 @@ export type InvoiceTotalsBreakdown = {
   delivery: number;
   rush: number;
   tax: number;
-  /** Everything between the orders' totals and Amount due: money taken on the
-   *  order before this invoice, what another invoice asked for (a deposit,
-   *  139), and what has been paid on this one. */
+  /** "Less invoice N" — what the orders' other invoices already bill (141). */
+  prior: number;
+  /** What has been applied to this invoice. */
   payments: number;
 };
 
 /**
- * THE ORDERS' OWN MONEY, SUMMED — so the Totals window reads like an order's:
- * Subtotal − Discount + Delivery + Rush fee + Tax − Payments = Amount due,
- * to the cent. A BALANCE line is its order's totals less what was taken or
- * billed elsewhere, and that gap lands in Payments. A deposit or part payment
- * (139) is a fixed figure the order's breakdown would not add up to, and a
- * cancelled order bills what its line says (nothing), so either counts its
- * amount as Subtotal.
+ * THE LINES, SUMMED BY TYPE (141) — so the Totals window reads like an order's
+ * and adds to Amount due to the cent: Subtotal − Discount + Delivery + Rush
+ * fee + Tax − Invoiced earlier − Payments. Items, deposits and the one-line
+ * orders sent before 141 are the Subtotal; a free Delivery Fee is Delivery.
  */
 export function invoiceTotalsBreakdown(
-  lines: {
-    amount: number;
-    kind?: InvoiceLineKind;
-    status?: string | null;
-    totals: { subtotal: number; discount: number; deliveryCharge: number; rushFee: number; tax: number; total: number } | null;
-  }[],
+  lines: Pick<CustomerInvoiceLine, "line_type" | "amount">[],
   paid: number
 ): InvoiceTotalsBreakdown {
-  const b = { subtotal: 0, discount: 0, delivery: 0, rush: 0, tax: 0, payments: paid };
-  for (const l of lines) {
-    const t = l.totals;
-    if (!t || (l.kind ?? "balance") !== "balance" || l.status === "cancelled") {
-      b.subtotal += Number(l.amount || 0);
-      continue;
-    }
-    b.subtotal += t.subtotal;
-    b.discount += t.discount;
-    b.delivery += t.deliveryCharge;
-    b.rush += t.rushFee;
-    b.tax += t.tax;
-    b.payments += t.total - Number(l.amount || 0);
-  }
+  const by = (types: InvoiceLineType[]) =>
+    cents(lines.filter((l) => types.includes(l.line_type)).reduce((a, l) => a + Number(l.amount || 0), 0));
   return {
-    subtotal: cents(b.subtotal),
-    discount: cents(b.discount),
-    delivery: cents(b.delivery),
-    rush: cents(b.rush),
-    tax: cents(b.tax),
-    payments: cents(b.payments),
+    subtotal: by(["item", "deposit", "order_total"]),
+    discount: -by(["discount"]),
+    delivery: by(["delivery"]),
+    rush: by(["rush"]),
+    tax: by(["tax"]),
+    prior: -by(["prior_billing"]),
+    payments: cents(paid),
   };
+}
+
+/* ==========================================================================
+ * THE GROUPS — each order's lines together, then the invoice's own
+ * ========================================================================== */
+
+/** How an order sits on an invoice: its CHARGES copied (less what is billed
+ *  elsewhere), a fixed DEPOSIT, or one ORDER_TOTAL line from before 141. */
+export type InvoiceGroupKind = "charges" | "deposit" | "order_total" | "free";
+
+export type InvoiceGroup<L extends Pick<CustomerInvoiceLine, "special_order_id" | "line_type" | "amount" | "sort" | "order_label" | "description"> = CustomerInvoiceLine> = {
+  /** The order's id, or "free" — the pay link's and the breakdown's key. */
+  key: string;
+  orderId: string | null;
+  /** The band: the order's label, or "Other charges". */
+  label: string;
+  kind: InvoiceGroupKind;
+  lines: L[];
+  /** What the group bills on this invoice. */
+  net: number;
+};
+
+export const FREE_GROUP_LABEL = "Other charges";
+
+/**
+ * The lines in their groups: orders by event date then number (the order a
+ * payment is split in, 141's `customer_invoice_payment_groups`), each group's
+ * lines in their own order, and the free lines last.
+ */
+export function groupInvoiceLines<
+  L extends Pick<CustomerInvoiceLine, "special_order_id" | "line_type" | "amount" | "sort" | "order_label" | "description">
+>(lines: L[], orders: Map<string, { number: string; event_date: string | null }>): InvoiceGroup<L>[] {
+  const byKey = new Map<string, L[]>();
+  for (const l of lines) {
+    const k = l.special_order_id ?? "free";
+    byKey.set(k, [...(byKey.get(k) ?? []), l]);
+  }
+  const bySort = (a: L, b: L) => (a.sort ?? 0) - (b.sort ?? 0);
+  const groups: InvoiceGroup<L>[] = [];
+  for (const [key, ls] of byKey) {
+    const sorted = [...ls].sort(bySort);
+    const free = key === "free";
+    groups.push({
+      key,
+      orderId: free ? null : key,
+      label: free ? FREE_GROUP_LABEL : sorted[0]?.order_label || `Order #${orders.get(key)?.number ?? "?"}`,
+      kind: free
+        ? "free"
+        : sorted.some((l) => l.line_type === "deposit")
+          ? "deposit"
+          : sorted.some((l) => l.line_type === "order_total")
+            ? "order_total"
+            : "charges",
+      lines: sorted,
+      net: cents(sorted.reduce((a, l) => a + Number(l.amount || 0), 0)),
+    });
+  }
+  // The free lines LAST, by rule — not by a sentinel string, which a locale
+  // collation happily sorts ahead of the digits of a date.
+  return groups.sort((a, b) => {
+    if (!a.orderId || !b.orderId) return Number(!a.orderId) - Number(!b.orderId);
+    const ao = orders.get(a.orderId);
+    const bo = orders.get(b.orderId);
+    return (
+      (ao?.event_date ?? "9999").localeCompare(bo?.event_date ?? "9999") ||
+      (ao?.number ?? "").localeCompare(bo?.number ?? "", undefined, { numeric: true })
+    );
+  });
+}
+
+/**
+ * A group's money in `orderTotals`' shape, from its LINES — what the pay
+ * link's breakdown and the QuickBooks push are cut from, so they bill what the
+ * paper says rather than what the order says today. `total` is the charges
+ * before "Less invoice"; the group's `net` is what it bills here.
+ */
+export function groupTotals(lines: Pick<CustomerInvoiceLine, "line_type" | "amount" | "taxable">[]): {
+  subtotal: number;
+  taxableSubtotal: number;
+  discount: number;
+  deliveryCharge: number;
+  rushFee: number;
+  tax: number;
+  total: number;
+} {
+  const sum = (pick: (l: (typeof lines)[number]) => boolean) =>
+    cents(lines.filter(pick).reduce((a, l) => a + Number(l.amount || 0), 0));
+  const subtotal = sum((l) => l.line_type === "item" || l.line_type === "order_total" || l.line_type === "deposit");
+  const taxableSubtotal = sum((l) => l.line_type === "item" && l.taxable);
+  const discount = -sum((l) => l.line_type === "discount");
+  const deliveryCharge = sum((l) => l.line_type === "delivery");
+  const rushFee = sum((l) => l.line_type === "rush");
+  const tax = sum((l) => l.line_type === "tax");
+  return {
+    subtotal,
+    taxableSubtotal,
+    discount,
+    deliveryCharge,
+    rushFee,
+    tax,
+    total: cents(subtotal - discount + deliveryCharge + rushFee + tax),
+  };
+}
+
+/**
+ * A breakdown SCALED to what a group bills here — its charges less "Less
+ * invoice N", or a deposit's share of the order. Every part is scaled and the
+ * untaxed goods take the difference, so the parts always add to `net` exactly
+ * (`_shared/squareOrder` checks the total to the cent).
+ */
+export function scaleBreakdown(p: PayBreakdownParts, net: number): PayBreakdownParts {
+  if (Math.abs(p.total - net) < 0.005) return { ...p, total: cents(net) };
+  if (!(p.total > 0)) return { taxable_net: 0, other_net: cents(net), delivery: 0, tax: 0, tax_rate: p.tax_rate, total: cents(net) };
+  const f = net / p.total;
+  const taxable_net = cents(p.taxable_net * f);
+  const delivery = cents(p.delivery * f);
+  const tax = cents(p.tax * f);
+  return {
+    taxable_net,
+    delivery,
+    tax,
+    other_net: cents(net - taxable_net - delivery - tax),
+    tax_rate: p.tax_rate,
+    total: cents(net),
+  };
+}
+
+/**
+ * What the pay page lists (the snapshot's `lines`): each order ONCE, for what
+ * it bills here — a deposit says so — and each free line as itself.
+ */
+export function snapshotLines<
+  L extends Pick<CustomerInvoiceLine, "special_order_id" | "line_type" | "amount" | "sort" | "order_label" | "description">
+>(groups: InvoiceGroup<L>[]): { description: string; amount: number }[] {
+  return groups.flatMap((g) =>
+    g.orderId
+      ? [{ description: g.kind === "deposit" ? `${g.lines[0]?.description ?? "Deposit"} · ${g.label}` : g.label, amount: g.net }]
+      : g.lines.map((l) => ({ description: l.description, amount: cents(Number(l.amount)) }))
+  );
 }
 
 /* ==========================================================================
@@ -240,20 +382,6 @@ export function orderLineDescription(o: {
   return [`Order #${o.number}`, o.title || o.customer_name || "", usDate(o.event_date)]
     .filter((part) => part && part.trim() !== "")
     .join(" · ");
-}
-
-/**
- * WHETHER A LINE HAS MOVED SINCE THE CUSTOMER LAST SAW IT (128). The line
- * follows its order automatically; what went out is `sent_amount`. A cent or
- * more either way, and never before the first send.
- */
-export function lineChanged(line: { amount: number; sent_amount?: number | null }): boolean {
-  if (line.sent_amount === null || line.sent_amount === undefined) return false;
-  return Math.abs(cents(Number(line.amount) - Number(line.sent_amount))) >= 0.01;
-}
-
-export function invoiceChanged(lines: { amount: number; sent_amount?: number | null }[]): boolean {
-  return lines.some(lineChanged);
 }
 
 /* ==========================================================================
@@ -384,9 +512,9 @@ export function invoiceFileName(numberText: string, date: string): string {
 
 /**
  * The invoice AS SENT, the pay token's `document_snapshot` (124). Its own
- * shape rather than the order's `QuoteSnapshot`: it has lines of its own, one
- * per order, and no event, fulfillment or itemisation — the attached PDF is
- * the paper. `kind` is what tells the page which it is holding.
+ * shape rather than the order's `QuoteSnapshot`: one row per order and one per
+ * free line (`snapshotLines`), no itemisation — the attached PDF is the paper.
+ * `kind` is what tells the page which it is holding.
  */
 export type CustomerInvoiceSnapshot = {
   kind: "customer_invoice";

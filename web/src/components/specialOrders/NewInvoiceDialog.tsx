@@ -39,8 +39,7 @@ export function NewInvoiceDialog({
   orderId,
   orderNumber,
   total,
-  uninvoiced,
-  hasBalanceInvoice,
+  unbilled,
   hasCustomer,
   defaultDepositRate,
   from,
@@ -50,9 +49,8 @@ export function NewInvoiceDialog({
   orderNumber: string;
   /** The order's total — what a deposit's % is of. */
   total: number;
-  /** `uninvoicedAmount` — what an invoice may still ask for. */
-  uninvoiced: number;
-  hasBalanceInvoice: boolean;
+  /** `unbilledAmount` — what an invoice may still ask for (141). */
+  unbilled: number;
   hasCustomer: boolean;
   /** Settings' deposit rate, a fraction. */
   defaultDepositRate: number;
@@ -62,9 +60,8 @@ export function NewInvoiceDialog({
 }) {
   const supabase = createClient();
   const router = useRouter();
-  // The balance first — unless one is already asked for, when a deposit or
-  // part payment is all that is left to choose.
-  const [choice, setChoice] = useState<NewInvoiceChoice>(hasBalanceInvoice ? "deposit" : "balance");
+  // The balance first: what is left to bill, all of it.
+  const [choice, setChoice] = useState<NewInvoiceChoice>("balance");
   const [depositAmount, setDepositAmount] = useState(() =>
     amountFromPercent(total, String(toPercent(defaultDepositRate)))
   );
@@ -75,7 +72,7 @@ export function NewInvoiceDialog({
   const [error, setError] = useState<string | null>(null);
 
   const amountText = choice === "deposit" ? depositAmount : choice === "other" ? other : "";
-  const problem = newInvoiceProblem({ choice, amountText, uninvoiced, hasBalanceInvoice, hasCustomer });
+  const problem = newInvoiceProblem({ choice, amountText, unbilled, hasCustomer });
   const ready = problem === null && !busy;
 
   async function go() {
@@ -141,7 +138,7 @@ export function NewInvoiceDialog({
     >
       <div className="space-y-5">
         <p className="text-[13px] text-muted">
-          Order total {money(total)} · not yet invoiced {money(Math.max(uninvoiced, 0))}
+          Order total {money(total)} · not yet billed {money(Math.max(unbilled, 0))}
         </p>
 
         <Radio
@@ -160,7 +157,7 @@ export function NewInvoiceDialog({
               // 36 for the clear button + 1 right) so the digits line up.
               after: (
                 <span className="inline-block w-28 pl-[13px] pr-[37px] text-right tabular-nums">
-                  {money(Math.max(uninvoiced, 0))}
+                  {money(Math.max(unbilled, 0))}
                 </span>
               ),
             },

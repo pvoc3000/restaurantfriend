@@ -688,6 +688,8 @@ export type CustomerInvoiceDoc = {
      * stays one row per order.
      */
     detail?: { rows: { label: string; amount: number }[] };
+    /** A line of the invoice's own (141) — a delivery fee — not an order. */
+    free?: boolean;
   }[];
   /** The Totals window (2026-09-27): `invoiceTotalsBreakdown`. */
   totals: InvoiceTotalsBreakdown;
@@ -715,7 +717,7 @@ export function CustomerInvoicePdf({
   org: DocOrg;
 }) {
   const settled = invoice.balance <= 0;
-  const orderCount = invoice.lines.length;
+  const orderCount = invoice.lines.filter((l) => !l.free).length;
   return (
     <Document>
       <Page size="LETTER" style={s.page}>
@@ -764,10 +766,11 @@ export function CustomerInvoicePdf({
 
           <View style={s.items}>
             <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
-              {orderCount === 1 ? "Order" : "Orders"} <Text style={s.sectionCount}>{orderCount}</Text>
+              {orderCount === 0 ? "Charges" : orderCount === 1 ? "Order" : "Orders"}{" "}
+              <Text style={s.sectionCount}>{orderCount === 0 ? invoice.lines.length : orderCount}</Text>
             </Text>
             <View style={s.tableHead} fixed>
-              <Text style={[s.th, s.invDesc]}>{orderCount === 1 ? "Item" : "Order"}</Text>
+              <Text style={[s.th, s.invDesc]}>{orderCount <= 1 ? "Item" : "Order"}</Text>
               <Text style={[s.th, s.invAmount]}>Amount</Text>
             </View>
             {invoice.lines.map((l, i) =>
@@ -815,6 +818,11 @@ export function CustomerInvoicePdf({
                   <TotalRow label="Delivery" value={invoice.totals.delivery} />
                   <TotalRow label="Rush fee" value={invoice.totals.rush} />
                   <TotalRow label="Tax" value={invoice.totals.tax} />
+                  {/* "Less invoice N" (141) — only when an order is billed
+                      partly on another invoice, a deposit's before its balance. */}
+                  {invoice.totals.prior ? (
+                    <TotalRow label="Invoiced earlier" value={-invoice.totals.prior} />
+                  ) : null}
                   <TotalRow label="Payments" value={invoice.totals.payments ? -invoice.totals.payments : 0} />
                 </View>
                 <View style={settled ? [s.grand, { backgroundColor: "#fff" }] : s.grand}>

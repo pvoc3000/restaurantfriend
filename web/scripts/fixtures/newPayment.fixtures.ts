@@ -1,15 +1,14 @@
-// New Invoice and New Payment (migration 139) — the pure half: what is not
-// yet invoiced, the deposit's % ↔ $ pair, what each dialog refuses in words,
+// New Invoice and New Payment (migrations 139, 141) — the pure half: what is
+// not yet billed, the deposit's % ↔ $ pair, what each dialog refuses in words,
 // and where a payment goes by default.
 //
 // The figures are the throwaway-Postgres run's: a $368.50 order, a $36.85
-// deposit invoice, then a Balance Due invoice for $331.65; 10 more donuts
-// make it $364.50; $20 cash makes it $344.50.
+// deposit invoice, then a Balance Due invoice for $331.65.
 //
-// Checked by breaking: counting a LIVE invoice's payments as off-invoice in
-// `uninvoicedAmount` turns "a paid deposit is not subtracted twice" red;
-// dropping the `hasBalanceInvoice` test turns "one balance invoice" red;
-// letting a payment exceed its invoice's due turns "no more than it asks" red.
+// Checked by breaking: counting a cancelled order's total in `unbilledAmount`
+// turns "a cancelled order has nothing to bill" red; dropping the nothing-left
+// test turns "billed in full" red; letting a payment exceed its invoice's due
+// turns "no more than it asks" red.
 
 import { test, eq } from "./harness";
 import { depositAmount, readSettings, validDepositRate } from "../../src/lib/specialOrders";
@@ -20,7 +19,7 @@ import {
   newPaymentProblem,
   parseMoney,
   percentFromAmount,
-  uninvoicedAmount,
+  unbilledAmount,
 } from "../../src/lib/newPayment";
 
 test("depositAmount: total × rate, to the cent, as SQL rounds it", () => {
@@ -43,39 +42,28 @@ test("readSettings: New Payment's deposit starts at 10%, and a bad rate falls ba
   eq(readSettings({ special_orders: { deposit_rate: 25 } }).depositRate, 0.1);
 });
 
-test("uninvoicedAmount: a fresh order is all of it", () => {
-  eq(uninvoicedAmount({ total: 368.5, cancelled: false, payments: [], liveLines: [] }), 368.5);
+test("unbilledAmount: a fresh order is all of it", () => {
+  eq(unbilledAmount({ total: 368.5, cancelled: false, liveLines: [] }), 368.5);
 });
 
-test("uninvoicedAmount: a deposit invoice, paid or not, is subtracted once", () => {
-  const lines = [{ amount: 36.85 }];
-  eq(uninvoicedAmount({ total: 368.5, cancelled: false, payments: [], liveLines: lines }), 331.65);
+test("unbilledAmount: a deposit invoice, paid or not, is billed once", () => {
+  eq(unbilledAmount({ total: 368.5, cancelled: false, liveLines: [{ amount: 36.85 }] }), 331.65);
   eq(
-    uninvoicedAmount({
-      total: 368.5,
-      cancelled: false,
-      payments: [{ amount: 36.85, invoiceLive: true }],
-      liveLines: lines,
-    }),
-    331.65,
-    "a paid deposit is not subtracted twice"
+    unbilledAmount({ total: 368.5, cancelled: false, liveLines: [{ amount: 36.85 }, { amount: 331.65 }] }),
+    0,
+    "billed in full"
   );
 });
 
-test("uninvoicedAmount: cash, and a voided invoice's payment, come off it", () => {
-  eq(
-    uninvoicedAmount({
-      total: 401.35,
-      cancelled: false,
-      payments: [{ amount: 20, invoiceLive: false }, { amount: 36.85, invoiceLive: true }],
-      liveLines: [{ amount: 36.85 }],
-    }),
-    344.5
-  );
+test("unbilledAmount: cash is a payment, not a bill (141)", () => {
+  // $20 taken at the counter is held on the order and applies when its
+  // invoice is sent — the invoice still bills the order's whole total.
+  eq(unbilledAmount({ total: 401.35, cancelled: false, liveLines: [{ amount: 36.85 }] }), 364.5);
 });
 
-test("uninvoicedAmount: a cancelled order has nothing to invoice", () => {
-  eq(uninvoicedAmount({ total: 368.5, cancelled: true, payments: [], liveLines: [] }), 0);
+test("unbilledAmount: a cancelled order has nothing to bill, and one billed shows negative", () => {
+  eq(unbilledAmount({ total: 368.5, cancelled: true, liveLines: [] }), 0);
+  eq(unbilledAmount({ total: 368.5, cancelled: true, liveLines: [{ amount: 36.85 }] }), -36.85);
 });
 
 test("parseMoney: dollars as people type them", () => {
@@ -97,18 +85,18 @@ test("deposit % ↔ $: each box fills the other, of the order's total", () => {
   eq(percentFromAmount(0, "50"), "", "no total, no percentage");
 });
 
-const base = { uninvoiced: 331.65, hasBalanceInvoice: false, hasCustomer: true };
+const base = { unbilled: 331.65, hasCustomer: true };
 
 test("newInvoiceProblem: each option's refusal, in words", () => {
   eq(newInvoiceProblem({ ...base, choice: "balance", amountText: "" }), null);
-  eq(newInvoiceProblem({ ...base, choice: "balance", amountText: "", hasBalanceInvoice: true }),
-     "An invoice already bills this order's balance.", "one balance invoice");
-  eq(newInvoiceProblem({ ...base, choice: "balance", amountText: "", uninvoiced: 0 }),
-     "Nothing is left to invoice on this order.");
+  eq(newInvoiceProblem({ ...base, choice: "balance", amountText: "", unbilled: 0 }),
+     "Nothing is left to bill on this order.", "billed in full");
+  eq(newInvoiceProblem({ ...base, choice: "deposit", amountText: "10", unbilled: -5 }),
+     "Nothing is left to bill on this order.", "billed more than it now comes to");
   eq(newInvoiceProblem({ ...base, choice: "deposit", amountText: "36.85" }), null);
   eq(newInvoiceProblem({ ...base, choice: "deposit", amountText: "" }), "Enter an amount.");
   eq(newInvoiceProblem({ ...base, choice: "other", amountText: "400" }),
-     "That is more than the $331.65 not yet invoiced.");
+     "That is more than the $331.65 not yet billed.");
   eq(newInvoiceProblem({ ...base, choice: "deposit", amountText: "10", hasCustomer: false }),
      "Link a customer to this order before invoicing it.");
 });

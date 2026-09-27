@@ -30,24 +30,20 @@ export type OpenInvoice = { id: string; number: number; label: string; what: str
 const cents = (v: number) => Math.round(v * 100) / 100;
 
 /**
- * WHAT IS NOT YET INVOICED — `special_order_uninvoiced` in SQL, line for line:
- * the order's total, less payments on no live invoice (cash; a voided
- * invoice's), less every line on its live invoices, paid or not. Zero for a
- * cancelled order. Can go negative (an order shrunk after a deposit), which
- * the dialog reads as nothing left.
+ * WHAT IS NOT YET BILLED — `special_order_unbilled` in SQL (141): the order's
+ * total less every line it has on its live invoices, paid or not. Money taken
+ * on the order without an invoice (cash) is a PAYMENT, held, and applies when
+ * an invoice for the order is sent — it no longer shrinks what is left to
+ * bill. A cancelled order's total is nothing. Negative when an order shrank
+ * after it was billed, which the dialog reads as nothing left.
  */
-export function uninvoicedAmount(args: {
+export function unbilledAmount(args: {
   total: number;
   cancelled: boolean;
-  payments: { amount: number | null; invoiceLive: boolean }[];
   liveLines: { amount: number }[];
 }): number {
-  if (args.cancelled) return 0;
-  const offInvoice = args.payments
-    .filter((p) => !p.invoiceLive)
-    .reduce((a, p) => a + Number(p.amount || 0), 0);
-  const invoiced = args.liveLines.reduce((a, l) => a + Number(l.amount || 0), 0);
-  return cents(args.total - offInvoice - invoiced);
+  const billed = args.liveLines.reduce((a, l) => a + Number(l.amount || 0), 0);
+  return cents((args.cancelled ? 0 : args.total) - billed);
 }
 
 /** A typed dollar figure, or null for anything that is not a positive amount
@@ -82,21 +78,17 @@ export function percentFromAmount(total: number, amountText: string): string {
 export function newInvoiceProblem(args: {
   choice: NewInvoiceChoice;
   amountText: string;
-  uninvoiced: number;
-  hasBalanceInvoice: boolean;
+  unbilled: number;
   hasCustomer: boolean;
 }): string | null {
-  const { choice, uninvoiced } = args;
+  const { choice, unbilled } = args;
   if (!args.hasCustomer) return "Link a customer to this order before invoicing it.";
-  if (choice === "balance") {
-    if (args.hasBalanceInvoice) return "An invoice already bills this order's balance.";
-    if (uninvoiced <= 0.005) return "Nothing is left to invoice on this order.";
-    return null;
-  }
+  if (unbilled <= 0.005) return "Nothing is left to bill on this order.";
+  if (choice === "balance") return null;
   const amount = parseMoney(args.amountText);
   if (amount === null) return "Enter an amount.";
-  if (amount > uninvoiced + 0.005) {
-    return `That is more than the ${money(Math.max(uninvoiced, 0))} not yet invoiced.`;
+  if (amount > unbilled + 0.005) {
+    return `That is more than the ${money(unbilled)} not yet billed.`;
   }
   return null;
 }

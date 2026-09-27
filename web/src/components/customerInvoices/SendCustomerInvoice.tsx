@@ -42,12 +42,16 @@ import {
 import { fetchInvoiceView, type InvoiceView } from "@/lib/customerInvoiceQueries";
 import { QuickBooksCustomerStep } from "@/components/specialOrders/QuickBooksCustomerStep";
 import {
+  groupTotals,
   invoiceFileName,
   invoiceNumberText,
   invoiceTotalsBreakdown,
   readInvoiceTerms,
+  scaleBreakdown,
+  snapshotLines,
   sumBreakdowns,
   type CustomerInvoiceSnapshot,
+  type InvoiceGroup,
 } from "@/lib/customerInvoices";
 
 /** The org row the documents need: its name, settings and the doc header. */
@@ -68,6 +72,7 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
   const view = await fetchInvoiceView(supabase, id, readSettings(settings).rush);
   if (!view) throw new Error("That invoice is gone.");
   const terms = readInvoiceTerms(settings);
+  const single = view.groups.filter((g) => g.orderId).length === 1;
   const blob = await pdf(
     <docs.CustomerInvoicePdf
       org={doc}
@@ -81,17 +86,8 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
           phone: view.customer?.phone ?? null,
           email: view.customer?.email ?? null,
         },
-        lines: view.lines.map((l) => ({
-          description: l.description,
-          amount: l.amount,
-          // Itemized only for a balance line: a deposit or part payment is
-          // one figure, and the order's items would not add up to it (139).
-          detail: view.lines.length === 1 && (l.kind ?? "balance") === "balance" ? itemDetail(l) : undefined,
-        })),
-        totals: invoiceTotalsBreakdown(
-          view.lines.map((l) => ({ amount: l.amount, kind: l.kind, status: l.order?.status, totals: l.totals })),
-          view.paid
-        ),
+        lines: paperRows(view.groups, single),
+        totals: invoiceTotalsBreakdown(view.lines, view.paid),
         total: view.total,
         paid: view.paid,
         balance: view.balance,
@@ -101,19 +97,60 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
   return { blob, view, settings, doc, terms };
 }
 
+type PaperRow = { description: string; amount: number; detail?: { rows: { label: string; amount: number }[] }; free?: boolean };
+
 /**
- * A one-order invoice's itemization (2026-09-23): each item. The order's own
- * money — discount, delivery, rush, tax, payments — is the Totals window's
- * (2026-09-27), as on the order's own documents.
+ * The paper's rows (141): each ORDER once, for what it bills here — ITEMIZED
+ * when it is the only order, as a regular customer is used to seeing — and
+ * each free line as itself. The discount, delivery, rush, tax and "Less
+ * invoice" are the Totals window's, summed from the lines.
  */
-function itemDetail(l: InvoiceView["lines"][number]): { rows: { label: string; amount: number }[] } | undefined {
-  if (!l.totals) return undefined;
-  return {
-    rows: l.items.map((i) => ({
-      label: `${i.qty % 1 === 0 ? i.qty : i.qty.toFixed(2)} × ${i.name} @ ${money(i.unit_price)}`,
-      amount: Math.round(i.qty * i.unit_price * 100) / 100,
-    })),
-  };
+function paperRows(
+  groups: InvoiceGroup[],
+  single: boolean
+): PaperRow[] {
+  return groups.flatMap((g): PaperRow[] => {
+    if (!g.orderId) return g.lines.map((l) => ({ description: l.description, amount: l.amount, free: true }));
+    const items = g.lines.filter((l) => l.line_type === "item");
+    const description = g.kind === "deposit" ? `${g.lines[0]?.description ?? "Deposit"} · ${g.label}` : g.label;
+    return [
+      {
+        description,
+        amount: g.net,
+        detail:
+          single && g.kind === "charges" && items.length > 0
+            ? {
+                rows: items.map((i) => ({
+                  label:
+                    i.qty !== null && i.unit_price !== null
+                      ? `${i.qty % 1 === 0 ? i.qty : i.qty.toFixed(2)} × ${i.description} @ ${money(i.unit_price)}`
+                      : i.description,
+                  amount: i.amount,
+                })),
+              }
+            : undefined,
+      },
+    ];
+  });
+}
+
+/**
+ * THE PAY LINK'S BREAKDOWN, per group (126, 141) — keyed as `claim_pay_token`
+ * keys the Square items (the order's id, or "free"), so `square-pay` cuts one
+ * Square line per item exactly as before. A copied order's split comes from
+ * its own lines, scaled to what it bills here; a deposit, or a one-line order
+ * sent before 141, from the order's money scaled to its figure; a free line is
+ * untaxed goods, or delivery.
+ */
+function payBreakdowns(view: InvoiceView): Record<string, ReturnType<typeof breakdownFromTotals>> {
+  const out: Record<string, ReturnType<typeof breakdownFromTotals>> = {};
+  for (const g of view.groups) {
+    const order = g.orderId ? view.orders.get(g.orderId) : null;
+    const totals = g.kind === "charges" || g.kind === "free" ? groupTotals(g.lines) : order?.totals ?? groupTotals(g.lines);
+    const rate = g.kind === "charges" ? g.lines.find((l) => l.line_type === "tax")?.tax_rate ?? order?.tax_rate ?? 0 : order?.tax_rate ?? 0;
+    out[g.key] = scaleBreakdown(breakdownFromTotals(totals, rate), g.net);
+  }
+  return out;
 }
 
 type Compose = { to: string; cc: string; subject: string; body: string };
@@ -196,6 +233,11 @@ export function SendCustomerInvoice({
     setError(null);
     setSentNote(null);
     try {
+      // WHAT STOPS IT GOING OUT, said before the card opens (141) — the same
+      // check the edge function makes before it mails.
+      const { data: problems, error: pe } = await supabase.rpc("customer_invoice_send_problems", { p_invoice: id });
+      if (pe) throw new Error(pe.message);
+      if ((problems as string[] | null)?.length) throw new Error((problems as string[]).join(" "));
       const { blob, view, settings, doc, terms } = await renderInvoicePdf(supabase, id, today);
       const number = invoiceNumberText(view.invoice.number, terms);
 
@@ -226,15 +268,12 @@ export function SendCustomerInvoice({
       }
 
       const snapshot = invoiceSnapshotOf(view, number, doc, today);
-      // Each line's own split as well as the sum (126): the Square order is
-      // cut per ITEM from these, since a line's item can change after send.
-      const perLine = Object.fromEntries(
-        view.lines
-          .filter((l) => l.totals)
-          .map((l) => [l.id, breakdownFromTotals(l.totals!, l.order?.tax_rate ?? null)])
-      );
-      const summed = sumBreakdowns(Object.values(perLine));
-      const breakdown = summed ? { ...summed, lines: perLine } : null;
+      // Each group's own split as well as the sum (126): the Square order is
+      // cut per ITEM from these, since what an order is sold as can change
+      // after send.
+      const perGroup = payBreakdowns(view);
+      const summed = sumBreakdowns(Object.values(perGroup));
+      const breakdown = summed ? { ...summed, lines: perGroup } : null;
 
       setCompose(invoiceEmail(view, number, settings, pay, viaQbo));
       setPending({
@@ -448,7 +487,7 @@ function invoiceSnapshotOf(
     customer_name: view.customerName,
     issued_on: view.invoice.issued_on,
     due_on: view.invoice.due_on,
-    lines: view.lines.map((l) => ({ description: l.description, amount: l.amount })),
+    lines: snapshotLines(view.groups),
     // THE INVOICE'S WHOLE TOTAL, not what is owed at send: `pay_token_state`
     // subtracts every payment tagged with the invoice, so a link re-sent
     // after a part-payment still asks for the rest and no more.
@@ -480,7 +519,7 @@ function invoiceEmail(
     full_name: fullName,
     total: money(view.balance),
     due_on: view.invoice.due_on ? usDate(view.invoice.due_on) : "on receipt",
-    orders: view.lines.map((l) => `${l.description} — ${money(l.amount)}`).join("\n"),
+    orders: snapshotLines(view.groups).map((l) => `${l.description} — ${money(l.amount)}`).join("\n"),
     pay_url: pay,
     pay_line: viaQbo ? quickBooksPayLine(pay) : payLine(pay),
   };
@@ -548,13 +587,31 @@ export async function quickBooksInputs(
     itemRef: row?.invoice_item_ref ?? null,
     wholesaleItemRef: row?.wholesale_item_ref ?? null,
     taxCodeRef: row?.tax_code_ref ?? null,
-    lines: view.lines.map((l) => ({
-      description: l.description,
-      amount: l.amount,
-      square_item: l.square_item,
-      cancelled: l.order?.status === "cancelled",
-      totals: l.totals,
-    })),
+    // One push line per ORDER (Mark, 2026-09-24) and per free line, each with
+    // the money its own lines say (141). A deposit or "Less invoice" group's
+    // figure differs from its charges, which `customerInvoiceRefusals`
+    // refuses in words — as the send check does.
+    lines: view.groups.flatMap((g) => {
+      const order = g.orderId ? view.orders.get(g.orderId) : null;
+      if (!g.orderId) {
+        return g.lines.map((l) => ({
+          description: l.description,
+          amount: l.amount,
+          square_item: "special_order" as const,
+          cancelled: false,
+          totals: groupTotals([l]),
+        }));
+      }
+      return [
+        {
+          description: g.label,
+          amount: g.net,
+          square_item: g.lines[0]?.square_item ?? "special_order",
+          cancelled: order?.status === "cancelled",
+          totals: g.kind === "order_total" ? order?.totals ?? null : groupTotals(g.lines),
+        },
+      ];
+    }),
   };
 }
 

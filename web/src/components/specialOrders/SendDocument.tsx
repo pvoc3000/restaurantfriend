@@ -197,6 +197,29 @@ export function SendDocument({
   // the same paper, so they must come off the same renderer.
   const render = (k: DocumentKind) => renderOrderDocument(supabase, orderId, k, today);
 
+  /**
+   * THE INVOICE IS THE INVOICE'S (141). Once the order is on a live invoice,
+   * Preview ▸ Invoice and Download ▸ Invoice are that invoice's own PDF — not
+   * a second paper drawn from the order, which could say something different.
+   * An order not yet invoiced keeps its own (a pro forma, in effect).
+   */
+  const renderFile = async (k: DocumentKind): Promise<{ blob: Blob; name: string; ofInvoice: boolean }> => {
+    if (k === "invoice" && invoice?.liveInvoiceId) {
+      const [{ renderInvoicePdf }, { invoiceFileName, invoiceNumberText }] = await Promise.all([
+        import("@/components/customerInvoices/SendCustomerInvoice"),
+        import("@/lib/customerInvoices"),
+      ]);
+      const { blob, view, terms } = await renderInvoicePdf(supabase, invoice.liveInvoiceId, today);
+      return {
+        blob,
+        name: invoiceFileName(invoiceNumberText(view.invoice.number, terms), view.invoice.issued_on),
+        ofInvoice: true,
+      };
+    }
+    const { blob, order } = await render(k);
+    return { blob, name: documentFileName(k, order.number, order.event_date ?? today), ofInvoice: false };
+  };
+
   const preview = (k: DocumentKind) => {
     // Before any await, while the click gesture still counts. The menu closes
     // synchronously in `MenuButton`'s own handler, so this is still inside the
@@ -204,8 +227,8 @@ export function SendDocument({
     const win = openWindowNow();
     return run("preview", async () => {
       try {
-        const { blob, order } = await render(k);
-        showBlob(win, blob, documentFileName(k, order.number, order.event_date ?? today));
+        const { blob, name } = await renderFile(k);
+        showBlob(win, blob, name);
       } catch (e) {
         win?.close();
         throw e;
@@ -226,10 +249,12 @@ export function SendDocument({
    */
   const download = (k: DocumentKind) =>
     run("download", async () => {
-      const { blob, order } = await render(k);
-      downloadBlob(blob, documentFileName(k, order.number, order.event_date ?? today));
+      const { blob, name, ofInvoice } = await renderFile(k);
+      downloadBlob(blob, name);
 
-      const column = DOCUMENT_STAMPS[k];
+      // A customer invoice's own PDF is stamped by SENDING it (141), which
+      // records the send on the invoice as well as the order.
+      const column = ofInvoice ? null : DOCUMENT_STAMPS[k];
       if (column && !workflow[column]) {
         const { data } = await supabase
           .from("special_orders")
@@ -622,8 +647,7 @@ export function SendDocument({
           orderId={orderId}
           orderNumber={invoice.money.orderNumber}
           total={invoice.money.total}
-          uninvoiced={invoice.money.uninvoiced}
-          hasBalanceInvoice={invoice.money.hasBalanceInvoice}
+          unbilled={invoice.money.unbilled}
           hasCustomer={invoice.money.hasCustomer}
           defaultDepositRate={invoice.money.defaultDepositRate}
           from={invoice.money.from}

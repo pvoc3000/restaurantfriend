@@ -16,9 +16,12 @@ import {
   invoiceNumberText,
   invoiceStatus,
   invoiceTotalsBreakdown,
+  groupInvoiceLines,
+  groupTotals,
+  scaleBreakdown,
+  snapshotLines,
+  type CustomerInvoiceLine,
   isCustomerInvoiceSnapshot,
-  invoiceChanged,
-  lineChanged,
   orderLineDescription,
   readInvoiceTerms,
   sumBreakdowns,
@@ -98,23 +101,13 @@ test("invoiceBalance: tagged payments and refunds", () => {
   eq(invoiceBalance([{ amount: 0.1 }, { amount: 0.2 }], []).total, 0.3, "no floating-point dust");
 });
 
-test("lineChanged: a cent or more either way, and never before the first send", () => {
-  eq(lineChanged({ amount: 613.5, sent_amount: 613.5 }), false);
-  eq(lineChanged({ amount: 613.504, sent_amount: 613.5 }), false);
-  eq(lineChanged({ amount: 632.1, sent_amount: 613.5 }), true);
-  eq(lineChanged({ amount: 0, sent_amount: 613.5 }), true, "a cancelled day");
-  eq(lineChanged({ amount: 613.5, sent_amount: null }), false, "a draft has sent nothing");
-  eq(invoiceChanged([{ amount: 1, sent_amount: 1 }, { amount: 2, sent_amount: 3 }]), true);
-  eq(invoiceChanged([]), false);
-});
-
-test("invoiceStatus: changed since sent wins over paid, loses to void, needs a send", () => {
+test("invoiceStatus: void wins, then paid, then draft; overdue is sent and past due", () => {
   const base = { sent_at: "2026-10-04", paid_at: null, voided_at: null, due_on: "2026-10-08" };
-  eq(invoiceStatus(base, "2026-10-05", true), "changed");
-  eq(invoiceStatus({ ...base, paid_at: "2026-10-06" }, "2026-10-07", true), "changed", "shrank after payment: a credit to send");
-  eq(invoiceStatus({ ...base, voided_at: "2026-10-07" }, "2026-10-07", true), "void");
-  eq(invoiceStatus({ ...base, sent_at: null }, "2026-10-05", true), "draft");
-  eq(invoiceStatus(base, "2026-10-09", true), "changed", "changed says more than overdue");
+  eq(invoiceStatus(base, "2026-10-05"), "sent");
+  eq(invoiceStatus(base, "2026-10-09"), "overdue");
+  eq(invoiceStatus({ ...base, paid_at: "2026-10-06" }, "2026-10-09"), "paid");
+  eq(invoiceStatus({ ...base, voided_at: "2026-10-07", paid_at: "2026-10-06" }, "2026-10-07"), "void");
+  eq(invoiceStatus({ ...base, sent_at: null }, "2026-10-09"), "draft", "a draft is never overdue");
 });
 
 test("readInvoiceTerms: settings, with defaults for what is missing", () => {
@@ -168,38 +161,114 @@ test("createRefusals: an order already on an invoice is refused before the datab
   eq(createRefusals(week.map((r) => ({ ...r, on_invoice: false }))), []);
 });
 
-// The Totals window (2026-09-27). Checked by breaking: dropping the gap from
-// `payments` turns the deposit case red; breaking down a deposit line by its
-// order's totals turns the fixed-line case red.
-const money = (o: Partial<{ subtotal: number; discount: number; deliveryCharge: number; rushFee: number; tax: number }>) => {
-  const t = { subtotal: 0, discount: 0, deliveryCharge: 0, rushFee: 0, tax: 0, ...o };
-  return { ...t, total: Math.round((t.subtotal - t.discount + t.deliveryCharge + t.rushFee + t.tax) * 100) / 100 };
-};
-const adds = (b: ReturnType<typeof invoiceTotalsBreakdown>) =>
-  Math.round((b.subtotal - b.discount + b.delivery + b.rush + b.tax - b.payments) * 100) / 100;
+// 141: AN INVOICE OWNS ITS LINES. The figures are the throwaway-Postgres run's:
+// two Knotted days (370 × $1.55 + $50 delivery), a $40 Delivery Fee of the
+// invoice's own, and the wedding's $547.50 balance less its $100 deposit.
+//
+// Checked by breaking: summing prior_billing into the subtotal turns "adds to
+// Amount due" red; sorting groups by number before date turns "oldest event
+// first" red; scaling `other_net` rather than taking it by subtraction turns
+// "to the cent" red.
+let seq = 0;
+const line = (o: Partial<CustomerInvoiceLine>): CustomerInvoiceLine => ({
+  id: `l${++seq}`,
+  special_order_id: null,
+  line_type: "item",
+  description: "",
+  qty: null,
+  unit_price: null,
+  amount: 0,
+  taxable: false,
+  tax_rate: null,
+  order_label: null,
+  sort: 0,
+  square_item: "special_order",
+  ...o,
+});
+const knottedDay = (order: string, label: string) => [
+  line({ special_order_id: order, line_type: "item", description: "Knotted Bismark - 42g", qty: 370, unit_price: 1.55, amount: 573.5, order_label: label, sort: 0 }),
+  line({ special_order_id: order, line_type: "delivery", description: "Delivery", amount: 50, order_label: label, sort: 1001 }),
+];
+const knottedWeek = [
+  ...knottedDay("o2", "Order #10050 · Cafe Knotted · 10/6/2026"),
+  line({ line_type: "delivery", description: "Delivery Fee", qty: 4, unit_price: 10, amount: 40, sort: 0 }),
+  ...knottedDay("o1", "Order #10057 · Cafe Knotted · 10/5/2026"),
+];
+const orders = new Map([
+  ["o1", { number: "10057", event_date: "2026-10-05" }],
+  // A LOWER number on a LATER day: a split goes by the day, not the number.
+  ["o2", { number: "10050", event_date: "2026-10-06" }],
+]);
 
-test("invoiceTotalsBreakdown: a week of orders sums each part", () => {
-  const t = money({ subtotal: 96, deliveryCharge: 25 });
-  const b = invoiceTotalsBreakdown([1, 2, 3].map(() => ({ amount: t.total, totals: t })), 0);
-  eq(b, { subtotal: 288, discount: 0, delivery: 75, rush: 0, tax: 0, payments: 0 });
-  eq(adds(b), 363, "adds to the invoice total");
+test("groupInvoiceLines: oldest event first, each order once, the invoice's own lines last", () => {
+  const g = groupInvoiceLines(knottedWeek, orders);
+  eq(g.map((x) => x.key), ["o1", "o2", "free"], "oldest event first");
+  eq(g.map((x) => x.net), [623.5, 623.5, 40]);
+  eq(g.map((x) => x.kind), ["charges", "charges", "free"]);
+  eq(g[0].label, "Order #10057 · Cafe Knotted · 10/5/2026");
+  eq(g[2].label, "Other charges");
+  eq(g[0].lines.map((l) => l.line_type), ["item", "delivery"], "a group's own order");
 });
 
-test("invoiceTotalsBreakdown: a deposit taken first lands in Payments, and so does this invoice's", () => {
-  const t = money({ subtotal: 400, discount: 40, deliveryCharge: 30, rushFee: 20, tax: 29.7 });
-  const b = invoiceTotalsBreakdown([{ amount: t.total - 100, kind: "balance", totals: t }], 50);
-  eq(b.payments, 150);
-  eq(adds(b), Math.round((t.total - 150) * 100) / 100, "adds to Amount due");
-});
-
-test("invoiceTotalsBreakdown: a deposit line and a cancelled order are their own amounts", () => {
-  const t = money({ subtotal: 500, tax: 47.5 });
-  const b = invoiceTotalsBreakdown(
+test("groupInvoiceLines: a deposit, and a one-line order sent before 141, say so", () => {
+  const g = groupInvoiceLines(
     [
-      { amount: 100, kind: "deposit", totals: t },
-      { amount: 0, kind: "balance", status: "cancelled", totals: t },
+      line({ special_order_id: "o1", line_type: "deposit", description: "Deposit", amount: 100 }),
+      line({ special_order_id: "o2", line_type: "order_total", description: "Order #10068", amount: 623.5 }),
     ],
-    0
+    orders
   );
-  eq(b, { subtotal: 100, discount: 0, delivery: 0, rush: 0, tax: 0, payments: 0 });
+  eq(g.map((x) => x.kind), ["deposit", "order_total"]);
+});
+
+test("snapshotLines: the pay page lists each order once and each free line as itself", () => {
+  eq(snapshotLines(groupInvoiceLines(knottedWeek, orders)), [
+    { description: "Order #10057 · Cafe Knotted · 10/5/2026", amount: 623.5 },
+    { description: "Order #10050 · Cafe Knotted · 10/6/2026", amount: 623.5 },
+    { description: "Delivery Fee", amount: 40 },
+  ]);
+  eq(
+    snapshotLines(groupInvoiceLines([line({ special_order_id: "o1", line_type: "deposit", description: "Deposit", amount: 100, order_label: "Order #10080 · Smith wedding · 12/12/2026" })], orders)),
+    [{ description: "Deposit · Order #10080 · Smith wedding · 12/12/2026", amount: 100 }]
+  );
+});
+
+const wedding = [
+  line({ special_order_id: "w", line_type: "item", description: "Glazed dozen", qty: 10, unit_price: 50, amount: 500, taxable: true }),
+  line({ special_order_id: "w", line_type: "tax", description: "Sales tax", amount: 47.5, tax_rate: 0.095 }),
+  line({ special_order_id: "w", line_type: "prior_billing", description: "Less invoice 1004", amount: -100 }),
+];
+
+test("groupTotals: the order's money in orderTotals' shape, from its own lines", () => {
+  eq(groupTotals(wedding), {
+    subtotal: 500, taxableSubtotal: 500, discount: 0, deliveryCharge: 0, rushFee: 0, tax: 47.5, total: 547.5,
+  });
+  eq(groupTotals(knottedDay("o1", "x")).total, 623.5);
+});
+
+test("scaleBreakdown: a group's split scaled to what it bills here, to the cent", () => {
+  const whole = { taxable_net: 500, other_net: 0, delivery: 0, tax: 47.5, tax_rate: 0.095, total: 547.5 };
+  const b = scaleBreakdown(whole, 447.5);
+  eq(Math.round((b.taxable_net + b.other_net + b.delivery + b.tax) * 100) / 100, 447.5, "to the cent");
+  eq(b.total, 447.5);
+  ok(b.taxable_net < 500 && b.tax < 47.5, "every part scaled down");
+  eq(scaleBreakdown(whole, 547.5), whole, "nothing to scale");
+  eq(scaleBreakdown({ ...whole, total: 0, taxable_net: 0, tax: 0 }, 100).other_net, 100, "no breakdown: untaxed goods");
+  // Half of each part rounds UP twice; the untaxed goods by subtraction keep the sum.
+  const mixed = scaleBreakdown({ taxable_net: 100.01, other_net: 100.01, delivery: 0, tax: 9.5, tax_rate: 0.095, total: 209.52 }, 104.76);
+  eq(Math.round((mixed.taxable_net + mixed.other_net + mixed.delivery + mixed.tax) * 100) / 100, 104.76, "to the cent, mixed");
+});
+
+test("invoiceTotalsBreakdown: a week, a free delivery fee and a payment add to Amount due", () => {
+  const b = invoiceTotalsBreakdown(knottedWeek, 300);
+  eq(b, { subtotal: 1147, discount: 0, delivery: 140, rush: 0, tax: 0, prior: 0, payments: 300 });
+  const adds = Math.round((b.subtotal - b.discount + b.delivery + b.rush + b.tax - b.prior - b.payments) * 100) / 100;
+  eq(adds, 1287 - 300, "adds to Amount due");
+});
+
+test("invoiceTotalsBreakdown: a balance after its deposit shows the deposit as invoiced earlier", () => {
+  const b = invoiceTotalsBreakdown(wedding, 50);
+  eq(b, { subtotal: 500, discount: 0, delivery: 0, rush: 0, tax: 47.5, prior: 100, payments: 50 });
+  const adds = Math.round((b.subtotal - b.discount + b.delivery + b.rush + b.tax - b.prior - b.payments) * 100) / 100;
+  eq(adds, 397.5, "adds to Amount due");
 });

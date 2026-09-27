@@ -550,7 +550,10 @@ Deno.serve(async (req) => {
           .from("customer_invoice_lines")
           .select("special_order_id")
           .eq("invoice_id", claim.customer_invoice_id!);
-        orderIds = [...new Set((lines ?? []).map((l) => l.special_order_id as string))];
+        // A free line (141) is no order's — nothing to write the warning on.
+        orderIds = [
+          ...new Set((lines ?? []).map((l) => l.special_order_id as string | null).filter((o): o is string => !!o)),
+        ];
       }
       if (orderIds.length) {
         await admin.from("special_order_events").insert(
