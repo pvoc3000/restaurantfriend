@@ -4738,7 +4738,7 @@ checks no amount moved). The textbook plan's later phases move up one: Revise
 and credit is 143, reporting 144, clean-up 145.
 
 **THE TEXTBOOK A/R MODEL — PHASE 3: REVISE AND CUSTOMER CREDIT (migration 143,
-written and rehearsed 2026-09-27, NOT YET APPLIED).** A sent invoice is never
+written, rehearsed and APPLIED 2026-09-27).** A sent invoice is never
 edited; it is REPLACED. **Revise…** (Actions, on a sent invoice not already
 being revised) makes a DRAFT with the same number and the next revision —
 "1014-2", `revision`/`revision_of`, unique (org, number, revision) — its orders
@@ -4771,3 +4771,12 @@ overpayment → $76.50 credit, QuickBooks refusing credit and a paid revision,
 credit refunds capped and manager-only, a partial refund on the original moving
 netted (523.50 on the revision, the payment's credit and its refund cancelling).
 On the real data copy every invoice's total and paid are unchanged.
+**After 143 was applied (2026-09-27):** every invoice revision 1 with nothing
+revising it, totals and paid unchanged (#1014 $5,288.00 draft); 6,495 payments,
+6,495 applications, none with unapplied money, so nobody holds credit yet;
+`check-ledger-parity.mjs` holds; none of the new functions visible to `anon`;
+the one pay token (on void #1011) still answers "cancelled". `square-refund`
+deployed with its credit mode. As the owner (one-off session, signed out):
+`customer_credit` empty for Knotted and Alyssa Rosario, #1014's send check
+empty, and server renders of the list, #1014, #1013, both customers and order
+#10057 all 200. The Credit section draws nothing while there is no credit.
