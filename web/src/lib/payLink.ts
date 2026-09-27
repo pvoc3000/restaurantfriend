@@ -11,15 +11,15 @@
  * hosts, and the invoice is ours.
  */
 
-import type { QuoteSnapshot } from "./specialOrderSend";
 import type { CustomerInvoiceSnapshot } from "./customerInvoices";
 
 /**
- * What the pay page renders — the invoice AS SENT. The same document shape as
- * the quote's snapshot, and for the same reason: a capability URL exposes the
- * paper that was already emailed and nothing behind it.
+ * What the pay page renders — the customer invoice AS SENT, for the quote
+ * snapshot's reason: a capability URL exposes the paper that was already
+ * emailed and nothing behind it. (An ORDER's own snapshot was the other shape
+ * until 145 retired the order links.)
  */
-export type InvoiceSnapshot = QuoteSnapshot | CustomerInvoiceSnapshot;
+export type InvoiceSnapshot = CustomerInvoiceSnapshot;
 
 export type SquareConfig = {
   environment: "production" | "sandbox";

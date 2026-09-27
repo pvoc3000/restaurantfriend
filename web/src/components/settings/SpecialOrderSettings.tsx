@@ -130,12 +130,6 @@ const TEMPLATES: {
     vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "cutoff_clause", "total", "balance", "employee_name", "fulfillment_note", "pay_line"],
   },
   {
-    key: "payment",
-    label: "Payment received",
-    when: "Sent automatically when a customer pays online with the invoice’s pay link.",
-    vars: ["number", "title_suffix", "first_name", "full_name", "amount", "method", "balance", "balance_line", "receipt_line", "employee_name"],
-  },
-  {
     key: "receipt",
     label: "Receipt",
     when: "Sent with the receipt PDF, once an order is settled.",
@@ -155,8 +149,8 @@ const TEMPLATES: {
   },
   {
     key: "invoice_payment",
-    label: "Payment received (invoice)",
-    when: "Sent automatically when a customer pays a customer invoice with its pay link.",
+    label: "Payment received",
+    when: "Sent automatically when a customer pays an invoice with its pay link.",
     vars: ["number", "first_name", "full_name", "amount", "method", "balance", "balance_line", "receipt_line"],
   },
   {

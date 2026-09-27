@@ -60,7 +60,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 4d. 🚧 Bills (vendor bills, approval, financials lock, filing on close) — `docs/history/04d-invoices.md` (named Invoices until 2026-09-20; see Table naming)
 4e. ✅ Employee events (`employee_events`, `/events`) — `docs/history/04e-employee-events.md`
 4f. 🚧 Production (elements, recipes, items, price grid, plans, schedules, batch logs, costing) — `docs/history/04f-production.md`
-4g. 🚧 Special orders (quotes, documents, /q approval, /inquiry, standing orders, scheduling, /pay link via Square, customer invoices — 124–130 applied; build-your-order on /inquiry, 132–133 applied and deployed 2026-09-24, v1 form tagged `inquiry-v1`; **textbook A/R rebuild, 5 phases, 2026-09-27 — 140 payments ledger APPLIED + deployed; 141 invoices own their lines APPLIED + deployed; 142 picker fix APPLIED; 143 revise + credit APPLIED + deployed; 144 who owes us (balances, statement, aging) APPLIED; 145 clean-up after two weeks of clean parity, ~2026-10-11**) — `docs/history/04g-special-orders.md`
+4g. 🚧 Special orders (quotes, documents, /q approval, /inquiry, standing orders, scheduling, /pay link via Square, customer invoices — 124–130 applied; build-your-order on /inquiry, 132–133 applied and deployed 2026-09-24, v1 form tagged `inquiry-v1`; **textbook A/R rebuild, 5 phases, 2026-09-27 — 140 payments ledger APPLIED + deployed; 141 invoices own their lines APPLIED + deployed; 142 picker fix APPLIED; 143 revise + credit APPLIED + deployed; 144 who owes us (balances, statement, aging) APPLIED; 145 clean-up written (Mark: the invoices were all tests, go-live 2026-10-01)**) — `docs/history/04g-special-orders.md`
 4h. ✅ Supervisor shift report (runner, email, reopen) — `docs/history/04h-shift-report.md`
 4i. ✅ Which shops a member may work at (migration 073) — `docs/history/04i-location-access.md`
 4j. ✅ Password reset (migration 074 + `request-password-reset`) — `docs/history/04j-password-reset.md`
@@ -694,7 +694,8 @@ collected by QuickBooks Payments, which never touches Square, so it does not
 double-count. Every rule below about not pushing applies to SQUARE-collected
 invoices only. See 04l. The 2026-09-02 reasoning: it would mean a second merchant account beside Square,
 it fights the document flow this app deliberately owns, and it would make
-QuickBooks a second writer of a fact `special_order_payments` already holds.
+QuickBooks a second writer of a fact `special_order_payments` (since 140, the
+`customer_payments` ledger) already holds.
 The live question underneath it is **ACH on wholesale**, and that belongs with
 Square — **DECIDED 2026-09-22: Square collects everything not rung up in a shop,
 on the app's own `/pay` page** (see the customer-invoices thread). Also killed: any **A/R status pull** from QuickBooks, for the same

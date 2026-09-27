@@ -627,7 +627,7 @@ export type EmailParts = { to: string; cc: string; subject: string; body: string
  * FileMaker hardcoded "The Donut Friend Team" into a script. We don't.
  */
 export const DEFAULT_TEMPLATES: Record<
-  DocumentKind | "statement" | "inquiry" | "payment" | "customer_invoice" | "invoice_payment",
+  DocumentKind | "statement" | "inquiry" | "customer_invoice" | "invoice_payment",
   { subject: string; body: string }
 > = {
   quote: {
@@ -690,32 +690,6 @@ export const DEFAULT_TEMPLATES: Record<
       "— {org}\n",
   },
   /**
-   * PAYMENT RECEIVED — sent by `square-pay` the moment a pay-link payment
-   * clears (migration 119), so like `inquiry` this is a MIRROR of that
-   * function's own default and the two are kept in step by hand; Deno cannot
-   * import from `web/`. Editable on Settings → Messages (Mark, 2026-09-22: the
-   * confirmation "doesn't appear to have a edit field").
-   *
-   * NOT THE RECEIPT, deliberately. Mark asked for the receipt first and then
-   * withdrew it himself: "The receipt needs delivery information that won't
-   * exist at that time." A receipt is sent after the event; this only says the
-   * money arrived.
-   *
-   * Its tokens are its own small set, filled on the server: the two `_line`
-   * tokens are whole paragraphs that vanish when there is nothing to say
-   * (nothing left to pay; no receipt link, which is always the case in
-   * Square's sandbox).
-   */
-  payment: {
-    subject: "Payment received — order #{number}{title_suffix}",
-    body:
-      "Hi {first_name},\n\n" +
-      "Thank you — we received your payment of {amount} for order #{number} ({method}).\n" +
-      "{balance_line}" +
-      "{receipt_line}" +
-      "\nIf anything needs changing, just reply to this message.\n",
-  },
-  /**
    * THE CUSTOMER INVOICE (migration 124) — one invoice covering several
    * orders, Cafe Knotted's week. Filled in the browser by
    * `SendCustomerInvoice`, with its own small set of tokens: an invoice has no
@@ -731,9 +705,16 @@ export const DEFAULT_TEMPLATES: Record<
       "\nThank you!",
   },
   /**
-   * PAYMENT RECEIVED ON A CUSTOMER INVOICE — `payment`'s twin, sent by
-   * `square-pay` (124), so again a MIRROR of that function's
-   * `INVOICE_PAYMENT_TEMPLATE`, kept in step by hand.
+   * PAYMENT RECEIVED — sent by `square-pay` the moment a pay-link payment on a
+   * customer invoice clears (124), so like `inquiry` this is a MIRROR of that
+   * function's `INVOICE_PAYMENT_TEMPLATE`, kept in step by hand; Deno cannot
+   * import from `web/`. Editable on Settings → Messages (Mark, 2026-09-22).
+   *
+   * NOT THE RECEIPT, deliberately: "The receipt needs delivery information
+   * that won't exist at that time." It only says the money arrived. Its two
+   * `_line` tokens are paragraphs that vanish when there is nothing to say.
+   *
+   * An order's own "payment" message went with the order pay links (145).
    */
   invoice_payment: {
     subject: "Payment received — invoice #{number}",

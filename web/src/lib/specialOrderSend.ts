@@ -219,50 +219,18 @@ export async function bindQuoteSnapshot(
  * THE PAY TOKEN (migration 119) — the approval token's twin, for an invoice
  * ========================================================================== */
 
-/**
- * Whether an invoice composed now should carry a pay link: online payment is
- * configured (the Square application id — the LOCATION is the kitchen's own,
- * resolved on the server since migration 120), and there is something to pay. An invoice on a
- * settled or statement-billed order gets no link rather than one that opens on
- * "nothing to pay".
- */
-export function offersPayLink(
-  orgSettings: Record<string, unknown>,
-  order: Pick<OrderDocData, "totals" | "money">
-): boolean {
-  const sq = (orgSettings.square_payments ?? {}) as Record<string, unknown>;
-  const configured =
-    typeof sq.application_id === "string" && sq.application_id.trim() !== "";
-  return configured && !order.money.ignore_balance && order.totals.balance > 0;
-}
-
-/** The invoice's snapshot is the quote's shape with the INVOICE's note — the
- *  page renders one field for "what the paper said underneath". */
-export function invoiceSnapshot(
-  order: OrderDocData,
-  org: QuoteSnapshot["org"],
-  today: string
-): QuoteSnapshot {
-  return { ...quoteSnapshot(order, org, today), notes_quote: order.notes_invoice };
-}
-
 /** Minted when the invoice's compose card opens, WITHOUT a snapshot, so a
  *  card opened and cancelled leaves a link that reads as unknown. See
- *  `mintQuoteToken`, whose reasoning this repeats exactly. */
+ *  `mintQuoteToken`, whose reasoning this repeats exactly. A link pays a
+ *  CUSTOMER INVOICE: 119's links for one order were retired by 145. */
 export async function mintPayToken(
   supabase: SupabaseClient,
-  /** One order, or (124) one customer invoice — never both; the table's
-   *  check says so too. */
-  args: { orderId: string; orgId: string } | { customerInvoiceId: string; orgId: string }
+  args: { customerInvoiceId: string; orgId: string }
 ): Promise<string> {
   const token = mintTokenValue();
-  const target =
-    "customerInvoiceId" in args
-      ? { customer_invoice_id: args.customerInvoiceId }
-      : { order_id: args.orderId };
   const { data, error } = await supabase
     .from("special_order_pay_tokens")
-    .insert({ org_id: args.orgId, ...target, token })
+    .insert({ org_id: args.orgId, customer_invoice_id: args.customerInvoiceId, token })
     .select("token")
     .single();
   if (error) throw new Error(error.message);
@@ -272,19 +240,14 @@ export async function mintPayToken(
 
 /**
  * WHAT THE MONEY IS, for the Square order behind a pay-link payment (migration
- * 123; `supabase/functions/_shared/squareOrder`). `invoiceSplit` — the same
- * arithmetic the QuickBooks push sends as its TAX and NON lines — gives the
- * taxable and untaxed nets after the discount; delivery comes out of the
- * untaxed half because Square books it as a SERVICE CHARGE, and the rush fee
- * stays in it as untaxed income. Snapshotted at send beside the total, at the
- * same trust level.
+ * 123; `supabase/functions/_shared/squareOrder`), from money in `orderTotals`'
+ * shape — since 141 a customer invoice group's, summed from its own lines.
+ * `invoiceSplit` — the same arithmetic the QuickBooks push sends as its TAX and
+ * NON lines — gives the taxable and untaxed nets after the discount; delivery
+ * comes out of the untaxed half because Square books it as a SERVICE CHARGE,
+ * and the rush fee stays in it as untaxed income. Snapshotted at send beside
+ * the total, at the same trust level.
  */
-export function payBreakdown(order: OrderDocData) {
-  return breakdownFromTotals(order.totals, order.money.tax_rate);
-}
-
-/** The same split from money in `orderTotals`' shape — an order's, or since
- *  141 a customer invoice group's, summed from its own lines. */
 export function breakdownFromTotals(totals: Parameters<typeof invoiceSplit>[0], taxRate: number | null) {
   const { taxableNet, nonTaxableNet } = invoiceSplit(totals);
   const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -306,13 +269,12 @@ export function breakdownFromTotals(totals: Parameters<typeof invoiceSplit>[0], 
 export async function bindPaySnapshot(
   supabase: SupabaseClient,
   token: string,
-  /** An order's `QuoteSnapshot` or a customer invoice's snapshot (124) —
-   *  anything that says its total. */
+  /** The customer invoice's snapshot (124) — anything that says its total. */
   snapshot: { totals: { total: number } },
   /** A customer invoice's (126) also carries `lines`: each line's own split,
    *  keyed by line id, so the Square order can be cut per item. */
   breakdown:
-    | (ReturnType<typeof payBreakdown> & { lines?: Record<string, ReturnType<typeof payBreakdown>> })
+    | (ReturnType<typeof breakdownFromTotals> & { lines?: Record<string, ReturnType<typeof breakdownFromTotals>> })
     | null
 ): Promise<void> {
   const { data, error } = await supabase
@@ -352,7 +314,6 @@ export async function sendSpecialOrderEmail(
     blob: Blob;
     filename: string;
     quoteToken?: string | null;
-    payToken?: string | null;
   }
 ): Promise<{ warning?: string }> {
   const { data, error } = await supabase.functions.invoke("send-special-order-email", {
@@ -366,7 +327,6 @@ export async function sendSpecialOrderEmail(
       pdf_base64: await blobToBase64(args.blob),
       filename: args.filename,
       quote_token: args.quoteToken ?? undefined,
-      pay_token: args.payToken ?? undefined,
     },
   });
   if (error) {

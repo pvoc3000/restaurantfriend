@@ -32,7 +32,8 @@ import { canEditPage } from "@/lib/pageAccess";
  * either from their own lines.
  *
  * Both child sweeps PAGINATE. `special_order_items` holds 47,827 rows and
- * `special_order_payments` 6,457 — well past PostgREST's silent 1,000-row cap,
+ * `order_payments` (140's view of the ledger) 6,495 — well past PostgREST's
+ * silent 1,000-row cap,
  * which returns a short array and no error. A 500-order page can easily carry
  * more than a thousand lines.
  */

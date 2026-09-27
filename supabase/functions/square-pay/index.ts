@@ -26,12 +26,14 @@
 // still says "paid", and the failure goes to the order's log where a
 // supervisor will see it. Telling the customer "error" would invite a second
 // payment. The unique index in 119 makes a later retry of the record safe.
+//
+// A link pays a CUSTOMER INVOICE. 119's links named one order; 145 retired
+// them, every order being billed on an invoice since 2026-09-23.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { resolveTransport, sendMail, type ProviderConfig } from "../_shared/email.ts";
-import { buildPaymentNotice } from "../_shared/shopNotices.ts";
-import { appLink, notifyInvoicePaid, sendShopNotice } from "../_shared/shopNotify.ts";
+import { notifyInvoicePaid } from "../_shared/shopNotify.ts";
 import { buildSquareOrder, type PayBreakdown } from "../_shared/squareOrder.ts";
 
 const CORS = {
@@ -68,23 +70,11 @@ function toCents(value: unknown): number | null {
 
 /**
  * THE "PAYMENT RECEIVED" MESSAGE'S DEFAULT — a MIRROR of `DEFAULT_TEMPLATES.
- * payment` in web/src/lib/specialOrderDocs.ts, which is what Settings →
+ * invoice_payment` in web/src/lib/specialOrderDocs.ts, which is what Settings →
  * Messages shows. Deno cannot import from `web/` (submit-inquiry keeps its
  * inquiry default the same way), so the two are kept in step by hand; this one
  * is the copy that is actually SENT when the org has not written its own.
  */
-const PAYMENT_TEMPLATE = {
-  subject: "Payment received — order #{number}{title_suffix}",
-  body:
-    "Hi {first_name},\n\n" +
-    "Thank you — we received your payment of {amount} for order #{number} ({method}).\n" +
-    "{balance_line}" +
-    "{receipt_line}" +
-    "\nIf anything needs changing, just reply to this message.\n",
-};
-
-/** The same message for a CUSTOMER INVOICE (124), which covers several orders
- *  and has a number of its own. Mirrors `DEFAULT_TEMPLATES.invoice_payment`. */
 const INVOICE_PAYMENT_TEMPLATE = {
   subject: "Payment received — invoice #{number}",
   body:
@@ -175,10 +165,7 @@ Deno.serve(async (req) => {
     const claim = (claimData ?? {}) as {
       state: string;
       org_id?: string;
-      order_id?: string | null;
-      /** 124: a token for a customer invoice rather than one order. */
       customer_invoice_id?: string | null;
-      kind?: "order" | "customer_invoice";
       number?: string;
       balance?: number | string;
       location_id?: string;
@@ -191,8 +178,7 @@ Deno.serve(async (req) => {
     };
 
     // `unknown`, `superseded`, `cancelled`, `paid`, `busy` — the page words them.
-    const isInvoice = claim.kind === "customer_invoice" && !!claim.customer_invoice_id;
-    if (claim.state !== "claimed" || (!claim.order_id && !isInvoice) || !claim.org_id) {
+    if (claim.state !== "claimed" || !claim.customer_invoice_id || !claim.org_id) {
       return json(200, { state: claim.state });
     }
 
@@ -211,8 +197,8 @@ Deno.serve(async (req) => {
 
     // What the money WAS, in Square's own terms — Special Orders goods, sales
     // tax, delivery. See `_shared/squareOrder.ts` (migration 123).
-    const reference = `${isInvoice ? "Invoice" : "Order"} ${claim.number ?? ""}`.trim();
-    const label = `${isInvoice ? "Invoice" : "Order"} #${claim.number ?? ""}${claim.title ? ` — ${claim.title}` : ""}`.slice(0, 500);
+    const reference = `Invoice ${claim.number ?? ""}`.trim();
+    const label = `Invoice #${claim.number ?? ""}${claim.title ? ` — ${claim.title}` : ""}`.slice(0, 500);
     // 126: an invoice whose lines are sold as different items gets Square
     // lines per item — only when every line's money was snapshotted, or the
     // one-item order it always was.
@@ -291,7 +277,7 @@ Deno.serve(async (req) => {
       order_id: orderId,
       autocomplete: true,
       reference_id: reference.slice(0, 40),
-      note: `${isInvoice ? reference : `Invoice ${reference}`} — pay link`.slice(0, 500),
+      note: `${reference} — pay link`.slice(0, 500),
       ...(verification_token ? { verification_token } : {}),
     };
 
@@ -372,25 +358,14 @@ Deno.serve(async (req) => {
     /* ---- 5. THE CONFIRMATION ------------------------------------------- */
 
     // The "Payment received" message on Settings → Messages, filled here on
-    // the server. See `PAYMENT_TEMPLATE` for why this has its own copy.
-    // An invoice has no order of its own to read: its customer is on the
-    // invoice, and there is no day-of contact, taker or thread to answer.
-    const { data: order } = isInvoice
-      ? { data: null }
-      : await admin
-          .from("special_orders")
-          .select(
-            "number, title, event_date, contact_name, contact_email, inbound_message_id, taken_by, taken_by_employee_id, customers(first_name, last_name, company, email)"
-          )
-          .eq("id", claim.order_id!)
-          .maybeSingle();
-    const { data: invoiceRow } = isInvoice
-      ? await admin
-          .from("customer_invoices")
-          .select("number, customers(first_name, last_name, company, email)")
-          .eq("id", claim.customer_invoice_id!)
-          .maybeSingle()
-      : { data: null };
+    // the server. See `INVOICE_PAYMENT_TEMPLATE` for why this has its own
+    // copy. The customer is on the invoice; an invoice has no day-of contact,
+    // taker or thread to answer, as an order did.
+    const { data: invoiceRow } = await admin
+      .from("customer_invoices")
+      .select("number, customers(first_name, last_name, company, email)")
+      .eq("id", claim.customer_invoice_id)
+      .maybeSingle();
     const { data: org } = await admin
       .from("orgs")
       .select("name, settings")
@@ -402,68 +377,40 @@ Deno.serve(async (req) => {
         email_provider?: ProviderConfig;
         reply_to?: string;
         email?: {
-          payment?: { subject?: string; body?: string };
           invoice_payment?: { subject?: string; body?: string };
         };
       };
       billing?: { email?: string };
     };
 
-    const customer = ((isInvoice ? invoiceRow?.customers : order?.customers) ?? null) as {
+    const customer = (invoiceRow?.customers ?? null) as {
       first_name?: string | null;
       last_name?: string | null;
       company?: string | null;
       email?: string | null;
     } | null;
 
-    // `documentRecipient` in lib/specialOrderDocs: the CUSTOMER first (Mark,
-    // 2026-09-21), and the day-of contact when they are a different address.
-    // NO LONGER the standing `email_cc` (Mark, 2026-09-24: "stop the cc") —
-    // the shop gets its own paid-online notice below instead of a copy of the
-    // customer's receipt.
-    const to = (customer?.email ?? order?.contact_email ?? "").trim();
-    const ccList: string[] = [];
-    const contactEmail = (order?.contact_email ?? "").trim();
-    if (
-      contactEmail &&
-      ![to, ...ccList].map((a) => a.toLowerCase()).includes(contactEmail.toLowerCase())
-    ) {
-      ccList.push(contactEmail);
-    }
+    // The CUSTOMER (Mark, 2026-09-21), and NO LONGER the standing `email_cc`
+    // (Mark, 2026-09-24: "stop the cc") — the shop gets its own paid-online
+    // notice below instead of a copy of the customer's receipt.
+    const to = (customer?.email ?? "").trim();
 
     if (to) {
       try {
-        // WHO IS HANDLING IT, the same way the documents sign off: the linked
-        // employee's name where there is one, FileMaker's text where not.
-        let taker: string | null = order?.taken_by ?? null;
-        // `special_order_takers` (053) checks the CALLER's membership, which
-        // service_role does not have, so the one row is read directly and
-        // named the way that function names it: nickname first, else first.
-        if (order?.taken_by_employee_id) {
-          const { data: emp } = await admin
-            .from("employees")
-            .select("nickname, first_name, last_name")
-            .eq("id", order.taken_by_employee_id)
-            .maybeSingle();
-          const first = (emp?.nickname ?? "").trim() || (emp?.first_name ?? "").trim();
-          if (first) taker = first;
-        }
-
         const person = [customer?.first_name, customer?.last_name].filter(Boolean).join(" ").trim();
-        const fullName = person || (customer?.company ?? "").trim() || (order?.contact_name ?? "").trim();
+        const fullName = person || (customer?.company ?? "").trim();
         const remaining = Number((recorded as { balance?: number | string } | null)?.balance ?? 0);
         const money = (v: number) => `$${v.toFixed(2)}`;
-        const number = isInvoice
-          ? String(invoiceRow?.number ?? claim.number ?? "")
-          : (order?.number ?? claim.number ?? "");
 
         const values: Record<string, string> = {
-          number,
-          title: order?.title ?? "",
-          title_suffix: order?.title ? ` — ${order.title}` : "",
+          number: String(invoiceRow?.number ?? claim.number ?? ""),
+          // An order's tokens, kept empty so a template written for the order
+          // message still reads rather than printing its braces.
+          title: "",
+          title_suffix: "",
+          employee_name: "",
           first_name: firstNameOf(fullName) || "there",
           full_name: fullName,
-          employee_name: firstNameOf(taker),
           amount: money(amount),
           method,
           balance: money(Math.max(remaining, 0)),
@@ -472,11 +419,7 @@ Deno.serve(async (req) => {
           org: org?.name ?? "",
         };
 
-        const configured =
-          (isInvoice
-            ? orgSettings.special_orders?.email?.invoice_payment
-            : orgSettings.special_orders?.email?.payment) ?? {};
-        const template = isInvoice ? INVOICE_PAYMENT_TEMPLATE : PAYMENT_TEMPLATE;
+        const configured = orgSettings.special_orders?.email?.invoice_payment ?? {};
         const orDefault = (v: string | undefined, fallback: string) =>
           typeof v === "string" && v.trim() !== "" ? v : fallback;
 
@@ -486,16 +429,11 @@ Deno.serve(async (req) => {
           orgName: org?.name ?? "Orders",
           replyToFallbacks: [orgSettings.special_orders?.reply_to, orgSettings.billing?.email],
         });
-        const raw = (order?.inbound_message_id ?? "").trim();
-        const inReplyTo = raw ? (raw.startsWith("<") ? raw : `<${raw}>`) : undefined;
 
         await sendMail(transport, {
           to,
-          cc: ccList.length ? ccList.join(", ") : undefined,
-          subject: fill(orDefault(configured.subject, template.subject), values),
-          text: fill(orDefault(configured.body, template.body), values),
-          inReplyTo,
-          references: inReplyTo,
+          subject: fill(orDefault(configured.subject, INVOICE_PAYMENT_TEMPLATE.subject), values),
+          text: fill(orDefault(configured.body, INVOICE_PAYMENT_TEMPLATE.body), values),
         });
       } catch (e) {
         warnings.push(`the payment confirmation email was not sent: ${e instanceof Error ? e.message : String(e)}`);
@@ -507,54 +445,26 @@ Deno.serve(async (req) => {
     // Only for a payment recorded NOW: `already_recorded` is a retried request
     // for a payment the shop was already told about.
     if ((recorded as { state?: string } | null)?.state === "recorded") {
-      if (isInvoice) {
-        await notifyInvoicePaid(admin, {
-          orgId: claim.org_id,
-          invoiceId: claim.customer_invoice_id!,
-          amount,
-          method,
-          processor: "Square",
-        });
-      } else if (claim.order_id) {
-        const person = [customer?.first_name, customer?.last_name].filter(Boolean).join(" ").trim();
-        const remaining = Number((recorded as { balance?: number | string } | null)?.balance ?? 0);
-        await sendShopNotice(admin, {
-          orgId: claim.org_id,
-          notice: buildPaymentNotice(
-            {
-              kind: "order",
-              number: String(order?.number ?? claim.number ?? ""),
-              title: order?.title ?? null,
-              customer: person || (customer?.company ?? "").trim() || (order?.contact_name ?? "").trim() || null,
-              amount,
-              method,
-              processor: "Square",
-              balance: Math.max(remaining, 0),
-              event_date: order?.event_date ?? null,
-            },
-            appLink(`/special-orders/${claim.order_id}`)
-          ),
-          orderIds: [claim.order_id],
-          what: "Paid-online notice",
-          replyTo: to || null,
-        });
-      }
+      await notifyInvoicePaid(admin, {
+        orgId: claim.org_id,
+        invoiceId: claim.customer_invoice_id,
+        amount,
+        method,
+        processor: "Square",
+      });
     }
 
     if (warnings.length) {
       // On every order the invoice covers, so the warning is on whichever
-      // record somebody opens.
-      let orderIds: string[] = claim.order_id ? [claim.order_id] : [];
-      if (isInvoice) {
-        const { data: lines } = await admin
-          .from("customer_invoice_lines")
-          .select("special_order_id")
-          .eq("invoice_id", claim.customer_invoice_id!);
-        // A free line (141) is no order's — nothing to write the warning on.
-        orderIds = [
-          ...new Set((lines ?? []).map((l) => l.special_order_id as string | null).filter((o): o is string => !!o)),
-        ];
-      }
+      // record somebody opens. A free line (141) is no order's — nothing to
+      // write the warning on.
+      const { data: lines } = await admin
+        .from("customer_invoice_lines")
+        .select("special_order_id")
+        .eq("invoice_id", claim.customer_invoice_id);
+      const orderIds = [
+        ...new Set((lines ?? []).map((l) => l.special_order_id as string | null).filter((o): o is string => !!o)),
+      ];
       if (orderIds.length) {
         await admin.from("special_order_events").insert(
           orderIds.map((order_id) => ({

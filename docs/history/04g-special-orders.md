@@ -4890,3 +4890,66 @@ Invoiced 7, Orders), /customer-invoices (Shop DF02), #1014, order #10057, /start
 (the Invoices card, zero at DF01) and /forms all 200. `fetchStatement` run as
 the owner rendered Alyssa Rosario's real account: #1012 and #1013 and their two
 pay-link payments, closing $0.00.
+
+**THE TEXTBOOK A/R MODEL — PHASE 5: CLEAN-UP (migration 145, written and
+rehearsed 2026-09-27, NOT YET APPLIED).** The plan waited for two weeks of
+clean parity reports. Mark: "The existing invoices were all tests. The app
+won't be live until October 1st. We can do the cleanup now."
+
+Each item was checked for callers in the database (`pg_proc` bodies, views,
+keys), the app and the edge functions before it went:
+- **`special_order_payments`:** dropped. It had been frozen since 140, and
+  nothing read it.
+- **Retired with it:** `migration/check-ledger-parity.mjs`. The FileMaker
+  loaders (`load-special-orders.mjs`) still name the table; they are one-time
+  history and will not run again.
+- **`create_customer_invoice(org, lines jsonb, …)`:** 124's shape, kept by 141
+  as a wrapper, with no callers. Dropped.
+- **`special_order_uninvoiced`:** 139's function, replaced by
+  `special_order_unbilled`. Dropped.
+- **`customer_invoice_lines.sent_amount`:** 128's "changed since sent" record,
+  equal to `amount` on every invoice sent since 141. Its two writers were
+  redefined without it (the frozen-lines trigger's Sold-as comparison, and
+  `mark_customer_invoice_sent`'s copy), then the column was dropped.
+- **Order pay links (119):** no order link had been made since 2026-09-23, when
+  Send ▸ Invoice began going through a customer invoice, and none exists. 145
+  refuses to run if one does.
+  - The order branches came out of `pay_token_state`, `claim_pay_token`,
+    `record_pay_link_payment`, `pay_link_token_location` and
+    `pay_link_token_variation`.
+  - `pay_link_square_location` and the token's `order_id` are dropped;
+    `customer_invoice_id` is required.
+  - `claim_pay_token` still says `kind: 'customer_invoice'`, so a `square-pay`
+    deployed on either side of the migration reads a claim the same way.
+- **Edge functions:**
+  - `square-pay` lost its order path: the order lookup, the order
+    confirmation's cc, taker and reply threading, and the order paid-online
+    notice. The invoice path is unchanged.
+  - `send-special-order-email` no longer retires order links.
+- **App:**
+  - `SendDocument` no longer mints an order link. Its Send ▸ Invoice has gone
+    through a customer invoice since 2026-09-23, so the path was unreachable.
+  - `specialOrderSend` loses `offersPayLink`, `invoiceSnapshot` and
+    `payBreakdown`; `mintPayToken` is invoice-only.
+  - The pay page renders invoices only.
+  - Settings → Messages drops the order's "Payment received". The invoice's
+    takes that name.
+
+**KEPT, though the plan listed it:** `customer_invoice_lines.kind`. It is the
+only record of Deposit versus Part payment (`line_type` is 'deposit' for both),
+and 141's functions read it.
+
+**Verified on a copy of the data:**
+- 145 refuses while an order link exists.
+- It applies twice.
+- The old table and the column are gone; so are the dropped functions, whose
+  names appear in no function body. (The one false match is
+  `approve_quote_by_token`, which reads the quote tokens' own `order_id`.)
+- Phase 4's scenarios give output identical to their run before 145.
+- A new Square invoice:
+  - sends without `sent_amount`;
+  - Sold as still follows its unpaid lines, and an amount edit is refused;
+  - an order-only link is refused by the NOT NULL;
+  - the link goes open → claimed (Square location and item resolved) →
+    recorded → a retry "already_recorded" → paid, and the order is settled.
+- `tsc`, lint and 2,125 fixtures pass, and both edge functions parse.

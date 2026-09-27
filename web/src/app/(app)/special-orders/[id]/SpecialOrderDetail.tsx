@@ -766,7 +766,6 @@ export async function SpecialOrderDetail({
                       canWrite,
                       workflow: row as never,
                       orgSettings: session.orgSettings,
-                      onCustomerInvoice: liveInvoice !== null,
                       today,
                       invoice: {
                         liveInvoiceId: liveInvoice?.id ?? null,

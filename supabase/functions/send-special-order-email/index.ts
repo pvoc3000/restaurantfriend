@@ -155,8 +155,6 @@ Deno.serve(async (req) => {
        *  is real and editable. Binding it to the document is this function's
        *  job — see below. */
       quote_token,
-      /** The invoice's pay link token (migration 119), minted the same way. */
-      pay_token,
     } = payload;
 
     if (!order_id || !kind || !to || !subject || !pdf_base64 || !filename) {
@@ -340,22 +338,6 @@ Deno.serve(async (req) => {
         warnings.push(
           "the approval link has no document behind it, so it will tell the customer the quote is not ready"
         );
-      }
-    }
-
-    // MIGRATION 119: an invoice going out retires every earlier pay link for
-    // the order, so a customer holding last week's invoice reads "this invoice
-    // has been updated" rather than paying a figure that has since changed.
-    // Its snapshot and total were bound by the browser before the send.
-    if (kind === "invoice" && pay_token) {
-      const { error: supersedeError } = await supabase
-        .from("special_order_pay_tokens")
-        .update({ superseded_at: new Date().toISOString() })
-        .eq("order_id", order_id)
-        .neq("token", pay_token)
-        .is("superseded_at", null);
-      if (supersedeError) {
-        warnings.push(`earlier pay links were not retired: ${supersedeError.message}`);
       }
     }
 
