@@ -99,7 +99,13 @@ const VAR_EXAMPLE: Record<string, string> = {
   items: "what the customer built on the form, a line each, with an estimated subtotal — or nothing when they only described it",
 };
 
-/** The nine messages this module can send, in the order somebody meets them. */
+/**
+ * The messages this module sends, in the order somebody meets them. Only
+ * messages something SENDS are listed (Mark, 2026-09-27: "update the wording
+ * on messages so they make sense"): an order's own Invoice and Payment
+ * received went with the order pay links (145) — every order is billed on a
+ * customer invoice — and the statement is never emailed.
+ */
 const TEMPLATES: {
   key: keyof typeof DEFAULT_TEMPLATES;
   label: string;
@@ -113,8 +119,8 @@ const TEMPLATES: {
     // becomes the thread root every later message replies onto.
     when:
       "Sent the moment somebody submits the public form. It also starts the " +
-      "email thread — every quote, invoice and receipt for that order replies " +
-      "onto this message.",
+      "email thread — the quote and the receipt for that order reply onto " +
+      "this message.",
     vars: ["number", "first_name", "full_name", "employee_name", "org", "items"],
   },
   {
@@ -124,10 +130,16 @@ const TEMPLATES: {
     vars: ["number", "title", "title_suffix", "first_name", "full_name", "event_date", "event_time", "event_time_clause", "cutoff_clause", "location", "total", "employee_name", "fulfillment_note", "approve_line"],
   },
   {
-    key: "invoice",
+    key: "customer_invoice",
     label: "Invoice",
-    when: "Sent with the invoice PDF. {pay_line} is the pay link, and only appears when there is one.",
-    vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "cutoff_clause", "total", "balance", "employee_name", "fulfillment_note", "pay_line"],
+    when: "Sent with an invoice — one order or several, like a wholesale week. {pay_line} is the pay link, and only appears when there is one.",
+    vars: ["number", "first_name", "full_name", "total", "due_on", "orders", "pay_line"],
+  },
+  {
+    key: "invoice_payment",
+    label: "Payment received",
+    when: "Sent automatically when a customer pays an invoice with its pay link.",
+    vars: ["number", "first_name", "full_name", "amount", "method", "balance", "balance_line", "receipt_line"],
   },
   {
     key: "receipt",
@@ -140,24 +152,6 @@ const TEMPLATES: {
     label: "Kitchen order",
     when: "Internal — the kitchen document, which carries no prices.",
     vars: ["number", "event_date"],
-  },
-  {
-    key: "customer_invoice",
-    label: "Customer invoice",
-    when: "Sent with a customer invoice — several orders billed at once, like a wholesale week. {pay_line} is the pay link.",
-    vars: ["number", "first_name", "full_name", "total", "due_on", "orders", "pay_line"],
-  },
-  {
-    key: "invoice_payment",
-    label: "Payment received",
-    when: "Sent automatically when a customer pays an invoice with its pay link.",
-    vars: ["number", "first_name", "full_name", "amount", "method", "balance", "balance_line", "receipt_line"],
-  },
-  {
-    key: "statement",
-    label: "Statement",
-    when: "A customer's orders over a period — the weekly wholesale bill.",
-    vars: ["number", "first_name", "period", "total"],
   },
 ];
 

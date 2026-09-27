@@ -4971,3 +4971,43 @@ me?"). This is the first migration not pasted into the SQL editor.
 - **Checked live:** the one real link (void #1001) answers "cancelled". As the
   owner, #1014, the invoice list, #10057's Payments tab, Knotted's record and
   /start all 200, and the pay page loads. The textbook A/R rebuild is complete.
+
+**BEFORE GOING LIVE (2026-09-27): MESSAGES THAT MAKE SENSE, AND INVOICES FROM
+10000.** Mark: "Update the wording on messages so they make sense. Start the
+next invoice at 10000." Both were applied by Claude through
+`supabase db query --linked`, in one transaction. The org's settings were saved
+first to `FMP Export/org-settings-before-2026-09-27.json`.
+
+**Messages** (`orgs.settings.special_orders.email`, Mark's own wording kept):
+- **Invoice** (`customer_invoice`) and **Payment received**
+  (`invoice_payment`): his order versions carried over, reworded for
+  invoices.
+  - "Order #" became "Invoice #".
+  - The broken "Balance Due: {balance_line}" is now "Balance Due: {balance}".
+  - His cut-off sentence reads "Please pay in full by {due_on} so we can place
+    your order into our production queue!"
+  - They are signed "Donut Friend" beside his address, since an invoice
+    carries no `{employee_name}`.
+- **Retired:** the order versions ("invoice", "payment"). Nothing had sent them
+  since 2026-09-23 and 145 respectively.
+- **Quote:** no longer promises "an invoice from Square". It introduced the
+  approval link twice (its own sentence, then `{approve_line}`'s), and now
+  keeps only `{approve_line}`'s.
+- **Inquiry:** a line break inside a sentence was removed.
+- **Receipt:** untouched.
+- **Settings → Messages** lists only what something sends: Inquiry, Quote,
+  Invoice, Payment received, Receipt, Kitchen order. The order Invoice and the
+  Statement (never emailed) are gone from it; "Customer invoice" is now
+  "Invoice".
+
+**Numbering (migration 146):** `next_customer_invoice_number` is now the
+larger of the org's highest number plus one and
+`orgs.settings.customer_invoices.first_number`, with 1001 when that is unset.
+The setting sits beside the terms and the prefix, which also have no screen.
+It is set to 10000.
+- **On a copy of the data:** unset → 1015; 10000 as a number or text → 10000;
+  junk → 1015; two new invoices → 10000, 10001.
+- **Live:** next number 10000.
+- **Left as they are:** the test invoices 1001–1014 keep their numbers, draft
+  #1014 among them. Invoices from 10000 will share a range with order numbers
+  (#10057…).
