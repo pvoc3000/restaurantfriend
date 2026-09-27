@@ -23,6 +23,8 @@ export type InvoiceOrderRow = {
   href: string;
   status: string;
   kind: InvoiceGroupKind;
+  /** A fixed line's own word — "Deposit", "Part payment" — beside the order. */
+  note: string | null;
   soldAs: SquareItem;
   /** What it bills on this invoice. */
   billed: number;
@@ -122,7 +124,7 @@ export function InvoiceOrders({
                   <Link href={r.href} className="hover:underline">
                     {r.label}
                   </Link>
-                  {r.kind === "deposit" ? <span className="ml-2 text-[13px] text-muted">Deposit</span> : null}
+                  {r.note ? <span className="ml-2 text-[13px] text-muted">{r.note}</span> : null}
                   {r.stale ? (
                     <span className="mt-0.5 block text-[13px]">
                       <span className="box-decoration-clone bg-mark-fill px-1">

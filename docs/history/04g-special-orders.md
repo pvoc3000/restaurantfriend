@@ -4655,7 +4655,8 @@ renders read-only (0 editors) where an order's hand-typed ones stay editable
 (3). The browser pane itself had no session, so nothing was clicked.
 
 **THE TEXTBOOK A/R MODEL — PHASE 2 OF 5: AN INVOICE OWNS ITS LINES (migration
-141, written and rehearsed 2026-09-27, NOT YET APPLIED).** Mark's three asks,
+141, APPLIED 2026-09-27; send-special-order-email v19 and square-pay v13
+DEPLOYED the same day).** Mark's three asks,
 built: an invoice with no order (**New Invoice…** on `/customer-invoices`, in
 the filter row: customer — `CustomerPicker`, a new one allowed — the shop that
 collects, due date, processor); orders added to it later (**Add Orders…**, the
@@ -4720,3 +4721,18 @@ invariant is after = before + held). **Real-data rehearsal**: every one of the
 Fixtures: grouping (oldest event first; free lines last — a "~" sentinel had
 sorted them FIRST under locale collation), group totals, scaling to the cent,
 snapshot rows, the Totals window — each claim proved by breaking the code.
+**After 141 was applied (2026-09-27):** the hosted DB matched the rehearsal
+exactly — every invoice total unchanged, #1014 15 lines at $5,288.00, only the
+two void invoices without a shop, ledger parity still holding. As the owner
+(one-off session, signed out): #1014's seven groups not stale, its send check
+empty; server renders of the list (New Invoice…), #1014 (Orders 7, Lines 15,
+Add Orders…, Add Line…, Shop DF02), #1013, order #10057's Payments tab and
+Knotted's customer record all 200. **Two things the real data showed, fixed by
+migration 142 (written 2026-09-27):** Add Orders… offered 48 Knotted days back
+to August — unbilled in 141's sense because they were billed by hand in Square
+before the app invoiced, but every one PAID IN FULL — so the picker now offers
+only orders with something left to bill AND still owed; and 139's deposit lines
+read "Part payment · Order #10055 · …" under a band that already names the
+order, so they now say "Deposit" / "Part payment" (wording only; the migration
+checks no amount moved). The textbook plan's later phases move up one: Revise
+and credit is 143, reporting 144, clean-up 145.

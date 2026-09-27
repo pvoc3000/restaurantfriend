@@ -91,6 +91,7 @@ export async function CustomerInvoiceDetail({
       href: withFrom(`/special-orders/${g.orderId}`, backHere),
       status: order?.status ? STATUS_LABEL[order.status] : "—",
       kind: g.kind,
+      note: g.kind === "deposit" ? g.lines[0]?.description ?? "Deposit" : null,
       soldAs: order?.square_item ?? g.lines[0]?.square_item ?? "special_order",
       billed: g.net,
       expected: state?.expected ?? g.net,
