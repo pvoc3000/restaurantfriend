@@ -44,6 +44,7 @@ import {
   type PaymentRow,
 } from "@/components/specialOrders/OrderPayments";
 import { uninvoicedAmount, type OpenInvoice } from "@/lib/newPayment";
+import { applicationCounts, isSplitPayment, paymentsToCount, type LedgerRow } from "@/lib/customerPayments";
 import { CompletionDates } from "@/components/specialOrders/CompletionDates";
 import { StatusCatchUp } from "@/components/specialOrders/StatusCatchUp";
 import { OrderTotals } from "@/components/specialOrders/OrderTotals";
@@ -171,8 +172,8 @@ export async function SpecialOrderDetail({
           .order("sort", { ascending: true, nullsFirst: false })
       : SKIP,
     supabase
-      .from("special_order_payments")
-      .select("id, paid_on, amount, payment_type, note, external_ref, customer_invoice_id")
+      .from("order_payments")
+      .select("id, payment_id, paid_on, amount, payment_type, note, external_ref, processor, customer_invoice_id")
       .eq("order_id", id)
       .order("paid_on", { ascending: true, nullsFirst: false }),
     wantsLog
@@ -347,12 +348,21 @@ export async function SpecialOrderDetail({
       }
     : null;
 
-  const payments: PaymentRow[] = ((paymentRows ?? []) as unknown as (PaymentRow & {
-    customer_invoice_id: string | null;
-  })[]).map((p) => {
+  // A PAYMENT SPLIT ACROSS SEVERAL ORDERS OR INVOICES (140) is one payment:
+  // its amount and its removal are not one order's to change. Only a payment
+  // taken on an invoice or by a processor can be split, so only those are asked.
+  const ledgerRows = (paymentRows ?? []) as unknown as (PaymentRow & LedgerRow & { customer_invoice_id: string | null })[];
+  const splitCandidates = paymentsToCount(ledgerRows);
+  const { data: applicationRows } = splitCandidates.length
+    ? await supabase.from("payment_applications").select("payment_id").in("payment_id", splitCandidates)
+    : { data: [] as { payment_id: string }[] };
+  const applicationCount = applicationCounts((applicationRows ?? []) as { payment_id: string }[]);
+
+  const payments: PaymentRow[] = ledgerRows.map((p) => {
     const inv = invoicesOnOrder.find((i) => i.id === p.customer_invoice_id);
     return {
       ...p,
+      shared: isSplitPayment(p.payment_id, applicationCount),
       invoice: inv
         ? { label: invoiceLabel(inv), href: invoiceHref(inv.id, orderTabHref(id, "payments", rawParams)) }
         : null,
@@ -517,7 +527,7 @@ export async function SpecialOrderDetail({
       : Promise.resolve({ data: [] as { invoice_id: string; amount: number }[] }),
     openInvoiceIds.length
       ? supabase
-          .from("special_order_payments")
+          .from("payment_applications")
           .select("customer_invoice_id, amount")
           .in("customer_invoice_id", openInvoiceIds)
       : Promise.resolve({ data: [] as { customer_invoice_id: string; amount: number }[] }),
@@ -773,7 +783,6 @@ export async function SpecialOrderDetail({
                 kind === "order" && status !== "cancelled" && canScheduleProduction(session.membership.role)
                   ? {
                       orderId: id,
-                      orgId: row.org_id as string,
                       number: row.number as string,
                       title: (row.title as string | null) ?? null,
                       eventDate: (row.event_date as string | null) ?? null,
@@ -1147,7 +1156,6 @@ export async function SpecialOrderDetail({
                           it would offer one on every wholesale day. */}
                       <CompletionDates
                         id={id}
-                        orgId={row.org_id as string}
                         order={row as never}
                         money={{
                           balance: totals.balance,
@@ -1272,7 +1280,6 @@ export async function SpecialOrderDetail({
                 <div className="min-w-0">
                   <OrderPayments
                     orderId={id}
-                    orgId={row.org_id as string}
                     rows={payments}
                     invoices={orderInvoices}
                     money={orderMoney}

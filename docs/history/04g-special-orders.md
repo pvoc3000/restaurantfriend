@@ -4588,3 +4588,58 @@ cancelled order, count their line amount as Subtotal. Consequence on a
 one-order invoice: the itemized block now lists the ITEMS only and lost its
 "This order" row, since discount, delivery, rush, tax and earlier payments
 would otherwise print twice — the order's own documents already work this way.
+
+**THE TEXTBOOK A/R MODEL — PHASE 1 OF 5: THE PAYMENTS LEDGER (migration 140,
+written and rehearsed 2026-09-27, NOT YET APPLIED).** Mark, 2026-09-27: "FMP
+never had invoices and when we added them to Restaurant Friend we tried to make
+them fit an old, outdated model instead of starting from scratch. Make
+Restaurant Friend use the textbook model." The approved plan is five
+migrations: 140 the payments ledger · 141 invoices own their lines (lines with
+no order, Add Orders…, Add Line…, a sent invoice FROZEN) · 142 Revise ("1014-2")
+and customer credit · 143 A/R reporting (statements, aging, who owes us from
+invoices) · 144 clean-up. Decided on Mark's behalf and his to overturn: sent =
+frozen; revisions numbered "-2"; credit auto-applies to the next invoice; free
+lines untaxed; QuickBooks invoices stay supported with today's limits; and THE
+ORDER'S `invoice` STATUS STAYS — it is what holds Knotted's unpaid days out of
+production (`pullReadiness`), so only the order's MONEY is read from the ledger.
+**140 is where money is recorded, not what any screen shows.** Two tables:
+`customer_payments` (money received — one row per real payment, signed, a
+refund names what it refunds with `refund_of`, a processor's id unique per org)
+and `payment_applications` (where it went: order only = HELD on the order, the
+textbook customer deposit; order + invoice = that order's share of an invoice
+payment; invoice only = 141's free lines). Nothing writes either table except
+definer functions — `record_order_payment(s)`, `update_order_payment`,
+`delete_order_payment`, `payment_refundable`, `record_payment_refund`, and the
+restated processor paths — and writes are REVOKED so a stale client fails
+loudly. Readers get the old table's columns from the security-invoker view
+**`order_payments`** (id = the application's = the old row's id); readers of
+what an INVOICE collected read `payment_applications` directly, since 141's
+invoice-only money has no order. `special_order_payments` is frozen (writes
+revoked, triggers dropped) and dropped in 144.
+**THE BACKFILL PROVES ITSELF OR ROLLS BACK**: each old row → a payment + an
+application keeping its id; Square/QuickBooks rows sharing an id become ONE
+payment (none in live data; the harness has one); a row tagged to a VOID
+invoice becomes money held on its order (139's reading). A parity block raises
+unless every order's paid AND held totals, every live invoice's collected, and
+every payment's full application are unchanged — proved to bite by sabotaging
+the grouped amount (it raised and nothing was created). **Rehearsed on a copy
+of the live money columns**: 6,495 rows → 6,495 payments, parity holds, 0 log
+lines written (the log triggers are created after the backfill), 8 payments
+with no customer (the 8 FileMaker rows the probe predicted).
+**Behaviour changes, all deliberate:** one QuickBooks payment paying TWO
+invoices is one payment with applications on both (the old index would have
+called the second a duplicate); a VOIDED invoice releases its money to its
+orders in the ledger (the new `trg_customer_invoice_void_releases_payments`),
+and `record_qbo_invoice_payment` answers `void` rather than re-adding it; an
+order's delete takes payments that went only to it (a before-delete trigger,
+log suppressed as 100 does); a payment follows its order's customer. The
+Payments tab hides the amount editor on a processor's payment or a split one,
+and the × on a split one (`lib/customerPayments`, fixtures; each rule proved by
+breaking it). Excess on an invoice payment still lands on the last order until
+142 brings credit. **Harness**: all 139 migrations replay on PG15, 140 applies
+twice, and eleven role scenarios pass (staff read/no write; old table refused
+loudly; anon nothing; held cash logs once; hand amount edit logged; Square
+amount and split delete refused; pay-link retry records nothing; refund capped
+per order and manager-only, reopens the invoice; QuickBooks two-invoice payment
+and replay; void releases; batch all-or-nothing). Read-only re-check after it
+is applied: `node --env-file=.env migration/check-ledger-parity.mjs`.

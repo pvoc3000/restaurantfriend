@@ -120,13 +120,14 @@ export async function notifyInvoicePaid(
       .select("amount, special_order_id, special_orders(number, title, event_date)")
       .eq("invoice_id", args.invoiceId)
       .order("sort");
+    // What the invoice has collected: the ledger's applications to it (140).
     const { data: pays } = await admin
-      .from("special_order_payments")
+      .from("payment_applications")
       .select("amount")
       .eq("customer_invoice_id", args.invoiceId);
     const rows = (lines ?? []) as unknown as {
       amount: number | string;
-      special_order_id: string;
+      special_order_id: string | null;
       special_orders: { number: string; title: string | null; event_date: string | null } | null;
     }[];
     const total = rows.reduce((a, l) => a + Number(l.amount), 0);
@@ -143,16 +144,21 @@ export async function notifyInvoicePaid(
         processor: args.processor,
         balance: Math.round((total - paid) * 100) / 100,
         event_date: null,
-        orders: rows
-          .filter((l) => l.special_orders)
-          .map((l) => `#${l.special_orders!.number}${l.special_orders!.title ? ` — ${l.special_orders!.title}` : ""}`),
+        // Each order once, however many lines it has on the invoice.
+        orders: [
+          ...new Set(
+            rows
+              .filter((l) => l.special_orders)
+              .map((l) => `#${l.special_orders!.number}${l.special_orders!.title ? ` — ${l.special_orders!.title}` : ""}`)
+          ),
+        ],
       },
       appLink(`/customer-invoices/${args.invoiceId}`)
     );
     return await sendShopNotice(admin, {
       orgId: args.orgId,
       notice,
-      orderIds: [...new Set(rows.map((l) => l.special_order_id))],
+      orderIds: [...new Set(rows.map((l) => l.special_order_id).filter((o): o is string => !!o))],
       what: "Paid-online notice",
       replyTo: customer?.email ?? null,
     });

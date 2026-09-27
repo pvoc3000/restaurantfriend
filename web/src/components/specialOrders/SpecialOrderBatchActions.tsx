@@ -286,11 +286,10 @@ export function SpecialOrderBatchActions({
   /**
    * THE PAYMENTS, AS ROWS — decision 2's whole point, applied to a selection.
    *
-   * ONE INSERT, NOT ONE PER ORDER. PostgREST takes an array, so the amounts can
-   * differ per row and the write is still a single statement: twenty round
-   * trips are twenty chances to half-finish, and a half-recorded batch of
-   * PAYMENTS is the worst version of that — you cannot tell by looking which
-   * half landed.
+   * ONE CALL, NOT ONE PER ORDER. `record_order_payments` (140) takes the whole
+   * selection and records all of it or none of it: twenty round trips are
+   * twenty chances to half-finish, and a half-recorded batch of PAYMENTS is
+   * the worst version of that — you cannot tell by looking which half landed.
    *
    * `payment_type` IS ASKED FOR HERE, where `Mark Paid` could not ask and so
    * wrote nothing. That is the difference between stamping a date and recording
@@ -302,26 +301,21 @@ export function SpecialOrderBatchActions({
       payFull ? Math.round(r.totals.balance * 100) / 100 : typedAmount;
 
     setBusy("paid");
-    const { data, error } = await supabase
-      .from("special_order_payments")
-      .insert(
-        payRows.map((r) => ({
-          // Explicit — design rule 1.
-          org_id: orgId,
-          order_id: r.id,
-          amount: amountFor(r),
-          paid_on: payOn,
-          payment_type: payType || null,
-        }))
-      )
-      .select("order_id");
+    const { data, error } = await supabase.rpc("record_order_payments", {
+      p_rows: payRows.map((r) => ({
+        order_id: r.id,
+        amount: amountFor(r),
+        paid_on: payOn,
+        payment_type: payType || null,
+      })),
+    });
 
     if (error) {
       setBusy(null);
       setPaying(false);
       return onReport(error.message, "error");
     }
-    if (!data?.length) {
+    if (!data) {
       setBusy(null);
       setPaying(false);
       return onReport(
@@ -370,7 +364,7 @@ export function SpecialOrderBatchActions({
 
     const skipped = selected.length - payRows.length;
     onReport(
-      `Recorded ${plural(data.length, "payment")}, ${money(payTotal)} in all.` +
+      `Recorded ${plural(data as number, "payment")}, ${money(payTotal)} in all.` +
         (stamped ? ` ${plural(stamped, "of them")} settled and now carr${stamped === 1 ? "ies" : "y"} a paid date.` : "") +
         (skipped ? ` ${plural(skipped, "row")} skipped.` : "") +
         (stampError ? ` The paid dates were NOT set: ${stampError}` : ""),

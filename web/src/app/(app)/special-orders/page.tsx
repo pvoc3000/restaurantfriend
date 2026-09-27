@@ -183,7 +183,7 @@ export default async function SpecialOrdersPage({
 
     for (let from = 0; ; from += 1000) {
       const { data, error: payError } = await supabase
-        .from("special_order_payments")
+        .from("order_payments")
         .select("order_id, amount")
         .in("order_id", ids)
         .order("id")

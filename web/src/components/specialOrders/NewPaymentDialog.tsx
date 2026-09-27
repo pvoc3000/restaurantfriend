@@ -31,12 +31,11 @@ const ORDER = "order";
  * chosen, then "The order — no invoice". On an invoice it goes through
  * `record_customer_invoice_payment` — the invoice record's own Record
  * Payment, which closes the invoice when met and settles the order when ITS
- * balance reaches zero (139). On the order it is a plain payment row, the
- * old Take a payment.
+ * balance reaches zero (139). On the order it is money held on the order
+ * (140's `record_order_payment`), the old Take a payment.
  */
 export function NewPaymentDialog({
   orderId,
-  orgId,
   orderNumber,
   openInvoices,
   today,
@@ -44,7 +43,6 @@ export function NewPaymentDialog({
   onOrderPayment,
 }: {
   orderId: string;
-  orgId: string;
   orderNumber: string;
   openInvoices: OpenInvoice[];
   /** The org's calendar day — the payment date it starts at. */
@@ -94,20 +92,17 @@ export function NewPaymentDialog({
       return;
     }
 
-    const { data, error: e } = await supabase
-      .from("special_order_payments")
-      .insert({
-        // Explicit — design rule 1.
-        org_id: orgId,
-        order_id: orderId,
-        amount: value,
-        paid_on: paidOn,
-        payment_type: how || null,
-        note: note.trim() || null,
-      })
-      .select("id");
+    // Held on the order (140): the function writes the payment and its one
+    // application together, and takes the org from the order.
+    const { data, error: e } = await supabase.rpc("record_order_payment", {
+      p_order: orderId,
+      p_amount: value,
+      p_paid_on: paidOn,
+      p_type: how || null,
+      p_note: note.trim() || null,
+    });
     setBusy(false);
-    if (e || !data?.length) {
+    if (e || !data) {
       setError(e?.message ?? "Nothing was recorded — the database refused it and said nothing.");
       return;
     }

@@ -88,7 +88,6 @@ function readable(message: string, code?: string): string {
  */
 export function ScheduleProduction({
   orderId,
-  orgId,
   number,
   title,
   eventDate,
@@ -113,13 +112,6 @@ export function ScheduleProduction({
    */
   children?: (items: ActionMenuItem[]) => ReactNode;
   orderId: string;
-  /**
-   * Threaded through for `WorkflowOffer` alone, which needs it to insert a
-   * payment — a consequence scheduling can never raise. It is REQUIRED there
-   * rather than optional on purpose: design rule 1's missing `org_id` reports
-   * itself as an RLS refusal, so the compiler asks instead of the database.
-   */
-  orgId: string;
   number: string;
   title: string | null;
   eventDate: string | null;
@@ -420,7 +412,6 @@ export function ScheduleProduction({
       {offer ? (
         <WorkflowOffer
           orderId={orderId}
-          orgId={orgId}
           consequences={offer}
           onClose={() => {
             setOffer(null);

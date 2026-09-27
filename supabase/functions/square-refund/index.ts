@@ -22,10 +22,10 @@
 // ---------------------------------------------------------------------------
 // THE RECORD IS A NEGATIVE PAYMENT, AND THE ORDER IS LEFT ALONE
 // ---------------------------------------------------------------------------
-// Written through the caller's client (RLS: supervisor+, so a manager passes)
-// as `payment_type = 'Square Refund'`, a negative amount and the Square REFUND
-// id, so the balance and the history follow on their own (054's trigger logs
-// it). Status, to-do and dates are NOT touched: why the money went back decides
+// `record_payment_refund` (140), through the caller's client: a negative
+// payment naming the one it gives back, applied where the original was, with
+// the Square REFUND id — so the balance and the history follow on their own.
+// Status, to-do and dates are NOT touched: why the money went back decides
 // whether the order is cancelled or re-invoiced, and that is a person's call.
 //
 // A card refund is accepted at once and settles over days (PENDING →
@@ -82,8 +82,10 @@ Deno.serve(async (req) => {
     } = await supabase.auth.getUser();
     if (!user) return json(401, { error: "not signed in" });
 
+    // `payment_id` is the Payments tab's row: this ORDER's slice of a payment
+    // (140's application), read through the caller's RLS.
     const { data: row, error: rowError } = await supabase
-      .from("special_order_payments")
+      .from("order_payments")
       .select("id, org_id, order_id, customer_invoice_id, amount, payment_type, note, external_ref")
       .eq("id", payment_id)
       .maybeSingle();
@@ -145,20 +147,15 @@ Deno.serve(async (req) => {
     let left =
       (payBody.payment.amount_money?.amount ?? 0) - (payBody.payment.refunded_money?.amount ?? 0);
 
-    // 124: ONE Square payment for a customer invoice is split across its
-    // orders, one row each, so Square's own "left to refund" is the whole
-    // invoice's. A refund from this row may take only this ORDER's share, less
-    // what has already been refunded against the order on this invoice.
-    if (row.customer_invoice_id) {
-      const { data: refunds } = await supabase
-        .from("special_order_payments")
-        .select("amount")
-        .eq("order_id", row.order_id)
-        .eq("customer_invoice_id", row.customer_invoice_id)
-        .eq("payment_type", "Square Refund");
-      const refunded = (refunds ?? []).reduce((a, r) => a - Math.round(Number(r.amount) * 100), 0);
-      left = Math.min(left, Math.round(Number(row.amount) * 100) - refunded);
-    }
+    // ONE Square payment for a customer invoice is split across its orders,
+    // so Square's own "left to refund" is the whole invoice's. A refund from
+    // this row may take only this ORDER's share, less what has already been
+    // refunded against it — the ledger's figure (140).
+    const { data: share, error: shareError } = await supabase.rpc("payment_refundable", {
+      p_application: row.id,
+    });
+    if (shareError) return json(400, { error: shareError.message });
+    left = Math.min(left, Math.round(Number(share) * 100));
     if (cents > left) {
       return json(400, {
         error:
@@ -191,37 +188,21 @@ Deno.serve(async (req) => {
 
     /* ---- the record ---------------------------------------------------- */
 
-    const { data: org } = await supabase
-      .from("orgs")
-      .select("settings")
-      .eq("id", row.org_id)
-      .maybeSingle();
-    const tz =
-      ((org?.settings ?? {}) as { timezone?: string }).timezone ?? "America/Los_Angeles";
-    // en-CA formats as YYYY-MM-DD, which is the column's own shape.
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
-
     const method = (row.note ?? "").replace(/^Pay link · /, "");
     const note = [`Refund${method ? ` to ${method}` : ""}`, reason ? String(reason).trim() : ""]
       .filter(Boolean)
       .join(" · ");
 
-    // DESIGN RULE 1: org_id explicitly.
-    const { data: inserted, error: insertError } = await supabase
-      .from("special_order_payments")
-      .insert({
-        org_id: row.org_id,
-        order_id: row.order_id,
-        customer_invoice_id: row.customer_invoice_id ?? null,
-        paid_on: today,
-        amount: -cents / 100,
-        payment_type: "Square Refund",
-        note,
-        external_ref: refund.id,
-      })
-      .select("id");
+    // The function dates it in the org's own day, takes the org from the
+    // payment, and re-checks the manager role and the cap.
+    const { data: inserted, error: insertError } = await supabase.rpc("record_payment_refund", {
+      p_application: row.id,
+      p_amount: cents / 100,
+      p_refund_id: refund.id,
+      p_note: note,
+    });
 
-    if (insertError || !inserted?.length) {
+    if (insertError || !inserted) {
       // The money has gone back; the record did not land. Say so on the order
       // where a person will see it, and to the person who pressed the button.
       const warning = `refunded $${(cents / 100).toFixed(2)} in Square (refund ${refund.id}) but it was NOT recorded here — record −$${(cents / 100).toFixed(2)} as 'Square Refund' by hand${insertError ? `: ${insertError.message}` : ""}`;

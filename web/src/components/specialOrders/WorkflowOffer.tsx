@@ -40,12 +40,9 @@ import {
  * way about — which is the state nothing downstream knows how to read.
  *
  * IT CAN NOW RECORD A PAYMENT, AND THAT IS THE ONE THING IT WRITES SOMEWHERE
- * ELSE (2026-09-19). A `payment` consequence is an INSERT into
- * `special_order_payments`, so this takes an `orgId` — REQUIRED of every
- * caller, not optional, because design rule 1's failure mode is an insert that
- * omits `org_id` and reports "new row violates row-level security policy",
- * which sends you to look at roles. A required prop makes the compiler ask the
- * question instead.
+ * ELSE (2026-09-19). A `payment` consequence is `record_order_payment` (140),
+ * which writes the payment and its application together and takes the org
+ * from the order.
  *
  * THE MONEY LANDS FIRST, AND A FAILURE THERE WRITES NOTHING ELSE. The one
  * update statement below is still one statement; what is no longer true is that
@@ -62,14 +59,11 @@ import {
  */
 export function WorkflowOffer({
   orderId,
-  orgId,
   consequences,
   onClose,
   title = "One more thing",
 }: {
   orderId: string;
-  /** Design rule 1: a payment consequence inserts, and an insert says its org. */
-  orgId: string;
   /** From `lib/orderWorkflow`. An empty list renders nothing. */
   consequences: Consequence[];
   onClose: () => void;
@@ -107,22 +101,17 @@ export function WorkflowOffer({
     // that sets it, where a state update would not have arrived yet.
     const pay = chosen.find((c): c is PaymentConsequence => c.column === "payment");
     if (pay && !recorded.current) {
-      const { data, error: e } = await supabase
-        .from("special_order_payments")
-        .insert({
-          // Explicit — design rule 1.
-          org_id: orgId,
-          order_id: orderId,
-          amount: pay.amount,
-          paid_on: pay.on,
-        })
-        .select("id");
+      const { data, error: e } = await supabase.rpc("record_order_payment", {
+        p_order: orderId,
+        p_amount: pay.amount,
+        p_paid_on: pay.on,
+      });
       if (e) {
         setSaving(false);
         setError(e.message);
         return;
       }
-      if (!data?.length) {
+      if (!data) {
         setSaving(false);
         setError("The payment wasn't recorded — the database refused it silently.");
         return;

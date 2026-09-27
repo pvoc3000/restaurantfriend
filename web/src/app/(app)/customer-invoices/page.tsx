@@ -55,7 +55,7 @@ export default async function CustomerInvoicesPage({
     paged<{ invoice_id: string; amount: number; sent_amount: number | null }>(supabase, "customer_invoice_lines", "invoice_id, amount, sent_amount", orgId),
     paged<{ customer_invoice_id: string | null; amount: number }>(
       supabase,
-      "special_order_payments",
+      "payment_applications",
       "customer_invoice_id, amount",
       orgId,
       true

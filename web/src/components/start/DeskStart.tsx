@@ -529,7 +529,7 @@ async function loadSpecialOrders(
   }
   for (let from = 0; ids.length > 0; from += 1000) {
     const { data: page, error: e } = await supabase
-      .from("special_order_payments")
+      .from("order_payments")
       .select("order_id, amount")
       .in("order_id", ids)
       .order("id")

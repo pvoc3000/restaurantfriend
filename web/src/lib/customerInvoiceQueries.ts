@@ -123,7 +123,7 @@ export async function fetchInvoiceView(
         .order("sort", { ascending: true, nullsFirst: false })
         .order("id"),
       supabase
-        .from("special_order_payments")
+        .from("order_payments")
         .select("id, order_id, customer_invoice_id, paid_on, amount, payment_type, note, external_ref")
         .in("order_id", orderIds)
         .order("paid_on", { ascending: true }),

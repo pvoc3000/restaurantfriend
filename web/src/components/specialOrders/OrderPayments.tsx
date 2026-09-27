@@ -15,6 +15,7 @@ import { RefundPayment } from "./RefundPayment";
 import { NewPaymentDialog } from "./NewPaymentDialog";
 import { NewInvoiceDialog } from "./NewInvoiceDialog";
 import type { OpenInvoice } from "@/lib/newPayment";
+import { amountEditable, removable } from "@/lib/customerPayments";
 import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
 import type { InvoiceStatus } from "@/lib/customerInvoices";
 
@@ -30,12 +31,18 @@ import {
 } from "@/lib/specialOrders";
 
 export type PaymentRow = {
+  /** The APPLICATION's id (140): this order's slice of a payment. */
   id: string;
   paid_on: string | null;
   amount: number | null;
   payment_type: string | null;
   note: string | null;
   external_ref: string | null;
+  /** Square or QuickBooks took it, so its amount is theirs (140). */
+  processor?: string | null;
+  /** One payment split across several orders or invoices (140): its amount
+   *  and its removal are not this order's to change. */
+  shared?: boolean;
   /** The customer invoice this payment was taken on (124), if any. */
   invoice?: { label: string; href: string } | null;
 };
@@ -69,17 +76,13 @@ export type OrderMoneyContext = {
 /**
  * Payments as ROWS, which is decision 2's whole point.
  *
- * There is no `paid` status and no payments TABLE beyond this one — payment is
- * a fact QuickBooks will own, and two truths about the same money is worse than
- * one truth elsewhere. The balance on the totals card is derived from these.
- *
- * `external_ref` exists from day one and nothing writes it yet: it is where a
- * Square invoice id lands when decision 20's approve-and-pay arrives, and the
- * acceptance test for v1 is that adding it needs no schema surgery.
+ * Each row is this order's slice of a payment (140): the money received is a
+ * `customer_payments` row, and where it went is its applications — one here,
+ * or one per order when an invoice payment covered several. The balance on the
+ * totals card is the sum of these; there is no `paid` status to drift.
  */
 export function OrderPayments({
   orderId,
-  orgId,
   rows,
   invoices = [],
   money: ctx = null,
@@ -90,7 +93,6 @@ export function OrderPayments({
   workflow,
 }: {
   orderId: string;
-  orgId: string;
   rows: PaymentRow[];
   /** Its invoices, void ones left out (139). */
   invoices?: OrderInvoiceRow[];
@@ -146,16 +148,25 @@ export function OrderPayments({
     }
     setError(null);
     start(async () => {
-      const { data, error: e } = await supabase
-        .from("special_order_payments")
-        .delete()
-        .eq("id", row.id)
-        .select("id");
+      const { error: e } = await supabase.rpc("delete_order_payment", { p_application: row.id });
       if (e) setError(e.message);
-      else if (!data?.length) setError("Nothing was removed — the database refused it silently.");
       else router.refresh();
     });
   }
+
+  /**
+   * THE PAYMENT'S FIELDS GO THROUGH ITS FUNCTION (140): a row here is this
+   * order's slice of a payment, and the date, method and note are the
+   * payment's — one write, and every order it paid shows the change.
+   */
+  const writeField = (row: PaymentRow, column: string) => async (next: string | number | null) => {
+    const { error: e } = await supabase.rpc("update_order_payment", {
+      p_application: row.id,
+      p_column: column,
+      p_value: next === null ? null : String(next),
+    });
+    return { error: e?.message ?? null };
+  };
 
   // The Invoice column only where some payment has one — the thousands of
   // orders billed on their own keep the table they had.
@@ -240,26 +251,29 @@ export function OrderPayments({
               <tr key={p.id} className="hover:bg-neutral-50">
                 <td className="px-3 py-2">
                   {canWrite ? (
-                    <InlineValue boxed={BOXED_FIELDS} table="special_order_payments" id={p.id} column="paid_on" kind="date"
-                                 value={p.paid_on} ariaLabel="Payment date" />
+                    <InlineValue boxed={BOXED_FIELDS} table="order_payments" id={p.id} column="paid_on" kind="date"
+                                 value={p.paid_on} ariaLabel="Payment date" onWrite={writeField(p, "paid_on")} />
                   ) : (
                     <span className="tabular-nums">{p.paid_on ?? "—"}</span>
                   )}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums">
-                  {canWrite ? (
-                    <InlineValue boxed={BOXED_FIELDS} table="special_order_payments" id={p.id} column="amount" kind="number"
+                  {/* A processor's figure is the processor's, and a split
+                      payment's is the payment's (140). */}
+                  {canWrite && amountEditable(p) ? (
+                    <InlineValue boxed={BOXED_FIELDS} table="order_payments" id={p.id} column="amount" kind="number"
                                  value={p.amount} nullable={false} align="right" className="text-right"
-                                 ariaLabel="Payment amount" format={(v) => money(Number(v))} />
+                                 ariaLabel="Payment amount" format={(v) => money(Number(v))}
+                                 onWrite={writeField(p, "amount")} />
                   ) : (
                     money(Number(p.amount ?? 0))
                   )}
                 </td>
                 <td className="px-3 py-2">
                   {canWrite ? (
-                    <InlineValue boxed={BOXED_FIELDS} table="special_order_payments" id={p.id} column="payment_type" kind="pick"
+                    <InlineValue boxed={BOXED_FIELDS} table="order_payments" id={p.id} column="payment_type" kind="pick"
                                  allowNew clearable options={PAYMENT_TYPES} value={p.payment_type}
-                                 ariaLabel="How it was paid" />
+                                 ariaLabel="How it was paid" onWrite={writeField(p, "payment_type")} />
                   ) : (
                     <span className="text-muted">{p.payment_type ?? "—"}</span>
                   )}
@@ -277,8 +291,8 @@ export function OrderPayments({
                 ) : null}
                 <td className="px-3 py-2">
                   {canWrite ? (
-                    <InlineValue boxed={BOXED_FIELDS} table="special_order_payments" id={p.id} column="note" value={p.note}
-                                 ariaLabel="Payment note" placeholder="—" />
+                    <InlineValue boxed={BOXED_FIELDS} table="order_payments" id={p.id} column="note" value={p.note}
+                                 ariaLabel="Payment note" placeholder="—" onWrite={writeField(p, "note")} />
                   ) : (
                     <span className="text-muted">{p.note ?? "—"}</span>
                   )}
@@ -295,15 +309,17 @@ export function OrderPayments({
                         Refund…
                       </button>
                     ) : null}
-                    <button
-                      type="button"
-                      onClick={() => remove(p)}
-                      disabled={pending}
-                      aria-label="Remove this payment"
-                      className="px-1 text-[15px] leading-none text-subtle hover:text-accent disabled:opacity-35"
-                    >
-                      ×
-                    </button>
+                    {!removable(p) ? null : (
+                      <button
+                        type="button"
+                        onClick={() => remove(p)}
+                        disabled={pending}
+                        aria-label="Remove this payment"
+                        className="px-1 text-[15px] leading-none text-subtle hover:text-accent disabled:opacity-35"
+                      >
+                        ×
+                      </button>
+                    )}
                   </td>
                 ) : null}
               </tr>
@@ -330,7 +346,6 @@ export function OrderPayments({
       {opening === "payment" && ctx && (
         <NewPaymentDialog
           orderId={orderId}
-          orgId={orgId}
           orderNumber={ctx.orderNumber}
           openInvoices={ctx.openInvoices}
           today={today}
@@ -350,7 +365,6 @@ export function OrderPayments({
       {offer && (
         <WorkflowOffer
           orderId={orderId}
-          orgId={orgId}
           consequences={offer}
           onClose={() => setOffer(null)}
           title="Paid in full"

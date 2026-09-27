@@ -53,7 +53,7 @@ export default async function CustomersPage({
       supabase.from("special_order_items").select("order_id, qty, unit_price, taxable", { count: "exact" }).eq("org_id", orgId)
     ),
     sweepAll<{ order_id: string; amount: number | null }>(() =>
-      supabase.from("special_order_payments").select("order_id, amount", { count: "exact" }).eq("org_id", orgId)
+      supabase.from("order_payments").select("order_id, amount", { count: "exact" }).eq("org_id", orgId)
     ),
   ]);
 

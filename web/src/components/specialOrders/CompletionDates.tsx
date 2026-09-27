@@ -59,14 +59,11 @@ import {
  */
 export function CompletionDates({
   id,
-  orgId,
   order,
   money,
   canWrite,
 }: {
   id: string;
-  /** Design rule 1 — the paid date's offer can insert a payment. */
-  orgId: string;
   order: WorkflowOrder & Record<string, unknown>;
   /**
    * What is still owed, and whether it is owed at all. The Invoice paid date is
@@ -170,7 +167,6 @@ export function CompletionDates({
       {offer && (
         <WorkflowOffer
           orderId={id}
-          orgId={orgId}
           consequences={offer}
           onClose={() => setOffer(null)}
         />

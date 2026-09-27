@@ -102,7 +102,7 @@ export async function CustomerDetail({
   if (ids.length) {
     const [{ data: lineRows }, { data: payRows }] = await Promise.all([
       supabase.from("special_order_items").select("order_id, qty, unit_price, taxable").in("order_id", ids),
-      supabase.from("special_order_payments").select("order_id, amount").in("order_id", ids),
+      supabase.from("order_payments").select("order_id, amount").in("order_id", ids),
     ]);
     for (const l of lineRows ?? []) {
       const list = lines.get(l.order_id as string) ?? [];
@@ -159,7 +159,7 @@ export async function CustomerDetail({
   const invoiceIds = (invoiceRows ?? []).map((r) => r.id as string);
   const { data: invoicePays } = invoiceIds.length
     ? await supabase
-        .from("special_order_payments")
+        .from("payment_applications")
         .select("customer_invoice_id, amount")
         .in("customer_invoice_id", invoiceIds)
     : { data: [] };

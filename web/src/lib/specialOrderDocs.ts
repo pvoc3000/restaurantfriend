@@ -478,7 +478,7 @@ export async function fetchOrderDocData(
         .in("order_id", orderIds)
         .order("sort", { ascending: true, nullsFirst: false }),
       supabase
-        .from("special_order_payments")
+        .from("order_payments")
         .select("order_id, paid_on, amount, payment_type, note")
         .in("order_id", orderIds)
         .order("paid_on", { ascending: true, nullsFirst: false }),
@@ -709,7 +709,7 @@ export async function fetchStatementData(
         .from("special_order_items")
         .select("order_id, qty, unit_price, taxable, item_type")
         .in("order_id", ids),
-      supabase.from("special_order_payments").select("order_id, amount").in("order_id", ids),
+      supabase.from("order_payments").select("order_id, amount").in("order_id", ids),
     ]);
     for (const l of (lineRows ?? []) as unknown as (MoneyLine & { order_id: string })[]) {
       const list = lines.get(l.order_id) ?? [];

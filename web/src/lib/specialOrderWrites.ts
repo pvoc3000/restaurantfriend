@@ -182,7 +182,7 @@ export async function readDeleteContext(
   const [{ count: lineCount }, { count: paymentCount }, { count: madeCount }, { data: parent }] =
     await Promise.all([
       supabase.from("special_order_items").select("id", { count: "exact", head: true }).eq("order_id", id),
-      supabase.from("special_order_payments").select("id", { count: "exact", head: true }).eq("order_id", id),
+      supabase.from("order_payments").select("id", { count: "exact", head: true }).eq("order_id", id),
       row.kind === "standing_order"
         ? supabase
             .from("special_orders")

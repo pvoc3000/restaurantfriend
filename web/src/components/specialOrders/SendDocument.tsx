@@ -633,7 +633,6 @@ export function SendDocument({
       {moneyOpen === "payment" && invoice?.money && (
         <NewPaymentDialog
           orderId={orderId}
-          orgId={orgId}
           orderNumber={invoice.money.orderNumber}
           openInvoices={invoice.money.openInvoices}
           today={today}
@@ -655,7 +654,6 @@ export function SendDocument({
       {offer && (
         <WorkflowOffer
           orderId={orderId}
-          orgId={orgId}
           consequences={offer}
           onClose={() => {
             setOffer(null);
