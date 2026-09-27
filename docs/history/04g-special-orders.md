@@ -4574,3 +4574,17 @@ two-page order it had landed on page 2), in the red "stop" fill; and the
 kitchen sheet's facts vs. blanks split — what the record knows prints as
 fields, what the kitchen writes (completed by, boxes, tracking, received) is a
 box. `kitchenOrderPages` now takes the org name, for the masthead.
+
+**THE CUSTOMER INVOICE'S TOTALS WINDOW READS LIKE AN ORDER'S (Mark,
+2026-09-27: "add discounts, delivery, rush fee, tax, and payments").** It was
+Total · Payments · Amount due; it is now Subtotal · Discount · Delivery · Rush
+fee · Tax · Payments · Amount due, summed over every order on the invoice by
+`invoiceTotalsBreakdown` (`lib/customerInvoices`, fixtures beside it). A
+BALANCE line contributes its order's own figures, and the gap between the
+order's total and the line — a deposit taken first, or asked for on another
+invoice (139) — goes into Payments with what this invoice has collected, so the
+window adds to Amount due to the cent. A deposit or part-payment line, and a
+cancelled order, count their line amount as Subtotal. Consequence on a
+one-order invoice: the itemized block now lists the ITEMS only and lost its
+"This order" row, since discount, delivery, rush, tax and earlier payments
+would otherwise print twice — the order's own documents already work this way.

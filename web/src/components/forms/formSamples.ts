@@ -187,6 +187,14 @@ export const sampleCustomerInvoice: CustomerInvoiceDoc = {
     description: `Order #${o.number} · Sample Cafe · ${o.event_date!.slice(5).replace("-", "/")}/2026`,
     amount: o.totals.total,
   })),
+  totals: {
+    subtotal: sampleStatement.orders.reduce((a, o) => a + o.totals.subtotal, 0),
+    discount: 0,
+    delivery: sampleStatement.orders.reduce((a, o) => a + o.totals.deliveryCharge, 0),
+    rush: 0,
+    tax: 0,
+    payments: 0,
+  },
   total: sampleStatement.total,
   paid: 0,
   balance: sampleStatement.total,
@@ -200,11 +208,6 @@ export const sampleItemizedInvoice: CustomerInvoiceDoc = (() => {
     ...o.lines
       .filter((l) => l.qty * l.unit_price !== 0)
       .map((l) => ({ label: `${l.qty} × ${l.name}`, amount: l.qty * l.unit_price })),
-    { label: "Discount (10%)", amount: -t.discount },
-    { label: "Delivery", amount: t.deliveryCharge },
-    { label: "Rush", amount: t.rushFee },
-    { label: "Sales tax", amount: t.tax },
-    { label: "Deposit paid 9/20/2026", amount: -t.paid },
   ];
   return {
     number: "INV-1043",
@@ -213,8 +216,16 @@ export const sampleItemizedInvoice: CustomerInvoiceDoc = (() => {
     notes: o.notes_invoice,
     customer: { name: "Example Studios (Dana Whitfield)", phone: "(323) 555-0101", email: "dana@example.com" },
     lines: [{ description: `Order #${o.number} · Example Studios · 10/3/2026`, amount: t.balance, detail: { rows } }],
-    total: t.total,
-    paid: t.paid,
+    totals: {
+      subtotal: t.subtotal,
+      discount: t.discount,
+      delivery: t.deliveryCharge,
+      rush: t.rushFee,
+      tax: t.tax,
+      payments: t.paid,
+    },
+    total: t.balance,
+    paid: 0,
     balance: t.balance,
   };
 })();

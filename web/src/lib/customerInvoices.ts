@@ -166,6 +166,61 @@ export function invoiceBalance(
   return { total, paid, balance: cents(total - paid) };
 }
 
+/** The printed invoice's Totals window (Mark, 2026-09-27). */
+export type InvoiceTotalsBreakdown = {
+  subtotal: number;
+  discount: number;
+  delivery: number;
+  rush: number;
+  tax: number;
+  /** Everything between the orders' totals and Amount due: money taken on the
+   *  order before this invoice, what another invoice asked for (a deposit,
+   *  139), and what has been paid on this one. */
+  payments: number;
+};
+
+/**
+ * THE ORDERS' OWN MONEY, SUMMED — so the Totals window reads like an order's:
+ * Subtotal − Discount + Delivery + Rush fee + Tax − Payments = Amount due,
+ * to the cent. A BALANCE line is its order's totals less what was taken or
+ * billed elsewhere, and that gap lands in Payments. A deposit or part payment
+ * (139) is a fixed figure the order's breakdown would not add up to, and a
+ * cancelled order bills what its line says (nothing), so either counts its
+ * amount as Subtotal.
+ */
+export function invoiceTotalsBreakdown(
+  lines: {
+    amount: number;
+    kind?: InvoiceLineKind;
+    status?: string | null;
+    totals: { subtotal: number; discount: number; deliveryCharge: number; rushFee: number; tax: number; total: number } | null;
+  }[],
+  paid: number
+): InvoiceTotalsBreakdown {
+  const b = { subtotal: 0, discount: 0, delivery: 0, rush: 0, tax: 0, payments: paid };
+  for (const l of lines) {
+    const t = l.totals;
+    if (!t || (l.kind ?? "balance") !== "balance" || l.status === "cancelled") {
+      b.subtotal += Number(l.amount || 0);
+      continue;
+    }
+    b.subtotal += t.subtotal;
+    b.discount += t.discount;
+    b.delivery += t.deliveryCharge;
+    b.rush += t.rushFee;
+    b.tax += t.tax;
+    b.payments += t.total - Number(l.amount || 0);
+  }
+  return {
+    subtotal: cents(b.subtotal),
+    discount: cents(b.discount),
+    delivery: cents(b.delivery),
+    rush: cents(b.rush),
+    tax: cents(b.tax),
+    payments: cents(b.payments),
+  };
+}
+
 /* ==========================================================================
  * THE LINE
  * ========================================================================== */

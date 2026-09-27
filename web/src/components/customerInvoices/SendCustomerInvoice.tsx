@@ -44,6 +44,7 @@ import { QuickBooksCustomerStep } from "@/components/specialOrders/QuickBooksCus
 import {
   invoiceFileName,
   invoiceNumberText,
+  invoiceTotalsBreakdown,
   readInvoiceTerms,
   sumBreakdowns,
   type CustomerInvoiceSnapshot,
@@ -87,6 +88,10 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
           // one figure, and the order's items would not add up to it (139).
           detail: view.lines.length === 1 && (l.kind ?? "balance") === "balance" ? itemDetail(l) : undefined,
         })),
+        totals: invoiceTotalsBreakdown(
+          view.lines.map((l) => ({ amount: l.amount, kind: l.kind, status: l.order?.status, totals: l.totals })),
+          view.paid
+        ),
         total: view.total,
         paid: view.paid,
         balance: view.balance,
@@ -97,32 +102,18 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
 }
 
 /**
- * A one-order invoice's itemization (2026-09-23): each item, then the order's
- * own money in the order its record shows it, then anything paid before the
- * invoice — so the rows add up to the line's amount.
+ * A one-order invoice's itemization (2026-09-23): each item. The order's own
+ * money — discount, delivery, rush, tax, payments — is the Totals window's
+ * (2026-09-27), as on the order's own documents.
  */
 function itemDetail(l: InvoiceView["lines"][number]): { rows: { label: string; amount: number }[] } | undefined {
   if (!l.totals) return undefined;
-  const rows: { label: string; amount: number }[] = l.items.map((i) => ({
-    label: `${i.qty % 1 === 0 ? i.qty : i.qty.toFixed(2)} × ${i.name} @ ${money(i.unit_price)}`,
-    amount: Math.round(i.qty * i.unit_price * 100) / 100,
-  }));
-  const t = l.totals;
-  if (t.discount) rows.push({ label: "Discount", amount: -t.discount });
-  if (t.deliveryCharge) rows.push({ label: "Delivery", amount: t.deliveryCharge });
-  if (t.rushFee) rows.push({ label: "Rush fee", amount: t.rushFee });
-  if (t.tax) rows.push({ label: "Tax", amount: t.tax });
-  const earlier = Math.round((t.total - l.amount) * 100) / 100;
-  if (Math.abs(earlier) >= 0.01) {
-    // A cancelled order bills nothing (128); anything else in the gap is money
-    // taken before this invoice, or asked for on another — a deposit invoice
-    // (139), paid or not.
-    rows.push({
-      label: l.order?.status === "cancelled" ? "Order cancelled" : "Deposits and earlier payments",
-      amount: -earlier,
-    });
-  }
-  return { rows };
+  return {
+    rows: l.items.map((i) => ({
+      label: `${i.qty % 1 === 0 ? i.qty : i.qty.toFixed(2)} × ${i.name} @ ${money(i.unit_price)}`,
+      amount: Math.round(i.qty * i.unit_price * 100) / 100,
+    })),
+  };
 }
 
 type Compose = { to: string; cc: string; subject: string; body: string };

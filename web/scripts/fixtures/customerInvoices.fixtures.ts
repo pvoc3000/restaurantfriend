@@ -15,6 +15,7 @@ import {
   invoiceLinesFor,
   invoiceNumberText,
   invoiceStatus,
+  invoiceTotalsBreakdown,
   isCustomerInvoiceSnapshot,
   invoiceChanged,
   lineChanged,
@@ -165,4 +166,40 @@ test("isCustomerInvoiceSnapshot: tells the two snapshots apart", () => {
 test("createRefusals: an order already on an invoice is refused before the database refuses it", () => {
   ok(createRefusals([...week, day(8, { on_invoice: true })])[0].includes("already on an invoice"));
   eq(createRefusals(week.map((r) => ({ ...r, on_invoice: false }))), []);
+});
+
+// The Totals window (2026-09-27). Checked by breaking: dropping the gap from
+// `payments` turns the deposit case red; breaking down a deposit line by its
+// order's totals turns the fixed-line case red.
+const money = (o: Partial<{ subtotal: number; discount: number; deliveryCharge: number; rushFee: number; tax: number }>) => {
+  const t = { subtotal: 0, discount: 0, deliveryCharge: 0, rushFee: 0, tax: 0, ...o };
+  return { ...t, total: Math.round((t.subtotal - t.discount + t.deliveryCharge + t.rushFee + t.tax) * 100) / 100 };
+};
+const adds = (b: ReturnType<typeof invoiceTotalsBreakdown>) =>
+  Math.round((b.subtotal - b.discount + b.delivery + b.rush + b.tax - b.payments) * 100) / 100;
+
+test("invoiceTotalsBreakdown: a week of orders sums each part", () => {
+  const t = money({ subtotal: 96, deliveryCharge: 25 });
+  const b = invoiceTotalsBreakdown([1, 2, 3].map(() => ({ amount: t.total, totals: t })), 0);
+  eq(b, { subtotal: 288, discount: 0, delivery: 75, rush: 0, tax: 0, payments: 0 });
+  eq(adds(b), 363, "adds to the invoice total");
+});
+
+test("invoiceTotalsBreakdown: a deposit taken first lands in Payments, and so does this invoice's", () => {
+  const t = money({ subtotal: 400, discount: 40, deliveryCharge: 30, rushFee: 20, tax: 29.7 });
+  const b = invoiceTotalsBreakdown([{ amount: t.total - 100, kind: "balance", totals: t }], 50);
+  eq(b.payments, 150);
+  eq(adds(b), Math.round((t.total - 150) * 100) / 100, "adds to Amount due");
+});
+
+test("invoiceTotalsBreakdown: a deposit line and a cancelled order are their own amounts", () => {
+  const t = money({ subtotal: 500, tax: 47.5 });
+  const b = invoiceTotalsBreakdown(
+    [
+      { amount: 100, kind: "deposit", totals: t },
+      { amount: 0, kind: "balance", status: "cancelled", totals: t },
+    ],
+    0
+  );
+  eq(b, { subtotal: 100, discount: 0, delivery: 0, rush: 0, tax: 0, payments: 0 });
 });

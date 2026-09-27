@@ -57,6 +57,7 @@ import {
 } from "@/lib/specialOrderDocs";
 
 import { customerLabel, lineTotal } from "@/lib/specialOrders";
+import type { InvoiceTotalsBreakdown } from "@/lib/customerInvoices";
 import { dateInTimeZone, serverTimeZone } from "@/lib/today";
 import {
   Field,
@@ -184,7 +185,6 @@ const s = {
   },
   invBandText: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold", color: "#fff" },
   invDetail: { paddingLeft: 12 },
-  invSum: { borderTopWidth: 1, borderTopColor: INK, marginTop: 2 },
 
   /* ---- statement ---- */
   stNo: { width: 48, color: SUBTLE },
@@ -682,12 +682,15 @@ export type CustomerInvoiceDoc = {
     /**
      * ITEMIZED, ON A ONE-ORDER INVOICE (Mark, 2026-09-23: every order's Send ▸
      * Invoice now goes through a customer invoice, and a regular customer was
-     * used to seeing what they ordered). The items, then the order's own
-     * discount, delivery, rush and tax, then anything paid before invoicing.
-     * Absent on a multi-order invoice, which stays one row per order.
+     * used to seeing what they ordered). The items only — the order's
+     * discount, delivery, rush, tax and payments are the Totals window's, as
+     * on the order's own documents. Absent on a multi-order invoice, which
+     * stays one row per order.
      */
     detail?: { rows: { label: string; amount: number }[] };
   }[];
+  /** The Totals window (2026-09-27): `invoiceTotalsBreakdown`. */
+  totals: InvoiceTotalsBreakdown;
   total: number;
   paid: number;
   balance: number;
@@ -697,8 +700,9 @@ export type CustomerInvoiceDoc = {
 /**
  * The customer invoice in the app's language (Mark, 2026-09-25):
  * one row per ORDER on a weekly invoice; on a one-order invoice that order is
- * ITEMIZED — here under `DataTable`'s black group band, its items, discount,
- * delivery, rush, tax and earlier payments beneath, closed by "This order".
+ * ITEMIZED — here under `DataTable`'s black group band, its items beneath.
+ * The Totals window reads like an order's: Subtotal, Discount, Delivery, Rush
+ * fee, Tax and Payments, summed over every order (2026-09-27).
  * The customer is the heading, because an invoice is addressed to someone.
  * Amount due wears the one yellow fill, which leaves once it is settled — the
  * receipt's rule.
@@ -780,10 +784,6 @@ export function CustomerInvoicePdf({
                       </Text>
                     </View>
                   ))}
-                  <View style={[s.invRow, s.invDetail, s.invSum]} wrap={false}>
-                    <Text style={[s.invDesc, s.itemName]}>This order</Text>
-                    <Text style={[s.invAmount, { fontFamily: "Helvetica-Bold" }]}>{money(l.amount)}</Text>
-                  </View>
                 </View>
               ) : (
                 <View key={i} style={s.invRow} wrap={false}>
@@ -810,8 +810,12 @@ export function CustomerInvoicePdf({
                   <Text style={s.titleBarText}>Totals</Text>
                 </View>
                 <View style={s.totals}>
-                  <TotalRow label="Total" value={invoice.total} />
-                  <TotalRow label="Payments" value={invoice.paid ? -invoice.paid : 0} />
+                  <TotalRow label="Subtotal" value={invoice.totals.subtotal} />
+                  <TotalRow label="Discount" value={invoice.totals.discount ? -invoice.totals.discount : 0} />
+                  <TotalRow label="Delivery" value={invoice.totals.delivery} />
+                  <TotalRow label="Rush fee" value={invoice.totals.rush} />
+                  <TotalRow label="Tax" value={invoice.totals.tax} />
+                  <TotalRow label="Payments" value={invoice.totals.payments ? -invoice.totals.payments : 0} />
                 </View>
                 <View style={settled ? [s.grand, { backgroundColor: "#fff" }] : s.grand}>
                   <Text style={s.grandLabel}>Amount due</Text>
