@@ -97,7 +97,7 @@ export async function fetchInvoiceView(
   const { data: inv, error } = await supabase
     .from("customer_invoices")
     .select(
-      `id, org_id, number, customer_id, location_id, issued_on, due_on, notes, sent_at, paid_at, voided_at, document_path, last_sent_at, processor, external_ref,
+      `id, org_id, number, revision, revision_of, customer_id, location_id, issued_on, due_on, notes, sent_at, paid_at, voided_at, document_path, last_sent_at, processor, external_ref,
        customers ( id, first_name, last_name, company, phone, email )`
     )
     .eq("id", id)

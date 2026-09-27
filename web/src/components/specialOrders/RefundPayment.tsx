@@ -26,8 +26,12 @@ export function RefundPayment({
   amount,
   method,
   onClose,
+  credit = false,
 }: {
+  /** An order's slice of a payment (140) — or, with `credit`, the payment
+   *  itself, whose credit is refunded (143). */
   paymentId: string;
+  credit?: boolean;
   amount: number;
   /** "visa ending 2998", from the payment's note. */
   method: string | null;
@@ -50,7 +54,12 @@ export function RefundPayment({
     setBusy(true);
     setError(null);
     const { data, error: e } = await createClient().functions.invoke("square-refund", {
-      body: { payment_id: paymentId, amount: n, reason: reason.trim() || null, idempotency_key: key },
+      body: {
+        ...(credit ? { credit_payment_id: paymentId } : { payment_id: paymentId }),
+        amount: n,
+        reason: reason.trim() || null,
+        idempotency_key: key,
+      },
     });
     setBusy(false);
     if (e) {

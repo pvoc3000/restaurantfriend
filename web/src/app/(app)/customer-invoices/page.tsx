@@ -33,7 +33,7 @@ export default async function CustomerInvoicesPage({
   const { data: invoices, error } = await supabase
     .from("customer_invoices")
     .select(
-      `id, number, customer_id, issued_on, due_on, sent_at, paid_at, voided_at, processor,
+      `id, number, revision, customer_id, issued_on, due_on, sent_at, paid_at, voided_at, processor,
        customers ( id, first_name, last_name, company )`
     )
     .eq("org_id", orgId)
@@ -73,7 +73,7 @@ export default async function CustomerInvoicesPage({
     return {
       id: inv.id as string,
       number: inv.number as number,
-      numberText: invoiceNumberText(inv.number as number, terms),
+      numberText: invoiceNumberText(inv.number as number, terms, (inv as { revision?: number }).revision),
       customer_id: inv.customer_id as string | null,
       customer: customerLabel(customer) || "—",
       issued_on: inv.issued_on as string,

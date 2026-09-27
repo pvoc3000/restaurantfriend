@@ -4736,3 +4736,38 @@ read "Part payment · Order #10055 · …" under a band that already names the
 order, so they now say "Deposit" / "Part payment" (wording only; the migration
 checks no amount moved). The textbook plan's later phases move up one: Revise
 and credit is 143, reporting 144, clean-up 145.
+
+**THE TEXTBOOK A/R MODEL — PHASE 3: REVISE AND CUSTOMER CREDIT (migration 143,
+written and rehearsed 2026-09-27, NOT YET APPLIED).** A sent invoice is never
+edited; it is REPLACED. **Revise…** (Actions, on a sent invoice not already
+being revised) makes a DRAFT with the same number and the next revision —
+"1014-2", `revision`/`revision_of`, unique (org, number, revision) — its orders
+re-copied as they are now, deposits and free lines carried. **The original
+stays live and payable while the revision is a draft**; the two are ONE BILL
+(`special_order_billed` counts the original and not a draft revision, and the
+revision's own copy looks past the original instead of subtracting it as "Less
+invoice"). **Sending the revision** voids the original (its pay link answers
+"superseded", not "cancelled") and moves its money across — per ORIGINAL
+payment, netted against that payment's refunds, or the revision would claim
+money already given back — spread orders-oldest-first then free lines by
+`apply_payment_to_invoice`; anything the revision does not need stays with its
+payment as **CREDIT** (unapplied money — a payment's amount less its
+applications; money held on an order is earmarked, not credit). An overpayment
+through QuickBooks' page, which 140 put on the last order, is now credit too.
+Credit is applied **automatically when the customer's next Square invoice is
+sent** (QuickBooks' default), by hand with **Apply Credit ($x)**, or refunded:
+the customer record's **Credit** section lists it, with Refund… on pay-link
+money for managers (`square-refund`'s new `credit_payment_id` mode →
+`record_credit_refund`). A QuickBooks invoice takes no credit and is revised
+only while unpaid; its revision is pushed as a NEW QuickBooks invoice ("1014-2")
+and the original is voided there after the send. The invoice record says what
+replaces what (a draft revision's banner, "Being revised as…", "Replaced by…",
+"Replaces…"). **Verified**: 143 applies twice after 142; scenarios — refusals
+(a draft, staff, a second pending revision), a revision while the order grew
+(billed 623.50 / unbilled 25.00 while pending, the old link still open), the
+original paid meanwhile and its $623.50 moved on send, the order shrinking after
+payment → $25 credit → applied automatically to the next invoice, a QuickBooks
+overpayment → $76.50 credit, QuickBooks refusing credit and a paid revision,
+credit refunds capped and manager-only, a partial refund on the original moving
+netted (523.50 on the revision, the payment's credit and its refund cancelling).
+On the real data copy every invoice's total and paid are unchanged.

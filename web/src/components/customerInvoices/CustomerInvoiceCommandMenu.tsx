@@ -47,6 +47,11 @@ import {
  *   and its orders are free to go on another invoice. Payments already taken
  *   stay on the orders; a refund is its own act on the order's Payments table.
  * - **Delete** — an unsent invoice with nothing paid, for a mistake.
+ * - **Revise…** (143) — a sent invoice is never edited; it is REPLACED. A
+ *   draft "1014-2" is made with its orders as they are now, and sending it
+ *   voids 1014 and moves 1014's money across.
+ * - **Apply Credit** (143) — the customer's credit onto what this still owes.
+ *   Sending a Square invoice does it by itself.
  */
 export function CustomerInvoiceCommandMenu({
   id,
@@ -60,6 +65,8 @@ export function CustomerInvoiceCommandMenu({
   inQuickBooks = false,
   processor = "square",
   autoSend = null,
+  revisable = false,
+  credit = 0,
 }: {
   id: string;
   orgId: string;
@@ -76,6 +83,10 @@ export function CustomerInvoiceCommandMenu({
   canWrite: boolean;
   /** Reached with `?send=<code>`: open Send once for that code. */
   autoSend?: string | null;
+  /** Sent, not void, not a draft revision, and not already being revised. */
+  revisable?: boolean;
+  /** The customer's credit (143), 0 where it cannot apply. */
+  credit?: number;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -240,6 +251,35 @@ export function CustomerInvoiceCommandMenu({
     });
   };
 
+  const revise = async () => {
+    if (
+      !(await confirmDialog({
+        ...splitConfirmMessage(
+          `Revise invoice ${numberText}?\n\n` +
+            "A draft revision is made with its orders as they are now, to check and send. " +
+            `${numberText} stays live and payable until then; sending the revision voids it and moves ` +
+            (paid !== 0 ? `the ${money(paid)} paid on it across.` : "anything paid on it across.")
+        ),
+        confirmLabel: "Revise",
+      }))
+    ) {
+      return;
+    }
+    await run("revise", async () => {
+      const { data, error: e } = await supabase.rpc("revise_customer_invoice", { p_invoice: id });
+      if (e) throw new Error(e.message);
+      router.push(`/customer-invoices/${data as string}`);
+    });
+  };
+
+  const applyCredit = () =>
+    run("credit", async () => {
+      const { data, error: e } = await supabase.rpc("apply_customer_credit", { p_invoice: id });
+      if (e) throw new Error(e.message);
+      setNote(Number(data) > 0 ? `Applied ${money(Number(data))} of credit.` : "No credit was left to apply.");
+      router.refresh();
+    });
+
   const typed = Number(payAmount);
   const payOk = Number.isFinite(typed) && typed > 0 && typed <= balance + 0.005 && !!payOn;
 
@@ -267,6 +307,9 @@ export function CustomerInvoiceCommandMenu({
       { label: busy === "preview" ? "Rendering…" : "Preview", onSelect: preview, disabled: busy !== null },
       { label: busy === "download" ? "Rendering…" : "Download", onSelect: () => void download(), disabled: busy !== null },
       ...sendItems,
+      ...(canWrite && revisable
+        ? [{ label: busy === "revise" ? "Revising…" : "Revise…", onSelect: () => void revise(), disabled: busy !== null }]
+        : []),
       ...(canWrite && live && processor === "quickbooks"
         ? [
             {
@@ -296,6 +339,15 @@ export function CustomerInvoiceCommandMenu({
                 setPaying(true);
               },
             },
+            ...(credit > 0.005 && processor === "square"
+              ? [
+                  {
+                    label: busy === "credit" ? "Applying…" : `Apply Credit (${money(credit)})`,
+                    onSelect: () => void applyCredit(),
+                    disabled: busy !== null,
+                  },
+                ]
+              : []),
           ]
         : [];
     const destructive: ActionMenuItem[] = [

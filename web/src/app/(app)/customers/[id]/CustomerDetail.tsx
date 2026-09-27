@@ -31,6 +31,8 @@ import {
 } from "@/lib/customerInvoices";
 import { usDate } from "@/lib/specialOrderDocs";
 import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
+import { CustomerCredit, type CreditRow } from "@/components/customerInvoices/CustomerCredit";
+import { canRefundPayments } from "@/lib/roles";
 
 const CUSTOMERS_CRUMB = { href: "/customers", label: "Customers" };
 
@@ -152,7 +154,7 @@ export async function CustomerDetail({
   // hides the section rather than breaking the record.
   const { data: invoiceRows } = await supabase
     .from("customer_invoices")
-    .select("id, number, issued_on, due_on, sent_at, paid_at, voided_at, customer_invoice_lines ( amount )")
+    .select("id, number, revision, issued_on, due_on, sent_at, paid_at, voided_at, customer_invoice_lines ( amount )")
     .eq("customer_id", id)
     .order("number", { ascending: false });
   const invoiceIds = (invoiceRows ?? []).map((r) => r.id as string);
@@ -166,7 +168,7 @@ export async function CustomerDetail({
   const invoiceTerms = readInvoiceTerms(session.orgSettings as Record<string, unknown>);
   const invoices = (invoiceRows ?? []).map((r) => ({
     id: r.id as string,
-    number: invoiceNumberText(r.number as number, invoiceTerms),
+    number: invoiceNumberText(r.number as number, invoiceTerms, r.revision as number),
     issued_on: r.issued_on as string,
     status: invoiceStatus(r as never, today),
     ...invoiceBalance(
@@ -174,6 +176,10 @@ export async function CustomerDetail({
       (invoicePays ?? []).filter((p) => p.customer_invoice_id === r.id) as { amount: number }[]
     ),
   }));
+
+  // Their CREDIT (143): money applied to nothing.
+  const { data: creditData } = await supabase.rpc("customer_credit", { p_customer: id });
+  const creditRows = ((creditData ?? []) as CreditRow[]).map((c) => ({ ...c, credit: Number(c.credit) }));
 
   const trail = parseTrail(rawParams, CUSTOMERS_CRUMB);
   const address = (customer.address ?? {}) as Record<string, unknown>;
@@ -309,6 +315,8 @@ export async function CustomerDetail({
           </table>
         </section>
       ) : null}
+
+      <CustomerCredit rows={creditRows} canRefund={canRefundPayments(session.membership.role)} />
 
       <CustomerActions
         id={id}

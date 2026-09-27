@@ -212,7 +212,7 @@ export function SendDocument({
       const { blob, view, terms } = await renderInvoicePdf(supabase, invoice.liveInvoiceId, today);
       return {
         blob,
-        name: invoiceFileName(invoiceNumberText(view.invoice.number, terms), view.invoice.issued_on),
+        name: invoiceFileName(invoiceNumberText(view.invoice.number, terms, view.invoice.revision), view.invoice.issued_on),
         ofInvoice: true,
       };
     }

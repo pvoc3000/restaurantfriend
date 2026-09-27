@@ -77,7 +77,7 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
     <docs.CustomerInvoicePdf
       org={doc}
       invoice={{
-        number: invoiceNumberText(view.invoice.number, terms),
+        number: invoiceNumberText(view.invoice.number, terms, view.invoice.revision),
         issued_on: view.invoice.issued_on ?? today,
         due_on: view.invoice.due_on,
         notes: view.invoice.notes,
@@ -216,6 +216,9 @@ export function SendCustomerInvoice({
      *  the placeholder. `billEmail` is filled from To at that moment. */
     qbo: Omit<CustomerInvoicePushInputs, "billEmail"> | null;
     snapshot: CustomerInvoiceSnapshot;
+    /** A revision's original that is in QuickBooks (143) — voided THERE once
+     *  this has gone, as the send voids it here. */
+    replacesInQbo: string | null;
     breakdown: (ReturnType<typeof breakdownFromTotals> & {
       lines: Record<string, ReturnType<typeof breakdownFromTotals>>;
     }) | null;
@@ -239,7 +242,7 @@ export function SendCustomerInvoice({
       if (pe) throw new Error(pe.message);
       if ((problems as string[] | null)?.length) throw new Error((problems as string[]).join(" "));
       const { blob, view, settings, doc, terms } = await renderInvoicePdf(supabase, id, today);
-      const number = invoiceNumberText(view.invoice.number, terms);
+      const number = invoiceNumberText(view.invoice.number, terms, view.invoice.revision);
 
       // The pay link, on SendDocument's terms: only when online payment is
       // configured and something is owed; the address resolved first.
@@ -275,8 +278,19 @@ export function SendCustomerInvoice({
       const summed = sumBreakdowns(Object.values(perGroup));
       const breakdown = summed ? { ...summed, lines: perGroup } : null;
 
+      let replacesInQbo: string | null = null;
+      if (viaQbo && view.invoice.revision_of) {
+        const { data: orig } = await supabase
+          .from("customer_invoices")
+          .select("external_ref")
+          .eq("id", view.invoice.revision_of)
+          .maybeSingle();
+        if ((orig?.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id) replacesInQbo = view.invoice.revision_of;
+      }
+
       setCompose(invoiceEmail(view, number, settings, pay, viaQbo));
       setPending({
+        replacesInQbo,
         blob,
         url: URL.createObjectURL(blob),
         filename: invoiceFileName(number, view.invoice.issued_on ?? today),
@@ -357,6 +371,15 @@ export function SendCustomerInvoice({
           // keep the generic message
         }
         throw new Error(message);
+      }
+      // 143: the revision has gone and the original is void here; void it in
+      // QuickBooks too, or its customer could still pay the old one there.
+      if (pending.replacesInQbo) {
+        const { message } = await invokeQbo(supabase, {
+          mode: "void_customer_invoice",
+          customer_invoice_id: pending.replacesInQbo,
+        });
+        if (message) qboNotes.push(`The invoice it replaces was not voided in QuickBooks: ${message}`);
       }
       const warning = [(data as { warning?: string } | null)?.warning, ...qboNotes]
         .filter(Boolean)

@@ -215,7 +215,7 @@ export async function SpecialOrderDetail({
     // a payment taken on an invoice later voided still names it.
     supabase
       .from("customer_invoice_lines")
-      .select("invoice_id, amount, kind, line_type, customer_invoices ( id, number, sent_at, paid_at, voided_at, due_on )")
+      .select("invoice_id, amount, kind, line_type, customer_invoices ( id, number, revision, revision_of, sent_at, paid_at, voided_at, due_on )")
       .eq("special_order_id", id),
   ]);
 
@@ -315,7 +315,7 @@ export async function SpecialOrderDetail({
    * Payments tab and the Info tab; void ones only name payments.
    */
   const invoiceTerms = readInvoiceTerms(session.orgSettings as Record<string, unknown>);
-  type InvoiceRef = { id: string; number: number; sent_at: string | null; paid_at: string | null; voided_at: string | null; due_on: string | null };
+  type InvoiceRef = { id: string; number: number; revision: number; revision_of: string | null; sent_at: string | null; paid_at: string | null; voided_at: string | null; due_on: string | null };
   // AN ORDER IS SEVERAL LINES ON AN INVOICE since 141 (its charges, copied),
   // so the rows are summed per invoice: what THIS order bills on each, and
   // whether that is a deposit or its charges.
@@ -336,7 +336,7 @@ export async function SpecialOrderDetail({
   const invoicesOnOrder = [...onInvoice.values()].map((x) => x.invoice);
   const invoiceHref = (invoiceId: string, from: string) =>
     withFrom(`/customer-invoices/${invoiceId}`, { href: from, label: `#${row.number as string}` });
-  const invoiceLabel = (i: InvoiceRef) => `Invoice ${invoiceNumberText(i.number, invoiceTerms)}`;
+  const invoiceLabel = (i: InvoiceRef) => `Invoice ${invoiceNumberText(i.number, invoiceTerms, i.revision)}`;
   const statusOf = (i: InvoiceRef) => invoiceStatus(i, today);
   const liveInvoices = [...onInvoice.values()]
     .filter((x) => !x.invoice.voided_at)
@@ -396,11 +396,15 @@ export async function SpecialOrderDetail({
     ignore_balance: Boolean(row.ignore_balance),
   };
   const totals = orderTotals(moneyInputs, lines, payments, settings.rush);
-  // What New Invoice may still bill (141) — `special_order_unbilled`.
+  // What New Invoice may still bill (141) — `special_order_unbilled`. A DRAFT
+  // revision is a proposal: the invoice it would replace is still the bill
+  // (143), so it is not counted twice.
   const unbilled = unbilledAmount({
     total: totals.total,
     cancelled: row.status === "cancelled",
-    liveLines: liveInvoices.map((l) => ({ amount: l.amount })),
+    liveLines: liveInvoices
+      .filter((l) => !(l.invoice.revision_of && !l.invoice.sent_at))
+      .map((l) => ({ amount: l.amount })),
   });
 
   const attention = needsAttention(row as never, today, totals, settings.attention);

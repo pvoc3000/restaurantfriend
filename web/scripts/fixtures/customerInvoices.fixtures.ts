@@ -125,6 +125,10 @@ test("addDays: Sunday plus four is Thursday, across a month and a DST night", ()
 
 test("invoiceNumberText / invoiceFileName", () => {
   eq(invoiceNumberText(1001, { prefix: "" }), "1001");
+  // 143: a revision keeps the number and says which one it is.
+  eq(invoiceNumberText(1014, { prefix: "" }, 1), "1014", "the first is just the number");
+  eq(invoiceNumberText(1014, { prefix: "" }, 2), "1014-2");
+  eq(invoiceNumberText(1014, { prefix: "DF-" }, 3), "DF-1014-3", "the prefix, then the revision");
   eq(invoiceNumberText(1001, { prefix: "DF-" }), "DF-1001");
   eq(invoiceFileName("1001", "2026-10-04"), "INVOICE#1001_2026.10.04.pdf");
 });

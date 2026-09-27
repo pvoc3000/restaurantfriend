@@ -73,7 +73,7 @@ export async function CustomerInvoiceDetail({
 
   const { invoice, payments, groups } = view;
   const status = invoiceStatus(invoice, today);
-  const numberText = invoiceNumberText(invoice.number, terms);
+  const numberText = invoiceNumberText(invoice.number, terms, invoice.revision);
   // Editable: nothing sent, nothing void, no money on it (141).
   const draft = !view.frozen;
   const trail = parseTrail(rawParams, INVOICES_CRUMB);
@@ -113,6 +113,28 @@ export async function CustomerInvoiceDetail({
   );
   const processor = invoice.processor ?? "square";
   const qbo = (invoice.external_ref as { qbo?: { id?: string; doc_number?: string | null; invoice_link?: string | null } } | null)?.qbo;
+
+  // REVISIONS (143): what this replaces, and what replaces it — a draft being
+  // made, or a sent one that already did. And the customer's CREDIT, which
+  // Apply Credit offers while a Square invoice still owes.
+  const [{ data: originalRow }, { data: revisionRows }, { data: creditRows }] = await Promise.all([
+    invoice.revision_of
+      ? supabase.from("customer_invoices").select("id, number, revision, voided_at").eq("id", invoice.revision_of).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from("customer_invoices").select("id, number, revision, sent_at, voided_at").eq("revision_of", id),
+    invoice.customer_id
+      ? supabase.rpc("customer_credit", { p_customer: invoice.customer_id })
+      : Promise.resolve({ data: [] }),
+  ]);
+  type Related = { id: string; number: number; revision: number; sent_at?: string | null; voided_at: string | null };
+  const original = (originalRow as Related | null) ?? null;
+  const revisions = ((revisionRows ?? []) as Related[]).filter((r) => !r.voided_at);
+  const pendingRevision = revisions.find((r) => !r.sent_at) ?? null;
+  const replacedBy = revisions.find((r) => r.sent_at) ?? null;
+  const isPendingRevision = Boolean(invoice.revision_of && !invoice.sent_at && !invoice.voided_at);
+  const credit = Math.round(((creditRows ?? []) as { credit: number }[]).reduce((a, c) => a + Number(c.credit), 0) * 100) / 100;
+  const labelOf = (r: Related) => `Invoice ${invoiceNumberText(r.number, terms, r.revision)}`;
+  const relatedHref = (r: Related) => withFrom(`/customer-invoices/${r.id}`, backHere);
 
   // Every send, with its PDF (128) — what the customer had, and when.
   const { data: sendRows } = await supabase
@@ -166,9 +188,41 @@ export async function CustomerInvoiceDetail({
           canWrite={canWrite}
           inQuickBooks={Boolean(qbo?.id)}
           processor={processor}
+          revisable={
+            Boolean(invoice.sent_at) && !invoice.voided_at && !isPendingRevision && !pendingRevision
+          }
+          credit={processor === "square" ? credit : 0}
           autoSend={typeof rawParams.send === "string" ? rawParams.send : null}
         />
       </div>
+
+      {/* WHAT REPLACES WHAT (143) — said once, where it matters. */}
+      {isPendingRevision && original ? (
+        <p className="text-[13px]">
+          <span className="box-decoration-clone bg-mark-fill px-1">
+            A draft revision of{" "}
+            <Link href={relatedHref(original)} className="underline underline-offset-2">{labelOf(original)}</Link>.
+            Sending it voids {labelOf(original)} and moves what was paid on it here.
+          </span>
+        </p>
+      ) : pendingRevision ? (
+        <p className="text-[13px]">
+          <span className="box-decoration-clone bg-mark-fill px-1">
+            Being revised as{" "}
+            <Link href={relatedHref(pendingRevision)} className="underline underline-offset-2">{labelOf(pendingRevision)}</Link>{" "}
+            (a draft). This invoice is still the one the customer pays until that is sent.
+          </span>
+        </p>
+      ) : replacedBy ? (
+        <p className="text-[13px] text-muted">
+          Replaced by{" "}
+          <Link href={relatedHref(replacedBy)} className="underline underline-offset-2">{labelOf(replacedBy)}</Link>.
+        </p>
+      ) : invoice.revision_of && original ? (
+        <p className="text-[13px] text-muted">
+          Replaces <Link href={relatedHref(original)} className="underline underline-offset-2">{labelOf(original)}</Link>.
+        </p>
+      ) : null}
 
       <section className="space-y-3">
         <SectionHeading>Details</SectionHeading>

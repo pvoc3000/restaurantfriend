@@ -61,8 +61,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
-    const { payment_id, amount, reason, idempotency_key } = await req.json();
-    if (!payment_id || !idempotency_key) {
+    const { payment_id, credit_payment_id, amount, reason, idempotency_key } = await req.json();
+    // 143: `credit_payment_id` refunds a payment's CREDIT — money of the
+    // customer's applied to nothing — rather than an order's share of it.
+    const fromCredit = Boolean(credit_payment_id);
+    if ((!payment_id && !credit_payment_id) || !idempotency_key) {
       return json(400, { error: "missing payment_id or idempotency_key" });
     }
     const cents = Math.round(Number(amount) * 100);
@@ -83,12 +86,20 @@ Deno.serve(async (req) => {
     if (!user) return json(401, { error: "not signed in" });
 
     // `payment_id` is the Payments tab's row: this ORDER's slice of a payment
-    // (140's application), read through the caller's RLS.
-    const { data: row, error: rowError } = await supabase
-      .from("order_payments")
-      .select("id, org_id, order_id, customer_invoice_id, amount, payment_type, note, external_ref")
-      .eq("id", payment_id)
-      .maybeSingle();
+    // (140's application); `credit_payment_id` is the payment itself (143).
+    // Either read through the caller's RLS.
+    const { data: row, error: rowError } = fromCredit
+      ? await supabase
+          .from("customer_payments")
+          .select("id, org_id, amount, payment_type, note, external_ref")
+          .eq("id", credit_payment_id)
+          .maybeSingle()
+          .then((r) => ({ ...r, data: r.data ? { ...r.data, order_id: null as string | null, customer_invoice_id: null } : null }))
+      : await supabase
+          .from("order_payments")
+          .select("id, org_id, order_id, customer_invoice_id, amount, payment_type, note, external_ref")
+          .eq("id", payment_id)
+          .maybeSingle();
     if (rowError) return json(400, { error: rowError.message });
     if (!row) return json(404, { error: "payment not found" });
 
@@ -151,9 +162,9 @@ Deno.serve(async (req) => {
     // so Square's own "left to refund" is the whole invoice's. A refund from
     // this row may take only this ORDER's share, less what has already been
     // refunded against it — the ledger's figure (140).
-    const { data: share, error: shareError } = await supabase.rpc("payment_refundable", {
-      p_application: row.id,
-    });
+    const { data: share, error: shareError } = fromCredit
+      ? await supabase.rpc("payment_credit_refundable", { p_payment: row.id })
+      : await supabase.rpc("payment_refundable", { p_application: row.id });
     if (shareError) return json(400, { error: shareError.message });
     left = Math.min(left, Math.round(Number(share) * 100));
     if (cents > left) {
@@ -195,23 +206,33 @@ Deno.serve(async (req) => {
 
     // The function dates it in the org's own day, takes the org from the
     // payment, and re-checks the manager role and the cap.
-    const { data: inserted, error: insertError } = await supabase.rpc("record_payment_refund", {
-      p_application: row.id,
-      p_amount: cents / 100,
-      p_refund_id: refund.id,
-      p_note: note,
-    });
+    const { data: inserted, error: insertError } = fromCredit
+      ? await supabase.rpc("record_credit_refund", {
+          p_payment: row.id,
+          p_amount: cents / 100,
+          p_refund_id: refund.id,
+          p_note: note,
+        })
+      : await supabase.rpc("record_payment_refund", {
+          p_application: row.id,
+          p_amount: cents / 100,
+          p_refund_id: refund.id,
+          p_note: note,
+        });
 
     if (insertError || !inserted) {
       // The money has gone back; the record did not land. Say so on the order
       // where a person will see it, and to the person who pressed the button.
       const warning = `refunded $${(cents / 100).toFixed(2)} in Square (refund ${refund.id}) but it was NOT recorded here — record −$${(cents / 100).toFixed(2)} as 'Square Refund' by hand${insertError ? `: ${insertError.message}` : ""}`;
-      await supabase.from("special_order_events").insert({
-        org_id: row.org_id,
-        order_id: row.order_id,
-        message: `Refund ${warning}`,
-        source: "app",
-      });
+      // Credit belongs to no order (143): the person who pressed it is told.
+      if (row.order_id) {
+        await supabase.from("special_order_events").insert({
+          org_id: row.org_id,
+          order_id: row.order_id,
+          message: `Refund ${warning}`,
+          source: "app",
+        });
+      }
       return json(200, { refund_id: refund.id, status: refund.status, warning });
     }
 

@@ -32,6 +32,10 @@ export type CustomerInvoice = {
   last_sent_at?: string | null;
   /** Who takes the money (131). Locked once sent. */
   processor?: InvoiceProcessor;
+  /** 143: 1 for an invoice as first made; a revision is 2, 3… of the same
+   *  number, and names the invoice it replaces. */
+  revision?: number;
+  revision_of?: string | null;
   /** `{ qbo: { id, sync_token, doc_number, invoice_link, attachments } }` once
    *  a QuickBooks invoice has been pushed (131). */
   external_ref?: Record<string, unknown> | null;
@@ -496,9 +500,10 @@ export function addDays(issued: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** "1001", or "DF-1001" with a prefix. What the paper and the email print. */
-export function invoiceNumberText(number: number, terms: Pick<InvoiceTerms, "prefix">): string {
-  return `${terms.prefix}${number}`;
+/** "1001", or "DF-1001" with a prefix; a revision (143) is "1001-2". What
+ *  the paper, the email and QuickBooks' DocNumber print. */
+export function invoiceNumberText(number: number, terms: Pick<InvoiceTerms, "prefix">, revision = 1): string {
+  return `${terms.prefix}${number}${revision > 1 ? `-${revision}` : ""}`;
 }
 
 export function invoiceFileName(numberText: string, date: string): string {
