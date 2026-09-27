@@ -4781,8 +4781,8 @@ deployed with its credit mode. As the owner (one-off session, signed out):
 empty, and server renders of the list, #1014, #1013, both customers and order
 #10057 all 200. The Credit section draws nothing while there is no credit.
 
-**THE TEXTBOOK A/R MODEL — PHASE 4: WHO OWES US (migration 144, written and
-rehearsed 2026-09-27, NOT YET APPLIED).** What a customer owes is read the
+**THE TEXTBOOK A/R MODEL — PHASE 4: WHO OWES US (migration 144, written,
+rehearsed and APPLIED 2026-09-27).** What a customer owes is read the
 textbook way, in three parts that never overlap:
 - **invoiced:** the open balance of every POSTED invoice. Posted means not
   void, and sent, paid or holding money. #1012 and #1013 were paid through
@@ -4878,3 +4878,15 @@ Payment….
 **Two test invoices read oddly and are left alone:** #1006 and #1007 bill
 $0.00 but hold $1.10 each, left over from the follow-the-order days. Their
 statements close $1.10 in credit, where `customer_balances` says 0.
+**After 144 was applied (2026-09-27):** `customer_invoice_totals` matches the
+rehearsal invoice for invoice (#1014 draft $5,288.00 not posted; #1006–#1008,
+#1012, #1013 posted); no money on a void invoice; `record_held_payment` gone;
+none of the new views or functions visible to `anon`; ledger parity holds. As
+the owner (one-off session, signed out): `customer_balances` gives the same 3
+customers and $5,888.24 as the rehearsal; the invoice view embeds its customer
+through PostgREST; server renders of /customers (Invoiced · Not Invoiced ·
+Credit; 2.5s), Knotted's record ("$5248.00 not invoiced", Invoices, Not
+Invoiced 7, Orders), /customer-invoices (Shop DF02), #1014, order #10057, /start
+(the Invoices card, zero at DF01) and /forms all 200. `fetchStatement` run as
+the owner rendered Alyssa Rosario's real account: #1012 and #1013 and their two
+pay-link payments, closing $0.00.
