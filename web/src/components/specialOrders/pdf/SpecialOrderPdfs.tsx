@@ -21,7 +21,7 @@
 //                       Document, for the production packet.
 //   CustomerInvoicePdf  migration 124 — one row per order, itemized on a
 //                       one-order invoice.
-//   StatementPdf        decision 21 — one customer's orders over a period.
+//   StatementPdf        144 — one customer's account over a period, balance forward.
 //
 // Each look is a rule the app already keeps on screen:
 //   · The masthead is a BLACK BAND with the org's name in white tracked caps —
@@ -53,8 +53,8 @@ import {
   type DocOrg,
   type DocumentKind,
   type OrderDocData,
-  type StatementData,
 } from "@/lib/specialOrderDocs";
+import { AGING_BUCKETS, type StatementDocument, type StatementRow } from "@/lib/customerStatement";
 
 import { customerLabel, lineTotal } from "@/lib/specialOrders";
 import type { InvoiceTotalsBreakdown } from "@/lib/customerInvoices";
@@ -191,6 +191,10 @@ const s = {
   stDate: { width: 96 },
   stTitle: { flexGrow: 1, flexBasis: 0, paddingRight: 12 },
   stMoney: { width: 70, textAlign: "right" },
+  aging: { flexDirection: "row", gap: 10 },
+  agingCell: { flexGrow: 1, flexBasis: 0 },
+  agingLabel: { ...caps(6.5, 0.12), color: SUBTLE, marginBottom: 3 },
+  agingValue: { fontSize: 9 },
   }),
 };
 
@@ -851,26 +855,53 @@ export function CustomerInvoicePdf({
 }
 
 /* ==========================================================================
- * THE STATEMENT (decision 21)
+ * THE STATEMENT (migration 144)
  * ========================================================================== */
 
 /**
- * The statement in the app's language (Mark, 2026-09-25): one customer's
- * orders over a period. The customer is the heading and the period its
- * caption; each order a row, rule-free like a list. There are no notes on a
- * statement, so the invoice footer takes the column beside the totals instead
- * of a line of its own below them. Total due keeps the yellow until settled.
+ * A BALANCE-FORWARD STATEMENT, the textbook one (Mark, 2026-09-27): what the
+ * customer owed when the period began, every invoice and payment in it with
+ * the balance after each, and what they owe at its end — then the invoices
+ * still open and how late they are. It was one row per ORDER (decision 21)
+ * while orders were the bill; invoices are the bill now.
+ *
+ * A refund is a charge (money back to them raises what they owe); a voided
+ * invoice stays on the paper at no charge, so a number they were sent is
+ * accounted for. Balance due keeps the yellow until settled, and a customer
+ * in credit reads CREDIT, not a minus sign.
  */
 export function StatementPdf({
-  statement,
+  statement: doc,
   org,
 }: {
-  statement: StatementData;
+  statement: StatementDocument;
   org: DocOrg;
 }) {
-  const period = `${statement.from} – ${statement.to}`;
-  const settled = statement.balance <= 0;
-  const count = statement.orders.length;
+  const st = doc.statement;
+  const name = customerLabel(doc.customer);
+  const invoiceCount = st.rows.filter((r) => r.kind === "invoice").length;
+  const paymentCount = st.rows.filter((r) => r.kind === "payment" || r.kind === "refund").length;
+  const settled = st.closing <= 0.005;
+  const inCredit = st.closing < -0.005;
+  const activity = (r: StatementRow): string => {
+    if (r.invoice) {
+      return r.kind === "void"
+        ? `Invoice ${r.invoice.label} · void`
+        : `Invoice ${r.invoice.label}${r.invoice.due_on ? ` · due ${isoDay(r.invoice.due_on)}` : ""}`;
+    }
+    const p = r.payment;
+    return [
+      r.kind === "refund" ? "Refund" : "Payment",
+      p?.type,
+      p?.paid.length ? `invoice ${p.paid.join(", ")}` : null,
+      p?.credit ? `${money(p.credit)} credit` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  };
+  const cell = (value: number) => (
+    <Text style={value ? s.stMoney : [s.stMoney, s.empty]}>{value ? money(value) : "—"}</Text>
+  );
   return (
     <Document>
       <Page size="LETTER" style={s.page}>
@@ -885,59 +916,110 @@ export function StatementPdf({
         <View style={s.body}>
           <View>
             <Text style={s.kicker}>Statement</Text>
-            <Text style={s.h1}>{customerLabel(statement.customer)}</Text>
+            <Text style={s.h1}>{name}</Text>
             <Text style={s.caption}>
-              {period} · {count} {count === 1 ? "order" : "orders"}
+              {st.from} – {st.to} · {invoiceCount} {invoiceCount === 1 ? "invoice" : "invoices"} ·{" "}
+              {paymentCount} {paymentCount === 1 ? "payment" : "payments"}
             </Text>
           </View>
 
           <View style={s.blocks}>
             <View style={s.block}>
               <Text style={s.sectionHead}>Customer</Text>
-              <Field label="Name" value={customerLabel(statement.customer)} />
-              <Field label="Phone" value={statement.customer?.phone} />
-              <Field label="Email" value={statement.customer?.email} />
+              <Field label="Name" value={name} />
+              <Field label="Phone" value={doc.customer?.phone} />
+              <Field label="Email" value={doc.customer?.email} />
             </View>
             <View style={s.block}>
-              <Text style={s.sectionHead}>Period</Text>
-              <Field label="From" value={isoDay(statement.from)} />
-              <Field label="To" value={isoDay(statement.to)} />
-              <Field label="Orders" value={String(count)} />
+              <Text style={s.sectionHead}>Account</Text>
+              <Field label="From" value={isoDay(st.from)} />
+              <Field label="To" value={isoDay(st.to)} />
+              <Field label="Opening" value={money(st.opening)} />
             </View>
           </View>
 
           <View style={s.items}>
             <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
-              Orders <Text style={s.sectionCount}>{count}</Text>
+              Activity <Text style={s.sectionCount}>{st.rows.length}</Text>
             </Text>
             <View style={s.tableHead} fixed>
-              <Text style={[s.th, s.stNo]}>No.</Text>
               <Text style={[s.th, s.stDate]}>Date</Text>
-              <Text style={[s.th, s.stTitle]}>Order</Text>
-              <Text style={[s.th, s.stMoney]}>Paid</Text>
-              <Text style={[s.th, s.stMoney]}>Total</Text>
+              <Text style={[s.th, s.stTitle]}>Activity</Text>
+              <Text style={[s.th, s.stMoney]}>Charges</Text>
+              <Text style={[s.th, s.stMoney]}>Payments</Text>
+              <Text style={[s.th, s.stMoney]}>Balance</Text>
             </View>
-            {statement.orders.map((o) => (
-              <View key={o.id} style={s.invRow} wrap={false}>
-                <Text style={s.stNo}>{o.number}</Text>
-                <Text style={s.stDate}>{isoDay(o.event_date) || "—"}</Text>
-                <Text style={s.stTitle}>{o.title ?? ""}</Text>
-                <Text style={o.totals.paid ? s.stMoney : [s.stMoney, s.empty]}>
-                  {o.totals.paid ? money(o.totals.paid) : "—"}
-                </Text>
-                <Text style={s.stMoney}>{money(o.totals.total)}</Text>
+            <View style={s.invRow} wrap={false}>
+              <Text style={s.stDate}>{isoDay(st.from)}</Text>
+              <Text style={[s.stTitle, { color: MUTED }]}>Opening balance</Text>
+              <Text style={[s.stMoney, s.empty]}>—</Text>
+              <Text style={[s.stMoney, s.empty]}>—</Text>
+              <Text style={s.stMoney}>{money(st.opening)}</Text>
+            </View>
+            {st.rows.map((r, i) => (
+              <View key={i} style={s.invRow} wrap={false}>
+                <Text style={s.stDate}>{isoDay(r.date) || "—"}</Text>
+                <Text style={r.kind === "void" ? [s.stTitle, { color: MUTED }] : s.stTitle}>{activity(r)}</Text>
+                {cell(r.kind === "refund" ? -r.paid : r.charge)}
+                {cell(r.kind === "refund" ? 0 : r.paid)}
+                <Text style={s.stMoney}>{money(r.balance)}</Text>
               </View>
             ))}
-            {count === 0 ? (
-              <Text style={[s.prose, s.empty, { marginTop: 8 }]}>No orders in this period.</Text>
+            {st.rows.length === 0 ? (
+              <Text style={[s.prose, s.empty, { marginTop: 8 }]}>No invoices or payments in this period.</Text>
             ) : null}
+          </View>
+
+          {st.open.length > 0 ? (
+            <View style={s.items}>
+              <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
+                Open invoices <Text style={s.sectionCount}>{st.open.length}</Text>
+              </Text>
+              <View style={s.tableHead} fixed>
+                <Text style={[s.th, s.stNo]}>Invoice</Text>
+                <Text style={[s.th, s.stDate]}>Issued</Text>
+                <Text style={[s.th, s.stDate]}>Due</Text>
+                <Text style={[s.th, s.stTitle]}>Late</Text>
+                <Text style={[s.th, s.stMoney]}>Balance</Text>
+              </View>
+              {st.open.map((o) => (
+                <View key={o.id} style={s.invRow} wrap={false}>
+                  <Text style={s.stNo}>{o.label}</Text>
+                  <Text style={s.stDate}>{isoDay(o.issued_on)}</Text>
+                  <Text style={s.stDate}>{isoDay(o.due_on) || "—"}</Text>
+                  <Text style={o.daysPastDue > 0 ? s.stTitle : [s.stTitle, s.empty]}>
+                    {o.daysPastDue > 0 ? `${o.daysPastDue} ${o.daysPastDue === 1 ? "day" : "days"}` : "—"}
+                  </Text>
+                  <Text style={s.stMoney}>{money(o.balance)}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          <View style={s.items} wrap={false}>
+            <Text style={s.sectionHead}>Aging · {isoDay(st.to)}</Text>
+            <View style={s.aging}>
+              {AGING_BUCKETS.map((b) => (
+                <View key={b.key} style={s.agingCell}>
+                  <Text style={s.agingLabel}>{b.label}</Text>
+                  <Text style={st.aging[b.key] ? s.agingValue : [s.agingValue, s.empty]}>
+                    {st.aging[b.key] ? money(st.aging[b.key]) : "—"}
+                  </Text>
+                </View>
+              ))}
+              {/* What the columns come to, less this, is the balance due. */}
+              <View style={s.agingCell}>
+                <Text style={s.agingLabel}>Credit</Text>
+                <Text style={st.credit > 0.005 ? s.agingValue : [s.agingValue, s.empty]}>
+                  {st.credit > 0.005 ? money(-st.credit) : "—"}
+                </Text>
+              </View>
+            </View>
           </View>
 
           <View style={s.foot} wrap={false}>
             <View style={s.notes}>
-              {org.invoiceFooter ? (
-                <Text style={[s.prose, { color: MUTED }]}>{org.invoiceFooter}</Text>
-              ) : null}
+              {org.invoiceFooter ? <Text style={[s.prose, { color: MUTED }]}>{org.invoiceFooter}</Text> : null}
             </View>
             <View style={s.windowWrap}>
               <View style={s.windowShadow} />
@@ -946,12 +1028,13 @@ export function StatementPdf({
                   <Text style={s.titleBarText}>Totals</Text>
                 </View>
                 <View style={s.totals}>
-                  <TotalRow label="Orders" value={statement.total} />
-                  <TotalRow label="Payments" value={statement.paid ? -statement.paid : 0} />
+                  <TotalRow label="Opening" value={st.opening} />
+                  <TotalRow label="Charges" value={st.charges} />
+                  <TotalRow label="Payments" value={st.payments ? -st.payments : 0} />
                 </View>
                 <View style={settled ? [s.grand, { backgroundColor: "#fff" }] : s.grand}>
-                  <Text style={s.grandLabel}>Total due</Text>
-                  <Text style={s.grandValue}>{money(statement.balance)}</Text>
+                  <Text style={s.grandLabel}>{inCredit ? "Credit" : "Balance due"}</Text>
+                  <Text style={s.grandValue}>{money(Math.abs(st.closing))}</Text>
                 </View>
               </View>
             </View>
@@ -960,7 +1043,7 @@ export function StatementPdf({
 
         <View style={s.footer} fixed>
           <Text style={s.footerText}>
-            {org.name} · Statement {period}
+            {org.name} · Statement {st.from} – {st.to}
           </Text>
           <Text
             style={s.footerText}

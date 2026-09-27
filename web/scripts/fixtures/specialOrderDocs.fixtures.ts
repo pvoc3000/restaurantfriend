@@ -11,9 +11,6 @@
 //   · `sizeClassGroups` written without `isProductionLine` puts "Delivery Fee"
 //     on the production sheet as something to make, and written to DROP lines
 //     with no size loses a real donut off it silently;
-//   · `lastWeek` written as "today minus seven days" produces overlapping
-//     statements, which double-bills a wholesale customer for whichever days
-//     fall in both;
 //   · `fillTemplate` written to blank unknown placeholders swallows a typo in
 //     a template into a hole in a sentence a customer reads;
 //   · `quoteStateMessage` collapsed to one "this link is not valid" tells a
@@ -29,7 +26,6 @@ import {
   documentFileName,
   documentRecipient,
   fillTemplate,
-  lastWeek,
   orgDocHeader,
   productionCount,
   replySubject,
@@ -246,36 +242,6 @@ test("productionCount excludes the money lines the kitchen never sees", () => {
     line({ id: "c", qty: 6 }),
   ]);
   eq(count, { lines: 2, qty: 18 });
-});
-
-/* -------------------------------------------------------------------------- */
-/* The statement's period                                                      */
-/* -------------------------------------------------------------------------- */
-
-test("lastWeek is the Monday–Sunday week BEFORE, whatever day you ask on", () => {
-  // 2026-08-17 is a Monday: last week is 8/10 – 8/16.
-  eq(lastWeek("2026-08-17"), { from: "2026-08-10", to: "2026-08-16" });
-  // 2026-08-16 is a Sunday — still in the 8/10 week, so last week is 8/3 – 8/9.
-  eq(lastWeek("2026-08-16"), { from: "2026-08-03", to: "2026-08-09" });
-  // A Wednesday lands on the same answer as its Monday, which is what makes
-  // two consecutive statements neither overlap nor leave a day out.
-  eq(lastWeek("2026-08-19"), lastWeek("2026-08-17"));
-});
-
-test("consecutive weeks abut exactly — no overlap, no gap", () => {
-  const thisOne = lastWeek("2026-08-17");
-  const nextOne = lastWeek("2026-08-24");
-  eq(thisOne.to, "2026-08-16");
-  eq(nextOne.from, "2026-08-17");
-  ok(nextOne.from > thisOne.to, "the next period starts after this one ends");
-});
-
-test("lastWeek crosses a month and a year boundary correctly", () => {
-  // 2026-01-05 is a Monday, so "last week" is the one that ENDS the day before
-  // — Mon 29 Dec to Sun 4 Jan, which spans both the month and the year.
-  eq(lastWeek("2026-01-05"), { from: "2025-12-29", to: "2026-01-04" });
-  // And the Sunday inside it still points at the week before THAT.
-  eq(lastWeek("2026-01-04"), { from: "2025-12-22", to: "2025-12-28" });
 });
 
 /* -------------------------------------------------------------------------- */

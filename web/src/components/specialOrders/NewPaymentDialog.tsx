@@ -13,6 +13,7 @@ import { PAYMENT_TYPE_OPTIONS, money } from "@/lib/specialOrders";
 import {
   defaultApplyTo,
   newPaymentProblem,
+  offersOrderChoice,
   parseMoney,
   type OpenInvoice,
 } from "@/lib/newPayment";
@@ -32,7 +33,9 @@ const ORDER = "order";
  * `record_customer_invoice_payment` — the invoice record's own Record
  * Payment, which closes the invoice when met and settles the order when ITS
  * balance reaches zero (139). On the order it is money held on the order
- * (140's `record_order_payment`), the old Take a payment.
+ * (140's `record_order_payment`), the old Take a payment — offered only while
+ * no sent invoice is open (`offersOrderChoice`), since 144 routes money on an
+ * order onto its sent invoices.
  */
 export function NewPaymentDialog({
   orderId,
@@ -150,7 +153,7 @@ export function NewPaymentDialog({
                 value: i.id,
                 label: `${[i.label, i.what].filter(Boolean).join(" · ")} · ${money(i.due)} due`,
               })),
-              { value: ORDER, label: "The order — no invoice" },
+              ...(offersOrderChoice(sorted) ? [{ value: ORDER, label: "The order — no invoice" }] : []),
             ]}
           />
         </div>

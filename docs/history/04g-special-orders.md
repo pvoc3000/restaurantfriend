@@ -4780,3 +4780,101 @@ deployed with its credit mode. As the owner (one-off session, signed out):
 `customer_credit` empty for Knotted and Alyssa Rosario, #1014's send check
 empty, and server renders of the list, #1014, #1013, both customers and order
 #10057 all 200. The Credit section draws nothing while there is no credit.
+
+**THE TEXTBOOK A/R MODEL — PHASE 4: WHO OWES US (migration 144, written and
+rehearsed 2026-09-27, NOT YET APPLIED).** What a customer owes is read the
+textbook way, in three parts that never overlap:
+- **invoiced:** the open balance of every POSTED invoice. Posted means not
+  void, and sent, paid or holding money. #1012 and #1013 were paid through
+  their links without ever being marked sent, and money on a draft already
+  freezes it (141).
+- **not invoiced:** an order that `countsAsOwed` owing more than its posted
+  invoices still ask of it; the difference (`special_order_receivable`).
+- **credit:** a payment's amount less its applications.
+
+`customer_balances(p_org, p_customer)` returns the three; the list gets only
+the customers who have any. `customer_uninvoiced_orders` lists the orders
+behind "not invoiced". Both are definer functions, because
+`special_order_money` is, and both re-check the caller's org.
+
+**On the real data** (a copy, 2026-09-27) invoiced + not invoiced equals
+today's order-based "outstanding" customer by customer: 3 customers, $5,888.24,
+Knotted's $5,248 among them. The customer page's $5,248 against draft #1014's
+$5,288 was the $40 free Delivery line, which no order carries. It is owed once
+#1014 is sent.
+
+**Two security-invoker views:**
+- `customer_invoice_totals`: one row per invoice with its total, applied,
+  balance, order count and `posted`. It replaces the invoice list's sweep of
+  every line and payment.
+- `customer_account_entries`: the money that reached the account, one row per
+  payment per invoice it paid plus one for its unapplied remainder. Unique on
+  (payment, invoice), so a page can sweep it.
+
+**The statement** (`lib/customerStatement.buildStatement`, pure, with fixtures)
+is balance forward: the opening balance, every posted invoice and payment with
+the balance after each, the closing balance, then the invoices still open as of
+its last day with a full-width aging row (Current, 1–30, 31–60, 61–90, 90+,
+Credit). The aging less the credit is the closing balance, by construction.
+- A voided invoice that was sent stays on it at no charge, so a revision's
+  original is accounted for.
+- A refund is a charge.
+- Money HELD on an order is left off until an invoice for that order is sent.
+  Every FileMaker payment is held; counting them would set $61,010 of Knotted's
+  history against $5,288 of invoices. It is then dated the day it was paid, so
+  re-rendering an old period can change after a later send.
+- The period defaults to a month back to today, as QuickBooks' does.
+  Decision 21's one-row-per-order statement and `lastWeek` are gone:
+  invoices are the bill now.
+
+**Screens:**
+- **Customers list:** Invoiced, Not Invoiced and Credit columns replace Owed.
+  It no longer sweeps 47,827 order lines and every payment.
+- **Customer record:** the header states the three parts. Money comes first:
+  Invoices, with today's aging above them, then Not Invoiced, Credit, then
+  Orders.
+- **Invoice list:** reads `customer_invoice_totals`, and gains a Shop column
+  and filter.
+- **Desk start page:** gains an Invoices card for the working shop (overdue,
+  sent awaiting payment, drafts). Each count is a status-and-shop filter on the
+  list, so the two agree.
+
+**One phase-2 rule 141 had left out, found by the rehearsal:**
+`record_order_payment(s)` held every dollar on the order, even an order on a
+sent invoice. The order read paid while its invoice kept asking. The paths are
+New Payment ▸ The order, a workflow's "paid in full", and the list's Record
+Payment….
+- Since 144 (`record_order_money`), money pays the order's share of its open
+  posted invoices first, oldest first, and holds only the rest. A share paid in
+  full settles the order.
+- An order with a share open on a QUICKBOOKS invoice is refused by name:
+  QuickBooks collects it, and its webhook records it here.
+- A negative amount stays on the order.
+- New Payment offers "The order — no invoice" only while no sent invoice is
+  open (`offersOrderChoice`).
+- `record_held_payment` is dropped; nothing else called it.
+
+**Verified:**
+- 144 applies twice after 143 on the copy.
+- Scenarios, run as real roles:
+  - anon refused on every view and function;
+  - a member of no org sees nothing;
+  - sending #1014 moves Knotted from $5,248 not invoiced to $5,288 invoiced;
+  - hand cash on a QuickBooks-invoiced day is refused (single and bulk);
+  - a QuickBooks overpayment leaves $76.50 credit;
+  - a Square invoice: cash on its draft is held → applied on send → $30 by hand
+    goes onto the invoice → $70 pays the $60 left, settling the order, and
+    holds $10;
+  - a hand refund stays on the order;
+  - a pending revision is not posted while its original still is;
+  - for every customer, invoiced − credit = posted totals − account entries.
+- Fixtures: the statement, the aging boundaries, the as-of date, same-day
+  order, void and refund rows, the period clamp, the order choice. Each claim
+  was proved by breaking the code.
+- PDFs rendered in Node (the /forms sample, and Knotted's account from the
+  scenario: void #1001 at no charge, #1014, the QuickBooks payment naming 1014
+  once, $76.50 credit).
+
+**Two test invoices read oddly and are left alone:** #1006 and #1007 bill
+$0.00 but hold $1.10 each, left over from the follow-the-order days. Their
+statements close $1.10 in credit, where `customer_balances` says 0.

@@ -24,11 +24,11 @@ import { CustomerAccounting } from "@/components/specialOrders/CustomerAccountin
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { canEditPage } from "@/lib/pageAccess";
 import {
-  invoiceBalance,
   invoiceNumberText,
   invoiceStatus,
   readInvoiceTerms,
 } from "@/lib/customerInvoices";
+import { AGING_BUCKETS, agingBucket, daysBetween, type Aging } from "@/lib/customerStatement";
 import { usDate } from "@/lib/specialOrderDocs";
 import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
 import { CustomerCredit, type CreditRow } from "@/components/customerInvoices/CustomerCredit";
@@ -39,14 +39,16 @@ const CUSTOMERS_CRUMB = { href: "/customers", label: "Customers" };
 /**
  * One customer, and everything they have ever ordered.
  *
- * THE UNPAID ORDERS COME FIRST, which is FileMaker's own split and the reason
- * anybody opens this record: "what does Cafe Knotted owe us" is answered by
- * looking, not by reading down a list of two hundred.
+ * WHAT THEY OWE COMES FIRST, which is the reason anybody opens this record:
+ * "what does Cafe Knotted owe us" is answered by looking, not by reading down
+ * a list of two hundred. Since 144 it is read the textbook way, in three parts
+ * that never overlap (`customer_balances`): their open INVOICES, aged; orders
+ * owed and NOT INVOICED; and their CREDIT.
  *
  * There are no `balance`, `spent` or `order_count` columns on `customers` and
  * there must never be. FMP had all three as calc fields; here they are summed
- * from the orders on every load, so deleting an order cannot leave a customer
- * claiming money nobody owes.
+ * on every load, so deleting an order cannot leave a customer claiming money
+ * nobody owes.
  */
 export async function CustomerDetail({
   id,
@@ -128,57 +130,75 @@ export async function CustomerDetail({
     totals: orderTotals(o as never, lines.get(o.id as string) ?? [], payments.get(o.id as string) ?? [], readSettings(session.orgSettings).rush),
   }));
 
-  /**
-   * `kind === "order"` IS LOAD-BEARING, and leaving it out was a real bug
-   * caught by looking at Cafe Knotted: a standing order carries lines and no
-   * payments, so it always derives a balance — and the record claimed $1,738.50
-   * outstanding from two RECURRENCES while the list, which does check the kind,
-   * said nothing was owed. Two screens disagreeing about one customer's money.
-   *
-   * A standing order is the SHAPE of a recurring order, never a bill. The days
-   * it materializes are the orders, and those are in the list below.
-   * `needsAttention` guards the same way for the same reason.
-   *
-   * Since 2026-09-17 the rule is `countsAsOwed`, shared with the list: a lead
-   * or a quote is a price offered, not a debt, so neither is "outstanding".
-   */
-  const unpaid = withMoney.filter(
-    (o) => countsAsOwed(o) && o.totals.balance > 0 && o.totals.total > 0
-  );
-  const rest = withMoney.filter((o) => !unpaid.includes(o));
-  const owed = unpaid.reduce((a, o) => a + o.totals.balance, 0);
   // Payments are payments whatever the record's kind — a template has none.
   const spent = withMoney.reduce((a, o) => a + o.totals.paid, 0);
 
-  // Their customer invoices (124). A failed read — 124 not applied yet —
-  // hides the section rather than breaking the record.
-  const { data: invoiceRows } = await supabase
-    .from("customer_invoices")
-    .select("id, number, revision, issued_on, due_on, sent_at, paid_at, voided_at, customer_invoice_lines ( amount )")
-    .eq("customer_id", id)
-    .order("number", { ascending: false });
-  const invoiceIds = (invoiceRows ?? []).map((r) => r.id as string);
-  const { data: invoicePays } = invoiceIds.length
-    ? await supabase
-        .from("payment_applications")
-        .select("customer_invoice_id, amount")
-        .in("customer_invoice_id", invoiceIds)
-    : { data: [] };
-  const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
-  const invoiceTerms = readInvoiceTerms(session.orgSettings as Record<string, unknown>);
-  const invoices = (invoiceRows ?? []).map((r) => ({
-    id: r.id as string,
-    number: invoiceNumberText(r.number as number, invoiceTerms, r.revision as number),
-    issued_on: r.issued_on as string,
-    status: invoiceStatus(r as never, today),
-    ...invoiceBalance(
-      (r.customer_invoice_lines ?? []) as { amount: number }[],
-      (invoicePays ?? []).filter((p) => p.customer_invoice_id === r.id) as { amount: number }[]
-    ),
+  // WHAT THEY OWE (144), in three parts, and their invoices (124) with each
+  // one's money — a failed read hides a part rather than breaking the record.
+  const [{ data: balanceRows }, { data: uninvoicedRows }, { data: invoiceRows }, { data: creditData }] =
+    await Promise.all([
+      supabase.rpc("customer_balances", { p_org: customer.org_id, p_customer: id }),
+      supabase.rpc("customer_uninvoiced_orders", { p_customer: id }),
+      supabase
+        .from("customer_invoice_totals")
+        .select("id, number, revision, issued_on, due_on, sent_at, paid_at, voided_at, total, applied, balance, posted")
+        .eq("customer_id", id)
+        .order("number", { ascending: false })
+        .order("revision", { ascending: false }),
+      // Their CREDIT (143): money applied to nothing.
+      supabase.rpc("customer_credit", { p_customer: id }),
+    ]);
+  const owes = ((balanceRows ?? []) as { invoiced: number; not_invoiced: number; credit: number }[])[0];
+  const invoiced = Number(owes?.invoiced ?? 0);
+  const notInvoiced = Number(owes?.not_invoiced ?? 0);
+  const credit = Number(owes?.credit ?? 0);
+
+  /**
+   * `countsAsOwed` IS LOAD-BEARING (`customer_uninvoiced_orders` applies it in
+   * SQL): a standing order carries lines and no payments, so it always derives
+   * a balance, and the record once claimed $1,738.50 outstanding for Cafe
+   * Knotted from two RECURRENCES. A lead or a quote is a price offered, not a
+   * debt. And an order on a sent invoice is owed THROUGH that invoice, so it
+   * is not here twice.
+   */
+  const uninvoiced = ((uninvoicedRows ?? []) as {
+    id: string; number: string; title: string | null; event_date: string | null; status: SpecialOrderStatus | null;
+    total: number; not_invoiced: number;
+  }[]).map((o) => ({
+    id: o.id,
+    number: o.number,
+    kind: "order",
+    status: o.status,
+    title: o.title,
+    event_date: o.event_date,
+    total: Number(o.total),
+    due: Number(o.not_invoiced),
   }));
 
-  // Their CREDIT (143): money applied to nothing.
-  const { data: creditData } = await supabase.rpc("customer_credit", { p_customer: id });
+  const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
+  const invoiceTerms = readInvoiceTerms(session.orgSettings as Record<string, unknown>);
+  const invoices = ((invoiceRows ?? []) as {
+    id: string; number: number; revision: number; issued_on: string; due_on: string | null;
+    sent_at: string | null; paid_at: string | null; voided_at: string | null;
+    total: number; applied: number; balance: number; posted: boolean;
+  }[]).map((r) => ({
+    id: r.id,
+    number: invoiceNumberText(r.number, invoiceTerms, r.revision),
+    issued_on: r.issued_on,
+    due_on: r.due_on,
+    status: invoiceStatus(r, today),
+    total: Number(r.total),
+    balance: Number(r.balance),
+    posted: r.posted,
+  }));
+  // The open ones, aged as of today — a posted invoice still asking for money.
+  const aging: Aging = { current: 0, days30: 0, days60: 0, days90: 0, over90: 0 };
+  for (const inv of invoices) {
+    if (!inv.posted || inv.balance <= 0.005) continue;
+    const bucket = agingBucket(daysBetween(inv.due_on ?? inv.issued_on, today));
+    aging[bucket] = Math.round((aging[bucket] + inv.balance) * 100) / 100;
+  }
+
   const creditRows = ((creditData ?? []) as CreditRow[]).map((c) => ({ ...c, credit: Number(c.credit) }));
 
   const trail = parseTrail(rawParams, CUSTOMERS_CRUMB);
@@ -198,9 +218,9 @@ export async function CustomerDetail({
         <p className="text-sm text-muted">
           {withMoney.length} order{withMoney.length === 1 ? "" : "s"}
           {spent > 0 ? ` · ${money(spent)} paid` : ""}
-          {owed > 0 ? (
-            <span className="text-accent"> · {money(owed)} outstanding</span>
-          ) : null}
+          {invoiced > 0 ? <span className="text-accent"> · {money(invoiced)} invoiced</span> : null}
+          {notInvoiced > 0 ? <span className="text-accent"> · {money(notInvoiced)} not invoiced</span> : null}
+          {credit > 0 ? ` · ${money(credit)} credit` : ""}
         </p>
       </div>
 
@@ -255,36 +275,27 @@ export async function CustomerDetail({
         )}
       </section>
 
-      {orderError ? (
-        <p className="text-sm text-accent">Could not load their orders: {orderError.message}</p>
-      ) : (
-        <>
-          {unpaid.length > 0 ? (
-            <OrderTable
-              heading="Outstanding"
-              count={unpaid.length}
-              rows={unpaid}
-              trailHref={`/customers/${id}`}
-              accent
-            />
-          ) : null}
-          <OrderTable
-            heading={unpaid.length ? "Everything else" : "Orders"}
-            count={rest.length}
-            rows={rest}
-            trailHref={`/customers/${id}`}
-          />
-        </>
-      )}
-
       {invoices.length > 0 ? (
         <section className="space-y-2">
           <SectionHeading count={invoices.length}>Invoices</SectionHeading>
+          {invoiced > 0 ? (
+            <dl className="flex max-w-[60rem] flex-wrap gap-x-8 gap-y-2 pb-1">
+              {AGING_BUCKETS.map((b) => (
+                <div key={b.key} className="space-y-0.5">
+                  <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{b.label}</dt>
+                  <dd className={`tabular-nums ${aging[b.key] ? (b.key === "current" ? "" : "text-accent") : "text-faint"}`}>
+                    {aging[b.key] ? money(aging[b.key]) : "—"}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
           <table className="w-full max-w-[60rem] border-collapse text-[14px]">
             <thead>
               <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
                 <th className="w-28 px-3 py-2 text-left">Invoice</th>
                 <th className="w-32 px-3 py-2 text-left">Issued</th>
+                <th className="w-32 px-3 py-2 text-left">Due date</th>
                 <th className="px-3 py-2 text-left">Status</th>
                 <th className="w-28 px-3 py-2 text-right">Total</th>
                 <th className="w-28 px-3 py-2 text-right">Due</th>
@@ -302,12 +313,13 @@ export async function CustomerDetail({
                     </Link>
                   </td>
                   <td className="px-3 py-2 tabular-nums text-muted">{usDate(inv.issued_on)}</td>
+                  <td className="px-3 py-2 tabular-nums text-muted">{inv.due_on ? usDate(inv.due_on) : "—"}</td>
                   <td className="px-3 py-2">
                     <InvoiceStatusChip status={inv.status} />
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{money(inv.total)}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-accent">
-                    {inv.status !== "void" && inv.balance > 0.005 ? money(inv.balance) : ""}
+                    {inv.posted && inv.balance > 0.005 ? money(inv.balance) : ""}
                   </td>
                 </tr>
               ))}
@@ -316,13 +328,31 @@ export async function CustomerDetail({
         </section>
       ) : null}
 
+      {uninvoiced.length > 0 ? (
+        <OrderTable heading="Not Invoiced" count={uninvoiced.length} rows={uninvoiced} trailHref={`/customers/${id}`} accent />
+      ) : null}
+
       <CustomerCredit rows={creditRows} canRefund={canRefundPayments(session.membership.role)} />
+
+      {orderError ? (
+        <p className="text-sm text-accent">Could not load their orders: {orderError.message}</p>
+      ) : (
+        <OrderTable
+          heading="Orders"
+          count={withMoney.length}
+          rows={withMoney.map((o) => ({
+            ...o,
+            total: o.totals.total,
+            due: countsAsOwed(o) && o.totals.balance > 0 ? o.totals.balance : 0,
+          }))}
+          trailHref={`/customers/${id}`}
+        />
+      )}
 
       <CustomerActions
         id={id}
         orgId={customer.org_id as string}
         name={customerLabel(customer)}
-        email={(customer.email as string) ?? null}
         orderCount={withMoney.length}
         today={today}
         defaultLocationId={session.activeLocation?.id ?? null}
@@ -344,8 +374,10 @@ function OrderTable({
   count: number;
   rows: {
     id: string; number: string; kind: string; status: SpecialOrderStatus | null;
-    title: string | null; event_date: string | null; ignore_balance: boolean;
-    totals: { total: number; balance: number };
+    title: string | null; event_date: string | null;
+    total: number;
+    /** What this table says is owed on the order; 0 for nothing. */
+    due: number;
   }[];
   trailHref: string;
   accent?: boolean;
@@ -383,9 +415,9 @@ function OrderTable({
                 <td className="px-3 py-2 text-muted">
                   {o.kind === "order" ? (o.status ? STATUS_LABEL[o.status] : "—") : KIND_LABEL[o.kind as never]}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">{money(o.totals.total)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{money(o.total)}</td>
                 <td className={`px-3 py-2 text-right tabular-nums ${accent ? "text-accent" : "text-faint"}`}>
-                  {countsAsOwed(o) && o.totals.balance > 0 ? money(o.totals.balance) : "—"}
+                  {o.due > 0 ? money(o.due) : "—"}
                 </td>
               </tr>
             ))}

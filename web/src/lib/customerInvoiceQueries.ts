@@ -15,10 +15,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   groupInvoiceLines,
   invoiceBalance,
+  invoiceNumberText,
   type CustomerInvoice,
   type CustomerInvoiceLine,
   type InvoiceGroup,
+  type InvoiceTerms,
 } from "./customerInvoices";
+import {
+  buildStatement,
+  type AccountEntry,
+  type AccountInvoice,
+  type StatementDocument,
+} from "./customerStatement";
 import {
   customerLabel,
   orderTotals,
@@ -211,5 +219,93 @@ export async function fetchInvoiceView(
     payments,
     frozen: Boolean(invoice.sent_at || invoice.voided_at || payments.length > 0),
     ...money,
+  };
+}
+
+/* ==========================================================================
+ * THE STATEMENT (144) — a customer's posted invoices and the money that
+ * reached their account, both SWEPT: PostgREST stops at 1,000 rows without a
+ * word, and a weekly customer has a row a week for as long as they buy.
+ * ========================================================================== */
+
+type Page = {
+  order: (column: string, opts?: { ascending?: boolean; nullsFirst?: boolean }) => Page;
+  range: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>;
+};
+
+/** Every row, a page at a time, in an order that is unique on `columns` —
+ *  or the pages overlap. `build` is a function: a query builder is single-use. */
+export async function sweepRows<T>(build: () => unknown, columns: string[]): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    let q = build() as Page;
+    for (const c of columns) q = q.order(c, { ascending: true, nullsFirst: false });
+    const { data, error } = await q.range(from, from + 999);
+    if (error) throw new Error(error.message);
+    out.push(...((data ?? []) as T[]));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+
+export async function fetchStatement(
+  supabase: SupabaseClient,
+  customerId: string,
+  from: string,
+  to: string,
+  terms: Pick<InvoiceTerms, "prefix">
+): Promise<StatementDocument> {
+  const [{ data: customer, error }, invoiceRows, entryRows] = await Promise.all([
+    supabase
+      .from("customers")
+      .select("first_name, last_name, company, phone, email")
+      .eq("id", customerId)
+      .maybeSingle(),
+    sweepRows<{
+      id: string;
+      number: number;
+      revision: number;
+      issued_on: string;
+      due_on: string | null;
+      sent_at: string | null;
+      voided_at: string | null;
+      total: number;
+      posted: boolean;
+    }>(
+      () =>
+        supabase
+          .from("customer_invoice_totals")
+          .select("id, number, revision, issued_on, due_on, sent_at, voided_at, total, posted")
+          .eq("customer_id", customerId),
+      ["id"]
+    ),
+    sweepRows<AccountEntry>(
+      () =>
+        supabase
+          .from("customer_account_entries")
+          .select("payment_id, paid_on, payment_type, customer_invoice_id, amount, created_at")
+          .eq("customer_id", customerId),
+      ["payment_id", "customer_invoice_id"]
+    ),
+  ]);
+  if (error) throw new Error(error.message);
+
+  // On the account, and a sent invoice since voided — at no charge, so the
+  // number the customer was sent is still accounted for.
+  const invoices: AccountInvoice[] = invoiceRows
+    .filter((r) => r.posted || (r.voided_at && r.sent_at))
+    .map((r) => ({
+      id: r.id,
+      label: invoiceNumberText(r.number, terms, r.revision),
+      issued_on: r.issued_on,
+      due_on: r.due_on,
+      total: Number(r.total),
+      void: !r.posted,
+    }));
+  const entries = entryRows.map((e) => ({ ...e, amount: Number(e.amount) }));
+
+  return {
+    customer: (customer ?? null) as StatementDocument["customer"],
+    statement: buildStatement({ invoices, entries, from, to }),
   };
 }

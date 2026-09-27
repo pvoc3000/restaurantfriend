@@ -541,8 +541,16 @@ export async function SpecialOrderDetail({
       const paid = (openPaymentRows.data ?? [])
         .filter((p) => p.customer_invoice_id === invoiceId)
         .reduce((a, p) => a + Number(p.amount), 0);
-      const number = liveInvoices.find((l) => l.invoice.id === invoiceId)!.invoice.number;
-      return { id: invoiceId, number, label: inv.label, what: inv.what, due: Math.round((billed - paid) * 100) / 100 };
+      const live = liveInvoices.find((l) => l.invoice.id === invoiceId)!.invoice;
+      return {
+        id: invoiceId,
+        number: live.number,
+        label: inv.label,
+        what: inv.what,
+        due: Math.round((billed - paid) * 100) / 100,
+        // A bill the customer has (144's "posted"): sent, or holding money.
+        posted: !!live.sent_at || (openPaymentRows.data ?? []).some((p) => p.customer_invoice_id === invoiceId),
+      };
     })
     .filter((i) => i.due > 0.005);
   // NEW INVOICE and NEW PAYMENT (139) — the Payments tab's buttons and the

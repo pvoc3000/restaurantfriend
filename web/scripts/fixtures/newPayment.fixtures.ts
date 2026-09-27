@@ -8,13 +8,15 @@
 // Checked by breaking: counting a cancelled order's total in `unbilledAmount`
 // turns "a cancelled order has nothing to bill" red; dropping the nothing-left
 // test turns "billed in full" red; letting a payment exceed its invoice's due
-// turns "no more than it asks" red.
+// turns "no more than it asks" red; `offersOrderChoice` counting a draft as
+// sent turns "only a draft" red.
 
-import { test, eq } from "./harness";
+import { test, eq, ok, no } from "./harness";
 import { depositAmount, readSettings, validDepositRate } from "../../src/lib/specialOrders";
 import {
   amountFromPercent,
   defaultApplyTo,
+  offersOrderChoice,
   newInvoiceProblem,
   newPaymentProblem,
   parseMoney,
@@ -101,8 +103,8 @@ test("newInvoiceProblem: each option's refusal, in words", () => {
      "Link a customer to this order before invoicing it.");
 });
 
-const deposit = { id: "a", number: 1010, label: "Invoice 1010", what: "Deposit", due: 3.8 };
-const balance = { id: "b", number: 1011, label: "Invoice 1011", what: "Balance due", due: 34.17 };
+const deposit = { id: "a", number: 1010, label: "Invoice 1010", what: "Deposit", due: 3.8, posted: true };
+const balance = { id: "b", number: 1011, label: "Invoice 1011", what: "Balance due", due: 34.17, posted: true };
 
 test("newPaymentProblem: no more than the invoice asks; the order has no ceiling", () => {
   eq(newPaymentProblem({ amountText: "3.80", applyTo: deposit }), null);
@@ -110,6 +112,13 @@ test("newPaymentProblem: no more than the invoice asks; the order has no ceiling
      "That is more than the $3.80 due on Invoice 1010.", "no more than it asks");
   eq(newPaymentProblem({ amountText: "500", applyTo: null }), null);
   eq(newPaymentProblem({ amountText: "", applyTo: null }), "Enter an amount.");
+});
+
+test("offersOrderChoice: not while a sent invoice is open — the money would go onto it anyway", () => {
+  ok(offersOrderChoice([]), "nothing open: the order itself");
+  no(offersOrderChoice([deposit]), "a sent deposit invoice");
+  ok(offersOrderChoice([{ ...balance, posted: false }]), "only a draft: cash is held and applies when it is sent");
+  no(offersOrderChoice([{ ...balance, posted: false }, deposit]), "a draft and a sent one");
 });
 
 test("defaultApplyTo: the oldest open invoice — the deposit before the balance", () => {

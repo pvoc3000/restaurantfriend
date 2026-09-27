@@ -34,15 +34,18 @@ export type CustomerRow = {
   phone: string | null;
   email: string | null;
   city: string | null;
-  /** Derived on the server from this customer's orders — never a column. */
+  /** Derived on the server — never a column. */
   orderCount: number;
   lastOrder: string | null;
-  outstanding: number;
+  /** What they owe, in 144's three parts (`customer_balances`). */
+  invoiced: number;
+  notInvoiced: number;
+  credit: number;
 };
 
 const PATH = "/customers";
 
-const SORT_KEYS = ["name", "company", "phone", "email", "city", "orders", "last", "owed"] as const;
+const SORT_KEYS = ["name", "company", "phone", "email", "city", "orders", "last", "invoiced", "uninvoiced", "credit"] as const;
 
 /**
  * The customer book.
@@ -80,7 +83,7 @@ export function CustomersList({
           { value: "owing", label: "Owes Money" },
           { value: "clear", label: "Settled" },
         ],
-        matches: (r, v) => (v === "owing" ? r.outstanding > 0 : r.outstanding <= 0),
+        matches: (r, v) => (v === "owing" ? r.invoiced + r.notInvoiced > 0 : r.invoiced + r.notInvoiced <= 0),
       },
       {
         key: "company",
@@ -200,15 +203,33 @@ export function CustomersList({
       render: (r) => <span className="tabular-nums text-muted">{r.lastOrder ?? "—"}</span>,
     },
     {
-      key: "owed",
-      label: "Owed",
+      key: "invoiced",
+      label: "Invoiced",
       width: 110,
       align: "right",
-      sortValue: (r) => r.outstanding,
+      sortValue: (r) => r.invoiced,
+      sortTiebreaks: [(r) => r.last_name ?? ""],
+      render: (r) => owedCell(r.invoiced),
+    },
+    {
+      key: "uninvoiced",
+      label: "Not Invoiced",
+      width: 110,
+      align: "right",
+      sortValue: (r) => r.notInvoiced,
+      sortTiebreaks: [(r) => r.last_name ?? ""],
+      render: (r) => owedCell(r.notInvoiced),
+    },
+    {
+      key: "credit",
+      label: "Credit",
+      width: 100,
+      align: "right",
+      sortValue: (r) => r.credit,
       sortTiebreaks: [(r) => r.last_name ?? ""],
       render: (r) =>
-        r.outstanding > 0 ? (
-          <span className="tabular-nums text-accent">{money(r.outstanding)}</span>
+        r.credit > 0 ? (
+          <span className="tabular-nums">{money(r.credit)}</span>
         ) : (
           <span className="text-faint">—</span>
         ),
@@ -273,5 +294,13 @@ export function CustomersList({
       empty={<p className="text-sm text-muted">No customers match these filters.</p>}
     />
     </div>
+  );
+}
+
+function owedCell(value: number) {
+  return value > 0 ? (
+    <span className="tabular-nums text-accent">{money(value)}</span>
+  ) : (
+    <span className="text-faint">—</span>
   );
 }

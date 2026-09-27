@@ -1,5 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import type { RawSearchParams } from "@/lib/filterMenus";
@@ -7,16 +5,18 @@ import { parseFilterSearch } from "@/lib/filterMenus";
 import { canEditPage } from "@/lib/pageAccess";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { customerLabel } from "@/lib/specialOrders";
-import { invoiceBalance, invoiceStatus, readInvoiceTerms, invoiceNumberText } from "@/lib/customerInvoices";
+import { invoiceStatus, readInvoiceTerms, invoiceNumberText } from "@/lib/customerInvoices";
+import { sweepRows } from "@/lib/customerInvoiceQueries";
 import {
   CustomerInvoicesList,
   type CustomerInvoiceRow,
 } from "@/components/customerInvoices/CustomerInvoicesList";
 
 /**
- * Every customer invoice (migration 124), newest first. Small today — one a
- * week for Knotted — but the lines and the payments are PAGED anyway: 1,000
- * rows is PostgREST's silent cap, and a year of weekly invoices is 364 lines.
+ * Every customer invoice (migration 124), newest first, with its money from
+ * `customer_invoice_totals` (144) — one row an invoice, where this page used
+ * to sweep every line and every payment and add them up. PAGED anyway: 1,000
+ * rows is PostgREST's silent cap, and a weekly customer is 52 a year.
  */
 export default async function CustomerInvoicesPage({
   searchParams,
@@ -30,61 +30,71 @@ export default async function CustomerInvoicesPage({
   const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
   const terms = readInvoiceTerms(session.orgSettings as Record<string, unknown>);
 
-  const { data: invoices, error } = await supabase
-    .from("customer_invoices")
-    .select(
-      `id, number, revision, customer_id, issued_on, due_on, sent_at, paid_at, voided_at, processor,
-       customers ( id, first_name, last_name, company )`
-    )
-    .eq("org_id", orgId)
-    .order("number", { ascending: false });
-
-  if (error) {
+  type Row = {
+    id: string;
+    number: number;
+    revision: number;
+    customer_id: string | null;
+    location_id: string | null;
+    issued_on: string;
+    due_on: string | null;
+    sent_at: string | null;
+    paid_at: string | null;
+    voided_at: string | null;
+    processor: string | null;
+    total: number;
+    applied: number;
+    balance: number;
+    order_count: number;
+    customers: Parameters<typeof customerLabel>[0];
+  };
+  let invoices: Row[];
+  try {
+    invoices = await sweepRows<Row>(
+      () =>
+        supabase
+          .from("customer_invoice_totals")
+          .select(
+            `id, number, revision, customer_id, location_id, issued_on, due_on, sent_at, paid_at, voided_at, processor,
+             total, applied, balance, order_count,
+             customers ( id, first_name, last_name, company )`
+          )
+          .eq("org_id", orgId),
+      ["id"]
+    );
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
     return (
       <p className="text-sm text-accent">
-        Could not load invoices: {error.message}
-        {error.message.includes("customer_invoices") ? (
+        Could not load invoices: {message}
+        {message.includes("customer_invoice_totals") ? (
           <span className="mt-2 block text-muted">
-            If this names a missing relation, migration 124 has not been applied yet.
+            If this names a missing relation, migration 144 has not been applied yet.
           </span>
         ) : null}
       </p>
     );
   }
+  const shopCode = new Map(session.locations.map((l) => [l.id, l.code]));
 
-  const [lines, payments] = await Promise.all([
-    paged<{ invoice_id: string; amount: number; special_order_id: string | null }>(supabase, "customer_invoice_lines", "invoice_id, amount, special_order_id", orgId),
-    paged<{ customer_invoice_id: string | null; amount: number }>(
-      supabase,
-      "payment_applications",
-      "customer_invoice_id, amount",
-      orgId,
-      true
-    ),
-  ]);
-
-  const rows: CustomerInvoiceRow[] = (invoices ?? []).map((inv) => {
-    const mine = lines.filter((l) => l.invoice_id === inv.id);
-    const money = invoiceBalance(
-      mine,
-      payments.filter((p) => p.customer_invoice_id === inv.id)
-    );
-    const customer = (inv as unknown as { customers: Parameters<typeof customerLabel>[0] }).customers;
-    return {
-      id: inv.id as string,
-      number: inv.number as number,
-      numberText: invoiceNumberText(inv.number as number, terms, (inv as { revision?: number }).revision),
-      customer_id: inv.customer_id as string | null,
-      customer: customerLabel(customer) || "—",
-      issued_on: inv.issued_on as string,
-      due_on: inv.due_on as string | null,
-      status: invoiceStatus(inv as never, today),
-      processor: ((inv as { processor?: string }).processor === "quickbooks" ? "quickbooks" : "square"),
-      // Each order once — an order is several lines since 141.
-      orders: new Set(mine.map((l) => l.special_order_id).filter(Boolean)).size,
-      ...money,
-    };
-  });
+  const rows: CustomerInvoiceRow[] = invoices
+    .sort((a, b) => b.number - a.number || b.revision - a.revision)
+    .map((inv) => ({
+      id: inv.id,
+      number: inv.number,
+      numberText: invoiceNumberText(inv.number, terms, inv.revision),
+      customer_id: inv.customer_id,
+      customer: customerLabel(inv.customers) || "—",
+      shop: (inv.location_id && shopCode.get(inv.location_id)) || null,
+      issued_on: inv.issued_on,
+      due_on: inv.due_on,
+      status: invoiceStatus(inv, today),
+      processor: inv.processor === "quickbooks" ? "quickbooks" : "square",
+      orders: inv.order_count,
+      total: Number(inv.total),
+      paid: Number(inv.applied),
+      balance: Number(inv.balance),
+    }));
 
   return (
     <CustomerInvoicesList
@@ -103,24 +113,4 @@ export default async function CustomerInvoicesPage({
       }
     />
   );
-}
-
-async function paged<T>(
-  supabase: SupabaseClient,
-  table: string,
-  columns: string,
-  orgId: string,
-  taggedOnly = false
-): Promise<T[]> {
-  const out: T[] = [];
-  // `.order()` before `.range()`, or the pages overlap.
-  for (let from = 0; ; from += 1000) {
-    let q = supabase.from(table).select(columns).eq("org_id", orgId);
-    if (taggedOnly) q = q.not("customer_invoice_id", "is", null);
-    const { data, error } = await q.order("id").range(from, from + 999);
-    if (error) throw new Error(error.message);
-    out.push(...((data ?? []) as unknown as T[]));
-    if (!data || data.length < 1000) break;
-  }
-  return out;
 }

@@ -70,6 +70,7 @@ import "./inquiryNotice.fixtures";
 import "./payLink.fixtures";
 import "./customerInvoices.fixtures";
 import "./customerPayments.fixtures";
+import "./customerStatement.fixtures";
 import "./newPayment.fixtures";
 import "./squareCatalog.fixtures";
 import "./squareOrder.fixtures";

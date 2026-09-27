@@ -43,6 +43,8 @@ export type CustomerInvoiceRow = {
   numberText: string;
   customer_id: string | null;
   customer: string;
+  /** The shop that collects (141's header). */
+  shop: string | null;
   issued_on: string;
   due_on: string | null;
   status: InvoiceStatus;
@@ -55,7 +57,7 @@ export type CustomerInvoiceRow = {
 
 const PATH = "/customer-invoices";
 
-const SORT_KEYS = ["number", "customer", "issued", "due", "status", "processor", "orders", "total", "balance"] as const;
+const SORT_KEYS = ["number", "customer", "shop", "issued", "due", "status", "processor", "orders", "total", "balance"] as const;
 
 /**
  * Every customer invoice (migration 124). NEW INVOICE… makes one for a
@@ -86,8 +88,18 @@ export function CustomerInvoicesList({
         })),
         matches: (r, v) => r.status === v,
       },
+      {
+        // The desk page's Invoices card counts its own shop's, and links here
+        // with this set so the two agree.
+        key: "shop",
+        label: "Shop",
+        options: [...new Set(rows.map((r) => r.shop).filter((c): c is string => !!c))]
+          .sort()
+          .map((c) => ({ value: c, label: c })),
+        matches: (r, v) => r.shop === v,
+      },
     ],
-    []
+    [rows]
   );
 
   const [search, setSearch] = useState(() => {
@@ -146,6 +158,14 @@ export function CustomerInvoicesList({
       sortValue: (r) => r.customer.toLowerCase(),
       sortTiebreaks: [(r) => String(r.number).padStart(9, "0")],
       render: (r) => <span>{r.customer}</span>,
+    },
+    {
+      key: "shop",
+      label: "Shop",
+      width: 80,
+      sortValue: (r) => r.shop ?? "",
+      sortTiebreaks: [(r) => String(r.number).padStart(9, "0")],
+      render: (r) => <span className="text-muted">{r.shop ?? "—"}</span>,
     },
     {
       key: "issued",

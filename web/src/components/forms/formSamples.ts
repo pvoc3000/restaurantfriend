@@ -21,7 +21,8 @@ import type { TagPrint } from "@/components/tags/pdf/TagSheetPdf";
 import type { OrgDocData, PoDocData } from "@/lib/poProcessing";
 import type { PacketData, PacketSchedule } from "@/lib/productionPacket";
 import type { ScheduleLine } from "@/lib/productionSchedule";
-import type { DocumentLine, OrderDocData, StatementData } from "@/lib/specialOrderDocs";
+import type { DocumentLine, OrderDocData } from "@/lib/specialOrderDocs";
+import { buildStatement, type StatementDocument } from "@/lib/customerStatement";
 import { orderTotals, type MoneyOrder } from "@/lib/specialOrders";
 
 /* -------------------------------------------------------------------------- */
@@ -138,7 +139,9 @@ export const sampleApproval = {
   reference: "Q-7F3K2",
 };
 
-export const sampleStatement: StatementData = {
+/** A weekly wholesale account over a month: last month's bill carried in,
+ *  three weeks billed, two paid (one with a little over), one overdue. */
+export const sampleStatement: StatementDocument = {
   customer: {
     first_name: "Ji-Yeon",
     last_name: "Kim",
@@ -146,35 +149,34 @@ export const sampleStatement: StatementData = {
     phone: "(818) 555-0133",
     email: "orders@samplecafe.example",
   },
-  from: "2026-09-14",
-  to: "2026-09-20",
-  orders: [14, 15, 16, 17, 18, 19, 20].map((d, i) => {
-    const total = 96 + (i % 3) * 12 + 25;
-    return {
-      id: `stmt-${d}`,
-      number: String(10090 + i),
-      event_date: `2026-09-${d}`,
-      title: "Weekly wholesale",
-      totals: {
-        subtotal: total - 25,
-        taxableSubtotal: 0,
-        discount: 0,
-        deliveryCharge: 25,
-        rushFee: 0,
-        tax: 0,
-        total,
-        paid: i < 2 ? total : 0,
-        balance: i < 2 ? 0 : total,
-      },
-    };
+  statement: buildStatement({
+    invoices: [
+      { id: "i1", label: "1009", issued_on: "2026-08-23", due_on: "2026-08-27", total: 842, void: false },
+      { id: "i2", label: "1011", issued_on: "2026-08-30", due_on: "2026-09-03", total: 868, void: true },
+      { id: "i3", label: "1011-2", issued_on: "2026-08-31", due_on: "2026-09-04", total: 893, void: false },
+      { id: "i4", label: "1013", issued_on: "2026-09-06", due_on: "2026-09-10", total: 918, void: false },
+      { id: "i5", label: "1016", issued_on: "2026-09-13", due_on: "2026-09-17", total: 905.5, void: false },
+    ],
+    entries: [
+      { payment_id: "p1", paid_on: "2026-09-02", payment_type: "Square Online", customer_invoice_id: "i1", amount: 842, created_at: "2026-09-02T10:00:00Z" },
+      { payment_id: "p2", paid_on: "2026-09-09", payment_type: "Check", customer_invoice_id: "i3", amount: 893, created_at: "2026-09-09T10:00:00Z" },
+      { payment_id: "p2", paid_on: "2026-09-09", payment_type: "Check", customer_invoice_id: null, amount: 7, created_at: "2026-09-09T10:00:00Z" },
+    ],
+    from: "2026-08-27",
+    to: "2026-09-27",
   }),
-  total: 0,
-  paid: 0,
-  balance: 0,
 };
-sampleStatement.total = sampleStatement.orders.reduce((a, o) => a + o.totals.total, 0);
-sampleStatement.paid = sampleStatement.orders.reduce((a, o) => a + o.totals.paid, 0);
-sampleStatement.balance = sampleStatement.total - sampleStatement.paid;
+
+/** The wholesale week the multi-order invoice bills: seven days, delivery on each. */
+const sampleWeek = [14, 15, 16, 17, 18, 19, 20].map((d, i) => {
+  const total = 96 + (i % 3) * 12 + 25;
+  return {
+    number: String(10090 + i),
+    event_date: `2026-09-${d}`,
+    totals: { subtotal: total - 25, deliveryCharge: 25, total },
+  };
+});
+const sampleWeekTotal = sampleWeek.reduce((a, o) => a + o.totals.total, 0);
 
 /** A multi-order invoice: one row per order, the wholesale week. */
 export const sampleCustomerInvoice: CustomerInvoiceDoc = {
@@ -183,22 +185,22 @@ export const sampleCustomerInvoice: CustomerInvoiceDoc = {
   due_on: "2026-09-24",
   notes: "Due Thursday. Pay online with the link in the email, or by ACH.",
   customer: { name: "Sample Cafe", phone: "(818) 555-0133", email: "orders@samplecafe.example" },
-  lines: sampleStatement.orders.map((o) => ({
-    description: `Order #${o.number} · Sample Cafe · ${o.event_date!.slice(5).replace("-", "/")}/2026`,
+  lines: sampleWeek.map((o) => ({
+    description: `Order #${o.number} · Sample Cafe · ${o.event_date.slice(5).replace("-", "/")}/2026`,
     amount: o.totals.total,
   })),
   totals: {
-    subtotal: sampleStatement.orders.reduce((a, o) => a + o.totals.subtotal, 0),
+    subtotal: sampleWeek.reduce((a, o) => a + o.totals.subtotal, 0),
     discount: 0,
-    delivery: sampleStatement.orders.reduce((a, o) => a + o.totals.deliveryCharge, 0),
+    delivery: sampleWeek.reduce((a, o) => a + o.totals.deliveryCharge, 0),
     rush: 0,
     tax: 0,
     prior: 0,
     payments: 0,
   },
-  total: sampleStatement.total,
+  total: sampleWeekTotal,
   paid: 0,
-  balance: sampleStatement.total,
+  balance: sampleWeekTotal,
 };
 
 /** A one-order invoice, which prints itemized. */

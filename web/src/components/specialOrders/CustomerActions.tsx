@@ -27,7 +27,6 @@ export function CustomerActions({
   id,
   orgId,
   name,
-  email,
   orderCount,
   today,
   defaultLocationId,
@@ -39,7 +38,6 @@ export function CustomerActions({
   name: string;
   /** Named in the statement dialog, so whoever renders one knows where it is
    *  meant to go without leaving the record to find out. */
-  email: string | null;
   orderCount: number;
   /** Today in the ORG's timezone — what "last week" is measured from on the
    *  statement, and a new order's `date_initiated`. */
@@ -135,15 +133,10 @@ export function CustomerActions({
         <button type="button" className={BUTTON_CLASS} onClick={newOrder} disabled={pending}>
           New order for them
         </button>
-        {/* Decision 21. It sits with the other commands rather than beside the
-            order table it summarises, because it produces a DOCUMENT — the same
-            class of act as New order, not a view of the list. */}
-        <CustomerStatement
-          customerId={id}
-          customerEmail={email}
-          today={today}
-          canWrite={canWrite}
-        />
+        {/* It sits with the other commands rather than beside the tables it
+            summarises, because it produces a DOCUMENT — the same class of act
+            as New order, not a view of the list. */}
+        <CustomerStatement customerId={id} today={today} canWrite={canWrite} />
         <button type="button" className={DANGER_BUTTON_CLASS} onClick={remove} disabled={pending}>
           Delete
         </button>

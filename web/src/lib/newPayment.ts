@@ -24,8 +24,9 @@ export const NEW_INVOICE_LABEL: Record<NewInvoiceChoice, string> = {
 
 /** An open invoice a payment can be applied to: not void, not paid. `due` is
  *  the WHOLE invoice's — a weekly invoice's payment is split across its
- *  orders by the database. */
-export type OpenInvoice = { id: string; number: number; label: string; what: string; due: number };
+ *  orders by the database. `posted`: sent, or already holding money — a bill
+ *  the customer has (144). */
+export type OpenInvoice = { id: string; number: number; label: string; what: string; due: number; posted: boolean };
 
 const cents = (v: number) => Math.round(v * 100) / 100;
 
@@ -106,6 +107,17 @@ export function newPaymentProblem(args: { amountText: string; applyTo: OpenInvoi
     return `That is more than the ${money(args.applyTo.due)} due on ${args.applyTo.label}.`;
   }
   return null;
+}
+
+/**
+ * Whether New Payment offers "The order — no invoice". Not while a bill the
+ * customer has is open: since 144 money recorded on the order goes onto that
+ * bill anyway (`record_order_payment`), so the choice would say one thing and
+ * do another. A DRAFT does not count — money on an order with only a draft is
+ * held, and applies when the draft is sent.
+ */
+export function offersOrderChoice(open: OpenInvoice[]): boolean {
+  return !open.some((i) => i.posted);
 }
 
 /** Where a new payment goes unless somebody says otherwise: the OLDEST open

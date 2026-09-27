@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import type { RawSearchParams } from "@/lib/filterMenus";
 import { parseFilterSearch } from "@/lib/filterMenus";
-import { countsAsOwed, orderTotals } from "@/lib/specialOrders";
 import { CustomersList, type CustomerRow } from "@/components/specialOrders/CustomersList";
 import { canEditPage } from "@/lib/pageAccess";
 
@@ -11,15 +10,16 @@ import { canEditPage } from "@/lib/pageAccess";
  * `InactiveLocationGate` for the same reason `/employees` is: a customer
  * belongs to the org, not to a shop.
  *
- * ORDER COUNT, LAST ORDER AND THE OUTSTANDING BALANCE ARE DERIVED HERE.
- * FileMaker kept all three as calc fields on the customer; a stored count goes
- * wrong the first time an order is deleted, and this list is where anybody
- * would notice last.
+ * ORDER COUNT, LAST ORDER AND WHAT THEY OWE ARE DERIVED HERE. FileMaker kept
+ * them as calc fields on the customer; a stored count goes wrong the first
+ * time an order is deleted, and this list is where anybody would notice last.
  *
- * That is four paginated sweeps over the whole book. It is the honest cost of
- * having no stored total, and it is bounded: 5,874 customers, 8,330 orders,
- * 47,827 lines. Every sweep `.order()`s before `.range()`, or the pages
- * overlap and a customer silently loses orders.
+ * What they owe is `customer_balances` (144) — invoiced, not invoiced and
+ * credit, worked out in the database for the few dozen customers who have
+ * any. It replaced sweeping all 47,827 order lines and every payment to
+ * re-derive each order's balance here. The customers and their orders are
+ * still swept, for the count and the last order; every sweep `.order()`s
+ * before `.range()`, or the pages overlap and a customer silently loses orders.
  */
 export default async function CustomersPage({
   searchParams,
@@ -32,29 +32,20 @@ export default async function CustomersPage({
   const supabase = await createClient();
   const orgId = session.membership.org_id;
 
-  // All four sweeps at once, and every sweep's pages at once too. Run one page
-  // after another this was ~70 round trips in a row — measured 10.4s, 6.4s of
-  // it the 48 pages of lines alone.
-  const [customerRes, orderRes, lineRes, paymentRes] = await Promise.all([
+  // Every sweep at once, and every sweep's pages at once too. Run one page
+  // after another this was ~70 round trips in a row (measured 10.4s).
+  const [customerRes, orderRes, balanceRes] = await Promise.all([
     sweepAll<Record<string, unknown>>(() =>
       supabase.from("customers").select("id, first_name, last_name, company, phone, email, address", { count: "exact" }).eq("org_id", orgId)
     ),
-    sweepAll<Record<string, unknown>>(() =>
+    sweepAll<{ id: string; customer_id: string; event_date: string | null; status: string | null; kind: string }>(() =>
       supabase
         .from("special_orders")
-        .select(
-          "id, customer_id, event_date, status, kind, ignore_balance, tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate",
-          { count: "exact" }
-        )
+        .select("id, customer_id, event_date, status, kind", { count: "exact" })
         .eq("org_id", orgId)
         .not("customer_id", "is", null)
     ),
-    sweepAll<{ order_id: string; qty: number | null; unit_price: number | null; taxable: boolean }>(() =>
-      supabase.from("special_order_items").select("order_id, qty, unit_price, taxable", { count: "exact" }).eq("org_id", orgId)
-    ),
-    sweepAll<{ order_id: string; amount: number | null }>(() =>
-      supabase.from("order_payments").select("order_id, amount", { count: "exact" }).eq("org_id", orgId)
-    ),
+    sweepBalances(supabase, orgId),
   ]);
 
   if (customerRes.error) {
@@ -69,51 +60,26 @@ export default async function CustomersPage({
       </p>
     );
   }
-  // A short sweep of lines or payments would quietly UNDER- or OVER-state what
-  // somebody owes, so any failure is a refusal rather than a smaller number.
-  const failed = orderRes.error ?? lineRes.error ?? paymentRes.error;
+  // A short read would quietly UNDER-state what somebody owes, so any failure
+  // is a refusal rather than a smaller number.
+  const failed = orderRes.error ?? balanceRes.error;
   if (failed) {
     return <p className="text-sm text-accent">Could not load orders: {failed}</p>;
   }
   const customers = customerRes.rows;
-  const orders = orderRes.rows;
 
-  const lines = new Map<string, { qty: number | null; unit_price: number | null; taxable: boolean }[]>();
-  for (const l of lineRes.rows) {
-    const list = lines.get(l.order_id) ?? [];
-    list.push({ qty: l.qty, unit_price: l.unit_price, taxable: l.taxable });
-    lines.set(l.order_id, list);
-  }
-  const payments = new Map<string, { amount: number | null }[]>();
-  for (const p of paymentRes.rows) {
-    const list = payments.get(p.order_id) ?? [];
-    list.push({ amount: p.amount });
-    payments.set(p.order_id, list);
-  }
-
-  const stats = new Map<string, { count: number; last: string | null; owed: number }>();
-  for (const o of orders) {
-    const cid = o.customer_id as string;
-    const s = stats.get(cid) ?? { count: 0, last: null, owed: 0 };
+  const stats = new Map<string, { count: number; last: string | null }>();
+  for (const o of orderRes.rows) {
+    const s = stats.get(o.customer_id) ?? { count: 0, last: null };
     // A cancelled order is not an order they placed with us, and a template is
     // not an order at all — neither counts toward the relationship.
     if (o.status !== "cancelled" && o.kind === "order") {
       s.count += 1;
-      const d = o.event_date as string | null;
-      if (d && (!s.last || d > s.last)) s.last = d;
-      // Only a BILLED order is money owed — a lead or a quote is a price we
-      // offered (`countsAsOwed`, shared with the customer record).
-      if (countsAsOwed(o as never)) {
-        const totals = orderTotals(
-          o as never,
-          lines.get(o.id as string) ?? [],
-          payments.get(o.id as string) ?? []
-        );
-        if (totals.balance > 0) s.owed += totals.balance;
-      }
+      if (o.event_date && (!s.last || o.event_date > s.last)) s.last = o.event_date;
     }
-    stats.set(cid, s);
+    stats.set(o.customer_id, s);
   }
+  const owes = new Map(balanceRes.rows.map((b) => [b.customer_id, b]));
 
   const rows: CustomerRow[] = customers.map((c) => {
     const s = stats.get(c.id as string);
@@ -128,7 +94,9 @@ export default async function CustomersPage({
       city: (address.city as string | null) ?? null,
       orderCount: s?.count ?? 0,
       lastOrder: s?.last ?? null,
-      outstanding: Math.round((s?.owed ?? 0) * 100) / 100,
+      invoiced: Number(owes.get(c.id as string)?.invoiced ?? 0),
+      notInvoiced: Number(owes.get(c.id as string)?.not_invoiced ?? 0),
+      credit: Number(owes.get(c.id as string)?.credit ?? 0),
     };
   });
 
@@ -179,5 +147,26 @@ async function sweepAll<T>(
   const bad = rest.find((r) => r.error);
   if (bad?.error) return { rows: [], error: bad.error.message };
   const rows = [first, ...rest].flatMap((r) => (r.data ?? []) as T[]);
+  return { rows, error: null };
+}
+
+type Balance = { customer_id: string; invoiced: number; not_invoiced: number; credit: number };
+
+/** `customer_balances` (144), paged like the tables: an RPC's rows stop at
+ *  1,000 as silently as a select's. It returns only customers who owe or
+ *  hold credit, a few dozen, in customer id order. */
+async function sweepBalances(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string
+): Promise<{ rows: Balance[]; error: string | null }> {
+  const rows: Balance[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .rpc("customer_balances", { p_org: orgId })
+      .range(from, from + 999);
+    if (error) return { rows: [], error: error.message };
+    rows.push(...((data ?? []) as Balance[]));
+    if (!data || data.length < 1000) break;
+  }
   return { rows, error: null };
 }
