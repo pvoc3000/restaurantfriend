@@ -19,3 +19,6 @@ dist/
 
 # throwaway audit scripts (must sit beside migration/node_modules to run)
 _tmp-*
+
+# the Supabase CLI's link state (project ref, versions) — local to this machine
+supabase/.temp/

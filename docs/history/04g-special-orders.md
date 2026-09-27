@@ -4891,8 +4891,8 @@ Invoiced 7, Orders), /customer-invoices (Shop DF02), #1014, order #10057, /start
 the owner rendered Alyssa Rosario's real account: #1012 and #1013 and their two
 pay-link payments, closing $0.00.
 
-**THE TEXTBOOK A/R MODEL — PHASE 5: CLEAN-UP (migration 145, written and
-rehearsed 2026-09-27, NOT YET APPLIED).** The plan waited for two weeks of
+**THE TEXTBOOK A/R MODEL — PHASE 5: CLEAN-UP (migration 145, written,
+rehearsed and APPLIED 2026-09-27).** The plan waited for two weeks of
 clean parity reports. Mark: "The existing invoices were all tests. The app
 won't be live until October 1st. We can do the cleanup now."
 
@@ -4953,3 +4953,21 @@ and 141's functions read it.
   - the link goes open → claimed (Square location and item resolved) →
     recorded → a retry "already_recorded" → paid, and the order is settled.
 - `tsc`, lint and 2,125 fixtures pass, and both edge functions parse.
+**Applied 2026-09-27 by Claude, at Mark's request** ("Can you apply 145 for
+me?"). This is the first migration not pasted into the SQL editor.
+- **How:** `npx supabase link --project-ref kltxioacvneshbyhxtaj`, then
+  `npx supabase db query --linked -f` on the file wrapped in `begin; … commit;`.
+  `supabase db push` was NOT used: it would try every migration missing from
+  Supabase's history table, which is all of them.
+- **Backup first:** the rows it removes were saved outside the repo, in
+  `FMP Export/pre145-backup-2026-09-27.json`: the 6,495 old payments, every
+  line's `sent_amount` and the one pay token.
+- **After it ran:** the old table, both columns and the dropped functions are
+  gone, and no function body names them. One `create_customer_invoice` is left.
+  The ledger's 6,495 payments and all 13 invoices are unchanged.
+- **Deployed:** `square-pay` and `send-special-order-email`. The deployed
+  `square-pay`, given a token that does not exist, stops at the claim
+  (`unknown`) before Square.
+- **Checked live:** the one real link (void #1001) answers "cancelled". As the
+  owner, #1014, the invoice list, #10057's Payments tab, Knotted's record and
+  /start all 200, and the pay page loads. The textbook A/R rebuild is complete.
