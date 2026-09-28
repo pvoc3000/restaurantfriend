@@ -11,8 +11,9 @@ import type { ReactNode } from "react";
  * which is the reason the guide drew it this way.
  *
  * **SINCE 2026-09-12 THEY ARE CLASSIC MAC TABS** (Mark): the selected tab is
- * WHITE, full height and open at the bottom (no bottom border), the rest GREY
- * (#c0c0c0) and 8px shorter, bottom-aligned, all with black type. What follows about a black selected cell is
+ * WHITE, full height and open at the bottom (no bottom border), the rest
+ * 8px shorter and bottom-aligned — BLACK with grey type and a white edge since
+ * 2026-09-28 (Mark), grey (#c0c0c0) with black type before that. What follows about a black selected cell is
  * history; the rule that there is no per-caller colour still holds.
  *
  * This RETIRES the underline-marker tab dialect (border-b-2 on the active
@@ -116,7 +117,12 @@ export function TabPicker<K extends string>({
         // sits above its neighbours (`z-10`) so its full-height border is the
         // one you see. Hover is the Mac look's 2px edge, drawn inset so
         // nothing grows — never a fill, since grey already means unselected.
-        const cls = `relative inline-flex ${on ? `${tall} z-10 border-b-0 bg-white` : `${short} bg-[#c0c0c0] hover:shadow-[inset_0_0_0_1px_#000]`} items-center gap-2 whitespace-nowrap border border-ink ${cell} font-semibold uppercase tracking-[0.06em] text-ink no-underline ${
+        //
+        // AN UNSELECTED TAB IS BLACK WITH GREY TYPE (#c0c0c0, 12.6:1) AND A WHITE EDGE since
+        // 2026-09-28 (Mark), and its hover edge is white to match. Its BOTTOM
+        // edge stays black: that is the stretch of the rule under the row
+        // that the tabs carry, and a white one would break it at every tab.
+        const cls = `relative inline-flex ${on ? `${tall} z-10 border-ink border-b-0 bg-white text-ink` : `${short} border-white border-b-ink bg-ink text-[#c0c0c0] hover:shadow-[inset_0_0_0_1px_#fff]`} items-center gap-2 whitespace-nowrap border ${cell} font-semibold uppercase tracking-[0.06em] no-underline ${
           // Equal shares, centred — a stretched bar whose cells were sized by
           // their labels would put "Never ordered" three times the width of
           // "2+ years" and read as a mistake.
