@@ -89,7 +89,7 @@ export const DANGER_BUTTON_CLASS =
 // which re-earns the 2px edge and keeps the red while held.
 //
 // SINCE 2026-09-28 (Mark) BOTH FILLED COMMANDS ARE BLACK: the primary with
-// white type, a black shadow and a blue hover edge, the destructive with red
+// white type, a black shadow and a white hover edge, the destructive with red
 // type and a red shadow (`--color-danger-ink`; the rest is in mac-look.css).
 // What follows is the pale-wash era that preceded it.
 //
