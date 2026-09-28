@@ -16,6 +16,7 @@ import {
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { SectionNav } from "@/components/ui/SectionNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { CustomerInvoiceCommandMenu } from "@/components/customerInvoices/CustomerInvoiceCommandMenu";
@@ -77,6 +78,23 @@ export async function CustomerInvoiceDetail({
   // Editable: nothing sent, nothing void, no money on it (141).
   const draft = !view.frozen;
   const trail = parseTrail(rawParams, INVOICES_CRUMB);
+  const TABS = [
+    { key: "detail", label: "Detail" },
+    { key: "charges", label: "Charges" },
+    { key: "payments", label: "Payments" },
+  ] as const;
+  type Tab = (typeof TABS)[number]["key"];
+  const tabHref = (t: Tab) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(rawParams)) {
+      const one = Array.isArray(v) ? v[0] : v;
+      if (k !== "tab" && k !== "send" && one) q.set(k, one);
+    }
+    if (t !== "detail") q.set("tab", t);
+    const qs = q.toString();
+    return `/customer-invoices/${id}${qs ? `?${qs}` : ""}`;
+  };
+  const activeTab: Tab = TABS.some((t) => t.key === rawParams.tab) ? (rawParams.tab as Tab) : "detail";
   const here = `/customer-invoices/${id}`;
   const orderGroups = groups.filter((g) => g.orderId);
   const shop = session.locations.find((l) => l.id === invoice.location_id)?.code ?? null;
@@ -161,6 +179,13 @@ export async function CustomerInvoiceDetail({
     : { data: [] as { signedUrl: string | null }[] };
   const urlOf = new Map(paths.map((path, i) => [path, signed?.[i]?.signedUrl ?? null]));
 
+  const tabItems = TABS.map((t) => ({
+    key: t.key,
+    label: t.label,
+    href: tabHref(t.key),
+    count: t.key === "charges" ? orderRows.length + chargeRows.length : t.key === "payments" ? payments.length : undefined,
+  }));
+
   return (
     <div className="space-y-12">
       <div className="flex items-start justify-between gap-4">
@@ -233,195 +258,223 @@ export async function CustomerInvoiceDetail({
         </p>
       ) : null}
 
-      <section className="space-y-3">
-        <SectionHeading>Details</SectionHeading>
-        <dl className="grid max-w-[56rem] gap-x-6 gap-y-4 sm:grid-cols-2">
-          <Row label="Customer">
-            {invoice.customer_id ? (
-              <Link
-                href={withFrom(`/customers/${invoice.customer_id}`, { href: here, label: `Invoice ${numberText}` })}
-                className={`${READ_ONLY_VALUE} hover:underline`}
-              >
-                {view.customerName}
-              </Link>
-            ) : (
-              <span className={READ_ONLY_VALUE}>—</span>
-            )}
-          </Row>
-          <Row label="Email">
-            <span className={READ_ONLY_VALUE}>{view.customer?.email ?? "—"}</span>
-          </Row>
-          <Row label="Shop">
-            {/* The shop whose Square location collects (141) — the orders
-                added must be made there. */}
-            <span className={READ_ONLY_VALUE}>{shop ?? "—"}</span>
-          </Row>
-          <Row label="Issued">
-            {canWrite && draft ? (
-              <InlineValue boxed={BOXED_FIELDS} table="customer_invoices" id={id} column="issued_on"
-                           kind="date" nullable={false} value={invoice.issued_on} ariaLabel="Issued" />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{usDate(invoice.issued_on)}</span>
-            )}
-          </Row>
-          <Row label="Due">
-            {canWrite && draft ? (
-              <InlineValue boxed={BOXED_FIELDS} table="customer_invoices" id={id} column="due_on"
-                           kind="date" value={invoice.due_on} ariaLabel="Due" />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{invoice.due_on ? usDate(invoice.due_on) : "—"}</span>
-            )}
-          </Row>
-          <Row label="Sent">
-            <span className={READ_ONLY_VALUE}>
-              {invoice.sent_at ? usDate(invoice.sent_at) : "—"}
-              {invoice.last_sent_at && invoice.last_sent_at !== invoice.sent_at
-                ? ` · again ${usDate(invoice.last_sent_at)}`
-                : ""}
-            </span>
-          </Row>
-          <Row label="Collect through">
-            {/* 131: chosen per invoice, locked once sent — the customer then
-                holds that processor's link — and once it is in QuickBooks,
-                which Send to QuickBooks can do before any send. Void it to
-                change its mind. */}
-            {canWrite && draft && !qbo?.id ? (
-              <ProcessorField key={processor} id={id} value={processor} />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{PROCESSOR_LABEL[processor]}</span>
-            )}
-          </Row>
-          <Row label={invoice.voided_at ? "Voided" : "Paid"}>
-            <span className={READ_ONLY_VALUE}>
-              {invoice.voided_at ? usDate(invoice.voided_at) : invoice.paid_at ? usDate(invoice.paid_at) : "—"}
-            </span>
-          </Row>
-          {processor === "quickbooks" ? (
-            <Row label="In QuickBooks">
-              <span className={READ_ONLY_VALUE}>
-                {qbo?.id ? (
-                  <>
-                    <a href={`https://app.qbo.intuit.com/app/invoice?txnId=${encodeURIComponent(qbo.id)}`}
-                       target="_blank" rel="noreferrer" className="underline underline-offset-2">
-                      Invoice {qbo.doc_number ?? qbo.id}
-                    </a>
-                    {qbo.invoice_link ? (
-                      <>
-                        {" · "}
-                        <a href={qbo.invoice_link} target="_blank" rel="noreferrer"
-                           className="underline underline-offset-2">
-                          Pay page
-                        </a>
-                      </>
-                    ) : null}
-                  </>
+      {/* THREE TABS (Mark, 2026-09-27: "Detail", "Charges", "Payments") —
+          the order record's section nav, the tab in the URL. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+        <div
+          className="hidden lg:sticky lg:block lg:w-40 lg:shrink-0"
+          style={{ top: "calc(var(--rf-header-h) + 1.5rem)" }}
+        >
+          <SectionNav ariaLabel="Which part of this invoice" value={activeTab} items={tabItems} />
+        </div>
+        <div className="lg:hidden">
+          <SectionNav orientation="horizontal" ariaLabel="Which part of this invoice" value={activeTab} items={tabItems} />
+        </div>
+
+        <div className="min-w-0 flex-1 space-y-12">
+          {activeTab === "detail" && (
+            <>
+              <section className="space-y-3">
+                <SectionHeading>Details</SectionHeading>
+                <dl className="grid max-w-[56rem] gap-x-6 gap-y-4 sm:grid-cols-2">
+                  <Row label="Customer">
+                    {invoice.customer_id ? (
+                      <Link
+                        href={withFrom(`/customers/${invoice.customer_id}`, { href: here, label: `Invoice ${numberText}` })}
+                        className={`${READ_ONLY_VALUE} hover:underline`}
+                      >
+                        {view.customerName}
+                      </Link>
+                    ) : (
+                      <span className={READ_ONLY_VALUE}>—</span>
+                    )}
+                  </Row>
+                  <Row label="Email">
+                    <span className={READ_ONLY_VALUE}>{view.customer?.email ?? "—"}</span>
+                  </Row>
+                  <Row label="Shop">
+                    {/* The shop whose Square location collects (141) — the orders
+                        added must be made there. */}
+                    <span className={READ_ONLY_VALUE}>{shop ?? "—"}</span>
+                  </Row>
+                  <Row label="Issued">
+                    {canWrite && draft ? (
+                      <InlineValue boxed={BOXED_FIELDS} table="customer_invoices" id={id} column="issued_on"
+                                   kind="date" nullable={false} value={invoice.issued_on} ariaLabel="Issued" />
+                    ) : (
+                      <span className={READ_ONLY_VALUE}>{usDate(invoice.issued_on)}</span>
+                    )}
+                  </Row>
+                  <Row label="Due">
+                    {canWrite && draft ? (
+                      <InlineValue boxed={BOXED_FIELDS} table="customer_invoices" id={id} column="due_on"
+                                   kind="date" value={invoice.due_on} ariaLabel="Due" />
+                    ) : (
+                      <span className={READ_ONLY_VALUE}>{invoice.due_on ? usDate(invoice.due_on) : "—"}</span>
+                    )}
+                  </Row>
+                  <Row label="Sent">
+                    <span className={READ_ONLY_VALUE}>
+                      {invoice.sent_at ? usDate(invoice.sent_at) : "—"}
+                      {invoice.last_sent_at && invoice.last_sent_at !== invoice.sent_at
+                        ? ` · again ${usDate(invoice.last_sent_at)}`
+                        : ""}
+                    </span>
+                  </Row>
+                  <Row label="Collect through">
+                    {/* 131: chosen per invoice, locked once sent — the customer then
+                        holds that processor's link — and once it is in QuickBooks,
+                        which Send to QuickBooks can do before any send. Void it to
+                        change its mind. */}
+                    {canWrite && draft && !qbo?.id ? (
+                      <ProcessorField key={processor} id={id} value={processor} />
+                    ) : (
+                      <span className={READ_ONLY_VALUE}>{PROCESSOR_LABEL[processor]}</span>
+                    )}
+                  </Row>
+                  <Row label={invoice.voided_at ? "Voided" : "Paid"}>
+                    <span className={READ_ONLY_VALUE}>
+                      {invoice.voided_at ? usDate(invoice.voided_at) : invoice.paid_at ? usDate(invoice.paid_at) : "—"}
+                    </span>
+                  </Row>
+                  {processor === "quickbooks" ? (
+                    <Row label="In QuickBooks">
+                      <span className={READ_ONLY_VALUE}>
+                        {qbo?.id ? (
+                          <>
+                            <a href={`https://app.qbo.intuit.com/app/invoice?txnId=${encodeURIComponent(qbo.id)}`}
+                               target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                              Invoice {qbo.doc_number ?? qbo.id}
+                            </a>
+                            {qbo.invoice_link ? (
+                              <>
+                                {" · "}
+                                <a href={qbo.invoice_link} target="_blank" rel="noreferrer"
+                                   className="underline underline-offset-2">
+                                  Pay page
+                                </a>
+                              </>
+                            ) : null}
+                          </>
+                        ) : (
+                          "Not yet — it goes when the invoice is sent"
+                        )}
+                      </span>
+                    </Row>
+                  ) : null}
+                </dl>
+              </section>
+
+              <section className="space-y-3">
+                <SectionHeading>Notes</SectionHeading>
+                {canWrite && draft ? (
+                  <InlineValue table="customer_invoices" id={id} column="notes" multiline boxed={BOXED_FIELDS}
+                               value={invoice.notes} ariaLabel="Notes printed on the invoice" />
                 ) : (
-                  "Not yet — it goes when the invoice is sent"
+                  <p
+                    className={`${READ_ONLY_VALUE} whitespace-pre-wrap ${
+                      BOXED_FIELDS ? "block min-h-16 w-full border border-hairline" : ""
+                    }`}
+                  >
+                    {invoice.notes ?? "—"}
+                  </p>
                 )}
-              </span>
-            </Row>
-          ) : null}
-        </dl>
-      </section>
+              </section>
 
-      <InvoiceOrders
-        invoiceId={id}
-        customerId={invoice.customer_id as string}
-        locationId={invoice.location_id}
-        rows={orderRows}
-        draft={canWrite && draft}
-        soldAsEditable={canWrite && !invoice.paid_at && !invoice.voided_at}
-      />
+              {sends.length > 0 ? (
+                <section className="space-y-2">
+                  {/* EVERY SEND, NEWEST FIRST (128): re-sending keeps the number, so
+                      this is where "what did they have, and when" is answered. */}
+                  <SectionHeading count={sends.length}>Sent</SectionHeading>
+                  <table className="w-full max-w-[60rem] border-collapse text-[14px]">
+                    <thead>
+                      <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
+                        <th className="w-28 px-3 py-2 text-left">Date</th>
+                        <th className="px-3 py-2 text-left">To</th>
+                        <th className="w-32 px-3 py-2 text-right">Total</th>
+                        <th className="w-24 px-3 py-2 text-left">PDF</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sends.map((x) => {
+                        const url = x.document_path ? urlOf.get(x.document_path) : null;
+                        return (
+                          <tr key={x.id}>
+                            <td className="px-3 py-2 tabular-nums text-muted">{usDate(x.sent_on)}</td>
+                            <td className="px-3 py-2 text-muted">{x.sent_to ?? "—"}</td>
+                            <td className="px-3 py-2 text-right tabular-nums">{x.total === null ? "—" : money(Number(x.total))}</td>
+                            <td className="px-3 py-2">
+                              {url ? (
+                                <a href={url} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                                  Open
+                                </a>
+                              ) : (
+                                <span className="text-faint">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </section>
+              ) : null}
+            </>
+          )}
 
-      <InvoiceLines invoiceId={id} orgId={invoice.org_id} rows={chargeRows} draft={canWrite && draft} />
+          {activeTab === "charges" && (
+            <>
+              <InvoiceOrders
+                invoiceId={id}
+                customerId={invoice.customer_id as string}
+                locationId={invoice.location_id}
+                rows={orderRows}
+                draft={canWrite && draft}
+                soldAsEditable={canWrite && !invoice.paid_at && !invoice.voided_at}
+              />
 
-      {sends.length > 0 ? (
-        <section className="space-y-2">
-          {/* EVERY SEND, NEWEST FIRST (128): re-sending keeps the number, so
-              this is where "what did they have, and when" is answered. */}
-          <SectionHeading count={sends.length}>Sent</SectionHeading>
-          <table className="w-full max-w-[60rem] border-collapse text-[14px]">
-            <thead>
-              <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
-                <th className="w-28 px-3 py-2 text-left">Date</th>
-                <th className="px-3 py-2 text-left">To</th>
-                <th className="w-32 px-3 py-2 text-right">Total</th>
-                <th className="w-24 px-3 py-2 text-left">PDF</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sends.map((x) => {
-                const url = x.document_path ? urlOf.get(x.document_path) : null;
-                return (
-                  <tr key={x.id}>
-                    <td className="px-3 py-2 tabular-nums text-muted">{usDate(x.sent_on)}</td>
-                    <td className="px-3 py-2 text-muted">{x.sent_to ?? "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{x.total === null ? "—" : money(Number(x.total))}</td>
-                    <td className="px-3 py-2">
-                      {url ? (
-                        <a href={url} target="_blank" rel="noreferrer" className="underline underline-offset-2">
-                          Open
-                        </a>
-                      ) : (
-                        <span className="text-faint">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </section>
-      ) : null}
+              <InvoiceLines invoiceId={id} orgId={invoice.org_id} rows={chargeRows} draft={canWrite && draft} />
+            </>
+          )}
 
-      <section className="space-y-2">
-        <SectionHeading count={payments.length}>Payments</SectionHeading>
-        {canWrite && processor === "quickbooks" && qbo?.id && !invoice.paid_at && !invoice.voided_at ? (
-          <QuickBooksPaymentCheck id={id} />
-        ) : null}
-        {payments.length === 0 ? (
-          <p className="text-sm text-muted">Nothing paid yet.</p>
-        ) : (
-          <table className="w-full max-w-[60rem] border-collapse text-[14px]">
-            <thead>
-              <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
-                <th className="w-28 px-3 py-2 text-left">Date</th>
-                <th className="w-28 px-3 py-2 text-left">Order</th>
-                <th className="w-36 px-3 py-2 text-left">How</th>
-                <th className="px-3 py-2 text-left">Note</th>
-                <th className="w-32 px-3 py-2 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {payments.map((p) => (
-                <tr key={p.id}>
-                  <td className="px-3 py-2 tabular-nums text-muted">{usDate(p.paid_on)}</td>
-                  <td className="px-3 py-2 tabular-nums text-muted">{p.order_number ?? "Other charges"}</td>
-                  <td className="px-3 py-2 text-muted">{p.payment_type ?? "—"}</td>
-                  <td className="px-3 py-2 text-muted">{p.note ?? ""}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{money(p.amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <SectionHeading>Notes</SectionHeading>
-        {canWrite && draft ? (
-          <InlineValue table="customer_invoices" id={id} column="notes" multiline boxed={BOXED_FIELDS}
-                       value={invoice.notes} ariaLabel="Notes printed on the invoice" />
-        ) : (
-          <p
-            className={`${READ_ONLY_VALUE} whitespace-pre-wrap ${
-              BOXED_FIELDS ? "block min-h-16 w-full border border-hairline" : ""
-            }`}
-          >
-            {invoice.notes ?? "—"}
-          </p>
-        )}
-      </section>
+          {activeTab === "payments" && (
+            <>
+              <section className="space-y-2">
+                <SectionHeading count={payments.length}>Payments</SectionHeading>
+                {canWrite && processor === "quickbooks" && qbo?.id && !invoice.paid_at && !invoice.voided_at ? (
+                  <QuickBooksPaymentCheck id={id} />
+                ) : null}
+                {payments.length === 0 ? (
+                  <p className="text-sm text-muted">Nothing paid yet.</p>
+                ) : (
+                  <table className="w-full max-w-[60rem] border-collapse text-[14px]">
+                    <thead>
+                      <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
+                        <th className="w-28 px-3 py-2 text-left">Date</th>
+                        <th className="w-28 px-3 py-2 text-left">Order</th>
+                        <th className="w-36 px-3 py-2 text-left">How</th>
+                        <th className="px-3 py-2 text-left">Note</th>
+                        <th className="w-32 px-3 py-2 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payments.map((p) => (
+                        <tr key={p.id}>
+                          <td className="px-3 py-2 tabular-nums text-muted">{usDate(p.paid_on)}</td>
+                          <td className="px-3 py-2 tabular-nums text-muted">{p.order_number ?? "Other charges"}</td>
+                          <td className="px-3 py-2 text-muted">{p.payment_type ?? "—"}</td>
+                          <td className="px-3 py-2 text-muted">{p.note ?? ""}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{money(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </section>
+            </>
+          )}
+        </div>
+      </div>
 
     </div>
   );

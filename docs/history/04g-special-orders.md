@@ -5102,3 +5102,14 @@ split it apart again. Other charges stay untaxed (v1), and Rush is not a type
   items on a one-order invoice. Then come the other charges, then the totals
   lines.
 - **Fixtures** check both, and fail when the zero-filter is removed.
+
+**The invoice record gets tabs (2026-09-27).** Mark: "add tabs to the
+invoice detail page: 'Detail', 'Charges', 'Payments'". The order record's
+`SectionNav` (vertical on a wide screen, horizontal on a narrow one), with the
+tab in `?tab=` and Detail the default.
+- **Detail:** Details, Notes and the Sent history.
+- **Charges:** Orders and Other Charges; its count is both.
+- **Payments:** the payments and the QuickBooks check.
+
+The revision banners and the Actions menu stay above the tabs. Switching tabs
+drops `?send=`, so a Send opened from an order does not reopen.
