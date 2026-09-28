@@ -850,7 +850,6 @@ export async function SpecialOrderDetail({
                   : null
               }
               actions={{
-                scheduled,
                 id,
                 orgId: row.org_id as string,
                 number: row.number as string,

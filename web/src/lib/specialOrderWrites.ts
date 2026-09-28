@@ -236,36 +236,101 @@ export async function deleteSpecialOrder(
  * 2026-09-28) so the two say the same thing. Only an ORDER cancels: a lead, a
  * quote, a template or a standing order has no production to call off.
  *
- * Cancelling does NOT unschedule — the confirm says so when a schedule exists.
+ * CANCELLING CALLS OFF THE ORDER'S INVOICING (Mark, 2026-09-28: "build all
+ * three"). An invoice owns a COPY of its orders' lines (141), so changing the
+ * order's status changes no invoice:
+ *
+ * - a DRAFT can still change, so the order comes off it;
+ * - a SENT invoice (or one holding money) is frozen and still asks the
+ *   customer for this order's money. Nothing here can edit it — it changes by
+ *   Revise…, or goes by Void… — so the confirm names it and says so.
  */
-export function cancelConfirmMessage(number: string, scheduled: boolean): string {
-  return `Cancel order ${number}?\n\nIt stays on the list, greyed and struck through, and drops out of every working view. Cancelling is reversible — set the status back on the Info tab.${
-    scheduled
-      ? " The kitchen still has this order: cancelling does NOT unschedule it, so unschedule it as well or those donuts get made."
-      : ""
-  }`;
+export type CancelContext = {
+  scheduled: boolean;
+  /** The live (not void) invoices carrying this order, as the paper names them. */
+  invoices: { id: string; label: string; sent: boolean }[];
+};
+
+/** "INV-10004", "INV-10004 and INV-10005", "A, B and C". */
+function andList(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-/** Whether a schedule exists for the order — read at the moment of the click
- *  by a caller (the list) whose row does not carry it. */
-export async function readScheduled(
+export function cancelConfirmMessage(number: string, ctx: CancelContext): string {
+  const paragraphs = [
+    `Cancel order ${number}?`,
+    "It stays on the list, greyed and struck through, and drops out of every working view. Cancelling is reversible — set the status back on the order's Info tab.",
+  ];
+  const drafts = ctx.invoices.filter((i) => !i.sent).map((i) => i.label);
+  const sent = ctx.invoices.filter((i) => i.sent).map((i) => i.label);
+  if (drafts.length) {
+    paragraphs.push(`It comes off draft invoice${drafts.length === 1 ? "" : "s"} ${andList(drafts)}.`);
+  }
+  if (sent.length) {
+    paragraphs.push(
+      `${andList(sent)} ${sent.length === 1 ? "has" : "have"} gone out and still ask${
+        sent.length === 1 ? "s" : ""
+      } the customer for this order's money. Cancelling does not change a sent invoice: Revise… it and take this order off the revision, or Void… it.`
+    );
+  }
+  if (ctx.scheduled) {
+    paragraphs.push(
+      "The kitchen still has this order: cancelling does NOT unschedule it, so unschedule it as well or those donuts get made."
+    );
+  }
+  return paragraphs.join("\n\n");
+}
+
+/**
+ * What the confirm needs, read at the moment of the click — neither the list's
+ * row nor the record carries the invoices. `prefix` is the org's invoice
+ * prefix ("INV-"), so the confirm names each invoice as its paper does.
+ */
+export async function readCancelContext(
   supabase: SupabaseClient,
-  id: string
-): Promise<{ scheduled: boolean } | { error: string }> {
-  const { data, error } = await supabase
-    .from("special_orders")
-    .select("production_schedule_id")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) return { error: error.message };
-  return { scheduled: Boolean(data?.production_schedule_id) };
+  id: string,
+  prefix: string
+): Promise<CancelContext | { error: string }> {
+  const [{ data: order, error: orderError }, { data: lines, error: lineError }] = await Promise.all([
+    supabase.from("special_orders").select("production_schedule_id").eq("id", id).maybeSingle(),
+    supabase.from("customer_invoice_lines").select("invoice_id").eq("special_order_id", id),
+  ]);
+  if (orderError) return { error: orderError.message };
+  if (lineError) return { error: lineError.message };
+  const ids = [...new Set((lines ?? []).map((l) => l.invoice_id as string))];
+  let invoices: CancelContext["invoices"] = [];
+  if (ids.length) {
+    // `posted` is 144's "on the account" — sent, paid or holding money, and
+    // not void — which for a live invoice is 141's "frozen".
+    const { data, error } = await supabase
+      .from("customer_invoice_totals")
+      .select("id, number, revision, voided_at, posted")
+      .in("id", ids)
+      .is("voided_at", null)
+      .order("number")
+      .order("revision");
+    if (error) return { error: error.message };
+    invoices = (data ?? []).map((r) => ({
+      id: r.id as string,
+      label: `${prefix}${r.number}${(r.revision as number) > 1 ? `-${r.revision}` : ""}`,
+      sent: Boolean(r.posted),
+    }));
+  }
+  return { scheduled: Boolean(order?.production_schedule_id), invoices };
 }
 
+/**
+ * Cancels, then takes the order off its drafts. The status write is the act;
+ * a draft that refuses (somebody sent it a moment ago) does not undo it — it
+ * comes back in `notes`, the things the person must be told afterwards.
+ */
 export async function cancelSpecialOrder(
   supabase: SupabaseClient,
-  id: string
-): Promise<{ cancelled: true } | { error: string }> {
-  // `.select()` its own result: a refused update removes nothing and says so.
+  id: string,
+  ctx: CancelContext
+): Promise<{ notes: string[] } | { error: string }> {
+  // `.select()` its own result: a refused update changes nothing and says so.
   const { data, error } = await supabase
     .from("special_orders")
     .update({ status: "cancelled" })
@@ -273,7 +338,16 @@ export async function cancelSpecialOrder(
     .select("id");
   if (error) return { error: error.message };
   if (!data?.length) return { error: "The change wasn't saved — the database refused it silently." };
-  return { cancelled: true };
+
+  const notes: string[] = [];
+  for (const inv of ctx.invoices.filter((i) => !i.sent)) {
+    const { error: e } = await supabase.rpc("remove_order_from_customer_invoice", {
+      p_invoice: inv.id,
+      p_order: id,
+    });
+    if (e) notes.push(`It is still on ${inv.label}: ${e.message}.`);
+  }
+  return { notes };
 }
 
 /**

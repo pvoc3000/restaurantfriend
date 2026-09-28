@@ -8,6 +8,7 @@
 
 import { eq, no, ok, test } from "./harness";
 import {
+  cancelConfirmMessage,
   deleteBlock,
   deleteConfirmMessage,
   deleteRefusal,
@@ -195,3 +196,40 @@ test("every dimension the list filters by is a recognised view key", () => {
     ok((SPECIAL_ORDER_VIEW_KEYS as readonly string[]).includes(key), `${key} is a view key`);
   }
 });
+
+/* --------------------------------------------------------------------------
+ * CANCEL (2026-09-28) — what the confirm says about the order's invoices
+ * ------------------------------------------------------------------------ */
+
+const draft = (label: string) => ({ id: label, label, sent: false });
+const sent = (label: string) => ({ id: label, label, sent: true });
+
+test("cancel: a plain order says only what cancelling does", () => {
+  const m = cancelConfirmMessage("SO-10021", { scheduled: false, invoices: [] });
+  ok(m.startsWith("Cancel order SO-10021?"), "asks by number");
+  no(/invoice/i.test(m), "no invoice talk when there is none");
+  no(/kitchen/i.test(m), "no schedule talk when unscheduled");
+});
+
+test("cancel: a draft is named as coming off, a sent invoice as still asking", () => {
+  const m = cancelConfirmMessage("SO-1", { scheduled: false, invoices: [draft("INV-10005"), sent("INV-10004")] });
+  ok(m.includes("It comes off draft invoice INV-10005."), "the draft comes off");
+  ok(m.includes("INV-10004 has gone out and still asks"), "the sent one still asks");
+  ok(m.includes("Revise…"), "and says how to change it");
+  no(m.includes("draft invoice INV-10004"), "a sent invoice is never called a draft");
+});
+
+test("cancel: several invoices read as a list, with the verb agreeing", () => {
+  const m = cancelConfirmMessage("SO-1", {
+    scheduled: false,
+    invoices: [draft("INV-1"), draft("INV-2"), sent("INV-3"), sent("INV-4")],
+  });
+  ok(m.includes("draft invoices INV-1 and INV-2."), "plural drafts");
+  ok(m.includes("INV-3 and INV-4 have gone out and still ask the customer"), "plural sent");
+});
+
+test("cancel: paragraphs are split for the confirm's body", () => {
+  const m = cancelConfirmMessage("SO-1", { scheduled: true, invoices: [sent("INV-3")] });
+  eq(m.split("\n\n").length, 4, "question, what it does, the invoice, the kitchen");
+});
+

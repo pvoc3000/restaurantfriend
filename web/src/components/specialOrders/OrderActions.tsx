@@ -9,6 +9,7 @@ import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { TextInput } from "@/components/ui/TextInput";
+import { runCancelOrder } from "@/lib/cancelOrderFlow";
 import {
   FLAG_TODO,
   KIND_COMMAND_NOUN,
@@ -16,8 +17,6 @@ import {
   type SpecialOrderStatus,
 } from "@/lib/specialOrders";
 import {
-  cancelConfirmMessage,
-  cancelSpecialOrder,
   deleteConfirmMessage,
   deleteRefusal,
   deleteSpecialOrder,
@@ -53,7 +52,6 @@ export function OrderActions({
   flagSource,
   todo,
   canWrite,
-  scheduled,
   schedule,
   children,
 }: {
@@ -74,16 +72,6 @@ export function OrderActions({
    *  there for why clearing the flag does not always clear it. */
   todo: string | null;
   canWrite: boolean;
-  /**
-   * True once a production schedule exists for this order — read by CANCEL,
-   * which warns that cancelling does not unschedule.
-   *
-   * The DELETE no longer takes it, nor the line and payment counts, nor the
-   * standing order behind a materialized day: `readDeleteContext` gathers all
-   * four itself so that this component and the list's row menu ask the same
-   * question of the same data rather than of whatever each happened to hold.
-   */
-  scheduled: boolean;
   /**
    * `<ScheduleProduction>`, composed upstream — `ScheduleDetail` passes
    * `print={<PrintPacket/>}` into `ScheduleActions` the same way. Used only by
@@ -165,21 +153,17 @@ export function OrderActions({
      writes it directly: a duplicate is a fact about a row that has no column
      anywhere, since nothing on the new order records where it came from. */
 
-  async function cancel() {
-    if (
-      !(await confirmDialog({
-        ...splitConfirmMessage(cancelConfirmMessage(number, scheduled)),
-        confirmLabel: "Cancel the order",
-        tone: "danger",
-      }))
-    ) {
-      return;
-    }
+  /**
+   * CANCEL reads what it touches itself — the schedule, the order's invoices —
+   * as the list's row menu does (`runCancelOrder`), and as DELETE has since
+   * `readDeleteContext`: both doors ask the same question of the same data.
+   */
+  function cancel() {
     setError(null);
     start(async () => {
-      const result = await cancelSpecialOrder(supabase, id);
+      const result = await runCancelOrder(supabase, { id, number });
       if ("error" in result) setError(result.error);
-      else {
+      else if (result.cancelled) {
         // The trigger's "Status changed from Order to Cancelled" is strictly
         // more than "Order cancelled" was.
         router.refresh();
@@ -347,7 +331,7 @@ export function OrderActions({
       // two lines down, so its noun can only ever be "Order" and interpolating
       // it would suggest a variation that cannot happen.
       ...(kind === "order" && status !== "cancelled"
-        ? [{ label: "Cancel Order", onSelect: () => void cancel(), danger: true, disabled: pending }]
+        ? [{ label: "Cancel Order", onSelect: cancel, danger: true, disabled: pending }]
         : []),
       { label: `Delete ${KIND_COMMAND_NOUN[kind]}`, onSelect: remove, danger: true, disabled: pending },
     ];

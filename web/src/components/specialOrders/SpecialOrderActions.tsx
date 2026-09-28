@@ -6,15 +6,13 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { alertDialog, confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import {
-  cancelConfirmMessage,
-  cancelSpecialOrder,
   deleteConfirmMessage,
   deleteRefusal,
   deleteSpecialOrder,
   duplicateSpecialOrder,
   readDeleteContext,
-  readScheduled,
 } from "@/lib/specialOrderWrites";
+import { runCancelOrder } from "@/lib/cancelOrderFlow";
 import type { SpecialOrderKind, SpecialOrderStatus } from "@/lib/specialOrders";
 import { RowMenu } from "@/components/ui/RowMenu";
 
@@ -86,30 +84,15 @@ export function SpecialOrderActions({
   function cancel() {
     setBusy("cancel");
     start(async () => {
-      // The row does not carry the schedule link, so it is read on the click
-      // — the confirm warns that cancelling does not unschedule.
-      const ctx = await readScheduled(supabase, id);
-      if ("error" in ctx) {
-        setBusy(null);
-        void alertDialog({ title: `Order ${number} could not be read`, body: ctx.error });
-        return;
-      }
-      const ok = await confirmDialog({
-        ...splitConfirmMessage(cancelConfirmMessage(number, ctx.scheduled)),
-        confirmLabel: "Cancel the order",
-        tone: "danger",
-      });
-      if (!ok) {
-        setBusy(null);
-        return;
-      }
-      const result = await cancelSpecialOrder(supabase, id);
+      // The row carries neither the schedule nor the invoices, so
+      // `runCancelOrder` reads them on the click — the record's own path.
+      const result = await runCancelOrder(supabase, { id, number });
       setBusy(null);
       if ("error" in result) {
         void alertDialog({ title: `Order ${number} was not cancelled`, body: result.error });
         return;
       }
-      router.refresh();
+      if (result.cancelled) router.refresh();
     });
   }
 
