@@ -275,33 +275,29 @@ function andList(items: string[]): string {
   return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
+/**
+ * THE BARE MINIMUM (Mark, 2026-09-28: "the text … is a lot"): the question,
+ * and only what the person cannot guess or will have to act on — the money
+ * becoming credit, and a sent invoice still billing the order. Coming off the
+ * list's working views, off drafts and off the schedule are what anybody
+ * expects of "cancel", so they go unsaid; a schedule the kitchen already has
+ * is reported AFTER, by `cancelSpecialOrder`'s notes.
+ */
 export function cancelConfirmMessage(number: string, ctx: CancelContext): string {
-  const paragraphs = [
-    `Cancel order ${number}?`,
-    "It stays on the list, greyed and struck through, and drops out of every working view. Cancelling is reversible — set the status back on the order's Info tab.",
-  ];
-  const drafts = ctx.invoices.filter((i) => !i.sent).map((i) => i.label);
-  const sent = ctx.invoices.filter((i) => i.sent).map((i) => i.label);
-  if (drafts.length) {
-    paragraphs.push(`It comes off draft invoice${drafts.length === 1 ? "" : "s"} ${andList(drafts)}.`);
-  }
-  if (sent.length) {
-    paragraphs.push(
-      `${andList(sent)} ${sent.length === 1 ? "has" : "have"} gone out and still ask${
-        sent.length === 1 ? "s" : ""
-      } the customer for this order's money. Cancelling does not change a sent invoice: Revise… it (the revision leaves this order out) or Void… it. Either way, money paid on it that is no longer needed becomes the customer's credit.`
-    );
-  }
+  const paragraphs = [`Cancel order ${number}?`];
   if (ctx.held > 0.005) {
     paragraphs.push(
       ctx.hasCustomer
-        ? `${money(ctx.held)} paid on it becomes the customer's credit. It is applied to their next Square invoice when that is sent, or refund it from their record's Billing tab.`
-        : `${money(ctx.held)} paid on it stays on the order: it has no customer to hold credit for.`
+        ? `${money(ctx.held)} paid becomes the customer's credit.`
+        : `${money(ctx.held)} paid stays on the order (no customer to credit).`
     );
   }
-  if (ctx.scheduled) {
+  const sent = ctx.invoices.filter((i) => i.sent).map((i) => i.label);
+  if (sent.length) {
     paragraphs.push(
-      "It comes off the production schedule — unless that schedule has been printed or counted, in which case the kitchen already has it and you will be told."
+      sent.length === 1
+        ? `${sent[0]} has been sent and still bills this order — revise or void it.`
+        : `${andList(sent)} have been sent and still bill this order — revise or void them.`
     );
   }
   return paragraphs.join("\n\n");

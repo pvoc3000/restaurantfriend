@@ -5192,3 +5192,9 @@ fixtures on the wording.
   Left for Mark to decide one by one.
 - **Un-cancelling** leaves the money as credit; it is applied when the order
   is next invoiced and sent.
+- **The confirm, cut to the bare minimum (same day).** Mark: "the text on the
+  cancel order confirmation dialogue is a lot." Now the question, plus only
+  "$X paid becomes the customer's credit." and "INV-N has been sent and still
+  bills this order — revise or void it." when they apply. Drafts, the
+  schedule, "stays on the list" and "reversible" went: they are what cancel
+  means, and a schedule the kitchen already has is still reported afterwards.

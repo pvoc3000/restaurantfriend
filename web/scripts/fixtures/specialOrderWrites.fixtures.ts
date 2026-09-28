@@ -198,52 +198,45 @@ test("every dimension the list filters by is a recognised view key", () => {
 });
 
 /* --------------------------------------------------------------------------
- * CANCEL (2026-09-28) — what the confirm says about the order's invoices
+ * CANCEL (2026-09-28) — the confirm says the bare minimum
  * ------------------------------------------------------------------------ */
 
 const draft = (label: string) => ({ id: label, label, sent: false });
 const sent = (label: string) => ({ id: label, label, sent: true });
+const plain = { scheduled: false, held: 0, hasCustomer: true, invoices: [] };
 
-test("cancel: a plain order says only what cancelling does", () => {
-  const m = cancelConfirmMessage("SO-10021", { scheduled: false, held: 0, hasCustomer: true, invoices: [] });
-  ok(m.startsWith("Cancel order SO-10021?"), "asks by number");
-  no(/invoice/i.test(m), "no invoice talk when there is none");
-  no(/kitchen/i.test(m), "no schedule talk when unscheduled");
+test("cancel: a plain order is the question and nothing else", () => {
+  eq(cancelConfirmMessage("SO-10021", plain), "Cancel order SO-10021?", "just the question");
 });
 
-test("cancel: a draft is named as coming off, a sent invoice as still asking", () => {
-  const m = cancelConfirmMessage("SO-1", { scheduled: false, held: 0, hasCustomer: true, invoices: [draft("INV-10005"), sent("INV-10004")] });
-  ok(m.includes("It comes off draft invoice INV-10005."), "the draft comes off");
-  ok(m.includes("INV-10004 has gone out and still asks"), "the sent one still asks");
-  ok(m.includes("Revise…"), "and says how to change it");
-  no(m.includes("draft invoice INV-10004"), "a sent invoice is never called a draft");
+test("cancel: drafts and the schedule go unsaid — they are what cancel means", () => {
+  eq(
+    cancelConfirmMessage("SO-1", { ...plain, scheduled: true, invoices: [draft("INV-10005")] }),
+    "Cancel order SO-1?",
+    "no draft or schedule talk"
+  );
 });
 
-test("cancel: several invoices read as a list, with the verb agreeing", () => {
-  const m = cancelConfirmMessage("SO-1", {
-    scheduled: false,
-    held: 0,
-    hasCustomer: true,
-    invoices: [draft("INV-1"), draft("INV-2"), sent("INV-3"), sent("INV-4")],
-  });
-  ok(m.includes("draft invoices INV-1 and INV-2."), "plural drafts");
-  ok(m.includes("INV-3 and INV-4 have gone out and still ask the customer"), "plural sent");
+test("cancel: held money is named as credit, with the amount, never as a refund", () => {
+  const m = cancelConfirmMessage("SO-1", { ...plain, held: 150 });
+  eq(m, "Cancel order SO-1?\n\n$150.00 paid becomes the customer's credit.", "credit line");
+  no(/refund/i.test(m), "never promises a refund");
+  const orphan = cancelConfirmMessage("SO-1", { ...plain, held: 50, hasCustomer: false });
+  ok(orphan.includes("$50.00 paid stays on the order (no customer to credit)."), "no customer: it stays");
 });
 
-test("cancel: paragraphs are split for the confirm's body", () => {
-  const m = cancelConfirmMessage("SO-1", { scheduled: true, held: 0, hasCustomer: true, invoices: [sent("INV-3")] });
-  eq(m.split("\n\n").length, 4, "question, what it does, the invoice, the kitchen");
-  ok(m.includes("comes off the production schedule"), "a scheduled order says it is unscheduled");
+test("cancel: a sent invoice is named, with what to do; several read as a list", () => {
+  const one = cancelConfirmMessage("SO-1", { ...plain, invoices: [draft("INV-10005"), sent("INV-10004")] });
+  eq(
+    one,
+    "Cancel order SO-1?\n\nINV-10004 has been sent and still bills this order — revise or void it.",
+    "one sent, the draft unsaid"
+  );
+  const two = cancelConfirmMessage("SO-1", { ...plain, invoices: [sent("INV-3"), sent("INV-4")] });
+  ok(two.includes("INV-3 and INV-4 have been sent and still bill this order — revise or void them."), "plural");
 });
 
-test("cancel: held money is named as becoming credit, never as a refund", () => {
-  const m = cancelConfirmMessage("SO-1", { scheduled: false, held: 150, hasCustomer: true, invoices: [] });
-  ok(m.includes("$150.00 paid on it becomes the customer's credit"), "credit, with the amount");
-  no(/refunded to|will be refunded/i.test(m), "never promises a refund");
-  const none = cancelConfirmMessage("SO-1", { scheduled: false, held: 0, hasCustomer: true, invoices: [] });
-  no(none.includes("credit"), "no money, no credit talk");
-  const orphan = cancelConfirmMessage("SO-1", { scheduled: false, held: 50, hasCustomer: false, invoices: [] });
-  ok(orphan.includes("stays on the order"), "no customer: the money stays");
-  no(orphan.includes("becomes the customer's credit"), "and is not called credit");
+test("cancel: money and a sent invoice are one short paragraph each", () => {
+  const m = cancelConfirmMessage("SO-1", { ...plain, held: 150, invoices: [sent("INV-10004")] });
+  eq(m.split("\n\n").length, 3, "question, credit, invoice");
 });
-
