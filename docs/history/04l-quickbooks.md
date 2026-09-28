@@ -465,3 +465,11 @@ QuickBooks invoice payments, with Mark's $1.10 as the first live refund.
   is DELETED and refused. A booking failure never undoes the refund: it is a
   warning on the dialog and a line in the order's history. First checked with
   `deno check` (via npx), which the function had never had.
+- **First booking, SO-10088's $1.10 (same day, Mark: "yes, book the
+  $1.10").** `book_refund` made RefundReceipt **550779**, DocNumber
+  `MW0056938635`, dated 2026-09-28, $1.10 = $1.00 "Special Orders" (TAX) +
+  $0.10 tax, customer "Mark Trombino (1696)", paid from **Undeposited Funds**
+  (where the Payment had gone) by "QuickBooks Payments-Credit Card", no
+  `CreditCardPayment`, no location (the invoice carried none). One receipt with
+  that number afterwards. Undeposited Funds is worth the bookkeeper's eye: the
+  QuickBooks Payments deposit that nets the refund has to take this receipt in.
