@@ -1532,11 +1532,15 @@ Deno.serve(async (req) => {
     // refund made in QuickBooks counts — and the ledger's share
     // (`payment_refundable`).
     //
-    // UNSETTLED OR SETTLED: a charge still CAPTURED (the batch has not closed,
-    // usually until the next business day) is VOIDED, which the Payments API
-    // does only whole, by the charge's original request id
-    // (`context.clientTransID`); a SETTLED one is REFUNDED, whole or in part.
-    // So a PART refund of an unsettled charge is refused with the reason.
+    // ALWAYS THE REFUND ENDPOINT, `charges/<id>/refunds`, by the charge id we
+    // hold. The first version VOIDED a charge still CAPTURED (unsettled), by
+    // `txn-requests/<clientTransID>/void` — and the first live try, SO-10088's
+    // $1.10, was refused with PMT-6000 and nothing moved: a void is addressed
+    // by the request id the charge was CREATED with, which for a charge
+    // QuickBooks' own invoice page made is not ours to know (clientTransID was
+    // a guess). The refund endpoint's docs do not limit it to settled charges;
+    // if QuickBooks refuses one that has not settled, the person is told to
+    // try again once it has (usually the next business day).
     //
     // THE RECORD is 149's `record_payment_refund`, through the caller's client:
     // a negative 'QuickBooks Refund' naming the payment, applied where the
@@ -1608,36 +1612,30 @@ Deno.serve(async (req) => {
         });
       }
 
-      let kind: "void" | "refund";
+      if (!["CAPTURED", "AUTHORIZED", "SETTLED"].includes(String(charge.status))) {
+        return json(400, { error: `QuickBooks says this payment is ${String(charge.status ?? "unknown").toLowerCase()}, so there is nothing to give back.` });
+      }
+      const kind = "refund" as const;
       let result: { id?: string; status?: string };
-      if (charge.status === "CAPTURED" || charge.status === "AUTHORIZED") {
-        if (cents !== chargeCents || refundedCents > 0) {
-          return json(400, {
-            error: `QuickBooks can only give back the whole $${(chargeCents / 100).toFixed(2)} until the payment settles (usually the next business day). Refund all of it now, or a part once it has settled.`,
-          });
-        }
-        kind = "void";
-        result = (await paymentsFetch(
-          admin,
-          conn,
-          `txn-requests/${encodeURIComponent(charge.context?.clientTransID ?? chargeId)}/void`,
-          { method: "POST", body: "{}", requestId: key }
-        )) as { id?: string; status?: string };
-      } else if (charge.status === "SETTLED") {
-        kind = "refund";
+      try {
         result = (await paymentsFetch(admin, conn, `charges/${encodeURIComponent(chargeId)}/refunds`, {
           method: "POST",
           body: JSON.stringify({ amount: cents / 100, description: (reason || "Refund").slice(0, 4000) }),
           requestId: key,
         })) as { id?: string; status?: string };
-      } else {
-        return json(400, { error: `QuickBooks says this payment is ${String(charge.status ?? "unknown").toLowerCase()}, so there is nothing to give back.` });
+      } catch (e) {
+        if (charge.status !== "SETTLED" && e instanceof QboError) {
+          return json(400, {
+            error: `${e.message} This payment has not settled yet (it usually settles by the next business day); try the refund again once it has.`,
+          });
+        }
+        throw e;
       }
       if (!result?.id || /^DECLINED/i.test(result.status ?? "")) {
-        return json(400, { error: `QuickBooks refused the ${kind}${result?.status ? `: ${result.status}` : ""}.` });
+        return json(400, { error: `QuickBooks refused the refund${result?.status ? `: ${result.status}` : ""}.` });
       }
 
-      const note = [kind === "void" ? "Voided in QuickBooks Payments" : "Refunded through QuickBooks Payments", reason]
+      const note = ["Refunded through QuickBooks Payments", reason]
         .filter(Boolean)
         .join(" · ");
       const { data: inserted, error: insertError } = await supabase.rpc("record_payment_refund", {
@@ -1647,7 +1645,7 @@ Deno.serve(async (req) => {
         p_note: note,
       });
       if (insertError || !inserted) {
-        const warning = `${kind === "void" ? "voided" : "refunded"} $${(cents / 100).toFixed(2)} in QuickBooks (${result.id}) but it was NOT recorded here — record −$${(cents / 100).toFixed(2)} as 'QuickBooks Refund' by hand${insertError ? `: ${insertError.message}` : ""}`;
+        const warning = `refunded $${(cents / 100).toFixed(2)} in QuickBooks (${result.id}) but it was NOT recorded here — record −$${(cents / 100).toFixed(2)} as 'QuickBooks Refund' by hand${insertError ? `: ${insertError.message}` : ""}`;
         if (row.special_order_id) {
           await supabase.from("special_order_events").insert({
             org_id: orgId,

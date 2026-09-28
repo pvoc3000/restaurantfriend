@@ -426,3 +426,15 @@ QuickBooks invoice payments, with Mark's $1.10 as the first live refund.
   **Still unknown until the first live refund:** whether QuickBooks records
   the void or refund against its own Payment (or a RefundReceipt is needed for
   the books), and what the webhook then sees.
+- **The first live try failed safely (same day), and the void path is gone.**
+  Mark pressed Refund… on SO-10088's $1.10 and got "A temporary issue
+  prevented this request from being processed. (code PMT-6000) [intuit_tid
+  1-6abad4f9-3b2a03133c598ee417729a3f]". Read back afterwards: the charge still
+  CAPTURED, no `refundDetail`, nothing recorded — nothing moved. The call was
+  the VOID (`txn-requests/<clientTransID>/void`), which is addressed by the
+  request id the charge was created with; for a charge QuickBooks' invoice page
+  made, `clientTransID` was a guess. `refund_payment` now always uses
+  `charges/<id>/refunds`, by the charge id proven in step 2, whatever the
+  status; a refusal on an unsettled charge adds "try again once it has
+  settled". A retry needs a NEW dialog: the key is the `Request-Id`, and
+  Intuit answers a repeated Request-Id with its first response.
