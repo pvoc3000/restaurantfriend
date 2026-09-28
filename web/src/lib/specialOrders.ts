@@ -1222,7 +1222,7 @@ export const ORDER_TABS: OrderTab[] = ["info", "items", "payments", "notes", "de
 export const ORDER_TAB_LABEL: Record<OrderTab, string> = {
   info: "Info",
   items: "Items",
-  payments: "Payments",
+  payments: "Billing",
   notes: "Notes",
   delivery: "Delivery",
   documents: "Documents",
