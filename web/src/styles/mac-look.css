@@ -288,7 +288,7 @@
    still 224 x 32 and `WEEKDAY_PICKER_WIDTH` still holds; a 2px shadow rather
    than `.mac-control`'s 3px, because 3px of shadow on a 26px square is a
    ninth of the button. Same grammar otherwise: a 2px edge on hover, the drop
-   into the shadow while held. An ON day keeps its grey fill through hover and
+   into the shadow while held. An ON day keeps its black fill (white type) through hover and
    press (its ground is what it MEANS), an OFF day fills #c0c0c0 while held. */
 .mac-day {
   box-shadow: 2px 2px 0 0 #000;
@@ -872,8 +872,10 @@ span:has(> input.mac-field) {
 }
 
 /* ON: the thumb travels and the well fills. */
+/* BLACK since 2026-09-28 (Mark: "make the active switch state have a black
+   fill instead of grey"); #c0c0c0 until then. */
 .mac-switch input:checked + label::before {
-  background: #c0c0c0;
+  background: #000;
 }
 
 .mac-switch input:checked + label::after {

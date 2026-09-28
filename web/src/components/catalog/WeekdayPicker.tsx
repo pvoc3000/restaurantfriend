@@ -17,7 +17,9 @@ import { useDayPaint } from "@/lib/dayPaint";
 export const WEEKDAY_PICKER_WIDTH = 300;
 
 /**
- * A DAY THAT IS ON — THE MAC LOOK'S LIGHT GREY WITH BLACK TYPE (Mark,
+ * A DAY THAT IS ON — BLACK WITH WHITE TYPE since 2026-09-28 (Mark: "make the
+ * active weekday picker buttons have a black fill and white text"). Before
+ * that, THE MAC LOOK'S LIGHT GREY WITH BLACK TYPE (Mark,
  * 2026-09-18: "the lighter grey we use on our other controls. It looks out of
  * place in context. If the text needs to be black to be readable that's
  * fine"). #c0c0c0 is the fill every held `.mac-control` and every
@@ -37,7 +39,7 @@ export const WEEKDAY_PICKER_WIDTH = 300;
  * an array, so it hand-rolls the markup — and the two are drawn on neighbouring
  * records, where two greys would read as a fault rather than as a distinction.
  */
-export const WEEKDAY_ON_CLASS = "bg-[#c0c0c0] text-ink";
+export const WEEKDAY_ON_CLASS = "bg-ink text-white";
 
 /**
  * ONE DAY IS A SMALL RAISED BUTTON IN A 32px SLOT (Mark, 2026-09-18: keep the
