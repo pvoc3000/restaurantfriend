@@ -5,8 +5,6 @@ import { getAppSession } from "@/lib/session";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import type { RawSearchParams } from "@/lib/filterMenus";
 import {
-  KIND_LABEL,
-  STATUS_LABEL,
   countsAsOwed,
   customerLabel,
   money,
@@ -19,7 +17,9 @@ import { RecordNav } from "@/components/ui/RecordNav";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
-import { CustomerActions } from "@/components/specialOrders/CustomerActions";
+import { SectionNav } from "@/components/ui/SectionNav";
+import { CustomerCommandMenu } from "@/components/specialOrders/CustomerCommandMenu";
+import { CustomerOrdersTable } from "@/components/specialOrders/CustomerOrdersTable";
 import { CustomerAccounting } from "@/components/specialOrders/CustomerAccounting";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { canEditPage } from "@/lib/pageAccess";
@@ -36,14 +36,23 @@ import { canRefundPayments } from "@/lib/roles";
 
 const CUSTOMERS_CRUMB = { href: "/customers", label: "Customers" };
 
+/** THE RECORD'S TWO TABS (Mark, 2026-09-28): who they are, and their money. */
+const TABS = [
+  { key: "info", label: "Info" },
+  { key: "billing", label: "Billing" },
+] as const;
+type Tab = (typeof TABS)[number]["key"];
+
 /**
  * One customer, and everything they have ever ordered.
  *
- * WHAT THEY OWE COMES FIRST, which is the reason anybody opens this record:
- * "what does Cafe Knotted owe us" is answered by looking, not by reading down
- * a list of two hundred. Since 144 it is read the textbook way, in three parts
- * that never overlap (`customer_balances`): their open INVOICES, aged; orders
- * owed and NOT INVOICED; and their CREDIT.
+ * TWO TABS, the tab in the URL: INFO is who they are (details, address,
+ * QuickBooks, notes); BILLING is their money — open INVOICES, aged; orders
+ * owed and NOT INVOICED; their CREDIT; and every order, in a pane that ends
+ * at the foot of the window. What they owe is also in the line under the name,
+ * above the split, because "what does Cafe Knotted owe us" is the reason
+ * anybody opens this record. Since 144 it is read the textbook way, in three
+ * parts that never overlap (`customer_balances`).
  *
  * There are no `balance`, `spent` or `order_count` columns on `customers` and
  * there must never be. FMP had all three as calc fields; here they are summed
@@ -133,20 +142,29 @@ export async function CustomerDetail({
   // Payments are payments whatever the record's kind — a template has none.
   const spent = withMoney.reduce((a, o) => a + o.totals.paid, 0);
 
+  const tab: Tab = TABS.some((t) => t.key === rawParams.tab) ? (rawParams.tab as Tab) : "info";
+  const billing = tab === "billing";
+  // `SKIP` stands in for a read only the Billing tab wants, so the
+  // destructuring keeps its shape — VendorDetail's idiom.
+  const SKIP = { data: null };
+
   // WHAT THEY OWE (144), in three parts, and their invoices (124) with each
   // one's money — a failed read hides a part rather than breaking the record.
+  // The balances are read on both tabs: the line under the name states them.
   const [{ data: balanceRows }, { data: uninvoicedRows }, { data: invoiceRows }, { data: creditData }] =
     await Promise.all([
       supabase.rpc("customer_balances", { p_org: customer.org_id, p_customer: id }),
-      supabase.rpc("customer_uninvoiced_orders", { p_customer: id }),
-      supabase
-        .from("customer_invoice_totals")
-        .select("id, number, revision, issued_on, due_on, sent_at, paid_at, voided_at, total, applied, balance, posted")
-        .eq("customer_id", id)
-        .order("number", { ascending: false })
-        .order("revision", { ascending: false }),
+      billing ? supabase.rpc("customer_uninvoiced_orders", { p_customer: id }) : SKIP,
+      billing
+        ? supabase
+            .from("customer_invoice_totals")
+            .select("id, number, revision, issued_on, due_on, sent_at, paid_at, voided_at, total, applied, balance, posted")
+            .eq("customer_id", id)
+            .order("number", { ascending: false })
+            .order("revision", { ascending: false })
+        : SKIP,
       // Their CREDIT (143): money applied to nothing.
-      supabase.rpc("customer_credit", { p_customer: id }),
+      billing ? supabase.rpc("customer_credit", { p_customer: id }) : SKIP,
     ]);
   const owes = ((balanceRows ?? []) as { invoiced: number; not_invoiced: number; credit: number }[])[0];
   const invoiced = Number(owes?.invoiced ?? 0);
@@ -204,6 +222,23 @@ export async function CustomerDetail({
   const trail = parseTrail(rawParams, CUSTOMERS_CRUMB);
   const address = (customer.address ?? {}) as Record<string, unknown>;
 
+  // A link to one tab of this record, carrying the other params through —
+  // `from` above all, or moving between tabs would strip the breadcrumb trail.
+  // Info writes no parameter, so the record's plain address stays canonical.
+  const tabHref = (t: Tab) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(rawParams)) {
+      const one = Array.isArray(v) ? v[0] : v;
+      if (k !== "tab" && one) q.set(k, one);
+    }
+    if (t !== "info") q.set("tab", t);
+    const qs = q.toString();
+    return `/customers/${id}${qs ? `?${qs}` : ""}`;
+  };
+  const tabItems = TABS.map((t) => ({ key: t.key, label: t.label, href: tabHref(t.key) }));
+  // Links out of the Billing tab come back to it.
+  const here = { href: tabHref("billing"), label: "Customer" };
+
   return (
     <div className="space-y-12">
       <div className="flex items-start justify-between gap-4">
@@ -211,220 +246,198 @@ export async function CustomerDetail({
         <RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />
       </div>
 
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          {customerLabel(customer)}
-        </h1>
-        <p className="text-sm text-muted">
-          {withMoney.length} order{withMoney.length === 1 ? "" : "s"}
-          {spent > 0 ? ` · ${money(spent)} paid` : ""}
-          {invoiced > 0 ? <span className="text-accent"> · {money(invoiced)} invoiced</span> : null}
-          {notInvoiced > 0 ? <span className="text-accent"> · {money(notInvoiced)} not invoiced</span> : null}
-          {credit > 0 ? ` · ${money(credit)} credit` : ""}
-        </p>
+      {/* THE TITLE ROW CARRIES THE ONE ACTIONS MENU, level with the name at
+          the right margin — every record screen's shape. Above the split, so
+          it is on both tabs. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            {customerLabel(customer)}
+          </h1>
+          <p className="text-sm text-muted">
+            {withMoney.length} order{withMoney.length === 1 ? "" : "s"}
+            {spent > 0 ? ` · ${money(spent)} paid` : ""}
+            {invoiced > 0 ? <span className="text-accent"> · {money(invoiced)} invoiced</span> : null}
+            {notInvoiced > 0 ? <span className="text-accent"> · {money(notInvoiced)} not invoiced</span> : null}
+            {credit > 0 ? ` · ${money(credit)} credit` : ""}
+          </p>
+        </div>
+        <CustomerCommandMenu
+          id={id}
+          orgId={customer.org_id as string}
+          name={customerLabel(customer)}
+          orderCount={withMoney.length}
+          today={today}
+          defaultLocationId={session.activeLocation?.id ?? null}
+          takenBy={session.membership.display_name ?? session.email}
+          canWrite={canWrite}
+        />
       </div>
 
-      <section className="space-y-3">
-        <SectionHeading>Details</SectionHeading>
-        <div className="grid max-w-[56rem] gap-x-6 gap-y-4 sm:grid-cols-2">
-          <Row label="First name"><Cell id={id} canWrite={canWrite} address={address} column="first_name" value={customer.first_name as string | null} label="First name" /></Row>
-          <Row label="Last name"><Cell id={id} canWrite={canWrite} address={address} column="last_name" value={customer.last_name as string | null} label="Last name" /></Row>
-          <Row label="Company"><Cell id={id} canWrite={canWrite} address={address} column="company" value={customer.company as string | null} label="Company" /></Row>
-          <Row label="Phone"><Cell id={id} canWrite={canWrite} address={address} column="phone" value={customer.phone as string | null} label="Phone" /></Row>
-          <Row label="Email"><Cell id={id} canWrite={canWrite} address={address} column="email" value={customer.email as string | null} label="Email" /></Row>
-          <Row label="FileMaker id">
-            {/* History, never edited: it is how a re-export finds this row. */}
-            <span className={READ_ONLY_VALUE}>{(customer.legacy_id as string) ?? "—"}</span>
-          </Row>
+      {/* The section nav of every tabbed record — a sidebar at desk width, the
+          Mac tabs below `lg`. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+        <div
+          className="hidden lg:sticky lg:block lg:w-40 lg:shrink-0"
+          style={{ top: "calc(var(--rf-header-h) + 1.5rem)" }}
+        >
+          <SectionNav ariaLabel="Which part of this customer" value={tab} items={tabItems} />
         </div>
-      </section>
-
-      <section className="space-y-3">
-        <SectionHeading>Address</SectionHeading>
-        {/* jsonb, edited a key at a time — `locations.address`' idiom, and the
-            reason it stays jsonb: an address is read whole and written whole,
-            and `InlineValue` already has a json path for it. */}
-        <div className="grid max-w-[56rem] gap-x-6 gap-y-4 sm:grid-cols-2">
-          <Row label="Street"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["street"]} value={(address.street as string) ?? null} label="Street" /></Row>
-          <Row label="Street 2"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["street2"]} value={(address.street2 as string) ?? null} label="Street line 2" /></Row>
-          <Row label="City"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["city"]} value={(address.city as string) ?? null} label="City" /></Row>
-          <Row label="State"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["state"]} value={(address.state as string) ?? null} label="State" /></Row>
-          <Row label="ZIP"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["zip"]} value={(address.zip as string) ?? null} label="ZIP" /></Row>
+        <div className="lg:hidden">
+          <SectionNav orientation="horizontal" ariaLabel="Which part of this customer" value={tab} items={tabItems} />
         </div>
-      </section>
 
-      <CustomerAccounting
-        customerId={customer.id}
-        orgId={customer.org_id as string}
-        customerName={customerLabel(customer as never) || "This customer"}
-      />
-
-      <section className="space-y-3">
-        <SectionHeading>Notes</SectionHeading>
-        {canWrite ? (
-          <InlineValue table="customers" id={id} column="notes" multiline boxed={BOXED_FIELDS}
-                       value={customer.notes as string | null} ariaLabel="Notes about this customer" />
-        ) : (
-          <p
-            className={`${READ_ONLY_VALUE} whitespace-pre-wrap ${
-              BOXED_FIELDS ? "block min-h-16 w-full border border-hairline" : ""
-            }`}
-          >
-            {(customer.notes as string) ?? "—"}
-          </p>
-        )}
-      </section>
-
-      {invoices.length > 0 ? (
-        <section className="space-y-2">
-          <SectionHeading count={invoices.length}>Invoices</SectionHeading>
-          {invoiced > 0 ? (
-            <dl className="flex max-w-[60rem] flex-wrap gap-x-8 gap-y-2 pb-1">
-              {AGING_BUCKETS.map((b) => (
-                <div key={b.key} className="space-y-0.5">
-                  <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{b.label}</dt>
-                  <dd className={`tabular-nums ${aging[b.key] ? (b.key === "current" ? "" : "text-accent") : "text-faint"}`}>
-                    {aging[b.key] ? money(aging[b.key]) : "—"}
-                  </dd>
+        <div className="min-w-0 flex-1 space-y-12">
+          {tab === "info" && (
+            <>
+              <section className="space-y-3">
+                <SectionHeading>Details</SectionHeading>
+                <div className="grid max-w-[56rem] gap-x-6 gap-y-4 sm:grid-cols-2">
+                  <Row label="First name"><Cell id={id} canWrite={canWrite} address={address} column="first_name" value={customer.first_name as string | null} label="First name" /></Row>
+                  <Row label="Last name"><Cell id={id} canWrite={canWrite} address={address} column="last_name" value={customer.last_name as string | null} label="Last name" /></Row>
+                  <Row label="Company"><Cell id={id} canWrite={canWrite} address={address} column="company" value={customer.company as string | null} label="Company" /></Row>
+                  <Row label="Phone"><Cell id={id} canWrite={canWrite} address={address} column="phone" value={customer.phone as string | null} label="Phone" /></Row>
+                  <Row label="Email"><Cell id={id} canWrite={canWrite} address={address} column="email" value={customer.email as string | null} label="Email" /></Row>
+                  <Row label="FileMaker id">
+                    {/* History, never edited: it is how a re-export finds this row. */}
+                    <span className={READ_ONLY_VALUE}>{(customer.legacy_id as string) ?? "—"}</span>
+                  </Row>
                 </div>
-              ))}
-            </dl>
-          ) : null}
-          <table className="w-full max-w-[60rem] border-collapse text-[14px]">
-            <thead>
-              <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
-                <th className="w-28 px-3 py-2 text-left">Invoice</th>
-                <th className="w-32 px-3 py-2 text-left">Issued</th>
-                <th className="w-32 px-3 py-2 text-left">Due date</th>
-                <th className="px-3 py-2 text-left">Status</th>
-                <th className="w-28 px-3 py-2 text-right">Total</th>
-                <th className="w-28 px-3 py-2 text-right">Due</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((inv) => (
-                <tr key={inv.id} className="hover:bg-neutral-50">
-                  <td className="px-3 py-2 tabular-nums">
-                    <Link
-                      href={withFrom(`/customer-invoices/${inv.id}`, { href: `/customers/${id}`, label: "Customer" })}
-                      className="hover:underline"
-                    >
-                      {inv.number}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 tabular-nums text-muted">{usDate(inv.issued_on)}</td>
-                  <td className="px-3 py-2 tabular-nums text-muted">{inv.due_on ? usDate(inv.due_on) : "—"}</td>
-                  <td className="px-3 py-2">
-                    <InvoiceStatusChip status={inv.status} />
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{money(inv.total)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-accent">
-                    {inv.posted && inv.balance > 0.005 ? money(inv.balance) : ""}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      ) : null}
+              </section>
 
-      {uninvoiced.length > 0 ? (
-        <OrderTable heading="Not Invoiced" count={uninvoiced.length} rows={uninvoiced} trailHref={`/customers/${id}`} accent />
-      ) : null}
+              <section className="space-y-3">
+                <SectionHeading>Address</SectionHeading>
+                {/* jsonb, edited a key at a time — `locations.address`' idiom, and the
+                    reason it stays jsonb: an address is read whole and written whole,
+                    and `InlineValue` already has a json path for it. */}
+                <div className="grid max-w-[56rem] gap-x-6 gap-y-4 sm:grid-cols-2">
+                  <Row label="Street"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["street"]} value={(address.street as string) ?? null} label="Street" /></Row>
+                  <Row label="Street 2"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["street2"]} value={(address.street2 as string) ?? null} label="Street line 2" /></Row>
+                  <Row label="City"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["city"]} value={(address.city as string) ?? null} label="City" /></Row>
+                  <Row label="State"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["state"]} value={(address.state as string) ?? null} label="State" /></Row>
+                  <Row label="ZIP"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["zip"]} value={(address.zip as string) ?? null} label="ZIP" /></Row>
+                </div>
+              </section>
 
-      <CustomerCredit rows={creditRows} canRefund={canRefundPayments(session.membership.role)} />
+              <CustomerAccounting
+                customerId={customer.id}
+                orgId={customer.org_id as string}
+                customerName={customerLabel(customer as never) || "This customer"}
+              />
 
-      {orderError ? (
-        <p className="text-sm text-accent">Could not load their orders: {orderError.message}</p>
-      ) : (
-        <OrderTable
-          heading="Orders"
-          count={withMoney.length}
-          rows={withMoney.map((o) => ({
-            ...o,
-            total: o.totals.total,
-            due: countsAsOwed(o) && o.totals.balance > 0 ? o.totals.balance : 0,
-          }))}
-          trailHref={`/customers/${id}`}
-        />
-      )}
-
-      <CustomerActions
-        id={id}
-        orgId={customer.org_id as string}
-        name={customerLabel(customer)}
-        orderCount={withMoney.length}
-        today={today}
-        defaultLocationId={session.activeLocation?.id ?? null}
-        takenBy={session.membership.display_name ?? session.email}
-        canWrite={canWrite}
-      />
-    </div>
-  );
-}
-
-function OrderTable({
-  heading,
-  count,
-  rows,
-  trailHref,
-  accent = false,
-}: {
-  heading: string;
-  count: number;
-  rows: {
-    id: string; number: string; kind: string; status: SpecialOrderStatus | null;
-    title: string | null; event_date: string | null;
-    total: number;
-    /** What this table says is owed on the order; 0 for nothing. */
-    due: number;
-  }[];
-  trailHref: string;
-  accent?: boolean;
-}) {
-  return (
-    <section className="space-y-2">
-      <SectionHeading count={count}>{heading}</SectionHeading>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted">Nothing here.</p>
-      ) : (
-        <table className="w-full max-w-[60rem] border-collapse text-[14px]">
-          <thead>
-            <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
-              <th className="w-24 px-3 py-2 text-left">Number</th>
-              <th className="w-32 px-3 py-2 text-left">Event</th>
-              <th className="px-3 py-2 text-left">What</th>
-              <th className="w-28 px-3 py-2 text-left">Status</th>
-              <th className="w-28 px-3 py-2 text-right">Total</th>
-              <th className="w-28 px-3 py-2 text-right">Due</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((o) => (
-              <tr key={o.id} className="hover:bg-neutral-50">
-                <td className="px-3 py-2 tabular-nums">
-                  <Link
-                    href={withFrom(`/special-orders/${o.id}`, { href: trailHref, label: "Customer" })}
-                    className="hover:underline"
+              <section className="space-y-3">
+                <SectionHeading>Notes</SectionHeading>
+                {canWrite ? (
+                  <InlineValue table="customers" id={id} column="notes" multiline boxed={BOXED_FIELDS}
+                               value={customer.notes as string | null} ariaLabel="Notes about this customer" />
+                ) : (
+                  <p
+                    className={`${READ_ONLY_VALUE} whitespace-pre-wrap ${
+                      BOXED_FIELDS ? "block min-h-16 w-full border border-hairline" : ""
+                    }`}
                   >
-                    {o.number}
-                  </Link>
-                </td>
-                <td className="px-3 py-2 tabular-nums text-muted">{o.event_date ?? "—"}</td>
-                <td className="px-3 py-2 text-muted">{o.title ?? "—"}</td>
-                <td className="px-3 py-2 text-muted">
-                  {o.kind === "order" ? (o.status ? STATUS_LABEL[o.status] : "—") : KIND_LABEL[o.kind as never]}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums">{money(o.total)}</td>
-                <td className={`px-3 py-2 text-right tabular-nums ${accent ? "text-accent" : "text-faint"}`}>
-                  {o.due > 0 ? money(o.due) : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </section>
+                    {(customer.notes as string) ?? "—"}
+                  </p>
+                )}
+              </section>
+            </>
+          )}
+
+          {tab === "billing" && (
+            <>
+              {invoices.length > 0 ? (
+                <section className="space-y-2">
+                  <SectionHeading count={invoices.length}>Invoices</SectionHeading>
+                  {invoiced > 0 ? (
+                    <dl className="flex max-w-[60rem] flex-wrap gap-x-8 gap-y-2 pb-1">
+                      {AGING_BUCKETS.map((b) => (
+                        <div key={b.key} className="space-y-0.5">
+                          <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{b.label}</dt>
+                          <dd className={`tabular-nums ${aging[b.key] ? (b.key === "current" ? "" : "text-accent") : "text-faint"}`}>
+                            {aging[b.key] ? money(aging[b.key]) : "—"}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
+                  <table className="w-full max-w-[60rem] border-collapse text-[14px]">
+                    <thead>
+                      <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
+                        <th className="w-28 px-3 py-2 text-left">Invoice</th>
+                        <th className="w-32 px-3 py-2 text-left">Issued</th>
+                        <th className="w-32 px-3 py-2 text-left">Due date</th>
+                        <th className="px-3 py-2 text-left">Status</th>
+                        <th className="w-28 px-3 py-2 text-right">Total</th>
+                        <th className="w-28 px-3 py-2 text-right">Due</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invoices.map((inv) => (
+                        <tr key={inv.id} className="hover:bg-neutral-50">
+                          <td className="px-3 py-2 tabular-nums">
+                            <Link
+                              href={withFrom(`/customer-invoices/${inv.id}`, here)}
+                              className="hover:underline"
+                            >
+                              {inv.number}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-2 tabular-nums text-muted">{usDate(inv.issued_on)}</td>
+                          <td className="px-3 py-2 tabular-nums text-muted">{inv.due_on ? usDate(inv.due_on) : "—"}</td>
+                          <td className="px-3 py-2">
+                            <InvoiceStatusChip status={inv.status} />
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">{money(inv.total)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-accent">
+                            {inv.posted && inv.balance > 0.005 ? money(inv.balance) : ""}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              ) : null}
+
+              {uninvoiced.length > 0 ? (
+                <CustomerOrdersTable
+                  heading="Not Invoiced"
+                  rows={uninvoiced}
+                  from={here}
+                  storageKey="rf.customerUninvoiced.v1"
+                  accent
+                />
+              ) : null}
+
+              <CustomerCredit rows={creditRows} canRefund={canRefundPayments(session.membership.role)} />
+
+              {/* LAST, because its pane runs to the foot of the window: a
+                  wholesale account has hundreds of orders, and they scroll
+                  inside the pane rather than taking the record with them. */}
+              {orderError ? (
+                <p className="text-sm text-accent">Could not load their orders: {orderError.message}</p>
+              ) : (
+                <CustomerOrdersTable
+                  heading="Orders"
+                  rows={withMoney.map((o) => ({
+                    id: o.id,
+                    number: o.number,
+                    kind: o.kind,
+                    status: o.status,
+                    title: o.title,
+                    event_date: o.event_date,
+                    total: o.totals.total,
+                    due: countsAsOwed(o) && o.totals.balance > 0 ? o.totals.balance : 0,
+                  }))}
+                  from={here}
+                  storageKey="rf.customerOrders.v1"
+                  fillViewport
+                />
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

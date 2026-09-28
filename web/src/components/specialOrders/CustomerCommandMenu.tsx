@@ -5,13 +5,16 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
-import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
-import { SectionHeading } from "@/components/ui/SectionHeading";
+import { ActionMenu } from "@/components/ui/ActionMenu";
 import { CustomerStatement } from "./CustomerStatement";
 import { createSpecialOrder } from "@/lib/createSpecialOrder";
 
 /**
- * What you can do to a customer.
+ * What you can do to a customer, as ONE Actions menu level with the name at
+ * the right margin — every record screen's shape (Mark, 2026-09-28; it was a
+ * Commands section of three buttons at the foot of the record):
+ *
+ *   New Order · Statement… | Delete
  *
  * NEW ORDER FROM HERE is the one people reach for: the phone rings, it is
  * somebody we know, and typing their name into a fresh order is exactly the
@@ -23,7 +26,7 @@ import { createSpecialOrder } from "@/lib/createSpecialOrder";
  * an em dash. The confirm says so, because "delete" that silently keeps the
  * children is worth stating.
  */
-export function CustomerActions({
+export function CustomerCommandMenu({
   id,
   orgId,
   name,
@@ -127,21 +130,23 @@ export function CustomerActions({
   }
 
   return (
-    <section className="space-y-3">
-      <SectionHeading>Commands</SectionHeading>
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className={BUTTON_CLASS} onClick={newOrder} disabled={pending}>
-          New order for them
-        </button>
-        {/* It sits with the other commands rather than beside the tables it
-            summarises, because it produces a DOCUMENT — the same class of act
-            as New order, not a view of the list. */}
-        <CustomerStatement customerId={id} today={today} canWrite={canWrite} />
-        <button type="button" className={DANGER_BUTTON_CLASS} onClick={remove} disabled={pending}>
-          Delete
-        </button>
-      </div>
+    <div className="flex flex-col items-end gap-2">
+      {/* The statement produces a DOCUMENT — the same class of act as New
+          Order, not a view of the tables — so it is a command here too. */}
+      <CustomerStatement customerId={id} today={today}>
+        {(openStatement) => (
+          <ActionMenu
+            ariaLabel={`Actions for ${name}`}
+            disabled={pending}
+            items={[
+              { label: "New Order", onSelect: newOrder, disabled: pending },
+              { label: "Statement…", onSelect: openStatement },
+              { label: "Delete", onSelect: remove, danger: true, disabled: pending, separatorBefore: true },
+            ]}
+          />
+        )}
+      </CustomerStatement>
       {error ? <p className="text-[13px] text-accent">{error}</p> : null}
-    </section>
+    </div>
   );
 }

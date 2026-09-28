@@ -5113,3 +5113,19 @@ tab in `?tab=` and Detail the default.
 
 The revision banners and the Actions menu stay above the tabs. Switching tabs
 drops `?send=`, so a Send opened from an order does not reopen.
+
+**The customer record gets tabs and an Actions menu (2026-09-28).** Mark:
+"add two tabs: 'Info' and 'Billing'. And let's move the 'commands' buttons into
+an actionmenu that sits at the top of the page like all the other detail
+pages." The same `SectionNav` as the invoice record, `?tab=billing`, Info the
+default.
+- **Info:** Details, Address, QuickBooks and Notes.
+- **Billing:** Invoices (aged), Not Invoiced, Credit, then Orders LAST, in a
+  `DataTable` with `fillViewport` so a wholesale account's hundreds of orders
+  scroll inside a pane that ends at the foot of the window. Not Invoiced is the
+  same table without the fill (`CustomerOrdersTable`).
+- The invoices, not-invoiced and credit reads are skipped on Info; the balances
+  are still read, because the line under the name states them on both tabs.
+- **Actions** (`CustomerCommandMenu`, was `CustomerActions`): New Order ·
+  Statement… | Delete. `CustomerStatement` keeps its dialog and hands out the
+  row through a render prop. Still manager+ only, as the buttons were.

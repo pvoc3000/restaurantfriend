@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
@@ -26,17 +26,21 @@ import { downloadBlob, openWindowNow, showBlob } from "@/lib/poProcessing";
  *
  * THE DATES DEFAULT TO A MONTH BACK TO TODAY (`statementPeriod`), as
  * QuickBooks' statement does; the opening balance carries the rest.
+ *
+ * It owns its dialog and hands out the row's action through `children`, so
+ * the record's Actions menu can open it (`CustomerCommandMenu`).
  */
 export function CustomerStatement({
   customerId,
   today,
-  canWrite,
+  children,
 }: {
   customerId: string;
   /** Today in the ORG's timezone. A browser's own idea of today would put a
    *  statement in the wrong week for anyone working past 5pm on the coast. */
   today: string;
-  canWrite: boolean;
+  /** Renders the command that opens the dialog. */
+  children: (open: () => void) => ReactNode;
 }) {
   const supabase = createClient();
   const initial = statementPeriod(today);
@@ -46,8 +50,6 @@ export function CustomerStatement({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<StatementDocument | null>(null);
-
-  if (!canWrite) return null;
 
   async function org() {
     const { data } = await supabase.from("orgs").select("name, settings").maybeSingle();
@@ -107,9 +109,7 @@ export function CustomerStatement({
 
   return (
     <>
-      <button type="button" className={BUTTON_CLASS} onClick={() => setOpen(true)}>
-        Statement&hellip;
-      </button>
+      {children(() => setOpen(true))}
 
       {open && (
         <Dialog
