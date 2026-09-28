@@ -16,11 +16,14 @@ export type CustomerOrderRow = {
   total: number;
   /** What this table says is owed on the order; 0 for nothing. */
   due: number;
+  /** The unsent invoice this order is on, if any — Not Invoiced only. */
+  draftInvoice?: { id: string; number: string } | null;
 };
 
 /**
  * A customer's orders — the whole list on their record's Orders tab, or the
- * ones owed and not invoiced on its Billing tab.
+ * ones owed and not invoiced on its Billing tab, where an order already on an
+ * unsent invoice reads "Invoice Drafted" in its Status.
  */
 export function CustomerOrdersTable({
   heading,
@@ -67,9 +70,23 @@ export function CustomerOrdersTable({
     {
       key: "status",
       label: "Status",
-      width: 130,
+      // Room for "Invoice Drafted" on one line.
+      width: 150,
       sortValue: (o) => statusText(o),
-      render: (o) => <span className="text-muted">{statusText(o)}</span>,
+      render: (o) =>
+        o.draftInvoice ? (
+          // On an unsent invoice: still not invoiced in the money (144), but
+          // not waiting for one to be made. The link is the way to send it.
+          <Link
+            href={withFrom(`/customer-invoices/${o.draftInvoice.id}`, from)}
+            className="hover:underline"
+            title={`On draft invoice ${o.draftInvoice.number}, not yet sent`}
+          >
+            {statusText(o)}
+          </Link>
+        ) : (
+          <span className="text-muted">{statusText(o)}</span>
+        ),
     },
     {
       key: "total",
@@ -108,5 +125,6 @@ export function CustomerOrdersTable({
 }
 
 function statusText(o: CustomerOrderRow): string {
+  if (o.draftInvoice) return "Invoice Drafted";
   return o.kind === "order" ? (o.status ? STATUS_LABEL[o.status] : "—") : KIND_LABEL[o.kind as never];
 }

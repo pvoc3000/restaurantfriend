@@ -180,20 +180,6 @@ export async function CustomerDetail({
    * debt. And an order on a sent invoice is owed THROUGH that invoice, so it
    * is not here twice.
    */
-  const uninvoiced = ((uninvoicedRows ?? []) as {
-    id: string; number: string; title: string | null; event_date: string | null; status: SpecialOrderStatus | null;
-    total: number; not_invoiced: number;
-  }[]).map((o) => ({
-    id: o.id,
-    number: o.number,
-    kind: "order",
-    status: o.status,
-    title: o.title,
-    event_date: o.event_date,
-    total: Number(o.total),
-    due: Number(o.not_invoiced),
-  }));
-
   const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
   const invoiceTerms = readInvoiceTerms(session.orgSettings as Record<string, unknown>);
   const invoices = ((invoiceRows ?? []) as {
@@ -217,6 +203,45 @@ export async function CustomerDetail({
     const bucket = agingBucket(daysBetween(inv.due_on ?? inv.issued_on, today));
     aging[bucket] = Math.round((aging[bucket] + inv.balance) * 100) / 100;
   }
+
+  /**
+   * AN ORDER ON A DRAFT IS STILL "NOT INVOICED" (144): a draft is not a bill
+   * until it is sent, so its money stays out of the invoiced balance. But the
+   * order is not waiting for an invoice to be made either, so its Status reads
+   * Invoice Drafted and links to the draft (Mark, 2026-09-28: "we just need to
+   * make it clear"). A draft here is a live invoice that is not posted.
+   */
+  const draftIds = invoices.filter((inv) => !inv.posted && inv.status !== "void").map((inv) => inv.id);
+  const draftByOrder = new Map<string, { id: string; number: string }>();
+  if (draftIds.length) {
+    const { data: draftLines } = await supabase
+      .from("customer_invoice_lines")
+      .select("invoice_id, special_order_id")
+      .in("invoice_id", draftIds)
+      .not("special_order_id", "is", null);
+    const numberOf = new Map(invoices.map((inv) => [inv.id, inv.number]));
+    for (const l of draftLines ?? []) {
+      draftByOrder.set(l.special_order_id as string, {
+        id: l.invoice_id as string,
+        number: numberOf.get(l.invoice_id as string) ?? "",
+      });
+    }
+  }
+
+  const uninvoiced = ((uninvoicedRows ?? []) as {
+    id: string; number: string; title: string | null; event_date: string | null; status: SpecialOrderStatus | null;
+    total: number; not_invoiced: number;
+  }[]).map((o) => ({
+    id: o.id,
+    number: o.number,
+    kind: "order",
+    status: o.status,
+    title: o.title,
+    event_date: o.event_date,
+    total: Number(o.total),
+    due: Number(o.not_invoiced),
+    draftInvoice: draftByOrder.get(o.id) ?? null,
+  }));
 
   const creditRows = ((creditData ?? []) as CreditRow[]).map((c) => ({ ...c, credit: Number(c.credit) }));
 

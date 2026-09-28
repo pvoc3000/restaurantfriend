@@ -5132,3 +5132,10 @@ default.
 - **Actions** (`CustomerCommandMenu`, was `CustomerActions`): New Order ·
   Statement… | Delete. `CustomerStatement` keeps its dialog and hands out the
   row through a render prop. Still manager+ only, as the buttons were.
+- **"Invoice Drafted" (2026-09-28).** Mark asked why Cafe Knotted's 10-5 to
+  10-11 orders sat in Not Invoiced when they were on an invoice. It was on a
+  DRAFT, and 144 counts only a posted invoice (sent, paid or holding money) as
+  invoiced — rightly, for the money. Mark: "we just need to make it clear". So
+  the money is unchanged, and in Not Invoiced an order on a live, unposted
+  invoice has the Status **Invoice Drafted**, linking to the draft. The record
+  finds those by reading the draft invoices' lines; no migration.
