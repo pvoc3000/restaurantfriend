@@ -20,6 +20,9 @@ import {
   groupTotals,
   invoicePaper,
   PAPER_COLUMNS,
+  paperColumns,
+  paperText,
+  paperTotals,
   scaleBreakdown,
   snapshotLines,
   type CustomerInvoiceLine,
@@ -318,4 +321,40 @@ test("invoicePaper: one order is itemized, unless an other charge is Delivery", 
   ok(withFee.columns, "a Delivery charge has no place in the itemized Amount column");
   eq(withFee.rows[0].detail, undefined);
   ok(invoicePaper(groupInvoiceLines([line({ line_type: "item", description: "Setup", amount: 30 })], orders)).columns, "no orders: columns");
+});
+
+test("paperText: the email says what the columns say, in lines", () => {
+  const paper = invoicePaper(groupInvoiceLines(knottedWeek, orders));
+  const b = invoiceTotalsBreakdown(knottedWeek, 0);
+  eq(
+    paperText(paper, b, 100, 1187),
+    [
+      "Order #10057 · Cafe Knotted · 10/5/2026",
+      "   Subtotal $573.50 · Delivery $50.00",
+      "Order #10050 · Cafe Knotted · 10/6/2026",
+      "   Subtotal $573.50 · Delivery $50.00",
+      "",
+      "Other charges",
+      "Delivery Fee",
+      "   Delivery $40.00",
+      "",
+      "Subtotal: $1147.00",
+      "Delivery: $140.00",
+      "Paid: -$100.00",
+      "Amount due: $1187.00",
+    ].join("\n")
+  );
+  const one = invoicePaper(groupInvoiceLines(knottedDay("o1", "Order #10057 · Cafe Knotted · 10/5/2026"), orders));
+  eq(
+    paperText(one, invoiceTotalsBreakdown(knottedDay("o1", "x"), 0), 0, 623.5).split("\n").slice(0, 2),
+    ["Order #10057 · Cafe Knotted · 10/5/2026", "   370 × Knotted Bismark - 42g @ $1.55 — $573.50"],
+    "one order: its items"
+  );
+});
+
+test("paperTotals / paperColumns: Subtotal always, the rest only when used", () => {
+  const b = { subtotal: 100, discount: 0, delivery: 10, rush: 0, tax: 0, prior: 25 };
+  eq(paperTotals(b, 0, 85).map((t) => t.label), ["Subtotal", "Delivery", "Invoiced earlier", "Amount due"]);
+  eq(paperTotals(b, 0, 85)[2].value, -25);
+  eq(paperColumns([{ parts: { subtotal: 0, discount: 0, delivery: 5, rush: 0, tax: 0 } }]).map((c) => c.key), ["subtotal", "delivery"]);
 });

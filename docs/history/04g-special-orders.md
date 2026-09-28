@@ -5088,3 +5088,17 @@ no: each row is one charge of one TYPE. A row with fee, delivery, rush and tax
 columns could be all of them at once, and QuickBooks and Square would have to
 split it apart again. Other charges stay untaxed (v1), and Rush is not a type
 (it is worked out from an order's size). Either can be added if wanted.
+
+**The pay page and the email match the columns (2026-09-27).**
+- **Pay page:** a link sent from now on carries the paper's rows
+  (`invoicePaper`) and the Totals window (less the payments) in its snapshot.
+  The page draws Orders and Other charges the way the PDF does: column labels,
+  then each order's name with its figures on the line beneath, since a phone
+  is narrow. The totals are `paperTotals`: Subtotal always, the rest when not
+  zero, Paid read live, then Amount due. A link sent before this still shows
+  its one-line-per-order list.
+- **Email:** `{orders}` is `paperText`, the same thing in plain text. Each
+  order is followed by "   Subtotal $573.50 · Delivery $50.00", or by its
+  items on a one-order invoice. Then come the other charges, then the totals
+  lines.
+- **Fixtures** check both, and fail when the zero-filter is removed.

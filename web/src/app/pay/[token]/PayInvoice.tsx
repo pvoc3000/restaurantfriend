@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/specialOrders";
 import { usDate } from "@/lib/specialOrderDocs";
+import { paperColumns, paperTotals, type PaperRow } from "@/lib/customerInvoices";
 import {
   payStateMessage,
   squareScriptUrl,
@@ -328,26 +329,45 @@ export function PayInvoice({ token }: { token: string }) {
         <p className="text-[13px] text-muted">{invoice.org.contactLine}</p>
       </header>
 
-      {/* THE INVOICE'S LINES, as the paper printed them: one per order on a
-          weekly invoice, itemized for one order (141). Tax, delivery and
-          discounts are inside them. The attached PDF is the paper. */}
-      <section className="space-y-1 text-[15px] tabular-nums">
-        <div className="border-y-2 border-ink py-2">
-          <p className="pb-1 text-[13px] text-muted">
-            Invoice #{invoice.number}
-            {invoice.due_on ? ` · due ${usDate(invoice.due_on)}` : ""}
-          </p>
-          {invoice.lines.map((line, i) => (
-            <div key={i} className="flex items-baseline justify-between gap-4 py-1">
-              <span className="min-w-0">{line.description}</span>
-              <span className="shrink-0">{money(line.amount)}</span>
-            </div>
-          ))}
-        </div>
-        {state.paid !== 0 && <Total label="Paid" value={-state.paid} />}
-        <div className="flex items-baseline justify-between gap-4 border-t-2 border-ink pt-2 text-[19px] font-bold">
-          <span>Amount due</span>
-          <span>{money(balance)}</span>
+      {/* THE INVOICE AS PRINTED (2026-09-27: "make the pay page and email
+          match the new columns"): Orders, then Other charges, each figure in
+          its column, then the Totals window's lines — the paid figure live.
+          A phone is narrow, so an order's figures sit on the line beneath
+          its name. A link sent before this carries only its lines. */}
+      <section className="space-y-3 text-[15px] tabular-nums">
+        <p className="border-t-2 border-ink pt-2 text-[13px] text-muted">
+          Invoice #{invoice.number}
+          {invoice.due_on ? ` · due ${usDate(invoice.due_on)}` : ""}
+        </p>
+        {invoice.paper && invoice.breakdown ? (
+          <PaperSections paper={invoice.paper} />
+        ) : (
+          <div className="border-b-2 border-ink pb-2">
+            {invoice.lines.map((line, i) => (
+              <div key={i} className="flex items-baseline justify-between gap-4 py-1">
+                <span className="min-w-0">{line.description}</span>
+                <span className="shrink-0">{money(line.amount)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="space-y-0.5">
+          {(invoice.breakdown
+            ? paperTotals(invoice.breakdown, state.paid, balance)
+            : [
+                ...(state.paid !== 0 ? [{ label: "Paid", value: -state.paid }] : []),
+                { label: "Amount due", value: balance, grand: true },
+              ]
+          ).map((t) =>
+            t.grand ? (
+              <div key={t.label} className="flex items-baseline justify-between gap-4 border-t-2 border-ink pt-2 text-[19px] font-bold">
+                <span>{t.label}</span>
+                <span>{money(t.value)}</span>
+              </div>
+            ) : (
+              <Total key={t.label} label={t.label} value={t.value} />
+            )
+          )}
         </div>
       </section>
 
@@ -421,6 +441,79 @@ export function PayInvoice({ token }: { token: string }) {
         )}
       </section>
     </Shell>
+  );
+}
+
+/** The paper's two sections, as the PDF draws them. */
+function PaperSections({ paper }: { paper: { columns: boolean; rows: PaperRow[] } }) {
+  const shown = paperColumns(paper.rows);
+  const sections = [
+    { title: "Orders", rows: paper.rows.filter((r) => !r.free) },
+    { title: "Other charges", rows: paper.rows.filter((r) => r.free) },
+  ].filter((sec) => sec.rows.length > 0);
+  const figure = (v: number) => (Math.abs(v) >= 0.005 ? money(v) : "—");
+  return (
+    <>
+      {sections.map((sec) => (
+        <div key={sec.title}>
+          <p className="text-[12px] font-semibold uppercase tracking-[0.12em]">
+            {sec.title} <span className="text-subtle">{sec.rows.length}</span>
+          </p>
+          {paper.columns ? (
+            <table className="mt-1 w-full border-collapse text-[14px]">
+              <thead>
+                <tr className="border-b-2 border-ink text-[10px] uppercase tracking-[0.1em] text-subtle">
+                  {shown.map((c) => (
+                    <th key={c.key} className="pb-1 text-right font-normal">
+                      {c.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sec.rows.map((r, i) => (
+                  <Fragment key={i}>
+                    <tr>
+                      <td colSpan={shown.length} className="pt-2 text-[15px]">
+                        {r.description}
+                      </td>
+                    </tr>
+                    <tr>
+                      {shown.map((c) => (
+                        <td key={c.key} className={`text-right ${(r.parts?.[c.key] ?? 0) === 0 ? "text-faint" : ""}`}>
+                          {figure(r.parts?.[c.key] ?? 0)}
+                        </td>
+                      ))}
+                    </tr>
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="mt-1 border-t-2 border-ink">
+              {sec.rows.map((r, i) =>
+                r.detail ? (
+                  <div key={i} className="py-1">
+                    <p className="py-1 font-semibold">{r.description}</p>
+                    {r.detail.rows.map((d, j) => (
+                      <div key={j} className="flex items-baseline justify-between gap-4 py-0.5 pl-3 text-[14px]">
+                        <span className="min-w-0">{d.label}</span>
+                        <span className="shrink-0">{money(d.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div key={i} className="flex items-baseline justify-between gap-4 py-1">
+                    <span className="min-w-0">{r.description}</span>
+                    <span className="shrink-0">{money(r.amount)}</span>
+                  </div>
+                )
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </>
   );
 }
 

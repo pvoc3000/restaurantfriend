@@ -57,7 +57,7 @@ import {
 import { AGING_BUCKETS, type StatementDocument, type StatementRow } from "@/lib/customerStatement";
 
 import { customerLabel, lineTotal } from "@/lib/specialOrders";
-import { PAPER_COLUMNS, type InvoiceTotalsBreakdown, type PaperRow } from "@/lib/customerInvoices";
+import { paperColumns, type InvoiceTotalsBreakdown, type PaperRow } from "@/lib/customerInvoices";
 import { dateInTimeZone, serverTimeZone } from "@/lib/today";
 import {
   Field,
@@ -714,9 +714,7 @@ export function CustomerInvoicePdf({
   const chargeRows = invoice.lines.filter((l) => l.free);
   const orderCount = orderRows.length;
   // The columns something on this invoice uses; Subtotal always.
-  const shown = PAPER_COLUMNS.filter(
-    (c) => c.key === "subtotal" || invoice.lines.some((l) => Math.abs(l.parts?.[c.key] ?? 0) >= 0.005)
-  );
+  const shown = paperColumns(invoice.lines);
   return (
     <Document>
       <Page size="LETTER" style={s.page}>

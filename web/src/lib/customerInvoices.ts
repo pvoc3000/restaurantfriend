@@ -460,6 +460,69 @@ export function invoicePaper<
   return { columns, rows };
 }
 
+/** The columns a paper's rows use; Subtotal always. */
+export function paperColumns(rows: Pick<PaperRow, "parts">[]): typeof PAPER_COLUMNS {
+  return PAPER_COLUMNS.filter(
+    (c) => c.key === "subtotal" || rows.some((r) => Math.abs(r.parts?.[c.key] ?? 0) >= 0.005)
+  );
+}
+
+/** The Totals window's lines, as the PDF prints them: Subtotal always, the
+ *  rest when not zero, then what has been paid and what is due. */
+export function paperTotals(
+  b: Omit<InvoiceTotalsBreakdown, "payments">,
+  paid: number,
+  due: number
+): { label: string; value: number; grand?: boolean }[] {
+  const lines: { label: string; value: number; grand?: boolean }[] = [
+    { label: "Subtotal", value: b.subtotal },
+    { label: "Discount", value: -b.discount },
+    { label: "Delivery", value: b.delivery },
+    { label: "Rush fee", value: b.rush },
+    { label: "Tax", value: b.tax },
+    { label: "Invoiced earlier", value: -b.prior },
+    { label: "Paid", value: -paid },
+  ];
+  return lines
+    .filter((t) => t.label === "Subtotal" || Math.abs(t.value) >= 0.005)
+    .map((t) => ({ ...t, value: cents(t.value) }))
+    .concat([{ label: "Amount due", value: cents(due), grand: true }]);
+}
+
+/**
+ * THE EMAIL'S `{orders}` (2026-09-27: "make the pay page and email match the
+ * new columns") — the paper in plain text, which has no columns: each order
+ * with its figures on the line beneath ("Subtotal $573.50 · Delivery $50.00"),
+ * or its items when the paper is itemized; then the other charges; then the
+ * Totals window's lines.
+ */
+export function paperText(
+  paper: { columns: boolean; rows: PaperRow[] },
+  b: Omit<InvoiceTotalsBreakdown, "payments">,
+  paid: number,
+  due: number
+): string {
+  const dollars = (v: number) => `${v < 0 ? "-" : ""}$${Math.abs(v).toFixed(2)}`;
+  const shown = paperColumns(paper.rows);
+  const row = (r: PaperRow): string[] => {
+    if (!paper.columns) {
+      if (r.detail) return [r.description, ...r.detail.rows.map((d) => `   ${d.label} — ${dollars(d.amount)}`)];
+      return [`${r.description} — ${dollars(r.amount)}`];
+    }
+    const figures = shown
+      .map((c) => ({ c, v: r.parts?.[c.key] ?? 0 }))
+      .filter(({ v }) => Math.abs(v) >= 0.005)
+      .map(({ c, v }) => `${c.label} ${dollars(v)}`);
+    return [r.description, `   ${figures.join(" · ") || dollars(0)}`];
+  };
+  const orders = paper.rows.filter((r) => !r.free);
+  const charges = paper.rows.filter((r) => r.free);
+  const out: string[] = [...orders.flatMap(row)];
+  if (charges.length) out.push(...(orders.length ? ["", "Other charges"] : []), ...charges.flatMap(row));
+  out.push("", ...paperTotals(b, paid, due).map((t) => `${t.label}: ${dollars(t.value)}`));
+  return out.join("\n");
+}
+
 /* ==========================================================================
  * THE LINE
  * ========================================================================== */
@@ -625,6 +688,11 @@ export type CustomerInvoiceSnapshot = {
   due_on: string | null;
   lines: { description: string; amount: number }[];
   totals: { total: number };
+  /** The printed invoice's rows and columns (2026-09-27), so the page reads
+   *  as the paper does; absent on a link sent before. */
+  paper?: { columns: boolean; rows: PaperRow[] };
+  /** The Totals window as sent, less the payments — the page reads those live. */
+  breakdown?: Omit<InvoiceTotalsBreakdown, "payments">;
   notes_quote: string | null;
   org: { name: string; addressLine: string; contactLine: string; terms: string };
   sent_on: string;

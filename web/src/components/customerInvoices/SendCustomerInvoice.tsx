@@ -44,6 +44,7 @@ import { QuickBooksCustomerStep } from "@/components/specialOrders/QuickBooksCus
 import {
   groupTotals,
   invoicePaper,
+  paperText,
   invoiceFileName,
   invoiceNumberText,
   invoiceTotalsBreakdown,
@@ -462,6 +463,11 @@ export function SendCustomerInvoice({
   );
 }
 
+/** The Totals window less its payments, which the pay page reads live. */
+function withoutPayments(b: ReturnType<typeof invoiceTotalsBreakdown>) {
+  return { subtotal: b.subtotal, discount: b.discount, delivery: b.delivery, rush: b.rush, tax: b.tax, prior: b.prior };
+}
+
 function invoiceSnapshotOf(
   view: InvoiceView,
   number: string,
@@ -480,6 +486,8 @@ function invoiceSnapshotOf(
     // subtracts every payment tagged with the invoice, so a link re-sent
     // after a part-payment still asks for the rest and no more.
     totals: { total: view.total },
+    paper: invoicePaper(view.groups),
+    breakdown: withoutPayments(invoiceTotalsBreakdown(view.lines, 0)),
     notes_quote: view.invoice.notes,
     org: { name: org.name, addressLine: org.addressLine, contactLine: org.contactLine, terms: org.terms },
     sent_on: today,
@@ -508,7 +516,7 @@ function invoiceEmail(
     full_name: fullName,
     total: money(view.balance),
     due_on: view.invoice.due_on ? usDate(view.invoice.due_on) : "on receipt",
-    orders: snapshotLines(view.groups).map((l) => `${l.description} — ${money(l.amount)}`).join("\n"),
+    orders: paperText(invoicePaper(view.groups), invoiceTotalsBreakdown(view.lines, 0), view.paid, view.balance),
     pay_url: pay,
     pay_line: viaQbo ? quickBooksPayLine(pay) : payLine(pay),
     employee_name: employeeName,
