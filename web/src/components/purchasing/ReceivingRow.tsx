@@ -27,6 +27,7 @@ export function ReceivingRow({
   canMatch,
   canReceive,
   saving,
+  counting,
   onSetReceived,
   onPrice,
   onMatch,
@@ -43,6 +44,9 @@ export function ReceivingRow({
   /** purchaser+ — below that every control renders as text. */
   canReceive: boolean;
   saving: boolean;
+  /** Locks only the count controls. Narrower than `saving`, which also covers
+   *  a refresh: a count applies on the tap and must never wait on one. */
+  counting: boolean;
   onSetReceived: (value: number | null) => void;
   onPrice: (action: PriceAction) => void;
   onMatch: () => void;
@@ -195,7 +199,7 @@ export function ReceivingRow({
             <>
               <button
                 type="button"
-                disabled={saving}
+                disabled={counting}
                 onClick={() => step(-1)}
                 aria-label={`Decrease received ${name} by one`}
                 className="flex h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-ink text-ink hover:bg-neutral-100 disabled:opacity-35"
@@ -204,7 +208,7 @@ export function ReceivingRow({
               </button>
               <input
                 inputMode="decimal"
-                disabled={saving}
+                disabled={counting}
                 value={draft ?? (received === null ? "" : String(received))}
                 onChange={(e) => setDraft(e.target.value)}
                 onBlur={(e) => commit(e.target.value)}
@@ -219,7 +223,7 @@ export function ReceivingRow({
               />
               <button
                 type="button"
-                disabled={saving}
+                disabled={counting}
                 onClick={() => step(1)}
                 aria-label={`Increase received ${name} by one`}
                 className="flex h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-ink text-ink hover:bg-neutral-100 disabled:opacity-35"

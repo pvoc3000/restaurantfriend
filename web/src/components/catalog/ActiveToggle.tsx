@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useLatestWrite } from "@/lib/latestWrite";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Switch } from "@/components/ui/Switch";
 
@@ -72,8 +73,31 @@ export function ActiveToggle({
   const router = useRouter();
   const supabase = createClient();
   const [on, setOn] = useState(active);
-  const [pending, startTransition] = useTransition();
   const [failed, setFailed] = useState(false);
+  // What the database was last known to hold, for putting back on a failure.
+  const confirmed = useRef(active);
+  // Written behind the tap, one at a time, and never disabled while it goes
+  // (`lib/latestWrite`) — it used to wait out a whole-route refresh.
+  const push = useLatestWrite<boolean>(
+    async (next) => {
+      const { error } = onWrite
+        ? await onWrite(next)
+        : await supabase
+            .from(table)
+            .update({ [column]: next })
+            .eq("id", id);
+      if (error) return typeof error === "string" ? error : error.message;
+      confirmed.current = next;
+      return null;
+    },
+    (error) => {
+      if (error) {
+        setOn(confirmed.current);
+        setFailed(true);
+      }
+      router.refresh();
+    }
+  );
 
   const name =
     label ?? (on ? "Active — click to deactivate" : "Inactive — click to activate");
@@ -82,20 +106,7 @@ export function ActiveToggle({
     const next = !on;
     setOn(next);
     setFailed(false);
-    startTransition(async () => {
-      const { error } = onWrite
-        ? await onWrite(next)
-        : await supabase
-            .from(table)
-            .update({ [column]: next })
-            .eq("id", id);
-      if (error) {
-        setOn(!next);
-        setFailed(true);
-        return;
-      }
-      router.refresh();
-    });
+    push(next);
   }
 
   if (readOnly) {
@@ -113,12 +124,11 @@ export function ActiveToggle({
       {control === "switch" ? (
         <Switch
           checked={on}
-          disabled={pending}
           onChange={toggle}
           label={name}
         />
       ) : (
-        <Checkbox size="lg" checked={on} disabled={pending} onChange={toggle} label={name} />
+        <Checkbox size="lg" checked={on} onChange={toggle} label={name} />
       )}
       {failed && (
         <span className="text-[12px] uppercase tracking-[0.12em] text-accent">

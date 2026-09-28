@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { Fragment, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -94,7 +94,7 @@ export function PlanMatrix({
   planId,
   orgId,
   trays,
-  slots,
+  slots: savedSlots,
   items,
   defaultPars,
   locationId,
@@ -144,6 +144,50 @@ export function PlanMatrix({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  /**
+   * A PAR STEP NEVER WAITS ON THE LAST ONE (Mark, 2026-09-28, after the order
+   * guide's steppers). Every write used to go through `run`, whose transition
+   * holds `pending` until `router.refresh()` has re-rendered the whole plan —
+   * and `pending` disables every stepper, ✕ and offer on the screen. Tapping ▲
+   * three times raised the par by one.
+   *
+   * Par steps, taken defaults, ✕ and "set default" now apply HERE on the tap:
+   * `parOverlay` holds the par asked for and `removed` the slots taken off,
+   * until the server's copy arrives. Each slot's par saves one write at a time
+   * (`wantedPar`): taps made while a save runs go as ONE follow-up with the
+   * latest number, because separate updates in flight can land in either
+   * order. The refresh runs once, when the last write lands, and holds nothing.
+   * A failed write drops the slot's overlay and says why in the popup.
+   *
+   * Structural writes — drags, adding, renumbering, tray edits — still go
+   * through `run` and still lock the plan, on purpose: each computes from the
+   * layout on screen, and running two against a layout neither has seen yet
+   * is how a sort order gets corrupted.
+   *
+   * Overlays are dropped when fresh `slots` arrive and the slot has no write in
+   * flight, by adjusting state during render (no frame of the old value).
+   */
+  const [parOverlay, setParOverlay] = useState<ReadonlyMap<string, number | null>>(
+    () => new Map()
+  );
+  const [removed, setRemoved] = useState<ReadonlySet<string>>(() => new Set());
+  const [inFlight, setInFlight] = useState<ReadonlySet<string>>(() => new Set());
+  const [seenSlots, setSeenSlots] = useState(savedSlots);
+  if (seenSlots !== savedSlots) {
+    setSeenSlots(savedSlots);
+    setParOverlay((prev) => new Map([...prev].filter(([id]) => inFlight.has(id))));
+    setRemoved((prev) => new Set([...prev].filter((id) => inFlight.has(id))));
+  }
+  const slots = useMemo(
+    () =>
+      savedSlots
+        .filter((s) => !removed.has(s.id))
+        .map((s) => (parOverlay.has(s.id) ? { ...s, par: parOverlay.get(s.id) ?? null } : s)),
+    [savedSlots, removed, parOverlay]
+  );
+  const wantedPar = useRef(new Map<string, number | null>());
+  /** Quick writes still running; the refresh waits for the last of them. */
+  const quickWrites = useRef(0);
   const [adding, setAdding] = useState<{ trayId: string; weekday: number } | null>(null);
   const [newTray, setNewTray] = useState(false);
   const [editing, setEditing] = useState<MatrixTray | null>(null);
@@ -282,6 +326,61 @@ export function PlanMatrix({
   }
 
   /**
+   * A write nothing else on the screen computes from, so it locks nothing.
+   * `rowId` marks the slot it concerns as in flight, which keeps that slot's
+   * overlay alive over a refresh that was started before the write landed.
+   */
+  function quick(
+    rowId: string,
+    work: (supabase: ReturnType<typeof createClient>) => Promise<string | null>
+  ) {
+    quickWrites.current += 1;
+    setInFlight((prev) => new Set(prev).add(rowId));
+    void (async () => {
+      const message = await work(createClient());
+      setInFlight((prev) => {
+        const rest = new Set(prev);
+        rest.delete(rowId);
+        return rest;
+      });
+      quickWrites.current -= 1;
+      if (quickWrites.current === 0) router.refresh();
+      if (message) await alertDialog({ title: "That didn't work", body: message });
+    })();
+  }
+
+  /** Set one slot's par now, and save it behind any save already running. */
+  function writePar(rowId: string, par: number | null) {
+    setParOverlay((prev) => new Map(prev).set(rowId, par));
+    const running = wantedPar.current.has(rowId);
+    wantedPar.current.set(rowId, par);
+    if (running) return;
+    quick(rowId, async (supabase) => {
+      for (;;) {
+        const sending = wantedPar.current.get(rowId) ?? null;
+        const { data, error } = await supabase
+          .from("production_plan_tray_items")
+          .update({ par: sending })
+          .eq("id", rowId)
+          .select("id");
+        if (error || !data?.length) {
+          wantedPar.current.delete(rowId);
+          setParOverlay((prev) => {
+            const rest = new Map(prev);
+            rest.delete(rowId);
+            return rest;
+          });
+          return error?.message ?? "That par could not be changed.";
+        }
+        if (wantedPar.current.get(rowId) === sending) {
+          wantedPar.current.delete(rowId);
+          return null;
+        }
+      }
+    });
+  }
+
+  /**
    * Keep `production_plan_trays.sort` in step with the tray NUMBERS, which is
    * the order the matrix reads them in (`compareTrayNumbers`). `sort` is what
    * `production_day` and the printed packet order by, and until now nothing
@@ -389,13 +488,22 @@ export function PlanMatrix({
   }
 
   function removeSlot(rowId: string) {
-    run(async (supabase) => {
+    setRemoved((prev) => new Set(prev).add(rowId));
+    quick(rowId, async (supabase) => {
       const { data, error } = await supabase
         .from("production_plan_tray_items")
         .delete()
         .eq("id", rowId)
         .select("id");
-      return error || !data?.length ? error?.message ?? "That could not be removed." : null;
+      if (error || !data?.length) {
+        setRemoved((prev) => {
+          const rest = new Set(prev);
+          rest.delete(rowId);
+          return rest;
+        });
+        return error?.message ?? "That could not be removed.";
+      }
+      return null;
     });
   }
 
@@ -485,14 +593,7 @@ export function PlanMatrix({
   function stepSlot(slot: TraySlot, direction: 1 | -1) {
     const next = stepPar(slot.par, stepFor(slot.itemId), direction);
     if (next === slot.par) return; // already on the floor
-    run(async (supabase) => {
-      const { data, error } = await supabase
-        .from("production_plan_tray_items")
-        .update({ par: next })
-        .eq("id", slot.rowId)
-        .select("id");
-      return error || !data?.length ? error?.message ?? "That par could not be changed." : null;
-    });
+    writePar(slot.rowId, next);
   }
 
   /**
@@ -514,24 +615,12 @@ export function PlanMatrix({
    * still exactly the row on screen the stepper sits beside.
    */
   function stepTray(days: TraySlot[][], direction: 1 | -1, index: number) {
-    const groups = new Map<number, string[]>();
     for (const day of days) {
       const slot = day[index];
       if (!slot) continue;
       const next = stepPar(slot.par, stepFor(slot.itemId), direction);
-      if (next === slot.par) continue;
-      groups.set(next, [...(groups.get(next) ?? []), slot.rowId]);
+      if (next !== slot.par) writePar(slot.rowId, next);
     }
-    if (!groups.size) return;
-    run(async (supabase) => {
-      const results = await Promise.all(
-        [...groups].map(([par, ids]) =>
-          supabase.from("production_plan_tray_items").update({ par }).in("id", ids).select("id")
-        )
-      );
-      const bad = results.find((r) => r.error || !r.data?.length);
-      return bad ? bad.error?.message ?? "That tray could not be changed." : null;
-    });
   }
 
   /**
@@ -654,7 +743,7 @@ export function PlanMatrix({
   function updateDefault(slot: TraySlot, weekday: number) {
     if (slot.par === null) return;
     const strip = withSlot(defaultPars[slot.itemId] ?? null, weekday - 1, slot.par, 7);
-    run(async (supabase) => {
+    quick(slot.rowId, async (supabase) => {
       const { data, error } = await supabase
         .from("production_item_locations")
         .upsert(
@@ -725,14 +814,7 @@ export function PlanMatrix({
   /** Take the destination's default for a slot a drag landed on. */
   function takeSuggested(rowId: string, par: number) {
     dismissLanded(rowId);
-    run(async (supabase) => {
-      const { data, error } = await supabase
-        .from("production_plan_tray_items")
-        .update({ par })
-        .eq("id", rowId)
-        .select("id");
-      return error || !data?.length ? error?.message ?? "That par could not be changed." : null;
-    });
+    writePar(rowId, par);
   }
 
   const { dragging, startSlotDrag, chipRef, moveZoneRef, copyZoneRef } = useSlotDrag({

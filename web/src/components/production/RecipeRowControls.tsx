@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { freezeScales, type ScalableLine, type ScaleColumn } from "@/lib/production";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { useLatestWrite } from "@/lib/latestWrite";
 
 /**
  * The AUTO box — FileMaker's `AutoUpdate_bool`, one per ingredient row, sitting
@@ -52,22 +53,12 @@ export function ScaleAutoBox({
   const supabase = createClient();
   const auto = line.scaleAuto !== false;
   const [on, setOn] = useState(auto);
-  const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
-
-  if (!editable) {
-    return (
-      <span className="text-[11px] uppercase tracking-[0.12em] text-subtle">
-        {auto ? "auto" : "set"}
-      </span>
-    );
-  }
-
-  function toggle() {
-    const next = !on;
-    setOn(next);
-    setFailed(false);
-    start(async () => {
+  // What the database was last known to hold, for putting back on a failure.
+  const confirmed = useRef(auto);
+  // Written behind the tap and never disabled while it goes (`lib/latestWrite`).
+  const push = useLatestWrite<boolean>(
+    async (next) => {
       const frozen = next ? null : freezeScales(line, columns, base, percent, baseIndex);
       const { data, error } = await supabase
         .from("production_recipe_lines")
@@ -81,20 +72,38 @@ export function ScaleAutoBox({
         // a bare call would report a cheerful success and leave the switch
         // showing a state the database never took.
         .select("id");
-      if (error || !data?.length) {
-        setOn(!next);
+      if (error || !data?.length) return error?.message ?? "not saved";
+      confirmed.current = next;
+      return null;
+    },
+    (error) => {
+      if (error) {
+        setOn(confirmed.current);
         setFailed(true);
-        return;
       }
       router.refresh();
-    });
+    }
+  );
+
+  if (!editable) {
+    return (
+      <span className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+        {auto ? "auto" : "set"}
+      </span>
+    );
+  }
+
+  function toggle() {
+    const next = !on;
+    setOn(next);
+    setFailed(false);
+    push(next);
   }
 
   return (
     <span className="inline-flex items-center gap-1">
       <Checkbox
         checked={on}
-        disabled={pending}
         label={
           on
             ? "Scaled from the multipliers — clear to type these columns"
@@ -125,7 +134,25 @@ export function HideOnPrint({
   const router = useRouter();
   const supabase = createClient();
   const [on, setOn] = useState(hidden);
-  const [pending, start] = useTransition();
+  // What the database was last known to hold, for putting back on a failure.
+  const confirmed = useRef(hidden);
+  // Written behind the tap and never disabled while it goes (`lib/latestWrite`).
+  const push = useLatestWrite<boolean>(
+    async (next) => {
+      const { data, error } = await supabase
+        .from("production_recipe_lines")
+        .update({ hide_on_print: next })
+        .eq("id", id)
+        .select("id");
+      if (error || !data?.length) return error?.message ?? "not saved";
+      confirmed.current = next;
+      return null;
+    },
+    (error) => {
+      if (error) setOn(confirmed.current);
+      router.refresh();
+    }
+  );
 
   if (!editable) {
     return hidden ? (
@@ -136,22 +163,10 @@ export function HideOnPrint({
   return (
     <Checkbox
       checked={on}
-      disabled={pending}
       label={on ? "Hidden when printed" : "Printed"}
       onChange={(next) => {
         setOn(next);
-        start(async () => {
-          const { data, error } = await supabase
-            .from("production_recipe_lines")
-            .update({ hide_on_print: next })
-            .eq("id", id)
-            .select("id");
-          if (error || !data?.length) {
-            setOn(!next);
-            return;
-          }
-          router.refresh();
-        });
+        push(next);
       }}
     />
   );

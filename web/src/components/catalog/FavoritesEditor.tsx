@@ -54,7 +54,6 @@ export function FavoritesEditor({
   const supabase = createClient();
   const [vendorItems, setVendorItems] = useState<VendorItem[] | null>(null);
   const [plan, setPlan] = useState<PlanMap>(new Map());
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Pure fetch (no setState) so it's safe to call from the effect and reuse
@@ -107,65 +106,87 @@ export function FavoritesEditor({
     };
   }, [fetchState, apply]);
 
-  async function toggle(weekday: number, viId: string, on: boolean) {
-    setBusy(true);
+  /**
+   * A TICK NEVER WAITS ON THE LAST ONE (Mark, 2026-09-28, after the order
+   * guide's steppers). Each tick used to write, then re-fetch the whole grid,
+   * then show — with every box on the grid disabled for all of it, so ticking
+   * Mon to Sun meant seven waits in a row.
+   *
+   * Now the box ticks on the tap and only THAT box is held while its row is
+   * written — it has to be, because unticking deletes by the id the insert
+   * hands back. Every other box stays live. A failed write re-fetches, so the
+   * grid shows what the database actually holds, and says why.
+   */
+  const [writing, setWriting] = useState<ReadonlySet<string>>(() => new Set());
+
+  async function setDays(viId: string, weekdays: number[], on: boolean) {
+    const keys = weekdays
+      .map((d) => key(d, viId))
+      .filter((k) => plan.has(k) !== on && !writing.has(k));
+    if (keys.length === 0) return;
+    const ids = keys.map((k) => plan.get(k)).filter(Boolean) as string[];
+
     setError(null);
-    const k = key(weekday, viId);
-    if (on) {
-      const { error } = await supabase.from("order_guide_plan_days").insert({
-        org_id: orgId,
-        item_location_id: itemLocationId,
-        weekday,
-        vendor_item_id: viId,
-      });
-      if (error) setError(error.message);
-    } else {
-      const id = plan.get(k);
-      if (id) {
-        const { error } = await supabase
-          .from("order_guide_plan_days")
-          .delete()
-          .eq("id", id);
-        if (error) setError(error.message);
+    setPlan((prev) => {
+      const next = new Map(prev);
+      for (const k of keys) {
+        if (on) next.set(k, "");
+        else next.delete(k);
       }
+      return next;
+    });
+    setWriting((prev) => new Set([...prev, ...keys]));
+
+    let failure: string | null = null;
+    if (on) {
+      const { data, error } = await supabase
+        .from("order_guide_plan_days")
+        .insert(
+          keys.map((k) => ({
+            org_id: orgId,
+            item_location_id: itemLocationId,
+            weekday: Number(k.split("|")[0]),
+            vendor_item_id: viId,
+          }))
+        )
+        .select("id, weekday, vendor_item_id");
+      if (error || data?.length !== keys.length) failure = error?.message ?? "Not saved.";
+      else
+        setPlan((prev) => {
+          const next = new Map(prev);
+          for (const r of data) next.set(key(r.weekday, r.vendor_item_id), r.id);
+          return next;
+        });
+    } else {
+      const { data, error } = await supabase
+        .from("order_guide_plan_days")
+        .delete()
+        .in("id", ids)
+        // A delete RLS refuses matches no rows and reports no error.
+        .select("id");
+      if (error || data?.length !== ids.length) failure = error?.message ?? "Not saved.";
     }
-    await load();
-    setBusy(false);
+
+    if (failure) {
+      setError(failure);
+      await load();
+    }
+    setWriting((prev) => {
+      const rest = new Set(prev);
+      for (const k of keys) rest.delete(k);
+      return rest;
+    });
     onChanged();
   }
 
-  async function toggleAllDays(viId: string, on: boolean) {
-    setBusy(true);
-    setError(null);
-    if (on) {
-      const missing = DAYS.filter((d) => !plan.has(key(d.weekday, viId)));
-      if (missing.length > 0) {
-        const { error } = await supabase.from("order_guide_plan_days").insert(
-          missing.map((d) => ({
-            org_id: orgId,
-            item_location_id: itemLocationId,
-            weekday: d.weekday,
-            vendor_item_id: viId,
-          }))
-        );
-        if (error) setError(error.message);
-      }
-    } else {
-      const ids = DAYS.map((d) => plan.get(key(d.weekday, viId))).filter(
-        Boolean
-      ) as string[];
-      if (ids.length > 0) {
-        const { error } = await supabase
-          .from("order_guide_plan_days")
-          .delete()
-          .in("id", ids);
-        if (error) setError(error.message);
-      }
-    }
-    await load();
-    setBusy(false);
-    onChanged();
-  }
+  const toggle = (weekday: number, viId: string, on: boolean) =>
+    void setDays(viId, [weekday], on);
+  const toggleAllDays = (viId: string, on: boolean) =>
+    void setDays(
+      viId,
+      DAYS.map((d) => d.weekday),
+      on
+    );
 
   if (vendorItems === null)
     return <p className="text-sm text-subtle">Loading favorites…</p>;
@@ -218,7 +239,7 @@ export function FavoritesEditor({
                         <span className="flex justify-center">
                           <Checkbox
                             checked={on}
-                            disabled={busy}
+                            disabled={writing.has(key(d.weekday, vi.id))}
                             onChange={(next) => toggle(d.weekday, vi.id, next)}
                             label={`${vi.vendors?.name ?? "vendor"} day ${d.weekday}`}
                           />
@@ -230,7 +251,6 @@ export function FavoritesEditor({
                     <span className="flex justify-center">
                       <Checkbox
                         checked={allOn}
-                        disabled={busy}
                         onChange={(next) => toggleAllDays(vi.id, next)}
                         label="all days"
                       />

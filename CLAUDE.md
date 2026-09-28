@@ -203,6 +203,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 - Breadcrumbs follow the route taken
 - Detail views are FULL-SCREEN PAGES
 - A detail screen that outgrows one page becomes TABS, and the employee record is the pattern
+- A TAP NEVER WAITS ON THE SERVER, AND NEVER ON A REFRESH — `lib/latestWrite`
 
 - **USE THE PARTS THAT EXIST — don't hand-roll a second one.** Every shared control encodes a decision that was expensive to reach. **Read `docs/ui-parts.md` (the parts table: what to reach for instead of a raw `<input>`, `<select>`, `<table>`, panel or button) before building or changing any UI.** A new shared part goes in `components/ui/`, gets a row in that table, and a specimen on `/interface`.
 - **Safari:** a table cell under `border-collapse` is NOT a containing block in

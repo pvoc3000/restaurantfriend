@@ -2452,3 +2452,26 @@
   Known gap, not fixed: `ScrollMemory` keys on pathname without the query, so
   all five tabs share one scroll position — `useScrollMemoryKey` is how the
   order guide solves exactly that.
+
+- **A TAP NEVER WAITS ON THE SERVER, AND NEVER ON A REFRESH** (Mark,
+  2026-09-28, after the order guide's steppers felt "very sluggish"). A control
+  you tap repeatedly — a stepper, a checkbox, a day button, a ✕ down a list —
+  shows its new value ON THE TAP and writes behind it. Three rules, each learned
+  from a screen that broke it:
+  1. **Never disable a repeat control for a save, and never for a refresh.** The
+     order guide's one page-wide `saving` flag, and every `disabled={pending}`
+     whose transition wraps `router.refresh()`, swallowed the second tap: +
+     three times added one. Lock a create dialog's Save (a double submit is
+     real); never lock a stepper.
+  2. **One write in flight per field, sending the LATEST value.** Separate
+     updates in flight can land in either order, and the database keeps the
+     one you tapped away from. `lib/latestWrite`'s `useLatestWrite` does this
+     for a single control; the order guide, receiving and the production plan
+     keep a `wanted` map per row for the same rule.
+  3. **Hold the new value until the server's copy arrives,** dropped by the
+     "adjust state during render" pattern when fresh props land and the row has
+     no write in flight. A failure puts back the last value known to be SAVED,
+     not the one before the tap, and says why.
+  Applied to: the checklist walk (`9f52b4db`), `InlineValue`, the order guide,
+  receiving, the favorites grid, the production plan's par steppers and ✕,
+  `WeekdayPicker`, `ActiveToggle`, and the recipe row's Auto/Hide boxes.

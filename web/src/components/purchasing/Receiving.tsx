@@ -74,13 +74,14 @@ import { confirmDialog, confirmDialogWithOption, splitConfirmMessage } from "@/l
  * required avoiding a duplicate VIEW.
  *
  * Nothing on this screen seeds state from server data, on purpose, so there is
- * no keying trap (CLAUDE.md's rule). The one exception is the document's signed
+ * no keying trap (CLAUDE.md's rule). The exceptions are the document's signed
  * URL, which is held and keyed inside `DocumentPane` for reasons documented
- * there.
+ * there, and the received counts still on their way to the server
+ * (`receivedOverlay`), which are dropped as the server's copy arrives.
  */
 export function Receiving({
   order,
-  lines,
+  lines: savedLines,
   locationCode,
   orgId,
   canReceive,
@@ -119,6 +120,46 @@ export function Receiving({
   const [lastBulk, setLastBulk] = useState<string[] | null>(null);
   /** The line being matched by hand, if the pick dialog is open. */
   const [matching, setMatching] = useState<PoLine | null>(null);
+
+  /**
+   * A COUNT NEVER WAITS ON THE LAST ONE (Mark, 2026-09-28, after the order
+   * guide's steppers). A received count used to change only after its update
+   * AND a `router.refresh()` of the whole screen — the order, its lines, every
+   * attachment's signed URL — and `pending` held every stepper on the screen
+   * disabled for all of it, so tapping + three times received one.
+   *
+   * Now the count moves on the tap: `receivedOverlay` holds what was asked for
+   * until the server's copy arrives, and the totals read it too. Each line saves
+   * one write at a time (`wantedReceived`): taps made while a save runs go as
+   * ONE follow-up with the latest number, because separate updates in flight
+   * can land in either order and leave the database a tap behind the screen.
+   * The refresh runs once the last write lands, and no longer locks the
+   * steppers. A failed write drops the line's overlay and says why.
+   *
+   * Overlays are dropped when fresh `lines` arrive and the line has no write in
+   * flight — adjusted during render, so there is no frame of the old count.
+   */
+  const [receivedOverlay, setReceivedOverlay] = useState<ReadonlyMap<string, number | null>>(
+    () => new Map()
+  );
+  const [receiving, setReceiving] = useState<ReadonlySet<string>>(() => new Set());
+  const [seenLines, setSeenLines] = useState(savedLines);
+  if (seenLines !== savedLines) {
+    setSeenLines(savedLines);
+    setReceivedOverlay((prev) => new Map([...prev].filter(([id]) => receiving.has(id))));
+  }
+  const lines = useMemo(
+    () =>
+      receivedOverlay.size === 0
+        ? savedLines
+        : savedLines.map((l) =>
+            receivedOverlay.has(l.id)
+              ? { ...l, qty_received: receivedOverlay.get(l.id) ?? null }
+              : l
+          ),
+    [savedLines, receivedOverlay]
+  );
+  const wantedReceived = useRef(new Map<string, number | null>());
 
   const layout = useReceivingLayout();
   const split = useReceivingSplit();
@@ -260,13 +301,47 @@ export function Receiving({
   }
 
   function setReceived(line: PoLine, value: number | null) {
+    const id = line.id;
     setLastBulk(null);
-    void write(() =>
-      supabase
+    setError(null);
+    setReceivedOverlay((prev) => new Map(prev).set(id, value));
+    const running = wantedReceived.current.has(id);
+    wantedReceived.current.set(id, value);
+    if (running) return; // the loop below sends it when the current save lands
+    void saveReceived(id);
+  }
+
+  async function saveReceived(id: string) {
+    setReceiving((prev) => new Set(prev).add(id));
+    for (;;) {
+      const sending = wantedReceived.current.get(id) ?? null;
+      const { data, error: writeError } = await supabase
         .from("purchase_order_items")
-        .update({ qty_received: value })
-        .eq("id", line.id)
-    );
+        .update({ qty_received: sending })
+        .eq("id", id)
+        // An update RLS refuses matches no rows and reports no error.
+        .select("id");
+      if (writeError || !data?.length) {
+        wantedReceived.current.delete(id);
+        setReceivedOverlay((prev) => {
+          const rest = new Map(prev);
+          rest.delete(id);
+          return rest;
+        });
+        setError(writeError?.message ?? "That count was not saved.");
+        break;
+      }
+      if (wantedReceived.current.get(id) === sending) {
+        wantedReceived.current.delete(id);
+        break;
+      }
+    }
+    setReceiving((prev) => {
+      const rest = new Set(prev);
+      rest.delete(id);
+      return rest;
+    });
+    if (wantedReceived.current.size === 0) router.refresh();
   }
 
   /**
@@ -649,6 +724,7 @@ export function Receiving({
             canMatch={(match?.unmatchedInvoice.length ?? 0) > 0}
             canReceive={canReceive}
             saving={saving}
+            counting={attachBusy}
             onSetReceived={(value) => setReceived(line, value)}
             onPrice={(action) => applyPrice(line, action)}
             onMatch={() => setMatching(line)}

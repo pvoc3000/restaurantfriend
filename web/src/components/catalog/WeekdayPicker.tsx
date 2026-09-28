@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useDayPaint } from "@/lib/dayPaint";
+import { useLatestWrite } from "@/lib/latestWrite";
 
 /**
  * What a DataTable column holding a day picker has to be, in px: seven 32px
@@ -123,35 +124,43 @@ export function WeekdayPicker({
   const router = useRouter();
   const supabase = createClient();
   const [days, setDays] = useState<number[]>(value ?? []);
-  const [pending, startTransition] = useTransition();
   const [failed, setFailed] = useState(false);
-
-  function write(next: number[]) {
-    const previous = days;
-
-    setDays(next);
-    setFailed(false);
-
-    startTransition(async () => {
+  // What the database was last known to hold, for putting back on a failure.
+  const confirmed = useRef<number[]>(value ?? []);
+  // Written behind the press, one at a time, and never disabled while it goes
+  // (`lib/latestWrite`): pressing Mon, Wed and Fri in quick succession used to
+  // lose the second and third to a whole-route refresh.
+  const push = useLatestWrite<number[]>(
+    async (next) => {
       const { error } = onWrite
         ? await onWrite(next)
         : await supabase
             .from(table)
             .update({ [column]: next })
             .eq("id", id);
+      if (error) return typeof error === "string" ? error : error.message;
+      confirmed.current = next;
+      return null;
+    },
+    (error) => {
       if (error) {
-        setDays(previous);
+        setDays(confirmed.current);
         setFailed(true);
-        return;
       }
       router.refresh();
-    });
+    }
+  );
+
+  function write(next: number[]) {
+    setDays(next);
+    setFailed(false);
+    push(next);
   }
 
   // Press a day to flip it; hold and swipe across others to make them match
   // it. One write on release, however many days the stroke crossed
   // (`lib/dayPaint`).
-  const paint = useDayPaint({ days, disabled: pending, commit: write });
+  const paint = useDayPaint({ days, disabled: false, commit: write });
 
   // All-on / all-off in one click — seven clicks to say "every day" is the
   // kind of friction that stops config from being kept accurate.
@@ -193,7 +202,6 @@ export function WeekdayPicker({
               type="button"
               aria-pressed={on}
               aria-label={`${label}: ${day.label}`}
-              disabled={pending}
               {...paint.dayProps(day.weekday)}
               className={`mac-day ${WEEKDAY_DAY_CLASS} disabled:opacity-35 ${
                 on ? WEEKDAY_ON_CLASS : WEEKDAY_OFF_CLASS
@@ -209,7 +217,6 @@ export function WeekdayPicker({
           type="button"
           aria-pressed={allOn}
           aria-label={`${label}: ${allOn ? "clear every day" : "select every day"}`}
-          disabled={pending}
           onClick={toggleAll}
           title={allOn ? "Clear every day" : "Select every day"}
           className={weekdayAllClass(allOn)}
