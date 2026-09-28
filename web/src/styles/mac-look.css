@@ -904,6 +904,13 @@ span:has(> input.mac-field) {
   box-shadow: inset 0 0 0 1px #000;
 }
 
+/* An ON track is black, so its hover edge is WHITE (Mark, 2026-09-28), as an
+   ON weekday's is. */
+.mac-switch:hover input:checked:not(:disabled) + label::before,
+.mac-switch:active input:checked:not(:disabled) + label::before {
+  box-shadow: inset 0 0 0 1px #fff;
+}
+
 /* HELD, THE THUMB SINKS HALFWAY INTO ITS SHADOW (Mark, 2026-09-11: "can the
    thumb 'push down' like other buttons when pressed", then — having seen the
    full drop — "instead of the thumb moving 3px, can it move just 1px and the
