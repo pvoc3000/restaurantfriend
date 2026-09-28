@@ -261,6 +261,129 @@ function json(status: number, body: unknown): Response {
 
 type Row = Record<string, unknown>;
 
+/**
+ * THE BOOKS FOR A QUICKBOOKS PAYMENTS REFUND (Mark, 2026-09-28: "build the
+ * RefundReceipt for full refunds"). A refund through the Payments API moves
+ * the money and books NOTHING — measured on SO-10088's $1.10: the Payment,
+ * the invoice and the day's deposits all unchanged. This writes the standard
+ * entry, a RefundReceipt, so QuickBooks' books match the card.
+ *
+ * FULL REFUNDS ONLY: the refund must be the whole QuickBooks Payment, and the
+ * Payment must pay exactly one invoice for exactly that amount. Then the
+ * receipt COPIES THAT INVOICE'S LINES as QuickBooks stored them (item, tax
+ * code, class, amount) with its tax code and location, which reverses the sale
+ * and its tax exactly; anything else is refused with a sentence, for a person
+ * to enter by hand.
+ *
+ * - Paid out of the account the Payment was deposited to, by the same payment
+ *   method, so the QuickBooks Payments deposit reconciles against it.
+ * - A RECORD ONLY: no `CreditCardPayment`/`ProcessPayment` on it, so it can
+ *   never ask QuickBooks Payments for a second refund.
+ * - `DocNumber` is the Payments API refund id, and is looked up first, so
+ *   booking the same refund twice finds the first receipt instead.
+ * - Its total is checked against the refund: QuickBooks computes the tax, and
+ *   a receipt that came out different is deleted and refused.
+ */
+async function bookRefundReceipt(
+  admin: SupabaseClient,
+  conn: Awaited<ReturnType<typeof loadConnection>>,
+  args: { qboPaymentId: string; refundId: string; cents: number; note: string }
+): Promise<{ id: string; existing: boolean }> {
+  const docNumber = args.refundId.slice(0, 21);
+  const found = (await qboFetch(
+    admin,
+    conn,
+    `query?query=${encodeURIComponent(`select Id from RefundReceipt where DocNumber = '${docNumber.replace(/'/g, "")}'`)}`
+  )) as { QueryResponse?: { RefundReceipt?: { Id: string }[] } };
+  const prior = found?.QueryResponse?.RefundReceipt?.[0];
+  if (prior) return { id: prior.Id, existing: true };
+
+  type Ref = { value: string; name?: string };
+  const pay = ((await qboFetch(admin, conn, `payment/${encodeURIComponent(args.qboPaymentId)}`)) as {
+    Payment?: {
+      TotalAmt?: number;
+      CustomerRef?: Ref;
+      DepositToAccountRef?: Ref;
+      PaymentMethodRef?: Ref;
+      Line?: { Amount?: number; LinkedTxn?: { TxnId: string; TxnType: string }[] }[];
+    };
+  })?.Payment;
+  if (!pay) throw new Error("QuickBooks could not find the payment.");
+  const cents = (v: unknown) => Math.round(Number(v ?? 0) * 100);
+  if (cents(pay.TotalAmt) !== args.cents) {
+    throw new Error("only a refund of the whole payment is booked automatically — enter this one in QuickBooks");
+  }
+  const links = (pay.Line ?? []).flatMap((l) => (l.LinkedTxn ?? []).map((t) => ({ ...t, amount: l.Amount })));
+  if (links.length !== 1 || links[0].TxnType !== "Invoice") {
+    throw new Error("the payment does not pay exactly one invoice — enter this refund in QuickBooks");
+  }
+  if (!pay.DepositToAccountRef) throw new Error("QuickBooks did not say which account the payment went to");
+
+  const inv = ((await qboFetch(admin, conn, `invoice/${encodeURIComponent(links[0].TxnId)}`)) as {
+    Invoice?: {
+      TotalAmt?: number;
+      DocNumber?: string;
+      CustomerRef?: Ref;
+      DepartmentRef?: Ref;
+      GlobalTaxCalculation?: string;
+      TxnTaxDetail?: { TxnTaxCodeRef?: Ref };
+      Line?: {
+        Amount?: number;
+        Description?: string;
+        DetailType?: string;
+        SalesItemLineDetail?: { ItemRef?: Ref; TaxCodeRef?: Ref; ClassRef?: Ref; Qty?: number; UnitPrice?: number };
+      }[];
+    };
+  })?.Invoice;
+  if (!inv) throw new Error("QuickBooks could not find the invoice the payment paid.");
+  if (cents(inv.TotalAmt) !== args.cents) {
+    throw new Error("the refund is not the whole invoice — enter this one in QuickBooks");
+  }
+
+  const lines = (inv.Line ?? [])
+    .filter((l) => l.DetailType === "SalesItemLineDetail" && l.SalesItemLineDetail?.ItemRef)
+    .map((l) => ({
+      Amount: l.Amount,
+      DetailType: "SalesItemLineDetail",
+      ...(l.Description ? { Description: l.Description } : {}),
+      SalesItemLineDetail: {
+        ItemRef: l.SalesItemLineDetail!.ItemRef,
+        ...(l.SalesItemLineDetail!.TaxCodeRef ? { TaxCodeRef: l.SalesItemLineDetail!.TaxCodeRef } : {}),
+        ...(l.SalesItemLineDetail!.ClassRef ? { ClassRef: l.SalesItemLineDetail!.ClassRef } : {}),
+        ...(l.SalesItemLineDetail!.Qty != null ? { Qty: l.SalesItemLineDetail!.Qty } : {}),
+        ...(l.SalesItemLineDetail!.UnitPrice != null ? { UnitPrice: l.SalesItemLineDetail!.UnitPrice } : {}),
+      },
+    }));
+  if (lines.length === 0) throw new Error("the invoice has no item lines to copy — enter this refund in QuickBooks");
+
+  const body: Record<string, unknown> = {
+    DocNumber: docNumber,
+    CustomerRef: inv.CustomerRef ?? pay.CustomerRef,
+    DepositToAccountRef: pay.DepositToAccountRef,
+    ...(pay.PaymentMethodRef ? { PaymentMethodRef: pay.PaymentMethodRef } : {}),
+    ...(inv.DepartmentRef ? { DepartmentRef: inv.DepartmentRef } : {}),
+    ...(inv.GlobalTaxCalculation ? { GlobalTaxCalculation: inv.GlobalTaxCalculation } : {}),
+    ...(inv.TxnTaxDetail?.TxnTaxCodeRef ? { TxnTaxDetail: { TxnTaxCodeRef: inv.TxnTaxDetail.TxnTaxCodeRef } } : {}),
+    Line: lines,
+    PrivateNote: args.note.slice(0, 4000),
+  };
+  const made = ((await qboFetch(admin, conn, `refundreceipt?requestid=${encodeURIComponent(`rr-${docNumber}`)}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  })) as { RefundReceipt?: { Id: string; SyncToken: string; TotalAmt?: number } })?.RefundReceipt;
+  if (!made) throw new Error("QuickBooks did not return the refund receipt");
+  if (cents(made.TotalAmt) !== args.cents) {
+    await qboFetch(admin, conn, "refundreceipt?operation=delete", {
+      method: "POST",
+      body: JSON.stringify({ Id: made.Id, SyncToken: made.SyncToken }),
+    }).catch(() => undefined);
+    throw new Error(
+      `QuickBooks worked the receipt out at $${(cents(made.TotalAmt) / 100).toFixed(2)}, not $${(args.cents / 100).toFixed(2)}, so it was removed — enter this refund in QuickBooks`
+    );
+  }
+  return { id: made.Id, existing: false };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -1656,7 +1779,92 @@ Deno.serve(async (req) => {
         }
         return json(200, { refund_id: result.id, status: result.status, kind, warning });
       }
-      return json(200, { refund_id: result.id, status: result.status, kind, amount: cents / 100 });
+      // The books (full refunds): a failure here is told, never undone — the
+      // money has gone back and is recorded; the receipt can be booked again
+      // with `book_refund`, which finds one already made.
+      let receipt: { id: string; existing: boolean } | null = null;
+      let booking: string | null = null;
+      try {
+        receipt = await bookRefundReceipt(admin, conn, {
+          qboPaymentId: pay.external_ref,
+          refundId: result.id,
+          cents,
+          note: `Refund ${result.id} through QuickBooks Payments${reason ? ` · ${reason}` : ""} (restaurantfriend)`,
+        });
+      } catch (e) {
+        booking = e instanceof Error ? e.message : String(e);
+      }
+      if (row.special_order_id) {
+        await supabase.from("special_order_events").insert({
+          org_id: orgId,
+          order_id: row.special_order_id,
+          message: receipt
+            ? `QuickBooks refund receipt ${receipt.id} booked for refund ${result.id}`
+            : `Refund ${result.id} NOT booked in QuickBooks: ${booking}`,
+          source: "app",
+        });
+      }
+      return json(200, {
+        refund_id: result.id,
+        status: result.status,
+        kind,
+        amount: cents / 100,
+        refund_receipt_id: receipt?.id ?? null,
+        ...(booking ? { warning: `not booked in QuickBooks: ${booking}.` } : {}),
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // book_refund — the RefundReceipt for a QuickBooks refund already made
+    // -----------------------------------------------------------------------
+    //
+    // For a refund made before the receipt existed (SO-10088's $1.10), or one
+    // whose booking failed. Takes the REFUND's application; idempotent, since
+    // `bookRefundReceipt` finds a receipt already made for that refund id.
+    if (mode === "book_refund") {
+      if (!isManager) return json(403, { error: "Only a manager or the owner can book a refund." });
+      const appId = (body as unknown as { application_id?: unknown }).application_id;
+      if (typeof appId !== "string") return json(400, { error: "missing application_id" });
+      const { data: r, error: rErr } = await supabase
+        .from("payment_applications")
+        .select("id, org_id, special_order_id, amount, customer_payments ( payment_type, external_ref, refund_of )")
+        .eq("id", appId)
+        .maybeSingle();
+      if (rErr) return json(400, { error: rErr.message });
+      const rp = (r as unknown as { customer_payments?: { payment_type: string | null; external_ref: string | null; refund_of: string | null } | null } | null)
+        ?.customer_payments;
+      if (!r || r.org_id !== orgId || !rp) return json(404, { error: "refund not found" });
+      if (rp.payment_type !== "QuickBooks Refund" || !rp.external_ref || !rp.refund_of) {
+        return json(400, { error: "Only a QuickBooks refund made from this app is booked from here." });
+      }
+      const { data: orig } = await supabase
+        .from("customer_payments")
+        .select("external_ref, payment_type")
+        .eq("id", rp.refund_of)
+        .maybeSingle();
+      if (!orig?.external_ref || orig.payment_type !== "QuickBooks Payments") {
+        return json(400, { error: "The refunded payment is not a QuickBooks Payments one." });
+      }
+      const conn = await loadConnection(admin, orgId);
+      try {
+        const receipt = await bookRefundReceipt(admin, conn, {
+          qboPaymentId: orig.external_ref as string,
+          refundId: rp.external_ref,
+          cents: Math.round(-Number(r.amount) * 100),
+          note: `Refund ${rp.external_ref} through QuickBooks Payments (restaurantfriend)`,
+        });
+        if (!receipt.existing && r.special_order_id) {
+          await supabase.from("special_order_events").insert({
+            org_id: orgId,
+            order_id: r.special_order_id,
+            message: `QuickBooks refund receipt ${receipt.id} booked for refund ${rp.external_ref}`,
+            source: "app",
+          });
+        }
+        return json(200, { refund_receipt_id: receipt.id, existing: receipt.existing });
+      } catch (e) {
+        return json(400, { error: e instanceof Error ? e.message : String(e) });
+      }
     }
 
     // -----------------------------------------------------------------------

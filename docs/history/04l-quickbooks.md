@@ -449,3 +449,19 @@ QuickBooks invoice payments, with Mark's $1.10 as the first live refund.
   `refundLeft` (lib/customerPayments, fixtures) hides it at zero and offers
   only the rest after a part refund, on both the order's and the invoice's
   Payments tables.
+- **The RefundReceipt, for full refunds (Mark, same day: "build the
+  RefundReceipt for full refunds").** `bookRefundReceipt` in `qbo-sync`, run
+  after every `refund_payment` and on its own as mode `book_refund` (a refund
+  already made; takes the refund's application). Only when the refund is the
+  whole QuickBooks Payment and that Payment pays exactly one invoice for
+  exactly that amount; then the receipt copies the INVOICE's lines as
+  QuickBooks stored them (item, tax code, class, qty/price, amount), its tax
+  code, location and `GlobalTaxCalculation`, paid from the Payment's
+  `DepositToAccountRef` by its `PaymentMethodRef`. A RECORD ONLY — no
+  `CreditCardPayment` — so it can never ask Payments for a second refund.
+  `DocNumber` = the Payments refund id, looked up first, so booking twice finds
+  the first receipt; `requestid` guards a retried POST. Its `TotalAmt` is
+  checked against the refund, and a receipt QuickBooks worked out differently
+  is DELETED and refused. A booking failure never undoes the refund: it is a
+  warning on the dialog and a line in the order's history. First checked with
+  `deno check` (via npx), which the function had never had.
