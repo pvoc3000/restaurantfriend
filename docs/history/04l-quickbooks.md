@@ -379,3 +379,19 @@
    This is the "A/R pull" killed on 2026-09-02, reopened with the experiment:
    it still stores nothing QuickBooks-side — the payment row here is the one
    record.
+
+**The payments scope, for refunds (2026-09-28).** Mark canceled a test order
+paid through QuickBooks Payments (SO-10088, INV-10001, $1.10) and found no way
+to refund it. The accounting API can only RECORD a refund: on both Payment and
+RefundReceipt, `ProcessPayment: true` means "store the card transaction's
+details". The money goes back through the Payments API, `POST
+/quickbooks/v4/payments/charges/<id>/refunds` (link from Mark). A read-only
+query of QuickBooks Payment 550778 (the $1.10) showed `TxnSource: EInvoice` and
+`CreditChargeResponse.CCTransId: "12ai3fquje9y"` — an invoice-page payment
+carries the transaction id that endpoint takes. So Decision 2 (accounting only)
+is REVERSED: `QBO_SCOPE` asks for accounting and payments, `qbo-oauth` sends the
+space as %20, `docs/quickbooks-setup.md` says so, and both `qbo-oauth`
+(`--no-verify-jwt`) and `qbo-sync` were redeployed. QuickBooks has to be
+reconnected once for the token to carry the new scope. Next: a read-only `GET
+/charges/12ai3fquje9y` to prove the id is accepted, then Refund… on
+QuickBooks invoice payments, with Mark's $1.10 as the first live refund.

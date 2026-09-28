@@ -114,9 +114,21 @@ export const INTUIT_AUTHORIZE = "https://appcenter.intuit.com/connect/oauth2";
 export const INTUIT_TOKEN = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
 export const INTUIT_REVOKE = "https://developer.api.intuit.com/v2/oauth2/tokens/revoke";
 
-/** Decision 2: accounting only. `com.intuit.quickbooks.payment` is the
- *  merchant-account scope and this integration deliberately does not take it. */
-export const QBO_SCOPE = "com.intuit.quickbooks.accounting";
+/**
+ * Accounting AND payments. Decision 2 was accounting only, because
+ * `com.intuit.quickbooks.payment` is the merchant-account scope. REVERSED by
+ * Mark, 2026-09-28, for one reason: refunding a QuickBooks-collected invoice
+ * from the app. The accounting API can only RECORD a refund (`ProcessPayment`
+ * on a Payment or RefundReceipt means "store the card transaction's details");
+ * the money goes back through the Payments API, `POST
+ * /quickbooks/v4/payments/charges/<id>/refunds`, where the id is the Payment's
+ * `CreditChargeResponse.CCTransId`. Nothing in this app CHARGES a card; the
+ * scope allows it, so a new use of it is a decision, not a convenience.
+ *
+ * Changing this changes nothing for an existing connection: a token carries
+ * the scopes it was granted, so QuickBooks has to be reconnected once.
+ */
+export const QBO_SCOPE = "com.intuit.quickbooks.accounting com.intuit.quickbooks.payment";
 
 /** PINNED, never omitted — an unpinned minor version silently changes which
  *  fields come back, which is `SQUARE_VERSION`'s lesson one provider over.

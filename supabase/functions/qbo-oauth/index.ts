@@ -113,7 +113,9 @@ Deno.serve(async (req) => {
         redirect_uri: redirectUri(),
         response_type: "code",
         state: start,
-      }).toString();
+        // `URLSearchParams` writes the scopes' space as "+"; Intuit's own
+        // examples use %20, so send that rather than find out.
+      }).toString().replace(/\+/g, "%20");
     return new Response(null, { status: 302, headers: { Location: authorize } });
   }
 

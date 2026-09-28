@@ -17,9 +17,13 @@ keeps sending its own documents from specialorders@ and info@.
    QuickBooks company. No separate signup.
 2. **Create an app** → **QuickBooks Online and Payments**. Name it
    `restaurantfriend`.
-3. Scope: **`com.intuit.quickbooks.accounting`** and nothing else.
-   `com.intuit.quickbooks.payment` is the merchant-account scope and this
-   integration deliberately does not take it.
+3. Scopes: **`com.intuit.quickbooks.accounting`** and
+   **`com.intuit.quickbooks.payment`**. Accounting only until 2026-09-28, when
+   Mark added payments for ONE use: refunding a QuickBooks-collected invoice
+   from the app (the accounting API can only record a refund; the Payments API
+   returns the money). The app never charges a card with it. See `QBO_SCOPE` in
+   `_shared/qbo.ts`. An existing connection has only the scopes it was granted,
+   so after this change QuickBooks is **reconnected once**.
 4. Left menu → **Keys & credentials**, under **Development Settings** for
    sandbox (**Production Settings** later). Copy the **Client ID** and
    **Client Secret**.
