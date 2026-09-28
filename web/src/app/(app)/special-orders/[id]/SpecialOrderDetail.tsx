@@ -73,7 +73,6 @@ import {
   readInvoiceTerms,
 } from "@/lib/customerInvoices";
 import { canRefundPayments, canScheduleProduction } from "@/lib/roles";
-import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
 
 const SPECIAL_ORDERS_CRUMB = { href: "/special-orders", label: "Orders" };
 
@@ -1038,27 +1037,6 @@ export async function SpecialOrderDetail({
                           {madeFrom.number}
                           {madeFrom.title ? ` — ${madeFrom.title}` : ""}
                         </Link>
-                      </Row>
-                    ) : null}
-                    {/* THE INVOICE THAT BILLS IT, when a customer invoice
-                        does (124) — shown only then, like Made from, so the
-                        8,000 orders billed on their own say nothing new. */}
-                    {orderInvoices.length > 0 ? (
-                      <Row label={orderInvoices.length === 1 ? "Invoice" : "Invoices"}>
-                        {orderInvoices.map((i) => (
-                          <span key={i.id} className="block">
-                            <Link
-                              href={invoiceHref(i.id, orderTabHref(id, "info", rawParams))}
-                              className="underline underline-offset-2"
-                            >
-                              {i.label}
-                            </Link>
-                            {i.what ? <span className="ml-2 text-muted">{i.what}</span> : null}
-                            <span className="ml-3 align-middle">
-                              <InvoiceStatusChip status={i.status} />
-                            </span>
-                          </span>
-                        ))}
                       </Row>
                     ) : null}
                   </div>
