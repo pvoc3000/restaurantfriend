@@ -710,7 +710,9 @@ export function CustomerInvoicePdf({
   org: DocOrg;
 }) {
   const settled = invoice.balance <= 0;
-  const orderCount = invoice.lines.filter((l) => !l.free).length;
+  const orderRows = invoice.lines.filter((l) => !l.free);
+  const chargeRows = invoice.lines.filter((l) => l.free);
+  const orderCount = orderRows.length;
   // The columns something on this invoice uses; Subtotal always.
   const shown = PAPER_COLUMNS.filter(
     (c) => c.key === "subtotal" || invoice.lines.some((l) => Math.abs(l.parts?.[c.key] ?? 0) >= 0.005)
@@ -761,48 +763,31 @@ export function CustomerInvoicePdf({
             </View>
           </View>
 
-          <View style={s.items}>
-            <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
-              {orderCount === 0 ? "Charges" : orderCount === 1 ? "Order" : "Orders"}{" "}
-              <Text style={s.sectionCount}>{orderCount === 0 ? invoice.lines.length : orderCount}</Text>
-            </Text>
-            {invoice.columns ? (
-              <>
+          {/* ORDERS, then OTHER CHARGES — two sections headed alike (Mark,
+              2026-09-27: "make the 'other charges' header the same formatting
+              as 'order'"), each with its own column labels. */}
+          {[
+            { title: orderCount === 1 ? "Order" : "Orders", first: invoice.columns ? "Order" : "Item", rows: orderRows },
+            { title: "Other charges", first: "Charge", rows: chargeRows },
+          ]
+            .filter((sec) => sec.rows.length > 0)
+            .map((sec) => (
+              <View key={sec.title} style={s.items}>
+                <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
+                  {sec.title} <Text style={s.sectionCount}>{sec.rows.length}</Text>
+                </Text>
                 <View style={s.tableHead} fixed>
-                  <Text style={[s.th, s.invDesc]}>{orderCount === 0 ? "Charge" : "Order"}</Text>
-                  {shown.map((c) => (
-                    <Text key={c.key} style={[s.th, s.invCol]}>{c.label}</Text>
-                  ))}
+                  <Text style={[s.th, s.invDesc]}>{sec.first}</Text>
+                  {invoice.columns ? (
+                    shown.map((c) => (
+                      <Text key={c.key} style={[s.th, s.invCol]}>{c.label}</Text>
+                    ))
+                  ) : (
+                    <Text style={[s.th, s.invAmount]}>Amount</Text>
+                  )}
                 </View>
-                {invoice.lines.map((l, i) => (
-                  <View key={i}>
-                    {l.free && orderCount > 0 && !invoice.lines[i - 1]?.free ? (
-                      <View style={s.invBand} wrap={false}>
-                        <Text style={s.invBandText}>Other charges</Text>
-                      </View>
-                    ) : null}
-                    <View style={s.invRow} wrap={false}>
-                      <Text style={s.invDesc}>{l.description}</Text>
-                      {shown.map((c) => {
-                        const v = l.parts?.[c.key] ?? 0;
-                        return (
-                          <Text key={c.key} style={v ? (v < 0 ? [s.invCol, { color: MUTED }] : s.invCol) : [s.invCol, s.empty]}>
-                            {v ? money(v) : "—"}
-                          </Text>
-                        );
-                      })}
-                    </View>
-                  </View>
-                ))}
-              </>
-            ) : (
-              <>
-                <View style={s.tableHead} fixed>
-                  <Text style={[s.th, s.invDesc]}>Item</Text>
-                  <Text style={[s.th, s.invAmount]}>Amount</Text>
-                </View>
-                {invoice.lines.map((l, i) =>
-                  l.detail ? (
+                {sec.rows.map((l, i) =>
+                  l.detail && !invoice.columns ? (
                     <View key={i}>
                       <View style={s.invBand} wrap={false}>
                         <Text style={[s.invBandText, s.invDesc]}>{l.description}</Text>
@@ -817,22 +802,25 @@ export function CustomerInvoicePdf({
                       ))}
                     </View>
                   ) : (
-                    <View key={i}>
-                      {l.free && orderCount > 0 && !invoice.lines[i - 1]?.free ? (
-                        <View style={s.invBand} wrap={false}>
-                          <Text style={s.invBandText}>Other charges</Text>
-                        </View>
-                      ) : null}
-                      <View style={s.invRow} wrap={false}>
-                        <Text style={s.invDesc}>{l.description}</Text>
+                    <View key={i} style={s.invRow} wrap={false}>
+                      <Text style={s.invDesc}>{l.description}</Text>
+                      {invoice.columns ? (
+                        shown.map((c) => {
+                          const v = l.parts?.[c.key] ?? 0;
+                          return (
+                            <Text key={c.key} style={v ? (v < 0 ? [s.invCol, { color: MUTED }] : s.invCol) : [s.invCol, s.empty]}>
+                              {v ? money(v) : "—"}
+                            </Text>
+                          );
+                        })
+                      ) : (
                         <Text style={s.invAmount}>{money(l.amount)}</Text>
-                      </View>
+                      )}
                     </View>
                   )
                 )}
-              </>
-            )}
-          </View>
+              </View>
+            ))}
 
           <View style={s.foot} wrap={false}>
             <View style={s.notes}>
