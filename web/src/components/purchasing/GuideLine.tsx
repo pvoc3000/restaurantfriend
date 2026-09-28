@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import Link from "next/link";
 import { withFrom, type Crumb } from "@/lib/breadcrumbs";
 import {
@@ -27,7 +27,7 @@ import { useCalcField } from "@/components/ui/CalcPad";
  * than per keystroke; the steppers commit immediately, since a click is already
  * a complete decision.
  */
-export function GuideLine({
+export const GuideLine = memo(function GuideLine({
   row,
   entry,
   weekday,
@@ -36,8 +36,7 @@ export function GuideLine({
   itemPar,
   baseUnit,
   wasLastPurchased,
-  onCommit,
-  saving,
+  onCommit: commitRow,
 }: {
   row: GuideRow;
   entry: EntryState | undefined;
@@ -49,9 +48,10 @@ export function GuideLine({
   baseUnit: string;
   /** This is the source the item was most recently bought from here (048). */
   wasLastPurchased: boolean;
-  onCommit: (patch: Partial<EntryState>) => void;
-  saving: boolean;
+  /** Stable across renders, which is what lets `memo` skip untouched rows. */
+  onCommit: (row: GuideRow, patch: Partial<EntryState>) => void;
 }) {
+  const onCommit = (patch: Partial<EntryState>) => commitRow(row, patch);
   const calcField = useCalcField();
   const [qtyDraft, setQtyDraft] = useState<string | null>(null);
   const [onHandDraft, setOnHandDraft] = useState<string | null>(null);
@@ -311,7 +311,6 @@ export function GuideLine({
         <span className="inline-flex items-baseline gap-1.5">
           <input
             {...calcField}
-            disabled={saving}
             value={onHandDraft ?? (onHand === null ? "" : String(onHand))}
             onChange={(e) => setOnHandDraft(e.target.value)}
             onBlur={(e) => commitOnHand(e.target.value)}
@@ -337,7 +336,7 @@ export function GuideLine({
         ) : (
           <button
             type="button"
-            disabled={saving || suggestion === qty}
+            disabled={suggestion === qty}
             onClick={() => onCommit({ qty_to_order: suggestion })}
             title="Use the suggested quantity"
             className="px-1 hover:bg-neutral-100 disabled:opacity-35"
@@ -368,7 +367,6 @@ export function GuideLine({
           </span>
           <button
             type="button"
-            disabled={saving}
             onClick={() => step(-1)}
             aria-label="Decrease by one"
             className="flex h-9 w-9 items-center justify-center rounded-full border-[1.5px] border-ink text-ink hover:bg-neutral-100 disabled:opacity-35"
@@ -377,7 +375,6 @@ export function GuideLine({
           </button>
           <input
             {...calcField}
-            disabled={saving}
             value={qtyDraft ?? (qty === null ? "" : String(qty))}
             onChange={(e) => setQtyDraft(e.target.value)}
             onBlur={(e) => commitQty(e.target.value)}
@@ -391,7 +388,6 @@ export function GuideLine({
           />
           <button
             type="button"
-            disabled={saving}
             onClick={() => step(1)}
             aria-label="Increase by one"
             className="flex h-9 w-9 items-center justify-center rounded-full border-[1.5px] border-ink text-ink hover:bg-neutral-100 disabled:opacity-35"
@@ -422,4 +418,4 @@ export function GuideLine({
       </td>
     </tr>
   );
-}
+});

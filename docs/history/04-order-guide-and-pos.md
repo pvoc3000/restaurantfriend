@@ -1384,3 +1384,16 @@ page. The shopping list keeps its internal content — our item name first,
 the composed pack, unit prices and the estimated total (in the special-order
 documents' Mac-window frame, no yellow: an estimate is nothing to chase) —
 grouped by shop section in walk order.
+
+**THE STEPPERS NO LONGER WAIT ON THE LAST TAP (2026-09-28).** Mark: the −/+
+buttons "feel very sluggish". The number already moved on the tap; what made it
+slow was ONE page-wide `saving` flag that disabled every stepper, box and
+suggestion on the guide for the whole round trip, so a second tap inside it was
+swallowed and the row blinked to 35%. The flag is gone. Each vendor item now
+saves one write at a time (`wanted` in `OrderGuide.commit`): taps made while a
+save runs are sent as ONE follow-up with the latest value, because separate
+upserts in flight can land in either order and leave the database one tap
+behind the screen. A failed save restores the last value known to be saved.
+`GuideLine` is now `memo`'d with a stable `onCommit`, so a tap redraws its own
+row rather than every line on the guide. Same idea as the checklist walk's fix
+(`9f52b4db`): nothing the user sees waits on the server.

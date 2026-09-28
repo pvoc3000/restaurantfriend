@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -204,7 +204,6 @@ export function OrderGuide({
       return next;
     });
   }
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Seeded from the session cookie by the server, so you come back to the view
   // you left rather than to the defaults. Favorites is the working mode when
@@ -319,40 +318,80 @@ export function OrderGuide({
     })}; path=/; SameSite=Lax`;
   }, [weekday, filter, grouping, ignoreDays, vendors, term]);
 
+  /**
+   * A TAP NEVER WAITS ON THE LAST ONE (Mark, 2026-09-28: the steppers "feel
+   * very sluggish"). The number always moved on the tap, but one page-wide
+   * `saving` flag disabled EVERY stepper, box and suggestion on the guide
+   * until the save came back, so a second tap within the round trip was
+   * swallowed and the whole row blinked to 35%. Tapping + three times did not
+   * add three.
+   *
+   * Now nothing is disabled, and each vendor item saves one write at a time:
+   * `wanted` holds the latest value asked for while a save is running, and when
+   * a save lands the loop sends whatever was asked for since. Firing each tap as
+   * its own upsert instead would race — two requests in flight can land in
+   * either order, and the database could keep 2 while the screen says 3. A
+   * failed save puts back the last value the database is known to hold.
+   */
+  const wanted = useRef(new Map<string, EntryState>());
+
   async function commit(row: GuideRow, patch: Partial<EntryState>) {
-    const current = entries.get(row.vendor_item_id) ?? { on_hand: null, qty_to_order: null };
-    const next: EntryState = { ...current, ...patch };
+    const id = row.vendor_item_id;
+    const stored = entries.get(id) ?? { on_hand: null, qty_to_order: null };
+    const running = wanted.current.has(id);
+    const next: EntryState = { ...(wanted.current.get(id) ?? stored), ...patch };
 
-    setEntries((prev) => new Map(prev).set(row.vendor_item_id, next));
-    setPendingWrites((prev) => new Set(prev).add(row.vendor_item_id));
-    setSaving(true);
+    wanted.current.set(id, next);
+    setEntries((prev) => new Map(prev).set(id, next));
     setError(null);
+    if (running) return; // the loop below sends it when the current save lands
 
-    const { error } = await supabase.from("order_guide_entries").upsert(
-      {
-        org_id: orgId,
-        location_id: locationId,
-        guide_date: guideDate,
-        vendor_item_id: row.vendor_item_id,
-        on_hand: next.on_hand,
-        qty_to_order: next.qty_to_order,
-      },
-      { onConflict: "location_id,guide_date,vendor_item_id" }
-    );
-
-    setSaving(false);
+    setPendingWrites((prev) => new Set(prev).add(id));
+    let saved = stored;
+    for (;;) {
+      const sending = wanted.current.get(id)!;
+      const { error } = await supabase.from("order_guide_entries").upsert(
+        {
+          org_id: orgId,
+          location_id: locationId,
+          guide_date: guideDate,
+          vendor_item_id: id,
+          on_hand: sending.on_hand,
+          qty_to_order: sending.qty_to_order,
+        },
+        { onConflict: "location_id,guide_date,vendor_item_id" }
+      );
+      if (error) {
+        // Put the last saved value back rather than leaving a number on
+        // screen that isn't in the database.
+        wanted.current.delete(id);
+        setEntries((prev) => new Map(prev).set(id, saved));
+        setError(error.message);
+        break;
+      }
+      saved = sending;
+      if (wanted.current.get(id) === sending) {
+        wanted.current.delete(id);
+        break;
+      }
+    }
     setPendingWrites((prev) => {
       const rest = new Set(prev);
-      rest.delete(row.vendor_item_id);
+      rest.delete(id);
       return rest;
     });
-    if (error) {
-      // Put the old value back rather than leaving a number on screen that
-      // isn't in the database.
-      setEntries((prev) => new Map(prev).set(row.vendor_item_id, current));
-      setError(error.message);
-    }
   }
+
+  // One function for every line, so a memoised `GuideLine` whose entry did not
+  // change skips re-rendering: a tap redraws its own row, not all of them.
+  const commitRef = useRef(commit);
+  useEffect(() => {
+    commitRef.current = commit;
+  });
+  const onCommit = useCallback(
+    (row: GuideRow, patch: Partial<EntryState>) => void commitRef.current(row, patch),
+    []
+  );
 
   /**
    * The tier and the search applied, but NOT the vendor filter — what the
@@ -420,7 +459,10 @@ export function OrderGuide({
   // you were walking, not whichever day defaults today.
   // The trail back from an item returns to the DAY you left, which is now one
   // parameter rather than two.
-  const here = { href: guideHref(guideDate, today), label: "Order Guide" };
+  const here = useMemo(
+    () => ({ href: guideHref(guideDate, today), label: "Order Guide" }),
+    [guideDate, today]
+  );
 
   /**
    * Last purchase keyed by item-location, so an item header is a map lookup
@@ -1659,8 +1701,7 @@ export function OrderGuide({
                           lastByItemLocation.get(row.item_location_id)
                             ?.vendor_item_id === row.vendor_item_id
                         }
-                        saving={saving}
-                        onCommit={(patch) => commit(row, patch)}
+                        onCommit={onCommit}
                       />
                     ))}
                   </Fragment>
