@@ -402,5 +402,8 @@ QuickBooks invoice payments, with Mark's $1.10 as the first live refund.
   status **CAPTURED**, `clientTransID` equal to the Payment's `CCTransId`. So
   an invoice-page payment's `CCTransId` IS a Payments API charge id, and the
   reconnected token carries the payments scope. CAPTURED rather than SETTLED
-  matters for the refund: a charge not yet settled is VOIDED
-  (`charges/<id>/void`), a settled one REFUNDED — step 3 has to handle both.
+  may matter for the refund: QuickBooks' own screens void an unsettled
+  charge and refund a settled one, and the Payments API has both
+  (`charges/<id>/void`, `charges/<id>/refunds`). Whether its refund endpoint
+  accepts a charge that is only CAPTURED is UNVERIFIED — step 3 must handle
+  the answer either way.
