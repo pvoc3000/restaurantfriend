@@ -395,3 +395,12 @@ space as %20, `docs/quickbooks-setup.md` says so, and both `qbo-oauth`
 reconnected once for the token to carry the new scope. Next: a read-only `GET
 /charges/12ai3fquje9y` to prove the id is accepted, then Refund… on
 QuickBooks invoice payments, with Mark's $1.10 as the first live refund.
+- **Step 2, the read-only check, passed (same day).** After Mark reconnected,
+  `qbo-sync`'s new `get_charge` mode (`_shared/qbo.ts`' `paymentsFetch`, the
+  Payments host, a `Request-Id` per call, and a 401 that does NOT mark the
+  connection dead) read `charges/12ai3fquje9y` with HTTP 200: $1.10 USD, Visa,
+  status **CAPTURED**, `clientTransID` equal to the Payment's `CCTransId`. So
+  an invoice-page payment's `CCTransId` IS a Payments API charge id, and the
+  reconnected token carries the payments scope. CAPTURED rather than SETTLED
+  matters for the refund: a charge not yet settled is VOIDED
+  (`charges/<id>/void`), a settled one REFUNDED — step 3 has to handle both.

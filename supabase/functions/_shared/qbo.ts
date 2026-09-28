@@ -618,6 +618,75 @@ export async function qboFetch(
   );
 }
 
+// ---------------------------------------------------------------------------
+// The Payments API (2026-09-28) — a different host and a different shape
+// ---------------------------------------------------------------------------
+
+/** Where QuickBooks Payments lives. Not the accounting host, and no realm in
+ *  the path: the token says which company. */
+export function paymentsBase(environment: string): string {
+  return environment === "production" ? "https://api.intuit.com" : "https://sandbox.api.intuit.com";
+}
+
+/**
+ * One call to the Payments API (`/quickbooks/v4/payments/…`), with the same
+ * token as the accounting calls — it carries both scopes since 2026-09-28.
+ *
+ * `requestId` is Intuit's idempotency key: the same id sent twice gets the
+ * first answer back rather than a second operation. A caller that MOVES money
+ * must pass one it can repeat on a retry; a read can let this make one up.
+ *
+ * A 401 here does NOT mark the connection dead, unlike `qboFetch`: the likely
+ * cause is a token granted before the payments scope was added, and ending a
+ * connection that still posts bills over that would be the wrong cure.
+ */
+export async function paymentsFetch(
+  admin: SupabaseClient,
+  conn: Connection,
+  path: string,
+  init: RequestInit & { requestId?: string } = {}
+): Promise<unknown> {
+  const token = await accessTokenFor(admin, conn);
+  const { requestId, ...rest } = init;
+  const res = await fetch(`${paymentsBase(conn.environment)}/quickbooks/v4/payments/${path}`, {
+    ...rest,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Request-Id": requestId ?? crypto.randomUUID(),
+      ...(rest.body ? { "Content-Type": "application/json" } : {}),
+      ...(rest.headers ?? {}),
+    },
+  });
+  const text = await res.text();
+  const tid = intuitTid(res);
+  if (res.ok) return text ? JSON.parse(text) : null;
+
+  logFailure("payments", { path: path.split("?")[0], status: res.status, intuit_tid: tid, body: text.slice(0, 500) });
+  if (res.status === 401 || res.status === 403) {
+    throw new QboError(
+      `QuickBooks Payments refused this connection (${res.status}). If QuickBooks was connected before the payments permission was added, reconnect it.${tidSuffix(tid)}`,
+      400
+    );
+  }
+  throw new QboError(`QuickBooks Payments refused the request: ${paymentsFault(text, res.status)}${tidSuffix(tid)}`, 502);
+}
+
+/** The Payments API's refusal: `{ errors: [{ message, detail, code }] }`. */
+function paymentsFault(text: string, status: number): string {
+  try {
+    const body = JSON.parse(text) as { errors?: { message?: string; detail?: string; code?: string }[] };
+    const first = body.errors?.[0];
+    if (first) {
+      const parts = [first.message, first.detail].filter(Boolean).join(" — ");
+      return first.code ? `${parts} (code ${first.code})` : parts;
+    }
+  } catch {
+    // not JSON
+  }
+  return `HTTP ${status}`;
+}
+
 /** Appended to what a person reads, because the id is only useful if it
  *  reaches whoever opens the support ticket. */
 function tidSuffix(tid: string | null): string {

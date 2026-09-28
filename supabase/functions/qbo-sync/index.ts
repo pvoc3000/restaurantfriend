@@ -49,6 +49,7 @@ import {
   QBO_SCOPE,
   QboError,
   loadConnection,
+  paymentsFetch,
   qboFetch,
   qboQuote,
   isStaleObject,
@@ -1495,6 +1496,24 @@ Deno.serve(async (req) => {
       const conn = await loadConnection(admin, orgId);
       const res = await qboFetch(admin, conn, `query?query=${encodeURIComponent(sql)}`);
       return json(200, res);
+    }
+
+    // -----------------------------------------------------------------------
+    // get_charge — one QuickBooks Payments charge, read-only (2026-09-28)
+    // -----------------------------------------------------------------------
+    //
+    // The id is a QuickBooks Payment's `CreditChargeResponse.CCTransId`. Read
+    // before any refund is built on it, to prove the Payments API accepts the
+    // id an invoice-page payment carries; kept because a refund will want the
+    // charge's status and what has already been refunded.
+    if (mode === "get_charge") {
+      if (!isManager) return json(403, { error: "a manager or the owner is required" });
+      const id = (body as unknown as { id?: unknown }).id;
+      if (typeof id !== "string" || !/^[A-Za-z0-9]{4,64}$/.test(id)) {
+        return json(400, { error: "missing or malformed charge id" });
+      }
+      const conn = await loadConnection(admin, orgId);
+      return json(200, await paymentsFetch(admin, conn, `charges/${id}`));
     }
 
     // -----------------------------------------------------------------------
