@@ -5149,3 +5149,46 @@ cancelled, as on the record. The confirm and the write moved to
 record and the row say the same thing; the row reads `production_schedule_id`
 on the click (`readScheduled`) so its confirm still warns that cancelling does
 not unschedule.
+
+**Cancel Order calls off the order's schedule, invoicing and money
+(2026-09-28, migration 148).** Mark asked whether cancelling should unschedule
+and refund, agreed the reasoning below, and said "build all three". The flow
+is `lib/cancelOrderFlow` (read → confirm → write → tell), shared by the record
+and the list's ⋯; the words and writes are `lib/specialOrderWrites`
+(`readCancelContext`, `cancelConfirmMessage`, `cancelSpecialOrder`), with
+fixtures on the wording.
+- **Invoices.** An invoice owns a copy of its orders' lines (141), so changing
+  the status changed no invoice. Now the order comes off every DRAFT, and the
+  confirm names any SENT invoice, which still asks for the money and changes
+  only by Revise… or Void….
+- **Schedule.** It comes off, through 068's `unschedule_special_order`. A
+  schedule that is printed or counted is refused by that function's own guard;
+  the order is still cancelled and the refusal is shown ("Tell the kitchen").
+- **Money → credit, never a refund.** Held money (140) on a cancelled order
+  was stranded: not owed, never invoiced, not credit. 148's
+  `cancel_special_order` removes the held applications, which makes it credit
+  (143), applied to the customer's next Square invoice or refunded from their
+  record. Not an automatic refund because a deposit may be non-refundable, a
+  late cancel may carry a fee, the customer may want it on the next order, a
+  refund cannot be undone, Square refunds book to the wrong accounts, and cash
+  or cheques cannot be refunded by the app. An order with no customer keeps its
+  money held.
+- **148 also** leaves cancelled orders out of `revise_customer_invoice` (143
+  re-copied them at full price) and makes a VOID give a cancelled order's share
+  to credit rather than back to the order.
+- **Tested** on a throwaway Postgres with a trimmed prelude (the real
+  logger, frozen-lines guard, credit and revise functions): cancel with a
+  draft, a held payment and a held refund ($100 − $30 → $70 credit); no
+  customer (held stays); a sent invoice (untouched, then void → $80 credit,
+  the live order's $20 back to held); revise (only the live order); and the
+  three refusals. Run without 148, the same script left the money held and the
+  revision re-billing the cancelled order.
+- **NO BACKFILL.** On 2026-09-28, 11 already-cancelled orders held $1,232.93
+  (7 FileMaker-era: SO-8097 $494.06, SO-8175 $242.43, SO-8824 $154.60,
+  SO-8825 $95.59, SO-8187 $87.05, SO-7576 $85.96, SO-8143 $68.44; 4 app-era
+  test-sized, SO-10075/10080/10082/10083). Credit is applied automatically to
+  the next Square invoice, and the FileMaker ones were almost certainly settled
+  by hand at the time, so releasing them would take money off real invoices.
+  Left for Mark to decide one by one.
+- **Un-cancelling** leaves the money as credit; it is applied when the order
+  is next invoiced and sent.

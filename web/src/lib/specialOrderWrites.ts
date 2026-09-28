@@ -21,7 +21,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { SpecialOrderKind } from "./specialOrders";
+import { money, type SpecialOrderKind } from "./specialOrders";
 
 /**
  * Everything the guards and the confirm need, in one read.
@@ -245,6 +245,14 @@ export async function deleteSpecialOrder(
  *   customer for this order's money. Nothing here can edit it — it changes by
  *   Revise…, or goes by Void… — so the confirm names it and says so.
  *
+ * THE MONEY (148, `cancel_special_order`): what is HELD on the order becomes
+ * the customer's CREDIT — applied to their next Square invoice when it is
+ * sent, or refunded from their record. Never refunded here: whether they get
+ * it back is a business decision (a deposit, a late-cancel fee, a next
+ * order), and a refund cannot be taken back. An order with no customer has no
+ * account to hold credit on, so its money stays where it is. Status, drafts
+ * and credit are one transaction, in the database.
+ *
  * AND IT COMES OFF THE PRODUCTION SCHEDULE, through 068's own
  * `unschedule_special_order` and its guards: a schedule that has been PRINTED
  * or has COUNTED quantities is the kitchen's now, so the function refuses, the
@@ -254,6 +262,9 @@ export async function deleteSpecialOrder(
  */
 export type CancelContext = {
   scheduled: boolean;
+  /** Money held on the order — applied to it and to no invoice (140). */
+  held: number;
+  hasCustomer: boolean;
   /** The live (not void) invoices carrying this order, as the paper names them. */
   invoices: { id: string; label: string; sent: boolean }[];
 };
@@ -278,7 +289,14 @@ export function cancelConfirmMessage(number: string, ctx: CancelContext): string
     paragraphs.push(
       `${andList(sent)} ${sent.length === 1 ? "has" : "have"} gone out and still ask${
         sent.length === 1 ? "s" : ""
-      } the customer for this order's money. Cancelling does not change a sent invoice: Revise… it and take this order off the revision, or Void… it.`
+      } the customer for this order's money. Cancelling does not change a sent invoice: Revise… it (the revision leaves this order out) or Void… it. Either way, money paid on it that is no longer needed becomes the customer's credit.`
+    );
+  }
+  if (ctx.held > 0.005) {
+    paragraphs.push(
+      ctx.hasCustomer
+        ? `${money(ctx.held)} paid on it becomes the customer's credit. It is applied to their next Square invoice when that is sent, or refund it from their record's Billing tab.`
+        : `${money(ctx.held)} paid on it stays on the order: it has no customer to hold credit for.`
     );
   }
   if (ctx.scheduled) {
@@ -299,12 +317,23 @@ export async function readCancelContext(
   id: string,
   prefix: string
 ): Promise<CancelContext | { error: string }> {
-  const [{ data: order, error: orderError }, { data: lines, error: lineError }] = await Promise.all([
-    supabase.from("special_orders").select("production_schedule_id").eq("id", id).maybeSingle(),
+  const [
+    { data: order, error: orderError },
+    { data: lines, error: lineError },
+    { data: heldRows, error: heldError },
+  ] = await Promise.all([
+    supabase.from("special_orders").select("production_schedule_id, customer_id").eq("id", id).maybeSingle(),
     supabase.from("customer_invoice_lines").select("invoice_id").eq("special_order_id", id),
+    supabase
+      .from("payment_applications")
+      .select("amount")
+      .eq("special_order_id", id)
+      .is("customer_invoice_id", null),
   ]);
   if (orderError) return { error: orderError.message };
   if (lineError) return { error: lineError.message };
+  if (heldError) return { error: heldError.message };
+  const held = Math.round((heldRows ?? []).reduce((a, r) => a + Number(r.amount), 0) * 100) / 100;
   const ids = [...new Set((lines ?? []).map((l) => l.invoice_id as string))];
   let invoices: CancelContext["invoices"] = [];
   if (ids.length) {
@@ -324,37 +353,37 @@ export async function readCancelContext(
       sent: Boolean(r.posted),
     }));
   }
-  return { scheduled: Boolean(order?.production_schedule_id), invoices };
+  return {
+    scheduled: Boolean(order?.production_schedule_id),
+    held,
+    hasCustomer: Boolean(order?.customer_id),
+    invoices,
+  };
 }
 
 /**
- * Cancels, then takes the order off its drafts and off the production
- * schedule. The status write is the act; a draft that refuses (somebody sent
- * it a moment ago) or a schedule the kitchen already has does not undo it — it
- * comes back in `notes`, the things the person must be told afterwards.
+ * Cancels — 148's `cancel_special_order`: the status, the drafts and the
+ * credit in one transaction — then takes the order off the production
+ * schedule. A schedule the kitchen already has does not undo the cancel; its
+ * refusal comes back in `notes`, the things the person must be told
+ * afterwards.
  */
 export async function cancelSpecialOrder(
   supabase: SupabaseClient,
   id: string,
   ctx: CancelContext
 ): Promise<{ notes: string[] } | { error: string }> {
-  // `.select()` its own result: a refused update changes nothing and says so.
-  const { data, error } = await supabase
-    .from("special_orders")
-    .update({ status: "cancelled" })
-    .eq("id", id)
-    .select("id");
-  if (error) return { error: error.message };
-  if (!data?.length) return { error: "The change wasn't saved — the database refused it silently." };
+  const { error } = await supabase.rpc("cancel_special_order", { p_order: id });
+  if (error) {
+    return {
+      error:
+        error.code === "PGRST202" || /schema cache/i.test(error.message)
+          ? "Cancelling needs migration 148, which has not been applied yet."
+          : error.message,
+    };
+  }
 
   const notes: string[] = [];
-  for (const inv of ctx.invoices.filter((i) => !i.sent)) {
-    const { error: e } = await supabase.rpc("remove_order_from_customer_invoice", {
-      p_invoice: inv.id,
-      p_order: id,
-    });
-    if (e) notes.push(`It is still on ${inv.label}: ${e.message}.`);
-  }
   if (ctx.scheduled) {
     // The function's refusals are worded for a person — the print date, or
     // how many lines were counted — so they are passed on as they arrive.
