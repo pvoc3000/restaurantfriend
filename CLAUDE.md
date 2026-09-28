@@ -388,98 +388,51 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 
 ## Open threads (pinned by Mark — don't act without asking)
 
-- **CUSTOMER INVOICES (A/R) ON SPECIAL ORDERS — explored 2026-09-20, NOTHING
-  BUILT, don't start without asking.** This is what migration 110's rename
-  freed the word for. Mark: "Bills are documents we have to pay. An invoice, by
-  contrast, is a document our customers have to pay."
-  **The case is WHOLESALE, not proper special orders.** Those get billed once
-  and paid in full and have never been a problem. Cafe Knotted is billed WEEKLY
-  IN ADVANCE — one invoice per week, a line for each day's donuts and a line
-  for each day's delivery, 14 lines, **sent Sunday and due Thursday or service
-  stops**. Mark wants to select the week's seven standing orders and have them
-  become one invoice. So the shape is SEVEN ORDERS BILLED ONCE, which no view
-  over `special_orders` can express. Deposits on far-out bookings are the other
-  direction — one order billed twice — and since 139 (2026-09-25) that is
-  exactly how they work: a deposit invoice, then a balance invoice.
-  **THE MODEL IS ALREADY DESIGNED, on the A/P side.** 025 put the PO join on the
-  LINE and said why: "split and merge need no schema at all — one invoice across
-  two orders is lines pointing at two orders, and one order invoiced in two
-  parts is two invoices whose lines point at disjoint subsets (hence NO unique
-  constraint)". That paragraph describes Knotted's week and Mark's deposit,
-  written before either was asked for. Mirror it: `customer_invoices` +
-  `customer_invoice_lines` carrying `special_order_id` + `special_order_line_id`
-  on the LINE, with its own issue date, due date and terms (a deposit is months
-  from `date_initiated`, which the push currently uses as `TxnDate`).
-  **TWO HALVES OF THIS ARE ALREADY BUILT AND WERE NEVER JOINED.**
-  `ignore_balance` (45 orders) means "billed weekly by statement, not per
-  order", and `invoicePushRefusals` REFUSES to push such an order on its own —
-  the app already knows these must be billed together and has no way to do it.
-  `CustomerStatement` (decision 21) renders exactly that week and calls itself
-  "the dry run for the QBO era"; it stores nothing and can't be pushed. The
-  invoice record is the join between them.
-  **IT COLLIDES WITH THE STAGE MODEL.** `special_orders.status = 'invoice'`,
-  `invoice_sent_at` and `invoice_paid_at` make an invoice a STAGE OF THE ORDER;
-  once one invoice covers seven, those three become DERIVED from the records.
-  **OPEN QUESTIONS, in the order they block things:** is Cafe Knotted taxable
-  at all (a resale certificate makes every line NON and the QBO tax split stops
-  mattering); does a pushed invoice carry FOURTEEN lines or the two summary
-  lines `buildInvoicePayload` sends today. ~~WHERE A CUSTOMER PAYMENT GETS
-  RECORDED~~ — answered 2026-09-22, below.
-  **COLLECTION IS DECIDED (Mark, 2026-09-22): SQUARE COLLECTS, ON OUR OWN PAGE.**
-  (1) **Square is the processor for everything that is not a shop sale** —
-  special orders now, wholesale later. It is dearer than QuickBooks Payments
-  and it wins anyway: customers can pay with Square GIFT CARDS and earn LOYALTY
-  points, it is one merchant account, and the API rates (card 2.9% + 30¢, ACH
-  1% with a $1 minimum and a **$5 cap**) undercut Square Invoices' own (3.3% +
-  30¢). The $5 cap is what makes it right for wholesale-sized bills.
-  (2) **OUR invoices, paid on OUR page (`/pay/[token]`) through Square's Web
-  Payments SDK** — Square's own card/gift-card/wallet fields embedded in our
-  page. It has to be one or the other: Square's Invoices docs say "You cannot
-  use Square APIs such as PayOrder or CreatePayment to process a payment for an
-  order that is associated with an invoice", so a Square invoice can only be
-  paid on Square's hosted page. We build the invoice, so the page is ours.
-  (3) **THE MONEY LANDS AT THE SHOP THAT MAKES THE ORDER** (Mark, same day,
-  after 119 was applied: "I don't want to create an 'Orders' location. I think
-  sales should stay with the location that makes the donuts"). Migration 120:
-  the order's KITCHEN's `square_location_id`, then its pickup shop's, else no
-  online payment. ~~A dedicated Square location for invoiced sales that the
-  sync never reads~~ was the first plan and is withdrawn — so a pay-link payment
-  IS in that shop's Square sales, `sync-square-sales` reads it and the nightly
-  journal entry posts it, exactly where a hand-sent Square invoice's payment
-  lands today. A large special order now shows in its kitchen's day, on purpose.
-  Splitting special orders onto QBO and wholesale onto Square was considered and
-  rejected: both are invoiced, both have due dates and deposits, and one
-  customer buying both would meet two pay pages from one bakery.
-  (4) **Double-counting is set aside, not solved** — Mark: "we'll make sure that
-  doesn't happen". Since (3), the nightly journal entry ALREADY books a
-  pay-link payment as that shop's sales, so the "Square invoice → DO NOT PUSH"
-  rule under "What NOT to build" applies to pay-link orders too: pushing one to
-  QBO as an invoice books its revenue twice.
-  Phase 1 is a pay link on today's per-order invoice (balance due; card, Apple
-  Pay, Google Pay, gift card); ACH + webhook, loyalty, the QBO Payment push and
-  `customer_invoices` follow. Plan: `docs/history/04g-special-orders.md`.
-  **`customer_invoices` IS BUILT (2026-09-23, migrations 124 + 125 applied,
-  functions deployed).** The open questions
-  above are answered: Knotted is NOT taxable (resale certificate; their orders
-  already carry `tax_rate = 0`), and an invoice carries ONE LINE PER ORDER
-  (Mark), delivery inside each order's amount — so not fourteen lines and not
-  the QBO push's two. The stage collision is settled by WRITING THROUGH: the
-  order keeps `status` / `invoice_sent_at` / `invoice_paid_at`, and the invoice
-  stamps them (sent) and settles each order its payment covers, through
-  `settle_special_order_paid` — the same function the per-order link uses.
-  **THE ONE-WORKFLOW MOVE HAS STARTED (Mark, 2026-09-23, "every order"):** an
-  order's Send ▸ Invoice now creates (or reuses) a customer invoice and opens
-  its Send; one-order invoices print itemized. Lines follow their orders and
-  re-send keeps the number (128); "Sold as" is the order's (129). What is NOT
-  yet moved: receipts, "who owes us" read from invoices, and retiring the
-  per-order pay path — ask before each.
-  **NEW PAYMENT (Mark, 2026-09-25, migration 139 APPLIED; replaces 138's
-  deposit-on-the-order):** the order's Payments tab has one door — Cash, or an
-  invoice of its own for the Balance Due, a Deposit ($ or %) or Other. An
-  order may be on several live invoices; they never overlap (a balance line
-  bills only what is not yet invoiced). The order is settled when ITS balance
-  reaches zero, not when one invoice is paid. See 04g.
-  Read `docs/history/04g-special-orders.md` and `docs/bill-rename-sweep.md` first.
+- **CUSTOMER INVOICES (A/R) — BUILT, the textbook model (migrations 124–147,
+  live 2026-10-01).** Mark, 2026-09-27: "Make Restaurant Friend use the
+  textbook model." Invoices and orders are related but separate. The full
+  history is in `docs/history/04g-special-orders.md`; read it before changing
+  anything here.
+  **THE MODEL:**
+  - `customer_invoices` owns its customer, collecting shop, dates, `processor`
+    and `revision`.
+  - `customer_invoice_lines` are the invoice's own content. An order's charges
+    are COPIED in (items, discount, delivery, rush, tax, "Less invoice N");
+    other charges have no order and are typed Item or Delivery, untaxed.
+  - `customer_payments` records money received and `payment_applications`
+    says where it went: order only = held; order + invoice = that order's
+    share; invoice only = the other charges.
+  - A sent invoice, or one holding money, is FROZEN. It changes by Revise…
+    ("INV-10004-2"); money it no longer needs becomes CREDIT, applied to the
+    customer's next Square invoice or refunded.
+  - Who owes what is read from invoices (`customer_balances`: invoiced · not
+    invoiced · credit). The statement is balance-forward.
+  - The order keeps `status = 'invoice'` and its sent/paid stamps, written by
+    invoice events. This is the one departure from the textbook: the status is
+    what gates production.
+  **NUMBERING:** invoices start at `customer_invoices.first_number` (10000)
+  and print the display prefix `customer_invoices.prefix` ("INV-"). Order
+  numbers STORE `special_orders.number_prefix` ("SO-").
+  **COLLECTION (decided 2026-09-22):** Square collects, on the app's own
+  `/pay/[token]` page, into the Square location of the shop that makes the
+  order. A pay-link payment is booked as that shop's sales by the nightly
+  journal entry, so a Square-collected invoice must NEVER also be pushed to
+  QBO as an invoice (that books the revenue twice). A `processor =
+  'quickbooks'` invoice (131) is the exception: it is pushed, and QuickBooks
+  collects it. Its payment comes back by `qbo-webhook`, and cash recorded by
+  hand on its orders is refused.
+  **STILL OPEN (2026-09-28), roughly in this order:**
+  1. **Refunds book to the wrong accounts:** see the next thread.
+  2. **No ACH on the pay page** (card, Apple/Google Pay and gift cards only).
+     ACH also needs Square's webhook, because a bank payment can fail days
+     later.
+  3. **Receipts are still the order's.** The "Payment received" email covers
+     only pay-link payments.
+  4. **Statements** can be downloaded but never emailed.
+  5. **Not built, by choice so far:** an A/R aging screen across all
+     customers; overdue reminder emails; making the weekly Knotted invoice
+     automatically; taxable or Rush-type other charges; credit-note documents.
+  Before building any of them, ask.
 
 
 - **A PAY-LINK REFUND BOOKS TO THE WRONG ACCOUNTS — LEFT AS IS FOR NOW (Mark,
