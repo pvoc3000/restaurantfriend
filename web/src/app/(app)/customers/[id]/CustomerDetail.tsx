@@ -47,9 +47,9 @@ type Tab = (typeof TABS)[number]["key"];
  * One customer, and everything they have ever ordered.
  *
  * TWO TABS, the tab in the URL: INFO is who they are (details, address,
- * QuickBooks, notes); BILLING is their money — open INVOICES, aged; orders
- * owed and NOT INVOICED; their CREDIT; and every order, in a pane that ends
- * at the foot of the window. What they owe is also in the line under the name,
+ * notes); BILLING is their money — open INVOICES, aged; orders owed and NOT
+ * INVOICED; their CREDIT; their QuickBooks link; and every order, in a pane
+ * that ends at the foot of the window. What they owe is also in the line under the name,
  * above the split, because "what does Cafe Knotted owe us" is the reason
  * anybody opens this record. Since 144 it is read the textbook way, in three
  * parts that never overlap (`customer_balances`).
@@ -319,12 +319,6 @@ export async function CustomerDetail({
                 </div>
               </section>
 
-              <CustomerAccounting
-                customerId={customer.id}
-                orgId={customer.org_id as string}
-                customerName={customerLabel(customer as never) || "This customer"}
-              />
-
               <section className="space-y-3">
                 <SectionHeading>Notes</SectionHeading>
                 {canWrite ? (
@@ -409,6 +403,12 @@ export async function CustomerDetail({
               ) : null}
 
               <CustomerCredit rows={creditRows} canRefund={canRefundPayments(session.membership.role)} />
+
+              <CustomerAccounting
+                customerId={customer.id}
+                orgId={customer.org_id as string}
+                customerName={customerLabel(customer as never) || "This customer"}
+              />
 
               {/* LAST, because its pane runs to the foot of the window: a
                   wholesale account has hundreds of orders, and they scroll

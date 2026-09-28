@@ -5119,8 +5119,9 @@ drops `?send=`, so a Send opened from an order does not reopen.
 an actionmenu that sits at the top of the page like all the other detail
 pages." The same `SectionNav` as the invoice record, `?tab=billing`, Info the
 default.
-- **Info:** Details, Address, QuickBooks and Notes.
-- **Billing:** Invoices (aged), Not Invoiced, Credit, then Orders LAST, in a
+- **Info:** Details, Address and Notes.
+- **Billing:** Invoices (aged), Not Invoiced, Credit, QuickBooks (moved here
+  the same day, Mark), then Orders LAST, in a
   `DataTable` with `fillViewport` so a wholesale account's hundreds of orders
   scroll inside a pane that ends at the foot of the window. Not Invoiced is the
   same table without the fill (`CustomerOrdersTable`).
