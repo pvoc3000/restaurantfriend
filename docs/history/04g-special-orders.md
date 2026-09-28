@@ -5107,9 +5107,10 @@ split it apart again. Other charges stay untaxed (v1), and Rush is not a type
 invoice detail page: 'Detail', 'Charges', 'Payments'". The order record's
 `SectionNav` (vertical on a wide screen, horizontal on a narrow one), with the
 tab in `?tab=` and Detail the default.
-- **Detail:** Details, Notes and the Sent history.
+- **Detail:** Details and Notes.
 - **Charges:** Orders and Other Charges; its count is both.
-- **Payments:** the payments and the QuickBooks check.
+- **Payments:** the Sent history at the top (moved from Detail, Mark,
+  2026-09-28), then the payments and the QuickBooks check.
 
 The revision banners and the Actions menu stay above the tabs. Switching tabs
 drops `?send=`, so a Send opened from an order does not reopen.

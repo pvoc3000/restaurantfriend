@@ -380,11 +380,32 @@ export async function CustomerInvoiceDetail({
                   </p>
                 )}
               </section>
+            </>
+          )}
 
+          {activeTab === "charges" && (
+            <>
+              <InvoiceOrders
+                invoiceId={id}
+                customerId={invoice.customer_id as string}
+                locationId={invoice.location_id}
+                rows={orderRows}
+                draft={canWrite && draft}
+                soldAsEditable={canWrite && !invoice.paid_at && !invoice.voided_at}
+              />
+
+              <InvoiceLines invoiceId={id} orgId={invoice.org_id} rows={chargeRows} draft={canWrite && draft} />
+            </>
+          )}
+
+          {activeTab === "payments" && (
+            <>
               {sends.length > 0 ? (
                 <section className="space-y-2">
                   {/* EVERY SEND, NEWEST FIRST (128): re-sending keeps the number, so
-                      this is where "what did they have, and when" is answered. */}
+                      this is where "what did they have, and when" is answered.
+                      At the top of Payments (Mark, 2026-09-28): what was asked
+                      for, and when, above what came in. */}
                   <SectionHeading count={sends.length}>Sent</SectionHeading>
                   <table className="w-full max-w-[60rem] border-collapse text-[14px]">
                     <thead>
@@ -419,26 +440,7 @@ export async function CustomerInvoiceDetail({
                   </table>
                 </section>
               ) : null}
-            </>
-          )}
 
-          {activeTab === "charges" && (
-            <>
-              <InvoiceOrders
-                invoiceId={id}
-                customerId={invoice.customer_id as string}
-                locationId={invoice.location_id}
-                rows={orderRows}
-                draft={canWrite && draft}
-                soldAsEditable={canWrite && !invoice.paid_at && !invoice.voided_at}
-              />
-
-              <InvoiceLines invoiceId={id} orgId={invoice.org_id} rows={chargeRows} draft={canWrite && draft} />
-            </>
-          )}
-
-          {activeTab === "payments" && (
-            <>
               <section className="space-y-2">
                 <SectionHeading count={payments.length}>Payments</SectionHeading>
                 {canWrite && processor === "quickbooks" && qbo?.id && !invoice.paid_at && !invoice.voided_at ? (
