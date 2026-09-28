@@ -34,6 +34,7 @@
   --rf-red-100: #ffdbd6;
   --rf-red-200: #ffcfc9;   /* zeroed order box (from FMP's #ffb3ac, calmed) */
   --rf-red-300: #f3a49b;
+  --rf-red-400: #ff5c52;   /* the danger command's ink + shadow on black, 6.9:1 */
   --rf-red-500: #d20000;   /* the accent red */
   --rf-red-700: #a80000;
   --rf-red-800: #8c0000;
@@ -68,6 +69,9 @@
      deliberately sits a step lighter than any of them and cannot be mistaken
      for one. See `.mac-primary` in styles/mac-look.css. */
   --rf-blue-100: #e3edfb;
+  /* The primary command's INK and SHADOW on its black ground (Mark,
+     2026-09-28). 7.6:1 on black. */
+  --rf-blue-400: #5b9bff;
 
   /* Orange — the invoice status ladder's "Submitted" rung (Mark, 2026-09-03):
      pushed to QuickBooks, waiting on payment. It sits between Approved's

@@ -35,6 +35,10 @@
      screen is pointing at. `PRIMARY_BUTTON_CLASS` was a raw `bg-[#c0c0c0]`
      before this, which is why nothing could find it. */
   --color-commit-fill: var(--rf-blue-100);
+  /* The primary and danger commands' INK, on their black ground (Mark,
+     2026-09-28). Each also colours its button's shadow in mac-look.css. */
+  --color-commit-ink: var(--rf-blue-400);
+  --color-danger-ink: var(--rf-red-400);
   --font-sans: var(--rf-font-sans);
   --radius-*: initial; /* kill Tailwind's radii — the system is square */
   --shadow-*: initial; /* kill Tailwind's shadows */

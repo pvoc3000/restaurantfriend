@@ -223,7 +223,7 @@ export const DIALOG_CANCEL_CLASS =
 // its red border, until 2026-09-21 put it on the same black-on-red-wash dress
 // as `DANGER_BUTTON_CLASS`; it now shares `mac-stop` with it.
 export const DIALOG_COMMIT_CLASS =
-  "mac-control mac-own-hover mac-primary inline-flex h-9 items-center border border-ink bg-commit-fill px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink disabled:opacity-35";
+  "mac-control mac-own-hover mac-primary inline-flex h-9 items-center border border-ink bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-commit-ink disabled:opacity-35";
 
 /**
  * A destructive commit — black type on the `stop` wash, following
@@ -236,4 +236,4 @@ export const DIALOG_COMMIT_CLASS =
  * roomier padding, which is the whole reason they are two strings.
  */
 export const DIALOG_DANGER_CLASS =
-  "mac-control mac-own-hover mac-stop inline-flex h-9 items-center border border-ink bg-stop px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink disabled:opacity-35";
+  "mac-control mac-own-hover mac-stop inline-flex h-9 items-center border border-ink bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-danger-ink disabled:opacity-35";
