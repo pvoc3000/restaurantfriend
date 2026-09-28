@@ -130,7 +130,9 @@ export function TabPicker<K extends string>({
         } ${i > 0 ? "-ml-px" : ""}`;
         const count =
           o.count !== undefined ? (
-            <span className="font-normal tabular-nums opacity-55">{o.count}</span>
+            // Dimmed on the white selected tab only: on an unselected tab's black the
+            // grey type is already the quiet one (Mark, 2026-09-28).
+            <span className={`font-normal tabular-nums ${on ? "opacity-55" : ""}`}>{o.count}</span>
           ) : null;
 
         return o.href ? (
