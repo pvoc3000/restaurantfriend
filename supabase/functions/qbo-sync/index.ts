@@ -44,6 +44,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { splitRefund } from "../_shared/refundSplit.ts";
 import {
   INTUIT_AUTHORIZE,
   QBO_SCOPE,
@@ -268,12 +269,14 @@ type Row = Record<string, unknown>;
  * the invoice and the day's deposits all unchanged. This writes the standard
  * entry, a RefundReceipt, so QuickBooks' books match the card.
  *
- * FULL REFUNDS ONLY: the refund must be the whole QuickBooks Payment, and the
- * Payment must pay exactly one invoice for exactly that amount. Then the
- * receipt COPIES THAT INVOICE'S LINES as QuickBooks stored them (item, tax
- * code, class, amount) with its tax code and location, which reverses the sale
- * and its tax exactly; anything else is refused with a sentence, for a person
- * to enter by hand.
+ * THE PAYMENT MUST PAY EXACTLY ONE INVOICE. For the WHOLE invoice the receipt
+ * COPIES ITS LINES as QuickBooks stored them (item, tax code, class, qty and
+ * price, amount) with its tax code and location, which reverses the sale and
+ * its tax exactly. For PART of it (Mark, 2026-09-28: "build proportional
+ * partial refunds") every item line gives back the same share, with QuickBooks'
+ * own tax landing it on the refund to the cent — `_shared/refundSplit.ts`,
+ * which the fixtures sweep cent by cent. Anything else is refused with a
+ * sentence, for a person to enter by hand.
  *
  * - Paid out of the account the Payment was deposited to, by the same payment
  *   method, so the QuickBooks Payments deposit reconciles against it.
@@ -310,8 +313,8 @@ async function bookRefundReceipt(
   })?.Payment;
   if (!pay) throw new Error("QuickBooks could not find the payment.");
   const cents = (v: unknown) => Math.round(Number(v ?? 0) * 100);
-  if (cents(pay.TotalAmt) !== args.cents) {
-    throw new Error("only a refund of the whole payment is booked automatically — enter this one in QuickBooks");
+  if (args.cents > cents(pay.TotalAmt)) {
+    throw new Error("the refund is more than the payment — enter this one in QuickBooks");
   }
   const links = (pay.Line ?? []).flatMap((l) => (l.LinkedTxn ?? []).map((t) => ({ ...t, amount: l.Amount })));
   if (links.length !== 1 || links[0].TxnType !== "Invoice") {
@@ -326,7 +329,11 @@ async function bookRefundReceipt(
       CustomerRef?: Ref;
       DepartmentRef?: Ref;
       GlobalTaxCalculation?: string;
-      TxnTaxDetail?: { TxnTaxCodeRef?: Ref };
+      TxnTaxDetail?: {
+        TxnTaxCodeRef?: Ref;
+        TotalTax?: number;
+        TaxLine?: { TaxLineDetail?: { TaxPercent?: number } }[];
+      };
       Line?: {
         Amount?: number;
         Description?: string;
@@ -336,12 +343,36 @@ async function bookRefundReceipt(
     };
   })?.Invoice;
   if (!inv) throw new Error("QuickBooks could not find the invoice the payment paid.");
-  if (cents(inv.TotalAmt) !== args.cents) {
-    throw new Error("the refund is not the whole invoice — enter this one in QuickBooks");
+  const whole = cents(inv.TotalAmt) === args.cents;
+  if (args.cents > cents(inv.TotalAmt)) {
+    throw new Error("the refund is more than the invoice — enter this one in QuickBooks");
   }
 
-  const lines = (inv.Line ?? [])
-    .filter((l) => l.DetailType === "SalesItemLineDetail" && l.SalesItemLineDetail?.ItemRef)
+  const itemLines = (inv.Line ?? []).filter(
+    (l) => l.DetailType === "SalesItemLineDetail" && l.SalesItemLineDetail?.ItemRef
+  );
+  if (!whole && (inv.Line ?? []).some((l) => !["SalesItemLineDetail", "SubTotalLineDetail"].includes(String(l.DetailType)))) {
+    throw new Error("the invoice has discount or other lines a part refund cannot split — enter this one in QuickBooks");
+  }
+  let split: ReturnType<typeof splitRefund> | null = null;
+  if (!whole) {
+    const rates = (inv.TxnTaxDetail?.TaxLine ?? [])
+      .map((t) => Number(t.TaxLineDetail?.TaxPercent))
+      .filter((p) => Number.isFinite(p) && p > 0)
+      .map((p) => p / 100);
+    split = splitRefund(
+      itemLines.map((l) => ({ cents: cents(l.Amount), taxable: l.SalesItemLineDetail?.TaxCodeRef?.value !== "NON" })),
+      cents(inv.TxnTaxDetail?.TotalTax),
+      args.cents,
+      rates
+    );
+    if ("error" in split) throw new Error(`${split.error} — enter this refund in QuickBooks`);
+  }
+  const share = split && !("error" in split) ? split : null;
+
+  const lines = itemLines
+    .map((l, i) => (share ? { ...l, Amount: share.lines[i] / 100 } : l))
+    .filter((l) => cents(l.Amount) > 0)
     .map((l) => ({
       Amount: l.Amount,
       DetailType: "SalesItemLineDetail",
@@ -350,10 +381,19 @@ async function bookRefundReceipt(
         ItemRef: l.SalesItemLineDetail!.ItemRef,
         ...(l.SalesItemLineDetail!.TaxCodeRef ? { TaxCodeRef: l.SalesItemLineDetail!.TaxCodeRef } : {}),
         ...(l.SalesItemLineDetail!.ClassRef ? { ClassRef: l.SalesItemLineDetail!.ClassRef } : {}),
-        ...(l.SalesItemLineDetail!.Qty != null ? { Qty: l.SalesItemLineDetail!.Qty } : {}),
-        ...(l.SalesItemLineDetail!.UnitPrice != null ? { UnitPrice: l.SalesItemLineDetail!.UnitPrice } : {}),
+        // A share of a line has no quantity or price of its own.
+        ...(!share && l.SalesItemLineDetail!.Qty != null ? { Qty: l.SalesItemLineDetail!.Qty } : {}),
+        ...(!share && l.SalesItemLineDetail!.UnitPrice != null ? { UnitPrice: l.SalesItemLineDetail!.UnitPrice } : {}),
       },
     }));
+  if (share && share.rounding > 0 && itemLines[0]) {
+    lines.push({
+      Amount: share.rounding / 100,
+      DetailType: "SalesItemLineDetail",
+      Description: "Rounding",
+      SalesItemLineDetail: { ItemRef: itemLines[0].SalesItemLineDetail!.ItemRef, TaxCodeRef: { value: "NON" } },
+    });
+  }
   if (lines.length === 0) throw new Error("the invoice has no item lines to copy — enter this refund in QuickBooks");
 
   const body: Record<string, unknown> = {
@@ -365,7 +405,10 @@ async function bookRefundReceipt(
     ...(inv.GlobalTaxCalculation ? { GlobalTaxCalculation: inv.GlobalTaxCalculation } : {}),
     ...(inv.TxnTaxDetail?.TxnTaxCodeRef ? { TxnTaxDetail: { TxnTaxCodeRef: inv.TxnTaxDetail.TxnTaxCodeRef } } : {}),
     Line: lines,
-    PrivateNote: args.note.slice(0, 4000),
+    PrivateNote: (share
+      ? `${args.note} · part refund, ${((args.cents / cents(inv.TotalAmt)) * 100).toFixed(2)}% of invoice ${inv.DocNumber ?? ""}`.trim()
+      : args.note
+    ).slice(0, 4000),
   };
   const made = ((await qboFetch(admin, conn, `refundreceipt?requestid=${encodeURIComponent(`rr-${docNumber}`)}`, {
     method: "POST",

@@ -473,3 +473,19 @@ QuickBooks invoice payments, with Mark's $1.10 as the first live refund.
   `CreditCardPayment`, no location (the invoice carried none). One receipt with
   that number afterwards. Undeposited Funds is worth the bookkeeper's eye: the
   QuickBooks Payments deposit that nets the refund has to take this receipt in.
+- **Proportional PART refunds (Mark, same day: "build proportional partial
+  refunds").** The money already refunded by amount; now the RefundReceipt
+  books a part refund too. Every item line gives back the same share (refund ÷
+  invoice total), and the taxable lines are chosen so that they plus
+  QuickBooks' OWN tax lands the receipt on the refund to the cent — a cent
+  rounding can skip goes on an untaxed "Rounding" line. The rates are the
+  invoice's `TaxLine` `TaxPercent`s, rounded COMPONENT BY COMPONENT as
+  QuickBooks does (7.25% + 2.25%, not 9.5%); the rate implied by the invoice's
+  rounded tax is only a fallback. `_shared/refundSplit.ts`, pure, whole cents;
+  `refundSplit.fixtures` sweeps every cent from 1¢ to the whole of an $81.25
+  invoice at one, two and three components. The sweep caught the first
+  version: the implied 9.504% rounded $1.63's tax up where 9.5% rounds down.
+  Breaking the per-component rounding turns two sweeps red. A share has no
+  qty or price; an invoice with discount or other non-item lines is refused
+  for a part refund. The total check and the delete-on-mismatch still apply.
+  The payment must still pay exactly one invoice. Not yet run live.
