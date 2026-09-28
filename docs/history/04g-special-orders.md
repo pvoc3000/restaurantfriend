@@ -5011,3 +5011,40 @@ It is set to 10000.
 - **Left as they are:** the test invoices 1001–1014 keep their numbers, draft
   #1014 among them. Invoices from 10000 will share a range with order numbers
   (#10057…).
+
+**GO-LIVE PREP, CONTINUED (2026-09-27, migration 147).** Mark: "delete the
+test invoices and apply 146. Let's preface invoices with "INV-" and orders with
+"SO-". We need an {employee_name} field token for Invoices and Payment
+Received." (146 had already been applied.)
+
+**Applied** by Claude in one transaction. Backed up first to
+`FMP Export/pre147-backup-2026-09-27.json`: every invoice, line, send, pay
+token and invoice application, the org settings, and all 8,374 order numbers.
+- **The 13 test invoices** are deleted. Their five applications fell back to
+  being held on their orders; all 6,495 payments are still there, and nothing
+  sat on an invoice's own lines. The QuickBooks tests #1002–#1009 still exist
+  in QuickBooks. The first real invoice is INV-10000.
+- **"INV-"** is `customer_invoices.prefix`, an existing display setting.
+- **"SO-"** is `special_orders.number_prefix`, and it is STORED in the order
+  number. An order's number is text printed in some 77 places, where an
+  invoice's is an integer with a display prefix.
+  - New numbers take it through `special_order_number_for`, which
+    `next_special_order_number` and `create_inquiry` now call.
+  - All 8,374 orders were renumbered ("10057" → "SO-10057") with the table's
+    triggers off: no log lines and no changed `updated_at`.
+  - The sequence is untouched, so the next order is SO-10087.
+- **`{employee_name}`** on Invoice and Payment received is whoever sent the
+  invoice, or the org's name when nobody can be named. It comes from
+  `member_first_name(org, user)`: the linked employee's nickname or first
+  name, else the display name's first word.
+  - The browser asks `my_first_name` when composing.
+  - `square-pay` asks about the last `customer_invoice_sends.created_by`.
+  - Mark's two invoice messages now sign off with it, as his others do.
+
+**Verified:**
+- On a copy of the data: the deletion kept every payment; 147 applied twice
+  with no double prefixes and no log lines; a new order and an inquiry are
+  numbered SO-.
+- Live: 0 invoices, 6,495 payments all held, 8,374 of 8,374 orders prefixed,
+  next invoice 10000.
+- `square-pay` redeployed.

@@ -395,6 +395,19 @@ Deno.serve(async (req) => {
     // notice below instead of a copy of the customer's receipt.
     const to = (customer?.email ?? "").trim();
 
+    // WHO SENT THE INVOICE (147) — `{employee_name}`, as it signed the
+    // invoice's own email; the org's name when nobody can be named.
+    const { data: lastSend } = await admin
+      .from("customer_invoice_sends")
+      .select("created_by")
+      .eq("invoice_id", claim.customer_invoice_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const { data: sender } = lastSend?.created_by
+      ? await admin.rpc("member_first_name", { p_org: claim.org_id, p_user: lastSend.created_by })
+      : { data: null };
+
     if (to) {
       try {
         const person = [customer?.first_name, customer?.last_name].filter(Boolean).join(" ").trim();
@@ -408,7 +421,7 @@ Deno.serve(async (req) => {
           // message still reads rather than printing its braces.
           title: "",
           title_suffix: "",
-          employee_name: "",
+          employee_name: (sender as string | null) || (org?.name ?? ""),
           first_name: firstNameOf(fullName) || "there",
           full_name: fullName,
           amount: money(amount),

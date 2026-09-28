@@ -288,7 +288,10 @@ export function SendCustomerInvoice({
         if ((orig?.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id) replacesInQbo = view.invoice.revision_of;
       }
 
-      setCompose(invoiceEmail(view, number, settings, pay, viaQbo));
+      // WHO IS SENDING IT (147) — `{employee_name}`, the way an order's
+      // documents sign off; the org's name when the sender has none.
+      const { data: me } = await supabase.rpc("my_first_name", { p_org: orgId });
+      setCompose(invoiceEmail(view, number, settings, pay, viaQbo, (me as string | null) || doc.name));
       setPending({
         replacesInQbo,
         blob,
@@ -528,7 +531,8 @@ function invoiceEmail(
   number: string,
   settings: Record<string, unknown>,
   pay: string,
-  viaQbo = false
+  viaQbo = false,
+  employeeName = ""
 ): Compose {
   const so = (settings.special_orders ?? {}) as Record<string, unknown>;
   const templates = (so.email ?? {}) as Record<string, { subject?: string; body?: string }>;
@@ -545,6 +549,7 @@ function invoiceEmail(
     orders: snapshotLines(view.groups).map((l) => `${l.description} — ${money(l.amount)}`).join("\n"),
     pay_url: pay,
     pay_line: viaQbo ? quickBooksPayLine(pay) : payLine(pay),
+    employee_name: employeeName,
   };
   return {
     to: (view.customer?.email ?? "").trim(),
