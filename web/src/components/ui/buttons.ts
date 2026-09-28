@@ -89,8 +89,8 @@ export const DANGER_BUTTON_CLASS =
 // which re-earns the 2px edge and keeps the red while held.
 //
 // SINCE 2026-09-28 (Mark) BOTH FILLED COMMANDS ARE BLACK: the primary with
-// blue type and a blue shadow, the destructive with red type and a red shadow
-// (`--color-commit-ink`, `--color-danger-ink`; the shadow is in mac-look.css).
+// white type and a blue shadow, the destructive with red type and a red shadow
+// (`--color-danger-ink`; both shadows are in mac-look.css).
 // What follows is the pale-wash era that preceded it.
 //
 // THE PRIMARY ONE WAS A PALE BLUE FILL from 2026-09-21 (Mark) — `bg-commit-fill`
@@ -106,7 +106,7 @@ export const DANGER_BUTTON_CLASS =
 // something. The same sentence in two colours, which is what the glow could
 // never quite say while its neighbour stayed flat.
 export const PRIMARY_BUTTON_CLASS =
-  "mac-control mac-own-hover mac-primary inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-ink px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-commit-ink disabled:opacity-35";
+  "mac-control mac-own-hover mac-primary inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-ink px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-white disabled:opacity-35";
 
 export const BUTTON_CLASS =
   "mac-control inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";

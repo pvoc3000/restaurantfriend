@@ -69,8 +69,7 @@
      deliberately sits a step lighter than any of them and cannot be mistaken
      for one. See `.mac-primary` in styles/mac-look.css. */
   --rf-blue-100: #e3edfb;
-  /* The primary command's INK and SHADOW on its black ground (Mark,
-     2026-09-28). 7.6:1 on black. */
+  /* The primary command's SHADOW on its black ground (Mark, 2026-09-28). */
   --rf-blue-400: #5b9bff;
 
   /* Orange — the invoice status ladder's "Submitted" rung (Mark, 2026-09-03):
