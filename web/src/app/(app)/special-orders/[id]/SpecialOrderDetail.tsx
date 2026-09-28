@@ -44,7 +44,7 @@ import {
   type PaymentRow,
 } from "@/components/specialOrders/OrderPayments";
 import { unbilledAmount, type OpenInvoice } from "@/lib/newPayment";
-import { applicationCounts, isSplitPayment, paymentsToCount, type LedgerRow } from "@/lib/customerPayments";
+import { applicationCounts, isSplitPayment, paymentsToCount, refundLeft, type LedgerRow } from "@/lib/customerPayments";
 import { CompletionDates } from "@/components/specialOrders/CompletionDates";
 import { StatusCatchUp } from "@/components/specialOrders/StatusCatchUp";
 import { OrderTotals } from "@/components/specialOrders/OrderTotals";
@@ -171,7 +171,7 @@ export async function SpecialOrderDetail({
       : SKIP,
     supabase
       .from("order_payments")
-      .select("id, payment_id, paid_on, amount, payment_type, note, external_ref, processor, customer_invoice_id")
+      .select("id, payment_id, paid_on, amount, payment_type, note, external_ref, processor, customer_invoice_id, refund_of")
       .eq("order_id", id)
       .order("paid_on", { ascending: true, nullsFirst: false }),
     wantsLog
@@ -353,7 +353,8 @@ export async function SpecialOrderDetail({
   // A PAYMENT SPLIT ACROSS SEVERAL ORDERS OR INVOICES (140) is one payment:
   // its amount and its removal are not one order's to change. Only a payment
   // taken on an invoice or by a processor can be split, so only those are asked.
-  const ledgerRows = (paymentRows ?? []) as unknown as (PaymentRow & LedgerRow & { customer_invoice_id: string | null })[];
+  const ledgerRows = (paymentRows ?? []) as unknown as (PaymentRow &
+    LedgerRow & { customer_invoice_id: string | null; refund_of: string | null })[];
   const splitCandidates = paymentsToCount(ledgerRows);
   const { data: applicationRows } = splitCandidates.length
     ? await supabase.from("payment_applications").select("payment_id").in("payment_id", splitCandidates)
@@ -365,6 +366,7 @@ export async function SpecialOrderDetail({
     return {
       ...p,
       shared: isSplitPayment(p.payment_id, applicationCount),
+      refundable: refundLeft(p, ledgerRows),
       invoice: inv
         ? { label: invoiceLabel(inv), href: invoiceHref(inv.id, orderTabHref(id, "payments", rawParams)) }
         : null,

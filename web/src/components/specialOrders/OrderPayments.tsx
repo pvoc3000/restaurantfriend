@@ -46,6 +46,8 @@ export type PaymentRow = {
   shared?: boolean;
   /** The customer invoice this payment was taken on (124), if any. */
   invoice?: { label: string; href: string } | null;
+  /** What is left to refund of it (`refundLeft`); 0 once given back in full. */
+  refundable?: number;
 };
 
 /** One of the order's invoices (139: an order can be on several — a deposit,
@@ -313,7 +315,7 @@ export function OrderPayments({
                 </td>
                 {canWrite ? (
                   <td className="whitespace-nowrap px-1 py-2 text-right">
-                    {canRefund && isRefundablePayment(p) ? (
+                    {canRefund && isRefundablePayment(p) && (p.refundable ?? Number(p.amount ?? 0)) > 0.005 ? (
                       <button
                         type="button"
                         onClick={() => setRefunding(p)}
@@ -369,7 +371,7 @@ export function OrderPayments({
       {refunding && (
         <RefundPayment
           paymentId={refunding.id}
-          amount={Number(refunding.amount ?? 0)}
+          amount={refunding.refundable ?? Number(refunding.amount ?? 0)}
           method={(refunding.note ?? "").replace(/^Pay link · /, "") || null}
           processor={refundProcessor(refunding) ?? "square"}
           onClose={() => setRefunding(null)}

@@ -438,3 +438,14 @@ QuickBooks invoice payments, with Mark's $1.10 as the first live refund.
   status; a refusal on an unsettled charge adds "try again once it has
   settled". A retry needs a NEW dialog: the key is the `Request-Id`, and
   Intuit answers a repeated Request-Id with its first response.
+- **The first live refund WORKED (2026-09-28 22:13 UTC).** By charge id, on
+  a charge still CAPTURED: refund `MW0056938635`, ISSUED, $1.10, the charge now
+  REFUNDED; the app recorded −$1.10 'QuickBooks Refund' naming the payment. So
+  the refund endpoint takes an unsettled charge after all. **QuickBooks' books
+  did NOT follow:** Payment 550778 unchanged (SyncToken 0), INV-10001 balance
+  $0 there, and no RefundReceipt, CreditMemo or Deposit dated that day. A
+  Payments API refund moves money and books nothing.
+  Mark also found Refund… still offered on the fully refunded row: now
+  `refundLeft` (lib/customerPayments, fixtures) hides it at zero and offers
+  only the rest after a part refund, on both the order's and the invoice's
+  Payments tables.

@@ -25,11 +25,13 @@ export function InvoicePaymentRefund({
     external_ref: string | null;
     note: string | null;
     order_number: string | null;
+    /** What is left to refund (`refundLeft`). */
+    refundable: number;
   };
 }) {
   const [open, setOpen] = useState(false);
   const processor = refundProcessor(payment);
-  if (!processor || (processor === "square" && !payment.order_number)) return null;
+  if (!processor || payment.refundable <= 0.005 || (processor === "square" && !payment.order_number)) return null;
 
   return (
     <>
@@ -43,7 +45,7 @@ export function InvoicePaymentRefund({
       {open && (
         <RefundPayment
           paymentId={payment.id}
-          amount={payment.amount}
+          amount={payment.refundable}
           method={(payment.note ?? "").replace(/^Pay link · /, "") || null}
           processor={processor}
           onClose={() => setOpen(false)}

@@ -13,6 +13,7 @@ import {
   isSplitPayment,
   paymentsToCount,
   removable,
+  refundLeft,
 } from "../../src/lib/customerPayments";
 
 test("paymentsToCount: only invoice or processor payments can have been split", () => {
@@ -49,3 +50,14 @@ test("amountEditable / removable: the database's own rules, before anyone presse
   ok(removable({ processor: "square", shared: false } as { shared?: boolean }), "a test pay-link payment can still be removed");
   no(removable({ shared: true }), "a split payment cannot leave one order");
 });
+
+test("refundLeft: a row given back in full leaves nothing, a part refund leaves the rest", () => {
+  const pay = { payment_id: "p1", amount: 1.1, order_id: "o1", customer_invoice_id: "i1" };
+  const refund = { refund_of: "p1", amount: -1.1, order_id: "o1", customer_invoice_id: "i1" };
+  eq(refundLeft(pay, [pay, refund]), 0, "SO-10088's $1.10, refunded");
+  eq(refundLeft(pay, [pay, { ...refund, amount: -0.6 }]), 0.5, "a part refund");
+  eq(refundLeft(pay, [pay]), 1.1, "nothing refunded yet");
+  eq(refundLeft(pay, [pay, { ...refund, order_id: "o2" }]), 1.1, "a refund of the same payment on ANOTHER order is not this row's");
+  eq(refundLeft(pay, [pay, { ...refund, refund_of: "p9" }]), 1.1, "a refund of another payment");
+});
+

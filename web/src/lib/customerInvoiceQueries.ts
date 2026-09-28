@@ -11,6 +11,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { refundLeft } from "./customerPayments";
 
 import {
   groupInvoiceLines,
@@ -76,6 +77,11 @@ export type InvoiceViewPayment = {
   payment_type: string | null;
   note: string | null;
   external_ref: string | null;
+  /** The payment this row is a share of, and the payment a refund gives
+   *  back — so the tab can tell what is left to refund (`refundLeft`). */
+  payment_id: string;
+  refund_of: string | null;
+  refundable: number;
 };
 
 export type InvoiceView = {
@@ -120,7 +126,7 @@ export async function fetchInvoiceView(
       // ledger's applications to it (140), each with its payment's facts.
       supabase
         .from("payment_applications")
-        .select("id, special_order_id, amount, customer_payments ( paid_on, payment_type, note, external_ref )")
+        .select("id, payment_id, special_order_id, amount, customer_payments ( paid_on, payment_type, note, external_ref, refund_of )")
         .eq("customer_invoice_id", id),
       supabase.rpc("customer_invoice_groups", { p_invoice: id }),
     ]);
@@ -179,14 +185,26 @@ export async function fetchInvoiceView(
   }
 
   const numberOf = (orderId: string | null) => (orderId ? orders.get(orderId)?.number ?? null : null);
-  const payments: InvoiceViewPayment[] = ((appRows ?? []) as unknown as {
+  const appList = ((appRows ?? []) as unknown as {
     id: string;
+    payment_id: string;
     special_order_id: string | null;
     amount: number;
-    customer_payments: { paid_on: string | null; payment_type: string | null; note: string | null; external_ref: string | null } | null;
-  }[])
+    customer_payments: {
+      paid_on: string | null; payment_type: string | null; note: string | null; external_ref: string | null; refund_of: string | null;
+    } | null;
+  }[]);
+  const refundRows = appList.map((a) => ({
+    refund_of: a.customer_payments?.refund_of ?? null,
+    amount: Number(a.amount),
+    order_id: a.special_order_id,
+  }));
+  const payments: InvoiceViewPayment[] = appList
     .map((a) => ({
       id: a.id,
+      payment_id: a.payment_id,
+      refund_of: a.customer_payments?.refund_of ?? null,
+      refundable: refundLeft({ payment_id: a.payment_id, amount: Number(a.amount), order_id: a.special_order_id }, refundRows),
       order_id: a.special_order_id,
       order_number: numberOf(a.special_order_id),
       paid_on: a.customer_payments?.paid_on ?? null,

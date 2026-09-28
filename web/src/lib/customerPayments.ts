@@ -50,3 +50,25 @@ export function amountEditable(row: { processor?: string | null; shared?: boolea
 export function removable(row: { shared?: boolean }): boolean {
   return !row.shared;
 }
+
+/**
+ * WHAT IS LEFT TO REFUND of one row — its amount less the refunds that name
+ * its payment in the same place (the same order, the same invoice). The
+ * client's copy of 140/149's `payment_refundable`, so Refund… leaves a row
+ * that has been given back in full (Mark, 2026-09-28: "the refund button was
+ * still on the original payment row") and offers only the rest after a part
+ * refund. The database still caps it; this only decides what is OFFERED.
+ */
+export function refundLeft(
+  row: { payment_id: string; amount: number | null; order_id?: string | null; customer_invoice_id?: string | null },
+  rows: { refund_of?: string | null; amount: number | null; order_id?: string | null; customer_invoice_id?: string | null }[]
+): number {
+  const same = (a?: string | null, b?: string | null) => (a ?? null) === (b ?? null);
+  const refunded = rows
+    .filter(
+      (r) => r.refund_of === row.payment_id && same(r.order_id, row.order_id) && same(r.customer_invoice_id, row.customer_invoice_id)
+    )
+    .reduce((a, r) => a + Number(r.amount ?? 0), 0);
+  return Math.max(0, Math.round((Number(row.amount ?? 0) + refunded) * 100) / 100);
+}
+
