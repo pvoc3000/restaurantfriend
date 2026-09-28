@@ -308,6 +308,16 @@
   background-color: #c0c0c0;
 }
 
+/* An ON day is black, so the black 2px edge vanishes into it: hovered or held,
+   its edge is WHITE instead (Mark, 2026-09-28). */
+.mac-day.mac-day-on:not(:disabled):hover {
+  box-shadow: 2px 2px 0 0 #000, inset 0 0 0 1px #fff;
+}
+
+.mac-day.mac-day-on:not(:disabled):active {
+  box-shadow: inset 0 0 0 1px #fff;
+}
+
 /* THE ALL BUTTON IS AN EIGHTH DAY THAT ALWAYS READS "All", STRUCK THROUGH WHEN
    PRESSING IT WOULD CLEAR THE WEEK (Mark, 2026-09-18: "a normal weekday button
    whose text is always 'All' but with a slash across it when its action will

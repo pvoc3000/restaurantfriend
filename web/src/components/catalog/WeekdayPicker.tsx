@@ -39,7 +39,7 @@ export const WEEKDAY_PICKER_WIDTH = 300;
  * an array, so it hand-rolls the markup — and the two are drawn on neighbouring
  * records, where two greys would read as a fault rather than as a distinction.
  */
-export const WEEKDAY_ON_CLASS = "bg-ink text-white";
+export const WEEKDAY_ON_CLASS = "mac-day-on bg-ink text-white";
 
 /**
  * ONE DAY IS A SMALL RAISED BUTTON IN A 32px SLOT (Mark, 2026-09-18: keep the
