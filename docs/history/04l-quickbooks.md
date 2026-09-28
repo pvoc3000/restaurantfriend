@@ -407,3 +407,22 @@ QuickBooks invoice payments, with Mark's $1.10 as the first live refund.
   (`charges/<id>/void`, `charges/<id>/refunds`). Whether its refund endpoint
   accepts a charge that is only CAPTURED is UNVERIFIED — step 3 must handle
   the answer either way.
+- **Step 3, Refund… on QuickBooks payments (built 2026-09-28).**
+  `qbo-sync` mode `refund_payment` (manager+), `square-refund`'s shape: it
+  reads the order's or invoice's share of the payment through the caller's
+  RLS, takes the QuickBooks Payment's `CCTransId`, reads the charge, caps the
+  amount at the smaller of the charge less its `refundDetail`s and the ledger's
+  `payment_refundable`, then VOIDS a charge still CAPTURED (whole only,
+  `txn-requests/<clientTransID>/void`) or REFUNDS a SETTLED one
+  (`charges/<id>/refunds`, whole or part). The dialog's key is the
+  `Request-Id`, so a second press after a lost answer is the same operation.
+  Migration **149** widens 140's `payment_refundable` and
+  `record_payment_refund` to 'QuickBooks Payments' → a 'QuickBooks Refund'
+  (processor 'quickbooks'); tested on a throwaway Postgres (records −$1.10 on
+  the order and the invoice; refuses over the cap, a second refund and a
+  cheque; reruns). Refund… is on the order's Billing tab and, new, on the
+  invoice's Payments tab (`InvoicePaymentRefund`). `refundProcessor` in
+  lib/specialOrders decides who gives it back; fixtures cover it.
+  **Still unknown until the first live refund:** whether QuickBooks records
+  the void or refund against its own Payment (or a RefundReceipt is needed for
+  the books), and what the webhook then sees.

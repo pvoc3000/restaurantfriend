@@ -16,6 +16,7 @@
 import { eq, no, ok, test } from "./harness";
 import {
   isRefundablePayment,
+  refundProcessor,
   KIND_COMMAND_NOUN,
   KIND_LABEL,
   contactCopyPlan,
@@ -1008,10 +1009,19 @@ test("every order kind has a command noun, and it matches KIND_LABEL's words", (
   }
 });
 
-test("isRefundablePayment: only a pay-link payment, with its Square id, for money received", () => {
+test("isRefundablePayment: a pay-link or QuickBooks Payments payment, with its processor id, for money received", () => {
   ok(isRefundablePayment({ payment_type: "Square Online", external_ref: "ff4oOrh", amount: 1.1 }));
   no(isRefundablePayment({ payment_type: "Square Invoice", external_ref: null, amount: 248 }), "hand-typed");
   no(isRefundablePayment({ payment_type: "Square Online", external_ref: null, amount: 248 }), "no Square id");
   no(isRefundablePayment({ payment_type: "Square Refund", external_ref: "r1", amount: -1.1 }), "a refund itself");
   no(isRefundablePayment({ payment_type: "Square Online", external_ref: "x", amount: 0 }), "nothing to give back");
+  ok(isRefundablePayment({ payment_type: "QuickBooks Payments", external_ref: "550778", amount: 1.1 }), "QuickBooks (149)");
+  no(isRefundablePayment({ payment_type: "QuickBooks Payments", external_ref: null, amount: 1.1 }), "no QuickBooks id");
+  no(isRefundablePayment({ payment_type: "QuickBooks Refund", external_ref: "v1", amount: -1.1 }), "a QuickBooks refund itself");
+});
+
+test("refundProcessor: each payment goes back the way it came", () => {
+  eq(refundProcessor({ payment_type: "Square Online", external_ref: "a", amount: 5 }), "square", "pay link");
+  eq(refundProcessor({ payment_type: "QuickBooks Payments", external_ref: "b", amount: 5 }), "quickbooks", "QuickBooks");
+  eq(refundProcessor({ payment_type: "check", external_ref: "c", amount: 5 }), null, "a cheque is not refunded here");
 });

@@ -25,6 +25,8 @@ import { InvoiceLines, type InvoiceLineRow } from "@/components/customerInvoices
 import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
 import { ProcessorField } from "@/components/customerInvoices/ProcessorField";
 import { QuickBooksPaymentCheck } from "@/components/customerInvoices/QuickBooksPaymentCheck";
+import { InvoicePaymentRefund } from "@/components/customerInvoices/InvoicePaymentRefund";
+import { canRefundPayments } from "@/lib/roles";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { canEditPage } from "@/lib/pageAccess";
 
@@ -49,6 +51,8 @@ export async function CustomerInvoiceDetail({
   const session = await getAppSession();
   const supabase = await createClient();
   const canWrite = canEditPage(session.membership.role, "/customer-invoices");
+  // Refund… — manager and up, the order's Billing tab's rule (`canRefundPayments`).
+  const canRefund = canRefundPayments(session.membership.role);
   const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
   const terms = readInvoiceTerms(session.orgSettings as Record<string, unknown>);
 
@@ -457,6 +461,7 @@ export async function CustomerInvoiceDetail({
                         <th className="w-36 px-3 py-2 text-left">How</th>
                         <th className="px-3 py-2 text-left">Note</th>
                         <th className="w-32 px-3 py-2 text-right">Amount</th>
+                        {canRefund ? <th className="w-20 px-3 py-2" /> : null}
                       </tr>
                     </thead>
                     <tbody>
@@ -467,6 +472,11 @@ export async function CustomerInvoiceDetail({
                           <td className="px-3 py-2 text-muted">{p.payment_type ?? "—"}</td>
                           <td className="px-3 py-2 text-muted">{p.note ?? ""}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{money(p.amount)}</td>
+                          {canRefund ? (
+                            <td className="whitespace-nowrap px-3 py-2 text-right">
+                              <InvoicePaymentRefund payment={p} />
+                            </td>
+                          ) : null}
                         </tr>
                       ))}
                     </tbody>

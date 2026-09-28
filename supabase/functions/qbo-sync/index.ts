@@ -1517,6 +1517,151 @@ Deno.serve(async (req) => {
     }
 
     // -----------------------------------------------------------------------
+    // refund_payment — give back a QuickBooks Payments payment (2026-09-28)
+    // -----------------------------------------------------------------------
+    //
+    // `square-refund`'s shape, for a customer invoice QuickBooks collected
+    // (131). The row is an order's (or an invoice's) SHARE of a payment — a
+    // `payment_applications` row, read through the caller's RLS — and only a
+    // 'QuickBooks Payments' one, which the webhook recorded with the QuickBooks
+    // Payment's id in `external_ref`.
+    //
+    // THE MONEY: the Payment's `CreditChargeResponse.CCTransId` is the Payments
+    // API charge (verified on SO-10088's $1.10). What is left is the smaller of
+    // the charge less its `refundDetail`s — QuickBooks is the authority, so a
+    // refund made in QuickBooks counts — and the ledger's share
+    // (`payment_refundable`).
+    //
+    // UNSETTLED OR SETTLED: a charge still CAPTURED (the batch has not closed,
+    // usually until the next business day) is VOIDED, which the Payments API
+    // does only whole, by the charge's original request id
+    // (`context.clientTransID`); a SETTLED one is REFUNDED, whole or in part.
+    // So a PART refund of an unsettled charge is refused with the reason.
+    //
+    // THE RECORD is 149's `record_payment_refund`, through the caller's client:
+    // a negative 'QuickBooks Refund' naming the payment, applied where the
+    // original was. If it fails after the money moved, the person and the
+    // order's history are told, as `square-refund` does.
+    //
+    // NOT DONE HERE: the books. Whether QuickBooks records the void or refund
+    // against its Payment by itself, or a RefundReceipt is needed, is what the
+    // first live refund will show (docs/history/04l-quickbooks.md).
+    if (mode === "refund_payment") {
+      if (!isManager) return json(403, { error: "Only a manager or the owner can refund a payment." });
+      const b = body as unknown as {
+        application_id?: unknown; amount?: unknown; reason?: unknown; idempotency_key?: unknown;
+      };
+      const key = typeof b.idempotency_key === "string" ? b.idempotency_key.slice(0, 50) : "";
+      if (typeof b.application_id !== "string" || !key) {
+        return json(400, { error: "missing application_id or idempotency_key" });
+      }
+      const cents = Math.round(Number(b.amount) * 100);
+      if (!Number.isFinite(cents) || cents <= 0) {
+        return json(400, { error: "The refund amount must be more than zero." });
+      }
+      const reason = typeof b.reason === "string" ? b.reason.trim() : "";
+
+      const { data: row, error: rowError } = await supabase
+        .from("payment_applications")
+        .select("id, org_id, special_order_id, amount, customer_payments ( payment_type, external_ref )")
+        .eq("id", b.application_id)
+        .maybeSingle();
+      if (rowError) return json(400, { error: rowError.message });
+      const pay = (row as unknown as { customer_payments?: { payment_type: string | null; external_ref: string | null } | null } | null)
+        ?.customer_payments;
+      if (!row || row.org_id !== orgId || !pay) return json(404, { error: "payment not found" });
+      if (pay.payment_type !== "QuickBooks Payments" || !pay.external_ref || Number(row.amount) <= 0) {
+        return json(400, { error: "Only a payment collected through QuickBooks Payments is refunded from here." });
+      }
+
+      const conn = await loadConnection(admin, orgId);
+      const qp = (await qboFetch(admin, conn, `payment/${encodeURIComponent(pay.external_ref)}`)) as {
+        Payment?: { CreditCardPayment?: { CreditChargeResponse?: { CCTransId?: string } } };
+      };
+      const chargeId = qp?.Payment?.CreditCardPayment?.CreditChargeResponse?.CCTransId;
+      if (!chargeId) {
+        return json(400, {
+          error: "This QuickBooks payment has no card transaction on it (a bank payment, or one entered by hand). Refund it in QuickBooks.",
+        });
+      }
+      const charge = (await paymentsFetch(admin, conn, `charges/${encodeURIComponent(chargeId)}`)) as {
+        status?: string;
+        amount?: string | number;
+        refundDetail?: { amount?: string | number }[];
+        context?: { clientTransID?: string };
+      };
+      const chargeCents = Math.round(Number(charge.amount) * 100);
+      const refundedCents = Math.round(
+        (charge.refundDetail ?? []).reduce((a, r) => a + Number(r.amount ?? 0), 0) * 100
+      );
+      const { data: share, error: shareError } = await supabase.rpc("payment_refundable", {
+        p_application: row.id,
+      });
+      if (shareError) return json(400, { error: shareError.message });
+      const left = Math.min(chargeCents - refundedCents, Math.round(Number(share) * 100));
+      if (cents > left) {
+        return json(400, {
+          error:
+            left <= 0
+              ? "This payment has already been refunded in full."
+              : `Only $${(left / 100).toFixed(2)} of this payment is left to refund.`,
+        });
+      }
+
+      let kind: "void" | "refund";
+      let result: { id?: string; status?: string };
+      if (charge.status === "CAPTURED" || charge.status === "AUTHORIZED") {
+        if (cents !== chargeCents || refundedCents > 0) {
+          return json(400, {
+            error: `QuickBooks can only give back the whole $${(chargeCents / 100).toFixed(2)} until the payment settles (usually the next business day). Refund all of it now, or a part once it has settled.`,
+          });
+        }
+        kind = "void";
+        result = (await paymentsFetch(
+          admin,
+          conn,
+          `txn-requests/${encodeURIComponent(charge.context?.clientTransID ?? chargeId)}/void`,
+          { method: "POST", body: "{}", requestId: key }
+        )) as { id?: string; status?: string };
+      } else if (charge.status === "SETTLED") {
+        kind = "refund";
+        result = (await paymentsFetch(admin, conn, `charges/${encodeURIComponent(chargeId)}/refunds`, {
+          method: "POST",
+          body: JSON.stringify({ amount: cents / 100, description: (reason || "Refund").slice(0, 4000) }),
+          requestId: key,
+        })) as { id?: string; status?: string };
+      } else {
+        return json(400, { error: `QuickBooks says this payment is ${String(charge.status ?? "unknown").toLowerCase()}, so there is nothing to give back.` });
+      }
+      if (!result?.id || /^DECLINED/i.test(result.status ?? "")) {
+        return json(400, { error: `QuickBooks refused the ${kind}${result?.status ? `: ${result.status}` : ""}.` });
+      }
+
+      const note = [kind === "void" ? "Voided in QuickBooks Payments" : "Refunded through QuickBooks Payments", reason]
+        .filter(Boolean)
+        .join(" · ");
+      const { data: inserted, error: insertError } = await supabase.rpc("record_payment_refund", {
+        p_application: row.id,
+        p_amount: cents / 100,
+        p_refund_id: result.id,
+        p_note: note,
+      });
+      if (insertError || !inserted) {
+        const warning = `${kind === "void" ? "voided" : "refunded"} $${(cents / 100).toFixed(2)} in QuickBooks (${result.id}) but it was NOT recorded here — record −$${(cents / 100).toFixed(2)} as 'QuickBooks Refund' by hand${insertError ? `: ${insertError.message}` : ""}`;
+        if (row.special_order_id) {
+          await supabase.from("special_order_events").insert({
+            org_id: orgId,
+            order_id: row.special_order_id,
+            message: `Refund ${warning}`,
+            source: "app",
+          });
+        }
+        return json(200, { refund_id: result.id, status: result.status, kind, warning });
+      }
+      return json(200, { refund_id: result.id, status: result.status, kind, amount: cents / 100 });
+    }
+
+    // -----------------------------------------------------------------------
     // find_journal_entries — what is on the books for a range, flattened
     // -----------------------------------------------------------------------
     //
