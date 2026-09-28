@@ -176,23 +176,29 @@ const sampleWeek = [14, 15, 16, 17, 18, 19, 20].map((d, i) => {
     totals: { subtotal: total - 25, deliveryCharge: 25, total },
   };
 });
-const sampleWeekTotal = sampleWeek.reduce((a, o) => a + o.totals.total, 0);
+const sampleWeekTotal = sampleWeek.reduce((a, o) => a + o.totals.total, 0) + 40;
 
-/** A multi-order invoice: one row per order, the wholesale week. */
+/** A multi-order invoice: a row per order in columns, the wholesale week, and
+ *  one other charge. */
 export const sampleCustomerInvoice: CustomerInvoiceDoc = {
-  number: "INV-1042",
+  number: "INV-10042",
   issued_on: "2026-09-20",
   due_on: "2026-09-24",
   notes: "Due Thursday. Pay online with the link in the email, or by ACH.",
   customer: { name: "Sample Cafe", phone: "(818) 555-0133", email: "orders@samplecafe.example" },
-  lines: sampleWeek.map((o) => ({
-    description: `Order #${o.number} · Sample Cafe · ${o.event_date.slice(5).replace("-", "/")}/2026`,
-    amount: o.totals.total,
-  })),
+  columns: true,
+  lines: [
+    ...sampleWeek.map((o) => ({
+      description: `Order #SO-${o.number} · Sample Cafe · ${o.event_date.slice(5).replace("-", "/")}/2026`,
+      amount: o.totals.total,
+      parts: { subtotal: o.totals.subtotal, discount: 0, delivery: o.totals.deliveryCharge, rush: 0, tax: 0 },
+    })),
+    { description: "Delivery Fee", amount: 40, free: true, parts: { subtotal: 0, discount: 0, delivery: 40, rush: 0, tax: 0 } },
+  ],
   totals: {
     subtotal: sampleWeek.reduce((a, o) => a + o.totals.subtotal, 0),
     discount: 0,
-    delivery: sampleWeek.reduce((a, o) => a + o.totals.deliveryCharge, 0),
+    delivery: sampleWeek.reduce((a, o) => a + o.totals.deliveryCharge, 0) + 40,
     rush: 0,
     tax: 0,
     prior: 0,
@@ -213,11 +219,12 @@ export const sampleItemizedInvoice: CustomerInvoiceDoc = (() => {
       .map((l) => ({ label: `${l.qty} × ${l.name}`, amount: l.qty * l.unit_price })),
   ];
   return {
-    number: "INV-1043",
+    number: "INV-10043",
     issued_on: "2026-09-25",
     due_on: "2026-10-03",
     notes: o.notes_invoice,
     customer: { name: "Example Studios (Dana Whitfield)", phone: "(323) 555-0101", email: "dana@example.com" },
+    columns: false,
     lines: [{ description: `Order #${o.number} · Example Studios · 10/3/2026`, amount: t.balance, detail: { rows } }],
     totals: {
       subtotal: t.subtotal,

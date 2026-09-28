@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -32,6 +32,8 @@ export type InvoiceOrderRow = {
   expected: number;
   /** The draft's copy no longer matches the order. */
   stale: boolean;
+  /** What it copied here: its items, then its discount, delivery, rush, tax. */
+  lines: { description: string; qty: number | null; unitPrice: number | null; amount: number }[];
 };
 
 type Unbilled = {
@@ -75,6 +77,16 @@ export function InvoiceOrders({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  // The rows opened to show what they copied (Mark, 2026-09-27: the Lines
+  // section repeated this section; now an order's lines are under its row).
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setOpen((was) => {
+      const next = new Set(was);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   async function call(key: string, fn: string, args: Record<string, unknown>) {
     setBusy(key);
@@ -119,8 +131,18 @@ export function InvoiceOrders({
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.orderId} className="border-b border-hairline align-top">
+              <Fragment key={r.orderId}>
+              <tr className={`${open.has(r.orderId) ? "" : "border-b border-hairline"} align-top`}>
                 <td className="px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => toggle(r.orderId)}
+                    aria-expanded={open.has(r.orderId)}
+                    aria-label={`${open.has(r.orderId) ? "Hide" : "Show"} what ${r.label} bills`}
+                    className="mr-1.5 inline-block w-4 text-subtle hover:text-ink"
+                  >
+                    {open.has(r.orderId) ? "▾" : "▸"}
+                  </button>
                   <Link href={r.href} className="hover:underline">
                     {r.label}
                   </Link>
@@ -200,6 +222,31 @@ export function InvoiceOrders({
                   </td>
                 ) : null}
               </tr>
+              {open.has(r.orderId) ? (
+                <tr className="border-b border-hairline">
+                  <td colSpan={draft ? 5 : 4} className="px-3 pb-3 pl-9">
+                    <table className="w-full max-w-[40rem] text-[13px]">
+                      <tbody>
+                        {r.lines.map((l, i) => (
+                          <tr key={i}>
+                            <td className="py-0.5 pr-3">{l.description}</td>
+                            <td className="w-20 py-0.5 pr-3 text-right tabular-nums text-muted">
+                              {l.qty === null ? "" : l.qty % 1 === 0 ? l.qty : l.qty.toFixed(2)}
+                            </td>
+                            <td className="w-24 py-0.5 pr-3 text-right tabular-nums text-muted">
+                              {l.unitPrice === null ? "" : money(l.unitPrice)}
+                            </td>
+                            <td className={`w-28 py-0.5 text-right tabular-nums ${l.amount < 0 ? "text-muted" : ""}`}>
+                              {money(l.amount)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              ) : null}
+              </Fragment>
             ))}
           </tbody>
         </table>

@@ -16,29 +16,31 @@ import { money } from "@/lib/specialOrders";
 import { parseMoney } from "@/lib/newPayment";
 import { FREE_LINE_TYPES } from "@/lib/customerInvoices";
 
-/** One line of the invoice, as plain data built on the server. */
+/** One OTHER CHARGE — a free line of the invoice's own (141) — as plain data
+ *  built on the server. */
 export type InvoiceLineRow = {
   id: string;
-  /** Its place on the paper — the groups in order, then each group's lines. */
+  /** Its place on the paper. */
   position: number;
-  /** The band: the order's label, or "Other charges". */
-  group: string;
   description: string;
+  /** Where it prints: an Item in Subtotal, Delivery in Delivery. */
+  lineType: "item" | "delivery";
   qty: number | null;
   unitPrice: number | null;
   amount: number;
-  /** A FREE line (141) — the invoice's own, editable on a draft. */
-  free: boolean;
 };
 
 const figure = (v: number | null) => (v === null ? "" : money(v));
 
 /**
- * THE INVOICE'S LINES (141) — what the paper says, banded by order like the
- * PDF, each band closed by what that order bills here. An order's lines are a
- * copy of its charges and change only by Update above; a FREE line — a
- * delivery fee, an item — is the invoice's own and is edited here while the
- * invoice is a draft. Its amount is qty × price when both are set.
+ * OTHER CHARGES (Mark, 2026-09-27: "My expectations were 'lines' were for
+ * items that aren't orders") — the invoice's own lines (141): a delivery fee,
+ * a setup fee. Each is one charge of one TYPE, which is where the printed
+ * invoice puts it — an Item in the Subtotal column, Delivery in Delivery —
+ * rather than a row with a column per fee, which would let one line be a fee
+ * and a tax and a rush at once. Untaxed in v1: anything taxable belongs on an
+ * order. Edited here while the invoice is a draft; the amount is qty × price
+ * when both are set. An order's copied lines are under its row in Orders.
  */
 export function InvoiceLines({
   invoiceId,
@@ -74,22 +76,35 @@ export function InvoiceLines({
     });
   }
 
-  const editable = (r: InvoiceLineRow) => draft && r.free;
+  const editable = () => draft;
 
   const columns: DataColumn<InvoiceLineRow>[] = [
     {
       key: "line",
-      label: "Line",
-      width: 380,
+      label: "Charge",
+      width: 340,
       pinned: true,
       wrap: true,
       sortValue: (r) => r.position,
       render: (r) =>
-        editable(r) ? (
+        editable() ? (
           <InlineValue table="customer_invoice_lines" id={r.id} column="description" value={r.description}
                        nullable={false} ariaLabel="Line description" />
         ) : (
           r.description
+        ),
+    },
+    {
+      key: "type",
+      label: "Type",
+      width: 130,
+      sortValue: (r) => r.lineType,
+      render: (r) =>
+        editable() ? (
+          <InlineValue table="customer_invoice_lines" id={r.id} column="line_type" kind="pick" nullable={false}
+                       value={r.lineType} options={FREE_LINE_TYPES} ariaLabel={`Type of ${r.description}`} />
+        ) : (
+          <span className="text-muted">{FREE_LINE_TYPES.find((t) => t.value === r.lineType)?.label}</span>
         ),
     },
     {
@@ -99,7 +114,7 @@ export function InvoiceLines({
       align: "right",
       sortValue: (r) => r.qty ?? 0,
       render: (r) =>
-        editable(r) ? (
+        editable() ? (
           <InlineValue table="customer_invoice_lines" id={r.id} column="qty" kind="number" value={r.qty}
                        align="right" className="text-right" ariaLabel={`Quantity for ${r.description}`} />
         ) : (
@@ -113,7 +128,7 @@ export function InvoiceLines({
       align: "right",
       sortValue: (r) => r.unitPrice ?? 0,
       render: (r) =>
-        editable(r) ? (
+        editable() ? (
           <InlineValue table="customer_invoice_lines" id={r.id} column="unit_price" kind="number" value={r.unitPrice}
                        align="right" className="text-right" ariaLabel={`Price for ${r.description}`}
                        format={(v) => money(Number(v))} />
@@ -130,7 +145,7 @@ export function InvoiceLines({
       render: (r) =>
         // A free line with no qty × price takes a typed amount; with them, the
         // database works it out.
-        editable(r) && (r.qty === null || r.unitPrice === null) ? (
+        editable() && (r.qty === null || r.unitPrice === null) ? (
           <InlineValue table="customer_invoice_lines" id={r.id} column="amount" kind="number" value={r.amount}
                        nullable={false} align="right" className="text-right" ariaLabel={`Amount for ${r.description}`}
                        format={(v) => money(Number(v))} />
@@ -145,7 +160,7 @@ export function InvoiceLines({
             label: "",
             width: 44,
             render: (r: InvoiceLineRow) =>
-              r.free ? (
+              draft ? (
                 <button
                   type="button"
                   onClick={() => void remove(r)}
@@ -163,13 +178,16 @@ export function InvoiceLines({
 
   const total = Math.round(rows.reduce((a, r) => a + r.amount, 0) * 100) / 100;
 
+  // A sent invoice with none has nothing to show here.
+  if (!draft && rows.length === 0) return null;
+
   return (
     <section className="space-y-2">
       <div className="flex max-w-[60rem] items-center justify-between gap-4">
-        <SectionHeading count={rows.length}>Lines</SectionHeading>
+        <SectionHeading count={rows.length}>Other Charges</SectionHeading>
         {draft ? (
           <button type="button" className={SMALL_BUTTON_CLASS} onClick={() => setAdding(true)}>
-            Add Line…
+            Add Charge…
           </button>
         ) : null}
       </div>
@@ -178,24 +196,13 @@ export function InvoiceLines({
           rows={rows}
           columns={columns}
           rowKey={(r) => r.id}
-          storageKey="customer-invoice-lines.v2"
+          storageKey="customer-invoice-charges.v1"
           defaultSort={{ key: "line", dir: "asc" }}
-          group={{
-            label: (r) => r.group,
-            sortKey: "line",
-            summary: (rs) => ({
-              amount: (
-                <span className="tabular-nums font-semibold">
-                  {money(Math.round(rs.reduce((a, r) => a + r.amount, 0) * 100) / 100)}
-                </span>
-              ),
-            }),
-          }}
           totals={() => ({
             line: "Total",
             amount: <span className="tabular-nums font-semibold">{money(total)}</span>,
           })}
-          empty={<p className="text-sm text-muted">No lines yet — add an order or a line.</p>}
+          empty={<p className="text-sm text-muted">Nothing here.</p>}
         />
       </div>
       {error ? <p className="text-[13px] text-accent">{error}</p> : null}
@@ -203,7 +210,7 @@ export function InvoiceLines({
         <AddLineDialog
           invoiceId={invoiceId}
           orgId={orgId}
-          nextSort={rows.filter((r) => r.free).length}
+          nextSort={rows.length}
           onClose={() => setAdding(false)}
         />
       ) : null}
@@ -212,9 +219,8 @@ export function InvoiceLines({
 }
 
 /**
- * ADD LINE… — a charge of the invoice's own (141): a delivery fee, an item.
- * Untaxed in v1; anything taxable belongs on an order. Qty × price, or just an
- * amount.
+ * ADD CHARGE… — a charge of the invoice's own (141): a delivery fee, an item.
+ * Untaxed in v1; anything taxable belongs on an order. Qty × price.
  */
 function AddLineDialog({
   invoiceId,
@@ -274,7 +280,7 @@ function AddLineDialog({
 
   return (
     <Dialog
-      title="Add a line"
+      title="Add a charge"
       onClose={() => {
         if (!busy) onClose();
       }}
@@ -294,7 +300,7 @@ function AddLineDialog({
     >
       <div className="space-y-5">
         <div className="space-y-1.5">
-          {caption("Kind")}
+          {caption("Type")}
           <Radio
             options={FREE_LINE_TYPES}
             value={type}
@@ -302,7 +308,7 @@ function AddLineDialog({
               setType(next);
               if (next === "delivery" && description.trim() === "") setDescription("Delivery Fee");
             }}
-            ariaLabel="Kind of line"
+            ariaLabel="Type of charge"
           />
         </div>
         <label className="block space-y-1.5">

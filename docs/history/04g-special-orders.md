@@ -5048,3 +5048,43 @@ token and invoice application, the org settings, and all 8,374 order numbers.
 - Live: 0 invoices, 6,495 payments all held, 8,374 of 8,374 orders prefixed,
   next invoice 10000.
 - `square-pay` redeployed.
+
+**THE PRINTED INVOICE ADDS UP; LINES BECOME OTHER CHARGES (2026-09-27).**
+Mark: "On the actual printed/emailed invoice, the numbers do not add up … I'd
+like to see delivery, rush fee, and tax columns … I don't understand why the
+'Lines' section … duplicates what's in the 'Orders' section … My expectations
+were 'lines' were for items that aren't orders."
+
+**Why it didn't add up:** 2026-09-23's one-row-per-order paper put each
+order's whole cost in its Amount (items less discount, plus delivery, rush and
+tax, less anything invoiced earlier). This morning's Totals window then began
+at a Subtotal of items alone, so the column summed to the total and never to
+the Subtotal.
+
+**The paper now** (`invoicePaper`, lib/customerInvoices):
+- **Several orders, or none:** a row per order with Subtotal, Discount,
+  Delivery, Rush fee and Tax columns. Columns nobody uses are hidden; Subtotal
+  always shows. Then an "Other charges" band, each charge in its type's column.
+  Every column adds up to its Totals line. "Invoiced earlier" and Payments
+  belong to the invoice and stay in the window alone.
+- **One order:** still itemized in one Amount column, which sums to the
+  Subtotal. The exception is a Delivery-type other charge, which has no place
+  in that column, so the paper takes the columns instead.
+- **Fixtures** prove the column sums on a mixed week (discount, rush, tax, a
+  "Less invoice" and a free fee) and the layout rule; each was checked by
+  breaking it. The pay page and the email's list of orders still give one
+  total per order.
+
+**The record screen:**
+- **Lines is now "Other Charges":** only the invoice's own lines, with a
+  **Type** column (Item → Subtotal, Delivery → Delivery), editable on a draft.
+  Add Line… is now Add Charge…, and the section is hidden on a sent invoice
+  that has none.
+- **Each Orders row opens** (▸) to show what it copied: its items, then its
+  discount, delivery, rush, tax and any "Less invoice".
+
+**Mark asked whether Other charges should have a column per fee.** Answered
+no: each row is one charge of one TYPE. A row with fee, delivery, rush and tax
+columns could be all of them at once, and QuickBooks and Square would have to
+split it apart again. Other charges stay untaxed (v1), and Rush is not a type
+(it is worked out from an order's size). Either can be added if wanted.

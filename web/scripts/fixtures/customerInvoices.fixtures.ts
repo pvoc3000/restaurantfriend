@@ -6,7 +6,7 @@
 // turns the two-kitchens case red; letting `sumBreakdowns` accept mixed rates
 // turns that case red.
 
-import { test, eq, ok } from "./harness";
+import { test, eq, ok, no } from "./harness";
 import {
   addDays,
   createRefusals,
@@ -18,6 +18,8 @@ import {
   invoiceTotalsBreakdown,
   groupInvoiceLines,
   groupTotals,
+  invoicePaper,
+  PAPER_COLUMNS,
   scaleBreakdown,
   snapshotLines,
   type CustomerInvoiceLine,
@@ -275,4 +277,45 @@ test("invoiceTotalsBreakdown: a balance after its deposit shows the deposit as i
   eq(b, { subtotal: 500, discount: 0, delivery: 0, rush: 0, tax: 47.5, prior: 100, payments: 50 });
   const adds = Math.round((b.subtotal - b.discount + b.delivery + b.rush + b.tax - b.prior - b.payments) * 100) / 100;
   eq(adds, 397.5, "adds to Amount due");
+});
+
+/* The printed invoice's columns (Mark, 2026-09-27: "the numbers do not add up"). */
+
+const columnSums = (rows: ReturnType<typeof invoicePaper>["rows"]) =>
+  Object.fromEntries(
+    PAPER_COLUMNS.map((c) => [c.key, Math.round(rows.reduce((a, r) => a + (r.parts?.[c.key] ?? 0), 0) * 100) / 100])
+  );
+
+test("invoicePaper: several orders print in columns, and each column adds up to its Totals line", () => {
+  // A week with a discounted, taxed, rushed day billed partly on an earlier
+  // invoice, and a free Delivery Fee.
+  const odd = "Order #10060 · Cafe Knotted · 10/7/2026";
+  const lines = [
+    ...knottedWeek,
+    line({ special_order_id: "o3", line_type: "item", description: "Cake", amount: 200, taxable: true, order_label: odd, sort: 0 }),
+    line({ special_order_id: "o3", line_type: "discount", description: "Discount", amount: -20, order_label: odd, sort: 1000 }),
+    line({ special_order_id: "o3", line_type: "rush", description: "Rush fee", amount: 25, order_label: odd, sort: 1002 }),
+    line({ special_order_id: "o3", line_type: "tax", description: "Tax", amount: 17.1, order_label: odd, sort: 1003 }),
+    line({ special_order_id: "o3", line_type: "prior_billing", description: "Less invoice INV-10001", amount: -50, order_label: odd, sort: 1004 }),
+  ];
+  const withO3 = new Map([...orders, ["o3", { number: "10060", event_date: "2026-10-07" }]]);
+  const paper = invoicePaper(groupInvoiceLines(lines, withO3));
+  ok(paper.columns, "three orders");
+  const t = invoiceTotalsBreakdown(lines, 0);
+  eq(columnSums(paper.rows), { subtotal: t.subtotal, discount: -t.discount, delivery: t.delivery, rush: t.rush, tax: t.tax });
+  eq(paper.rows.map((r) => r.parts?.subtotal), [573.5, 573.5, 200, 0], "an order's Subtotal is its items; the fee is not one");
+  eq(paper.rows[3], { description: "Delivery Fee", amount: 40, free: true, parts: { subtotal: 0, discount: 0, delivery: 40, rush: 0, tax: 0 } });
+  eq(paper.rows[2].amount, 222.1, "what the order charges, before the earlier invoice — that is the Totals window's");
+});
+
+test("invoicePaper: one order is itemized, unless an other charge is Delivery", () => {
+  const one = knottedDay("o1", "Order #10057 · Cafe Knotted · 10/5/2026");
+  const itemized = invoicePaper(groupInvoiceLines([...one, line({ line_type: "item", description: "Box", amount: 5, sort: 0 })], orders));
+  no(itemized.columns);
+  eq(itemized.rows[0].detail?.rows, [{ label: "370 × Knotted Bismark - 42g @ $1.55", amount: 573.5 }]);
+  eq(itemized.rows[1].amount, 5, "an Item charge adds to the Subtotal the items do");
+  const withFee = invoicePaper(groupInvoiceLines([...one, line({ line_type: "delivery", description: "Delivery Fee", amount: 40, sort: 0 })], orders));
+  ok(withFee.columns, "a Delivery charge has no place in the itemized Amount column");
+  eq(withFee.rows[0].detail, undefined);
+  ok(invoicePaper(groupInvoiceLines([line({ line_type: "item", description: "Setup", amount: 30 })], orders)).columns, "no orders: columns");
 });

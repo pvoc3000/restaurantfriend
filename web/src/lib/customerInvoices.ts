@@ -368,6 +368,99 @@ export function snapshotLines<
 }
 
 /* ==========================================================================
+ * THE PAPER — what the printed invoice's table says (Mark, 2026-09-27)
+ * ========================================================================== */
+
+/** One row's money in the printed columns. Signed: a discount is negative, so
+ *  the five add up to what the row charges. */
+export type PaperParts = { subtotal: number; discount: number; delivery: number; rush: number; tax: number };
+
+export const PAPER_COLUMNS: { key: keyof PaperParts; label: string }[] = [
+  { key: "subtotal", label: "Subtotal" },
+  { key: "discount", label: "Discount" },
+  { key: "delivery", label: "Delivery" },
+  { key: "rush", label: "Rush fee" },
+  { key: "tax", label: "Tax" },
+];
+
+export type PaperRow = {
+  description: string;
+  /** What the row charges: its parts added up, or an item's amount. */
+  amount: number;
+  /** The row's money by column, when the paper has columns. */
+  parts?: PaperParts;
+  /** A one-order invoice's items, when the paper is itemized. */
+  detail?: { rows: { label: string; amount: number }[] };
+  /** An OTHER CHARGE (141's free line), not an order. */
+  free?: boolean;
+};
+
+/**
+ * THE PRINTED INVOICE'S ROWS. Mark, 2026-09-27: "the numbers do not add up"
+ * — each order's Amount was everything it cost, while the Totals window began
+ * at a Subtotal of items. Now every figure sits in its own COLUMN, and each
+ * column adds up to its line in the Totals window:
+ *
+ * - Several orders (or none): a row per order, its Subtotal, Discount,
+ *   Delivery, Rush fee and Tax; then each other charge, an Item in Subtotal
+ *   and a Delivery charge in Delivery.
+ * - ONE order is ITEMIZED instead, its items in one Amount column that adds
+ *   up to the Subtotal (Mark, 2026-09-23: a regular customer is used to
+ *   seeing what they ordered) — unless an other charge is Delivery, which has
+ *   no place in that column, and the paper takes the columns.
+ *
+ * "Invoiced earlier" and the payments are the invoice's, not a row's, and
+ * stay in the Totals window alone.
+ */
+export function invoicePaper<
+  L extends Pick<CustomerInvoiceLine, "special_order_id" | "line_type" | "amount" | "sort" | "order_label" | "description" | "qty" | "unit_price" | "taxable">
+>(groups: InvoiceGroup<L>[]): { columns: boolean; rows: PaperRow[] } {
+  const orderCount = groups.filter((g) => g.orderId).length;
+  const freeDelivery = groups.some((g) => !g.orderId && g.lines.some((l) => l.line_type === "delivery"));
+  const columns = orderCount !== 1 || freeDelivery;
+  const qtyText = (q: number) => (q % 1 === 0 ? String(q) : q.toFixed(2));
+  // `money` in lib/specialOrders, whose shape a price is printed in.
+  const dollars = (v: number) => `${v < 0 ? "-" : ""}$${Math.abs(v).toFixed(2)}`;
+  const rows = groups.flatMap((g): PaperRow[] => {
+    if (!g.orderId) {
+      return g.lines.map((l) => {
+        const amount = cents(Number(l.amount));
+        const delivery = l.line_type === "delivery";
+        return {
+          description: l.description,
+          amount,
+          free: true,
+          parts: { subtotal: delivery ? 0 : amount, discount: 0, delivery: delivery ? amount : 0, rush: 0, tax: 0 },
+        };
+      });
+    }
+    const t = groupTotals(g.lines);
+    const parts: PaperParts = { subtotal: t.subtotal, discount: -t.discount, delivery: t.deliveryCharge, rush: t.rushFee, tax: t.tax };
+    const items = g.lines.filter((l) => l.line_type === "item");
+    return [
+      {
+        description: g.kind === "deposit" ? `${g.lines[0]?.description ?? "Deposit"} · ${g.label}` : g.label,
+        amount: t.total,
+        parts,
+        detail:
+          !columns && g.kind === "charges" && items.length > 0
+            ? {
+                rows: items.map((i) => ({
+                  label:
+                    i.qty !== null && i.unit_price !== null
+                      ? `${qtyText(Number(i.qty))} × ${i.description} @ ${dollars(Number(i.unit_price))}`
+                      : i.description,
+                  amount: cents(Number(i.amount)),
+                })),
+              }
+            : undefined,
+      },
+    ];
+  });
+  return { columns, rows };
+}
+
+/* ==========================================================================
  * THE LINE
  * ========================================================================== */
 

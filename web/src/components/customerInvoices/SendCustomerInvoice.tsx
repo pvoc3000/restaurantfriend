@@ -43,6 +43,7 @@ import { fetchInvoiceView, type InvoiceView } from "@/lib/customerInvoiceQueries
 import { QuickBooksCustomerStep } from "@/components/specialOrders/QuickBooksCustomerStep";
 import {
   groupTotals,
+  invoicePaper,
   invoiceFileName,
   invoiceNumberText,
   invoiceTotalsBreakdown,
@@ -51,7 +52,6 @@ import {
   snapshotLines,
   sumBreakdowns,
   type CustomerInvoiceSnapshot,
-  type InvoiceGroup,
 } from "@/lib/customerInvoices";
 
 /** The org row the documents need: its name, settings and the doc header. */
@@ -72,7 +72,6 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
   const view = await fetchInvoiceView(supabase, id, readSettings(settings).rush);
   if (!view) throw new Error("That invoice is gone.");
   const terms = readInvoiceTerms(settings);
-  const single = view.groups.filter((g) => g.orderId).length === 1;
   const blob = await pdf(
     <docs.CustomerInvoicePdf
       org={doc}
@@ -86,7 +85,7 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
           phone: view.customer?.phone ?? null,
           email: view.customer?.email ?? null,
         },
-        lines: paperRows(view.groups, single),
+        ...(({ columns, rows }) => ({ columns, lines: rows }))(invoicePaper(view.groups)),
         totals: invoiceTotalsBreakdown(view.lines, view.paid),
         total: view.total,
         paid: view.paid,
@@ -95,43 +94,6 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
     />
   ).toBlob();
   return { blob, view, settings, doc, terms };
-}
-
-type PaperRow = { description: string; amount: number; detail?: { rows: { label: string; amount: number }[] }; free?: boolean };
-
-/**
- * The paper's rows (141): each ORDER once, for what it bills here — ITEMIZED
- * when it is the only order, as a regular customer is used to seeing — and
- * each free line as itself. The discount, delivery, rush, tax and "Less
- * invoice" are the Totals window's, summed from the lines.
- */
-function paperRows(
-  groups: InvoiceGroup[],
-  single: boolean
-): PaperRow[] {
-  return groups.flatMap((g): PaperRow[] => {
-    if (!g.orderId) return g.lines.map((l) => ({ description: l.description, amount: l.amount, free: true }));
-    const items = g.lines.filter((l) => l.line_type === "item");
-    const description = g.kind === "deposit" ? `${g.lines[0]?.description ?? "Deposit"} · ${g.label}` : g.label;
-    return [
-      {
-        description,
-        amount: g.net,
-        detail:
-          single && g.kind === "charges" && items.length > 0
-            ? {
-                rows: items.map((i) => ({
-                  label:
-                    i.qty !== null && i.unit_price !== null
-                      ? `${i.qty % 1 === 0 ? i.qty : i.qty.toFixed(2)} × ${i.description} @ ${money(i.unit_price)}`
-                      : i.description,
-                  amount: i.amount,
-                })),
-              }
-            : undefined,
-      },
-    ];
-  });
 }
 
 /**

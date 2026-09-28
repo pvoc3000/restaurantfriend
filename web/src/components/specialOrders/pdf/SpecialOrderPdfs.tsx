@@ -57,7 +57,7 @@ import {
 import { AGING_BUCKETS, type StatementDocument, type StatementRow } from "@/lib/customerStatement";
 
 import { customerLabel, lineTotal } from "@/lib/specialOrders";
-import type { InvoiceTotalsBreakdown } from "@/lib/customerInvoices";
+import { PAPER_COLUMNS, type InvoiceTotalsBreakdown, type PaperRow } from "@/lib/customerInvoices";
 import { dateInTimeZone, serverTimeZone } from "@/lib/today";
 import {
   Field,
@@ -176,6 +176,7 @@ const s = {
   invRow: { flexDirection: "row", paddingVertical: 4, alignItems: "flex-start" },
   invDesc: { flexGrow: 1, flexBasis: 0, paddingRight: 12 },
   invAmount: { width: 80, textAlign: "right" },
+  invCol: { width: 62, textAlign: "right" },
   invBand: {
     flexDirection: "row",
     backgroundColor: INK,
@@ -667,12 +668,12 @@ export function kitchenOrderPages(
  * ========================================================================== */
 
 /**
- * THE CUSTOMER INVOICE (migration 124) — one invoice, one row per ORDER, the
- * statement's grain. Mark, 2026-09-23: one line for each special order, worded
- * like the pay page ("Order #10057 · Cafe Knotted · 10/5/2026"), and delivery
- * NOT its own line — it is inside each order's amount, as on a regular order.
- * The amounts are the invoice's own frozen lines, never re-derived here: this
- * is the paper the customer was sent.
+ * THE CUSTOMER INVOICE (migration 124) — one invoice, a row per ORDER (Mark,
+ * 2026-09-23), worded like the pay page ("Order #SO-10057 · Cafe Knotted ·
+ * 10/5/2026"). Since 2026-09-27 its money is in COLUMNS — Subtotal, Discount,
+ * Delivery, Rush fee, Tax — each adding up to its line in the Totals window
+ * (`invoicePaper`, lib/customerInvoices). The amounts are the invoice's own
+ * frozen lines, never re-derived here: this is the paper the customer was sent.
  */
 export type CustomerInvoiceDoc = {
   number: string;
@@ -680,21 +681,9 @@ export type CustomerInvoiceDoc = {
   due_on: string | null;
   notes: string | null;
   customer: { name: string; phone: string | null; email: string | null };
-  lines: {
-    description: string;
-    amount: number;
-    /**
-     * ITEMIZED, ON A ONE-ORDER INVOICE (Mark, 2026-09-23: every order's Send ▸
-     * Invoice now goes through a customer invoice, and a regular customer was
-     * used to seeing what they ordered). The items only — the order's
-     * discount, delivery, rush, tax and payments are the Totals window's, as
-     * on the order's own documents. Absent on a multi-order invoice, which
-     * stays one row per order.
-     */
-    detail?: { rows: { label: string; amount: number }[] };
-    /** A line of the invoice's own (141) — a delivery fee — not an order. */
-    free?: boolean;
-  }[];
+  /** The money in columns (several orders); else one order, itemized. */
+  columns: boolean;
+  lines: PaperRow[];
   /** The Totals window (2026-09-27): `invoiceTotalsBreakdown`. */
   totals: InvoiceTotalsBreakdown;
   total: number;
@@ -722,6 +711,10 @@ export function CustomerInvoicePdf({
 }) {
   const settled = invoice.balance <= 0;
   const orderCount = invoice.lines.filter((l) => !l.free).length;
+  // The columns something on this invoice uses; Subtotal always.
+  const shown = PAPER_COLUMNS.filter(
+    (c) => c.key === "subtotal" || invoice.lines.some((l) => Math.abs(l.parts?.[c.key] ?? 0) >= 0.005)
+  );
   return (
     <Document>
       <Page size="LETTER" style={s.page}>
@@ -773,31 +766,71 @@ export function CustomerInvoicePdf({
               {orderCount === 0 ? "Charges" : orderCount === 1 ? "Order" : "Orders"}{" "}
               <Text style={s.sectionCount}>{orderCount === 0 ? invoice.lines.length : orderCount}</Text>
             </Text>
-            <View style={s.tableHead} fixed>
-              <Text style={[s.th, s.invDesc]}>{orderCount <= 1 ? "Item" : "Order"}</Text>
-              <Text style={[s.th, s.invAmount]}>Amount</Text>
-            </View>
-            {invoice.lines.map((l, i) =>
-              l.detail ? (
-                <View key={i}>
-                  <View style={s.invBand} wrap={false}>
-                    <Text style={[s.invBandText, s.invDesc]}>{l.description}</Text>
-                  </View>
-                  {l.detail.rows.map((r, j) => (
-                    <View key={j} style={[s.invRow, s.invDetail]} wrap={false}>
-                      <Text style={[s.invDesc, r.amount < 0 ? { color: MUTED } : {}]}>{r.label}</Text>
-                      <Text style={[s.invAmount, r.amount < 0 ? { color: MUTED } : {}]}>
-                        {r.amount ? money(r.amount) : "—"}
-                      </Text>
-                    </View>
+            {invoice.columns ? (
+              <>
+                <View style={s.tableHead} fixed>
+                  <Text style={[s.th, s.invDesc]}>{orderCount === 0 ? "Charge" : "Order"}</Text>
+                  {shown.map((c) => (
+                    <Text key={c.key} style={[s.th, s.invCol]}>{c.label}</Text>
                   ))}
                 </View>
-              ) : (
-                <View key={i} style={s.invRow} wrap={false}>
-                  <Text style={s.invDesc}>{l.description}</Text>
-                  <Text style={s.invAmount}>{money(l.amount)}</Text>
+                {invoice.lines.map((l, i) => (
+                  <View key={i}>
+                    {l.free && orderCount > 0 && !invoice.lines[i - 1]?.free ? (
+                      <View style={s.invBand} wrap={false}>
+                        <Text style={s.invBandText}>Other charges</Text>
+                      </View>
+                    ) : null}
+                    <View style={s.invRow} wrap={false}>
+                      <Text style={s.invDesc}>{l.description}</Text>
+                      {shown.map((c) => {
+                        const v = l.parts?.[c.key] ?? 0;
+                        return (
+                          <Text key={c.key} style={v ? (v < 0 ? [s.invCol, { color: MUTED }] : s.invCol) : [s.invCol, s.empty]}>
+                            {v ? money(v) : "—"}
+                          </Text>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))}
+              </>
+            ) : (
+              <>
+                <View style={s.tableHead} fixed>
+                  <Text style={[s.th, s.invDesc]}>Item</Text>
+                  <Text style={[s.th, s.invAmount]}>Amount</Text>
                 </View>
-              )
+                {invoice.lines.map((l, i) =>
+                  l.detail ? (
+                    <View key={i}>
+                      <View style={s.invBand} wrap={false}>
+                        <Text style={[s.invBandText, s.invDesc]}>{l.description}</Text>
+                      </View>
+                      {l.detail.rows.map((r, j) => (
+                        <View key={j} style={[s.invRow, s.invDetail]} wrap={false}>
+                          <Text style={[s.invDesc, r.amount < 0 ? { color: MUTED } : {}]}>{r.label}</Text>
+                          <Text style={[s.invAmount, r.amount < 0 ? { color: MUTED } : {}]}>
+                            {r.amount ? money(r.amount) : "—"}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <View key={i}>
+                      {l.free && orderCount > 0 && !invoice.lines[i - 1]?.free ? (
+                        <View style={s.invBand} wrap={false}>
+                          <Text style={s.invBandText}>Other charges</Text>
+                        </View>
+                      ) : null}
+                      <View style={s.invRow} wrap={false}>
+                        <Text style={s.invDesc}>{l.description}</Text>
+                        <Text style={s.invAmount}>{money(l.amount)}</Text>
+                      </View>
+                    </View>
+                  )
+                )}
+              </>
             )}
           </View>
 

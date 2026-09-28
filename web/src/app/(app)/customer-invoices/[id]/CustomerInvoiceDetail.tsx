@@ -96,21 +96,30 @@ export async function CustomerInvoiceDetail({
       billed: g.net,
       expected: state?.expected ?? g.net,
       stale: draft && Boolean(state?.stale),
+      // What it copied here (141): its items, then its discount, delivery,
+      // rush, tax and any "Less invoice" — shown when the row is opened.
+      lines: g.lines.map((l) => ({
+        description: l.description,
+        qty: l.qty,
+        unitPrice: l.unit_price,
+        amount: l.amount,
+      })),
     };
   });
-  let position = 0;
-  const lineRows: InvoiceLineRow[] = groups.flatMap((g) =>
-    g.lines.map((l) => ({
+  // OTHER CHARGES (Mark, 2026-09-27): only the invoice's own lines. An
+  // order's copied lines are under its row in Orders, not repeated here.
+  const chargeRows: InvoiceLineRow[] = groups
+    .filter((g) => !g.orderId)
+    .flatMap((g) => g.lines)
+    .map((l, position) => ({
       id: l.id,
-      position: position++,
-      group: g.label,
+      position,
       description: l.description,
+      lineType: l.line_type === "delivery" ? "delivery" : "item",
       qty: l.qty,
       unitPrice: l.unit_price,
       amount: l.amount,
-      free: !l.special_order_id,
-    }))
-  );
+    }));
   const processor = invoice.processor ?? "square";
   const qbo = (invoice.external_ref as { qbo?: { id?: string; doc_number?: string | null; invoice_link?: string | null } } | null)?.qbo;
 
@@ -324,7 +333,7 @@ export async function CustomerInvoiceDetail({
         soldAsEditable={canWrite && !invoice.paid_at && !invoice.voided_at}
       />
 
-      <InvoiceLines invoiceId={id} orgId={invoice.org_id} rows={lineRows} draft={canWrite && draft} />
+      <InvoiceLines invoiceId={id} orgId={invoice.org_id} rows={chargeRows} draft={canWrite && draft} />
 
       {sends.length > 0 ? (
         <section className="space-y-2">
