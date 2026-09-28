@@ -36,9 +36,11 @@ import { canRefundPayments } from "@/lib/roles";
 
 const CUSTOMERS_CRUMB = { href: "/customers", label: "Customers" };
 
-/** THE RECORD'S TWO TABS (Mark, 2026-09-28): who they are, and their money. */
+/** THE RECORD'S THREE TABS (Mark, 2026-09-28): who they are, what they have
+ *  ordered, and their money. */
 const TABS = [
   { key: "info", label: "Info" },
+  { key: "orders", label: "Orders" },
   { key: "billing", label: "Billing" },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
@@ -46,11 +48,10 @@ type Tab = (typeof TABS)[number]["key"];
 /**
  * One customer, and everything they have ever ordered.
  *
- * TWO TABS, the tab in the URL: INFO is who they are (details, address,
- * notes); BILLING is their money — open INVOICES, aged; orders owed and NOT
- * INVOICED; their CREDIT; their QuickBooks link; and every order, in a pane
- * that ends at the foot of the window. What they owe is also in the line under the name,
- * above the split, because "what does Cafe Knotted owe us" is the reason
+ * THREE TABS, the tab in the URL: INFO is who they are (details, address,
+ * notes); ORDERS is every order; BILLING is their money — their QuickBooks
+ * link, open INVOICES, aged; orders owed and NOT INVOICED; and their CREDIT.
+ * What they owe is also in the line under the name, above the split, because "what does Cafe Knotted owe us" is the reason
  * anybody opens this record. Since 144 it is read the textbook way, in three
  * parts that never overlap (`customer_balances`).
  *
@@ -236,8 +237,8 @@ export async function CustomerDetail({
     return `/customers/${id}${qs ? `?${qs}` : ""}`;
   };
   const tabItems = TABS.map((t) => ({ key: t.key, label: t.label, href: tabHref(t.key) }));
-  // Links out of the Billing tab come back to it.
-  const here = { href: tabHref("billing"), label: "Customer" };
+  // Links out of a tab come back to it.
+  const here = { href: tabHref(tab), label: "Customer" };
 
   return (
     <div className="space-y-12">
@@ -337,8 +338,35 @@ export async function CustomerDetail({
             </>
           )}
 
+          {tab === "orders" &&
+            (orderError ? (
+              <p className="text-sm text-accent">Could not load their orders: {orderError.message}</p>
+            ) : (
+              <CustomerOrdersTable
+                heading="Orders"
+                rows={withMoney.map((o) => ({
+                  id: o.id,
+                  number: o.number,
+                  kind: o.kind,
+                  status: o.status,
+                  title: o.title,
+                  event_date: o.event_date,
+                  total: o.totals.total,
+                  due: countsAsOwed(o) && o.totals.balance > 0 ? o.totals.balance : 0,
+                }))}
+                from={here}
+                storageKey="rf.customerOrders.v1"
+              />
+            ))}
+
           {tab === "billing" && (
             <>
+              <CustomerAccounting
+                customerId={customer.id}
+                orgId={customer.org_id as string}
+                customerName={customerLabel(customer as never) || "This customer"}
+              />
+
               {invoices.length > 0 ? (
                 <section className="space-y-2">
                   <SectionHeading count={invoices.length}>Invoices</SectionHeading>
@@ -403,36 +431,6 @@ export async function CustomerDetail({
               ) : null}
 
               <CustomerCredit rows={creditRows} canRefund={canRefundPayments(session.membership.role)} />
-
-              <CustomerAccounting
-                customerId={customer.id}
-                orgId={customer.org_id as string}
-                customerName={customerLabel(customer as never) || "This customer"}
-              />
-
-              {/* LAST, because its pane runs to the foot of the window: a
-                  wholesale account has hundreds of orders, and they scroll
-                  inside the pane rather than taking the record with them. */}
-              {orderError ? (
-                <p className="text-sm text-accent">Could not load their orders: {orderError.message}</p>
-              ) : (
-                <CustomerOrdersTable
-                  heading="Orders"
-                  rows={withMoney.map((o) => ({
-                    id: o.id,
-                    number: o.number,
-                    kind: o.kind,
-                    status: o.status,
-                    title: o.title,
-                    event_date: o.event_date,
-                    total: o.totals.total,
-                    due: countsAsOwed(o) && o.totals.balance > 0 ? o.totals.balance : 0,
-                  }))}
-                  from={here}
-                  storageKey="rf.customerOrders.v1"
-                  fillViewport
-                />
-              )}
             </>
           )}
         </div>

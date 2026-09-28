@@ -19,14 +19,8 @@ export type CustomerOrderRow = {
 };
 
 /**
- * A customer's orders on their record's Billing tab — the whole list, or the
- * ones owed and not invoiced.
- *
- * `fillViewport` is for the LAST table on the tab (the full Orders list, which
- * runs to hundreds for a wholesale account): its pane ends at the foot of the
- * window and the rows scroll under sticky column labels, instead of the record
- * scrolling for a screen and a half. A table above it stays as tall as its
- * rows.
+ * A customer's orders — the whole list on their record's Orders tab, or the
+ * ones owed and not invoiced on its Billing tab.
  */
 export function CustomerOrdersTable({
   heading,
@@ -34,7 +28,6 @@ export function CustomerOrdersTable({
   from,
   storageKey,
   accent = false,
-  fillViewport = false,
 }: {
   heading: string;
   rows: CustomerOrderRow[];
@@ -43,7 +36,6 @@ export function CustomerOrdersTable({
   storageKey: string;
   /** The Due figures in the accent: every row here is owed. */
   accent?: boolean;
-  fillViewport?: boolean;
 }) {
   const columns: DataColumn<CustomerOrderRow>[] = [
     {
@@ -109,8 +101,6 @@ export function CustomerOrdersTable({
       storageKey={storageKey}
       defaultSort={{ key: "event_date", dir: "desc" }}
       compactBelow={900}
-      scroll={fillViewport}
-      fillViewport={fillViewport}
       leading={<SectionHeading count={rows.length}>{heading}</SectionHeading>}
       empty={<p className="text-sm text-muted">Nothing here.</p>}
     />

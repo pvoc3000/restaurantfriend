@@ -5120,11 +5120,13 @@ an actionmenu that sits at the top of the page like all the other detail
 pages." The same `SectionNav` as the invoice record, `?tab=billing`, Info the
 default.
 - **Info:** Details, Address and Notes.
-- **Billing:** Invoices (aged), Not Invoiced, Credit, QuickBooks (moved here
-  the same day, Mark), then Orders LAST, in a
-  `DataTable` with `fillViewport` so a wholesale account's hundreds of orders
-  scroll inside a pane that ends at the foot of the window. Not Invoiced is the
-  same table without the fill (`CustomerOrdersTable`).
+- **Billing:** Invoices (aged), Not Invoiced and Credit (`CustomerOrdersTable`
+  for Not Invoiced).
+- **Later the same day (Mark):** QuickBooks moved from Info to Billing, then
+  to the TOP of Billing; and a third tab, **Orders**, between Info and Billing,
+  took the Orders list. It first shipped LAST on Billing in a `fillViewport`
+  pane that ended at the foot of the window; on a tab of its own it is a plain
+  `DataTable` and the page scrolls. Links out of a tab come back to that tab.
 - The invoices, not-invoiced and credit reads are skipped on Info; the balances
   are still read, because the line under the name states them on both tabs.
 - **Actions** (`CustomerCommandMenu`, was `CustomerActions`): New Order ·
