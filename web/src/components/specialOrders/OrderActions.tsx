@@ -16,6 +16,8 @@ import {
   type SpecialOrderStatus,
 } from "@/lib/specialOrders";
 import {
+  cancelConfirmMessage,
+  cancelSpecialOrder,
   deleteConfirmMessage,
   deleteRefusal,
   deleteSpecialOrder,
@@ -166,13 +168,7 @@ export function OrderActions({
   async function cancel() {
     if (
       !(await confirmDialog({
-        ...splitConfirmMessage(
-          `Cancel order ${number}?\n\nIt stays on the list, greyed and struck through, and drops out of every working view. Cancelling is reversible — set the status back on the Info tab.${
-            scheduled
-              ? " The kitchen still has this order: cancelling does NOT unschedule it, so unschedule it as well or those donuts get made."
-              : ""
-          }`
-        ),
+        ...splitConfirmMessage(cancelConfirmMessage(number, scheduled)),
         confirmLabel: "Cancel the order",
         tone: "danger",
       }))
@@ -181,13 +177,8 @@ export function OrderActions({
     }
     setError(null);
     start(async () => {
-      const { data, error: e } = await supabase
-        .from("special_orders")
-        .update({ status: "cancelled" })
-        .eq("id", id)
-        .select("id");
-      if (e) setError(e.message);
-      else if (!data?.length) setError("The change wasn't saved — the database refused it silently.");
+      const result = await cancelSpecialOrder(supabase, id);
+      if ("error" in result) setError(result.error);
       else {
         // The trigger's "Status changed from Order to Cancelled" is strictly
         // more than "Order cancelled" was.

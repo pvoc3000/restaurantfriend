@@ -6,16 +6,22 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { alertDialog, confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import {
+  cancelConfirmMessage,
+  cancelSpecialOrder,
   deleteConfirmMessage,
   deleteRefusal,
   deleteSpecialOrder,
   duplicateSpecialOrder,
   readDeleteContext,
+  readScheduled,
 } from "@/lib/specialOrderWrites";
+import type { SpecialOrderKind, SpecialOrderStatus } from "@/lib/specialOrders";
 import { RowMenu } from "@/components/ui/RowMenu";
 
 /**
- * A special order's row menu — Duplicate and Delete (Mark, 2026-09-08).
+ * A special order's row menu — Duplicate, Cancel Order and Delete (Mark,
+ * 2026-09-08; Cancel Order 2026-09-28). Cancel is offered on an ORDER that is
+ * not already cancelled, as on the record.
  *
  * `InventoryItemActions`' template, and every rule it encodes lives in
  * `lib/specialOrderWrites` rather than here, because the RECORD's own command
@@ -36,12 +42,16 @@ export function SpecialOrderActions({
   id,
   orgId,
   number,
+  kind,
+  status,
   onChanged,
 }: {
   id: string;
   /** For 113's `copy_special_order` — see `duplicateSpecialOrder`. */
   orgId: string;
   number: string;
+  kind: SpecialOrderKind;
+  status: SpecialOrderStatus | null;
   /**
    * Called after a successful delete. The LIST refreshes in place; the record
    * screen navigates away instead, which is why the destination is the
@@ -51,7 +61,7 @@ export function SpecialOrderActions({
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [busy, setBusy] = useState<"duplicate" | "delete" | null>(null);
+  const [busy, setBusy] = useState<"duplicate" | "cancel" | "delete" | null>(null);
   const [pending, start] = useTransition();
 
   function duplicate() {
@@ -70,6 +80,36 @@ export function SpecialOrderActions({
       // behaviour: you duplicated it in order to work on it.
       router.refresh();
       router.push(`/special-orders/${result.id}`);
+    });
+  }
+
+  function cancel() {
+    setBusy("cancel");
+    start(async () => {
+      // The row does not carry the schedule link, so it is read on the click
+      // — the confirm warns that cancelling does not unschedule.
+      const ctx = await readScheduled(supabase, id);
+      if ("error" in ctx) {
+        setBusy(null);
+        void alertDialog({ title: `Order ${number} could not be read`, body: ctx.error });
+        return;
+      }
+      const ok = await confirmDialog({
+        ...splitConfirmMessage(cancelConfirmMessage(number, ctx.scheduled)),
+        confirmLabel: "Cancel the order",
+        tone: "danger",
+      });
+      if (!ok) {
+        setBusy(null);
+        return;
+      }
+      const result = await cancelSpecialOrder(supabase, id);
+      setBusy(null);
+      if ("error" in result) {
+        void alertDialog({ title: `Order ${number} was not cancelled`, body: result.error });
+        return;
+      }
+      router.refresh();
     });
   }
 
@@ -134,6 +174,17 @@ export function SpecialOrderActions({
           disabled: busy !== null || pending,
           onSelect: duplicate,
         },
+        ...(kind === "order" && status !== "cancelled"
+          ? [
+              {
+                label: busy === "cancel" ? "Cancelling…" : "Cancel Order…",
+                hint: "Stays on the list, struck through",
+                danger: true,
+                disabled: busy !== null || pending,
+                onSelect: cancel,
+              },
+            ]
+          : []),
         {
           label: "Delete…",
           hint: "Shows what would go with it",

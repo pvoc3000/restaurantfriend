@@ -232,6 +232,51 @@ export async function deleteSpecialOrder(
 }
 
 /**
+ * CANCEL, shared by the record's Actions menu and the list's row menu (Mark,
+ * 2026-09-28) so the two say the same thing. Only an ORDER cancels: a lead, a
+ * quote, a template or a standing order has no production to call off.
+ *
+ * Cancelling does NOT unschedule — the confirm says so when a schedule exists.
+ */
+export function cancelConfirmMessage(number: string, scheduled: boolean): string {
+  return `Cancel order ${number}?\n\nIt stays on the list, greyed and struck through, and drops out of every working view. Cancelling is reversible — set the status back on the Info tab.${
+    scheduled
+      ? " The kitchen still has this order: cancelling does NOT unschedule it, so unschedule it as well or those donuts get made."
+      : ""
+  }`;
+}
+
+/** Whether a schedule exists for the order — read at the moment of the click
+ *  by a caller (the list) whose row does not carry it. */
+export async function readScheduled(
+  supabase: SupabaseClient,
+  id: string
+): Promise<{ scheduled: boolean } | { error: string }> {
+  const { data, error } = await supabase
+    .from("special_orders")
+    .select("production_schedule_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return { error: error.message };
+  return { scheduled: Boolean(data?.production_schedule_id) };
+}
+
+export async function cancelSpecialOrder(
+  supabase: SupabaseClient,
+  id: string
+): Promise<{ cancelled: true } | { error: string }> {
+  // `.select()` its own result: a refused update removes nothing and says so.
+  const { data, error } = await supabase
+    .from("special_orders")
+    .update({ status: "cancelled" })
+    .eq("id", id)
+    .select("id");
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: "The change wasn't saved — the database refused it silently." };
+  return { cancelled: true };
+}
+
+/**
  * Decision 13's one mechanism, and since 114 it is ONE CALL: a template, a
  * standing order and an ordinary order are all copied by
  * `copy_special_order`, and the copy's KIND is the caller's — which is what

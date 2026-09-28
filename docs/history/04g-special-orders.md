@@ -5140,3 +5140,12 @@ default.
   the money is unchanged, and in Not Invoiced an order on a live, unposted
   invoice has the Status **Invoice Drafted**, linking to the draft. The record
   finds those by reading the draft invoices' lines; no migration.
+
+**Cancel Order on the list's row menu (2026-09-28).** Mark: "add a 'Cancel
+Order' option to the more options menu on special order rows". The ⋯ now reads
+Duplicate · Cancel Order… · Delete…, Cancel offered on an ORDER not already
+cancelled, as on the record. The confirm and the write moved to
+`lib/specialOrderWrites` (`cancelConfirmMessage`, `cancelSpecialOrder`) so the
+record and the row say the same thing; the row reads `production_schedule_id`
+on the click (`readScheduled`) so its confirm still warns that cancelling does
+not unschedule.
