@@ -244,6 +244,13 @@ export async function deleteSpecialOrder(
  * - a SENT invoice (or one holding money) is frozen and still asks the
  *   customer for this order's money. Nothing here can edit it — it changes by
  *   Revise…, or goes by Void… — so the confirm names it and says so.
+ *
+ * AND IT COMES OFF THE PRODUCTION SCHEDULE, through 068's own
+ * `unschedule_special_order` and its guards: a schedule that has been PRINTED
+ * or has COUNTED quantities is the kitchen's now, so the function refuses, the
+ * order is still cancelled, and the refusal is what the person is told. The
+ * customer has cancelled whatever the kitchen has done; what to do about the
+ * paper on the wall is a person's call.
  */
 export type CancelContext = {
   scheduled: boolean;
@@ -276,7 +283,7 @@ export function cancelConfirmMessage(number: string, ctx: CancelContext): string
   }
   if (ctx.scheduled) {
     paragraphs.push(
-      "The kitchen still has this order: cancelling does NOT unschedule it, so unschedule it as well or those donuts get made."
+      "It comes off the production schedule — unless that schedule has been printed or counted, in which case the kitchen already has it and you will be told."
     );
   }
   return paragraphs.join("\n\n");
@@ -321,8 +328,9 @@ export async function readCancelContext(
 }
 
 /**
- * Cancels, then takes the order off its drafts. The status write is the act;
- * a draft that refuses (somebody sent it a moment ago) does not undo it — it
+ * Cancels, then takes the order off its drafts and off the production
+ * schedule. The status write is the act; a draft that refuses (somebody sent
+ * it a moment ago) or a schedule the kitchen already has does not undo it — it
  * comes back in `notes`, the things the person must be told afterwards.
  */
 export async function cancelSpecialOrder(
@@ -346,6 +354,12 @@ export async function cancelSpecialOrder(
       p_order: id,
     });
     if (e) notes.push(`It is still on ${inv.label}: ${e.message}.`);
+  }
+  if (ctx.scheduled) {
+    // The function's refusals are worded for a person — the print date, or
+    // how many lines were counted — so they are passed on as they arrive.
+    const { error: e } = await supabase.rpc("unschedule_special_order", { p_order_id: id });
+    if (e) notes.push(`It is still on the production schedule: ${e.message}. Tell the kitchen.`);
   }
   return { notes };
 }

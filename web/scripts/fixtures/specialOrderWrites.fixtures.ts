@@ -231,5 +231,6 @@ test("cancel: several invoices read as a list, with the verb agreeing", () => {
 test("cancel: paragraphs are split for the confirm's body", () => {
   const m = cancelConfirmMessage("SO-1", { scheduled: true, invoices: [sent("INV-3")] });
   eq(m.split("\n\n").length, 4, "question, what it does, the invoice, the kitchen");
+  ok(m.includes("comes off the production schedule"), "a scheduled order says it is unscheduled");
 });
 
