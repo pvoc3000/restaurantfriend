@@ -9,7 +9,10 @@ import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/u
 import { TextInput } from "@/components/ui/TextInput";
 
 /**
- * GIVE A PAY-LINK PAYMENT BACK, through Square (`square-refund`).
+ * GIVE A PAYMENT BACK — a pay-link one through Square (`square-refund`), or,
+ * since 2026-09-28, one QuickBooks Payments collected through QuickBooks
+ * (`qbo-sync`'s `refund_payment`, which voids a charge that has not settled
+ * and refunds one that has).
  *
  * The amount starts at the whole payment — a live value, the refund that will
  * really be sent if nobody changes it — and can be lowered for a part refund.
@@ -27,6 +30,7 @@ export function RefundPayment({
   method,
   onClose,
   credit = false,
+  processor = "square",
 }: {
   /** An order's slice of a payment (140) — or, with `credit`, the payment
    *  itself, whose credit is refunded (143). */
@@ -36,6 +40,8 @@ export function RefundPayment({
   /** "visa ending 2998", from the payment's note. */
   method: string | null;
   onClose: () => void;
+  /** Who collected it, and so who gives it back. */
+  processor?: "square" | "quickbooks";
 }) {
   const router = useRouter();
   const [value, setValue] = useState(amount.toFixed(2));
@@ -53,14 +59,25 @@ export function RefundPayment({
     if (!valid || busy) return;
     setBusy(true);
     setError(null);
-    const { data, error: e } = await createClient().functions.invoke("square-refund", {
-      body: {
-        ...(credit ? { credit_payment_id: paymentId } : { payment_id: paymentId }),
-        amount: n,
-        reason: reason.trim() || null,
-        idempotency_key: key,
-      },
-    });
+    const { data, error: e } =
+      processor === "quickbooks"
+        ? await createClient().functions.invoke("qbo-sync", {
+            body: {
+              mode: "refund_payment",
+              application_id: paymentId,
+              amount: n,
+              reason: reason.trim() || null,
+              idempotency_key: key,
+            },
+          })
+        : await createClient().functions.invoke("square-refund", {
+            body: {
+              ...(credit ? { credit_payment_id: paymentId } : { payment_id: paymentId }),
+              amount: n,
+              reason: reason.trim() || null,
+              idempotency_key: key,
+            },
+          });
     setBusy(false);
     if (e) {
       let message = e.message;
@@ -109,7 +126,7 @@ export function RefundPayment({
       <div className="space-y-4">
         <p className="text-[14px]">
           {money(amount)} paid online{method ? ` (${method})` : ""}. The money goes back the way it
-          came, through Square.
+          came, through {processor === "quickbooks" ? "QuickBooks" : "Square"}.
         </p>
         <label className="block space-y-1.5">
           <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">

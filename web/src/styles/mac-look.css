@@ -150,9 +150,12 @@
    is gone rather than left behind as a class that still works and means
    nothing. */
 
-/* SINCE 2026-09-28: BLACK FILL, WHITE TYPE, BLUE SHADOW (Mark: "make our
+/* SINCE 2026-09-28: BLACK FILL, WHITE TYPE, BLACK SHADOW, and a BLUE 2px edge
+   on hover and press — the only part of the blue left, since a black edge
+   would vanish into the fill. The steps, all that day (Mark): "make our
    primary button class have a black fill, blue text, and blue drop shadow",
-   then the same day "make the text … white instead of blue").
+   then "make the text … white instead of blue", then "make the drop shadow
+   on primary buttons black again").
    Hover and press keep the grammar — a 2px edge (now blue), the drop into the
    shadow. The history below is the pale-blue era it replaced.
 
@@ -191,11 +194,11 @@
 .mac-control.mac-primary {
   background-color: #000;
   color: #fff;
-  box-shadow: 3px 3px 0 0 var(--rf-blue-400);
+  box-shadow: 3px 3px 0 0 #000;
 }
 
 .mac-primary:not(:disabled):hover {
-  box-shadow: 3px 3px 0 0 var(--rf-blue-400), inset 0 0 0 1px var(--rf-blue-400);
+  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px var(--rf-blue-400);
 }
 
 .mac-control.mac-primary:not(:disabled):active {

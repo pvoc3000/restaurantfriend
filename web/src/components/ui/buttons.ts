@@ -89,8 +89,8 @@ export const DANGER_BUTTON_CLASS =
 // which re-earns the 2px edge and keeps the red while held.
 //
 // SINCE 2026-09-28 (Mark) BOTH FILLED COMMANDS ARE BLACK: the primary with
-// white type and a blue shadow, the destructive with red type and a red shadow
-// (`--color-danger-ink`; both shadows are in mac-look.css).
+// white type, a black shadow and a blue hover edge, the destructive with red
+// type and a red shadow (`--color-danger-ink`; the rest is in mac-look.css).
 // What follows is the pale-wash era that preceded it.
 //
 // THE PRIMARY ONE WAS A PALE BLUE FILL from 2026-09-21 (Mark) — `bg-commit-fill`

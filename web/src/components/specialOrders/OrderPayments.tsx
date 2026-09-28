@@ -27,6 +27,7 @@ import { SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
 import {
   PAYMENT_TYPE_OPTIONS as PAYMENT_TYPES,
   isRefundablePayment,
+  refundProcessor,
   money,
 } from "@/lib/specialOrders";
 
@@ -370,6 +371,7 @@ export function OrderPayments({
           paymentId={refunding.id}
           amount={Number(refunding.amount ?? 0)}
           method={(refunding.note ?? "").replace(/^Pay link · /, "") || null}
+          processor={refundProcessor(refunding) ?? "square"}
           onClose={() => setRefunding(null)}
         />
       )}

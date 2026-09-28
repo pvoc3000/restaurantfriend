@@ -182,21 +182,36 @@ export const PAYMENT_TYPE_OPTIONS: PickOption[] = [
   { value: "Square Online", label: "Square Online", hint: "the pay link" },
   { value: "Square Refund", label: "Square Refund", hint: "a pay-link refund, negative" },
   { value: "QuickBooks Payments", label: "QuickBooks Payments", hint: "a QuickBooks invoice's pay link" },
+  { value: "QuickBooks Refund", label: "QuickBooks Refund", hint: "a QuickBooks Payments refund, negative" },
   { value: "cash", label: "Cash" },
   { value: "check", label: "Check" },
   { value: "comp", label: "Comp" },
   { value: "legacy", label: "Legacy", hint: "migrated from FileMaker's paid total" },
 ];
 
-/** A payment the Refund… command can give back: written by `square-pay`
- *  (migration 119), so it carries the Square payment id. Hand-typed rows do
- *  not, and are refunded in Square's own dashboard. */
+/** Who gives a payment back through Refund…: Square for a pay-link payment
+ *  (`square-pay`, migration 119), QuickBooks for one QuickBooks Payments
+ *  collected (131; `qbo-sync`'s `refund_payment`, 149). Either carries the
+ *  processor's id. Hand-typed rows do not, and are refunded where they were
+ *  taken. */
+export function refundProcessor(p: {
+  payment_type: string | null;
+  external_ref: string | null;
+  amount: number | null;
+}): "square" | "quickbooks" | null {
+  if (!p.external_ref || !(Number(p.amount) > 0)) return null;
+  if (p.payment_type === "Square Online") return "square";
+  if (p.payment_type === "QuickBooks Payments") return "quickbooks";
+  return null;
+}
+
+/** A payment the Refund… command can give back — see `refundProcessor`. */
 export function isRefundablePayment(p: {
   payment_type: string | null;
   external_ref: string | null;
   amount: number | null;
 }): boolean {
-  return p.payment_type === "Square Online" && Boolean(p.external_ref) && Number(p.amount) > 0;
+  return refundProcessor(p) !== null;
 }
 
 /** What a new payment offers before anybody chooses — 1,188 of 1,190. */
