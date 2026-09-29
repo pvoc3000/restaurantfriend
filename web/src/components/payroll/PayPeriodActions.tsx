@@ -95,7 +95,10 @@ export function PayPeriodActions({
 
   // Everything the ladder allows EXCEPT `exported`, which only Finalize may
   // reach — see the note at the top of this file.
-  const forward = nextStatuses(status).filter((next) => next !== "exported");
+  // Neither end step is offered here: Export Timesheets marks a period
+  // exported and Close Pay Period closes it, both in the panel's footer
+  // (2026-09-29) — a second Close here is how a period got left at Exported.
+  const forward = nextStatuses(status).filter((next) => next !== "exported" && next !== "closed");
 
   /** The stamps each transition owns. Cleared on the way back out. `exported`
    *  isn't here because it isn't offered — Finalize stamps it. */

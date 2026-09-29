@@ -1061,3 +1061,18 @@
    person's jobs, each pay rate has exactly one job, and it will not add two
    rows together.** So two rows at one rate, or a separate zero-hour row for a
    job the hours rows already cover, are refused outright.
+   **2026-09-29 — EXPORT MARKS EXPORTED, CLOSE MARKS CLOSED.** Mark pressed the
+   footer's Close Pay Period, found the period at Exported (that button ran
+   `freeze_pay_period`, which only ever writes `exported`), then closed it with
+   the Status section's separate Close. Reworked to his rule:
+   - **Export Timesheets** on an open or review period confirms, listing the
+     caveats, then downloads (FIRST, inside the click, for Safari's gesture
+     rule) and freezes. That locks allocations and accruals and sets Exported.
+     On an exported or closed period it is a plain download.
+   - **Close Pay Period** sets `closed` + `closed_at` from any status. It warns
+     (danger confirm, "Close Anyway") when the period was never exported,
+     because that means no lock and no file. It confirms either way, since
+     closed is final. The DB enforces no ladder, so open → closed is allowed.
+   - Footer: Export and Close side by side. The primary is Export until
+     Exported, then Close. `PayPeriodActions` no longer offers Close, leaving
+     Start review / Back to open / Reopen.

@@ -10,6 +10,7 @@ import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/u
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { requestShiftFocus } from "@/lib/shiftFocus";
 import { PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
+import { confirmDialog } from "@/lib/confirm";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import {
   buildExportRows,
@@ -82,14 +83,16 @@ function stamp(value: string | null, timeZone: string): string {
  * and close — so it opens over the shifts instead of replacing them, and the
  * period `PickList` on the bar behind it is what the list used to be for.
  *
- * Export Timesheets and Close Pay Period are still TWO SEPARATE ACTS,
- * deliberately — they were called Download and Finalize until Mark renamed
- * them on 2026-08-22, which is a better fit: the file IS the export, and what
- * the second one does to the period is close it. DOWNLOAD
- * produces the file and changes nothing — take it as many times as you like
- * while you check it against Gusto. FINALIZE is the irreversible one: it
- * snapshots every tip allocation onto its timesheet and flips the period to
- * `exported`, in one transaction, through `freeze_pay_period`.
+ * Export Timesheets and Close Pay Period are TWO ACTS, side by side in the
+ * footer, and each MOVES THE STATUS (Mark, 2026-09-29). Before that, Export
+ * was a download that changed nothing and a button labelled Close Pay Period
+ * ran the freeze — which set the period to EXPORTED, not closed — while the
+ * real close sat up in the Status section; Mark closed a period, found it at
+ * Exported, and had to hunt for the other button. Now: EXPORT locks every tip
+ * allocation and benefit accrual and marks the period exported through
+ * `freeze_pay_period` (one transaction), downloading the file, and is a plain
+ * download after that; CLOSE sets `closed` — payroll ran — and warns, but
+ * allows, when nothing was exported. Whichever is next is the primary.
  *
  * Decision 10 is why the freeze exists at all: someone editing a March punch
  * must not silently re-derive a February allocation that disagrees with money
@@ -230,8 +233,74 @@ export function ExportTimesheets({
     URL.revokeObjectURL(url);
   }
 
+  /**
+   * EXPORTING IS WHAT MARKS THE PERIOD EXPORTED (Mark, 2026-09-29: "The status
+   * should be changed to 'Exported' when I export time sheets"). Until then the
+   * file was a side effect-free download and the status moved only on a
+   * separate button labelled Close Pay Period — which set it to Exported, not
+   * Closed, and caught him out. Now the first export of an open period locks
+   * the allocations and marks it Exported (`freeze_pay_period`, one
+   * transaction) and THEN downloads, so the file is always built from numbers
+   * that can no longer drift. Once exported, it is a plain download again.
+   */
+  function exportTimesheets() {
+    if (frozen || !canWrite) {
+      download();
+      return;
+    }
+    setConfirming(true);
+  }
+
+  /**
+   * Close sets CLOSED — "payroll ran" — from wherever the period is (Mark,
+   * 2026-09-29: "even if the timesheets [weren't] exported … if they insist we
+   * should allow it"). Unexported, it says so first. Irreversible either way:
+   * a closed period is never reopened.
+   */
+  async function closePeriod() {
+    const ok = await confirmDialog(
+      frozen
+        ? {
+            title: "Close this pay period?",
+            body: "Payroll ran. A closed period is final — it can't be reopened, and a correction becomes an adjustment in the current open period.",
+            confirmLabel: "Close Pay Period",
+          }
+        : {
+            title: "Close without exporting?",
+            body:
+              "These timesheets haven't been exported, so their tip allocations and benefit accruals were never locked and no file was produced.\n\nA closed period is final — it can't be reopened.",
+            confirmLabel: "Close Anyway",
+            tone: "danger",
+          }
+    );
+    if (!ok) return;
+    setFailed(null);
+    startTransition(async () => {
+      const { data, error } = await supabase
+        .from("pay_periods")
+        .update({ status: "closed", closed_at: new Date().toISOString() })
+        .eq("id", period.id)
+        .select("id");
+      if (error) {
+        setFailed(error.message);
+        return;
+      }
+      if (!data || data.length === 0) {
+        setFailed("Nothing was changed — the database refused the write. You may not have permission to run payroll.");
+        return;
+      }
+      setOpen(false);
+      router.refresh();
+    });
+  }
+
   function finalize() {
     setFailed(null);
+    // DOWNLOAD FIRST, inside the click: Safari may refuse a download started
+    // after an await, as no longer the user's gesture. The file is built from
+    // the same allocations the lock is about to write, so the order changes
+    // nothing about what is in it.
+    download();
     startTransition(async () => {
       // The allocations, in the shape freeze_pay_period validates. EVERY
       // timesheet in the period must be covered or it refuses — which is what
@@ -264,17 +333,13 @@ export function ExportTimesheets({
       });
 
       if (error) {
-        setFailed(error.message);
+        setConfirming(false);
+        setFailed(`The file downloaded, but the period was not marked exported: ${error.message}`);
         return;
       }
       setConfirming(false);
-      // Finalizing is the end of the task, so it LEAVES — the receiving
-      // screen's lesson. On the old screen that meant navigating to the
-      // pay-period list; here the equivalent gesture is closing the panel,
-      // which puts you back on the shifts with the period now frozen. Same
-      // reasoning: everything still in here is for a fortnight you have just
-      // declared done.
-      setOpen(false);
+      // STAY: Close Pay Period, now the primary, is the next act, taken once
+      // Gusto has the file.
       router.refresh();
       void data;
     });
@@ -335,11 +400,15 @@ export function ExportTimesheets({
               >
                 Close
               </button>
+              {/* SIDE BY SIDE, AND THE NEXT ACT IS THE PRIMARY (Mark,
+                  2026-09-29): Export until the period is exported, then
+                  Close. A closed period keeps only the download. */}
               {!worksheetError && (
                 <button
                   type="button"
-                  onClick={download}
-                  className={BUTTON}
+                  onClick={exportTimesheets}
+                  disabled={pending}
+                  className={canWrite && !frozen ? DIALOG_COMMIT_CLASS : BUTTON}
                   // UPLOAD IT AS DOWNLOADED (Mark, 2026-08-23, on seeing an id
                   // render as 1.8E+54). The FILE is right — Gusto's own import
                   // template writes `018e53` and `060f28` bare, unquoted and
@@ -357,12 +426,12 @@ export function ExportTimesheets({
                   Export Timesheets
                 </button>
               )}
-              {!worksheetError && canWrite && !frozen && (
+              {canWrite && period.status !== "closed" && (
                 <button
                   type="button"
-                  onClick={() => setConfirming(true)}
+                  onClick={() => void closePeriod()}
                   disabled={pending}
-                  className={DIALOG_COMMIT_CLASS}
+                  className={frozen ? DIALOG_COMMIT_CLASS : BUTTON}
                 >
                   Close Pay Period
                 </button>
@@ -626,9 +695,10 @@ export function ExportTimesheets({
                 )}
 
                 <p className="max-w-[80ch] text-sm text-muted">
-                  Exporting changes nothing — take the file as often as you
-                  like. Closing the period snapshots the tip allocations and
-                  benefit accruals, and marks it exported.
+                  Exporting locks the tip allocations and benefit accruals and
+                  marks the period exported; after that the file can be taken
+                  again as often as you like. Closing marks it closed — payroll
+                  ran — and is final.
                 </p>
 
                 <p className="max-w-[80ch] text-[13px] text-muted">
@@ -649,7 +719,7 @@ export function ExportTimesheets({
 
       {confirming && (
         <Dialog
-          title="Close this pay period"
+          title="Export timesheets"
           onClose={() => !pending && setConfirming(false)}
           busy={pending}
           width="max-w-xl"
@@ -669,15 +739,16 @@ export function ExportTimesheets({
                 disabled={pending}
                 className={DIALOG_COMMIT_CLASS}
               >
-                {pending ? "Closing…" : "Close Pay Period"}
+                {pending ? "Exporting…" : "Export Timesheets"}
               </button>
             </>
           }
         >
           <div className="space-y-5">
             <p className="max-w-[60ch] text-sm">
-              This snapshots every tip allocation and every benefit accrual, and
-              marks the period <strong>exported</strong>. After it, editing a
+              This locks every tip allocation and every benefit accrual, marks
+              the period <strong>exported</strong>, and downloads the file for
+              Gusto. After it, editing a
               punch no longer moves anybody&rsquo;s tips and correcting
               somebody&rsquo;s shops next month cannot move their benefit — which
               is the point: a correction later must not silently re-divide money
@@ -690,7 +761,7 @@ export function ExportTimesheets({
                 {caveats.map((c) => (
                   <p key={c.code}>{c.detail}</p>
                 ))}
-                <p className="text-[13px]">You can close it anyway.</p>
+                <p className="text-[13px]">You can export it anyway.</p>
               </div>
             ) : (
               <p className="text-sm text-muted">Nothing is outstanding.</p>
