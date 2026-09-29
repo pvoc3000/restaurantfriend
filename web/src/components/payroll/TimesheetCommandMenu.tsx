@@ -4,6 +4,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
+import { SyncFromSquare } from "@/components/sales/SyncFromSquare";
 import { DeleteTimesheets } from "./DeleteTimesheets";
 import { ExportTimesheets } from "./ExportTimesheets";
 import { NewPayPeriod } from "./NewPayPeriod";
@@ -40,7 +41,7 @@ function group(items: ActionMenuItem[]): ActionMenuItem[] {
  *
  *   Import Timesheets · New Timesheet · Delete Timesheets…   (the shifts)
  *   ─────
- *   New Pay Period · Recalculate Workdays… · Close Pay Period…   (the period)
+ *   New Pay Period · Recalculate Workdays… · Sync Tips from Square · Close Pay Period…   (the period)
  *
  * IMPORT LEADS, which is that same bar's other decided fact: importing IS the
  * routine and typing a shift by hand is the exception (Mark, 2026-08-22,
@@ -66,6 +67,7 @@ export function TimesheetCommandMenu({
   close,
   newTimesheet,
   deleteSheets,
+  syncTips,
 }: {
   newPeriod: PeriodProps;
   recalculate: RecalcProps;
@@ -74,6 +76,14 @@ export function TimesheetCommandMenu({
   newTimesheet: SheetProps;
   /** Null until a pay period is chosen — there is nothing to delete from. */
   deleteSheets: DeleteProps | null;
+  /**
+   * Sync Tips from Square over the period's dates (Mark, 2026-09-29) — the
+   * same sync as `/sales` and the Close Pay Period panel. Null until a period
+   * is chosen. `editable` because a tip figure is only written for a day an
+   * open period covers (064), so on a closed one it would pull sales and feed
+   * nothing.
+   */
+  syncTips: { today: string; from: string; to: string; editable: boolean } | null;
 }) {
   const router = useRouter();
 
@@ -81,8 +91,26 @@ export function TimesheetCommandMenu({
     close ? <ExportTimesheets {...close}>{render}</ExportTimesheets> : render([]);
   const withDelete = (render: (items: ActionMenuItem[]) => ReactNode) =>
     deleteSheets ? <DeleteTimesheets {...deleteSheets}>{render}</DeleteTimesheets> : render([]);
+  // Outermost, because it draws its progress and result BENEATH what it wraps
+  // — here, beneath the Actions button, as it does on /sales.
+  const withSync = (render: (items: ActionMenuItem[]) => ReactNode) =>
+    syncTips ? (
+      <SyncFromSquare today={syncTips.today} range={{ from: syncTips.from, to: syncTips.to }}>
+        {(row) =>
+          render([
+            {
+              label: "Sync Tips from Square",
+              onSelect: row.onSelect,
+              disabled: row.disabled || !syncTips.editable,
+            },
+          ])
+        }
+      </SyncFromSquare>
+    ) : (
+      render([])
+    );
 
-  return (
+  return withSync((syncRows) => (
     <NewTimesheet {...newTimesheet}>
       {(sheetRows) => (
         <NewPayPeriod {...newPeriod}>
@@ -104,7 +132,7 @@ export function TimesheetCommandMenu({
                       },
                       ...sheetRows,
                       ...deleteRows,
-                      ...group([...periodRows, ...recalcRows, ...closeRows]),
+                      ...group([...periodRows, ...recalcRows, ...syncRows, ...closeRows]),
                     ]}
                   />
                 )))
@@ -114,5 +142,5 @@ export function TimesheetCommandMenu({
         </NewPayPeriod>
       )}
     </NewTimesheet>
-  );
+  ));
 }

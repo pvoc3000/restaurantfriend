@@ -1046,3 +1046,11 @@
    - **Sync from Square in the Close Pay Period panel,** over the period's dates
      (clipped to today). `SyncFromSquare` gained a `range` prop. The
      `tips_missing` caveat names it.
+   **Sync Tips from Square in the Actions menu** (pay-period group, before
+   Close Pay Period): the same `SyncFromSquare` over the period's dates,
+   wrapped outermost so its progress shows under the Actions button as on
+   /sales. Disabled on a period that is not editable, where it would pull sales
+   and feed no tips. **NOT folded into Recalculate Workdays**, deliberately:
+   that rewrites `workday` only, while tips are keyed by `business_date`, so a
+   recalculation never changes a tip share. Coupling the two would make an
+   in-app rewrite depend on Square answering.

@@ -661,6 +661,12 @@ export default async function TimesheetsPage({
                 : null
             }
             newTimesheet={newTimesheet}
+            syncTips={{
+              today,
+              from: chosen.start_date,
+              to: chosen.end_date,
+              editable: canWrite && isPayPeriodEditable(chosen.status),
+            }}
             deleteSheets={{
               periodId: chosen.id,
               periodLabel: formatPeriodRange(chosen),
