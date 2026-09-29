@@ -25,6 +25,7 @@ import { withFrom } from "@/lib/breadcrumbs";
 import { unfiledReadings, type SignedAttachment } from "@/lib/attachments";
 import { fileReadingsLabel } from "@/lib/bills";
 import { fileReadings } from "@/lib/billFromExtraction";
+import { billLinesFromOrder, billsForOrder, createBillFromOrder } from "@/lib/billFromOrder";
 import { PoAttachments } from "./PoAttachments";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { SaveLineToCatalog } from "./SaveLineToCatalog";
@@ -312,6 +313,59 @@ export function PurchaseOrderDetail({
     setBusy(false);
     if (result.error) setError(result.error);
     router.refresh();
+  }
+
+  /**
+   * Make a bill out of the order itself — for an order with no paperwork to
+   * read. Lines at what arrived (ordered where nobody counted), at the line's
+   * price, each linked back to its PO line; the vendor's invoice number is left
+   * for the bill screen, where this lands. The confirm names any bill already
+   * holding this order's lines, since a second one is how a bill gets paid twice.
+   */
+  async function generateBill() {
+    setError(null);
+    const drafts = billLinesFromOrder(order.id, lines);
+    const existing = await billsForOrder(supabase, order.id);
+    if (existing.error) {
+      setError(`Could not check for an existing bill: ${existing.error}`);
+      return;
+    }
+    const total = drafts.reduce((sum, l) => sum + Number(l.extended ?? 0), 0);
+    const already = existing.bills.length
+      ? `\n\nWARNING: ${order.po_number} is already on ${
+          existing.bills.length === 1 ? "a bill" : `${existing.bills.length} bills`
+        } (${existing.bills.map((b) => b.invoice_number ?? "no number").join(", ")}).`
+      : "";
+    const paperwork =
+      canFileBills && unfiledReadings(attachments).length > 0
+        ? "\n\nThis order has paperwork that isn’t filed yet — File as Bill records the vendor’s own invoice instead."
+        : "";
+    const ok = await confirmDialog({
+      ...splitConfirmMessage(
+        `Generate a bill from ${order.po_number}?\n\n` +
+          `${drafts.length} ${drafts.length === 1 ? "line" : "lines"}, ${money(total)}, ` +
+          "at the quantities received (ordered where nothing was counted)." +
+          already +
+          paperwork
+      ),
+      confirmLabel: "Generate bill",
+    });
+    if (!ok) return;
+    setBusy(true);
+    const result = await createBillFromOrder(supabase, {
+      orgId,
+      order: { id: order.id, vendor_id: order.vendor_id, location_id: order.location_id, lines },
+      invoiceDate: order.delivery_date ?? todayLocal(),
+    });
+    setBusy(false);
+    if ("billId" in result) {
+      router.push(
+        withFrom(`/bills/${result.billId}`, { href: `/purchase-orders/${order.id}`, label: order.po_number })
+      );
+      router.refresh();
+      return;
+    }
+    setError(result.error);
   }
 
   const columns: DataColumn<PoLine>[] = [
@@ -751,6 +805,11 @@ export function PurchaseOrderDetail({
     ...(unfiled.length > 0
       ? [{ label: "File as Bill", onSelect: () => void fileUnfiled(unfiled), disabled: busy }]
       : []),
+    // Built from the order, not from paperwork — so offered whatever the
+    // status, to anyone who may file bills; the confirm is the guard.
+    ...(canEditLines && canFileBills
+      ? [{ label: "Generate Bill…", onSelect: () => void generateBill(), disabled: busy }]
+      : []),
     ...(canEditLines && canClose(order.status)
       ? [{ label: "Close Order…", onSelect: () => void close(), disabled: busy }]
       : []),
@@ -1133,4 +1192,13 @@ export function PurchaseOrderDetail({
 
     </div>
   );
+}
+
+/** The browser's day — a bill's date when the order has no delivery date. */
+function todayLocal(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }

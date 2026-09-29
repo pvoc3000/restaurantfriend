@@ -1021,3 +1021,17 @@
    UNLINKED to the bill they credit** (Mark: "leave credits unlinked") — the
    application happens in QuickBooks at payment time, which this module
    deliberately does not model.
+   **GENERATE BILL… ON PO DETAIL** (2026-09-29, Mark: "add an option to the
+   action menu that will take a purchase order and generate a bill"). The
+   paperwork-free path beside File as Bill: `lib/billFromOrder` builds the
+   bill from the ORDER — one line per PO line at the quantity RECEIVED
+   (ORDERED where nobody counted; a line counted at 0 is left off), at the
+   line's price, each linked by `purchase_order_id` + `purchase_order_item_id`
+   so receiving and the bill's Linked orders see it. Header: vendor and shop
+   from the order, `invoice_date` = the delivery date or today, subtotal/total
+   from `computedAmounts`, NO invoice number (the vendor's, typed on the bill),
+   `source = 'manual'` — no migration, because it is not a reading. Offered at
+   any status to `canEditLines && canFileBills`; the confirm states the line
+   count and total, WARNS if non-void bills already hold this order's lines,
+   and points at File as Bill when unfiled paperwork is on the order. Lands on
+   the new bill. Fixtures: `billFromOrder.fixtures.ts`.

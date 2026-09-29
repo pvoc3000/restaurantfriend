@@ -34,6 +34,7 @@ import "./invoiceMatch.fixtures";
 import "./lastPurchase.fixtures";
 import "./linePrices.fixtures";
 import "./bills.fixtures";
+import "./billFromOrder.fixtures";
 import "./billFilters.fixtures";
 import "./itemFilters.fixtures";
 import "./filedBill.fixtures";
