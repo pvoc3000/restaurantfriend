@@ -5208,3 +5208,7 @@ which now leaves off its own empty "All" for such a menu — an empty value
 writes no parameter, so it would have read as the default on the next reload.
 Clear returns Status to Not Cancelled, not to everything. DeskStart's
 `?status=attention` links are unaffected.
+Same day, relabelled (Mark: "more intuitive"): Show's **Upcoming** preset
+reads **Future**, and Status's **Not Cancelled** reads **Upcoming**. Labels
+only — the tokens `?view=upcoming` and `not-cancelled` are unchanged, so saved
+views and DeskStart's links still resolve.
