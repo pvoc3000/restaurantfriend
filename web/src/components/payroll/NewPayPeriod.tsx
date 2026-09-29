@@ -92,6 +92,17 @@ export function NewPayPeriod({
   const [end, setEnd] = useState<string | null>(proposal.end_date);
   const [notes, setNotes] = useState("");
 
+  // Proposed afresh on every open, not once at mount: after a create the page
+  // refreshes under this component, `proposal` moves on a fortnight, and seeded
+  // state would still offer the period that now exists.
+  function openDialog() {
+    setStart(proposal.start_date);
+    setEnd(proposal.end_date);
+    setNotes("");
+    setFailed(null);
+    setOpen(true);
+  }
+
   function close() {
     if (pending) return;
     setOpen(false);
@@ -173,6 +184,13 @@ export function NewPayPeriod({
         setFailed(error?.message ?? "The pay period could not be created.");
         return;
       }
+      // CLOSE FIRST (Mark, 2026-09-29). The push lands on this same screen, so
+      // this component stays mounted with the dialog open — and the refresh
+      // hands it `rows` holding the period it just created, which the overlap
+      // check then reports as a collision with itself. `close()` is refused
+      // while pending, and this runs inside the transition, hence the setters.
+      setOpen(false);
+      setNotes("");
       router.refresh();
       router.push(`/timesheets?period=${data.id as string}`);
     });
@@ -187,13 +205,13 @@ export function NewPayPeriod({
         children([
           {
             label: "New Pay Period",
-            onSelect: () => setOpen(true),
+            onSelect: openDialog,
           },
         ])
       ) : (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={openDialog}
           className="inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
         >
           New pay period
@@ -218,7 +236,7 @@ export function NewPayPeriod({
                 Cancel
               </button>
               <button type="button" onClick={add} disabled={!ready} className={DIALOG_COMMIT_CLASS}>
-                {pending ? "Opening…" : "Open period"}
+                {pending ? "Creating…" : "Create Period"}
               </button>
             </>
           }
