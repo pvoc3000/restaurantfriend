@@ -648,7 +648,11 @@ export default async function TimesheetsPage({
                     accruals,
                     earnings: [...earnings.entries()],
                     caveatInputs: {
-                      shiftsWithoutClockOut: shifts.filter((s) => !s.clock_out).length,
+                      // A clock-IN with no clock-out — the list's own rule. A
+                      // sick day has no punches at all, so it was never a shift
+                      // left unfinished (Mark, 2026-09-29: two sick days were
+                      // being counted as missing clock-outs).
+                      shiftsWithoutClockOut: shifts.filter((s) => s.clock_in && !s.clock_out).length,
                       undecidedBreakFindings: findings.filter((f) => !f.decided).length,
                       poolsWithoutFigure: worksheetPools.filter(
                         (pl) => pl.effectiveCents === null
