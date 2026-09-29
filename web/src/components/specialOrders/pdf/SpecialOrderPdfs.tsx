@@ -46,6 +46,7 @@
 import { Document, Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
   DOCUMENT_LABEL,
+  documentTimeLabel,
   sizeClassGroups,
   taxonomyLine,
   usTime,
@@ -305,7 +306,7 @@ export function OrderDocumentPdf({
                   <Field label="Date" value={isoDay(order.event_date)} />
                   <Field
                     label={delivery ? "Delivery" : "Pickup"}
-                    value={order.event_time ? `After ${usTime(order.event_time)}` : null}
+                    value={documentTimeLabel(order)}
                   />
                   <Field label="Location" value={order.location_name} />
                 </View>

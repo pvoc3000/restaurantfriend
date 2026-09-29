@@ -803,6 +803,30 @@ function deliveryWindow(order: OrderDocData): string {
   return "";
 }
 
+/**
+ * The time an order's document prints under Delivery or Pickup: `8:45 AM –
+ * 9:15 AM` for a delivery, `After 7:00 AM` for a pickup.
+ *
+ * A DELIVERY PRINTS ITS WINDOW (Mark, 2026-09-29: "if we're displaying a
+ * delivery time, we need to use the delivery window, not say 'after…'").
+ * `event_time` is when the order is READY, which is the right answer for a
+ * customer collecting it and the wrong one for a customer waiting for a van.
+ * With no window recorded, a delivery prints the ready time bare rather than
+ * "After", so the page never promises the customer a time they cannot hold
+ * the courier to.
+ */
+export function documentTimeLabel(order: OrderDocData): string | null {
+  if (order.fulfillment === "delivery") {
+    const from = usTime(order.delivery_window_start);
+    const to = usTime(order.delivery_window_end);
+    if (from && to) return `${from} – ${to}`;
+    if (from) return from;
+    if (to) return `By ${to}`;
+    return usTime(order.event_time) || null;
+  }
+  return order.event_time ? `After ${usTime(order.event_time)}` : null;
+}
+
 /** The first word of a name — the given name, or the nickname where the roster
  *  leads with one. Shared so the customer's greeting and the employee's
  *  sign-off cannot come to different conclusions about what a first name is. */

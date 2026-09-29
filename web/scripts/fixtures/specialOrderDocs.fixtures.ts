@@ -23,6 +23,7 @@ import {
   fillFulfillmentNote,
   fulfillmentNote,
   documentCc,
+  documentTimeLabel,
   documentFileName,
   documentRecipient,
   fillTemplate,
@@ -875,4 +876,19 @@ test("a draft becomes a row with the email folded and blanks nulled", () => {
   // Folded, so the same address typed two ways is one customer to a search.
   eq(row.email, "alex@example.com");
   eq(row.source, "app");
+});
+
+// The time under Delivery / Pickup on the order's own document (Mark,
+// 2026-09-29). Checked by restoring the old `After {event_time}` for both
+// kinds: the delivery case went red.
+test("documentTimeLabel: a delivery prints its window, never 'After'", () => {
+  const d = { fulfillment: "delivery" as const, event_time: "07:00:00" };
+  eq(documentTimeLabel(order({ ...d, delivery_window_start: "08:45:00", delivery_window_end: "09:15:00" })), "8:45 AM – 9:15 AM");
+  eq(documentTimeLabel(order({ ...d, delivery_window_start: "08:45:00" })), "8:45 AM");
+  eq(documentTimeLabel(order({ ...d, delivery_window_end: "09:15:00" })), "By 9:15 AM");
+  eq(documentTimeLabel(order(d)), "7:00 AM");
+});
+test("documentTimeLabel: a pickup is still 'After' its ready time", () => {
+  eq(documentTimeLabel(order({ fulfillment: "pickup", event_time: "07:00:00" })), "After 7:00 AM");
+  eq(documentTimeLabel(order({ fulfillment: "pickup", event_time: null })), null);
 });
