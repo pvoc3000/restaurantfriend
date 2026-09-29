@@ -25,7 +25,12 @@ import { withFrom } from "@/lib/breadcrumbs";
 import { unfiledReadings, type SignedAttachment } from "@/lib/attachments";
 import { fileReadingsLabel } from "@/lib/bills";
 import { fileReadings } from "@/lib/billFromExtraction";
-import { billLinesFromOrder, billsForOrder, createBillFromOrder } from "@/lib/billFromOrder";
+import {
+  billLinesFromOrder,
+  billsForOrder,
+  createBillFromOrder,
+  headerFromReadings,
+} from "@/lib/billFromOrder";
 import { PoAttachments } from "./PoAttachments";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { SaveLineToCatalog } from "./SaveLineToCatalog";
@@ -316,15 +321,22 @@ export function PurchaseOrderDetail({
   }
 
   /**
-   * Make a bill out of the order itself — for an order with no paperwork to
-   * read. Lines at what arrived (ordered where nobody counted), at the line's
-   * price, each linked back to its PO line; the vendor's invoice number is left
-   * for the bill screen, where this lands. The confirm names any bill already
-   * holding this order's lines, since a second one is how a bill gets paid twice.
+   * Make a bill out of the order itself. Lines at what arrived (ordered where
+   * nobody counted), at the line's price, each linked back to its PO line. The
+   * header — number, dates, terms, charges — comes from the vendor's invoice
+   * when the order has an unfiled reading of one, which is then filed with the
+   * bill (see lib/billFromOrder); without one the number is left for the bill
+   * screen, where this lands. The confirm names any bill already holding this
+   * order's lines, since a second one is how a bill gets paid twice.
    */
   async function generateBill() {
     setError(null);
     const drafts = billLinesFromOrder(order.id, lines);
+    const fromReadings = canFileBills
+      ? headerFromReadings(
+          unfiledReadings(attachments).map((a) => ({ id: a.id, extraction: a.extraction! }))
+        )
+      : ({ header: null, reason: null } as const);
     const existing = await billsForOrder(supabase, order.id);
     if (existing.error) {
       setError(`Could not check for an existing bill: ${existing.error}`);
@@ -336,17 +348,20 @@ export function PurchaseOrderDetail({
           existing.bills.length === 1 ? "a bill" : `${existing.bills.length} bills`
         } (${existing.bills.map((b) => b.invoice_number ?? "no number").join(", ")}).`
       : "";
-    const paperwork =
-      canFileBills && unfiledReadings(attachments).length > 0
-        ? "\n\nThis order has paperwork that isn’t filed yet — File as Bill records the vendor’s own invoice instead."
+    const source = fromReadings.header
+      ? `\n\nInvoice ${fromReadings.header.invoice_number ?? "with no number"}` +
+        `${fromReadings.header.invoice_date ? ` of ${fromReadings.header.invoice_date}` : ""}` +
+        " — the number, dates, terms and charges come from the vendor’s invoice, which is filed with the bill."
+      : fromReadings.reason
+        ? `\n\n${fromReadings.reason}`
         : "";
     const ok = await confirmDialog({
       ...splitConfirmMessage(
         `Generate a bill from ${order.po_number}?\n\n` +
-          `${drafts.length} ${drafts.length === 1 ? "line" : "lines"}, ${money(total)}, ` +
+          `${drafts.length} ${drafts.length === 1 ? "line" : "lines"}, ${money(total)} before charges, ` +
           "at the quantities received (ordered where nothing was counted)." +
-          already +
-          paperwork
+          source +
+          already
       ),
       confirmLabel: "Generate bill",
     });
@@ -356,16 +371,18 @@ export function PurchaseOrderDetail({
       orgId,
       order: { id: order.id, vendor_id: order.vendor_id, location_id: order.location_id, lines },
       invoiceDate: order.delivery_date ?? todayLocal(),
+      fromReading: fromReadings.header ? fromReadings : null,
     });
     setBusy(false);
-    if ("billId" in result) {
+    if ("billId" in result && !result.error) {
       router.push(
         withFrom(`/bills/${result.billId}`, { href: `/purchase-orders/${order.id}`, label: order.po_number })
       );
       router.refresh();
       return;
     }
-    setError(result.error);
+    setError(result.error ?? null);
+    router.refresh();
   }
 
   const columns: DataColumn<PoLine>[] = [

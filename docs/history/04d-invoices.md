@@ -1035,3 +1035,17 @@
    count and total, WARNS if non-void bills already hold this order's lines,
    and points at File as Bill when unfiled paperwork is on the order. Lands on
    the new bill. Fixtures: `billFromOrder.fixtures.ts`.
+   **GENERATE BILL… TAKES ITS HEADER FROM THE VENDOR'S INVOICE** (2026-09-29,
+   same day, Mark: an order CLOSED before its invoice was attached — so close
+   filed nothing — then the invoice attached, read and reconciled, and Generate
+   Bill made a bill with NO NUMBER, because it read only the order).
+   `headerFromReadings` now takes the number, dates, terms and charges from the
+   order's UNFILED readings, and `createBillFromOrder` tags those readings with
+   the new bill: that files them (File as Bill stops offering them, so no second
+   bill) and puts the document on the bill screen, whose approval check compares
+   against its printed total. Lines still come from the reconciled order; the
+   subtotal and total are computed from them plus the printed charges. Readings
+   naming TWO numbers give no header (one bill cannot be two invoices — File as
+   Bill is the path for that), a numberless reading is taken only when alone,
+   and a credit reading never heads a bill. The confirm names the invoice it is
+   taking from, or why it is taking none.
