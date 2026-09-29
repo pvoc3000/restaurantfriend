@@ -5212,3 +5212,5 @@ Same day, relabelled (Mark: "more intuitive"): Show's **Upcoming** preset
 reads **Future**, and Status's **Not Cancelled** reads **Upcoming**. Labels
 only — the tokens `?view=upcoming` and `not-cancelled` are unchanged, so saved
 views and DeskStart's links still resolve.
+Then Status's choice became **Active** instead of Upcoming, which sat too
+close to Show's Future and read wrong beside Past.

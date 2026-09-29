@@ -68,7 +68,7 @@ function daysAfter(iso: string, n: number): string {
  * null to null, so the control reads "All Time" instead of "Any date".
  */
 export const ORDER_RANGE_PRESETS: RangePreset[] = [
-  // Labelled "Future" since 2026-09-29, when Status took "Upcoming"; the key is
+  // Labelled "Future" since 2026-09-29 (Mark: more intuitive); the key is
   // unchanged so `?view=upcoming` and saved views keep working.
   { key: "upcoming", label: "Future", range: (t) => ({ from: t, to: DUSK }) },
   RANGE_PRESETS.today,

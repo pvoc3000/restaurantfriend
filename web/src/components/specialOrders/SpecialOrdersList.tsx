@@ -388,13 +388,13 @@ export function SpecialOrdersList({
            says "everything but". It is the resting value because a cancelled
            order is history, and hiding it should not be something you have to
            remember. "All" is therefore a real token — see `defaultValue`.
-           LABELLED "UPCOMING" (Mark, 2026-09-29), the word the Show menu gave
-           up for "Future": the orders still to come are the ones not called
-           off. The token stays `not-cancelled`, so saved URLs keep working. */
+           LABELLED "ACTIVE" (Mark, 2026-09-29) — briefly "Upcoming", which sat
+           too close to Show's "Future" and read wrong beside Past. The token
+           stays `not-cancelled`, so saved URLs keep working. */
         defaultValue: NOT_CANCELLED,
         options: [
           { value: STATUS_ALL, label: "All" },
-          { value: NOT_CANCELLED, label: "Upcoming" },
+          { value: NOT_CANCELLED, label: "Active" },
           ...(["lead", "quote", "invoice", "order", "cancelled"] as SpecialOrderStatus[]).map(
             (s, i) => ({ value: s, label: STATUS_LABEL[s], separatorBefore: i === 0 })
           ),
