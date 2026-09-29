@@ -115,6 +115,9 @@ export type SpecialOrderRow = {
 };
 
 const PATH = "/special-orders";
+/** The Status menu's two "everything" values — real tokens, because it rests on one of them. */
+const STATUS_ALL = "all";
+const NOT_CANCELLED = "not-cancelled";
 const NONE = "none";
 
 /**
@@ -379,14 +382,26 @@ export function SpecialOrdersList({
          */
         key: "status",
         label: "Status",
+        /* THE LIST RESTS ON NOT CANCELLED (Mark, 2026-09-29: "I want to be
+           able to hide canceled orders"). A single-choice menu could only SHOW
+           cancelled orders, never leave them out, so this is the one value that
+           says "everything but". It is the resting value because a cancelled
+           order is history, and hiding it should not be something you have to
+           remember. "All" is therefore a real token — see `defaultValue`. */
+        defaultValue: NOT_CANCELLED,
         options: [
+          { value: STATUS_ALL, label: "All" },
+          { value: NOT_CANCELLED, label: "Not Cancelled" },
           ...(["lead", "quote", "invoice", "order", "cancelled"] as SpecialOrderStatus[]).map(
-            (s) => ({ value: s, label: STATUS_LABEL[s] })
+            (s, i) => ({ value: s, label: STATUS_LABEL[s], separatorBefore: i === 0 })
           ),
           { value: "attention", label: "Needs Attention", separatorBefore: true },
           { value: "unpaid", label: "Unpaid" },
         ],
         matches: (r, v) => {
+          if (v === STATUS_ALL) return true;
+          // Kind-scoped like the rungs below: only an ORDER can be cancelled.
+          if (v === NOT_CANCELLED) return !(r.kind === "order" && r.status === "cancelled");
           if (v === "attention") return attention.has(r.id);
           if (v === "unpaid")
             return countsAsOwed(r) && r.totals.balance > 0 && r.totals.total > 0;

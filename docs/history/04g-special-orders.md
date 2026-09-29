@@ -5198,3 +5198,13 @@ fixtures on the wording.
   bills this order — revise or void it." when they apply. Drafts, the
   schedule, "stays on the list" and "reversible" went: they are what cancel
   means, and a schedule the kitchen already has is still reported afterwards.
+
+**2026-09-29 — the list hides cancelled orders by default** (Mark: "I want to
+be able to hide canceled orders"). The Status menu could only pick ONE value,
+so it could show cancelled orders but never leave them out. It now opens on
+**Not Cancelled**, with a real **All** above it (`?status=all`) and the rungs
+below a rule. It is the first defaulted dimension drawn by `ui/FilterMenus`,
+which now leaves off its own empty "All" for such a menu — an empty value
+writes no parameter, so it would have read as the default on the next reload.
+Clear returns Status to Not Cancelled, not to everything. DeskStart's
+`?status=attention` links are unaffected.

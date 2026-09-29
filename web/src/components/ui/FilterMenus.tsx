@@ -6,7 +6,9 @@ import {
   FILTER_ALL,
   activeFilterCount,
   clearedFilters,
+  dimensionDefault,
   filterCounts,
+  matchesDimension,
   type FilterDimension,
   type FilterValues,
 } from "@/lib/filterMenus";
@@ -118,10 +120,7 @@ export function FilterMenus<T>({
   const counts = filterCounts(rows, dimensions, values);
   const active = activeFilterCount(dimensions, values);
   const shown = rows.filter((row) =>
-    dimensions.every((d) => {
-      const chosen = values[d.key] ?? FILTER_ALL;
-      return chosen === FILTER_ALL || d.matches(row, chosen);
-    })
+    dimensions.every((d) => matchesDimension(d, row, values))
   ).length;
   const population = total ?? rows.length;
 
@@ -163,14 +162,24 @@ export function FilterMenus<T>({
               <PickList
                 variant="field"
                 ariaLabel={dimension.label}
-                value={values[dimension.key] ?? FILTER_ALL}
+                value={values[dimension.key] ?? dimensionDefault(dimension)}
                 onPick={(next) => onChange({ ...values, [dimension.key]: next })}
                 options={[
-                  {
-                    value: FILTER_ALL,
-                    label: dimension.allLabel ?? "All",
-                    hint: String(forThis[FILTER_ALL] ?? 0),
-                  },
+                  /* A MENU THAT RESTS SOMEWHERE OTHER THAN "ALL" DECLARES ITS
+                     OWN "All" (2026-09-29, the special order list's Status,
+                     which rests on Not Cancelled). The bar's "All" is the empty
+                     value, and an empty value writes no parameter — so it would
+                     read as the default on the next reload and "All" could
+                     never be kept. `defaultValue`'s note says the same thing. */
+                  ...(dimensionDefault(dimension) === FILTER_ALL
+                    ? [
+                        {
+                          value: FILTER_ALL,
+                          label: dimension.allLabel ?? "All",
+                          hint: String(forThis[FILTER_ALL] ?? 0),
+                        },
+                      ]
+                    : []),
                   ...dimension.options.map((option) => ({
                     ...option,
                     // The count REPLACES a declared hint rather than joining
