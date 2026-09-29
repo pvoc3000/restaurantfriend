@@ -269,8 +269,9 @@ export default async function TimesheetsPage({
       employee_name: emp?.name ?? "(unknown)",
       employee_excludes_tips: emp?.excludes_tips ?? false,
       employee_gusto_id: emp?.gusto_id ?? null,
-      // What the Gusto file will call this shift — the export's own rule, so the
-      // two can't disagree.
+      // This shift's own job: wage type, else Homebase's role, else the primary.
+      // The FILE may title its row differently — it consolidates by pay rate
+      // and names each rate by its most-worked role (lib/gustoExport).
       title:
         shiftJobTitle(
           { wage_type: (t.wage_type ?? null) as string | null, position: (t.position ?? null) as string | null },
@@ -536,6 +537,7 @@ export default async function TimesheetsPage({
       employee_id: s.employee_id,
       wage_type: (r?.wage_type ?? null) as string | null,
       position: (r?.position ?? null) as string | null,
+      wage_rate: wageRateOf(r?.source_payload),
       hours_regular: s.hours_regular,
       hours_overtime: s.hours_overtime,
       hours_double_ot: s.hours_double_ot,
@@ -547,6 +549,10 @@ export default async function TimesheetsPage({
       tip_hours: numOrNull(r?.tip_hours),
     };
   });
+
+  const homebaseShiftsWithoutRate = (sheets ?? []).filter(
+    (t) => t.source === "homebase" && wageRateOf(t.source_payload) === null
+  ).length;
 
   const exportEmployees = (employees ?? []).map((e) => ({
     id: e.id as string,
@@ -648,6 +654,7 @@ export default async function TimesheetsPage({
                       ).length,
                       overtimeNeedingReview,
                       unknownEarningColumns,
+                      homebaseShiftsWithoutRate,
                     },
                   }
                 : null
@@ -688,4 +695,14 @@ function numOrNull(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * The rate Homebase paid a shift at, from its saved source row (2026-09-29).
+ * Never displayed and never multiplied — the export groups by it.
+ */
+function wageRateOf(payload: unknown): number | null {
+  if (!payload || typeof payload !== "object") return null;
+  const v = (payload as Record<string, unknown>).wage_rate;
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
 }

@@ -71,6 +71,13 @@ export type HomebaseRow = {
    */
   unpaidBreakMinutes: number | null;
   role: string | null;
+  /**
+   * The hourly rate Homebase paid this row at — "$24.00" → 24. Read since
+   * 2026-09-29 for ONE purpose: Gusto matches each pay rate to one job, so the
+   * export groups a person's hours by it (`gustoExport.buildExportRows`). It is
+   * never multiplied by anything; Gusto still does the money.
+   */
+  wageRate: number | null;
   regularHours: number | null;
   overtimeHours: number | null;
   doubleOtHours: number | null;
@@ -304,6 +311,7 @@ export function planImport(text: string): ImportPlan {
     unpaidBreaks: at("Unpaid breaks"),
     payrollId: at("Payroll ID"),
     role: at("Role"),
+    wageRate: at("Wage rate"),
     regular: at("Regular hours"),
     ot: at("OT hours"),
     dot: at("Double OT"),
@@ -351,6 +359,7 @@ export function planImport(text: string): ImportPlan {
         return h === null ? null : Math.round(h * 60);
       })(),
       role: cell(r[cols.role]),
+      wageRate: num(cell(r[cols.wageRate])),
       regularHours: num(cell(r[cols.regular])),
       overtimeHours: num(cell(r[cols.ot])),
       doubleOtHours: num(cell(r[cols.dot])),

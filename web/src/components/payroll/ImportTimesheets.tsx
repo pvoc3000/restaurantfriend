@@ -466,6 +466,8 @@ export function ImportTimesheets({
               break_end: s.source.breakEnd,
               date_start: s.source.clockInDate,
               date_end: s.source.clockOutDate,
+              // What the export groups by — see `HomebaseRow.wageRate`.
+              wage_rate: s.source.wageRate,
               import_source: "homebase",
               matched_via: m.via,
               // Which boundary produced this row's workday, so a shift can

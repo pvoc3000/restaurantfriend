@@ -152,6 +152,7 @@ export function ExportTimesheets({
     poolsWithoutFigure: number;
     overtimeNeedingReview: number;
     unknownEarningColumns: { name: string; column: string; dollars: number }[];
+    homebaseShiftsWithoutRate: number;
   };
   /** Hand this component's row to an `ActionMenu` instead of drawing a
    *  button — `OrderCommandMenu`'s arrangement, so the dialog, its writes and
@@ -613,9 +614,9 @@ export function ExportTimesheets({
 
                 <p className="max-w-[80ch] text-[13px] text-muted">
                   The file is {GUSTO_COLUMNS.length} columns: one row per person
-                  per job — Homebase’s role where the shift came from Homebase —
-                  the person’s Gusto job marked <code>(Primary)</code>, and every
-                  earning — tips and premium hours — on that primary row only.
+                  per pay rate — titled with the Homebase role worked most at
+                  that rate — one of them marked <code>(Primary)</code>, and
+                  every earning — tips and premium hours — on that row only.
                 </p>
               </section>
             )}

@@ -996,3 +996,25 @@
    NOT sum. Every one of the 17 people it named had 2+ rows in the file, and
    every person it accepted had exactly one. So the mapping has to happen
    BEFORE the file, here.
+   **CORRECTED BY MARK THE SAME DAY: Gusto DOES match, within one rule. Each
+   pay rate can have only one job title.** So the file is now **ONE ROW PER
+   (PERSON, PAY RATE)**. That means reading Homebase's `Wage rate`, which
+   **REVERSES decision 1's "no wage rate is ever stored"**, at Mark's request.
+   It is stored as `source_payload.wage_rate` (no migration, never displayed)
+   and is only ever GROUPED BY, never multiplied. Gusto still does the money.
+   - Each rate's row is titled with the role worked most at that rate. A tie
+     goes to the primary job, then alphabetical.
+   - A shift with no rate (FileMaker history, hand-entered) joins the rated row
+     whose roles include its title, else forms its own by title.
+   - A shift with ZERO exportable hours (a sick day) opens no row.
+   - **The separate zero-hour `(Primary)` row is gone.** It was a second row for
+     a job the hours rows already matched, which is half of what Gusto refused.
+     Earnings now ride the row titled with the primary job, else the largest,
+     and that row carries the suffix. Only someone with money and no hours gets
+     a bare earnings row.
+   - Two caveats are new: `no_wage_rate` (Homebase rows imported before this;
+     re-import fills them) and `title_at_two_rates` (one role at two rates,
+     e.g. a raise mid-period, which Gusto will refuse).
+   **Re-importing Sep 14–27 resets one decision**: 156 of 157 Homebase rows are
+   untouched since import; one carries a `recomputed` overtime decision, which
+   the upsert puts back to `source`.

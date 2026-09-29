@@ -63,6 +63,12 @@ export type ExportShift = {
    * Optional so a caller that never had it is unchanged.
    */
   position?: string | null;
+  /**
+   * The hourly rate the SOURCE paid this shift at — Homebase's `Wage rate`,
+   * kept in `source_payload`. What the rows are grouped by; see
+   * `buildExportRows`. Null on FileMaker history and on hand-entered rows.
+   */
+  wage_rate?: number | null;
   hours_regular: number | null;
   hours_overtime: number | null;
   hours_double_ot: number | null;
@@ -166,19 +172,10 @@ export function isEarningColumn(column: string): column is GustoEarningColumn {
 }
 
 /**
- * The job title a shift goes to Gusto under: our wage type, else the source's
- * role, else the person's primary job.
- *
- * THE MIDDLE STEP IS HOMEBASE'S VOCABULARY, NOT GUSTO'S (Mark, 2026-09-29). The
- * Homebase importer never fills `wage_type` — Homebase's roles are finer than
- * Gusto's jobs ("Overnight Baker" and "Overnight Fryer" are one Gusto job at
- * one rate) — so until this step every imported hour landed on the primary
- * row. Gusto's Smart Import matches a role to a job and remembers the choice,
- * so the file hands it the role and lets IT keep the mapping, rather than
- * keeping a second copy here. FileMaker's rows carry a real `wage_type` and are
- * unchanged by this. If Smart Import turns out not to remember, the answer is a
- * role → job table filling `wage_type` at import, and this function is where
- * it would stop being needed.
+ * A shift's job title in the file: our wage type, else the source's role, else
+ * the person's primary job. FileMaker's rows carry a real `wage_type`; a
+ * Homebase row carries only its `Role`, which `buildExportRows` then groups by
+ * rate.
  */
 export function shiftJobTitle(
   shift: { wage_type: string | null; position?: string | null },
@@ -194,9 +191,26 @@ function round2(n: number): number {
 /**
  * Build the rows.
  *
- * The primary row is CREATED if the person didn't work their primary job, so
- * the earnings always have somewhere to go — which is what makes "exactly one
- * primary row per person" true of the output rather than merely hoped for.
+ * ONE ROW PER (PERSON, PAY RATE) — Gusto's rule, found on the first Smart
+ * Import (Mark, 2026-09-29): it matches each row to one of the person's jobs,
+ * and each pay rate can have only one job, so two rows at one rate are refused
+ * ("Each employee's job in Gusto can match to only one row"). Homebase splits by
+ * ROLE, which is finer — "Overnight Baker" and "Overnight Fryer" at the same
+ * $24 are one Gusto job — so the hours are consolidated by the rate Homebase
+ * paid, and the row is titled with whichever role has the most hours at that
+ * rate. Gusto works out which job that is and remembers it.
+ *
+ * A shift with no rate (FileMaker history, a hand-entered shift) joins the
+ * rated row whose roles include its title, or else forms its own by title — so
+ * a forgotten punch entered by hand lands on the job it names instead of
+ * becoming a second row for it.
+ *
+ * EARNINGS RIDE A REAL ROW. Tips, premiums and benefits go on the row whose
+ * title is the person's primary job, else their largest row, and that row
+ * carries `(Primary)`. It used to be a SEPARATE zero-hour row titled with the
+ * primary job, which Gusto refused as a second row for a job the hours rows
+ * already matched. Only someone with money and no hours at all gets a row of
+ * nothing but earnings.
  */
 export function buildExportRows(
   shifts: readonly ExportShift[],
@@ -211,38 +225,63 @@ export function buildExportRows(
 ): ExportRow[] {
   const byId = new Map(employees.map((e) => [e.id, e]));
 
-  // (employee, title) → hours
-  const cells = new Map<
-    string,
-    { employee_id: string; title: string; regular: number; overtime: number; double_ot: number }
-  >();
+  type Group = {
+    /** Hours per title in this group — the most-worked one names the row. */
+    titles: Map<string, number>;
+    regular: number;
+    overtime: number;
+    double_ot: number;
+  };
+  /** employee id → group key (`r:<cents>` or `t:<title>`) → group */
+  const groups = new Map<string, Map<string, Group>>();
   const tips = new Map<string, number>();
 
-  for (const s of shifts) {
+  const add = (g: Group, s: ExportShift, title: string) => {
+    const reg = s.hours_regular ?? 0;
+    const ot = s.hours_overtime ?? 0;
+    const dbl = s.hours_double_ot ?? 0;
+    g.regular += reg;
+    g.overtime += ot;
+    g.double_ot += dbl;
+    g.titles.set(title, (g.titles.get(title) ?? 0) + reg + ot + dbl);
+  };
+  const empty = (): Group => ({ titles: new Map(), regular: 0, overtime: 0, double_ot: 0 });
+
+  // Rated shifts first, so a rate-less one can look for a rated row to join.
+  const ordered = [...shifts].sort(
+    (a, b) => Number(a.wage_rate == null) - Number(b.wage_rate == null)
+  );
+
+  for (const s of ordered) {
     const emp = byId.get(s.employee_id);
     if (!emp) continue;
-    // A shift with no job at all still has to be paid. Falling back to the
-    // person's primary puts its hours on a row that exists rather than
-    // inventing a job called "(none)" that Gusto has never heard of.
-    const title = shiftJobTitle(s, emp.primary_wage_type);
-    const key = `${s.employee_id}|${title}`;
-    const cell = cells.get(key) ?? {
-      employee_id: s.employee_id,
-      title,
-      regular: 0,
-      overtime: 0,
-      double_ot: 0,
-    };
-    cell.regular += s.hours_regular ?? 0;
-    cell.overtime += s.hours_overtime ?? 0;
-    cell.double_ot += s.hours_double_ot ?? 0;
-    cells.set(key, cell);
 
     // Tips are a PERSON's, not a job's — they are pooled per shop-day across
     // whatever the person was doing.
     if (s.tip_allocation) {
       tips.set(s.employee_id, (tips.get(s.employee_id) ?? 0) + s.tip_allocation);
     }
+
+    // A shift that exports no hours — a sick day, whose hours Gusto already
+    // pays — must not open a row of its own: an empty row for a job is still a
+    // second row for that job.
+    const hours = (s.hours_regular ?? 0) + (s.hours_overtime ?? 0) + (s.hours_double_ot ?? 0);
+    if (hours === 0) continue;
+
+    const title = shiftJobTitle(s, emp.primary_wage_type);
+    const own = groups.get(s.employee_id) ?? new Map<string, Group>();
+    groups.set(s.employee_id, own);
+
+    let key: string;
+    if (s.wage_rate != null) {
+      key = `r:${Math.round(s.wage_rate * 100)}`;
+    } else {
+      const joined = [...own.entries()].find(([k, g]) => k.startsWith("r:") && g.titles.has(title));
+      key = joined ? joined[0] : `t:${title}`;
+    }
+    const g = own.get(key) ?? empty();
+    own.set(key, g);
+    add(g, s, title);
   }
 
   // Everybody who appears at all: worked hours, earned tips, is owed a premium,
@@ -250,7 +289,7 @@ export function buildExportRows(
   // silently drop somebody's money — a person whose only shift that fortnight
   // was on another payroll still has to get their row.
   const touched = new Set<string>([
-    ...[...cells.values()].map((c) => c.employee_id),
+    ...groups.keys(),
     ...tips.keys(),
     ...premiums.keys(),
     ...earnings.keys(),
@@ -262,19 +301,25 @@ export function buildExportRows(
     const emp = byId.get(employeeId);
     if (!emp) continue;
     const primaryTitle = emp.primary_wage_type ?? "";
-    const own = [...cells.values()].filter((c) => c.employee_id === employeeId);
 
-    // Guarantee the primary row exists, even with no hours on it. Since
-    // Homebase roles went into the file this is the COMMON case, not Leo's
-    // exception: the hours rows carry Homebase's words and the primary row
-    // carries Gusto's own job title, zero hours, and every earning — so tips
-    // land on a title Gusto already knows, whatever it makes of the roles.
-    const hasPrimary = own.some((c) => c.title === primaryTitle);
-    const titles = hasPrimary ? own.map((c) => c.title) : [primaryTitle, ...own.map((c) => c.title)];
+    const named = [...(groups.get(employeeId)?.values() ?? [])].map((g) => {
+      // Most hours names it; a tie goes to the primary job, then alphabetical,
+      // so the same data always writes the same file.
+      const title = [...g.titles.entries()].sort(
+        (a, b) =>
+          b[1] - a[1] ||
+          Number(b[0] === primaryTitle) - Number(a[0] === primaryTitle) ||
+          (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)
+      )[0][0];
+      return { title, g, total: g.regular + g.overtime + g.double_ot };
+    });
 
-    for (const title of [...new Set(titles)]) {
-      const cell = own.find((c) => c.title === title);
-      const isPrimary = title === primaryTitle;
+    const primary =
+      named.find((n) => n.title === primaryTitle) ??
+      [...named].sort((a, b) => b.total - a.total)[0] ??
+      null;
+
+    const push = (title: string, g: Group | null, isPrimary: boolean) =>
       rows.push({
         employee_id: employeeId,
         last_name: emp.last_name,
@@ -283,18 +328,19 @@ export function buildExportRows(
         // person can ever carry it.
         title: isPrimary ? `${title} (Primary)`.trim() : title,
         gusto_employee_id: emp.gusto_id ?? "",
-        regular_hours: round2(cell?.regular ?? 0),
-        overtime_hours: round2(cell?.overtime ?? 0),
-        double_overtime_hours: round2(cell?.double_ot ?? 0),
+        regular_hours: round2(g?.regular ?? 0),
+        overtime_hours: round2(g?.overtime ?? 0),
+        double_overtime_hours: round2(g?.double_ot ?? 0),
         // Premiums are HOURS and ride the primary row with every other earning.
         missed_break_hours: isPrimary ? round2(premiums.get(employeeId) ?? 0) : 0,
         paycheck_tips: isPrimary ? round2(tips.get(employeeId) ?? 0) || null : null,
-        // Same rule as the two above, and measured the same way: zero
-        // violations in the real template.
+        // Same rule as the two above: zero violations in the real template.
         earnings: isPrimary ? { ...(earnings.get(employeeId) ?? {}) } : {},
         isPrimary,
       });
-    }
+
+    if (named.length === 0) push(primaryTitle, null, true);
+    for (const n of named) push(n.title, n.g, n === primary);
   }
 
   // Last, first, then the PRIMARY row before the others — which is the order
@@ -384,6 +430,12 @@ export function exportReadiness(input: {
   poolsWithoutFigure: number;
   overtimeNeedingReview: number;
   /**
+   * Homebase shifts with no pay rate on file — imported before 2026-09-29,
+   * when the importer started reading it. They are grouped by role instead of
+   * rate, which is the file Gusto refused. Re-importing the period fills it.
+   */
+  homebaseShiftsWithoutRate?: number;
+  /**
    * Benefits pointed at a column this file does not have, with what they came
    * to. The UI picks from `EARNING_COLUMNS` so this cannot happen from a
    * screen — it is the safety net for a value written in the SQL editor.
@@ -411,6 +463,34 @@ export function exportReadiness(input: {
     out.push({
       code: "no_wage_type",
       detail: `${noTitle.length} row${noTitle.length === 1 ? " has" : "s have"} no job title. Gusto needs one to know which rate to pay.`,
+    });
+  }
+
+  if ((input.homebaseShiftsWithoutRate ?? 0) > 0) {
+    const n = input.homebaseShiftsWithoutRate ?? 0;
+    out.push({
+      code: "no_wage_rate",
+      detail: `${n} Homebase shift${n === 1 ? " has" : "s have"} no pay rate on file, so ${n === 1 ? "it is" : "they are"} grouped by role rather than by rate. Import this period's Homebase files again to fill it in.`,
+    });
+  }
+
+  // One job title on two rows for one person: the same role at two rates — a
+  // raise partway through the period. Gusto matches each row to one job and
+  // refuses the second, so it has to be settled in Gusto by hand.
+  const seen = new Map<string, number>();
+  for (const r of input.rows) {
+    const k = `${r.employee_id}|${r.title.replace(/\s*\(Primary\)$/, "")}`;
+    seen.set(k, (seen.get(k) ?? 0) + 1);
+  }
+  const twice = [...seen.entries()].filter(([, n]) => n > 1).map(([k]) => {
+    const [id, title] = k.split("|");
+    const e = byId.get(id);
+    return `${e ? `${e.first_name} ${e.last_name}` : id} (${title})`;
+  });
+  if (twice.length) {
+    out.push({
+      code: "title_at_two_rates",
+      detail: `The same job at two pay rates: ${twice.join(", ")}. Gusto takes one row per job, so one of them will need moving in Gusto.`,
     });
   }
 

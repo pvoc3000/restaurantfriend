@@ -59,6 +59,17 @@ test("Homebase does NOT split at midnight — the stitcher fires zero times", ()
   ok(plan.shifts.every((s) => !s.stitched), "no shift is marked stitched");
 });
 
+test("the pay rate is read off every row — the export groups by it", () => {
+  // Angelica Castellanos in the real slice: "$24.00" on Overnight Baker and on
+  // Overnight Fryer alike, which is why the two are one Gusto row.
+  const plan = planImport(REAL);
+  const hers = plan.shifts.filter((s) => s.name === "Angelica Castellanos");
+  ok(hers.length > 0);
+  ok(hers.every((s) => s.source.wageRate === 24), JSON.stringify(hers.map((s) => s.source.wageRate)));
+  ok(hers.some((s) => s.role === "02 Overnight Fryer") && hers.some((s) => s.role === "01 Overnight Baker"));
+  ok(plan.shifts.every((s) => typeof s.source.wageRate === "number"), "every real row carries one");
+});
+
 test("nothing in the real slice is refused", () => {
   eq(planImport(REAL).refused, []);
 });

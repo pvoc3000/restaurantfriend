@@ -106,32 +106,87 @@ test("the suffix is added, never expected in the data", () => {
   no(rows[0].title.includes("(Primary) (Primary)"), "never doubled");
 });
 
-test("someone who worked NONE of their primary job still gets a primary row", () => {
-  // Leo's own row in the real template: `Sr. Donut Friend (Primary)`, 0.0
-  // hours, 204.5 tips. Without this the earnings would have nowhere to go.
+test("someone who worked NONE of their primary job: earnings ride their real row", () => {
+  // Gusto's Smart Import (2026-09-29) refuses a second row for a job, so the
+  // old separate zero-hour primary row is gone: the only row carries it all.
   const rows = buildExportRows(
     [shift({ employee_id: "e1", wage_type: "Supervisor", hours_regular: 68.58, tip_allocation: 204.5 })],
     [alice],
     new Map()
   );
-  eq(rows.length, 2);
-  eq(rows[0].title, "Sr. Donut Friend (Primary)");
-  eq(rows[0].regular_hours, 0);
+  eq(rows.length, 1);
+  eq(rows[0].title, "Supervisor (Primary)");
+  eq(rows[0].regular_hours, 68.58);
   eq(rows[0].paycheck_tips, 204.5, "and it carries the tips");
-  eq(rows[1].title, "Supervisor");
-  eq(rows[1].regular_hours, 68.58);
+});
+
+test("someone with money and NO hours still gets a primary row", () => {
+  const rows = buildExportRows([], [alice], new Map([["e1", 1]]));
+  eq(rows.length, 1);
+  eq(rows[0].title, "Sr. Donut Friend (Primary)");
+  eq(rows[0].missed_break_hours, 1);
 });
 
 /* -- Homebase roles reach the file (2026-09-29) ---------------------------- */
 
-test("a Homebase shift goes out under its ROLE, one row per role", () => {
-  // The importer fills `position`, never `wage_type`. Before this every one of
-  // these hours landed on the primary row and the split never reached Gusto.
+test("Homebase shifts are ONE ROW PER PAY RATE, titled by the most-worked role", () => {
+  // Gusto matches each rate to one job and refuses two rows at one rate —
+  // "Consolidate each employee's job into one row" (2026-09-29).
   const rows = buildExportRows(
     [
-      shift({ employee_id: "e2", position: "Overnight Baker", hours_regular: 7.72 }),
-      shift({ employee_id: "e2", position: "Overnight Baker", hours_regular: 7.64 }),
-      shift({ employee_id: "e2", position: "Overnight Fryer", hours_regular: 7.62, tip_allocation: 12 }),
+      shift({ employee_id: "e2", position: "Overnight Baker", wage_rate: 24, hours_regular: 7.72 }),
+      shift({ employee_id: "e2", position: "Overnight Baker", wage_rate: 24, hours_regular: 7.64 }),
+      shift({ employee_id: "e2", position: "Overnight Fryer", wage_rate: 24, hours_regular: 7.62, tip_allocation: 12 }),
+      shift({ employee_id: "e2", position: "AB", wage_rate: 21, hours_regular: 4, hours_overtime: 1 }),
+    ],
+    [bob],
+    new Map()
+  );
+  eq(
+    rows.map((r) => [r.title, r.regular_hours, r.overtime_hours]),
+    [
+      ["Overnight Baker (Primary)", 22.98, 0],
+      ["AB", 4, 1],
+    ]
+  );
+  // No title is his primary job, so the LARGEST row carries the tips.
+  eq(rows[0].paycheck_tips, 12);
+  eq(rows[1].paycheck_tips, null);
+});
+
+test("the row named by the primary job carries the earnings, even if smaller", () => {
+  const rows = buildExportRows(
+    [
+      shift({ employee_id: "e2", position: "Fryer", wage_rate: 22, hours_regular: 5, tip_allocation: 9 }),
+      shift({ employee_id: "e2", position: "Overnight Baker", wage_rate: 24, hours_regular: 30 }),
+    ],
+    [bob],
+    new Map()
+  );
+  eq(rows.map((r) => r.title), ["Fryer (Primary)", "Overnight Baker"]);
+  eq(rows[0].paycheck_tips, 9);
+});
+
+test("a sick day opens no row of its own", () => {
+  // Zero exportable hours — Gusto pays sick time already — and an empty row
+  // for a job is still a second row for that job.
+  const rows = buildExportRows(
+    [
+      shift({ employee_id: "e1", position: "Donut Friend", wage_rate: 19, hours_regular: 30 }),
+      shift({ employee_id: "e1", sick_hours: 8 }),
+    ],
+    [alice],
+    new Map()
+  );
+  eq(rows.map((r) => r.title), ["Donut Friend (Primary)"]);
+});
+
+test("a hand-entered shift with no rate joins the rated row holding its role", () => {
+  const rows = buildExportRows(
+    [
+      shift({ employee_id: "e2", position: "Overnight Fryer", wage_rate: 24, hours_regular: 20 }),
+      shift({ employee_id: "e2", position: "Overnight Fryer", hours_regular: 6 }),
+      shift({ employee_id: "e2", position: "Catering", hours_regular: 3 }),
     ],
     [bob],
     new Map()
@@ -139,15 +194,31 @@ test("a Homebase shift goes out under its ROLE, one row per role", () => {
   eq(
     rows.map((r) => [r.title, r.regular_hours]),
     [
-      ["Fryer (Primary)", 0],
-      ["Overnight Baker", 15.36],
-      ["Overnight Fryer", 7.62],
+      ["Overnight Fryer (Primary)", 26],
+      ["Catering", 3],
     ]
   );
-  // The primary row is Gusto's own word, and the only home for the tips.
-  eq(rows[0].paycheck_tips, 12);
-  eq(rows[1].paycheck_tips, null);
-  eq(rows[2].paycheck_tips, null);
+});
+
+test("the same role at two rates is two rows, and the caveat names it", () => {
+  const rows = buildExportRows(
+    [
+      shift({ employee_id: "e1", position: "Donut Friend", wage_rate: 19, hours_regular: 10 }),
+      shift({ employee_id: "e1", position: "Donut Friend", wage_rate: 20, hours_regular: 20 }),
+    ],
+    [alice],
+    new Map()
+  );
+  eq(rows.length, 2);
+  const caveats = exportReadiness({
+    rows,
+    employees: [alice],
+    shiftsWithoutClockOut: 0,
+    undecidedBreakFindings: 0,
+    poolsWithoutFigure: 0,
+    overtimeNeedingReview: 0,
+  });
+  ok(caveats.some((c) => c.code === "title_at_two_rates" && c.detail.includes("Leo Almonte Mejia (Donut Friend)")));
 });
 
 test("a real wage type still beats the role — FileMaker's rows are unchanged", () => {
@@ -156,7 +227,7 @@ test("a real wage type still beats the role — FileMaker's rows are unchanged",
     [alice],
     new Map()
   );
-  eq(rows.map((r) => r.title), ["Sr. Donut Friend (Primary)", "Supervisor"]);
+  eq(rows.map((r) => r.title), ["Supervisor (Primary)"]);
 });
 
 test("a role that IS the primary job merges into the primary row", () => {
@@ -262,8 +333,7 @@ test("rows sort by last name, then first, then primary first", () => {
     new Map()
   );
   eq(rows.map((r) => `${r.last_name}/${r.title}`), [
-    "Almonte Mejia/Sr. Donut Friend (Primary)",
-    "Almonte Mejia/Supervisor",
+    "Almonte Mejia/Supervisor (Primary)",
     "Altamirano/Fryer (Primary)",
     "Altamirano/Overnight Fryer",
   ]);
