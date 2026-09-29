@@ -212,13 +212,19 @@
   color: #fff;
 }
 
-/* SINCE 2026-09-29: RED FILL, BLACK TYPE, BLACK SHADOW — the day before's
+/* SINCE 2026-09-29 (later): RED EDGE, WHITE FILL, RED TYPE, BLACK SHADOW
+   (Mark: "red outline, white fill, red text, black drop shadow"). The red is
+   the ACCENT, #d20000 (5.61:1 on white), not the lighter #ff5c52 the filled
+   versions used, which is 2.9:1 on white and too faint for 12px type. Hover
+   and press are a 2px RED edge.
+
+   EARLIER THAT DAY: RED FILL, BLACK TYPE, BLACK SHADOW — the day before's
    dress inverted (Mark: "red fill, black text, black drop shadow. Use the same
-   color red as the text currently"), so `--rf-red-400`, black on it 6.9:1.
+   color red as the text currently"), so #ff5c52 (a token since removed), black on it 6.9:1.
    Hover and press are the 2px BLACK edge again, which shows on red.
 
    2026-09-28: BLACK FILL, RED TYPE, RED SHADOW (Mark: "filled in
-   black, with red text, and a red drop shadow"). The red is `--rf-red-400`
+   black, with red text, and a red drop shadow"). The red is #ff5c52 (a token since removed)
    (#ff5c52, 6.9:1 on black), NOT the accent: #d20000 on black is 3.74:1, the
    same shortfall the note below measured the other way round. History:
 
@@ -243,23 +249,24 @@
    `mac-own-hover` for the same reason — the plain hover rule forces the ground
    WHITE, which would wipe the fill — and then re-earn the 2px edge here. */
 .mac-control.mac-stop {
-  background-color: var(--rf-red-400);
-  color: #000;
+  border-color: var(--color-accent);
+  background-color: #fff;
+  color: var(--color-accent);
   box-shadow: 3px 3px 0 0 #000;
 }
 
 .mac-stop:not(:disabled):hover {
-  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000;
+  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px var(--color-accent);
 }
 
 .mac-control.mac-stop:not(:disabled):active {
-  background-color: var(--rf-red-400);
-  color: #000;
-  box-shadow: inset 0 0 0 1px #000;
+  background-color: #fff;
+  color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
 }
 
 .mac-stop:not(:disabled):active * {
-  color: #000;
+  color: var(--color-accent);
 }
 
 /* THE DISCLOSURE BOX — `DataTable`'s row expander and `RevealPanel`'s toggle,
