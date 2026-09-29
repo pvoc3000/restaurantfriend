@@ -42,7 +42,7 @@
  * differently from another's.
  */
 export const DANGER_BUTTON_CLASS =
-  "mac-control mac-own-hover mac-stop h-9 border border-ink bg-ink px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-danger-ink disabled:opacity-35";
+  "mac-control mac-own-hover mac-stop h-9 border border-ink bg-danger-fill px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink disabled:opacity-35";
 
 /**
  * The ordinary command button — the ONE button this design system has.
@@ -88,9 +88,10 @@ export const DANGER_BUTTON_CLASS =
 // hover rule can't force its ground white and wipe the fill) and `mac-stop`,
 // which re-earns the 2px edge and keeps the red while held.
 //
-// SINCE 2026-09-28 (Mark) BOTH FILLED COMMANDS ARE BLACK: the primary with
-// white type, a black shadow and a white hover edge, the destructive with red
-// type and a red shadow (`--color-danger-ink`; the rest is in mac-look.css).
+// SINCE 2026-09-28 (Mark) THE PRIMARY COMMAND IS BLACK, with
+// white type, a black shadow and a white hover edge. The destructive one is
+// the other way round since 2026-09-29: a RED fill (`--color-danger-fill`)
+// under black type, black shadow, black hover edge (see mac-look.css).
 // What follows is the pale-wash era that preceded it.
 //
 // THE PRIMARY ONE WAS A PALE BLUE FILL from 2026-09-21 (Mark) — `bg-commit-fill`

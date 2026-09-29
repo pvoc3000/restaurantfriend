@@ -236,4 +236,4 @@ export const DIALOG_COMMIT_CLASS =
  * roomier padding, which is the whole reason they are two strings.
  */
 export const DIALOG_DANGER_CLASS =
-  "mac-control mac-own-hover mac-stop inline-flex h-9 items-center border border-ink bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-danger-ink disabled:opacity-35";
+  "mac-control mac-own-hover mac-stop inline-flex h-9 items-center border border-ink bg-danger-fill px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink disabled:opacity-35";

@@ -212,7 +212,12 @@
   color: #fff;
 }
 
-/* SINCE 2026-09-28: BLACK FILL, RED TYPE, RED SHADOW (Mark: "filled in
+/* SINCE 2026-09-29: RED FILL, BLACK TYPE, BLACK SHADOW — the day before's
+   dress inverted (Mark: "red fill, black text, black drop shadow. Use the same
+   color red as the text currently"), so `--rf-red-400`, black on it 6.9:1.
+   Hover and press are the 2px BLACK edge again, which shows on red.
+
+   2026-09-28: BLACK FILL, RED TYPE, RED SHADOW (Mark: "filled in
    black, with red text, and a red drop shadow"). The red is `--rf-red-400`
    (#ff5c52, 6.9:1 on black), NOT the accent: #d20000 on black is 3.74:1, the
    same shortfall the note below measured the other way round. History:
@@ -238,23 +243,23 @@
    `mac-own-hover` for the same reason — the plain hover rule forces the ground
    WHITE, which would wipe the fill — and then re-earn the 2px edge here. */
 .mac-control.mac-stop {
-  background-color: #000;
-  color: var(--rf-red-400);
-  box-shadow: 3px 3px 0 0 var(--rf-red-400);
+  background-color: var(--rf-red-400);
+  color: #000;
+  box-shadow: 3px 3px 0 0 #000;
 }
 
 .mac-stop:not(:disabled):hover {
-  box-shadow: 3px 3px 0 0 var(--rf-red-400), inset 0 0 0 1px var(--rf-red-400);
+  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000;
 }
 
 .mac-control.mac-stop:not(:disabled):active {
-  background-color: #000;
-  color: var(--rf-red-400);
-  box-shadow: inset 0 0 0 1px var(--rf-red-400);
+  background-color: var(--rf-red-400);
+  color: #000;
+  box-shadow: inset 0 0 0 1px #000;
 }
 
 .mac-stop:not(:disabled):active * {
-  color: var(--rf-red-400);
+  color: #000;
 }
 
 /* THE DISCLOSURE BOX — `DataTable`'s row expander and `RevealPanel`'s toggle,
