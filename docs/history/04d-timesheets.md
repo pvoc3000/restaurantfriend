@@ -1026,3 +1026,8 @@
    silence). Disabled when the period is not editable or has no rows. Benefit
    accruals cascade with the rows. Break-premium decisions and tip pools are
    keyed by person/shop-day, so they survive and a re-import finds them again.
+   **Migration 150 (NOT YET APPLIED when written, 2026-09-29).** Delete
+   Timesheets… timed out on 157 rows. `adjusts_timesheet_id`'s self-reference
+   (028, `on delete set null`) had no index, so every deleted row cost a
+   sequential scan of all 45,360 timesheets. 150 adds a partial index on it.
+   Nothing was deleted: the statement rolled back whole.
