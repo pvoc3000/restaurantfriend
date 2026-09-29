@@ -947,3 +947,29 @@
    checkbox, and the catch-up appeared on an order whose quote had gone out
    while its status still read Lead. **1094 fixtures pass**, 23 new, each rule
    checked by breaking it.
+   **2026-09-29 — HOMEBASE ROLES REACH THE GUSTO FILE; GUSTO'S SMART IMPORT
+   KEEPS THE MAPPING (an experiment).** Mark wanted hours split by job in the
+   export. The export already split by (employee, job) since 031 — but the
+   Homebase importer only ever writes `Role` to `position`, never `wage_type`,
+   so every imported hour fell back to the primary row. Measured on Aug 31 –
+   Sep 13: 153 Homebase shifts, **0 with a wage type**, 10 of 22 people across
+   more than one role, and none of those splits reached Gusto.
+   Homebase's roles are finer than Gusto's jobs (Overnight Baker and Overnight
+   Fryer at the same $24), so copying the role into `wage_type` would be wrong.
+   The options weighed were a role → job table here (with per-person
+   overrides), fixing the job by hand per shift, renaming Homebase roles to
+   Gusto's, and matching by rate (breaks decision 1). **Mark chose to try
+   Gusto's Smart Import instead**, which matches a role to a job and says it
+   remembers the choice — so the mapping lives in Gusto, not here.
+   `gustoExport.shiftJobTitle` is the rule: **wage type → role → primary**. So
+   FileMaker's rows, which carry a real wage type, are unchanged. The primary
+   row keeps the person's GUSTO job title and every earning, now usually with
+   zero hours, so tips land on a title Gusto already knows. `/timesheets`'
+   Title column uses the same function, so it and the file cannot disagree.
+   **To check on the first Smart Import run:** that it remembers role → job per
+   person, that two roles mapped to one job are SUMMED rather than one dropped,
+   where tips and premiums land, and what rate overtime filed under one role is
+   paid at (California's blended regular rate). **If it does not remember, the
+   fallback is the role → job table filling `wage_type` at import**, at which
+   point `shiftJobTitle`'s middle step stops mattering. 2157 fixtures pass; the
+   role cases go red with the middle step removed.

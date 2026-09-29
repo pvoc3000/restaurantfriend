@@ -13,6 +13,7 @@ import {
   exportReadiness,
   exportFileName,
   GUSTO_COLUMNS,
+  shiftJobTitle,
   type ExportEmployee,
   type ExportShift,
 } from "../../src/lib/gustoExport";
@@ -119,6 +120,61 @@ test("someone who worked NONE of their primary job still gets a primary row", ()
   eq(rows[0].paycheck_tips, 204.5, "and it carries the tips");
   eq(rows[1].title, "Supervisor");
   eq(rows[1].regular_hours, 68.58);
+});
+
+/* -- Homebase roles reach the file (2026-09-29) ---------------------------- */
+
+test("a Homebase shift goes out under its ROLE, one row per role", () => {
+  // The importer fills `position`, never `wage_type`. Before this every one of
+  // these hours landed on the primary row and the split never reached Gusto.
+  const rows = buildExportRows(
+    [
+      shift({ employee_id: "e2", position: "Overnight Baker", hours_regular: 7.72 }),
+      shift({ employee_id: "e2", position: "Overnight Baker", hours_regular: 7.64 }),
+      shift({ employee_id: "e2", position: "Overnight Fryer", hours_regular: 7.62, tip_allocation: 12 }),
+    ],
+    [bob],
+    new Map()
+  );
+  eq(
+    rows.map((r) => [r.title, r.regular_hours]),
+    [
+      ["Fryer (Primary)", 0],
+      ["Overnight Baker", 15.36],
+      ["Overnight Fryer", 7.62],
+    ]
+  );
+  // The primary row is Gusto's own word, and the only home for the tips.
+  eq(rows[0].paycheck_tips, 12);
+  eq(rows[1].paycheck_tips, null);
+  eq(rows[2].paycheck_tips, null);
+});
+
+test("a real wage type still beats the role — FileMaker's rows are unchanged", () => {
+  const rows = buildExportRows(
+    [shift({ employee_id: "e1", wage_type: "Supervisor", position: "Shift Lead", hours_regular: 8 })],
+    [alice],
+    new Map()
+  );
+  eq(rows.map((r) => r.title), ["Sr. Donut Friend (Primary)", "Supervisor"]);
+});
+
+test("a role that IS the primary job merges into the primary row", () => {
+  const rows = buildExportRows(
+    [shift({ employee_id: "e2", position: "Fryer", hours_regular: 6, tip_allocation: 5 })],
+    [bob],
+    new Map()
+  );
+  eq(rows.length, 1);
+  eq(rows[0].title, "Fryer (Primary)");
+  eq(rows[0].regular_hours, 6);
+});
+
+test("shiftJobTitle: wage type, then role, then primary — blanks don't count", () => {
+  eq(shiftJobTitle({ wage_type: "Supervisor", position: "Baker" }, "Fryer"), "Supervisor");
+  eq(shiftJobTitle({ wage_type: null, position: "Baker" }, "Fryer"), "Baker");
+  eq(shiftJobTitle({ wage_type: "  ", position: " " }, "Fryer"), "Fryer");
+  eq(shiftJobTitle({ wage_type: null }, null), "");
 });
 
 /* -- earnings ride the primary row ONLY ------------------------------------ */

@@ -25,7 +25,7 @@ import {
 } from "@/lib/payPeriods";
 import { proposeOvertime } from "@/lib/overtime";
 import { workedHours, type OtDecision } from "@/lib/timesheets";
-import { isEarningColumn } from "@/lib/gustoExport";
+import { isEarningColumn, shiftJobTitle } from "@/lib/gustoExport";
 import {
   buildEmployeeRollup,
   buildFindings,
@@ -269,8 +269,13 @@ export default async function TimesheetsPage({
       employee_name: emp?.name ?? "(unknown)",
       employee_excludes_tips: emp?.excludes_tips ?? false,
       employee_gusto_id: emp?.gusto_id ?? null,
-      // What the Gusto file will call this shift — the export's own fallback.
-      title: ((t.wage_type as string | null) ?? emp?.primary_wage_type ?? null),
+      // What the Gusto file will call this shift — the export's own rule, so the
+      // two can't disagree.
+      title:
+        shiftJobTitle(
+          { wage_type: (t.wage_type ?? null) as string | null, position: (t.position ?? null) as string | null },
+          emp?.primary_wage_type ?? null
+        ) || null,
       location_code: t.location_id ? (codeById.get(t.location_id as string) ?? null) : null,
       location_id: (t.location_id ?? null) as string | null,
       workday: t.workday as string,
@@ -530,6 +535,7 @@ export default async function TimesheetsPage({
       id: s.id,
       employee_id: s.employee_id,
       wage_type: (r?.wage_type ?? null) as string | null,
+      position: (r?.position ?? null) as string | null,
       hours_regular: s.hours_regular,
       hours_overtime: s.hours_overtime,
       hours_double_ot: s.hours_double_ot,

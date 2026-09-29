@@ -57,6 +57,12 @@ export type ExportShift = {
   employee_id: string;
   /** The bare job title this shift was worked as. 031's column. */
   wage_type: string | null;
+  /**
+   * The SOURCE's word for the job — Homebase's `Role`, numbering stripped
+   * ("Overnight Baker"). Used when `wage_type` is empty; see `shiftJobTitle`.
+   * Optional so a caller that never had it is unchanged.
+   */
+  position?: string | null;
   hours_regular: number | null;
   hours_overtime: number | null;
   hours_double_ot: number | null;
@@ -159,6 +165,28 @@ export function isEarningColumn(column: string): column is GustoEarningColumn {
   return (EARNING_COLUMNS as readonly string[]).includes(column);
 }
 
+/**
+ * The job title a shift goes to Gusto under: our wage type, else the source's
+ * role, else the person's primary job.
+ *
+ * THE MIDDLE STEP IS HOMEBASE'S VOCABULARY, NOT GUSTO'S (Mark, 2026-09-29). The
+ * Homebase importer never fills `wage_type` — Homebase's roles are finer than
+ * Gusto's jobs ("Overnight Baker" and "Overnight Fryer" are one Gusto job at
+ * one rate) — so until this step every imported hour landed on the primary
+ * row. Gusto's Smart Import matches a role to a job and remembers the choice,
+ * so the file hands it the role and lets IT keep the mapping, rather than
+ * keeping a second copy here. FileMaker's rows carry a real `wage_type` and are
+ * unchanged by this. If Smart Import turns out not to remember, the answer is a
+ * role → job table filling `wage_type` at import, and this function is where
+ * it would stop being needed.
+ */
+export function shiftJobTitle(
+  shift: { wage_type: string | null; position?: string | null },
+  primaryWageType: string | null
+): string {
+  return shift.wage_type?.trim() || shift.position?.trim() || primaryWageType || "";
+}
+
 function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
@@ -193,10 +221,10 @@ export function buildExportRows(
   for (const s of shifts) {
     const emp = byId.get(s.employee_id);
     if (!emp) continue;
-    // A shift with no wage type still has to be paid. Falling back to the
+    // A shift with no job at all still has to be paid. Falling back to the
     // person's primary puts its hours on a row that exists rather than
     // inventing a job called "(none)" that Gusto has never heard of.
-    const title = s.wage_type ?? emp.primary_wage_type ?? "";
+    const title = shiftJobTitle(s, emp.primary_wage_type);
     const key = `${s.employee_id}|${title}`;
     const cell = cells.get(key) ?? {
       employee_id: s.employee_id,
@@ -236,7 +264,11 @@ export function buildExportRows(
     const primaryTitle = emp.primary_wage_type ?? "";
     const own = [...cells.values()].filter((c) => c.employee_id === employeeId);
 
-    // Guarantee the primary row exists, even with no hours on it.
+    // Guarantee the primary row exists, even with no hours on it. Since
+    // Homebase roles went into the file this is the COMMON case, not Leo's
+    // exception: the hours rows carry Homebase's words and the primary row
+    // carries Gusto's own job title, zero hours, and every earning — so tips
+    // land on a title Gusto already knows, whatever it makes of the roles.
     const hasPrimary = own.some((c) => c.title === primaryTitle);
     const titles = hasPrimary ? own.map((c) => c.title) : [primaryTitle, ...own.map((c) => c.title)];
 

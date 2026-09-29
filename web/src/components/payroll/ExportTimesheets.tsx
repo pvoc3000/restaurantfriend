@@ -613,9 +613,9 @@ export function ExportTimesheets({
 
                 <p className="max-w-[80ch] text-[13px] text-muted">
                   The file is {GUSTO_COLUMNS.length} columns: one row per person
-                  per job title, the primary job marked <code>(Primary)</code>,
-                  and every earning — tips and premium hours — on that primary
-                  row only.
+                  per job — Homebase’s role where the shift came from Homebase —
+                  the person’s Gusto job marked <code>(Primary)</code>, and every
+                  earning — tips and premium hours — on that primary row only.
                 </p>
               </section>
             )}
