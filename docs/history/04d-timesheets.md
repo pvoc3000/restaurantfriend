@@ -1018,3 +1018,11 @@
    **Re-importing Sep 14–27 resets one decision**: 156 of 157 Homebase rows are
    untouched since import; one carries a `recomputed` overtime decision, which
    the upsert puts back to `source`.
+   **2026-09-29 — DELETE TIMESHEETS… in the Actions menu** (shifts group, after
+   New Timesheet), `payroll/DeleteTimesheets`. A `ui/Radio`: All / Imported /
+   Manually Entered, each with its count. Imported means `source <> 'manual'`,
+   which in an open period is Homebase. It is one `delete({ count: 'exact' })`
+   by `pay_period_id`, and zero deleted is reported as a refusal (the RLS
+   silence). Disabled when the period is not editable or has no rows. Benefit
+   accruals cascade with the rows. Break-premium decisions and tip pools are
+   keyed by person/shop-day, so they survive and a re-import finds them again.

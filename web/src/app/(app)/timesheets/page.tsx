@@ -660,6 +660,13 @@ export default async function TimesheetsPage({
                 : null
             }
             newTimesheet={newTimesheet}
+            deleteSheets={{
+              periodId: chosen.id,
+              periodLabel: formatPeriodRange(chosen),
+              editable: canWrite && isPayPeriodEditable(chosen.status),
+              importedCount: rows.filter((r) => r.source !== "manual").length,
+              manualCount: rows.filter((r) => r.source === "manual").length,
+            }}
           />
         }
       />

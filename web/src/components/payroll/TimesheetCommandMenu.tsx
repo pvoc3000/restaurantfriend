@@ -4,6 +4,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
+import { DeleteTimesheets } from "./DeleteTimesheets";
 import { ExportTimesheets } from "./ExportTimesheets";
 import { NewPayPeriod } from "./NewPayPeriod";
 import { NewTimesheet } from "./NewTimesheet";
@@ -13,6 +14,7 @@ type PeriodProps = Omit<ComponentProps<typeof NewPayPeriod>, "children">;
 type RecalcProps = Omit<ComponentProps<typeof RecalculateWorkdays>, "children">;
 type ExportProps = Omit<ComponentProps<typeof ExportTimesheets>, "children">;
 type SheetProps = Omit<ComponentProps<typeof NewTimesheet>, "children">;
+type DeleteProps = Omit<ComponentProps<typeof DeleteTimesheets>, "children">;
 
 /** The first row of a group carries the rule above it. */
 function group(items: ActionMenuItem[]): ActionMenuItem[] {
@@ -36,7 +38,7 @@ function group(items: ActionMenuItem[]): ActionMenuItem[] {
  * act on the SHIFTS — search them, group them, add one — while these act on the
  * PERIOD". So:
  *
- *   Import Timesheets · New Timesheet          (the shifts)
+ *   Import Timesheets · New Timesheet · Delete Timesheets…   (the shifts)
  *   ─────
  *   New Pay Period · Recalculate Workdays… · Close Pay Period…   (the period)
  *
@@ -63,17 +65,22 @@ export function TimesheetCommandMenu({
   recalculate,
   close,
   newTimesheet,
+  deleteSheets,
 }: {
   newPeriod: PeriodProps;
   recalculate: RecalcProps;
   /** Null until a pay period is chosen — there is nothing to close. */
   close: ExportProps | null;
   newTimesheet: SheetProps;
+  /** Null until a pay period is chosen — there is nothing to delete from. */
+  deleteSheets: DeleteProps | null;
 }) {
   const router = useRouter();
 
   const withClose = (render: (items: ActionMenuItem[]) => ReactNode) =>
     close ? <ExportTimesheets {...close}>{render}</ExportTimesheets> : render([]);
+  const withDelete = (render: (items: ActionMenuItem[]) => ReactNode) =>
+    deleteSheets ? <DeleteTimesheets {...deleteSheets}>{render}</DeleteTimesheets> : render([]);
 
   return (
     <NewTimesheet {...newTimesheet}>
@@ -82,7 +89,7 @@ export function TimesheetCommandMenu({
           {(periodRows) => (
             <RecalculateWorkdays {...recalculate}>
               {(recalcRows) =>
-                withClose((closeRows) => (
+                withClose((closeRows) => withDelete((deleteRows) => (
                   <ActionMenu
                     ariaLabel="Actions for this pay period"
                     minWidth={240}
@@ -96,10 +103,11 @@ export function TimesheetCommandMenu({
                         onSelect: () => router.push("/timesheets/import"),
                       },
                       ...sheetRows,
+                      ...deleteRows,
                       ...group([...periodRows, ...recalcRows, ...closeRows]),
                     ]}
                   />
-                ))
+                )))
               }
             </RecalculateWorkdays>
           )}
