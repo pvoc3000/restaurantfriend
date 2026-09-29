@@ -1031,3 +1031,18 @@
    (028, `on delete set null`) had no index, so every deleted row cost a
    sequential scan of all 45,360 timesheets. 150 adds a partial index on it.
    Nothing was deleted: the statement rolled back whole.
+   **2026-09-29 — TIPS NO LONGER DEPEND ON SYNCING AFTER THE PERIOD EXISTS.**
+   Mark asked whether Square must be synced after importing timesheets. It is
+   the PERIOD, not the timesheets: 064 writes a tip figure only for a day an
+   open period covers, and allocation is derived on each open until the freeze.
+   A sync taken before Sep 14–27 was created skipped its tips silently.
+   - **Migration 151:** a trigger on `pay_periods` (insert, or update of dates
+     or status into open/review) copies `daily_sales.tips_cents` into
+     `tip_pools` for shop-days in range that have no pool yet. `do nothing` on
+     conflict, so a reported or corrected figure is never touched; negative
+     tips are skipped. Tested on a throwaway Postgres: fills the synced day,
+     keeps a supervisor's figure, skips negative / out-of-range / other org,
+     fills nothing for a closed period, fills on reopen, reruns cleanly.
+   - **Sync from Square in the Close Pay Period panel,** over the period's dates
+     (clipped to today). `SyncFromSquare` gained a `range` prop. The
+     `tips_missing` caveat names it.

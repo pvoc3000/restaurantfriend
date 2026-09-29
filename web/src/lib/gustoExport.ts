@@ -515,7 +515,7 @@ export function exportReadiness(input: {
   if (input.poolsWithoutFigure > 0) {
     out.push({
       code: "tips_missing",
-      detail: `${input.poolsWithoutFigure} shop-day${input.poolsWithoutFigure === 1 ? " has" : "s have"} no tip figure entered, so those tips are not allocated.`,
+      detail: `${input.poolsWithoutFigure} shop-day${input.poolsWithoutFigure === 1 ? " has" : "s have"} no tip figure, so those tips are not allocated. Sync from Square in this panel pulls them.`,
     });
   }
 

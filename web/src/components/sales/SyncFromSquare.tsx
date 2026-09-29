@@ -50,9 +50,17 @@ export type SyncRow = { label: string; onSelect: () => void; disabled: boolean }
 
 export function SyncFromSquare({
   today,
+  range,
   children,
 }: {
   today: string;
+  /**
+   * Pull exactly these days instead of this month and last. The Close Pay
+   * Period panel passes its period (2026-09-29), because a tip figure is only
+   * written for a day an open period covers, and the fix for a missing one
+   * belongs where the panel reports it.
+   */
+  range?: { from: string; to: string };
   /** Given, the command is handed out as a row (`OrderCommandMenu`'s render-prop
    *  shape) and this draws only its progress and warnings beneath; otherwise
    *  it draws its own button. */
@@ -150,7 +158,13 @@ export function SyncFromSquare({
   // likely to be looking at and re-pulls recent days in case a tip settled
   // late — up to and including TODAY, whose figure the screen then marks as
   // still being taken.
+  // Never past today: Square has nothing for tomorrow.
+  const until = range ? (range.to < today ? range.to : today) : today;
   const sync = () => {
+    if (range) {
+      void run(monthsBetween(range.from, until), "Syncing");
+      return;
+    }
     const from = addDays(`${today.slice(0, 7)}-01`, -1);
     void run(monthsBetween(`${from.slice(0, 7)}-01`, today), "Syncing");
   };
@@ -180,7 +194,8 @@ export function SyncFromSquare({
         // at 4pm gets four hours of trading, and somebody reading the total
         // straight afterwards should not have to work that out.
         <p className="text-xs text-muted">
-          {result} Up to {today}, whose figure is still being taken.
+          {result} Up to {until}
+          {until === today ? ", whose figure is still being taken." : "."}
         </p>
       ) : null}
 

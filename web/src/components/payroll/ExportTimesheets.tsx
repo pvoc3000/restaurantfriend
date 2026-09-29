@@ -31,6 +31,7 @@ import {
 } from "@/lib/payPeriods";
 import { PayPeriodActions } from "./PayPeriodActions";
 import { PayrollWorksheet } from "./PayrollWorksheet";
+import { SyncFromSquare } from "@/components/sales/SyncFromSquare";
 import { StatusChip } from "./PayPeriodStatusChip";
 
 /**
@@ -109,6 +110,7 @@ export function ExportTimesheets({
   period,
   canWrite,
   timeZone,
+  today,
   weeks,
   orgName,
   worksheetError,
@@ -127,6 +129,8 @@ export function ExportTimesheets({
   period: PayPeriodRecord;
   canWrite: boolean;
   timeZone: string;
+  /** The org's calendar day — the tip sync never asks Square for tomorrow. */
+  today: string;
   /** The workweeks this period spans — stated because overtime is per WEEK. */
   weeks: string[];
   orgName: string;
@@ -522,6 +526,21 @@ export function ExportTimesheets({
                     Sick hours are not in this file — Gusto already pays them.
                   </span>
                 </div>
+
+                {/* TIPS COME FROM SQUARE, AND ONLY FOR DAYS AN OPEN PERIOD
+                    COVERS (064), so a sync taken before this period existed
+                    skipped them (Mark, 2026-09-29). Migration 151 now fills
+                    them when the period is created; this pulls the period
+                    again — for a day synced before closing time, or a tip that
+                    settled late — right where a missing figure is reported. */}
+                {!frozen && canWrite && (
+                  <div className="flex justify-end">
+                    <SyncFromSquare
+                      today={today}
+                      range={{ from: period.start_date, to: period.end_date }}
+                    />
+                  </div>
+                )}
 
                 {frozen && (
                   <p className="max-w-[72ch] border border-ink bg-go px-4 py-3 text-sm text-ink">

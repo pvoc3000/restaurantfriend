@@ -634,6 +634,7 @@ export default async function TimesheetsPage({
                     period: record,
                     canWrite,
                     timeZone,
+                    today,
                     weeks,
                     orgName: session.orgName,
                     worksheetError,
