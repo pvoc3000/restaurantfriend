@@ -14,7 +14,8 @@ import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { PAY_PERIOD_STATUS_LABEL, type PayPeriodStatus } from "@/lib/payPeriods";
+import { PAY_PERIOD_STATUS_LABEL, formatPeriodRange, type PayPeriodStatus } from "@/lib/payPeriods";
+import { createClient } from "@/lib/supabase/client";
 import {
   REASON_LABEL,
   proposeOvertime,
@@ -1078,6 +1079,7 @@ export function TimesheetsList({
               pool={r.location_id ? (dayPools.get(`${r.location_id}|${r.business_date}`) ?? null) : null}
               orgId={orgId}
               benefitLines={benefitNotes[r.id] ?? []}
+              period={period}
             />
           ),
         }}
@@ -1269,6 +1271,7 @@ function ShiftDetail({
   pool,
   orgId,
   benefitLines,
+  period,
 }: {
   row: TimesheetRow;
   editable: boolean;
@@ -1286,6 +1289,8 @@ function ShiftDetail({
   /** What each benefit did with this shift, INCLUDING the ones that paid
    *  nothing. Computed on the server — see `payrollBenefits.explainShift`. */
   benefitLines: ShiftBenefitLine[];
+  /** The period being viewed — a hand-entered row's day may move within it. */
+  period: PeriodOption | null;
 }) {
   const disagreements = otDisagreements(row);
   /**
@@ -1320,6 +1325,52 @@ function ShiftDetail({
             <dt className="text-subtle">Kind</dt>
             <dd>
               <span className="bg-mark-fill px-1">{paidAsSick ? "Sick day" : "Adjustment"}</span>
+            </dd>
+            {/* THE DAY IS EDITABLE (Mark, 2026-09-29: a sick day entered on the
+                wrong date, and "I should be able to edit timesheets"). Only
+                here, on a row with no punches: an imported shift's day comes
+                from its punches, and Homebase owns those — a re-import would
+                put it back.
+                BOTH DATES MOVE TOGETHER. An adjustment's `business_date` is its
+                workday (`NewTimesheet` writes them equal), and 062's trigger
+                files the row into a pay period by `business_date`, so moving
+                `workday` alone would leave it filed under the old day.
+                Held inside the period on screen. 028's policy already refuses a
+                day in a closed period or in none — but as a policy error; this
+                says it in words first. Another period is a delete and re-add. */}
+            <dt className="text-subtle">Day</dt>
+            <dd className="tabular-nums">
+              {editable ? (
+                <InlineValue
+                  table="timesheets"
+                  id={row.id}
+                  column="workday"
+                  kind="date"
+                  value={row.workday}
+                  ariaLabel="Day"
+                  nullable={false}
+                  onWrite={async (next) => {
+                    const day = String(next ?? "");
+                    if (period && (day < period.start_date || day > period.end_date)) {
+                      return {
+                        error: `Pick a day in this pay period (${formatPeriodRange(period)}).`,
+                      };
+                    }
+                    const { data, error } = await createClient()
+                      .from("timesheets")
+                      .update({ workday: day, business_date: day })
+                      .eq("id", row.id)
+                      .select("id");
+                    if (error) return { error: error.message };
+                    if (!data || data.length === 0) {
+                      return { error: "Nothing was changed — this pay period may no longer be open." };
+                    }
+                    return { error: null };
+                  }}
+                />
+              ) : (
+                <span className={READ_ONLY_VALUE}>{row.workday}</span>
+              )}
             </dd>
             <dt className="text-subtle">Punches</dt>
             <dd className="text-muted">none — paid time, not a worked shift</dd>

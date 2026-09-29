@@ -973,3 +973,12 @@
    fallback is the role → job table filling `wage_type` at import**, at which
    point `shiftJobTitle`'s middle step stops mattering. 2157 fixtures pass; the
    role cases go red with the middle step removed.
+   **2026-09-29 — A HAND-ENTERED ROW'S DAY IS EDITABLE.** Mark entered Nathalie
+   Menendez's sick day on the wrong date and could not correct it. Hours had
+   been editable in the expansion since 2026-09-01; the day never was. It is
+   now an `InlineValue` under "What this is" on adjustment rows, and it writes
+   `workday` AND `business_date` in one update, because 062 files a row into a
+   pay period by `business_date`. It stays inside the period on screen and says
+   so in words. 028's policy would refuse a closed period or none anyway, but
+   as a policy error. **Imported shifts keep their day read-only**: it comes
+   from the punches, Homebase owns those, and a re-import would put it back.
