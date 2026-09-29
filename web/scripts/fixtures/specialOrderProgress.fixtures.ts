@@ -96,18 +96,16 @@ test("the LENGTH is four steps and PAID fills the row (Mark, 2026-09-16)", () =>
   eq(order({ ...base, invoice_paid_at: "a", order_printed_at: "a", order_scheduled_at: "a" }).length, 1);
 });
 
-test("paid and unprinted is FULL WIDTH but not yet fully green", () => {
+test("paid and unprinted is FULL WIDTH and GREEN, and so is done", () => {
+  // 2026-09-29 (Mark): green means ready to print and schedule, and it stays
+  // green once that is done.
   const base = { quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a", invoice_paid_at: "a" };
   const paid = order(base);
   const done = order({ ...base, order_printed_at: "a", order_scheduled_at: "a" });
   ok(progressRowStyle(paid)!.backgroundImage.includes("100.000%"), "paid fills the row");
   ok(progressRowStyle(done)!.backgroundImage.includes("100.000%"), "so does done");
-  const hue = (css: string) => css.slice(css.indexOf("rgba("), css.indexOf(")") + 1);
-  no(
-    hue(progressRowStyle(paid)!.backgroundImage) === hue(progressRowStyle(done)!.backgroundImage),
-    "but the two are told apart by colour"
-  );
-  eq(progressColor(done.fraction), [74, 156, 63], "only done is the final green");
+  eq(progressColor(paid), [74, 156, 63], "paid is green");
+  eq(progressColor(done), [74, 156, 63], "done is green");
 });
 
 test("a status floor of Order fills the row too", () => {
@@ -229,18 +227,20 @@ test("A FLAGGED LEAD STILL DRAWS — and after 058 that is the common case", () 
   ok(style.backgroundImage.includes("100%"), "full width");
 });
 
-test("the ramp starts YELLOW at the first visible bar and ends GREEN", () => {
-  // The bar spans the five rungs beyond the lead, so the ramp must too —
-  // otherwise the first thing you ever see is already a third of the way green.
-  const first = order({ quote_sent_at: "a" });
-  const last = order({
-    quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a", invoice_paid_at: "a",
-    order_printed_at: "a", order_scheduled_at: "a",
-  });
-  const [r, g] = progressColor(first.fraction);
-  ok(r > 200, "still essentially yellow at the first drawn step");
-  eq(progressColor(last.fraction), [74, 156, 63], "green at the last");
-  ok(g > 0);
+test("every rung before Invoice paid is YELLOW, whatever its length", () => {
+  const steps = [
+    { quote_sent_at: "a" },
+    { quote_sent_at: "a", quote_returned_at: "a" },
+    { quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a" },
+  ];
+  for (const st of steps) eq(progressColor(order(st)), [255, 212, 0]);
+  ok(progressRowStyle(order({ quote_sent_at: "a" }))!.backgroundImage.includes("255, 212, 0"));
+});
+
+test("status Order is ready — green without a payment stamp", () => {
+  // Wholesale and standing-order days reach `order` without stamping a payment.
+  eq(progressColor(order({ status: "order" })), [74, 156, 63]);
+  eq(progressColor(order({ status: "invoice" })), [255, 212, 0], "an invoice is not yet");
 });
 
 test("cancelled beats flagged", () => {
@@ -249,15 +249,7 @@ test("cancelled beats flagged", () => {
   eq(order({ status: "cancelled", flag_reason: "something" }).tone, "none");
 });
 
-/* -- the colour ----------------------------------------------------------- */
-
-test("the ramp runs yellow to green", () => {
-  eq(progressColor(0), [255, 212, 0]);
-  eq(progressColor(1), [74, 156, 63]);
-  const mid = progressColor(0.5);
-  ok(mid[0] < 255 && mid[0] > 74, "red channel falls");
-  ok(mid[1] < 212 && mid[1] > 156, "green channel falls toward the green");
-});
+/* -- the wash ------------------------------------------------------------- */
 
 test("the wash is 20% and the fill stops at the fraction", () => {
   eq(WASH_ALPHA, 0.2);
@@ -416,8 +408,7 @@ test("each rung takes ITS OWN snapped stop — the index is done-2", () => {
 });
 
 test("the LENGTH snaps but the COLOUR does not", () => {
-  // The ramp stays even across the six rungs however the columns are dragged —
-  // otherwise a wide column would also skew the hue.
+  // The colour is the rung's, however the columns are dragged.
   const p = order({ quote_sent_at: "a" }); // 2 of 6
   const snappedStyle = progressRowStyle(p, NINE)!;
   const rawStyle = progressRowStyle(p, [])!;

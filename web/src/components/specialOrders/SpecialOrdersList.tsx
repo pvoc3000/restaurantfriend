@@ -1166,7 +1166,8 @@ export function SpecialOrdersList({
       rowClassName={(r) => (r.status === "cancelled" ? "text-faint line-through" : "")}
       /**
        * THE ROW IS THE PROGRESS BAR — a wash filling to the fraction done,
-       * yellow at the first rung and green at the last, under a 3px rule on the
+       * yellow until the order is ready to print and schedule and green from
+       * then on (2026-09-29, `progressColor`), under a 3px rule on the
        * row's bottom edge. Both are backgrounds on the `<tr>`, so both span its
        * full width; anchoring either to a cell makes it as wide as that column.
        *

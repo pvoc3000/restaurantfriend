@@ -127,8 +127,7 @@ export type OrderProgress = {
    * THE BAR'S OWN LENGTH, `(done - 1) / (total - 1)` — 0 at the lead rung and 1
    * when everything is done. Deliberately NOT `done / total`: the lead draws
    * nothing, so a fraction counting it would not describe what is on screen.
-   * Both the width and the colour ramp read this, which is what keeps the first
-   * VISIBLE bar yellow and the last green.
+   * The colour no longer reads it — see `progressColor`.
    */
   fraction: number;
   /**
@@ -137,15 +136,14 @@ export type OrderProgress = {
    * measures the SPECIAL ORDERS TEAM's work, which ends at Invoice paid —
    * printing and scheduling are the kitchen's, usually done from the generate
    * dialog — so four drawn steps (rungs 2–5) fill the row and rung 6 adds no
-   * length. The COLOUR still reads `fraction` over all six, so a paid order is
-   * full width but a shade short of green, and only printed-and-scheduled is
-   * fully green: the difference between paid/unprinted and done.
+   * length. The colour is `progressColor`'s: a paid order is full width and
+   * green, which is the kitchen's cue.
    */
   length: number;
   ticks: ProgressTick[];
   /**
    * What the row's wash says, and the three cases are Mark's:
-   *   · `progress` — the yellow→green ramp;
+   *   · `progress` — yellow, or green once ready to print and schedule;
    *   · `flagged`  — FULL WIDTH and red, whatever the stages say, because a
    *     flagged order is not a progress question;
    *   · `none`     — cancelled. No bar at all, and the row greys out. An order
@@ -330,14 +328,23 @@ const RED: [number, number, number] = [210, 0, 0];
  */
 export const WASH_ALPHA = 0.2;
 
-/** Yellow at the first rung, green at the last, mixed in between. */
-export function progressColor(fraction: number): [number, number, number] {
-  const t = Math.min(1, Math.max(0, fraction));
-  return [0, 1, 2].map((i) => Math.round(YELLOW[i] + (GREEN[i] - YELLOW[i]) * t)) as [
-    number,
-    number,
-    number,
-  ];
+/**
+ * THREE COLOURS, NOT A RAMP (Mark, 2026-09-29: "keep flagged rows red, orders
+ * that are ready to print and schedule green, and anything else yellow").
+ *
+ * The yellow→green ramp it replaces mixed the two by `fraction`, so most rows
+ * were some shade of olive and none of them answered a question. Three solid
+ * colours answer the one the list is read for — which orders the kitchen can
+ * take now. The LENGTH is untouched: it still says how far along.
+ *
+ * GREEN FROM RUNG 5, Invoice paid — or the status floor of `order`, "PAID —
+ * printing and scheduling remain", which is how wholesale orders get there
+ * without a payment stamp. A printed-and-scheduled order stays green: it is
+ * still the kitchen's. Red is decided by `progressRowStyle`, before this.
+ */
+export const READY_RUNG = 5;
+export function progressColor(p: OrderProgress): [number, number, number] {
+  return p.done >= READY_RUNG ? GREEN : YELLOW;
 }
 
 const rgba = ([r, g, b]: [number, number, number], a: number) => `rgba(${r}, ${g}, ${b}, ${a})`;
@@ -430,14 +437,13 @@ export function progressRowStyle(
   // does not appear either. See the header.
   if (!flagged && p.done <= 1) return null;
 
-  const solid = flagged ? RED : progressColor(p.fraction);
+  const solid = flagged ? RED : progressColor(p);
   // FOUR drawn steps — rungs 2 to 5, the team's work (see `length`). Rung 2
   // is the first that draws and rung 6 draws no further than rung 5, so the
   // index is `min(done, 5) - 2`.
   const drawn = p.total - 2;
   const snapped = snapStops(drawn, boundaries);
-  // The COLOUR runs off the six-rung `fraction` and is never snapped — only
-  // the LENGTH is, so the ramp stays even however the columns are dragged.
+  // Only the LENGTH snaps; the colour is the rung, not where the rules fall.
   const width = snapped ? snapped[Math.min(p.done - 1, drawn) - 1] : p.length;
   const stop = flagged ? "100%" : `${(width * 100).toFixed(3)}%`;
   const wash = rgba(solid, flagged ? 0.15 : WASH_ALPHA);
