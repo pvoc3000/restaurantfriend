@@ -90,8 +90,8 @@ export const DANGER_BUTTON_CLASS =
 //
 // SINCE 2026-09-28 (Mark) THE PRIMARY COMMAND IS BLACK, with
 // white type, a black shadow and a white hover edge. The destructive one is
-// since 2026-09-29 a WHITE button with a red (accent) edge and red type, a
-// black shadow and a 2px red hover edge (see mac-look.css).
+// since 2026-09-29 a WHITE button with a red (accent) edge, red type, a red
+// shadow and a 2px red hover edge (see mac-look.css).
 // What follows is the pale-wash era that preceded it.
 //
 // THE PRIMARY ONE WAS A PALE BLUE FILL from 2026-09-21 (Mark) — `bg-commit-fill`

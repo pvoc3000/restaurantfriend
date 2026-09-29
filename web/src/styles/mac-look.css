@@ -212,8 +212,9 @@
   color: #fff;
 }
 
-/* SINCE 2026-09-29 (later): RED EDGE, WHITE FILL, RED TYPE, BLACK SHADOW
-   (Mark: "red outline, white fill, red text, black drop shadow"). The red is
+/* SINCE 2026-09-29 (later): RED EDGE, WHITE FILL, RED TYPE, RED SHADOW
+   (Mark: "red outline, white fill, red text, black drop shadow", then "make
+   the danger button drop shadow red too"). The red is
    the ACCENT, #d20000 (5.61:1 on white), not the lighter #ff5c52 the filled
    versions used, which is 2.9:1 on white and too faint for 12px type. Hover
    and press are a 2px RED edge.
@@ -252,11 +253,11 @@
   border-color: var(--color-accent);
   background-color: #fff;
   color: var(--color-accent);
-  box-shadow: 3px 3px 0 0 #000;
+  box-shadow: 3px 3px 0 0 var(--color-accent);
 }
 
 .mac-stop:not(:disabled):hover {
-  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px var(--color-accent);
+  box-shadow: 3px 3px 0 0 var(--color-accent), inset 0 0 0 1px var(--color-accent);
 }
 
 .mac-control.mac-stop:not(:disabled):active {
