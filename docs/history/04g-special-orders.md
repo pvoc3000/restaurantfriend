@@ -5214,3 +5214,14 @@ only — the tokens `?view=upcoming` and `not-cancelled` are unchanged, so saved
 views and DeskStart's links still resolve.
 Then Status's choice became **Active** instead of Upcoming, which sat too
 close to Show's Future and read wrong beside Past.
+
+**2026-09-29 — a special order's invoice is due two business days before its
+event** (Mark: SO-10092's event was 10/1 and its invoice said due 10/3). The
+due date had always been `today + terms_days` (4), whatever the event. Now
+`dueDateFor` (`lib/customerInvoices`) sets Create Invoice's starting value to
+two business days (Mon–Fri, no holidays) before the earliest event, or today
+when that has passed. **Wholesale keeps the terms** (Mark: "this is for special
+orders only and shouldn't affect wholesale orders") — any wholesale order on
+the invoice (`isWholesaleOrder`, by Sold as), or no dated order, falls back to
+`today + terms_days`. The two is `orgs.settings.customer_invoices.
+due_business_days_before`, default 2. Invoices already created keep their date.

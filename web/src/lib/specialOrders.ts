@@ -92,13 +92,23 @@ export function kindFilterIsDateless(value: string): boolean {
   return value === "template" || value === "standing_order";
 }
 
+/**
+ * Is this a WHOLESALE order rather than a special order? Sold as (129) decides
+ * it; a row read without the column falls back to the old test, made by a
+ * standing order. The Kind filter and an invoice's due date both ask.
+ */
+export function isWholesaleOrder(order: {
+  standing_order_id?: string | null;
+  square_item?: string | null;
+}): boolean {
+  return order.square_item ? order.square_item === "wholesale" : Boolean(order.standing_order_id);
+}
+
 export function matchesKindFilter(
   order: { kind: string; standing_order_id?: string | null; square_item?: string | null },
   value: string
 ): boolean {
-  // Sold as (129) decides it; a row read without the column falls back to
-  // the old test, made by a standing order.
-  const wholesale = order.square_item ? order.square_item === "wholesale" : Boolean(order.standing_order_id);
+  const wholesale = isWholesaleOrder(order);
   if (value === "order") return order.kind === "order" && !wholesale;
   if (value === "standing_day") return order.kind === "order" && wholesale;
   return order.kind === value;

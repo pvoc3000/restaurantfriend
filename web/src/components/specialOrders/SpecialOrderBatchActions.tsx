@@ -17,6 +17,7 @@ import {
   customerLabel,
   money,
   type SpecialOrderStatus,
+  isWholesaleOrder,
 } from "@/lib/specialOrders";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { DateField } from "@/components/ui/DateField";
@@ -128,6 +129,7 @@ export function SpecialOrderBatchActions({
     shop: r.kitchen_code ?? r.location_code,
     on_invoice: r.invoice_id !== null,
     balance: r.totals.balance,
+    wholesale: isWholesaleOrder(r),
   }));
 
   /**

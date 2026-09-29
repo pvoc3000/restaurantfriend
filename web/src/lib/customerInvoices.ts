@@ -563,6 +563,8 @@ export type InvoiceCandidate = {
   balance: number;
   /** Already on a customer invoice that is not void. */
   on_invoice?: boolean;
+  /** A wholesale order (`isWholesaleOrder`) — its invoice keeps the terms. */
+  wholesale?: boolean;
 };
 
 /**
@@ -633,15 +635,26 @@ export function sendIntent(): string {
  * TERMS AND NAMES — `orgs.settings.customer_invoices`, design rule 2
  * ========================================================================== */
 
-export type InvoiceTerms = { termsDays: number; prefix: string };
+export type InvoiceTerms = {
+  /** Days after issue, for an invoice with no dated order on it. */
+  termsDays: number;
+  /** Business days before the earliest event an invoice is due — see `dueDateFor`. */
+  dueBusinessDaysBefore: number;
+  prefix: string;
+};
 
-export const DEFAULT_INVOICE_TERMS: InvoiceTerms = { termsDays: 4, prefix: "" };
+export const DEFAULT_INVOICE_TERMS: InvoiceTerms = { termsDays: 4, dueBusinessDaysBefore: 2, prefix: "" };
 
 export function readInvoiceTerms(orgSettings: Record<string, unknown> | null | undefined): InvoiceTerms {
   const ci = ((orgSettings ?? {}).customer_invoices ?? {}) as Record<string, unknown>;
   const days = Number(ci.terms_days);
+  // `?? NaN`, not `Number(undefined)` alone — that is NaN anyway, but a null
+  // would read as 0 and make every invoice due on its event day.
+  const before = Number(ci.due_business_days_before ?? NaN);
   return {
     termsDays: Number.isFinite(days) && days >= 0 ? Math.floor(days) : DEFAULT_INVOICE_TERMS.termsDays,
+    dueBusinessDaysBefore:
+      Number.isFinite(before) && before >= 0 ? Math.floor(before) : DEFAULT_INVOICE_TERMS.dueBusinessDaysBefore,
     prefix: typeof ci.prefix === "string" ? ci.prefix : DEFAULT_INVOICE_TERMS.prefix,
   };
 }
@@ -654,6 +667,40 @@ export function addDays(issued: string, days: number): string {
   const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * A NEW INVOICE'S DUE DATE. For SPECIAL ORDERS: two business days before the
+ * earliest event, or today when the event is closer than that (Mark,
+ * 2026-09-29: SO-10092's event was 10/1 and its invoice said due 10/3, "2 days
+ * after the event instead of 2 days before").
+ *
+ * WHOLESALE KEEPS ITS TERMS — `today + termsDays`, Sunday's invoice due
+ * Thursday (Mark, same day: "this is for special orders only and shouldn't
+ * affect wholesale orders"). A weekly invoice is sent ahead of deliveries that
+ * start the next morning, so the event rule would make it due the day it is
+ * sent. An invoice carrying ANY wholesale order keeps the terms, and so does
+ * one with no dated order (New Invoice starts with none).
+ *
+ * The EARLIEST event governs an invoice of several special orders, because
+ * that is the first one the kitchen would have to make unpaid. Business days
+ * skip Saturday and Sunday only — no holiday calendar, for `businessDaysUntil`'s
+ * reason. It is the dialog's starting value; the Due field stays editable.
+ */
+export function dueDateFor(
+  orders: { event_date: string | null; wholesale?: boolean }[],
+  today: string,
+  terms: Pick<InvoiceTerms, "termsDays" | "dueBusinessDaysBefore"> = DEFAULT_INVOICE_TERMS
+): string {
+  const dated = orders.map((o) => o.event_date).filter((d): d is string => !!d).sort();
+  if (dated.length === 0 || orders.some((o) => o.wholesale)) return addDays(today, terms.termsDays);
+  let due = dated[0].slice(0, 10);
+  for (let counted = 0; counted < terms.dueBusinessDaysBefore; ) {
+    due = addDays(due, -1);
+    const weekday = new Date(`${due}T00:00:00Z`).getUTCDay(); // 0 Sunday … 6 Saturday
+    if (weekday !== 0 && weekday !== 6) counted++;
+  }
+  return due < today ? today : due;
 }
 
 /** "1001", or "DF-1001" with a prefix; a revision (143) is "1001-2". What

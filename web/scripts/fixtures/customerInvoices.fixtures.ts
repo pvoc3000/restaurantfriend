@@ -29,6 +29,7 @@ import {
   isCustomerInvoiceSnapshot,
   orderLineDescription,
   readInvoiceTerms,
+  dueDateFor,
   sumBreakdowns,
   type InvoiceCandidate,
 } from "../../src/lib/customerInvoices";
@@ -116,8 +117,10 @@ test("invoiceStatus: void wins, then paid, then draft; overdue is sent and past 
 });
 
 test("readInvoiceTerms: settings, with defaults for what is missing", () => {
-  eq(readInvoiceTerms({}), { termsDays: 4, prefix: "" });
-  eq(readInvoiceTerms({ customer_invoices: { terms_days: 7, prefix: "DF-" } }), { termsDays: 7, prefix: "DF-" });
+  eq(readInvoiceTerms({}), { termsDays: 4, dueBusinessDaysBefore: 2, prefix: "" });
+  eq(readInvoiceTerms({ customer_invoices: { terms_days: 7, prefix: "DF-" } }), { termsDays: 7, dueBusinessDaysBefore: 2, prefix: "DF-" });
+  eq(readInvoiceTerms({ customer_invoices: { due_business_days_before: 3 } }).dueBusinessDaysBefore, 3);
+  eq(readInvoiceTerms({ customer_invoices: { due_business_days_before: null } }).dueBusinessDaysBefore, 2, "null is unset, not 0");
   eq(readInvoiceTerms({ customer_invoices: { terms_days: "abc" } }).termsDays, 4);
   eq(readInvoiceTerms({ customer_invoices: { terms_days: 0 } }).termsDays, 0, "due on receipt is a real term");
 });
@@ -357,4 +360,24 @@ test("paperTotals / paperColumns: Subtotal always, the rest only when used", () 
   eq(paperTotals(b, 0, 85).map((t) => t.label), ["Subtotal", "Delivery", "Invoiced earlier", "Amount due"]);
   eq(paperTotals(b, 0, 85)[2].value, -25);
   eq(paperColumns([{ parts: { subtotal: 0, discount: 0, delivery: 5, rush: 0, tax: 0 } }]).map((c) => c.key), ["subtotal", "delivery"]);
+});
+
+// A new invoice's due date (Mark, 2026-09-29: SO-10092's event was 10/1 and
+// its invoice said due 10/3). 2026-10-01 is a Thursday.
+test("dueDateFor: a special order is due two business days before its event", () => {
+  eq(dueDateFor([{ event_date: "2026-10-09" }], "2026-09-29"), "2026-10-07", "Fri event → Wed");
+  eq(dueDateFor([{ event_date: "2026-10-05" }], "2026-09-29"), "2026-10-01", "Mon event → Thu, skipping the weekend");
+  eq(dueDateFor([{ event_date: "2026-10-03" }], "2026-09-29"), "2026-10-01", "Sat event → Thu");
+});
+test("dueDateFor: an event too close is due TODAY, never before", () => {
+  eq(dueDateFor([{ event_date: "2026-10-01" }], "2026-09-29"), "2026-09-29", "SO-10092: due today, not 10/3");
+  eq(dueDateFor([{ event_date: "2026-09-29" }], "2026-09-29"), "2026-09-29");
+});
+test("dueDateFor: the EARLIEST event governs several orders", () => {
+  eq(dueDateFor([{ event_date: "2026-10-16" }, { event_date: "2026-10-09" }, { event_date: null }], "2026-09-29"), "2026-10-07");
+});
+test("dueDateFor: wholesale keeps the terms, and so does an undated invoice", () => {
+  eq(dueDateFor([{ event_date: "2026-10-05", wholesale: true }], "2026-10-04"), "2026-10-08", "Sunday's invoice, due Thursday");
+  eq(dueDateFor([{ event_date: "2026-10-20" }, { event_date: "2026-10-05", wholesale: true }], "2026-10-04"), "2026-10-08", "any wholesale order");
+  eq(dueDateFor([], "2026-09-29"), "2026-10-03");
 });

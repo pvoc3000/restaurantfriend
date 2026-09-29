@@ -10,8 +10,8 @@ import { Radio } from "@/components/ui/Radio";
 import { money } from "@/lib/specialOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import {
-  addDays,
   createRefusals,
+  dueDateFor,
   invoiceLinesFor,
   readInvoiceTerms,
   sendIntent,
@@ -69,8 +69,8 @@ export function CreateInvoiceDialog({
   const lines = refusals.length ? [] : invoiceLinesFor(candidates);
   const total = lines.reduce((a, l) => a + l.amount, 0);
 
-  // The org's terms (design rule 2): Sunday's invoice due Thursday is four
-  // days, and that is a setting, not code.
+  // The org's terms (design rule 2): a special order is due two business days
+  // before its event, wholesale on the terms — see `dueDateFor`.
   useEffect(() => {
     let live = true;
     void supabase
@@ -81,7 +81,7 @@ export function CreateInvoiceDialog({
       .then(({ data }) => {
         if (!live) return;
         const terms = readInvoiceTerms((data?.settings ?? {}) as Record<string, unknown>);
-        setDue((d) => d ?? addDays(today, terms.termsDays));
+        setDue((d) => d ?? dueDateFor(candidates, today, terms));
       });
     return () => {
       live = false;

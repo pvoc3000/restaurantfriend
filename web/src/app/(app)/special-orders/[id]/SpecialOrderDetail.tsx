@@ -27,6 +27,7 @@ import {
   type SpecialOrderKind,
   type SpecialOrderStatus,
   customerContactName,
+  isWholesaleOrder,
 } from "@/lib/specialOrders";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
@@ -499,6 +500,10 @@ export async function SpecialOrderDetail({
     shop: codeFor(kitchenId),
     balance: totals.balance,
     on_invoice: liveInvoice !== null,
+    wholesale: isWholesaleOrder({
+      square_item: (row.square_item as string | null) ?? null,
+      standing_order_id: (row.standing_order_id as string | null) ?? null,
+    }),
   };
   const invoiceFrom = { href: orderTabHref(id, "payments", rawParams), label: `#${row.number as string}` };
 
