@@ -308,7 +308,14 @@ export function OrderDocumentPdf({
                     label={delivery ? "Delivery" : "Pickup"}
                     value={documentTimeLabel(order)}
                   />
-                  <Field label="Location" value={order.location_name} />
+                  {/* WHERE THE EVENT IS, not which shop makes it (Mark,
+                      2026-09-29): a delivery goes to its address, and only a
+                      pickup happens at the shop. The address used to print
+                      under Contact, so it moved rather than printing twice. */}
+                  <Field
+                    label={delivery ? "Address" : "Location"}
+                    value={delivery ? order.delivery_address : order.location_name}
+                  />
                 </View>
                 <View style={s.block}>
                   <Text style={s.sectionHead}>Customer</Text>
@@ -321,7 +328,6 @@ export function OrderDocumentPdf({
                   <Field label="Name" value={order.contact_name} />
                   <Field label="Phone" value={order.contact_phone} />
                   <Field label="Email" value={order.contact_email} />
-                  <Field label="Address" value={order.delivery_address} />
                 </View>
               </View>
 
