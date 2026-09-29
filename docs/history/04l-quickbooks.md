@@ -489,3 +489,13 @@ QuickBooks invoice payments, with Mark's $1.10 as the first live refund.
   qty or price; an invoice with discount or other non-item lines is refused
   for a part refund. The total check and the delete-on-mismatch still apply.
   The payment must still pay exactly one invoice. Not yet run live.
+
+**A STALE LINK PROPOSAL OUTLIVED THE EDIT THAT DISPROVED IT** (2026-09-29,
+Mark). Send found a QuickBooks bill under the bill's WRONG invoice number;
+Mark withdrew approval, corrected the number, re-approved — and the menu still
+offered only "Link to QuickBooks", aimed at the document the wrong number had
+matched. `PushToQuickBooks` held the `find_bills` answer in state and nothing
+cleared it; `router.refresh()` keeps client state, so only a full reload would
+have. The proposal is now KEYED on what `proposeBillLink` reads — vendor, shop,
+invoice number, total, credit flag — and any change drops it, so the next Send
+asks QuickBooks again under the current number.

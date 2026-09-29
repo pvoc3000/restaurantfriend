@@ -103,8 +103,21 @@ export function PushToQuickBooks({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
-  /** What QuickBooks already has under this number. Null while unasked. */
-  const [proposal, setProposal] = useState<BillLinkProposal | null>(null);
+  /**
+   * What QuickBooks already has under this number. Null while unasked.
+   *
+   * KEYED ON WHAT IT WAS ASKED ABOUT (Mark, 2026-09-29): a Send finds a match
+   * under the WRONG number, the number is corrected, and the stale match used
+   * to survive the edit — `router.refresh()` keeps this state — so the menu
+   * offered only "Link to QuickBooks", pointing at the document the wrong
+   * number had matched. Any change to what `proposeBillLink` reads drops the
+   * proposal, and the next Send asks QuickBooks again.
+   */
+  const matchKey = `${vendorId}|${locationId}|${invoiceNumber ?? ""}|${total ?? ""}|${isCredit}`;
+  const [asked, setAsked] = useState<{ key: string; proposal: BillLinkProposal } | null>(null);
+  const proposal = asked?.key === matchKey ? asked.proposal : null;
+  const setProposal = (next: BillLinkProposal | null) =>
+    setAsked(next ? { key: matchKey, proposal: next } : null);
   const [warnings, setWarnings] = useState<string[]>([]);
   /** Mid the click-time duplicate lookup (see `push()`) — distinct from
    *  `busy`, which covers the SEND itself, so the button can say "Checking…"
