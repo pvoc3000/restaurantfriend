@@ -285,7 +285,7 @@ export default async function SalesPage({
       {/* Every shop, not the working one — the shop is a COLUMN here, which is
           why this screen is exempt from `InactiveLocationGate`. */}
       <PageHeading
-        title="Sales"
+        title="Daily Sales"
         total={days.length}
         noun="shop-days"
         action={

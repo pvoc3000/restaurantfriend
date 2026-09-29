@@ -239,7 +239,6 @@ export const SECTIONS: NavSection[] = [
         href: "/shift-reports",
         built: true,
       },
-      { slug: "sales", label: "Sales", href: "/sales", built: true },
       { slug: "documents", label: "Documents", href: "/documents", built: true },
       stub("operations", "policies", "Policies"),
       // "Check Lists" and "Master Check Lists" USED TO SIT HERE and moved to
@@ -360,6 +359,10 @@ export const SECTIONS: NavSection[] = [
         href: "/customers",
         built: true,
       },
+      // From Operations, and "Daily Sales" rather than "Sales" (Mark,
+      // 2026-09-29): what the shops sold belongs beside what we sell to order.
+      // The slug and `/sales` are unchanged, so bookmarks and `rf.nav` hold.
+      { slug: "sales", label: "Daily Sales", href: "/sales", built: true },
     ],
   },
 ];
