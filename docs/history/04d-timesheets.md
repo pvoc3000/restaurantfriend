@@ -1054,3 +1054,10 @@
    that rewrites `workday` only, while tips are keyed by `business_date`, so a
    recalculation never changes a tip share. Coupling the two would make an
    in-app rewrite depend on Square answering.
+   **2026-09-29 — SEP 14–27 IMPORTED INTO GUSTO CLEANLY** (Mark: "Gusto was
+   able to import our exported timesheets perfectly"), via Smart Import, with
+   one row per (person, pay rate). The rule that made it work, for whoever
+   touches `buildExportRows` next: **Gusto matches each row to one of the
+   person's jobs, each pay rate has exactly one job, and it will not add two
+   rows together.** So two rows at one rate, or a separate zero-hour row for a
+   job the hours rows already cover, are refused outright.
