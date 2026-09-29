@@ -573,6 +573,24 @@ export default async function TimesheetsPage({
 
   const canWrite = canRunPayroll(session.membership.role);
 
+  // One set of props for the dialog, whether it adds a row or edits one.
+  const newTimesheet = {
+    employees: [...employeeById.entries()]
+      .map(([id, e]) => ({
+        id,
+        name: e.name,
+        workday_starts_at: e.workday_starts_at,
+      }))
+      .sort((a, b) => (a.name < b.name ? -1 : 1)),
+    // ACTIVE locations only: this enumerates somewhere to put a new
+    // shift, and a closed shop is not one (design rule 3).
+    locations: session.activeLocations.map((l) => ({ id: l.id, code: l.code })),
+    orgId: session.membership.org_id,
+    timeZone,
+    period: chosen,
+    disabled: !(canWrite && isPayPeriodEditable(chosen.status)),
+  };
+
   return (
     <div className="space-y-6">
       {/* Org-wide and PAY-PERIOD scoped rather than shop scoped, so the code
@@ -634,22 +652,7 @@ export default async function TimesheetsPage({
                   }
                 : null
             }
-            newTimesheet={{
-              employees: [...employeeById.entries()]
-                .map(([id, e]) => ({
-                  id,
-                  name: e.name,
-                  workday_starts_at: e.workday_starts_at,
-                }))
-                .sort((a, b) => (a.name < b.name ? -1 : 1)),
-              // ACTIVE locations only: this enumerates somewhere to put a new
-              // shift, and a closed shop is not one (design rule 3).
-              locations: session.activeLocations.map((l) => ({ id: l.id, code: l.code })),
-              orgId: session.membership.org_id,
-              timeZone,
-              period: chosen,
-              disabled: !(canWrite && isPayPeriodEditable(chosen.status)),
-            }}
+            newTimesheet={newTimesheet}
           />
         }
       />
@@ -673,6 +676,7 @@ export default async function TimesheetsPage({
         premiums={premiums}
         pools={pools}
         benefitNotes={benefitNotes}
+        sheet={newTimesheet}
       />
     </div>
   );

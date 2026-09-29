@@ -982,3 +982,17 @@
    so in words. 028's policy would refuse a closed period or none anyway, but
    as a policy error. **Imported shifts keep their day read-only**: it comes
    from the punches, Homebase owns those, and a re-import would put it back.
+   **2026-09-29 — HAND-ENTERED ROWS ARE EDITED WHOLE, AND CAN BE DELETED.**
+   This supersedes the inline Day field added earlier the same day. A
+   `source = 'manual'` row in an open period shows **Edit Timesheet…** in its
+   expansion. That reopens `NewTimesheet` in edit mode, seeded from the row,
+   with Delete (a danger confirm, and `.select()` to catch an RLS zero-row
+   refusal). A save that leaves the punches alone keeps the hours columns, so
+   an overtime split decided since is not reset. Changed punches rewrite them
+   the way a create does. Imported rows get no command, for the reason above.
+   **The Smart Import experiment FAILED on its first run (Sep 14–27).** Gusto
+   refused the file: "Each employee in Gusto can match to only one row", and
+   for three people, "each employee's job … to only one row". It maps and does
+   NOT sum. Every one of the 17 people it named had 2+ rows in the file, and
+   every person it accepted had exactly one. So the mapping has to happen
+   BEFORE the file, here.

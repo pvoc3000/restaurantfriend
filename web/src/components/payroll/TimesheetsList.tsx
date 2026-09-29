@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ComponentProps } from "react";
 
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import {
@@ -14,8 +14,9 @@ import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { PAY_PERIOD_STATUS_LABEL, formatPeriodRange, type PayPeriodStatus } from "@/lib/payPeriods";
-import { createClient } from "@/lib/supabase/client";
+import { PAY_PERIOD_STATUS_LABEL, type PayPeriodStatus } from "@/lib/payPeriods";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { NewTimesheet, type EditableTimesheet } from "./NewTimesheet";
 import {
   REASON_LABEL,
   proposeOvertime,
@@ -173,6 +174,7 @@ export function TimesheetsList({
   premiums,
   pools,
   benefitNotes,
+  sheet,
 }: {
   rows: TimesheetRow[];
   /** The pay period these rows are from, chosen on the bar above. */
@@ -192,7 +194,12 @@ export function TimesheetsList({
   pools: Record<string, { reported_cents: number | null; corrected_cents: number | null }>;
   /** Timesheet id → one line per benefit, already worded by the server. */
   benefitNotes: Record<string, ShiftBenefitLine[]>;
+  /** What the New Timesheet dialog needs — the same dialog edits a
+   *  hand-entered row. */
+  sheet: Omit<ComponentProps<typeof NewTimesheet>, "children" | "editing" | "onDone">;
 }) {
+  /** The hand-entered row open in the edit dialog, if any. */
+  const [editing, setEditing] = useState<EditableTimesheet | null>(null);
   const [search, setSearch] = useState("");
   const [grouping, setGrouping] = useState<Grouping>("employee");
   const [review, setReview] = useState<Review>("all");
@@ -1079,7 +1086,24 @@ export function TimesheetsList({
               pool={r.location_id ? (dayPools.get(`${r.location_id}|${r.business_date}`) ?? null) : null}
               orgId={orgId}
               benefitLines={benefitNotes[r.id] ?? []}
-              period={period}
+              onEdit={
+                editable && r.source === "manual"
+                  ? () =>
+                      setEditing({
+                        id: r.id,
+                        employee_id: r.employee_id,
+                        location_id: r.location_id,
+                        workday: r.workday,
+                        kind: r.kind,
+                        clock_in: r.clock_in,
+                        clock_out: r.clock_out,
+                        unpaid_break_minutes: r.unpaid_break_minutes,
+                        sick_hours: r.sick_hours,
+                        hours_regular: r.hours_regular,
+                        manager_note: r.manager_note,
+                      })
+                  : null
+              }
             />
           ),
         }}
@@ -1091,6 +1115,10 @@ export function TimesheetsList({
           </p>
         }
       />
+
+      {editing && (
+        <NewTimesheet key={editing.id} {...sheet} editing={editing} onDone={() => setEditing(null)} />
+      )}
     </div>
   );
 }
@@ -1271,7 +1299,7 @@ function ShiftDetail({
   pool,
   orgId,
   benefitLines,
-  period,
+  onEdit,
 }: {
   row: TimesheetRow;
   editable: boolean;
@@ -1289,8 +1317,8 @@ function ShiftDetail({
   /** What each benefit did with this shift, INCLUDING the ones that paid
    *  nothing. Computed on the server — see `payrollBenefits.explainShift`. */
   benefitLines: ShiftBenefitLine[];
-  /** The period being viewed — a hand-entered row's day may move within it. */
-  period: PeriodOption | null;
+  /** Present on a hand-entered row in an open period: opens the edit dialog. */
+  onEdit: (() => void) | null;
 }) {
   const disagreements = otDisagreements(row);
   /**
@@ -1309,324 +1337,292 @@ function ShiftDetail({
   };
 
   return (
-    <div className="grid gap-8 md:grid-cols-3">
-      {/* PAID TIME THAT PRODUCED NO PUNCH (028's `adjustment` kind) has no
-          source and no punches, so this column was a heading over four em
-          dashes — the least informative thing on screen, on the one row whose
-          meaning is NOT obvious from its numbers (Mark, 2026-08-22, on a sick
-          day he had entered: "there's no indication it's a sick day… no
-          indication other than the 8 sick hours reported. I need more"). The
-          other two columns are unchanged: the hours are still decided and the
-          note is still edited where every other row's is. */}
-      {row.kind === "adjustment" ? (
-        <div className="space-y-2">
-          <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">What this is</h3>
-          <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
-            <dt className="text-subtle">Kind</dt>
-            <dd>
-              <span className="bg-mark-fill px-1">{paidAsSick ? "Sick day" : "Adjustment"}</span>
-            </dd>
-            {/* THE DAY IS EDITABLE (Mark, 2026-09-29: a sick day entered on the
-                wrong date, and "I should be able to edit timesheets"). Only
-                here, on a row with no punches: an imported shift's day comes
-                from its punches, and Homebase owns those — a re-import would
-                put it back.
-                BOTH DATES MOVE TOGETHER. An adjustment's `business_date` is its
-                workday (`NewTimesheet` writes them equal), and 062's trigger
-                files the row into a pay period by `business_date`, so moving
-                `workday` alone would leave it filed under the old day.
-                Held inside the period on screen. 028's policy already refuses a
-                day in a closed period or in none — but as a policy error; this
-                says it in words first. Another period is a delete and re-add. */}
-            <dt className="text-subtle">Day</dt>
-            <dd className="tabular-nums">
-              {editable ? (
-                <InlineValue
-                  table="timesheets"
-                  id={row.id}
-                  column="workday"
-                  kind="date"
-                  value={row.workday}
-                  ariaLabel="Day"
-                  nullable={false}
-                  onWrite={async (next) => {
-                    const day = String(next ?? "");
-                    if (period && (day < period.start_date || day > period.end_date)) {
-                      return {
-                        error: `Pick a day in this pay period (${formatPeriodRange(period)}).`,
-                      };
-                    }
-                    const { data, error } = await createClient()
-                      .from("timesheets")
-                      .update({ workday: day, business_date: day })
-                      .eq("id", row.id)
-                      .select("id");
-                    if (error) return { error: error.message };
-                    if (!data || data.length === 0) {
-                      return { error: "Nothing was changed — this pay period may no longer be open." };
-                    }
-                    return { error: null };
-                  }}
-                />
-              ) : (
-                <span className={READ_ONLY_VALUE}>{row.workday}</span>
-              )}
-            </dd>
-            <dt className="text-subtle">Punches</dt>
-            <dd className="text-muted">none — paid time, not a worked shift</dd>
-            {/* EDITABLE, WHICH IT WAS NOT (Mark, 2026-09-01: "I entered a sick
-                timesheet, accidentally entered the wrong hours and want to
-                correct it"). The figure was plain text here, and the column that
-                holds it — Sick — is `hideWhenCompact`, so on any window under
-                1280 a hand-entered sick day had no editor anywhere on the
-                screen. It is the same `InlineValue` on the same column the grid
-                cell uses, so a correction made here and one made there are one
-                act. */}
-            <dt className="text-subtle">{paidAsSick ? "Sick hours" : "Paid hours"}</dt>
-            <dd className="tabular-nums">
-              {editable ? (
-                <InlineValue
-                  table="timesheets"
-                  id={row.id}
-                  column={paidAsSick ? "sick_hours" : "hours_regular"}
-                  kind="number"
-                  value={adjustmentHours}
-                  ariaLabel={paidAsSick ? "Sick hours" : "Paid hours"}
-                  // These hours ARE the row — an adjustment with none pays
-                  // nothing and says nothing — so clearing the cell asks for a
-                  // value rather than writing null. It would also flip
-                  // `paidAsSick`, relabel the row Adjustment, and move its own
-                  // editor onto a different column mid-correction. Zero is
-                  // still enterable; it is a value, not an empty box.
-                  nullable={false}
-                  format={(v) => Number(v).toFixed(2)}
-                />
-              ) : (
-                <span className={READ_ONLY_VALUE}>
-                  {adjustmentHours === null ? "—" : adjustmentHours.toFixed(2)}
-                </span>
-              )}
-            </dd>
-            <dt className="text-subtle">Entered</dt>
-            <dd>{row.source === "manual" ? "by hand, on this screen" : row.source}</dd>
-          </dl>
-          {/* Decision 7, worth saying where somebody is looking at one: sick
-              hours are not worked hours, so they earn no overtime, never enter
-              the tip pool, and are DELIBERATELY absent from the Gusto file —
-              Gusto pays them already, and exporting them pays the person
-              twice. */}
-          {paidAsSick && (
-            <p className="max-w-[40ch] pt-1 text-[12px] leading-snug text-muted">
-              Sick hours earn no overtime and are kept out of the payroll export
-              — Gusto pays them already.
-            </p>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">What the source said</h3>
-          <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
-            <dt className="text-subtle">Source</dt>
-            <dd>{raw("import_source") ?? row.source}</dd>
-            <dt className="text-subtle">Clock in</dt>
-            <dd className="tabular-nums">{raw("time_in") ?? "—"}</dd>
-            <dt className="text-subtle">Clock out</dt>
-            <dd className="tabular-nums">{raw("time_out") ?? "—"}</dd>
-            <dt className="text-subtle">Dates</dt>
-            <dd className="tabular-nums">
-              {raw("date_start") ?? "—"}
-              {raw("date_end") && raw("date_end") !== raw("date_start") ? ` → ${raw("date_end")}` : ""}
-            </dd>
-            {/* Migration 061. When someone's workday starts in the afternoon, the
-                punch and the day its hours count toward are different dates —
-                which the In → Out column can only show as a time. Say it here,
-                where there is room, rather than leaving the row looking wrong. */}
-            {raw("date_start") && String(raw("date_start")) !== row.workday && (
-              <>
-                <dt className="text-subtle">Counts toward</dt>
-                <dd className="tabular-nums">
-                  <span className="bg-mark-fill px-1">{row.workday}</span>
-                  <span className="ml-2 text-muted">
-                    their workday starts in the afternoon
-                  </span>
-                </dd>
-              </>
-            )}
-            {raw("break_start") && (
-              <>
-                <dt className="text-subtle">Break</dt>
-                <dd className="tabular-nums">
-                  {raw("break_start")} → {raw("break_end") ?? "?"}
-                  {raw("break_type") ? ` · ${raw("break_type")}` : ""}
-                </dd>
-              </>
-            )}
-            <dt className="text-subtle">Hours</dt>
-            <dd className="tabular-nums">
-              {(row.source_hours_regular ?? 0).toFixed(2)} reg ·{" "}
-              {(row.source_hours_overtime ?? 0).toFixed(2)} OT ·{" "}
-              {(row.source_hours_double_ot ?? 0).toFixed(2)} dbl
-            </dd>
-            {raw("timesheet_error") && (
-              <>
-                <dt className="text-subtle">FMP flagged</dt>
-                {/* FileMaker's own derived break-violation calc, carried along
-                    unaltered. Decision 3 says a violation is DERIVED and never
-                    stored, so this is not a column — it is the reference that
-                    phase 5's breakRules.ts gets checked against. */}
-                <dd>
-                  <span className="bg-mark-fill px-1">{raw("timesheet_error")}</span>
-                </dd>
-              </>
-            )}
-          </dl>
-        </div>
+    <div className="space-y-6">
+      {/* HAND-ENTERED ROWS ARE EDITED WHOLE (Mark, 2026-09-29). Everything the
+          New Timesheet dialog asked for — who, day, shop, punches, hours, why —
+          reopens in that same dialog, with Delete. Imported rows get no such
+          command: their punches belong to Homebase, and a re-import would put
+          back whatever was changed here. */}
+      {onEdit && (
+        <button type="button" onClick={onEdit} className={BUTTON_CLASS}>
+          Edit Timesheet…
+        </button>
       )}
-
-      <div className="space-y-2">
-        <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">What we decided</h3>
-        {disagreements.length === 0 ? (
-          <p className="text-sm text-muted">
-            Nothing differs from the source. {OT_DECISION_LABEL[row.ot_decision]}.
-          </p>
+      <div className="grid gap-8 md:grid-cols-3">
+        {/* PAID TIME THAT PRODUCED NO PUNCH (028's `adjustment` kind) has no
+            source and no punches, so this column was a heading over four em
+            dashes — the least informative thing on screen, on the one row whose
+            meaning is NOT obvious from its numbers (Mark, 2026-08-22, on a sick
+            day he had entered: "there's no indication it's a sick day… no
+            indication other than the 8 sick hours reported. I need more"). The
+            other two columns are unchanged: the hours are still decided and the
+            note is still edited where every other row's is. */}
+        {row.kind === "adjustment" ? (
+          <div className="space-y-2">
+            <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">What this is</h3>
+            <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
+              <dt className="text-subtle">Kind</dt>
+              <dd>
+                <span className="bg-mark-fill px-1">{paidAsSick ? "Sick day" : "Adjustment"}</span>
+              </dd>
+              <dt className="text-subtle">Day</dt>
+              <dd className="tabular-nums">{row.workday}</dd>
+              <dt className="text-subtle">Punches</dt>
+              <dd className="text-muted">none — paid time, not a worked shift</dd>
+              {/* EDITABLE, WHICH IT WAS NOT (Mark, 2026-09-01: "I entered a sick
+                  timesheet, accidentally entered the wrong hours and want to
+                  correct it"). The figure was plain text here, and the column that
+                  holds it — Sick — is `hideWhenCompact`, so on any window under
+                  1280 a hand-entered sick day had no editor anywhere on the
+                  screen. It is the same `InlineValue` on the same column the grid
+                  cell uses, so a correction made here and one made there are one
+                  act. */}
+              <dt className="text-subtle">{paidAsSick ? "Sick hours" : "Paid hours"}</dt>
+              <dd className="tabular-nums">
+                {editable ? (
+                  <InlineValue
+                    table="timesheets"
+                    id={row.id}
+                    column={paidAsSick ? "sick_hours" : "hours_regular"}
+                    kind="number"
+                    value={adjustmentHours}
+                    ariaLabel={paidAsSick ? "Sick hours" : "Paid hours"}
+                    // These hours ARE the row — an adjustment with none pays
+                    // nothing and says nothing — so clearing the cell asks for a
+                    // value rather than writing null. It would also flip
+                    // `paidAsSick`, relabel the row Adjustment, and move its own
+                    // editor onto a different column mid-correction. Zero is
+                    // still enterable; it is a value, not an empty box.
+                    nullable={false}
+                    format={(v) => Number(v).toFixed(2)}
+                  />
+                ) : (
+                  <span className={READ_ONLY_VALUE}>
+                    {adjustmentHours === null ? "—" : adjustmentHours.toFixed(2)}
+                  </span>
+                )}
+              </dd>
+              <dt className="text-subtle">Entered</dt>
+              <dd>{row.source === "manual" ? "by hand, on this screen" : row.source}</dd>
+            </dl>
+            {/* Decision 7, worth saying where somebody is looking at one: sick
+                hours are not worked hours, so they earn no overtime, never enter
+                the tip pool, and are DELIBERATELY absent from the Gusto file —
+                Gusto pays them already, and exporting them pays the person
+                twice. */}
+            {paidAsSick && (
+              <p className="max-w-[40ch] pt-1 text-[12px] leading-snug text-muted">
+                Sick hours earn no overtime and are kept out of the payroll export
+                — Gusto pays them already.
+              </p>
+            )}
+          </div>
         ) : (
           <div className="space-y-2">
+            <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">What the source said</h3>
             <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
-              {disagreements.map((d) => (
-                <div key={d.field} className="contents">
-                  <dt className="text-subtle">{d.label}</dt>
+              <dt className="text-subtle">Source</dt>
+              <dd>{raw("import_source") ?? row.source}</dd>
+              <dt className="text-subtle">Clock in</dt>
+              <dd className="tabular-nums">{raw("time_in") ?? "—"}</dd>
+              <dt className="text-subtle">Clock out</dt>
+              <dd className="tabular-nums">{raw("time_out") ?? "—"}</dd>
+              <dt className="text-subtle">Dates</dt>
+              <dd className="tabular-nums">
+                {raw("date_start") ?? "—"}
+                {raw("date_end") && raw("date_end") !== raw("date_start") ? ` → ${raw("date_end")}` : ""}
+              </dd>
+              {/* Migration 061. When someone's workday starts in the afternoon, the
+                  punch and the day its hours count toward are different dates —
+                  which the In → Out column can only show as a time. Say it here,
+                  where there is room, rather than leaving the row looking wrong. */}
+              {raw("date_start") && String(raw("date_start")) !== row.workday && (
+                <>
+                  <dt className="text-subtle">Counts toward</dt>
                   <dd className="tabular-nums">
-                    <span className="text-muted">{d.source.toFixed(2)}</span>
-                    <span className="mx-1 text-faint">→</span>
-                    <span className="bg-mark-fill px-1">{d.decided.toFixed(2)}</span>
+                    <span className="bg-mark-fill px-1">{row.workday}</span>
+                    <span className="ml-2 text-muted">
+                      their workday starts in the afternoon
+                    </span>
                   </dd>
-                </div>
-              ))}
+                </>
+              )}
+              {raw("break_start") && (
+                <>
+                  <dt className="text-subtle">Break</dt>
+                  <dd className="tabular-nums">
+                    {raw("break_start")} → {raw("break_end") ?? "?"}
+                    {raw("break_type") ? ` · ${raw("break_type")}` : ""}
+                  </dd>
+                </>
+              )}
+              <dt className="text-subtle">Hours</dt>
+              <dd className="tabular-nums">
+                {(row.source_hours_regular ?? 0).toFixed(2)} reg ·{" "}
+                {(row.source_hours_overtime ?? 0).toFixed(2)} OT ·{" "}
+                {(row.source_hours_double_ot ?? 0).toFixed(2)} dbl
+              </dd>
+              {raw("timesheet_error") && (
+                <>
+                  <dt className="text-subtle">FMP flagged</dt>
+                  {/* FileMaker's own derived break-violation calc, carried along
+                      unaltered. Decision 3 says a violation is DERIVED and never
+                      stored, so this is not a column — it is the reference that
+                      phase 5's breakRules.ts gets checked against. */}
+                  <dd>
+                    <span className="bg-mark-fill px-1">{raw("timesheet_error")}</span>
+                  </dd>
+                </>
+              )}
             </dl>
-            <p className="text-sm text-muted">{OT_DECISION_LABEL[row.ot_decision]}.</p>
           </div>
         )}
-        {row.ot_reason && <p className="text-sm">{row.ot_reason}</p>}
-        {proposal && (
-          <AdjudicateOvertime
-            timesheetId={row.id}
-            decided={{
-              regular: row.hours_regular ?? 0,
-              overtime: row.hours_overtime ?? 0,
-              double_ot: row.hours_double_ot ?? 0,
-            } as Split}
-            proposal={proposal}
-            editable={editable}
-            currentDecision={OT_DECISION_LABEL[row.ot_decision].toLowerCase()}
-          />
-        )}
-        <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
-          <dt className="text-subtle">Workweek</dt>
-          <dd className="tabular-nums">{row.workweek_start}</dd>
-          <dt className="text-subtle">Tip pool day</dt>
-          <dd className="tabular-nums">{row.business_date}</dd>
-          {row.position && (
-            <>
-              <dt className="text-subtle">Position</dt>
-              <dd>{row.position}</dd>
-            </>
+
+        <div className="space-y-2">
+          <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">What we decided</h3>
+          {disagreements.length === 0 ? (
+            <p className="text-sm text-muted">
+              Nothing differs from the source. {OT_DECISION_LABEL[row.ot_decision]}.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
+                {disagreements.map((d) => (
+                  <div key={d.field} className="contents">
+                    <dt className="text-subtle">{d.label}</dt>
+                    <dd className="tabular-nums">
+                      <span className="text-muted">{d.source.toFixed(2)}</span>
+                      <span className="mx-1 text-faint">→</span>
+                      <span className="bg-mark-fill px-1">{d.decided.toFixed(2)}</span>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="text-sm text-muted">{OT_DECISION_LABEL[row.ot_decision]}.</p>
+            </div>
           )}
-        </dl>
-      </div>
-
-      <div className="space-y-2">
-        <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">Notes</h3>
-        {/* The finding used to be restated here, with a line sending you to the
-            pay-period worksheet to decide it. Both are gone: the Meal premium
-            block below states it AND decides it, and saying the same thing
-            twice in one expansion is how a reader learns to skim one of them. */}
-        {row.stitched && (
-          <p className="text-sm">
-            Reassembled from segments a source split at midnight.
-          </p>
-        )}
-        {typeof payload.local_time_ambiguity === "string" && (
-          <p className="text-sm">
-            This punch&rsquo;s local time is {String(payload.local_time_ambiguity)} — the clock
-            {payload.local_time_ambiguity === "ambiguous"
-              ? " read the same hour twice that night, so the shift is an hour longer or shorter depending which is meant."
-              : " skipped that hour entirely, so the punch was moved forward."}
-          </p>
-        )}
-        <dl className="grid grid-cols-[5rem_1fr] gap-x-3 gap-y-0.5 text-sm">
-          <dt className="text-subtle">Employee</dt>
-          <dd>
-            {editable ? (
-              <InlineValue
-                table="timesheets"
-                id={row.id}
-                column="employee_note"
-                value={row.employee_note}
-                placeholder="—"
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{row.employee_note ?? "—"}</span>
+          {row.ot_reason && <p className="text-sm">{row.ot_reason}</p>}
+          {proposal && (
+            <AdjudicateOvertime
+              timesheetId={row.id}
+              decided={{
+                regular: row.hours_regular ?? 0,
+                overtime: row.hours_overtime ?? 0,
+                double_ot: row.hours_double_ot ?? 0,
+              } as Split}
+              proposal={proposal}
+              editable={editable}
+              currentDecision={OT_DECISION_LABEL[row.ot_decision].toLowerCase()}
+            />
+          )}
+          <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
+            <dt className="text-subtle">Workweek</dt>
+            <dd className="tabular-nums">{row.workweek_start}</dd>
+            <dt className="text-subtle">Tip pool day</dt>
+            <dd className="tabular-nums">{row.business_date}</dd>
+            {row.position && (
+              <>
+                <dt className="text-subtle">Position</dt>
+                <dd>{row.position}</dd>
+              </>
             )}
-          </dd>
-          <dt className="text-subtle">Manager</dt>
-          <dd>
-            {editable ? (
-              <InlineValue
-                table="timesheets"
-                id={row.id}
-                column="manager_note"
-                value={row.manager_note}
-                placeholder="—"
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{row.manager_note ?? "—"}</span>
-            )}
-          </dd>
-        </dl>
+          </dl>
+        </div>
+
+        <div className="space-y-2">
+          <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">Notes</h3>
+          {/* The finding used to be restated here, with a line sending you to the
+              pay-period worksheet to decide it. Both are gone: the Meal premium
+              block below states it AND decides it, and saying the same thing
+              twice in one expansion is how a reader learns to skim one of them. */}
+          {row.stitched && (
+            <p className="text-sm">
+              Reassembled from segments a source split at midnight.
+            </p>
+          )}
+          {typeof payload.local_time_ambiguity === "string" && (
+            <p className="text-sm">
+              This punch&rsquo;s local time is {String(payload.local_time_ambiguity)} — the clock
+              {payload.local_time_ambiguity === "ambiguous"
+                ? " read the same hour twice that night, so the shift is an hour longer or shorter depending which is meant."
+                : " skipped that hour entirely, so the punch was moved forward."}
+            </p>
+          )}
+          <dl className="grid grid-cols-[5rem_1fr] gap-x-3 gap-y-0.5 text-sm">
+            <dt className="text-subtle">Employee</dt>
+            <dd>
+              {editable ? (
+                <InlineValue
+                  table="timesheets"
+                  id={row.id}
+                  column="employee_note"
+                  value={row.employee_note}
+                  placeholder="—"
+                />
+              ) : (
+                <span className={READ_ONLY_VALUE}>{row.employee_note ?? "—"}</span>
+              )}
+            </dd>
+            <dt className="text-subtle">Manager</dt>
+            <dd>
+              {editable ? (
+                <InlineValue
+                  table="timesheets"
+                  id={row.id}
+                  column="manager_note"
+                  value={row.manager_note}
+                  placeholder="—"
+                />
+              ) : (
+                <span className={READ_ONLY_VALUE}>{row.manager_note ?? "—"}</span>
+              )}
+            </dd>
+          </dl>
+        </div>
+
+        {/* THE TWO DECISIONS THAT USED TO LIVE ON THE PAY-PERIOD WORKSHEET.
+            They are here because this is where the evidence is (Mark,
+            2026-08-05): the punches, the recorded meal and the day's hours are
+            all above them, where on the worksheet a finding was a name, a date
+            and a sentence you had to leave the screen to check.
+
+            Five children in a three-column grid flow onto a second row by
+            themselves — there is no second layout to keep in step. */}
+        <ShiftPremium
+          employeeId={row.employee_id}
+          locationId={row.location_id}
+          workday={row.workday}
+          dayShifts={dayShifts}
+          finding={finding}
+          existing={premium}
+          editable={editable}
+          orgId={orgId}
+        />
+
+        <ShiftTips
+          timesheetId={row.id}
+          locationId={row.location_id}
+          locationCode={row.location_code}
+          businessDate={row.business_date}
+          reportedCents={pool?.reported ?? null}
+          correctedCents={pool?.corrected ?? null}
+          result={pool?.result ?? null}
+          tipHours={pool?.result?.allocations.find((a) => a.id === row.id)?.tipHours ?? 0}
+          allocationCents={pool?.result?.allocations.find((a) => a.id === row.id)?.cents ?? null}
+          excluded={excludedFromTips(row, row.employee_excludes_tips)}
+          // 028's `adjustment` kind is paid time that produced no punch, so it has
+          // no tip hours and can never take a share. The block states that instead
+          // of offering a tri-state whose third option could not take effect.
+          paidNotWorked={row.kind === "adjustment"}
+          excludeTips={row.exclude_tips}
+          employeeExcludesTips={row.employee_excludes_tips}
+          editable={editable}
+        />
+
+        {/* Read-only, and last: the two above are decisions to make, this is an
+            answer to read. */}
+        <ShiftBenefits lines={benefitLines} locationCode={row.location_code} />
       </div>
-
-      {/* THE TWO DECISIONS THAT USED TO LIVE ON THE PAY-PERIOD WORKSHEET.
-          They are here because this is where the evidence is (Mark,
-          2026-08-05): the punches, the recorded meal and the day's hours are
-          all above them, where on the worksheet a finding was a name, a date
-          and a sentence you had to leave the screen to check.
-
-          Five children in a three-column grid flow onto a second row by
-          themselves — there is no second layout to keep in step. */}
-      <ShiftPremium
-        employeeId={row.employee_id}
-        locationId={row.location_id}
-        workday={row.workday}
-        dayShifts={dayShifts}
-        finding={finding}
-        existing={premium}
-        editable={editable}
-        orgId={orgId}
-      />
-
-      <ShiftTips
-        timesheetId={row.id}
-        locationId={row.location_id}
-        locationCode={row.location_code}
-        businessDate={row.business_date}
-        reportedCents={pool?.reported ?? null}
-        correctedCents={pool?.corrected ?? null}
-        result={pool?.result ?? null}
-        tipHours={pool?.result?.allocations.find((a) => a.id === row.id)?.tipHours ?? 0}
-        allocationCents={pool?.result?.allocations.find((a) => a.id === row.id)?.cents ?? null}
-        excluded={excludedFromTips(row, row.employee_excludes_tips)}
-        // 028's `adjustment` kind is paid time that produced no punch, so it has
-        // no tip hours and can never take a share. The block states that instead
-        // of offering a tri-state whose third option could not take effect.
-        paidNotWorked={row.kind === "adjustment"}
-        excludeTips={row.exclude_tips}
-        employeeExcludesTips={row.employee_excludes_tips}
-        editable={editable}
-      />
-
-      {/* Read-only, and last: the two above are decisions to make, this is an
-          answer to read. */}
-      <ShiftBenefits lines={benefitLines} locationCode={row.location_code} />
     </div>
   );
 }

@@ -6,12 +6,18 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
-import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
+import {
+  Dialog,
+  DIALOG_CANCEL_CLASS,
+  DIALOG_COMMIT_CLASS,
+  DIALOG_DANGER_CLASS,
+} from "@/components/ui/Dialog";
+import { confirmDialog } from "@/lib/confirm";
 import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
-import { resolveLocal } from "@/lib/timeZone";
+import { localTime, resolveLocal } from "@/lib/timeZone";
 import { parseWorkdayStart, punchDateFor, formatWorkdayStart } from "@/lib/workday";
 import { formatPeriodRange, type PayPeriodStatus } from "@/lib/payPeriods";
 
@@ -40,6 +46,26 @@ import { formatPeriodRange, type PayPeriodStatus } from "@/lib/payPeriods";
  * was no source, and writing our own figures into those columns would forge a
  * claim that Homebase said something.
  */
+/**
+ * A hand-entered row, as the dialog needs it to EDIT one (Mark, 2026-09-29: "add
+ * delete and full editing of hand-entered rows"). Only `source = 'manual'`
+ * rows are ever passed: an imported shift's punches belong to Homebase, and a
+ * re-import would overwrite whatever was changed here.
+ */
+export type EditableTimesheet = {
+  id: string;
+  employee_id: string;
+  location_id: string | null;
+  workday: string;
+  kind: "shift" | "adjustment";
+  clock_in: string | null;
+  clock_out: string | null;
+  unpaid_break_minutes: number | null;
+  sick_hours: number | null;
+  hours_regular: number | null;
+  manager_note: string | null;
+};
+
 export function NewTimesheet({
   employees,
   locations,
@@ -47,6 +73,8 @@ export function NewTimesheet({
   timeZone,
   period,
   disabled = false,
+  editing = null,
+  onDone,
   children,
 }: {
   employees: { id: string; name: string; workday_starts_at: string | null }[];
@@ -72,6 +100,14 @@ export function NewTimesheet({
    * is hovered. The `title` is belt and braces for the desk.
    */
   disabled?: boolean;
+  /**
+   * EDIT this row instead of adding one. The dialog opens at once, seeded from
+   * it, and offers Delete. The caller mounts the component only while editing
+   * and KEYS it by the row's id, so the seeded state is always this row's.
+   */
+  editing?: EditableTimesheet | null;
+  /** Edit mode: the dialog closed, whether saved, deleted or cancelled. */
+  onDone?: () => void;
   /** Hand this component's row to an `ActionMenu` instead of drawing a
    *  button — `OrderCommandMenu`'s arrangement, so the dialog, its writes and
    *  its confirms stay here and only the command's PLACE moves. */
@@ -80,23 +116,46 @@ export function NewTimesheet({
   const router = useRouter();
   const supabase = createClient();
 
-  const [open, setOpen] = useState(false);
+  // What the row said when the dialog opened, in the dialog's own strings. Edit
+  // mode compares against it: a save that leaves the punches alone must not
+  // throw away an overtime split somebody has since decided.
+  const initial = useMemo(() => {
+    if (!editing) return null;
+    const at = (iso: string | null) => (iso ? localTime(timeZone, Date.parse(iso)) : "");
+    return {
+      workday: editing.workday,
+      inTime: at(editing.clock_in),
+      outTime: at(editing.clock_out),
+      breakHours:
+        editing.unpaid_break_minutes ? String(Math.round((editing.unpaid_break_minutes / 60) * 100) / 100) : "",
+    };
+  }, [editing, timeZone]);
+
+  const [open, setOpen] = useState(editing !== null);
   const [pending, startTransition] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
 
-  const [kind, setKind] = useState<"shift" | "adjustment">("shift");
-  const [employeeId, setEmployeeId] = useState("");
-  const [locationId, setLocationId] = useState(locations[0]?.id ?? "");
-  const [workday, setWorkday] = useState<string | null>(period?.start_date ?? null);
-  const [inTime, setInTime] = useState("");
-  const [outTime, setOutTime] = useState("");
-  const [breakHours, setBreakHours] = useState("");
-  const [payKind, setPayKind] = useState<"sick" | "regular">("sick");
-  const [hours, setHours] = useState("");
-  const [note, setNote] = useState("");
+  const [kind, setKind] = useState<"shift" | "adjustment">(editing?.kind ?? "shift");
+  const [employeeId, setEmployeeId] = useState(editing?.employee_id ?? "");
+  const [locationId, setLocationId] = useState(editing ? (editing.location_id ?? "") : (locations[0]?.id ?? ""));
+  const [workday, setWorkday] = useState<string | null>(editing?.workday ?? period?.start_date ?? null);
+  const [inTime, setInTime] = useState(initial?.inTime ?? "");
+  const [outTime, setOutTime] = useState(initial?.outTime ?? "");
+  const [breakHours, setBreakHours] = useState(initial?.breakHours ?? "");
+  const [payKind, setPayKind] = useState<"sick" | "regular">(
+    editing && editing.kind === "adjustment" && editing.sick_hours === null ? "regular" : "sick"
+  );
+  const [hours, setHours] = useState(
+    editing?.kind === "adjustment" ? String(editing.sick_hours ?? editing.hours_regular ?? "") : ""
+  );
+  const [note, setNote] = useState(editing?.manager_note ?? "");
 
   function close() {
     if (pending) return;
+    if (editing) {
+      onDone?.();
+      return;
+    }
     setOpen(false);
     setFailed(null);
     setEmployeeId("");
@@ -212,6 +271,17 @@ export function NewTimesheet({
       // one question, and the one in the column would be the stale one.
       let sick: number | null = null;
       let regular = 0;
+      // Edit mode only: the punches are as they were, so the hours columns —
+      // which may hold a split somebody decided since — are left alone.
+      const punchesUnchanged =
+        editing !== null &&
+        initial !== null &&
+        kind === "shift" &&
+        editing.kind === "shift" &&
+        workday === initial.workday &&
+        inTime.trim() === initial.inTime &&
+        outTime.trim() === initial.outTime &&
+        breakHours.trim() === initial.breakHours;
 
       if (kind === "shift") {
         const [y, mo, d] = workday.split("-").map(Number);
@@ -250,19 +320,19 @@ export function NewTimesheet({
         regular = hoursNum ?? 0;
       }
 
-      const { data, error } = await supabase
-        .from("timesheets")
-        .insert({
-          ...base,
-          clock_in: clockIn,
-          clock_out: clockOut,
-          unpaid_break_minutes: breakMinutes,
-          sick_hours: sick,
-          hours_regular: regular,
-          hours_overtime: 0,
-          hours_double_ot: 0,
-        })
-        .select("id");
+      const fields = {
+        ...base,
+        clock_in: clockIn,
+        clock_out: clockOut,
+        unpaid_break_minutes: breakMinutes,
+        sick_hours: sick,
+        ...(punchesUnchanged
+          ? {}
+          : { hours_regular: regular, hours_overtime: 0, hours_double_ot: 0 }),
+      };
+      const { data, error } = editing
+        ? await supabase.from("timesheets").update(fields).eq("id", editing.id).select("id")
+        : await supabase.from("timesheets").insert(fields).select("id");
 
       if (error) {
         setFailed(error.message);
@@ -281,6 +351,33 @@ export function NewTimesheet({
     });
   }
 
+  async function remove() {
+    if (!editing) return;
+    const ok = await confirmDialog({
+      title: "Delete this timesheet?",
+      body: "It was entered by hand, so nothing will bring it back — a re-import only restores rows that came from Homebase.",
+      confirmLabel: "Delete Timesheet",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setFailed(null);
+    startTransition(async () => {
+      // `.select()` because a delete refused by RLS — a period no longer open —
+      // matches zero rows and returns no error.
+      const { data, error } = await supabase.from("timesheets").delete().eq("id", editing.id).select("id");
+      if (error) {
+        setFailed(error.message);
+        return;
+      }
+      if (!data || data.length === 0) {
+        setFailed("Nothing was deleted — this pay period may no longer be open.");
+        return;
+      }
+      onDone?.();
+      router.refresh();
+    });
+  }
+
   const employeeOptions = useMemo(
     () => employees.map((e) => ({ value: e.id, label: e.name })),
     [employees]
@@ -291,7 +388,7 @@ export function NewTimesheet({
       {/* IN THE MENU (2026-09-12) — pass `children` and this hands back
           its row instead of drawing a button; the dialog below is
           unchanged and still belongs to this component. */}
-      {children ? (
+      {editing ? null : children ? (
         children([
           {
             label: "New Timesheet",
@@ -317,17 +414,30 @@ export function NewTimesheet({
 
       {open && (
         <Dialog
-          title="New timesheet"
+          title={editing ? "Edit timesheet" : "New timesheet"}
           onClose={close}
           busy={pending}
           width="max-w-2xl"
           footer={
             <>
+              {editing && (
+                <button type="button" onClick={remove} disabled={pending} className={`${DIALOG_DANGER_CLASS} mr-auto`}>
+                  Delete
+                </button>
+              )}
               <button type="button" onClick={close} disabled={pending} className={DIALOG_CANCEL_CLASS}>
                 Cancel
               </button>
               <button type="button" onClick={add} disabled={!ready} className={DIALOG_COMMIT_CLASS}>
-                {pending ? "Adding…" : kind === "shift" ? "Add timesheet" : "Add adjustment"}
+                {editing
+                  ? pending
+                    ? "Saving…"
+                    : "Save Changes"
+                  : pending
+                    ? "Adding…"
+                    : kind === "shift"
+                      ? "Add timesheet"
+                      : "Add adjustment"}
               </button>
             </>
           }
