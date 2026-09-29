@@ -3,6 +3,7 @@
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { money } from "@/lib/specialOrders";
 import { TimeCell } from "./TimeCell";
 
 /**
@@ -119,11 +120,20 @@ export function OrderDelivery({
               </Row>
               <Row label="What it costs us">
                 {/* `delivery_cost` is what the CARRIER charges; the customer's
-                    `delivery_charge` is money and lives on the totals card.
-                    Two columns because they routinely differ, and conflating
-                    them is how a delivery quietly stops making sense. */}
+                    `delivery_charge` is beside it. Two columns because they
+                    routinely differ, and conflating them is how a delivery
+                    quietly stops making sense. */}
                 <Cell id={id} canWrite={canWrite} column="delivery_cost" value={row.delivery_cost as number | null}
                       kind="number" label="What the carrier charges us" />
+              </Row>
+              {/* THE SAME COLUMN THE PAYMENTS TAB'S MONEY CARD WRITES (Mark,
+                  2026-09-29: "so we can enter it there as well as on the
+                  billing page"). Beside the cost, because what the carrier
+                  charges is what you are looking at when you set it. Both
+                  cells read the record, so an edit in one shows in the other. */}
+              <Row label="Delivery charge">
+                <Cell id={id} canWrite={canWrite} column="delivery_charge" value={row.delivery_charge as number | null}
+                      kind="number" label="Delivery charge" format={(v) => money(Number(v))} />
               </Row>
             </div>
           </section>
@@ -162,6 +172,7 @@ function Cell({
   label,
   kind,
   placeholder,
+  format,
 }: {
   id: string;
   canWrite: boolean;
@@ -170,8 +181,14 @@ function Cell({
   label: string;
   kind?: "text" | "number" | "date";
   placeholder?: string;
+  format?: (v: string | number) => string;
 }) {
-  if (!canWrite) return <span className={READ_ONLY_VALUE}>{(value as string) ?? "—"}</span>;
+  if (!canWrite)
+    return (
+      <span className={READ_ONLY_VALUE}>
+        {value === null ? "—" : format ? format(value) : value}
+      </span>
+    );
   return (
     <InlineValue
       boxed={BOXED_FIELDS}
@@ -182,6 +199,7 @@ function Cell({
       value={value}
       ariaLabel={label}
       placeholder={placeholder}
+      format={format}
     />
   );
 }
