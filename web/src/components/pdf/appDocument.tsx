@@ -142,6 +142,19 @@ export const docStyles = StyleSheet.create({
   footerText: { ...caps(6.5, 0.12), color: SUBTLE },
 });
 
+/**
+ * A QUARTER INCH ABOVE THE MASTHEAD, on the documents that go out by email —
+ * every special-order and purchasing document (Mark, 2026-09-30). A mail
+ * client previews the PDF directly under the message, and it trims any blank
+ * lines at the end of the text, so the gap has to be on the page. Spread AFTER
+ * `docStyles`; the other documents keep their masthead at the top edge.
+ */
+export const MAILED_TOP_GAP = 18; // pt: 1/4"
+export const mailedDocStyles = {
+  page: { ...docStyles.page, paddingTop: docStyles.page.paddingTop + MAILED_TOP_GAP },
+  masthead: { ...docStyles.masthead, top: MAILED_TOP_GAP },
+};
+
 /** Quantities print as integers where they are integers — "1", never "1.00". */
 export function qtyText(qty: number): string {
   return Number.isInteger(qty) ? String(qty) : String(Number(qty.toFixed(2)));

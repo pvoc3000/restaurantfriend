@@ -71,6 +71,7 @@ import {
   caps,
   docStyles,
   isoDay,
+  mailedDocStyles,
   qtyText,
 } from "@/components/pdf/appDocument";
 
@@ -81,6 +82,7 @@ Font.registerHyphenationCallback((word) => [word]);
 
 const s = {
   ...docStyles,
+  ...mailedDocStyles,
   ...StyleSheet.create({
 
   /* ---- items (DataTable) ---- */
