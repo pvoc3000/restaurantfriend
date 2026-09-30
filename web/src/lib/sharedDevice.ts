@@ -107,3 +107,47 @@ export function retryLabel(seconds: number): string {
   const hours = Math.ceil(minutes / 60);
   return hours === 1 ? "Try again in an hour." : `Try again in ${hours} hours.`;
 }
+
+/**
+ * Where an idle lock left off (Mark, 2026-09-30: being timed out, typing your
+ * PIN and landing on the home page "instead of where you were" is annoying).
+ * `IdleLock` writes the page into the device's localStorage just before it
+ * locks; the unlock reads it once and ALWAYS deletes it. Only the person who
+ * was locked out gets it back — anyone else unlocking lands on the home page,
+ * because the page is the previous person's (a record, a report runner) and
+ * the hard navigation that clears their in-memory state would be undone by
+ * sending the next person straight into it.
+ *
+ * localStorage rather than a cookie: the server never needs it, and it is the
+ * device's, like column widths. Only an idle lock writes it — Switch user is
+ * a deliberate goodbye.
+ */
+export const RESUME_KEY = "rf.lock.resume";
+
+export type ResumePoint = { userId: string; path: string };
+
+export function serializeResume(point: ResumePoint): string {
+  return JSON.stringify(point);
+}
+
+/**
+ * The path to go to after `userId` unlocks, or "/" — for another person, for
+ * nothing stored, for anything malformed, and for any path that is not a
+ * same-origin page (`//host` is protocol-relative, so it would leave the app;
+ * /lock and /login would only bounce).
+ */
+export function resumePathFor(raw: string | null | undefined, userId: string): string {
+  if (!raw) return "/";
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return "/";
+  }
+  if (typeof parsed !== "object" || parsed === null) return "/";
+  const { userId: who, path } = parsed as Record<string, unknown>;
+  if (who !== userId || typeof path !== "string") return "/";
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) return "/";
+  if (/^\/(lock|login)(\/|\?|#|$)/.test(path)) return "/";
+  return path;
+}

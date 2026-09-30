@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { unlockWithPin, type LockMember } from "@/app/deviceActions";
-import { PIN_LENGTH, retryLabel } from "@/lib/sharedDevice";
+import { PIN_LENGTH, RESUME_KEY, resumePathFor, retryLabel } from "@/lib/sharedDevice";
 import { MacTitleBar } from "@/components/ui/MacTitleBar";
 
 /**
@@ -47,7 +47,16 @@ export function LockScreen({
     setError(null);
     const result = await unlockWithPin(who.user_id, candidate);
     if (result.ok) {
-      window.location.assign("/");
+      // Back to the page an idle lock left, if it was THIS person's; read
+      // once and always cleared, so it never outlives the next unlock.
+      let destination = "/";
+      try {
+        destination = resumePathFor(localStorage.getItem(RESUME_KEY), who.user_id);
+        localStorage.removeItem(RESUME_KEY);
+      } catch {
+        // Storage unavailable: the home page, as before.
+      }
+      window.location.assign(destination);
       return;
     }
     submitting.current = false;

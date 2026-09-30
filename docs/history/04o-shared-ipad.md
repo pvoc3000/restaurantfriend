@@ -62,3 +62,16 @@
    with no client to navigate, and has always landed where it says.
    **1678 fixtures pass**, 11 new.
 
+
+**AN IDLE LOCK RETURNS YOU TO YOUR PAGE (Mark, 2026-09-30):** being timed
+out, typing your PIN and landing on the home page "instead of where you were"
+was annoying. `IdleLock` (now given `session.userId`) writes `{ userId, path }`
+to localStorage under `RESUME_KEY` (`rf.lock.resume`) just before it locks;
+`LockScreen` reads it once on a successful unlock and ALWAYS deletes it.
+`resumePathFor` (`lib/sharedDevice`, fixtures) gives the path back only to the
+SAME user, and only a same-origin page that is not /lock or /login — anyone
+else lands on "/" as before, since the page is the previous person's. Path
+includes the query string, so view state comes back too. Only the IDLE lock
+writes it: Switch user is a deliberate goodbye. No expiry — "the next time"
+the same person unlocks, however much later. Not walked live (needs a PIN on
+the registered iPad).

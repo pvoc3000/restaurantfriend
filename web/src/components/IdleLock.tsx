@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 import { lockDevice } from "@/app/deviceActions";
-import { IDLE_MS, idleExpired } from "@/lib/sharedDevice";
+import { IDLE_MS, RESUME_KEY, idleExpired, serializeResume } from "@/lib/sharedDevice";
 
 /**
  * Locks a REGISTERED shared iPad after five minutes without a touch. Renders
@@ -21,8 +21,11 @@ import { IDLE_MS, idleExpired } from "@/lib/sharedDevice";
  * to one write a second. Nothing is lost by locking: every runner and the
  * guide persist as you go, which is the property that makes five minutes
  * affordable.
+ *
+ * Before locking it notes the page in localStorage (`RESUME_KEY`), so the same
+ * person unlocking goes back to it rather than to the home page.
  */
-export function IdleLock() {
+export function IdleLock({ userId }: { userId: string }) {
   useEffect(() => {
     let last = Date.now();
     let locking = false;
@@ -36,6 +39,12 @@ export function IdleLock() {
       if (locking) return;
       if (idleExpired(last, Date.now())) {
         locking = true;
+        try {
+          const path = window.location.pathname + window.location.search;
+          localStorage.setItem(RESUME_KEY, serializeResume({ userId, path }));
+        } catch {
+          // Private mode or blocked storage: the unlock lands on the home page.
+        }
         // A HARD navigation, once the session is gone — see `lockDevice` for
         // why the action does not redirect itself.
         void lockDevice().then(() => window.location.assign("/lock"));
@@ -57,7 +66,7 @@ export function IdleLock() {
       window.removeEventListener("focus", check);
       window.clearInterval(timer);
     };
-  }, []);
+  }, [userId]);
 
   return null;
 }

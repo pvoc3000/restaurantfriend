@@ -44,7 +44,7 @@ export default async function FullscreenLayout({
       {/* Here too: a report left open on the counter is exactly the risk the
           lock exists for, and every runner persists as it goes, so a lock
           mid-count loses nothing. */}
-      {session.registeredDevice && <IdleLock />}
+      {session.registeredDevice && <IdleLock userId={session.userId} />}
     </ConfirmProvider>
   );
 }

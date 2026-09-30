@@ -84,7 +84,7 @@ export default async function AppLayout({
       {/* A registered shared iPad locks back to its picker after five
           minutes idle. Nothing on a desk browser — the session only says
           `registeredDevice` when the device cookie is present. */}
-      {session.registeredDevice && <IdleLock />}
+      {session.registeredDevice && <IdleLock userId={session.userId} />}
       </ShellProvider>
     </ConfirmProvider>
   );

@@ -10,8 +10,10 @@ import {
   isValidPin,
   lockoutFor,
   parseDeviceCookie,
+  resumePathFor,
   retryLabel,
   serializeDeviceCookie,
+  serializeResume,
   type PinAttempt,
 } from "../../src/lib/sharedDevice";
 import { eq, no, ok, test } from "./harness";
@@ -114,4 +116,28 @@ test("retryLabel: never says zero", () => {
   eq(retryLabel(14 * 60), "Try again in 14 minutes.");
   eq(retryLabel(60 * 60), "Try again in an hour.");
   eq(retryLabel(4 * 60 * 60), "Try again in 4 hours.");
+});
+
+test("resumePathFor: the same person gets their page back, with its view state", () => {
+  const raw = serializeResume({ userId: ID, path: "/purchase-orders/abc?tab=lines" });
+  eq(resumePathFor(raw, ID), "/purchase-orders/abc?tab=lines");
+});
+
+test("resumePathFor: anyone else lands on the home page", () => {
+  const raw = serializeResume({ userId: ID, path: "/employees/xyz" });
+  eq(resumePathFor(raw, "7ec6508c-1111-4222-8333-444444444444"), "/");
+});
+
+test("resumePathFor: nothing stored, or nothing sensible, is the home page", () => {
+  eq(resumePathFor(null, ID), "/", "absent");
+  eq(resumePathFor("", ID), "/", "empty");
+  eq(resumePathFor("{not json", ID), "/", "corrupt");
+  eq(resumePathFor("null", ID), "/", "json null");
+  eq(resumePathFor(JSON.stringify({ userId: ID }), ID), "/", "no path");
+  eq(resumePathFor(serializeResume({ userId: ID, path: "https://evil.test/" }), ID), "/", "absolute");
+  eq(resumePathFor(serializeResume({ userId: ID, path: "//evil.test/" }), ID), "/", "protocol-relative");
+  eq(resumePathFor(serializeResume({ userId: ID, path: "/\\evil.test/" }), ID), "/", "backslash");
+  eq(resumePathFor(serializeResume({ userId: ID, path: "/lock" }), ID), "/", "the lock itself");
+  eq(resumePathFor(serializeResume({ userId: ID, path: "/login?x=1" }), ID), "/", "the login page");
+  eq(resumePathFor(serializeResume({ userId: ID, path: "/locations" }), ID), "/locations", "not /lock");
 });
