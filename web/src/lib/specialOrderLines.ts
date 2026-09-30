@@ -318,42 +318,100 @@ type GroupableLine = {
  * key LAST. WITHIN a run the document order is kept (a stable sort), so a
  * letter order's run still spells what it spelt.
  */
-export function groupLines<T extends GroupableLine>(
-  rows: T[],
-  grouping: LineGrouping
-): { key: string; label: string; rows: T[] }[] {
-  if (grouping === "none") return [{ key: "", label: "", rows }];
-  const keyOf = (r: T): string => {
-    if (grouping === "type") return (r.item_type ?? "").trim();
-    // EVERY LETTER IS ONE CUT: `Letter - "T"` and `Letter - "H"` are the same
-    // shape, and banding by the literal cut would give each letter its own.
-    if (grouping === "cut") return isLetterCut(r.item_cut) ? "Letter" : (r.item_cut ?? "").trim();
-    if (grouping === "size") return (r.item_size ?? "").trim();
-    if (grouping === "item") return (r.item_donut ?? "").trim() || r.name.trim();
-    return r.unit_price === null || r.unit_price === "" ? "" : Number(r.unit_price).toFixed(2);
-  };
+export type LineGroup<T> = {
+  /** Unique across the whole list — the path of keys down to this band. */
+  key: string;
+  label: string;
+  /** 0 is the top band; Item type nests Size at 1 and Cut at 2. */
+  level: number;
+  /** Every line under this band, however deep — what its qty and total sum. */
+  rows: T[];
+  /** The lines are drawn under LEAF bands only; a parent band is a heading. */
+  leaf: boolean;
+};
+
+type Dimension = Exclude<LineGrouping, "none">;
+
+function lineKey(r: GroupableLine, d: Dimension): string {
+  if (d === "type") return (r.item_type ?? "").trim();
+  // EVERY LETTER IS ONE CUT: `Letter - "T"` and `Letter - "H"` are the same
+  // shape, and banding by the literal cut would give each letter its own.
+  if (d === "cut") return isLetterCut(r.item_cut) ? "Letter" : (r.item_cut ?? "").trim();
+  if (d === "size") return (r.item_size ?? "").trim();
+  if (d === "item") return (r.item_donut ?? "").trim() || r.name.trim();
+  return r.unit_price === null || r.unit_price === "" ? "" : Number(r.unit_price).toFixed(2);
+}
+
+const EMPTY_LABEL: Record<Dimension, string> = {
+  type: "No type",
+  cut: "No cut",
+  size: "No size",
+  item: "No item",
+  price: "No price",
+};
+
+/** Runs by one dimension, keyed and ordered — see `groupLines`. */
+function runsBy<T extends GroupableLine>(rows: T[], d: Dimension): [string, T[]][] {
   const runs = new Map<string, T[]>();
   for (const r of rows) {
-    const k = keyOf(r);
+    const k = lineKey(r, d);
     runs.set(k, [...(runs.get(k) ?? []), r]);
   }
-  const keys = [...runs.keys()].sort((a, b) => {
+  return [...runs.entries()].sort(([a], [b]) => {
     if (a === "" || b === "") return a === "" ? (b === "" ? 0 : 1) : -1;
-    return grouping === "price"
+    return d === "price"
       ? Number(a) - Number(b)
       : a.localeCompare(b, "en", { numeric: true, sensitivity: "base" });
   });
-  const empty = {
-    none: "",
-    type: "No type",
-    cut: "No cut",
-    size: "No size",
-    item: "No item",
-    price: "No price",
-  }[grouping];
-  return keys.map((k) => ({
-    key: k,
-    label: k === "" ? empty : grouping === "price" ? `$${k}` : k,
-    rows: runs.get(k)!,
-  }));
+}
+
+/**
+ * ITEM TYPE NESTS SIZE, THEN CUT (Mark, 2026-09-29: "when the group by is Item
+ * Type, can you create sub groups for size, then cut"). Every other choice is
+ * one level.
+ *
+ * A SUB-LEVEL THAT SAYS NOTHING IS SKIPPED: when every line under a band has
+ * no size (or no cut), a lone "No size" band would only restate its parent,
+ * so its lines go straight to the next level down. A "No size" band still
+ * appears beside real sizes, where it tells the two apart.
+ */
+const NESTING: Record<Dimension, Dimension[]> = {
+  type: ["type", "size", "cut"],
+  cut: ["cut"],
+  size: ["size"],
+  item: ["item"],
+  price: ["price"],
+};
+
+export function groupLines<T extends GroupableLine>(
+  rows: T[],
+  grouping: LineGrouping
+): LineGroup<T>[] {
+  if (grouping === "none") return [{ key: "", label: "", level: 0, rows, leaf: true }];
+  const dims = NESTING[grouping];
+  const out: LineGroup<T>[] = [];
+  const walk = (set: T[], depth: number, level: number, path: string) => {
+    const d = dims[depth];
+    const runs = runsBy(set, d);
+    const last = depth === dims.length - 1;
+    // Skip a sub-level whose only run is the empty one (see above).
+    if (depth > 0 && runs.length === 1 && runs[0][0] === "") {
+      if (last) out[out.length - 1].leaf = true;
+      else walk(set, depth + 1, level, path);
+      return;
+    }
+    for (const [k, run] of runs) {
+      const key = `${path}/${k}`;
+      out.push({
+        key,
+        label: k === "" ? EMPTY_LABEL[d] : d === "price" ? `$${k}` : k,
+        level,
+        rows: run,
+        leaf: last,
+      });
+      if (!last) walk(run, depth + 1, level + 1, key);
+    }
+  };
+  walk(rows, 0, 0, "");
+  return out;
 }

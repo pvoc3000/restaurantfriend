@@ -501,27 +501,55 @@ export function OrderLines({
               ordinary HTML; the drag needed no change at all. */}
           {groups.map((g) => [
             g.label ? (
+              /* THE BAND'S WEIGHT IS ITS LEVEL — the app's two marks for a
+                 break (see `DataGroup.subLabel`): black band on top, then a
+                 heading over an ink rule for Size, then a lighter one over a
+                 hairline for Cut, indented one step each. Each carries its
+                 line count, and its qty and total under those columns. */
               <tbody key={`band-${g.key}`}>
-                <tr className="bg-ink text-white">
+                <tr className={g.level === 0 ? "bg-ink text-white" : "text-ink"}>
                   {canWrite ? <td className="p-0" /> : null}
-                  <td colSpan={2} className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em]">
+                  <td
+                    colSpan={2}
+                    className={`text-xs font-semibold uppercase ${
+                      g.level === 0
+                        ? "px-3 py-2 tracking-[0.12em]"
+                        : g.level === 1
+                          ? "border-b border-ink pb-1 pl-6 pr-3 pt-3 tracking-[0.08em]"
+                          : "border-b border-hairline pb-1 pl-9 pr-3 pt-2 tracking-[0.08em] text-muted"
+                    }`}
+                  >
                     {g.label}
-                    <span className="ml-2 font-normal tracking-normal text-white/55 normal-case">
+                    <span
+                      className={`ml-2 font-normal tracking-normal normal-case ${
+                        g.level === 0 ? "text-white/55" : "text-subtle"
+                      }`}
+                    >
                       {g.rows.length}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-right text-xs font-semibold tabular-nums">
-                    {g.rows.reduce((a, r) => a + Number(r.qty ?? 0), 0)}
-                  </td>
-                  <td colSpan={2} />
-                  <td className="px-3 py-2 text-right text-xs font-semibold tabular-nums">
-                    {money(g.rows.reduce((a, r) => a + lineTotal(r), 0))}
-                  </td>
+                  {(() => {
+                    const cell =
+                      g.level === 0
+                        ? "px-3 py-2"
+                        : `px-3 pb-1 ${g.level === 1 ? "pt-3 border-b border-ink" : "pt-2 border-b border-hairline text-muted"}`;
+                    return (
+                      <>
+                        <td className={`${cell} text-right text-xs font-semibold tabular-nums`}>
+                          {g.rows.reduce((a, r) => a + Number(r.qty ?? 0), 0)}
+                        </td>
+                        <td colSpan={2} className={cell} />
+                        <td className={`${cell} text-right text-xs font-semibold tabular-nums`}>
+                          {money(g.rows.reduce((a, r) => a + lineTotal(r), 0))}
+                        </td>
+                      </>
+                    );
+                  })()}
                   {canWrite ? <td className="p-0" /> : null}
                 </tr>
               </tbody>
             ) : null,
-            ...g.rows.map((row) => {
+            ...(g.leaf ? g.rows : []).map((row) => {
               const production = isProductionLine(row);
               // Line 2's trailing filler: everything after Item and Note, plus
               // the ⋯ column when it is there.

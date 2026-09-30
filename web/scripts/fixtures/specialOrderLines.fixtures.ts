@@ -298,3 +298,32 @@ test("groupLines: Item cut bands every letter as ONE cut, and Item size by size"
   eq(cut[0].rows.map((r) => r.id), ["T", "H"]);
   eq(groupLines(rows, "size").map((x) => x.label), ["Mini", "Regular", "No size"]);
 });
+
+test("groupLines: Item type nests Size, then Cut (Mark, 2026-09-29)", () => {
+  const R = (id: string, type: string, size: string | null, cut: string | null) =>
+    ({ ...L(id, "D", type, 3), item_size: size, item_cut: cut });
+  const rows = [
+    R("1", "Raised", "Regular", 'Letter - "A"'),
+    R("2", "Raised", "Mini", "Round"),
+    R("3", "Raised", "Regular", "Round"),
+    R("4", "Raised", "Regular", 'Letter - "B"'),
+    R("5", "Cake", null, null),
+  ];
+  const g = groupLines(rows, "type");
+  eq(
+    g.map((x) => `${x.level}:${x.label}${x.leaf ? "*" : ""}`),
+    ["0:Cake*", "0:Raised", "1:Mini", "2:Round*", "1:Regular", "2:Letter*", "2:Round*"],
+    "a band per level, lines under the innermost; Cake has no size or cut, so no sub-bands"
+  );
+  eq(g.find((x) => x.label === "Letter")!.rows.map((r) => r.id), ["1", "4"]);
+  eq(g.find((x) => x.label === "Raised")!.rows.length, 4, "a parent band counts every line under it");
+  eq(new Set(g.map((x) => x.key)).size, g.length, "keys are unique across levels");
+});
+
+test("groupLines: a No-size band still shows BESIDE real sizes", () => {
+  const rows = [
+    { ...L("1", "D", "Raised", 3), item_size: "Mini", item_cut: null },
+    { ...L("2", "D", "Raised", 3), item_size: null, item_cut: null },
+  ];
+  eq(groupLines(rows, "type").map((x) => `${x.level}:${x.label}${x.leaf ? "*" : ""}`), ["0:Raised", "1:Mini*", "1:No size*"]);
+});
