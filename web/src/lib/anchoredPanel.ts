@@ -176,29 +176,6 @@ export function anyAnchoredPanelOpen(): boolean {
 }
 
 /**
- * The trigger's rect WITHOUT its own `transform` — where it sits at rest.
- *
- * A boxed picker is `rf-press`, and `.rf-press:active` translates it 3px down
- * and right while held (mac-look.css). The panel opens INSIDE the tap, so on
- * iPad whether the press is still showing when this measures is down to touch
- * timing. Measured pressed, the anchor was 3px off where the trigger comes to
- * rest — and nothing re-measured it, because a transform fires no
- * ResizeObserver. The keyboard rising to reveal the find box then fires a
- * scroll, the movement test below saw 3px, and the panel shut, taking the
- * field and the keyboard with it (Mark, 2026-09-30: "both give up and
- * disappear", worst on the batch log's pane, whose pickers are all boxed and
- * all low enough for the keyboard to scroll). Subtracting the element's own
- * translation makes the press invisible to both the anchor and the placement.
- */
-function restingRect(el: HTMLElement) {
-  const r = el.getBoundingClientRect();
-  const t = getComputedStyle(el).transform;
-  if (!t || t === "none") return r;
-  const m = new DOMMatrixReadOnly(t);
-  return new DOMRect(r.left - m.m41, r.top - m.m42, r.width, r.height);
-}
-
-/**
  * Position a small panel directly below the control that opened it, and take it
  * away again at the right moments.
  *
@@ -280,7 +257,7 @@ export function useAnchoredPanel({
     const measure = () => {
       const el = triggerRef.current;
       if (!el) return;
-      const r = restingRect(el);
+      const r = el.getBoundingClientRect();
       anchor.current = { top: r.top, left: r.left };
       setBox({
         top: r.bottom + 2,
@@ -329,7 +306,7 @@ export function useAnchoredPanel({
       const panel = panelRef.current;
       const trigger = triggerRef.current;
       if (!panel || !trigger) return;
-      const t = restingRect(trigger);
+      const t = trigger.getBoundingClientRect();
       const h = panel.offsetHeight;
       const w = panel.offsetWidth;
       if (!h || !w) return;
@@ -392,6 +369,12 @@ export function useAnchoredPanel({
      * scroll moves the trigger and still closes; a `position: fixed` trigger
      * (the masthead’s picker) correctly no longer does.
      *
+     * HALF WRONG, as measured on an iPad 2026-09-30: when the field the
+     * keyboard is for sits where the keyboard will land, Safari scrolls the
+     * LAYOUT, not just the visual viewport — `scrollY` 0 → 340, `innerHeight`
+     * 1130 → 790, the trigger 340px higher — with no window `resize` event.
+     * That case is the "follow" branch below.
+     *
      * A 1px slack, matching the fitting pass above: sub-pixel jitter from a
      * zoomed rect is not a scroll anybody performed.
      */
@@ -407,10 +390,42 @@ export function useAnchoredPanel({
       const el = triggerRef.current;
       const was = anchor.current;
       if (el && was) {
-        const r = restingRect(el);
+        const r = el.getBoundingClientRect();
         const moved = `Δ${Math.round(r.top - was.top)},${Math.round(r.left - was.left)}`;
         if (Math.abs(r.top - was.top) <= 1 && Math.abs(r.left - was.left) <= 1) {
           panelLog(`scroll ${describe(e.target)} ${moved} kept ${viewport()}`);
+          return;
+        }
+        /**
+         * THE KEYBOARD'S OWN SCROLL IS FOLLOWED, NOT OBEYED (Mark, 2026-09-30,
+         * on the iPad: "both the picklist menu and keyboard try to open, both
+         * give up and disappear").
+         *
+         * Measured on the device, not reasoned: with a picker low on the
+         * screen, focusing the find box made Safari shrink the viewport from
+         * 1130 to 790 and scroll the DOCUMENT 340px to reveal it — a real
+         * layout scroll, so the trigger moved 340px and the rule above shut
+         * the panel, and the keyboard went with the field it was raised for.
+         * Every searchable picker in the lower third of the screen, every time
+         * (the batch log's pane is all of them).
+         *
+         * So while focus is INSIDE the panel — which is what raised the
+         * keyboard — a document scroll re-anchors the panel to where the
+         * trigger now is instead of closing it. `setBox` hands it to the
+         * fitting pass, which measures against `innerHeight`, and that has
+         * already shrunk to the space above the keyboard. A pane's scroll
+         * still closes, and so does the page's with focus anywhere else.
+         */
+        const panelHasFocus = !!panel && panel.contains(document.activeElement);
+        const pageScroll = !(e.target instanceof Element);
+        if (panelHasFocus && pageScroll) {
+          panelLog(`FOLLOW scroll ${moved} ${viewport()}`);
+          anchor.current = { top: r.top, left: r.left };
+          setBox({
+            top: r.bottom + 2,
+            left: align === "right" ? r.right : r.left,
+            width: r.width,
+          });
           return;
         }
         panelLog(`CLOSE scroll ${describe(e.target)} ${moved} ${viewport()}`);
@@ -453,7 +468,7 @@ export function useAnchoredPanel({
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onDown);
     };
-  }, [open, onClose, triggerRef, panelRef]);
+  }, [open, onClose, triggerRef, panelRef, align]);
 
   return box;
 }
