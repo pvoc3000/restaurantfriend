@@ -166,8 +166,10 @@ export function ElementsPage({
       <table className="w-full table-fixed">
         <colgroup>
           <col />
-          <col className="w-[22rem]" />
-          <col className="w-64" />
+          {/* Made is sized to its three boxes and Prepared by to a name, so
+              Notes takes the rest (Mark, 2026-09-30). */}
+          <col className="w-[19rem]" />
+          <col className="w-48" />
           <col />
         </colgroup>
         <thead>
@@ -205,7 +207,7 @@ export function ElementsPage({
                       ariaLabel={`Made size, ${r.elementName}`}
                     />
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="w-28 shrink-0">
                     <PickList
                       variant="field"
                       size="lg"
