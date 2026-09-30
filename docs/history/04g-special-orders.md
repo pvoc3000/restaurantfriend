@@ -5230,3 +5230,10 @@ before the event** (a Monday event's cutoff is Thursday, not Saturday), through
 the shared `businessDaysBefore` in `lib/specialOrders`, so the quote and the
 invoice name one deadline. The dateless phrase reads "5pm two business days
 before your event".
+
+**2026-09-29 — 152: an inquiry's kitchen is its pickup shop** (Mark, on
+SO-10094). 9/23's "the kitchen is the shop the order is created at" reached the
+two in-app doors only; `create_inquiry` never wrote `kitchen_location_id`, so
+every /inquiry lead arrived without one. 152 sets it to the pickup shop, or for
+a delivery to `v_price_loc` (the delivery origin, where 133 takes the tax
+from), and backfills the one open lead it missed. WRITTEN, not applied.
