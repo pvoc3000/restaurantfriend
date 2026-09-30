@@ -175,6 +175,29 @@ export function anyAnchoredPanelOpen(): boolean {
 }
 
 /**
+ * The trigger's rect WITHOUT its own `transform` — where it sits at rest.
+ *
+ * A boxed picker is `rf-press`, and `.rf-press:active` translates it 3px down
+ * and right while held (mac-look.css). The panel opens INSIDE the tap, so on
+ * iPad whether the press is still showing when this measures is down to touch
+ * timing. Measured pressed, the anchor was 3px off where the trigger comes to
+ * rest — and nothing re-measured it, because a transform fires no
+ * ResizeObserver. The keyboard rising to reveal the find box then fires a
+ * scroll, the movement test below saw 3px, and the panel shut, taking the
+ * field and the keyboard with it (Mark, 2026-09-30: "both give up and
+ * disappear", worst on the batch log's pane, whose pickers are all boxed and
+ * all low enough for the keyboard to scroll). Subtracting the element's own
+ * translation makes the press invisible to both the anchor and the placement.
+ */
+function restingRect(el: HTMLElement) {
+  const r = el.getBoundingClientRect();
+  const t = getComputedStyle(el).transform;
+  if (!t || t === "none") return r;
+  const m = new DOMMatrixReadOnly(t);
+  return new DOMRect(r.left - m.m41, r.top - m.m42, r.width, r.height);
+}
+
+/**
  * Position a small panel directly below the control that opened it, and take it
  * away again at the right moments.
  *
@@ -242,7 +265,7 @@ export function useAnchoredPanel({
     const measure = () => {
       const el = triggerRef.current;
       if (!el) return;
-      const r = el.getBoundingClientRect();
+      const r = restingRect(el);
       anchor.current = { top: r.top, left: r.left };
       setBox({
         top: r.bottom + 2,
@@ -291,7 +314,7 @@ export function useAnchoredPanel({
       const panel = panelRef.current;
       const trigger = triggerRef.current;
       if (!panel || !trigger) return;
-      const t = trigger.getBoundingClientRect();
+      const t = restingRect(trigger);
       const h = panel.offsetHeight;
       const w = panel.offsetWidth;
       if (!h || !w) return;
@@ -366,7 +389,7 @@ export function useAnchoredPanel({
       const el = triggerRef.current;
       const was = anchor.current;
       if (el && was) {
-        const r = el.getBoundingClientRect();
+        const r = restingRect(el);
         if (Math.abs(r.top - was.top) <= 1 && Math.abs(r.left - was.left) <= 1) return;
       }
       onClose();
