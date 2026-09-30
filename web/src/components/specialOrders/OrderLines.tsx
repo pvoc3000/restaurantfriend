@@ -428,10 +428,13 @@ export function OrderLines({
       {/* THE GROUP BY SITS BESIDE THE TABLE'S NAME, ITS CAPTION INLINE (Mark,
           2026-09-29: "make the label inline instead of above"). Beside a
           heading, a caption above would push the menu below the heading's
-          line; inline, the heading, caption and menu share one centre line. */}
+          line; inline, the heading, caption and menu share one centre line.
+          AGAINST THE RIGHT EDGE (Mark, same day), over the figures it sums:
+          `ml-auto` takes the row's free space, and still right-aligns it on
+          a line of its own if a narrow window wraps it. */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <SectionHeading count={ordered.length}>Items</SectionHeading>
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2">
           <span className="text-xs uppercase tracking-[0.12em] text-subtle">Group by</span>
           <PickList
             variant="field"
