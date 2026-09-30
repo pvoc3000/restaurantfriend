@@ -5236,4 +5236,4 @@ SO-10094). 9/23's "the kitchen is the shop the order is created at" reached the
 two in-app doors only; `create_inquiry` never wrote `kitchen_location_id`, so
 every /inquiry lead arrived without one. 152 sets it to the pickup shop, or for
 a delivery to `v_price_loc` (the delivery origin, where 133 takes the tax
-from), and backfills the one open lead it missed. WRITTEN, not applied.
+from), and backfills the one open lead it missed. APPLIED 2026-09-29 (SO-10094 → DF02).
