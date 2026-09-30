@@ -533,3 +533,13 @@ export function newMessageId(from: string | undefined | null): string {
   const domain = (tail.match(/[A-Za-z0-9.-]+/)?.[0] ?? "").replace(/\.+$/, "");
   return `<rf-${crypto.randomUUID()}@${domain || "restaurantfriend.invalid"}>`;
 }
+
+/**
+ * A body that is followed by a PDF ends in a few blank lines (Mark,
+ * 2026-09-30), so the attachment a mail client previews inline below the text
+ * doesn't butt up against the signature. Trailing whitespace is trimmed first,
+ * so a body that already ends in blank lines gets the same gap, not a bigger one.
+ */
+export function withGapBeforeAttachment(text: string): string {
+  return `${text.replace(/\s+$/, "")}\n\n\n\n`;
+}

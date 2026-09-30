@@ -30,7 +30,13 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-import { resolveTransport, sendMail, TransportError, type ProviderConfig } from "../_shared/email.ts";
+import {
+  resolveTransport,
+  sendMail,
+  TransportError,
+  withGapBeforeAttachment,
+  type ProviderConfig,
+} from "../_shared/email.ts";
 import { buildApprovalNotice } from "../_shared/shopNotices.ts";
 import { appLink, sendShopNotice } from "../_shared/shopNotify.ts";
 
@@ -193,21 +199,22 @@ Deno.serve(async (req) => {
       // quote attached. No customer email, no confirmation: the shop notice
       // still goes.
       if (customerEmail) {
+        const attachSigned = Boolean(pdf_base64 && filed);
+        const confirmation =
+          `Thank you — we have your approval for quote #${order?.number ?? ""}.\n\n` +
+          `Approved by: ${state.approved_name}\n` +
+          `When: ${state.approved_at}\n\n` +
+          `Your invoice will follow by email. If anything needs changing, just reply to this message.\n`;
         await sendMail(transport, {
           to: customerEmail,
           subject: `Quote #${order?.number ?? ""} approved${order?.title ? ` — ${order.title}` : ""}`,
-          text:
-            `Thank you — we have your approval for quote #${order?.number ?? ""}.\n\n` +
-            `Approved by: ${state.approved_name}\n` +
-            `When: ${state.approved_at}\n\n` +
-            `Your invoice will follow by email. If anything needs changing, just reply to this message.\n`,
+          text: attachSigned ? withGapBeforeAttachment(confirmation) : confirmation,
           // The signed copy rides along where there IS one; with none the
           // message is an ordinary text email rather than one carrying a
           // placeholder file nobody can explain.
-          attachment:
-            pdf_base64 && filed
-              ? { filename: `Signed quote ${order?.number ?? ""}.pdf`, base64: pdf_base64 }
-              : undefined,
+          attachment: attachSigned
+            ? { filename: `Signed quote ${order?.number ?? ""}.pdf`, base64: pdf_base64 }
+            : undefined,
           inReplyTo,
           references: inReplyTo,
         });
