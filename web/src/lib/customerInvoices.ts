@@ -12,6 +12,7 @@
  */
 
 import { usDate } from "./specialOrderDocs";
+import { businessDaysBefore } from "./specialOrders";
 
 /* ==========================================================================
  * THE RECORD
@@ -694,12 +695,7 @@ export function dueDateFor(
 ): string {
   const dated = orders.map((o) => o.event_date).filter((d): d is string => !!d).sort();
   if (dated.length === 0 || orders.some((o) => o.wholesale)) return addDays(today, terms.termsDays);
-  let due = dated[0].slice(0, 10);
-  for (let counted = 0; counted < terms.dueBusinessDaysBefore; ) {
-    due = addDays(due, -1);
-    const weekday = new Date(`${due}T00:00:00Z`).getUTCDay(); // 0 Sunday … 6 Saturday
-    if (weekday !== 0 && weekday !== 6) counted++;
-  }
+  const due = businessDaysBefore(dated[0], terms.dueBusinessDaysBefore);
   return due < today ? today : due;
 }
 

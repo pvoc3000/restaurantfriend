@@ -23,6 +23,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   addDays,
+  businessDaysBefore,
   customerContactName,
   isProductionLine,
   orderTotals,
@@ -751,7 +752,8 @@ export function fillTemplate(template: string, vars: Record<string, string>): st
  * 2026-09-22, for "The order needs to be paid in full by {cutoff_clause} for it
  * to be placed into our production queue!").
  *
- * The cutoff is 5pm TWO DAYS before the event. Two of the four cases Mark named
+ * The cutoff is 5pm TWO BUSINESS DAYS before the event (calendar days until
+ * 2026-09-29). Two of the four cases Mark named
  * outright; the other two fall out of the same rule and would read as a bug
  * without it:
  *
@@ -765,7 +767,7 @@ export function fillTemplate(template: string, vars: Record<string, string>): st
  * So the rule is ONE line: the cutoff is never in the past. A date already gone
  * is not a deadline you can offer somebody.
  *
- * NO DATE, NO TODAY → "5pm two days before your event", which is not a fallback
+ * NO DATE, NO TODAY → "5pm two business days before your event", which is not a fallback
  * so much as the same sentence with the specifics left out. `{event_time_clause}`
  * can expand to nothing because it sits at the END of a line; this one sits in
  * the MIDDLE of Mark's sentence, and an empty expansion would leave "paid in
@@ -780,8 +782,10 @@ export function cutoffClause(
   eventDate: string | null | undefined,
   today?: string | null
 ): string {
-  if (!eventDate || !today) return "5pm two days before your event";
-  const cutoff = addDays(eventDate, -2);
+  // BUSINESS days since 2026-09-29 (Mark), the same two a special order's
+  // invoice is due by — so a Monday event's cutoff is Thursday, not Saturday.
+  if (!eventDate || !today) return "5pm two business days before your event";
+  const cutoff = businessDaysBefore(eventDate, 2);
   return cutoff <= today ? "5pm TODAY" : `5pm on ${usDate(cutoff)}`;
 }
 

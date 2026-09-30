@@ -483,28 +483,33 @@ test("{employee_name} is the FIRST name of whoever took the order", () => {
 
 test("{cutoff_clause}: 5pm two days before, and never in the past", () => {
   // Mark's two cases, 2026-09-22. The event is the 16th.
-  eq(cutoffClause("2026-08-16", "2026-08-10"), "5pm on 8/14/2026");
+  eq(cutoffClause("2026-08-16", "2026-08-10"), "5pm on 8/13/2026", "a Sunday event: Thursday, two BUSINESS days");
   eq(cutoffClause("2026-08-16", "2026-08-15"), "5pm TODAY", "event tomorrow");
 
   // The two he did not name, which fall out of the same rule. The cutoff IS
   // today on the 14th — printing today's own date there reads as a machine
   // talking — and it is behind us on the 16th and after.
-  eq(cutoffClause("2026-08-16", "2026-08-14"), "5pm TODAY", "cutoff is today");
+  eq(cutoffClause("2026-08-16", "2026-08-13"), "5pm TODAY", "cutoff is today");
+  eq(cutoffClause("2026-08-16", "2026-08-14"), "5pm TODAY", "cutoff was yesterday");
   eq(cutoffClause("2026-08-16", "2026-08-16"), "5pm TODAY", "event today");
   eq(cutoffClause("2026-08-16", "2026-08-20"), "5pm TODAY", "event gone");
   // The day before the cutoff still names it.
-  eq(cutoffClause("2026-08-16", "2026-08-13"), "5pm on 8/14/2026");
+  eq(cutoffClause("2026-08-16", "2026-08-12"), "5pm on 8/13/2026");
+  // A mid-week event is plain arithmetic: Friday's cutoff is Wednesday.
+  eq(cutoffClause("2026-08-21", "2026-08-10"), "5pm on 8/19/2026");
+  // A Monday event skips the weekend, the case that motivated business days.
+  eq(cutoffClause("2026-08-17", "2026-08-10"), "5pm on 8/13/2026");
 
   // MONTH AND YEAR BOUNDARIES, because the arithmetic is string-based UTC.
-  eq(cutoffClause("2026-03-01", "2026-02-01"), "5pm on 2/27/2026", "leap-less February");
-  eq(cutoffClause("2024-03-01", "2024-02-01"), "5pm on 2/28/2024", "a leap year");
+  eq(cutoffClause("2026-03-02", "2026-02-01"), "5pm on 2/26/2026", "leap-less February");
+  eq(cutoffClause("2024-03-01", "2024-02-01"), "5pm on 2/28/2024", "a leap year, through the 29th");
   eq(cutoffClause("2026-01-01", "2025-12-01"), "5pm on 12/30/2025", "across the year");
 
   // NO DATE — the sentence still has to read. An empty expansion would leave
   // "paid in full by  for it to be placed".
-  eq(cutoffClause(null, "2026-08-10"), "5pm two days before your event");
-  eq(cutoffClause("2026-08-16", null), "5pm two days before your event");
-  eq(cutoffClause(null, null), "5pm two days before your event");
+  eq(cutoffClause(null, "2026-08-10"), "5pm two business days before your event");
+  eq(cutoffClause("2026-08-16", null), "5pm two business days before your event");
+  eq(cutoffClause(null, null), "5pm two business days before your event");
 });
 
 test("{cutoff_clause} reaches a template, and reads as Mark wrote it", () => {
@@ -514,7 +519,7 @@ test("{cutoff_clause} reaches a template, and reads as Mark wrote it", () => {
   // The base order's event is 2026-08-16.
   eq(
     fillTemplate(sentence, templateVars(order(), {}, "2026-08-10")),
-    "The order needs to be paid in full by 5pm on 8/14/2026 for it to be placed " +
+    "The order needs to be paid in full by 5pm on 8/13/2026 for it to be placed " +
       "into our production queue!"
   );
   eq(
@@ -525,7 +530,7 @@ test("{cutoff_clause} reaches a template, and reads as Mark wrote it", () => {
   // And with no day given at all, which is what an unmigrated caller passes.
   eq(
     fillTemplate(sentence, templateVars(order())),
-    "The order needs to be paid in full by 5pm two days before your event for " +
+    "The order needs to be paid in full by 5pm two business days before your event for " +
       "it to be placed into our production queue!"
   );
 });

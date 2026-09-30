@@ -5225,3 +5225,8 @@ orders only and shouldn't affect wholesale orders") — any wholesale order on
 the invoice (`isWholesaleOrder`, by Sold as), or no dated order, falls back to
 `today + terms_days`. The two is `orgs.settings.customer_invoices.
 due_business_days_before`, default 2. Invoices already created keep their date.
+Same day, the quote's `{cutoff_clause}` followed: **5pm two BUSINESS days
+before the event** (a Monday event's cutoff is Thursday, not Saturday), through
+the shared `businessDaysBefore` in `lib/specialOrders`, so the quote and the
+invoice name one deadline. The dateless phrase reads "5pm two business days
+before your event".

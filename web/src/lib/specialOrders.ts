@@ -658,6 +658,22 @@ export function businessDaysUntil(from: string, to: string): number {
   return forward ? count : -count;
 }
 
+/**
+ * The date `days` business days before `date` — Monday to Friday, no holiday
+ * calendar (see `businessDaysUntil`). Two before a Monday is the Thursday.
+ * Shared by the quote's `{cutoff_clause}` and a special order invoice's due
+ * date (`dueDateFor`), so the customer is told one deadline in both places
+ * (Mark, 2026-09-29).
+ */
+export function businessDaysBefore(date: string, days: number): string {
+  let d = date.slice(0, 10);
+  for (let counted = 0; counted < days; ) {
+    d = addDays(d, -1);
+    if (isoWeekday(d) <= 5) counted++;
+  }
+  return d;
+}
+
 /** Decision 22's parameters, from `orgs.settings.special_orders`. */
 export type RushTerms = {
   cutoffBusinessDays: number;
