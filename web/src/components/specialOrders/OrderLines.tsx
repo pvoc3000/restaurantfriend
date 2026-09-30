@@ -508,12 +508,12 @@ export function OrderLines({
                  line count, and its qty and total under those columns. */
               <tbody key={`band-${g.key}`}>
                 {/* AIR ABOVE EVERY TOP BAND BUT THE FIRST (Mark, 2026-09-29:
-                    "padding between the item type groups"). A spacer ROW,
+                    "padding between the item type groups", then "double it": 48px). A spacer ROW,
                     because padding on the band's own cells would widen the
                     black fill rather than the gap above it. */}
                 {g.level === 0 && i > 0 ? (
                   <tr aria-hidden="true">
-                    <td colSpan={columnKeys.length} className="h-6 p-0" />
+                    <td colSpan={columnKeys.length} className="h-12 p-0" />
                   </tr>
                 ) : null}
                 <tr className={g.level === 0 ? "bg-ink text-white" : "text-ink"}>
