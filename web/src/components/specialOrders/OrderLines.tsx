@@ -512,8 +512,8 @@ export function OrderLines({
                   <td
                     colSpan={2}
                     className={`text-xs uppercase ${
-                      // SIZE IS BOLD BLACK (Mark, 2026-09-29).
-                      g.level === 1 ? "font-bold text-ink" : "font-semibold"
+                      // SIZE IS BLACK INK AT WEIGHT 900 (Mark, 2026-09-29: "bold black", then "a heavier weight").
+                      g.level === 1 ? "font-black text-ink" : "font-semibold"
                     } ${
                       g.level === 0
                         ? "px-3 py-2 tracking-[0.12em]"
@@ -536,7 +536,7 @@ export function OrderLines({
                       g.level === 0
                         ? "px-3 py-2"
                         : `px-3 pb-1 ${g.level === 1 ? "pt-3 border-b border-ink" : "pt-2 border-b border-hairline text-muted"}`;
-                    const weight = g.level === 1 ? "font-bold text-ink" : "font-semibold";
+                    const weight = g.level === 1 ? "font-black text-ink" : "font-semibold";
                     return (
                       <>
                         <td className={`${cell} ${weight} text-right text-xs tabular-nums`}>
