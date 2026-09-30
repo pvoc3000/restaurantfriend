@@ -476,12 +476,12 @@ export default async function RunShiftReportPage({
     const [{ data: batches }, { data: drafts }, { data: operators }] = await Promise.all([
       supabase
         .from("production_batches")
-        .select("id, sort, batch_count, operator_employee_id, production_elements(name)")
+        .select("id, sort, batch_count, operator_employee_id, notes, production_elements(name)")
         .eq("log_id", batchLog.id as string)
         .order("sort", { nullsFirst: false }),
       supabase
         .from("shift_report_batches")
-        .select("batch_id, batch_count, operator_employee_id")
+        .select("batch_id, batch_count, operator_employee_id, notes")
         .eq("report_id", id),
       // 044's definer — `employees` READ is owner/admin only (020), so this is
       // how a supervisor names who made a batch. The batch record reads it too.
@@ -513,6 +513,7 @@ export default async function RunShiftReportPage({
         operatorName: operatorId
           ? batchOperators.find((o) => o.value === operatorId)?.label ?? null
           : null,
+        notes: ((d?.notes ?? b.notes ?? null) as string | null),
       };
     });
   }
@@ -910,6 +911,7 @@ export default async function RunShiftReportPage({
       name: r.elementName,
       batches: r.batchCount,
       preparedBy: r.operatorName,
+      notes: r.notes,
     })),
     ratings: ratingRows.map((r) => ({
       employeeName: r.employeeName,

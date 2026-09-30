@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SHIFT_REPORT_BATCH_SCHEDULE } from "@/lib/production";
 import { PickList, type PickOption } from "@/components/ui/PickList";
-import { CountField } from "./fields";
+import { CountField, TextField } from "./fields";
 import { STICKY_HEAD_ROW_UNDER_RUNNER } from "@/lib/tableHead";
 
 export type ElementBatchRow = {
@@ -16,6 +16,8 @@ export type ElementBatchRow = {
   /** Who made it — the draft, else the batch's own "Prepared by" (154). */
   operatorId: string | null;
   operatorName: string | null;
+  /** Anything worth reporting about this batch — the batch's own Notes. */
+  notes: string | null;
 };
 
 /**
@@ -104,7 +106,10 @@ export function ElementsPage({
 
   function save(
     batchId: string,
-    patch: { batch_count: number | null } | { operator_employee_id: string | null }
+    patch:
+      | { batch_count: number | null }
+      | { operator_employee_id: string | null }
+      | { notes: string | null }
   ) {
     startTransition(async () => {
       const { error } = await createClient()
@@ -140,12 +145,13 @@ export function ElementsPage({
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <table className="w-full table-fixed">
         <colgroup>
           <col />
           <col className="w-40" />
-          <col className="w-72" />
+          <col className="w-64" />
+          <col />
         </colgroup>
         <thead>
           <tr
@@ -154,6 +160,7 @@ export function ElementsPage({
             <th className="py-2 text-left">Donut</th>
             <th className="py-2 text-right">Total batches</th>
             <th className="py-2 pl-3 text-left">Prepared by</th>
+            <th className="py-2 pl-3 text-left">Notes</th>
           </tr>
         </thead>
         <tbody>
@@ -184,6 +191,14 @@ export function ElementsPage({
                 ) : (
                   <span className="text-[16px]">{r.operatorName ?? "—"}</span>
                 )}
+              </td>
+              <td className="py-2 pl-3">
+                <TextField
+                  value={r.notes}
+                  onCommit={(next) => save(r.batchId, { notes: next })}
+                  disabled={!editable}
+                  ariaLabel={`Notes, ${r.elementName}`}
+                />
               </td>
             </tr>
           ))}

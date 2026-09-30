@@ -670,3 +670,7 @@
    `employees`). Drafted on `shift_report_batches.operator_employee_id`, written
    by Send onto the batch's own "Prepared by", taken back by reopen only if
    unchanged; the email's Donut batches table gains the column.
+   **NOTES on each donut row (Mark, 2026-09-30)** — "just in case there's
+   anything of note to report". No migration: `shift_report_batches.notes` and
+   its flush onto `production_batches.notes` have existed since 070. The
+   email's Donut batches table gains a Notes column.

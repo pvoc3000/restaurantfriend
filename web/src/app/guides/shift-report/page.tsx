@@ -271,6 +271,9 @@ export default function ShiftReportGuide() {
               <li>
                 Under <strong>Prepared by</strong>, choose the baker who made each donut.
               </li>
+              <li>
+                Use <strong>Notes</strong> for anything worth knowing about a batch.
+              </li>
               <li>If a donut wasn’t made, enter 0. The report won’t send with a donut left blank.</li>
             </ul>
           </Page>
