@@ -176,6 +176,29 @@ export function anyAnchoredPanelOpen(): boolean {
 }
 
 /**
+ * How far the panel is drawn from where its own `top` says, in px.
+ *
+ * Zero everywhere but one place: iPad Safari with the keyboard up (Mark,
+ * 2026-09-30). There, after the keyboard scrolls the page, a `position: fixed`
+ * box is no longer drawn at the `getBoundingClientRect` coordinate its `top`
+ * names — re-anchoring the panel to the moved trigger put it further up the
+ * screen than the trigger by about the scroll again, and "the more up it
+ * scrolls the further from the field the menu gets".
+ *
+ * Rather than model what WebKit is doing, measure it: the panel's rendered top
+ * minus its style top is the drift, and a panel placed at `wanted − drift`
+ * lands at `wanted`. The same measure holds wherever the drift comes from, and
+ * it reads zero wherever there is none. Vertical only — the keyboard scrolls
+ * up and down, and a right-aligned panel's `translateX(-100%)` would make a
+ * horizontal reading lie.
+ */
+function driftY(panel: HTMLElement): number {
+  const styled = parseFloat(panel.style.top);
+  if (!Number.isFinite(styled)) return 0;
+  return panel.getBoundingClientRect().top - styled;
+}
+
+/**
  * Position a small panel directly below the control that opened it, and take it
  * away again at the right moments.
  *
@@ -317,6 +340,11 @@ export function useAnchoredPanel({
         const above = t.top - 2 - h;
         top = above >= MARGIN ? above : Math.max(MARGIN, window.innerHeight - MARGIN - h);
       }
+      // Worked out where it should be SEEN; `top` is written in the panel's
+      // own coordinates, which the keyboard can shift — see `driftY`.
+      const drift = driftY(panel);
+      if (Math.abs(drift) > 1) panelLog(`fit drift ${Math.round(drift)}`);
+      top -= drift;
 
       // `align="right"` panels are drawn with `translateX(-100%)` by the caller,
       // so the box's own `left` is their RIGHT edge. Shifting the box by the
@@ -413,16 +441,20 @@ export function useAnchoredPanel({
          * keyboard — a document scroll re-anchors the panel to where the
          * trigger now is instead of closing it. `setBox` hands it to the
          * fitting pass, which measures against `innerHeight`, and that has
-         * already shrunk to the space above the keyboard. A pane's scroll
+         * already shrunk to the space above the keyboard. Both correct for
+         * `driftY`, without which the panel ran off above its field. A pane's scroll
          * still closes, and so does the page's with focus anywhere else.
          */
         const panelHasFocus = !!panel && panel.contains(document.activeElement);
         const pageScroll = !(e.target instanceof Element);
         if (panelHasFocus && pageScroll) {
-          panelLog(`FOLLOW scroll ${moved} ${viewport()}`);
+          const drift = driftY(panel);
+          panelLog(`FOLLOW scroll ${moved} drift ${Math.round(drift)} ${viewport()}`);
           anchor.current = { top: r.top, left: r.left };
+          // Placed where it should be SEEN, less the keyboard's drift; the
+          // fitting pass then settles it above or below.
           setBox({
-            top: r.bottom + 2,
+            top: r.bottom + 2 - drift,
             left: align === "right" ? r.right : r.left,
             width: r.width,
           });
