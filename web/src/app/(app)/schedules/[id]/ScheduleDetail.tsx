@@ -8,6 +8,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
+import { ScheduleLocationCell } from "@/components/production/ScheduleLocationCell";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { packetDate, planDeviation, plansInForce } from "@/lib/productionSchedule";
 import { meansNoAllergy } from "@/lib/specialOrders";
@@ -153,6 +154,7 @@ export async function ScheduleDetail({
 
   const sellsCode = codeById.get(schedule.location_id as string) ?? "—";
   const kitchenCode = codeById.get(schedule.kitchen_location_id as string) ?? "—";
+  const shops = session.activeLocations.map((l) => ({ id: l.id, code: l.code }));
 
   const rows: ScheduleLineRow[] = (lineRows ?? []).map((l) => ({
     id: l.id as string,
@@ -392,6 +394,41 @@ export async function ScheduleDetail({
             <span className={`${READ_ONLY_VALUE}`}>
               <span className="bg-mark-fill px-1">not printed</span>
             </span>
+          )}
+        </Field>
+        {/* Re-pointable in place (Mark, 2026-09-30), the list's picklists in
+            the record's box. `activeLocations` is what may be CHOSEN; a closed
+            shop the schedule already names stays on the list, sunk. */}
+        <Field label="Sells at">
+          {editable ? (
+            <ScheduleLocationCell
+              boxed={BOXED_FIELDS}
+              scheduleId={id}
+              column="location_id"
+              value={schedule.location_id as string}
+              code={sellsCode}
+              locations={shops}
+              ariaLabel="Sells at"
+              className="font-medium"
+            />
+          ) : (
+            <span className={`${READ_ONLY_VALUE} font-medium`}>{sellsCode}</span>
+          )}
+        </Field>
+        <Field label="Made at">
+          {editable ? (
+            <ScheduleLocationCell
+              boxed={BOXED_FIELDS}
+              scheduleId={id}
+              column="kitchen_location_id"
+              value={schedule.kitchen_location_id as string}
+              code={kitchenCode}
+              locations={shops}
+              ariaLabel="Made at"
+              className="font-medium"
+            />
+          ) : (
+            <span className={`${READ_ONLY_VALUE} font-medium`}>{kitchenCode}</span>
           )}
         </Field>
         <Field label="Note" span>

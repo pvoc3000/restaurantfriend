@@ -8,11 +8,12 @@ import { PickList, type PickOption } from "@/components/ui/PickList";
 
 /**
  * A schedule's Sells at or Made at, picked in its `/schedules` row (Mark,
- * 2026-09-30: "editable, borderless picklists" — `variant="inline"`).
+ * 2026-09-30: "editable, borderless picklists" — `variant="inline"`) and on
+ * its record, where it is `boxed` like the record's other fields.
  *
  * Shows the pick on the tap and writes behind it (`lib/latestWrite`); a failure
- * puts back the last SAVED shop and reports why through `onError`, since a
- * cell has no room to say it. The likely failure is 040's
+ * puts back the last SAVED shop and says why — through `onError` in a list
+ * row, which has no room for it, or under the picker on the record. The likely failure is 040's
  * `production_schedules_plan_day` key: a plan schedule already exists for that
  * shop, date and kitchen, and two would be the double night the key forbids.
  *
@@ -27,6 +28,7 @@ export function ScheduleLocationCell({
   locations,
   ariaLabel,
   className = "",
+  boxed = false,
   onError,
 }: {
   scheduleId: string;
@@ -37,13 +39,22 @@ export function ScheduleLocationCell({
   locations: { id: string; code: string }[];
   ariaLabel: string;
   className?: string;
-  onError: (message: string | null) => void;
+  /** A detail screen's box — `InlineValue`'s `boxed`, passed through. */
+  boxed?: boolean;
+  /**
+   * Where a failure is reported. Omitted — the schedule record, a server
+   * component that cannot hand a client one a function — it is said under the
+   * picker instead.
+   */
+  onError?: (message: string | null) => void;
 }) {
   const router = useRouter();
   const [picked, setPicked] = useState(value);
   // What the database was last known to hold.
   const confirmed = useRef(value);
   // Fresh props with no write in flight replace the held pick.
+  const [failed, setFailed] = useState<string | null>(null);
+  const report = (message: string | null) => (onError ? onError(message) : setFailed(message));
   const [seen, setSeen] = useState(value);
   if (seen !== value) {
     setSeen(value);
@@ -68,7 +79,7 @@ export function ScheduleLocationCell({
     },
     (error) => {
       if (error) setPicked(confirmed.current);
-      onError(error);
+      report(error);
       router.refresh();
     }
   );
@@ -78,9 +89,10 @@ export function ScheduleLocationCell({
     options.push({ value, label: code, inactive: true });
   }
 
-  return (
+  const picker = (
     <PickList
       variant="inline"
+      boxed={boxed}
       value={picked}
       options={options}
       ariaLabel={ariaLabel}
@@ -88,9 +100,16 @@ export function ScheduleLocationCell({
       onPick={(next) => {
         if (!next || next === picked) return;
         setPicked(next);
-        onError(null);
+        report(null);
         push(next);
       }}
     />
+  );
+  if (onError) return picker;
+  return (
+    <>
+      {picker}
+      {failed ? <p className="mt-1 text-xs text-accent">{failed}</p> : null}
+    </>
   );
 }
