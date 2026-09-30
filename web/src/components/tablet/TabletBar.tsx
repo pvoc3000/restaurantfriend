@@ -68,16 +68,8 @@ export function TabletBar({
           no record book can be. */}
       <div className="flex items-center gap-1 px-2">
         <TabletBack />
-        {/* HOME WEARS THE WORKING SHOP'S CODE in place of the house (Mark,
-            2026-09-30): the picker lives on the landing page only, so once you
-            left it nothing on a tablet said which shop you were working at.
-            The house comes back only if there is no working location. */}
-        <Link
-          href={TABLET_HOME}
-          className={BAR_CELL}
-          aria-label={working ? `Home — ${working.code}` : undefined}
-        >
-          <BarLabel icon={ICON_HOME} glyph={working?.code} word="Home" />
+        <Link href={TABLET_HOME} className={BAR_CELL}>
+          <BarLabel icon={ICON_HOME} word="Home" />
         </Link>
         {/* A screen's LEADING commands sit right after Home — the order
             guide's Refresh (Mark, 2026-09-10). */}
