@@ -223,12 +223,16 @@ async function notifyShop(orgId: string, orderId: string): Promise<string> {
   if (!serviceKey) return "none";
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
   try {
+    // THE PICKUP SHOP, NAMED. `special_orders` has two keys into `locations`
+    // (pickup and kitchen), so a bare `locations(...)` embed is refused as
+    // ambiguous (PGRST201) — which silently stopped this notice (Mark,
+    // 2026-09-29: "we are not getting an email notification").
     const { data: o, error } = await admin
       .from("special_orders")
       .select(
         "number, title, contact_name, contact_email, contact_phone, event_date, event_time, fulfillment, " +
           "delivery_address, delivery_distance, delivery_charge, allergen_info, source_payload, " +
-          "locations(name, public_name)"
+          "locations!special_orders_location_id_fkey(name, public_name)"
       )
       .eq("id", orderId)
       .maybeSingle();

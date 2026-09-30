@@ -143,9 +143,11 @@ Deno.serve(async (req) => {
 
     // Both confirmations go out through the same provider layer the quote did,
     // so they come from the same mailbox and land in the same thread.
+    // `!special_orders_location_id_fkey`: two keys lead to `locations`, and an
+    // unnamed embed is refused as ambiguous — `order` came back null.
     const { data: order } = await admin
       .from("special_orders")
-      .select("number, title, contact_email, contact_name, contact_phone, event_date, event_time, fulfillment, delivery_address, inbound_message_id, customers(email), locations(name, public_name)")
+      .select("number, title, contact_email, contact_name, contact_phone, event_date, event_time, fulfillment, delivery_address, inbound_message_id, customers(email), locations!special_orders_location_id_fkey(name, public_name)")
       .eq("id", state.order_id)
       .maybeSingle();
     const { data: org } = await admin
