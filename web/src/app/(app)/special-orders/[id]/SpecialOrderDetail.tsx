@@ -998,11 +998,11 @@ export async function SpecialOrderDetail({
                       />
                     </Row>
                     {/* PICKUP SHOP BEFORE KITCHEN (Mark, 2026-09-29). */}
-                    <Row label="Pickup shop">
+                    <Row label="Pickup location">
                       {/* Decision 8: location is where it is PICKED UP… */}
                       <Cell table="special_orders" id={id} column="location_id" kind="pick"
                             options={locationOptions} value={row.location_id as string | null}
-                            canWrite={canWrite} ariaLabel="Pickup shop" />
+                            canWrite={canWrite} ariaLabel="Pickup location" />
                     </Row>
                     <Row label="Kitchen">
                       {/* …and kitchen is where it is MADE. */}

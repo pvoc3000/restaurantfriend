@@ -349,13 +349,13 @@ export function NewSpecialOrder({
                 bakes it. Leaving pickup empty was not neutral — it meant no tax
                 and org-grid prices. */}
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-              <Field label="Pickup shop">
+              <Field label="Pickup location">
                 <PickList
                   value={locationId}
                   onPick={setLocationId}
                   variant="field"
                   placeholder="Not set"
-                  ariaLabel="Pickup shop"
+                  ariaLabel="Pickup location"
                   options={[
                     { value: "", label: "Not set" },
                     ...kitchens.map((k) => ({ value: k.id, label: k.code })),
