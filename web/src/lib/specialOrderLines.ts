@@ -275,3 +275,69 @@ export function addedLineName(
   if (character) parts.push(`Letter ${character}`);
   return parts.join(" - ");
 }
+
+/* ==========================================================================
+ * GROUPING THE ITEMS TAB (Mark, 2026-09-29: "group the datatable on the items
+ * tab … by item type, item, price")
+ * ========================================================================== */
+
+export type LineGrouping = "none" | "type" | "item" | "price";
+
+export const LINE_GROUPINGS: { value: LineGrouping; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "type", label: "Item type" },
+  { value: "item", label: "Item" },
+  { value: "price", label: "Price" },
+];
+
+export function isLineGrouping(v: unknown): v is LineGrouping {
+  return LINE_GROUPINGS.some((g) => g.value === v);
+}
+
+type GroupableLine = {
+  name: string;
+  item_donut: string | null;
+  item_type: string | null;
+  unit_price: number | string | null;
+};
+
+/**
+ * The lines in runs, each with its band's label. `none` is ONE unlabelled run
+ * in document order — the order IS the document, so ungrouped is untouched.
+ *
+ * ITEM IS THE DONUT, not the line's name: a letter order names every line
+ * apart ("Paramoreo - Letter I"), so grouping by name would band each line
+ * alone. The name stands in where no donut was recorded.
+ *
+ * Runs are ordered by their key — text A→Z, price low→high — with the empty
+ * key LAST. WITHIN a run the document order is kept (a stable sort), so a
+ * letter order's run still spells what it spelt.
+ */
+export function groupLines<T extends GroupableLine>(
+  rows: T[],
+  grouping: LineGrouping
+): { key: string; label: string; rows: T[] }[] {
+  if (grouping === "none") return [{ key: "", label: "", rows }];
+  const keyOf = (r: T): string => {
+    if (grouping === "type") return (r.item_type ?? "").trim();
+    if (grouping === "item") return (r.item_donut ?? "").trim() || r.name.trim();
+    return r.unit_price === null || r.unit_price === "" ? "" : Number(r.unit_price).toFixed(2);
+  };
+  const runs = new Map<string, T[]>();
+  for (const r of rows) {
+    const k = keyOf(r);
+    runs.set(k, [...(runs.get(k) ?? []), r]);
+  }
+  const keys = [...runs.keys()].sort((a, b) => {
+    if (a === "" || b === "") return a === "" ? (b === "" ? 0 : 1) : -1;
+    return grouping === "price"
+      ? Number(a) - Number(b)
+      : a.localeCompare(b, "en", { numeric: true, sensitivity: "base" });
+  });
+  const empty = grouping === "type" ? "No type" : grouping === "item" ? "No item" : "No price";
+  return keys.map((k) => ({
+    key: k,
+    label: k === "" ? empty : grouping === "price" ? `$${k}` : k,
+    rows: runs.get(k)!,
+  }));
+}

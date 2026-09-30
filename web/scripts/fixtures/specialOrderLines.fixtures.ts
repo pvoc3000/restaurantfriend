@@ -15,6 +15,7 @@ import {
   cutLetter,
   cutOptions,
   donutOptions,
+  groupLines,
   isLetterCut,
   letterCut,
   taxonomyOptions,
@@ -235,4 +236,52 @@ test("parseLetters: blanks are dropped, and nothing typed is an empty list", () 
   eq(parseLetters("H,,A,"), ["H", "A"]);
   eq(parseLetters(""), []);
   eq(parseLetters(" , "), []);
+});
+
+/* -- the Items tab's Group by (Mark, 2026-09-29) ------------------------- */
+
+const L = (id: string, item_donut: string | null, item_type: string | null, unit_price: number | null, name = `${item_donut} - Letter ${id}`) =>
+  ({ id, name, item_donut, item_type, unit_price });
+// SO-10092's shape: a letter order, every line named apart.
+const LETTERS = [
+  L("T", "Give Up the Toast", "Raised", 5.1),
+  L("H", "Compassion Fruit", "Raised", 5.1),
+  L("A", "Strawberry So Far", "Raised", 5.6),
+  L("K", "Promise Ring - Glazed", "Raised", 4.6),
+  L("E", "Give Up the Toast", "Cake", 4.6),
+  L("X", null, null, null, "Delivery box"),
+];
+
+test("groupLines: None is the document, untouched", () => {
+  const g = groupLines(LETTERS, "none");
+  eq(g.length, 1);
+  eq(g[0].label, "");
+  eq(g[0].rows.map((r) => r.id), ["T", "H", "A", "K", "E", "X"]);
+});
+
+test("groupLines: Price runs low to high, and keeps document order inside a run", () => {
+  const g = groupLines(LETTERS, "price");
+  eq(g.map((x) => x.label), ["$4.60", "$5.10", "$5.60", "No price"]);
+  eq(g[0].rows.map((r) => r.id), ["K", "E"], "K before E, as the document has them");
+  eq(g[1].rows.map((r) => r.id), ["T", "H"]);
+});
+
+test("groupLines: Item is the DONUT, so two letters of one donut share a band", () => {
+  const g = groupLines(LETTERS, "item");
+  const toast = g.find((x) => x.label === "Give Up the Toast")!;
+  eq(toast.rows.map((r) => r.id), ["T", "E"]);
+  // No donut recorded: the line's name stands in, rather than a "No item" band.
+  ok(g.some((x) => x.label === "Delivery box"));
+  eq(g.map((x) => x.label), ["Compassion Fruit", "Delivery box", "Give Up the Toast", "Promise Ring - Glazed", "Strawberry So Far"]);
+});
+
+test("groupLines: Item type A→Z, the empty type last", () => {
+  const g = groupLines(LETTERS, "type");
+  eq(g.map((x) => x.label), ["Cake", "Raised", "No type"]);
+  eq(g[1].rows.map((r) => r.id), ["T", "H", "A", "K"]);
+});
+
+test("groupLines: Price is ordered as a NUMBER — $12.00 after $4.60", () => {
+  const g = groupLines([L("Z", "Giant", "Raised", 12), L("A", "Mini", "Raised", 4.6)], "price");
+  eq(g.map((x) => x.label), ["$4.60", "$12.00"]);
 });

@@ -13,6 +13,9 @@ import { InlineValue } from "@/components/catalog/InlineValue";
 import { ColumnHeader } from "@/components/catalog/ColumnHeader";
 import { useResizableColumns } from "@/lib/columnWidths";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { ControlField } from "@/components/ui/ControlField";
+import { PickList } from "@/components/ui/PickList";
+import { useLineGrouping } from "@/lib/lineGroupingPref";
 import { StickyFooter } from "@/components/ui/StickyFooter";
 import { STICKY_HEAD_ROW, useOverflowOnlyWhenNeeded } from "@/lib/tableHead";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -24,8 +27,11 @@ import {
   cutLetter,
   cutOptions,
   donutOptions,
+  groupLines,
   isLetterCut,
+  LINE_GROUPINGS,
   taxonomyOptions,
+  type LineGrouping,
 } from "@/lib/specialOrderLines";
 
 export type OrderLineRow = {
@@ -397,6 +403,20 @@ export function OrderLines({
 
   const subtotal = ordered.reduce((a, l) => a + lineTotal(l), 0);
 
+  /**
+   * GROUP BY (Mark, 2026-09-29). Bands over runs of Item type, Item or Price,
+   * each carrying its quantity and total under those columns. A per-browser
+   * display preference — see `lib/lineGroupingPref`.
+   *
+   * WHILE GROUPED THE LINES DO NOT DRAG. The drag writes the DOCUMENT order,
+   * and a grouped view is not it: a line dropped between two bands would land
+   * somewhere in the document nobody pointed at. The grip stays, dimmed, and
+   * says why.
+   */
+  const [grouping, setGrouping] = useLineGrouping();
+  const groups = groupLines(ordered, grouping);
+  const grouped = grouping !== "none";
+
   // THE LABELS STICK (Mark, 2026-09-16), which needs the wrapper to stop being
   // a scroll container whenever the table fits: a sticky cell inside an
   // `overflow-x-auto` box pins to THAT box and leaves with the page
@@ -406,7 +426,22 @@ export function OrderLines({
 
   return (
     <section className="space-y-2">
-      <SectionHeading count={ordered.length}>Items</SectionHeading>
+      {/* THE GROUP BY SITS BESIDE THE TABLE'S NAME (Mark, 2026-09-29),
+          captioned above like every picker (`ui/ControlField`), bottom-aligned
+          so the heading and the menu share a floor. */}
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+        <SectionHeading count={ordered.length}>Items</SectionHeading>
+        <ControlField label="Group by">
+          <PickList
+            variant="field"
+            fit
+            ariaLabel="Group items by"
+            value={grouping}
+            onPick={(next) => setGrouping(next as LineGrouping)}
+            options={LINE_GROUPINGS}
+          />
+        </ControlField>
+      </div>
 
       <div ref={scrollerRef} className="overflow-x-auto">
         {/* `table-fixed`, which is what makes a `<col>` width mean anything at
@@ -463,7 +498,29 @@ export function OrderLines({
               whole line rather than between its halves, and one `hover:` and one
               `opacity-40` still dress the lot. Several tbodies in one table is
               ordinary HTML; the drag needed no change at all. */}
-          {ordered.map((row) => {
+          {groups.map((g) => [
+            g.label ? (
+              <tbody key={`band-${g.key}`}>
+                <tr className="bg-ink text-white">
+                  {canWrite ? <td className="p-0" /> : null}
+                  <td colSpan={2} className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em]">
+                    {g.label}
+                    <span className="ml-2 font-normal tracking-normal text-white/55 normal-case">
+                      {g.rows.length}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right text-xs font-semibold tabular-nums">
+                    {g.rows.reduce((a, r) => a + Number(r.qty ?? 0), 0)}
+                  </td>
+                  <td colSpan={2} />
+                  <td className="px-3 py-2 text-right text-xs font-semibold tabular-nums">
+                    {money(g.rows.reduce((a, r) => a + lineTotal(r), 0))}
+                  </td>
+                  {canWrite ? <td className="p-0" /> : null}
+                </tr>
+              </tbody>
+            ) : null,
+            ...g.rows.map((row) => {
               const production = isProductionLine(row);
               // Line 2's trailing filler: everything after Item and Note, plus
               // the ⋯ column when it is there.
@@ -485,9 +542,14 @@ export function OrderLines({
                         role="button"
                         tabIndex={-1}
                         aria-label={`Reorder ${row.name}`}
-                        title={`Drag to reorder ${row.name}`}
-                        onPointerDown={(e) => startRowDrag(e, { id: row.id, label: row.name })}
-                        className="block cursor-grab touch-none select-none px-1 text-[13px] leading-none text-subtle hover:text-ink"
+                        aria-disabled={grouped || undefined}
+                        title={grouped ? "Set Group by to None to reorder" : `Drag to reorder ${row.name}`}
+                        onPointerDown={(e) => {
+                          if (!grouped) startRowDrag(e, { id: row.id, label: row.name });
+                        }}
+                        className={`block touch-none select-none px-1 text-[13px] leading-none ${
+                          grouped ? "cursor-not-allowed text-faint" : "cursor-grab text-subtle hover:text-ink"
+                        }`}
                       >
                         ⠿
                       </span>
@@ -679,7 +741,8 @@ export function OrderLines({
                 </tr>
                 </tbody>
               );
-            })}
+            }),
+          ])}
 
           <tbody>
             {ordered.length === 0 ? (
