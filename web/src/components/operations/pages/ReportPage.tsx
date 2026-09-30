@@ -53,6 +53,7 @@ export function ReportPage({
         value={narrative}
         onCommit={save}
         disabled={!editable}
+        ink
         ariaLabel="How was the shift"
       />
     </div>

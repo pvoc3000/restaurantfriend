@@ -246,6 +246,7 @@ export function RatingsPage({
               value={row.note}
               onCommit={(next) => patch(row.id, { note: next })}
               disabled={!editable}
+              ink
               ariaLabel={`Note, ${row.employeeName}`}
             />
           </div>

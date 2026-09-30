@@ -30,8 +30,9 @@ const BOX = "w-full border bg-white px-3 text-[16px] focus:outline-none";
 
 /**
  * The box's edge. HAIRLINE by default, blackening on hover and focus; `ink`
- * is black at rest, for a page whose picklists (black-edged) sit beside it —
- * Donut batches (Mark, 2026-09-30: "make the borders of the fields … black").
+ * is black at rest (Mark, 2026-09-30): the Donut batches fields, where the
+ * black-edged picklists sit beside them, the Employees page's Note and the
+ * Report page's text.
  */
 function boxBorder(ink: boolean): string {
   return ink ? "border-ink" : "border-hairline hover:border-ink focus:border-ink";
@@ -138,6 +139,7 @@ export function ProseField({
   placeholder,
   rows = 14,
   disabled = false,
+  ink = false,
 }: {
   value: string | null;
   onCommit: (next: string | null) => void;
@@ -145,6 +147,8 @@ export function ProseField({
   placeholder?: string;
   rows?: number;
   disabled?: boolean;
+  /** A black edge at rest — see `boxBorder`. */
+  ink?: boolean;
 }) {
   const [draft, setDraft] = useState(value ?? "");
   const [seen, setSeen] = useState(value);
@@ -164,7 +168,7 @@ export function ProseField({
   return (
     <div className="space-y-1">
       <textarea
-        className={`${BOX} ${boxBorder(false)} py-3 leading-relaxed`}
+        className={`${BOX} ${boxBorder(ink)} py-3 leading-relaxed`}
         rows={rows}
         value={draft}
         aria-label={ariaLabel}
