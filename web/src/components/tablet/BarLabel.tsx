@@ -8,12 +8,21 @@
  * A bare glyph cannot say which of two things the first cell is, and the
  * runners already made that argument at length — the word stays.
  */
-export function BarLabel({ icon, word }: { icon: string; word: string }) {
+export function BarLabel({ icon, glyph, word }: { icon?: string; glyph?: string; word: string }) {
   return (
     <span className="flex flex-col items-center gap-0.5">
-      <svg width="28" height="28" viewBox="0 -960 960 960" aria-hidden="true">
-        <path fill="currentColor" d={icon} />
-      </svg>
+      {glyph ? (
+        // TEXT IN THE ICON'S SLOT — Home's shop code (Mark, 2026-09-30). The
+        // same 28px line the artwork occupies, so the cell does not change
+        // height; black weight to stand as heavy as the glyphs beside it.
+        <span aria-hidden="true" className="text-[22px] font-black leading-[28px] tracking-[0.02em]">
+          {glyph}
+        </span>
+      ) : (
+        <svg width="28" height="28" viewBox="0 -960 960 960" aria-hidden="true">
+          <path fill="currentColor" d={icon} />
+        </svg>
+      )}
       <span className="text-[12px] font-bold uppercase leading-none tracking-[0.08em]">{word}</span>
     </span>
   );
