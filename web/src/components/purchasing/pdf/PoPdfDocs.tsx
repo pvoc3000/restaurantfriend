@@ -31,7 +31,7 @@ import {
   caps,
   docStyles,
   isoDay,
-  mailedDocStyles,
+  topGapDocStyles,
   qtyText,
 } from "@/components/pdf/appDocument";
 import {
@@ -115,7 +115,7 @@ export function groupBy<T>(
 
 const s = {
   ...docStyles,
-  ...mailedDocStyles,
+  ...topGapDocStyles,
   ...StyleSheet.create({
     headRight: { alignItems: "flex-end" },
     summary: { ...caps(6.5, 0.12), color: SUBTLE },

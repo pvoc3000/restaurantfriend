@@ -33,6 +33,7 @@ import {
   caps,
   docStyles,
   isoDay,
+  topGapDocStyles,
 } from "@/components/pdf/appDocument";
 import {
   countTotals,
@@ -90,6 +91,7 @@ export const PACKET_PARTS: { key: PacketPart; label: string }[] = [
 
 const styles = {
   ...docStyles,
+  ...topGapDocStyles,
   ...StyleSheet.create({
     // The night, large, where a record's number sits on the other documents.
     nightDate: { fontSize: 16, fontFamily: "Helvetica-Bold", marginTop: 3 },

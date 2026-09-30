@@ -542,7 +542,7 @@ export function newMessageId(from: string | undefined | null): string {
  * THE GAP LINES EACH HOLD A NON-BREAKING SPACE, because truly blank ones were
  * trimmed. It shows in Gmail; iCloud Mail trims even these, and there only the
  * line break before the preview survives. The page carries a gap of its own
- * for that reason: `mailedDocStyles` in `web/src/components/pdf/appDocument.tsx`
+ * for that reason: `topGapDocStyles` in `web/src/components/pdf/appDocument.tsx`
  * puts a quarter inch above the masthead of every special-order and purchasing
  * document. Trailing whitespace is trimmed first, so every message gets the
  * same gap however its body ended.

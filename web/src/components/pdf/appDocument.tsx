@@ -143,16 +143,17 @@ export const docStyles = StyleSheet.create({
 });
 
 /**
- * A QUARTER INCH ABOVE THE MASTHEAD, on the documents that go out by email —
- * every special-order and purchasing document (Mark, 2026-09-30). A mail
- * client previews the PDF directly under the message, and it trims any blank
- * lines at the end of the text, so the gap has to be on the page. Spread AFTER
- * `docStyles`; the other documents keep their masthead at the top edge.
+ * A QUARTER INCH ABOVE THE MASTHEAD (Mark, 2026-09-30) on every special-order
+ * and purchasing document, then the production packet. It began with the
+ * emailed ones: a mail client previews the PDF directly under the message, and
+ * iCloud trims any blank lines at the end of the text, so the gap has to be on
+ * the page. Spread AFTER `docStyles`; recipes, checklists, tags and the vendor
+ * item list keep their masthead at the top edge.
  */
-export const MAILED_TOP_GAP = 18; // pt: 1/4"
-export const mailedDocStyles = {
-  page: { ...docStyles.page, paddingTop: docStyles.page.paddingTop + MAILED_TOP_GAP },
-  masthead: { ...docStyles.masthead, top: MAILED_TOP_GAP },
+export const TOP_GAP = 18; // pt: 1/4"
+export const topGapDocStyles = {
+  page: { ...docStyles.page, paddingTop: docStyles.page.paddingTop + TOP_GAP },
+  masthead: { ...docStyles.masthead, top: TOP_GAP },
 };
 
 /** Quantities print as integers where they are integers — "1", never "1.00". */
