@@ -273,8 +273,8 @@ export default function ShiftReportGuide() {
               </li>
               <li>
                 Under <strong>Prepared by</strong>, choose the baker who made each donut. If one
-                baker made them all, choose them in <strong>Prepared by, every donut</strong> above
-                the table, then change any row that was somebody else.
+                baker made them all, choose them in the box under the <strong>Prepared by</strong>{" "}
+                heading, then change any row that was somebody else.
               </li>
               <li>
                 Use <strong>Notes</strong> for anything worth knowing about a batch.

@@ -684,7 +684,7 @@
    complete) and dropped the column from both tables. The page shows the batch
    log's three boxes, with "batch" at the top of its unit menu; the blocker reads
    "… nothing entered under Made."; the email and the tray guide's box say Made.
-   **PREPARED BY, EVERY DONUT (Mark, 2026-09-30)** — a picker above the Donut
+   **PREPARED BY, EVERY DONUT (Mark, 2026-09-30)** — a picker in the Prepared by header of the Donut
    batches table that writes one person to every row's draft in a single upsert
    naming only that column; rows stay individually editable. It holds no state:
    it shows a name only while every row has that name, and goes blank once one

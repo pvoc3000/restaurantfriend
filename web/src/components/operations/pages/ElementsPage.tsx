@@ -13,7 +13,7 @@ import { UNIT_PICK_OPTIONS } from "@/lib/units";
  */
 const MADE_UNITS: PickOption[] = [{ value: "batch", label: "batch" }, ...UNIT_PICK_OPTIONS];
 import { PickList, type PickOption } from "@/components/ui/PickList";
-import { CountField, FieldLabel, TextField } from "./fields";
+import { CountField, TextField } from "./fields";
 import { STICKY_HEAD_ROW_UNDER_RUNNER } from "@/lib/tableHead";
 
 export type ElementBatchRow = {
@@ -199,22 +199,6 @@ export function ElementsPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      {editable && rows.length > 1 ? (
-        <div className="w-64 space-y-2">
-          <FieldLabel>Prepared by, every donut</FieldLabel>
-          <PickList
-            variant="field"
-            size="lg"
-            boxed
-            className="w-full"
-            value={shared}
-            options={operators}
-            clearable
-            onPick={(next) => saveAllPreparers(next === "" ? null : next)}
-            ariaLabel="Prepared by, every donut"
-          />
-        </div>
-      ) : null}
       <table className="w-full table-fixed">
         <colgroup>
           <col />
@@ -228,10 +212,33 @@ export function ElementsPage({
           <tr
             className={`text-xs font-semibold uppercase tracking-[0.08em] ${STICKY_HEAD_ROW_UNDER_RUNNER}`}
           >
-            <th className="py-2 text-left">Donut</th>
-            <th className="py-2 text-left">Made</th>
-            <th className="py-2 pl-3 text-left">Prepared by</th>
-            <th className="py-2 pl-3 text-left">Notes</th>
+            {/* `align-top` on every label, so they stay on one line while the
+                Prepared by header grows a picker beneath its own. */}
+            <th className="py-2 text-left align-top">Donut</th>
+            <th className="py-2 text-left align-top">Made</th>
+            <th className="py-2 pl-3 text-left align-top">
+              Prepared by
+              {/* THE EVERY-DONUT PICKER SITS IN THE COLUMN IT FILLS (Mark,
+                  2026-09-30), at that column's width, and sticks with the
+                  header. The wrapper undoes the header row's caps and tracking,
+                  which the picker would otherwise inherit. */}
+              {editable && rows.length > 1 ? (
+                <div className="mt-2 font-normal normal-case tracking-normal">
+                  <PickList
+                    variant="field"
+                    size="lg"
+                    boxed
+                    className="w-full"
+                    value={shared}
+                    options={operators}
+                    clearable
+                    onPick={(next) => saveAllPreparers(next === "" ? null : next)}
+                    ariaLabel="Prepared by, every donut"
+                  />
+                </div>
+              ) : null}
+            </th>
+            <th className="py-2 pl-3 text-left align-top">Notes</th>
           </tr>
         </thead>
         <tbody>
