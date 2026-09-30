@@ -535,11 +535,16 @@ export function newMessageId(from: string | undefined | null): string {
 }
 
 /**
- * A body that is followed by a PDF ends in a few blank lines (Mark,
- * 2026-09-30 — special orders, then POs), so the attachment a mail client previews inline below the text
- * doesn't butt up against the signature. Trailing whitespace is trimmed first,
- * so a body that already ends in blank lines gets the same gap, not a bigger one.
+ * A body that is followed by a PDF ends in a gap (Mark, 2026-09-30 — special
+ * orders, then POs), so the attachment a mail client previews inline below the
+ * text doesn't butt up against the signature.
+ *
+ * THE GAP LINES EACH HOLD A NON-BREAKING SPACE, because truly blank ones do
+ * not survive: the first cut appended "\n\n\n\n" and Mark saw no gap at all —
+ * mail clients trim trailing blank lines off a plain-text part. A U+00A0 is
+ * invisible but is not whitespace to that trim. Trailing whitespace is trimmed
+ * first, so every message gets the same gap however its body ended.
  */
 export function withGapBeforeAttachment(text: string): string {
-  return `${text.replace(/\s+$/, "")}\n\n\n\n`;
+  return `${text.replace(/\s+$/, "")}\n${"\n\u00A0".repeat(4)}\n`;
 }
