@@ -324,6 +324,9 @@ export type LineGroup<T> = {
   label: string;
   /** 0 is the top band; Item type nests Size at 1 and Cut at 2. */
   level: number;
+  /** What this band groups by — a skipped Size puts Cut at level 1, so the
+   *  level alone cannot say it. Null for the ungrouped run. */
+  dimension: Exclude<LineGrouping, "none"> | null;
   /** Every line under this band, however deep — what its qty and total sum. */
   rows: T[];
   /** The lines are drawn under LEAF bands only; a parent band is a heading. */
@@ -387,7 +390,7 @@ export function groupLines<T extends GroupableLine>(
   rows: T[],
   grouping: LineGrouping
 ): LineGroup<T>[] {
-  if (grouping === "none") return [{ key: "", label: "", level: 0, rows, leaf: true }];
+  if (grouping === "none") return [{ key: "", label: "", level: 0, dimension: null, rows, leaf: true }];
   const dims = NESTING[grouping];
   const out: LineGroup<T>[] = [];
   const walk = (set: T[], depth: number, level: number, path: string) => {
@@ -406,6 +409,7 @@ export function groupLines<T extends GroupableLine>(
         key,
         label: k === "" ? EMPTY_LABEL[d] : d === "price" ? `$${k}` : k,
         level,
+        dimension: d,
         rows: run,
         leaf: last,
       });

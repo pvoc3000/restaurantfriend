@@ -516,6 +516,14 @@ export function OrderLines({
                     <td colSpan={columnKeys.length} className="h-12 p-0" />
                   </tr>
                 ) : null}
+                {/* …AND BETWEEN SIZES UNDER A TYPE (Mark, 2026-09-29) — above
+                    every Size heading but the first in its type, which sits
+                    tight to the type's band. Half the gap between types. */}
+                {g.level > 0 && g.dimension === "size" && (groups[i - 1]?.level ?? 0) > 0 ? (
+                  <tr aria-hidden="true">
+                    <td colSpan={columnKeys.length} className="h-6 p-0" />
+                  </tr>
+                ) : null}
                 <tr className={g.level === 0 ? "bg-ink text-white" : "text-ink"}>
                   {canWrite ? <td className="p-0" /> : null}
                   <td
