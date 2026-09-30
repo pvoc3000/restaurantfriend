@@ -997,17 +997,18 @@ export async function SpecialOrderDetail({
                         canWrite={canWrite}
                       />
                     </Row>
-                    <Row label="Kitchen">
-                      {/* Decision 8: kitchen is where it is MADE… */}
-                      <Cell table="special_orders" id={id} column="kitchen_location_id" kind="pick"
-                            options={locationOptions} value={row.kitchen_location_id as string | null}
-                            canWrite={canEditItems} ariaLabel="Kitchen" />
-                    </Row>
+                    {/* PICKUP SHOP BEFORE KITCHEN (Mark, 2026-09-29). */}
                     <Row label="Pickup shop">
-                      {/* …and location is where it is PICKED UP. */}
+                      {/* Decision 8: location is where it is PICKED UP… */}
                       <Cell table="special_orders" id={id} column="location_id" kind="pick"
                             options={locationOptions} value={row.location_id as string | null}
                             canWrite={canWrite} ariaLabel="Pickup shop" />
+                    </Row>
+                    <Row label="Kitchen">
+                      {/* …and kitchen is where it is MADE. */}
+                      <Cell table="special_orders" id={id} column="kitchen_location_id" kind="pick"
+                            options={locationOptions} value={row.kitchen_location_id as string | null}
+                            canWrite={canEditItems} ariaLabel="Kitchen" />
                     </Row>
                     <Row label="Pickup / delivery">
                       {/* The pickup/delivery CHOICE lives here, beside the
