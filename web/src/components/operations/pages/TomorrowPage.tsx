@@ -1,8 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useOptimisticRows } from "@/lib/useOptimisticRows";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { GenerateSchedules } from "@/components/production/GenerateSchedules";
@@ -94,16 +95,27 @@ export function TomorrowPage({
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [, startTransition] = useTransition();
+  // THE TICK SHOWS ON THE TAP (Mark, 2026-09-30) — `useOptimisticRows` over
+  // the report's one row, as the Info page does.
+  const saved = useMemo(
+    () => [{ id: reportId, task_schedules_done: schedulesDone }],
+    [reportId, schedulesDone]
+  );
+  const {
+    rows: [flags],
+    optimistic,
+  } = useOptimisticRows(saved);
 
-  function flag(column: string, value: boolean) {
-    startTransition(async () => {
-      await supabase
+  function flag(column: "task_schedules_done" | "task_special_orders_done", value: boolean) {
+    void optimistic(reportId, { [column]: value }, async () => {
+      const { data, error } = await supabase
         .from("shift_reports")
         .update({ [column]: value })
         .eq("id", reportId)
         .select("id");
+      if (error || !data?.length) return false;
       router.refresh();
+      return true;
     });
   }
 
@@ -208,7 +220,7 @@ export function TomorrowPage({
           ) : null}
         </div>
         <Checkbox
-          checked={schedulesDone}
+          checked={flags.task_schedules_done}
           disabled={!editable}
           onChange={(next) => flag("task_schedules_done", next)}
         >

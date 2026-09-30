@@ -689,3 +689,15 @@
    naming only that column; rows stay individually editable. It holds no state:
    it shows a name only while every row has that name, and goes blank once one
    row differs.
+   **FIELDS SHOW ON THE TAP, AND A CLEARED BOX STAYS CLEARED (Mark, 2026-09-30;
+   migration 156).** Info, Tomorrow and Donut batches now go through
+   `useOptimisticRows` like Ratings and Premades (Report's prose box already held
+   its own draft). The clearing bug: the Donut batches page saved only the
+   changed column and read "draft, else batch" per field, so an emptied amount
+   fell through to the batch's old number; submit's `coalesce(draft, batch)`
+   would have kept it on Send too. The page now saves the WHOLE row every time
+   (starting from the batch's values), reads the draft whole when there is one,
+   and 156's submit writes the draft as it stands, notes included. The
+   every-donut picker's shadow was clipped by the sticky Notes header painting
+   over it; the Prepared by header is lifted with `z-30!`. Headers are
+   bottom-aligned.

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useOptimisticRows } from "@/lib/useOptimisticRows";
 import { SHIFT_REPORT_BATCH_SCHEDULE } from "@/lib/production";
 import { UNIT_PICK_OPTIONS } from "@/lib/units";
 
@@ -77,9 +78,11 @@ export function ElementsPage({
   editable: boolean;
 }) {
   const router = useRouter();
+  /** Generating the log failed — there is no page to show without it. */
+  const [setupFailed, setSetupFailed] = useState<string | null>(null);
+  /** A save failed — said above the table; the row has gone back already. */
   const [failed, setFailed] = useState<string | null>(null);
   const [nothingHere, setNothingHere] = useState(false);
-  const [, startTransition] = useTransition();
   const started = useRef(false);
 
   useEffect(() => {
@@ -99,7 +102,7 @@ export function ElementsPage({
         .eq("production_elements.schedule_class", SHIFT_REPORT_BATCH_SCHEDULE)
         .eq("production_elements.is_active", true);
       if (countErr) {
-        setFailed(countErr.message);
+        setSetupFailed(countErr.message);
         return;
       }
       if (!count) {
@@ -112,77 +115,77 @@ export function ElementsPage({
         p_schedule: SHIFT_REPORT_BATCH_SCHEDULE,
       });
       if (error) {
-        setFailed(error.message);
+        setSetupFailed(error.message);
         return;
       }
       router.refresh();
     })();
   }, [hasLog, editable, kitchenId, reportDate, router]);
 
-  function save(
-    batchId: string,
-    patch:
-      | { yield_count: number | null }
-      | { yield_size: number | null }
-      | { yield_unit: string | null }
-      | { operator_employee_id: string | null }
-      | { notes: string | null }
-  ) {
-    startTransition(async () => {
-      const { error } = await createClient()
-        .from("shift_report_batches")
-        .upsert(
-          { org_id: orgId, report_id: reportId, batch_id: batchId, ...patch },
-          { onConflict: "report_id,batch_id" }
-        )
-        .select("id");
-      if (error) {
-        setFailed(error.message);
-        return;
-      }
-      setFailed(null);
-      router.refresh();
-    });
-  }
+  // EVERY CHANGE SHOWS ON THE TAP (Mark, 2026-09-30: "make the app feel
+  // better. Especially on tablets") — `useOptimisticRows`, as Ratings and
+  // Premades already do. The write and the refresh follow behind.
+  const { rows: shown, optimistic } = useOptimisticRows(rows, (r) => r.batchId);
 
   /**
-   * PREPARED BY FOR EVERY ROW (Mark, 2026-09-30) — "sets all the individual
-   * prepared by fields to the same employee … The user can still change the
-   * individual ones later". ONE upsert naming only that column, so each row's
-   * Made and Notes drafts are left alone.
+   * Save the WHOLE ROW, every time (156). The draft starts as a copy of what
+   * the batch held, so NULL in it means "emptied" rather than "untouched" —
+   * which is what lets a cleared box stay cleared, and lets Send empty the
+   * batch. Upserting only the changed column made a fresh draft row hold NULL
+   * everywhere else, and the page then fell back to the batch's old number.
    */
-  function saveAllPreparers(operatorId: string | null) {
-    startTransition(async () => {
+  function write(ids: string[], patch: Partial<ElementBatchRow>) {
+    const next = shown
+      .filter((r) => ids.includes(r.batchId))
+      .map((r) => ({ ...r, ...patch }));
+    setFailed(null);
+    void optimistic(ids, patch, async () => {
       const { error } = await createClient()
         .from("shift_report_batches")
         .upsert(
-          rows.map((r) => ({
+          next.map((r) => ({
             org_id: orgId,
             report_id: reportId,
             batch_id: r.batchId,
-            operator_employee_id: operatorId,
+            yield_count: r.yieldCount,
+            yield_size: r.yieldSize,
+            yield_unit: r.yieldUnit,
+            operator_employee_id: r.operatorId,
+            notes: r.notes,
           })),
           { onConflict: "report_id,batch_id" }
         )
         .select("id");
       if (error) {
         setFailed(error.message);
-        return;
+        return false;
       }
-      setFailed(null);
       router.refresh();
+      return true;
+    });
+  }
+
+  function setPreparer(ids: string[], operatorId: string | null) {
+    write(ids, {
+      operatorId,
+      operatorName: operatorId
+        ? operators.find((o) => o.value === operatorId)?.label ?? null
+        : null,
     });
   }
 
   // The shared picker READS the rows rather than holding its own state: it
   // names a person only while every row has that person, so once one row is
   // changed it goes blank instead of claiming something no longer true.
-  const shared = rows.length > 0 && rows.every((r) => r.operatorId === rows[0].operatorId)
-    ? rows[0].operatorId
-    : null;
+  // "Sets all the individual prepared by fields to the same employee … The
+  // user can still change the individual ones later" (Mark, 2026-09-30).
+  const shared =
+    shown.length > 0 && shown.every((r) => r.operatorId === shown[0].operatorId)
+      ? shown[0].operatorId
+      : null;
 
-  if (failed) {
-    return <p className="text-center text-[16px] text-accent">{failed}</p>;
+  if (setupFailed) {
+    return <p className="text-center text-[16px] text-accent">{setupFailed}</p>;
   }
 
   if (rows.length === 0) {
@@ -199,6 +202,7 @@ export function ElementsPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
+      {failed ? <p className="text-sm text-accent">{failed}</p> : null}
       <table className="w-full table-fixed">
         <colgroup>
           <col />
@@ -212,11 +216,14 @@ export function ElementsPage({
           <tr
             className={`text-xs font-semibold uppercase tracking-[0.08em] ${STICKY_HEAD_ROW_UNDER_RUNNER}`}
           >
-            {/* `align-top` on every label, so they stay on one line while the
-                Prepared by header grows a picker beneath its own. */}
-            <th className="py-2 text-left align-top">Donut</th>
-            <th className="py-2 text-left align-top">Made</th>
-            <th className="py-2 pl-3 text-left align-top">
+            {/* BOTTOM-ALIGNED (Mark, 2026-09-30), so each label sits on the
+                row it heads — level with the Prepared by picker's foot. */}
+            <th className="py-2 text-left align-bottom">Donut</th>
+            <th className="py-2 text-left align-bottom">Made</th>
+            {/* `z-30!` lifts this header over its sticky neighbour: Notes comes
+                later and paints its white ground over the picker's 3px shadow,
+                which is what clipped its right side. */}
+            <th className="py-2 pl-3 text-left align-bottom z-30!">
               Prepared by
               {/* THE EVERY-DONUT PICKER SITS IN THE COLUMN IT FILLS (Mark,
                   2026-09-30), at that column's width, and sticks with the
@@ -232,17 +239,22 @@ export function ElementsPage({
                     value={shared}
                     options={operators}
                     clearable
-                    onPick={(next) => saveAllPreparers(next === "" ? null : next)}
+                    onPick={(next) =>
+                      setPreparer(
+                        shown.map((r) => r.batchId),
+                        next === "" ? null : next
+                      )
+                    }
                     ariaLabel="Prepared by, every donut"
                   />
                 </div>
               ) : null}
             </th>
-            <th className="py-2 pl-3 text-left align-top">Notes</th>
+            <th className="py-2 pl-3 text-left align-bottom">Notes</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {shown.map((r) => (
             <tr key={r.batchId} className="border-b border-hairline/60">
               <td className="py-2 pr-3 text-[16px]">{r.elementName}</td>
               <td className="py-2">
@@ -252,7 +264,7 @@ export function ElementsPage({
                   <div className="w-20 shrink-0">
                     <CountField
                       value={r.yieldCount}
-                      onCommit={(next) => save(r.batchId, { yield_count: next })}
+                      onCommit={(next) => write([r.batchId], { yieldCount: next })}
                       disabled={!editable}
                       ariaLabel={`Made count, ${r.elementName}`}
                     />
@@ -261,7 +273,7 @@ export function ElementsPage({
                   <div className="w-20 shrink-0">
                     <CountField
                       value={r.yieldSize}
-                      onCommit={(next) => save(r.batchId, { yield_size: next })}
+                      onCommit={(next) => write([r.batchId], { yieldSize: next })}
                       disabled={!editable}
                       ariaLabel={`Made size, ${r.elementName}`}
                     />
@@ -277,7 +289,7 @@ export function ElementsPage({
                       options={MADE_UNITS}
                       disabled={!editable}
                       onPick={(next) =>
-                        save(r.batchId, { yield_unit: next === "" ? null : next })
+                        write([r.batchId], { yieldUnit: next === "" ? null : next })
                       }
                       ariaLabel={`Made unit, ${r.elementName}`}
                     />
@@ -298,7 +310,7 @@ export function ElementsPage({
                     options={operators}
                     clearable
                     onPick={(next) =>
-                      save(r.batchId, { operator_employee_id: next === "" ? null : next })
+                      setPreparer([r.batchId], next === "" ? null : next)
                     }
                     ariaLabel={`Prepared by, ${r.elementName}`}
                   />
@@ -309,7 +321,7 @@ export function ElementsPage({
               <td className="py-2 pl-3">
                 <TextField
                   value={r.notes}
-                  onCommit={(next) => save(r.batchId, { notes: next })}
+                  onCommit={(next) => write([r.batchId], { notes: next })}
                   disabled={!editable}
                   ariaLabel={`Notes, ${r.elementName}`}
                 />

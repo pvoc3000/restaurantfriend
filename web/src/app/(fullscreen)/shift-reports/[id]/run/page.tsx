@@ -503,11 +503,13 @@ export default async function RunShiftReportPage({
       // THIS REPORT'S DRAFT, else what the batch already holds — the opening
       // and mid reports share one log, so whichever comes second opens on the
       // first one's numbers rather than on empty boxes.
-      // Draft first, else the batch — per field, so a report that only sets
-      // the unit still shows the count somebody else entered.
-      const pick = (col: string) => (d?.[col] ?? b[col] ?? null) as number | string | null;
-      const operatorId =
-        ((d?.operator_employee_id ?? b.operator_employee_id ?? null) as string | null);
+      // THE DRAFT WHOLE, IF THERE IS ONE, else the batch (156). The page saves
+      // every field of a row together, starting from the batch's values, so a
+      // NULL in a draft is a box somebody emptied — falling back to the batch
+      // per field is what made a cleared amount reappear.
+      const src = (d ?? b) as Record<string, unknown>;
+      const pick = (col: string) => (src[col] ?? null) as number | string | null;
+      const operatorId = pick("operator_employee_id") as string | null;
       return {
         batchId: b.id as string,
         elementName: el?.name ?? "—",
@@ -518,7 +520,7 @@ export default async function RunShiftReportPage({
         operatorName: operatorId
           ? batchOperators.find((o) => o.value === operatorId)?.label ?? null
           : null,
-        notes: ((d?.notes ?? b.notes ?? null) as string | null),
+        notes: pick("notes") as string | null,
       };
     });
   }

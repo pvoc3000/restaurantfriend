@@ -1,8 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useOptimisticRows } from "@/lib/useOptimisticRows";
 import { DateField } from "@/components/ui/DateField";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { FieldLabel } from "./fields";
@@ -64,7 +65,27 @@ export function InfoPage({
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [, startTransition] = useTransition();
+  const [failed, setFailed] = useState<string | null>(null);
+
+  // EVERY PICK SHOWS ON THE TAP (Mark, 2026-09-30) — the report's one row
+  // through `useOptimisticRows`, the hook Ratings and Premades use. Memoised on
+  // the values, so a refresh that changes nothing does not reset it.
+  const saved = useMemo(
+    () => [
+      {
+        id: reportId,
+        report_date: reportDate,
+        shift,
+        supervisor_employee_id: supervisorId,
+        next_production_date: nextProductionDate,
+      },
+    ],
+    [reportId, reportDate, shift, supervisorId, nextProductionDate]
+  );
+  const {
+    rows: [info],
+    optimistic,
+  } = useOptimisticRows(saved);
 
   // The filtered list, plus whoever is recorded if the filter would drop them.
   // `takers` is the full roster, so the appended row carries a NAME rather than
@@ -82,13 +103,23 @@ export function InfoPage({
           },
         ];
 
-  function save(patch: Record<string, string | null>) {
-    startTransition(async () => {
+  function save(patch: Partial<(typeof saved)[number]>) {
+    setFailed(null);
+    void optimistic(reportId, patch, async () => {
       // `.select()` on every write: an update matching no policy changes
       // nothing and PostgREST returns NO error, so a bare update would report
-      // a cheerful success and the refresh would put the old value back.
-      await supabase.from("shift_reports").update(patch).eq("id", reportId).select("id");
+      // a cheerful success while the row went back to what it was.
+      const { data, error } = await supabase
+        .from("shift_reports")
+        .update(patch)
+        .eq("id", reportId)
+        .select("id");
+      if (error || !data?.length) {
+        setFailed(error?.message ?? "That change was not saved.");
+        return false;
+      }
       router.refresh();
+      return true;
     });
   }
 
@@ -99,6 +130,7 @@ export function InfoPage({
     // that the TRACK is the width — the block defines one edge and every field
     // in it shares both.
     <div className="mx-auto max-w-2xl space-y-8">
+      {failed ? <p className="text-sm text-accent">{failed}</p> : null}
       {/* LOCATION LEADS, because it is the one thing here nobody can change
           (Mark, 2026-08-28) — a read-only value below four editable ones reads
           as a field that has stopped working. At the top it is the heading it
@@ -111,7 +143,7 @@ export function InfoPage({
       <label className="block space-y-2">
         <FieldLabel hint="the day your shift started, not ended!">Date</FieldLabel>
         <DateField
-          value={reportDate}
+          value={info.report_date}
           onChange={(next) => next && save({ report_date: next })}
           variant="field"
           boxed
@@ -123,7 +155,7 @@ export function InfoPage({
       <div className="space-y-2">
         <FieldLabel>Supervisor</FieldLabel>
         <PickList
-          value={supervisorId}
+          value={info.supervisor_employee_id}
           options={supervisorOptions}
           onPick={(next) => save({ supervisor_employee_id: next })}
           placeholder="Who ran the shift"
@@ -139,9 +171,9 @@ export function InfoPage({
       <div className="space-y-2">
         <FieldLabel>Shift</FieldLabel>
         <PickList
-          value={shift}
+          value={info.shift}
           options={SHIFT_OPTIONS}
-          onPick={(next) => save({ shift: next })}
+          onPick={(next) => save({ shift: next as ShiftSlot })}
           variant="field"
           size="lg"
           boxed
@@ -156,7 +188,7 @@ export function InfoPage({
           Next production day
         </FieldLabel>
         <DateField
-          value={nextProductionDate}
+          value={info.next_production_date}
           onChange={(next) => save({ next_production_date: next })}
           variant="field"
           boxed
