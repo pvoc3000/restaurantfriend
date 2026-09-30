@@ -177,9 +177,14 @@ export function ElementsPage({
               </td>
               <td className="py-2 pl-3">
                 {editable ? (
+                  // Fills its column rather than shrinking to its value, and
+                  // `boxed` keeps an empty one blank rather than showing a dash
+                  // — the Employees page's Position picker, for its reasons.
                   <PickList
                     variant="field"
                     size="lg"
+                    boxed
+                    className="w-full"
                     value={r.operatorId}
                     options={operators}
                     clearable
