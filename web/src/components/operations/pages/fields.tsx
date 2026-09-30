@@ -24,8 +24,18 @@ export function FieldLabel({ children, hint }: { children: React.ReactNode; hint
   );
 }
 
-const BOX =
-  "w-full border border-hairline bg-white px-3 text-[16px] hover:border-ink focus:border-ink focus:outline-none";
+// LAYOUT ONLY; the border's colour is each field's own (`boxBorder`), the
+// "shared class string states layout" rule — so one page can ask for black.
+const BOX = "w-full border bg-white px-3 text-[16px] focus:outline-none";
+
+/**
+ * The box's edge. HAIRLINE by default, blackening on hover and focus; `ink`
+ * is black at rest, for a page whose picklists (black-edged) sit beside it —
+ * Donut batches (Mark, 2026-09-30: "make the borders of the fields … black").
+ */
+function boxBorder(ink: boolean): string {
+  return ink ? "border-ink" : "border-hairline hover:border-ink focus:border-ink";
+}
 
 /** A number a supervisor counts. Carries CalcPad, so "12+6" is typeable. */
 export function CountField({
@@ -33,11 +43,14 @@ export function CountField({
   onCommit,
   ariaLabel,
   disabled = false,
+  ink = false,
 }: {
   value: number | null;
   onCommit: (next: number | null) => void;
   ariaLabel: string;
   disabled?: boolean;
+  /** A black edge at rest — see `boxBorder`. */
+  ink?: boolean;
 }) {
   const calc = useCalcField();
   const [draft, setDraft] = useState(value === null ? "" : String(value));
@@ -56,7 +69,7 @@ export function CountField({
     <input
       {...calc}
       type="text"
-      className={`${BOX} h-12 text-right`}
+      className={`${BOX} ${boxBorder(ink)} h-12 text-right`}
       value={draft}
       aria-label={ariaLabel}
       disabled={disabled}
@@ -84,12 +97,15 @@ export function TextField({
   ariaLabel,
   placeholder,
   disabled = false,
+  ink = false,
 }: {
   value: string | null;
   onCommit: (next: string | null) => void;
   ariaLabel: string;
   placeholder?: string;
   disabled?: boolean;
+  /** A black edge at rest — see `boxBorder`. */
+  ink?: boolean;
 }) {
   const [draft, setDraft] = useState(value ?? "");
   const [seen, setSeen] = useState(value);
@@ -100,7 +116,7 @@ export function TextField({
   return (
     <input
       type="text"
-      className={`${BOX} h-12`}
+      className={`${BOX} ${boxBorder(ink)} h-12`}
       value={draft}
       aria-label={ariaLabel}
       placeholder={placeholder}
@@ -148,7 +164,7 @@ export function ProseField({
   return (
     <div className="space-y-1">
       <textarea
-        className={`${BOX} py-3 leading-relaxed`}
+        className={`${BOX} ${boxBorder(false)} py-3 leading-relaxed`}
         rows={rows}
         value={draft}
         aria-label={ariaLabel}

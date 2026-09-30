@@ -266,6 +266,7 @@ export function ElementsPage({
                       value={r.yieldCount}
                       onCommit={(next) => write([r.batchId], { yieldCount: next })}
                       disabled={!editable}
+                      ink
                       ariaLabel={`Made count, ${r.elementName}`}
                     />
                   </div>
@@ -275,6 +276,7 @@ export function ElementsPage({
                       value={r.yieldSize}
                       onCommit={(next) => write([r.batchId], { yieldSize: next })}
                       disabled={!editable}
+                      ink
                       ariaLabel={`Made size, ${r.elementName}`}
                     />
                   </div>
@@ -323,6 +325,7 @@ export function ElementsPage({
                   value={r.notes}
                   onCommit={(next) => write([r.batchId], { notes: next })}
                   disabled={!editable}
+                  ink
                   ariaLabel={`Notes, ${r.elementName}`}
                 />
               </td>
