@@ -503,7 +503,7 @@ export function OrderLines({
             g.label ? (
               /* THE BAND'S WEIGHT IS ITS LEVEL — the app's two marks for a
                  break (see `DataGroup.subLabel`): black band on top, then a
-                 heading over an ink rule for Size, then a lighter one over a
+                 bold black heading over an ink rule for Size, then a lighter one over a
                  hairline for Cut, indented one step each. Each carries its
                  line count, and its qty and total under those columns. */
               <tbody key={`band-${g.key}`}>
@@ -511,7 +511,10 @@ export function OrderLines({
                   {canWrite ? <td className="p-0" /> : null}
                   <td
                     colSpan={2}
-                    className={`text-xs font-semibold uppercase ${
+                    className={`text-xs uppercase ${
+                      // SIZE IS BOLD BLACK (Mark, 2026-09-29).
+                      g.level === 1 ? "font-bold text-ink" : "font-semibold"
+                    } ${
                       g.level === 0
                         ? "px-3 py-2 tracking-[0.12em]"
                         : g.level === 1
@@ -533,13 +536,14 @@ export function OrderLines({
                       g.level === 0
                         ? "px-3 py-2"
                         : `px-3 pb-1 ${g.level === 1 ? "pt-3 border-b border-ink" : "pt-2 border-b border-hairline text-muted"}`;
+                    const weight = g.level === 1 ? "font-bold text-ink" : "font-semibold";
                     return (
                       <>
-                        <td className={`${cell} text-right text-xs font-semibold tabular-nums`}>
+                        <td className={`${cell} ${weight} text-right text-xs tabular-nums`}>
                           {g.rows.reduce((a, r) => a + Number(r.qty ?? 0), 0)}
                         </td>
                         <td colSpan={2} className={cell} />
-                        <td className={`${cell} text-right text-xs font-semibold tabular-nums`}>
+                        <td className={`${cell} ${weight} text-right text-xs tabular-nums`}>
                           {money(g.rows.reduce((a, r) => a + lineTotal(r), 0))}
                         </td>
                       </>
