@@ -7,6 +7,7 @@ import { useRef } from "react";
 import { signOut } from "@/app/actions";
 import { SwitchUser } from "@/components/SwitchUser";
 import { WorkingLocation } from "@/components/WorkingLocation";
+import { useRecordNavSeat } from "@/lib/recordNavSlot";
 import type { Location } from "@/lib/session";
 import { TABLET_HOME } from "@/lib/shell";
 import { usePublishedHeight } from "@/lib/tableHead";
@@ -26,7 +27,9 @@ import { TabletBack } from "./TabletBack";
  * ONLY — the shop picker, Settings and Switch user (Mark, 2026-09-09: "to make room for
  * other controls, location switching and the account button only need to be on
  * the landing/home page. I don't think we need the title of the page in the
- * menu bar, either"). Every cell is a 64px box with the icon over its word, the
+ * menu bar, either"). The picker has since spread to every screen but the
+ * shift reports and a record's own screen (2026-09-30); Settings and Switch
+ * user stay on the landing page. Every cell is a 64px box with the icon over its word, the
  * runners' footer idiom. No title: the page's own heading says what it is.
  *
  * SCREEN COMMANDS (`lib/tabletBarActions`, 2026-09-10) are a page's own
@@ -56,7 +59,15 @@ export function TabletBar({
 }) {
   const ref = useRef<HTMLElement>(null);
   usePublishedHeight(ref, "--rf-header-h");
-  const atHome = usePathname() === TABLET_HOME;
+  const pathname = usePathname();
+  const atHome = pathname === TABLET_HOME;
+  const onRecord = useRecordNavSeat() !== null;
+  // THE SHOP PICKER ON EVERY SCREEN BUT TWO KINDS (Mark, 2026-09-30: once
+  // you left the landing page nothing said which shop you were at). Not on
+  // the shift reports, which belong to the shop they were run at, and not on
+  // a record's own screen — the record is the one it is whichever shop you
+  // are working at, and that is where the record book needs the room.
+  const showPicker = atHome || !(onRecord || pathname.startsWith("/shift-reports"));
 
   return (
     <header ref={ref} className="sticky top-0 z-50 bg-ink text-white">
@@ -77,6 +88,11 @@ export function TabletBar({
         <div className="min-w-0 flex-1" />
         <BarActions side="trailing" />
         <BarRecordNav />
+        {showPicker && !atHome && (
+          <div className="px-3">
+            <WorkingLocation locations={locations} working={working} size="lg" />
+          </div>
+        )}
         {atHome && (
           <div className="flex items-center gap-4 px-3">
             <WorkingLocation locations={locations} working={working} size="lg" />

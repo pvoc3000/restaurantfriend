@@ -285,3 +285,14 @@ can point that link at the working org's logo (an upload in Storage, a field
 in `orgs.settings`). The manifest is the part that cannot: it is fetched with no
 session, so its icons stay the product default unless orgs get their own
 hostnames. An icon already on a home screen never updates; people re-add it.
+
+**2026-09-30 — the shop picker leaves the landing page.** Once you left `/start`
+nothing on a tablet said which shop you were working at. First tried: Home wore
+the shop code over its word in place of the house (`beaaac0f`); Mark reverted
+it the same day ("maybe that wasn't such a great idea"). Instead the
+`WorkingLocation` picker now sits at the right end of the bar on every screen
+EXCEPT the shift reports (a report belongs to the shop it was run at) and a
+record's own screen — detected by the record book's seat being taken, so it
+covers every detail page without a list of routes, and leaves the record book
+the room it needs. Settings and Switch user/Sign out stay on the landing page.
+The runners are in `(fullscreen)` and have no bar at all.
