@@ -535,15 +535,17 @@ export function newMessageId(from: string | undefined | null): string {
 }
 
 /**
- * A body that is followed by a PDF ends in a line break or two (Mark,
- * 2026-09-30 — special orders, then POs), which at least keeps a client's
- * inline preview off the text's last line.
+ * A body that is followed by a PDF ends in a gap (Mark, 2026-09-30 — special
+ * orders, then POs), so the attachment a mail client previews inline below the
+ * text doesn't butt up against the signature.
  *
- * IT DOES NOT MAKE A GAP, AND NOTHING IN THE TEXT WILL. Blank lines were
- * trimmed; lines holding a non-breaking space were trimmed too (Mark, the same
- * day). The gap is on the PAGE instead: `mailedDocStyles` in
- * `web/src/components/pdf/appDocument.tsx` puts a quarter inch above the
- * masthead of every special-order and purchasing document.
+ * THE GAP LINES EACH HOLD A NON-BREAKING SPACE, because truly blank ones were
+ * trimmed. It shows in Gmail; iCloud Mail trims even these, and there only the
+ * line break before the preview survives. The page carries a gap of its own
+ * for that reason: `mailedDocStyles` in `web/src/components/pdf/appDocument.tsx`
+ * puts a quarter inch above the masthead of every special-order and purchasing
+ * document. Trailing whitespace is trimmed first, so every message gets the
+ * same gap however its body ended.
  */
 export function withGapBeforeAttachment(text: string): string {
   return `${text.replace(/\s+$/, "")}\n${"\n\u00A0".repeat(4)}\n`;
