@@ -25,6 +25,7 @@ import {
   scheduleSourceLabel,
   type SchedulePlan,
 } from "@/lib/productionSchedule";
+import { ScheduleLocationCell } from "@/components/production/ScheduleLocationCell";
 import { PrintPacket } from "@/components/production/PrintPacket";
 import { GenerateSchedules } from "@/components/production/GenerateSchedules";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
@@ -116,7 +117,8 @@ export function SchedulesList({
   /** Supervisor and up — who may print, which STAMPS the night (044). */
   stampable: boolean;
   /**
-   * Purchaser and up, per the Page Permissions sheet — who may DELETE a night.
+   * Supervisor and up, per the Page Permissions sheet — who may DELETE a night,
+   * and who may re-point one at another shop or kitchen (the two picklists).
    * Separate from `stampable` because the two are different rungs and the bar
    * can legitimately exist for somebody who may print and not delete.
    */
@@ -318,7 +320,21 @@ export function SchedulesList({
       label: "Sells at",
       width: 100,
       sortValue: (r) => r.sellsCode,
-      render: (r) => <span className="font-medium">{r.sellsCode}</span>,
+      render: (r) =>
+        editable ? (
+          <ScheduleLocationCell
+            scheduleId={r.id}
+            column="location_id"
+            value={r.location_id}
+            code={r.sellsCode}
+            locations={locations}
+            ariaLabel={`Sells at, ${packetDate(r.schedule_date)}`}
+            className="font-medium"
+            onError={setFailed}
+          />
+        ) : (
+          <span className="font-medium">{r.sellsCode}</span>
+        ),
     },
     {
       key: "kitchen",
@@ -328,11 +344,23 @@ export function SchedulesList({
       // The column FileMaker could not have. A kitchen that differs from the
       // shop is decision 9's whole point, so it is emphasised; a same-shop one
       // is quiet.
-      render: (r) => (
-        <span className={r.kitchenCode === r.sellsCode ? "text-muted" : "font-medium"}>
-          {r.kitchenCode}
-        </span>
-      ),
+      render: (r) =>
+        editable ? (
+          <ScheduleLocationCell
+            scheduleId={r.id}
+            column="kitchen_location_id"
+            value={r.kitchen_location_id}
+            code={r.kitchenCode}
+            locations={locations}
+            ariaLabel={`Made at, ${packetDate(r.schedule_date)} ${r.sellsCode}`}
+            className={r.kitchenCode === r.sellsCode ? "text-muted" : "font-medium"}
+            onError={setFailed}
+          />
+        ) : (
+          <span className={r.kitchenCode === r.sellsCode ? "text-muted" : "font-medium"}>
+            {r.kitchenCode}
+          </span>
+        ),
     },
     {
       key: "source",
