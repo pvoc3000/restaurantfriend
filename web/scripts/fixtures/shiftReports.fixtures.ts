@@ -978,15 +978,16 @@ test("a re-send says CORRECTED in the subject and at the top of BOTH bodies", ()
   }
 });
 
-test("the email lists DONUT BATCHES with each total, and a blank as a dash", () => {
+test("the email lists DONUT BATCHES with each total and who made it, a blank as a dash", () => {
   const html = supervisorBody({
     ...REPORT,
     elements: [
-      { name: "Raised Donut", batches: 7.5 },
-      { name: "Mochi Donut", batches: null },
+      { name: "Raised Donut", batches: 7.5, preparedBy: "Leo Baker" },
+      { name: "Mochi Donut", batches: null, preparedBy: null },
     ],
   });
   ok(html.includes("Donut batches"), "the heading");
   ok(html.includes(">7.5<"), "a half batch survives");
   ok(/Mochi Donut<\/td><td[^>]*>—</.test(html), "an uncounted donut reads —");
+  ok(html.includes("Prepared by") && html.includes(">Leo Baker<"), "who made it");
 });

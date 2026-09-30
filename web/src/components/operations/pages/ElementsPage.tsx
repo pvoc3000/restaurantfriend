@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SHIFT_REPORT_BATCH_SCHEDULE } from "@/lib/production";
+import { PickList, type PickOption } from "@/components/ui/PickList";
 import { CountField } from "./fields";
 import { STICKY_HEAD_ROW_UNDER_RUNNER } from "@/lib/tableHead";
 
@@ -12,6 +13,9 @@ export type ElementBatchRow = {
   elementName: string;
   /** This report's draft, else what the batch already holds. */
   batchCount: number | null;
+  /** Who made it — the draft, else the batch's own "Prepared by" (154). */
+  operatorId: string | null;
+  operatorName: string | null;
 };
 
 /**
@@ -28,8 +32,11 @@ export type ElementBatchRow = {
  * It checks the kitchen HAS donuts first, so a shop that bakes none does not
  * collect an empty Donut log every morning.
  *
- * The numbers are a DRAFT (`shift_report_batches`) until Send writes them onto
- * the batches — 070's rule for every page of this report.
+ * PREPARED BY, one per donut (Mark, 2026-09-30) — the batch record's own field,
+ * from `production_operators` because a supervisor cannot read `employees`.
+ *
+ * The numbers and names are a DRAFT (`shift_report_batches`) until Send writes
+ * them onto the batches — 070's rule for every page of this report.
  */
 export function ElementsPage({
   reportId,
@@ -39,6 +46,7 @@ export function ElementsPage({
   reportDate,
   hasLog,
   rows,
+  operators,
   editable,
 }: {
   reportId: string;
@@ -48,6 +56,7 @@ export function ElementsPage({
   reportDate: string;
   hasLog: boolean;
   rows: ElementBatchRow[];
+  operators: PickOption[];
   editable: boolean;
 }) {
   const router = useRouter();
@@ -93,12 +102,15 @@ export function ElementsPage({
     })();
   }, [hasLog, editable, kitchenId, reportDate, router]);
 
-  function save(batchId: string, batchCount: number | null) {
+  function save(
+    batchId: string,
+    patch: { batch_count: number | null } | { operator_employee_id: string | null }
+  ) {
     startTransition(async () => {
       const { error } = await createClient()
         .from("shift_report_batches")
         .upsert(
-          { org_id: orgId, report_id: reportId, batch_id: batchId, batch_count: batchCount },
+          { org_id: orgId, report_id: reportId, batch_id: batchId, ...patch },
           { onConflict: "report_id,batch_id" }
         )
         .select("id");
@@ -128,11 +140,12 @@ export function ElementsPage({
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-4">
+    <div className="mx-auto max-w-3xl space-y-4">
       <table className="w-full table-fixed">
         <colgroup>
           <col />
           <col className="w-40" />
+          <col className="w-72" />
         </colgroup>
         <thead>
           <tr
@@ -140,6 +153,7 @@ export function ElementsPage({
           >
             <th className="py-2 text-left">Donut</th>
             <th className="py-2 text-right">Total batches</th>
+            <th className="py-2 pl-3 text-left">Prepared by</th>
           </tr>
         </thead>
         <tbody>
@@ -149,10 +163,27 @@ export function ElementsPage({
               <td className="py-2">
                 <CountField
                   value={r.batchCount}
-                  onCommit={(next) => save(r.batchId, next)}
+                  onCommit={(next) => save(r.batchId, { batch_count: next })}
                   disabled={!editable}
                   ariaLabel={`Total batches, ${r.elementName}`}
                 />
+              </td>
+              <td className="py-2 pl-3">
+                {editable ? (
+                  <PickList
+                    variant="field"
+                    size="lg"
+                    value={r.operatorId}
+                    options={operators}
+                    clearable
+                    onPick={(next) =>
+                      save(r.batchId, { operator_employee_id: next === "" ? null : next })
+                    }
+                    ariaLabel={`Prepared by, ${r.elementName}`}
+                  />
+                ) : (
+                  <span className="text-[16px]">{r.operatorName ?? "—"}</span>
+                )}
               </td>
             </tr>
           ))}

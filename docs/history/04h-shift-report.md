@@ -665,3 +665,8 @@
    donut BLOCKS the send, like an uncounted premade ("3 of 4 donuts have no
    batch count.") — a donut not made is a 0. The email's section is "Donut
    batches".
+   **PREPARED BY, one per donut (Mark, 2026-09-30; migration 154).** A picker on
+   each Donut batches row, from `production_operators` (a supervisor cannot read
+   `employees`). Drafted on `shift_report_batches.operator_employee_id`, written
+   by Send onto the batch's own "Prepared by", taken back by reopen only if
+   unchanged; the email's Donut batches table gains the column.

@@ -446,7 +446,7 @@ export type EmailReport = {
     }[];
   }[];
   /** Donut batches — the day's total per element. */
-  elements: { name: string; batches: number | null }[];
+  elements: { name: string; batches: number | null; preparedBy: string | null }[];
   ratings: EmailRating[];
   /**
    * The checklist linked to this report. `ReadinessInput.checklist`'s shape and
@@ -764,12 +764,14 @@ export function supervisorBody(report: EmailReport): string {
   if (report.elements.length > 0) {
     parts.push(
       `<h3 style="${S.h3}">Donut batches</h3><table style="${S.table}"><tr>` +
-        `<th style="${S.th}">Donut</th><th style="${S.thr}">Batches</th></tr>`
+        `<th style="${S.th}">Donut</th><th style="${S.thr}">Batches</th>` +
+        `<th style="${S.th}">Prepared by</th></tr>`
     );
     for (const e of report.elements) {
       parts.push(
         `<tr><td style="${S.td}">${esc(e.name)}</td>` +
-          `<td style="${S.tdr}">${e.batches === null ? "—" : esc(e.batches.toLocaleString("en-US"))}</td></tr>`
+          `<td style="${S.tdr}">${e.batches === null ? "—" : esc(e.batches.toLocaleString("en-US"))}</td>` +
+          `<td style="${S.td}">${esc(e.preparedBy ?? "—")}</td></tr>`
       );
     }
     parts.push("</table>");

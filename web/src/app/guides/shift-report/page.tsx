@@ -268,6 +268,9 @@ export default function ShiftReportGuide() {
             </p>
             <ul>
               <li>Half batches are fine: type 7.5.</li>
+              <li>
+                Under <strong>Prepared by</strong>, choose the baker who made each donut.
+              </li>
               <li>If a donut wasn’t made, enter 0. The report won’t send with a donut left blank.</li>
             </ul>
           </Page>

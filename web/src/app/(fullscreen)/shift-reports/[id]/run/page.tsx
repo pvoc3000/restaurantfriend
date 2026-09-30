@@ -471,18 +471,26 @@ export default async function RunShiftReportPage({
 
   // ---- elements: the kitchen's Donut log for the day -----------------------
   let elementRows: ElementBatchRow[] = [];
+  let batchOperators: { value: string; label: string }[] = [];
   if (wants("elements") && batchLog) {
-    const [{ data: batches }, { data: drafts }] = await Promise.all([
+    const [{ data: batches }, { data: drafts }, { data: operators }] = await Promise.all([
       supabase
         .from("production_batches")
-        .select("id, sort, batch_count, production_elements(name)")
+        .select("id, sort, batch_count, operator_employee_id, production_elements(name)")
         .eq("log_id", batchLog.id as string)
         .order("sort", { nullsFirst: false }),
       supabase
         .from("shift_report_batches")
-        .select("batch_id, batch_count")
+        .select("batch_id, batch_count, operator_employee_id")
         .eq("report_id", id),
+      // 044's definer — `employees` READ is owner/admin only (020), so this is
+      // how a supervisor names who made a batch. The batch record reads it too.
+      supabase.rpc("production_operators", { p_location_id: kitchenId }),
     ]);
+    batchOperators = ((operators ?? []) as { id: string; name: string }[]).map((o) => ({
+      value: o.id,
+      label: o.name,
+    }));
     const draftById = new Map(
       ((drafts as Record<string, unknown>[] | null) ?? []).map((d) => [d.batch_id as string, d])
     );
@@ -494,11 +502,17 @@ export default async function RunShiftReportPage({
       // first one's numbers rather than on empty boxes.
       const drafted = d?.batch_count;
       const saved = b.batch_count;
+      const operatorId =
+        ((d?.operator_employee_id ?? b.operator_employee_id ?? null) as string | null);
       return {
         batchId: b.id as string,
         elementName: el?.name ?? "—",
         batchCount:
           drafted != null ? Number(drafted) : saved != null ? Number(saved) : null,
+        operatorId,
+        operatorName: operatorId
+          ? batchOperators.find((o) => o.value === operatorId)?.label ?? null
+          : null,
       };
     });
   }
@@ -792,6 +806,7 @@ export default async function RunShiftReportPage({
         reportDate={reportDate}
         hasLog={Boolean(batchLog)}
         rows={elementRows}
+        operators={batchOperators}
         editable={editable}
       />
     );
@@ -891,7 +906,11 @@ export default async function RunShiftReportPage({
         note: r.countNote,
       })),
     })),
-    elements: elementRows.map((r) => ({ name: r.elementName, batches: r.batchCount })),
+    elements: elementRows.map((r) => ({
+      name: r.elementName,
+      batches: r.batchCount,
+      preparedBy: r.operatorName,
+    })),
     ratings: ratingRows.map((r) => ({
       employeeName: r.employeeName,
       position: r.position,
