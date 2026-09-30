@@ -151,6 +151,10 @@ const styles = {
     writeIn: { width: 34, height: 14, borderWidth: 1, borderColor: INK, marginLeft: 4 },
     // Room for "7.5" in a baker's hand.
     batchWriteIn: { width: 60, height: 18, borderWidth: 1, borderColor: INK },
+    // A name in a baker's hand.
+    preparedByWriteIn: { width: 160, height: 18, borderWidth: 1, borderColor: INK, marginLeft: 8 },
+    batchWriteInLabel: { width: 60, paddingLeft: 3 },
+    preparedByLabel: { width: 160, marginLeft: 8, paddingLeft: 3 },
 
     // The tray ruler: a cell per tray NUMBER, the count written inside the ones
     // the run fills. NOT the counting strip — answered question 3 says so.
@@ -584,13 +588,20 @@ function TrayGuidePage({
           page, so the box is never split from its heading. */}
       {grain === "subtype" && kitchen.batchDonuts.length > 0 ? (
         <View wrap={false}>
+          {/* The two labels sit over their boxes: the band has no right
+              padding, so a fixed-width label lines up with the box beneath. */}
           <View style={styles.typeBand}>
-            <Text style={styles.typeBandText}>TOTAL BATCHES</Text>
+            <Text style={[styles.typeBandText, { flexGrow: 1 }]}>TOTAL BATCHES</Text>
+            <Text style={[styles.typeBandText, styles.batchWriteInLabel]}>BATCHES</Text>
+            <Text style={[styles.typeBandText, styles.preparedByLabel]}>PREPARED BY</Text>
           </View>
           {kitchen.batchDonuts.map((name) => (
             <View key={name} style={styles.sheetRow}>
               <Text style={[styles.cell, { flexGrow: 1 }]}>{name}</Text>
               <View style={styles.batchWriteIn} />
+              {/* Who made it (Mark, 2026-09-30) — the shift report's Prepared
+                  by picker is copied from here. */}
+              <View style={styles.preparedByWriteIn} />
             </View>
           ))}
         </View>
