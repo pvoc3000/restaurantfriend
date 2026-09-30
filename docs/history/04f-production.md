@@ -1727,9 +1727,9 @@ should track and display which schedule they came from."
 - `generate_production_batches(location, date, schedule, replace)` replaces
   047's type filter — New batch log picks a schedule with a count beside each.
   047 had shipped without revoking `anon`; 153 revokes it by name.
-- `production_batches.batch_count` (numeric 10,2 — half batches are real): the
-  day's TOTAL for an element, which is what a Donut log records. Editable as
-  "Batches" in the batch pane and shown as a column.
+- ~~`production_batches.batch_count`~~ — added by 153 and DROPPED by 155 the
+  same day (Mark: reuse the batch's own Made fields). A Donut log records the
+  day's total in Made, e.g. "7.5 batch".
 - The eight donuts on the batch log at DF01 and DF02 (Raised, Vanilla Cake,
   Pumpkin Cake, Coffee Cake, Old Fashioned, Mochi, Apple Fritter, Cinnamon Roll)
   — seasonal, changed from each element's Kitchens table.

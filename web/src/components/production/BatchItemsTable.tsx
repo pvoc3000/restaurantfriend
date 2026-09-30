@@ -41,8 +41,6 @@ export type BatchRow = {
   yield_count: number | null;
   yield_size: number | null;
   yield_unit: string | null;
-  /** The day's TOTAL batches (153) — a Donut log's one number per element. */
-  batch_count: number | null;
   generated: boolean;
   /**
    * Loaded from FileMaker (046) rather than made here.
@@ -261,7 +259,6 @@ export function BatchItemsTable({
         case "par": return amountTotal(r.par_count, r.par_size) ?? -1;
         case "onhand": return amountTotal(r.on_hand_count, r.on_hand_size) ?? -1;
         case "made": return amountTotal(r.yield_count, r.yield_size) ?? -1;
-        case "count": return r.batch_count ?? -1;
         case "note": return r.notes ?? "";
         case "status": return r.status;
         default: return r.element_name;
@@ -438,18 +435,6 @@ export function BatchItemsTable({
       render: (r) => (
         <span className={`${READ_ONLY_VALUE} tabular-nums`}>
           {describeAmount(r.yield_count, r.yield_size, r.yield_unit)}
-        </span>
-      ),
-    },
-    {
-      key: "count",
-      label: "Batches",
-      width: 100,
-      align: "right",
-      sortValue: (r) => r.batch_count ?? -1,
-      render: (r) => (
-        <span className={`${READ_ONLY_VALUE} tabular-nums`}>
-          {r.batch_count === null ? "—" : r.batch_count.toLocaleString()}
         </span>
       ),
     },

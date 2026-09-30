@@ -584,8 +584,9 @@ function TrayGuidePage({
       )}
 
       {/* TOTAL BATCHES (Mark, 2026-09-30) — the baker's guide only. The bakers
-          write how many batches of each donut they made; the opening or mid
-          supervisor copies these into the shift report's Donut batches page,
+          write how much of each donut they made; the opening or mid
+          supervisor copies it into the shift report's Donut batches page (the
+          batch's Made fields),
           which asks for exactly this list (`batchDonuts`). Kept whole on one
           page, so the box is never split from its heading. */}
       {grain === "subtype" && kitchen.batchDonuts.length > 0 ? (
@@ -594,7 +595,7 @@ function TrayGuidePage({
               padding, so a fixed-width label lines up with the box beneath. */}
           <View style={styles.typeBand}>
             <Text style={[styles.typeBandText, { flexGrow: 1 }]}>TOTAL BATCHES</Text>
-            <Text style={[styles.typeBandText, styles.batchWriteInLabel]}>BATCHES</Text>
+            <Text style={[styles.typeBandText, styles.batchWriteInLabel]}>MADE</Text>
             <Text style={[styles.typeBandText, styles.preparedByLabel]}>PREPARED BY</Text>
           </View>
           {kitchen.batchDonuts.map((name) => (

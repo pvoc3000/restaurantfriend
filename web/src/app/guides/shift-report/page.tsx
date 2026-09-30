@@ -263,11 +263,14 @@ export default function ShiftReportGuide() {
 
           <Page name="Donut batches" shifts="Opening · Mid">
             <p>
-              For each donut, enter the <strong>Total batches</strong> the bakers made today. Copy
-              them from the <strong>Total batches</strong> box on the baker tray guide.
+              For each donut, enter what the bakers <strong>Made</strong> today. Copy it from the{" "}
+              <strong>Made</strong> box under Total batches on the baker tray guide.
             </p>
             <ul>
-              <li>Half batches are fine: type 7.5.</li>
+              <li>
+                Made is three boxes, like the batch log: how many, times a size, then the unit. For
+                7½ batches, type 7.5 in the first box and choose batch as the unit.
+              </li>
               <li>
                 Under <strong>Prepared by</strong>, choose the baker who made each donut.
               </li>

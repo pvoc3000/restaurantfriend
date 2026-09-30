@@ -291,7 +291,7 @@ export function submitBlockers(input: ReadinessInput): string[] {
   if (pages.includes("elements") && input.countedBatches < input.scheduledBatches) {
     const left = input.scheduledBatches - input.countedBatches;
     out.push(
-      `${left} of ${input.scheduledBatches} ${left === 1 ? "donut has" : "donuts have"} no batch count.`
+      `${left} of ${input.scheduledBatches} ${left === 1 ? "donut has" : "donuts have"} nothing entered under Made.`
     );
   }
 
@@ -448,7 +448,8 @@ export type EmailReport = {
   /** Donut batches — the day's total per element. */
   elements: {
     name: string;
-    batches: number | null;
+    /** `describeAmount` of the batch's Made — "7.5 batch", or "—". */
+    made: string;
     preparedBy: string | null;
     notes: string | null;
   }[];
@@ -769,13 +770,13 @@ export function supervisorBody(report: EmailReport): string {
   if (report.elements.length > 0) {
     parts.push(
       `<h3 style="${S.h3}">Donut batches</h3><table style="${S.table}"><tr>` +
-        `<th style="${S.th}">Donut</th><th style="${S.thr}">Batches</th>` +
+        `<th style="${S.th}">Donut</th><th style="${S.thr}">Made</th>` +
         `<th style="${S.th}">Prepared by</th><th style="${S.th}">Notes</th></tr>`
     );
     for (const e of report.elements) {
       parts.push(
         `<tr><td style="${S.td}">${esc(e.name)}</td>` +
-          `<td style="${S.tdr}">${e.batches === null ? "—" : esc(e.batches.toLocaleString("en-US"))}</td>` +
+          `<td style="${S.tdr}">${esc(e.made)}</td>` +
           `<td style="${S.td}">${esc(e.preparedBy ?? "—")}</td>` +
           `<td style="${S.td}">${esc(e.notes ?? "")}</td></tr>`
       );

@@ -674,3 +674,13 @@
    anything of note to report". No migration: `shift_report_batches.notes` and
    its flush onto `production_batches.notes` have existed since 070. The
    email's Donut batches table gains a Notes column.
+   **MADE, NOT A BATCH COUNT (Mark, 2026-09-30; migration 155).** "Did you create
+   a 'Batch' field just for what we've been working on? … reuse the 'made'
+   fields from the regular batch log instead. The three fields." 153's
+   `batch_count` was a second answer beside the batch's own Made
+   (`yield_count × yield_size yield_unit`). 155 moved the eight counts DF01
+   entered that day into Made (unit "batch"; backup in `FMP Export/pre155-…`),
+   restated submit/reopen without it (a Made amount now marks the batch
+   complete) and dropped the column from both tables. The page shows the batch
+   log's three boxes, with "batch" at the top of its unit menu; the blocker reads
+   "… nothing entered under Made."; the email and the tray guide's box say Made.

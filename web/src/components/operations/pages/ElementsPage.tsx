@@ -4,6 +4,14 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SHIFT_REPORT_BATCH_SCHEDULE } from "@/lib/production";
+import { UNIT_PICK_OPTIONS } from "@/lib/units";
+
+/**
+ * "batch" FIRST, then the app's units. It is the unit this page is almost
+ * always in and the vocabulary lacks it (the batch log takes it through
+ * `allowNew`); 155 stored today's counts under it, lower case.
+ */
+const MADE_UNITS: PickOption[] = [{ value: "batch", label: "batch" }, ...UNIT_PICK_OPTIONS];
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { CountField, TextField } from "./fields";
 import { STICKY_HEAD_ROW_UNDER_RUNNER } from "@/lib/tableHead";
@@ -11,8 +19,14 @@ import { STICKY_HEAD_ROW_UNDER_RUNNER } from "@/lib/tableHead";
 export type ElementBatchRow = {
   batchId: string;
   elementName: string;
-  /** This report's draft, else what the batch already holds. */
-  batchCount: number | null;
+  /**
+   * MADE — the batch's own count × size unit (Mark, 2026-09-30: "reuse the
+   * 'made' fields from the regular batch log … The three fields"). Each is this
+   * report's draft, else what the batch already holds.
+   */
+  yieldCount: number | null;
+  yieldSize: number | null;
+  yieldUnit: string | null;
   /** Who made it — the draft, else the batch's own "Prepared by" (154). */
   operatorId: string | null;
   operatorName: string | null;
@@ -22,8 +36,9 @@ export type ElementBatchRow = {
 
 /**
  * DONUT BATCHES — the opening and mid supervisor's page (Mark, 2026-09-30):
- * how many batches of each donut the bakers made today in this kitchen. One
- * number per donut, the total, copied from the tray guide's box.
+ * how much of each donut the bakers made today in this kitchen, copied from
+ * the tray guide's box — in the batch's own MADE fields, count × size unit,
+ * the same three the batch log edits (155 retired a separate batch count).
  *
  * The rows are the kitchen's DONUT batch log for the day (153). REACHING THE
  * PAGE MAKES IT: if the log is not there yet, this generates it — every element
@@ -107,7 +122,9 @@ export function ElementsPage({
   function save(
     batchId: string,
     patch:
-      | { batch_count: number | null }
+      | { yield_count: number | null }
+      | { yield_size: number | null }
+      | { yield_unit: string | null }
       | { operator_employee_id: string | null }
       | { notes: string | null }
   ) {
@@ -145,11 +162,11 @@ export function ElementsPage({
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <table className="w-full table-fixed">
         <colgroup>
           <col />
-          <col className="w-40" />
+          <col className="w-[22rem]" />
           <col className="w-64" />
           <col />
         </colgroup>
@@ -158,7 +175,7 @@ export function ElementsPage({
             className={`text-xs font-semibold uppercase tracking-[0.08em] ${STICKY_HEAD_ROW_UNDER_RUNNER}`}
           >
             <th className="py-2 text-left">Donut</th>
-            <th className="py-2 text-right">Total batches</th>
+            <th className="py-2 text-left">Made</th>
             <th className="py-2 pl-3 text-left">Prepared by</th>
             <th className="py-2 pl-3 text-left">Notes</th>
           </tr>
@@ -168,12 +185,43 @@ export function ElementsPage({
             <tr key={r.batchId} className="border-b border-hairline/60">
               <td className="py-2 pr-3 text-[16px]">{r.elementName}</td>
               <td className="py-2">
-                <CountField
-                  value={r.batchCount}
-                  onCommit={(next) => save(r.batchId, { batch_count: next })}
-                  disabled={!editable}
-                  ariaLabel={`Total batches, ${r.elementName}`}
-                />
+                {/* The batch log's Triple, at the runner's 48px: count × size,
+                    then the unit — `MADE_UNITS`, `allowNew` like the log's. */}
+                <div className="flex items-center gap-1">
+                  <div className="w-20 shrink-0">
+                    <CountField
+                      value={r.yieldCount}
+                      onCommit={(next) => save(r.batchId, { yield_count: next })}
+                      disabled={!editable}
+                      ariaLabel={`Made count, ${r.elementName}`}
+                    />
+                  </div>
+                  <span className="shrink-0 text-subtle">×</span>
+                  <div className="w-20 shrink-0">
+                    <CountField
+                      value={r.yieldSize}
+                      onCommit={(next) => save(r.batchId, { yield_size: next })}
+                      disabled={!editable}
+                      ariaLabel={`Made size, ${r.elementName}`}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <PickList
+                      variant="field"
+                      size="lg"
+                      boxed
+                      allowNew
+                      className="w-full"
+                      value={r.yieldUnit}
+                      options={MADE_UNITS}
+                      disabled={!editable}
+                      onPick={(next) =>
+                        save(r.batchId, { yield_unit: next === "" ? null : next })
+                      }
+                      ariaLabel={`Made unit, ${r.elementName}`}
+                    />
+                  </div>
+                </div>
               </td>
               <td className="py-2 pl-3">
                 {editable ? (

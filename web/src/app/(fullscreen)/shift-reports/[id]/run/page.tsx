@@ -9,6 +9,7 @@ import { localDateISO, localTime } from "@/lib/timeZone";
 import { isDayComplete } from "@/lib/sales";
 import { readSettings } from "@/lib/specialOrders";
 import { SHIFT_REPORT_BATCH_SCHEDULE } from "@/lib/production";
+import { describeAmount } from "@/lib/productionBatches";
 import { ordersForKitchen } from "@/lib/specialOrderSchedule";
 import {
   pagesForShift,
@@ -476,12 +477,14 @@ export default async function RunShiftReportPage({
     const [{ data: batches }, { data: drafts }, { data: operators }] = await Promise.all([
       supabase
         .from("production_batches")
-        .select("id, sort, batch_count, operator_employee_id, notes, production_elements(name)")
+        .select(
+          "id, sort, yield_count, yield_size, yield_unit, operator_employee_id, notes, production_elements(name)"
+        )
         .eq("log_id", batchLog.id as string)
         .order("sort", { nullsFirst: false }),
       supabase
         .from("shift_report_batches")
-        .select("batch_id, batch_count, operator_employee_id, notes")
+        .select("batch_id, yield_count, yield_size, yield_unit, operator_employee_id, notes")
         .eq("report_id", id),
       // 044's definer — `employees` READ is owner/admin only (020), so this is
       // how a supervisor names who made a batch. The batch record reads it too.
@@ -500,15 +503,17 @@ export default async function RunShiftReportPage({
       // THIS REPORT'S DRAFT, else what the batch already holds — the opening
       // and mid reports share one log, so whichever comes second opens on the
       // first one's numbers rather than on empty boxes.
-      const drafted = d?.batch_count;
-      const saved = b.batch_count;
+      // Draft first, else the batch — per field, so a report that only sets
+      // the unit still shows the count somebody else entered.
+      const pick = (col: string) => (d?.[col] ?? b[col] ?? null) as number | string | null;
       const operatorId =
         ((d?.operator_employee_id ?? b.operator_employee_id ?? null) as string | null);
       return {
         batchId: b.id as string,
         elementName: el?.name ?? "—",
-        batchCount:
-          drafted != null ? Number(drafted) : saved != null ? Number(saved) : null,
+        yieldCount: pick("yield_count") === null ? null : Number(pick("yield_count")),
+        yieldSize: pick("yield_size") === null ? null : Number(pick("yield_size")),
+        yieldUnit: pick("yield_unit") as string | null,
         operatorId,
         operatorName: operatorId
           ? batchOperators.find((o) => o.value === operatorId)?.label ?? null
@@ -644,7 +649,8 @@ export default async function RunShiftReportPage({
     netSalesCents,
     countedLines: premadeRows.filter((r) => r.made !== null || r.leftover !== null).length,
     scheduledLines: premadeRows.length,
-    countedBatches: elementRows.filter((r) => r.batchCount !== null).length,
+    countedBatches: elementRows.filter((r) => r.yieldCount !== null || r.yieldSize !== null)
+      .length,
     scheduledBatches: elementRows.length,
     // DERIVED, never a `task_checklist_done` column — see the note on
     // `ReadinessInput.checklist`.
@@ -909,7 +915,7 @@ export default async function RunShiftReportPage({
     })),
     elements: elementRows.map((r) => ({
       name: r.elementName,
-      batches: r.batchCount,
+      made: describeAmount(r.yieldCount, r.yieldSize, r.yieldUnit),
       preparedBy: r.operatorName,
       notes: r.notes,
     })),

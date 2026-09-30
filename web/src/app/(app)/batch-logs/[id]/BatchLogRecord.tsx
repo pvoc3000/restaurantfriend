@@ -70,7 +70,7 @@ export async function BatchLogRecord({
      batch_amount, batch_unit,
      par_count, par_size, par_unit,
      on_hand_count, on_hand_size, on_hand_unit,
-     yield_count, yield_size, yield_unit, batch_count, notes, photo_path, photo_name,
+     yield_count, yield_size, yield_unit, notes, photo_path, photo_name,
      production_elements ( name, element_type )`;
 
   const [batchesResult, { data: employees }, { data: members }] = await Promise.all([
@@ -217,7 +217,6 @@ export async function BatchLogRecord({
       yield_count: num(b.yield_count),
       yield_size: num(b.yield_size),
       yield_unit: (b.yield_unit ?? null) as string | null,
-      batch_count: num(b.batch_count),
       generated: (b.is_generated ?? false) as boolean,
       migrated: migratedOf(b),
       notes: (b.notes ?? null) as string | null,
@@ -253,7 +252,6 @@ export async function BatchLogRecord({
       yield_count: num(b.yield_count),
       yield_size: num(b.yield_size),
       yield_unit: (b.yield_unit ?? null) as string | null,
-      batch_count: num(b.batch_count),
       notes: (b.notes ?? null) as string | null,
       photo_path: path,
       photo_name: (b.photo_name ?? null) as string | null,

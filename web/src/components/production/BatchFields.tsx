@@ -40,8 +40,6 @@ export type BatchFieldsRow = {
   yield_count: number | null;
   yield_size: number | null;
   yield_unit: string | null;
-  /** The day's TOTAL batches (153) — a Donut log's one number per element. */
-  batch_count: number | null;
   notes: string | null;
   photo_path: string | null;
   photo_name: string | null;
@@ -213,18 +211,6 @@ export function BatchFields({
         </Field>
         <Field label="Made">
           <Triple row={row} prefix="yield" editable={editable} />
-        </Field>
-        {/* The day's total (153) — what the shift report's Donut batches page
-            records, one number per element. */}
-        <Field label="Batches">
-          {editable ? (
-            <InlineValue
-              boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="batch_count"
-              kind="number" value={row.batch_count} ariaLabel="Total batches made"
-            />
-          ) : (
-            <span className={`${READ_ONLY_VALUE} tabular-nums`}>{row.batch_count ?? "—"}</span>
-          )}
         </Field>
       </dl>
 

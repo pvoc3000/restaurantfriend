@@ -220,7 +220,7 @@ test("AN UNCOUNTED DONUT BLOCKS the opening and mid report, like an uncounted pr
       scheduledBatches: 4,
     });
     ok(
-      out.some((line) => line === "3 of 4 donuts have no batch count."),
+      out.some((line) => line === "3 of 4 donuts have nothing entered under Made."),
       `${shift}: ${out.join(" · ")}`
     );
     eq(
@@ -982,12 +982,12 @@ test("the email lists DONUT BATCHES with each total and who made it, a blank as 
   const html = supervisorBody({
     ...REPORT,
     elements: [
-      { name: "Raised Donut", batches: 7.5, preparedBy: "Leo Baker", notes: "Proofed slow" },
-      { name: "Mochi Donut", batches: null, preparedBy: null, notes: null },
+      { name: "Raised Donut", made: "7.5 batch", preparedBy: "Leo Baker", notes: "Proofed slow" },
+      { name: "Mochi Donut", made: "—", preparedBy: null, notes: null },
     ],
   });
   ok(html.includes("Donut batches"), "the heading");
-  ok(html.includes(">7.5<"), "a half batch survives");
+  ok(html.includes(">7.5 batch<"), "the Made amount");
   ok(/Mochi Donut<\/td><td[^>]*>—</.test(html), "an uncounted donut reads —");
   ok(html.includes("Prepared by") && html.includes(">Leo Baker<"), "who made it");
   ok(html.includes(">Proofed slow<"), "the batch's note");
