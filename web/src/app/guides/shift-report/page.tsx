@@ -272,7 +272,9 @@ export default function ShiftReportGuide() {
                 7½ batches, type 7.5 in the first box and choose batch as the unit.
               </li>
               <li>
-                Under <strong>Prepared by</strong>, choose the baker who made each donut.
+                Under <strong>Prepared by</strong>, choose the baker who made each donut. If one
+                baker made them all, choose them in <strong>Prepared by, every donut</strong> above
+                the table, then change any row that was somebody else.
               </li>
               <li>
                 Use <strong>Notes</strong> for anything worth knowing about a batch.

@@ -13,7 +13,7 @@ import { UNIT_PICK_OPTIONS } from "@/lib/units";
  */
 const MADE_UNITS: PickOption[] = [{ value: "batch", label: "batch" }, ...UNIT_PICK_OPTIONS];
 import { PickList, type PickOption } from "@/components/ui/PickList";
-import { CountField, TextField } from "./fields";
+import { CountField, FieldLabel, TextField } from "./fields";
 import { STICKY_HEAD_ROW_UNDER_RUNNER } from "@/lib/tableHead";
 
 export type ElementBatchRow = {
@@ -145,6 +145,42 @@ export function ElementsPage({
     });
   }
 
+  /**
+   * PREPARED BY FOR EVERY ROW (Mark, 2026-09-30) — "sets all the individual
+   * prepared by fields to the same employee … The user can still change the
+   * individual ones later". ONE upsert naming only that column, so each row's
+   * Made and Notes drafts are left alone.
+   */
+  function saveAllPreparers(operatorId: string | null) {
+    startTransition(async () => {
+      const { error } = await createClient()
+        .from("shift_report_batches")
+        .upsert(
+          rows.map((r) => ({
+            org_id: orgId,
+            report_id: reportId,
+            batch_id: r.batchId,
+            operator_employee_id: operatorId,
+          })),
+          { onConflict: "report_id,batch_id" }
+        )
+        .select("id");
+      if (error) {
+        setFailed(error.message);
+        return;
+      }
+      setFailed(null);
+      router.refresh();
+    });
+  }
+
+  // The shared picker READS the rows rather than holding its own state: it
+  // names a person only while every row has that person, so once one row is
+  // changed it goes blank instead of claiming something no longer true.
+  const shared = rows.length > 0 && rows.every((r) => r.operatorId === rows[0].operatorId)
+    ? rows[0].operatorId
+    : null;
+
   if (failed) {
     return <p className="text-center text-[16px] text-accent">{failed}</p>;
   }
@@ -163,6 +199,22 @@ export function ElementsPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
+      {editable && rows.length > 1 ? (
+        <div className="w-64 space-y-2">
+          <FieldLabel>Prepared by, every donut</FieldLabel>
+          <PickList
+            variant="field"
+            size="lg"
+            boxed
+            className="w-full"
+            value={shared}
+            options={operators}
+            clearable
+            onPick={(next) => saveAllPreparers(next === "" ? null : next)}
+            ariaLabel="Prepared by, every donut"
+          />
+        </div>
+      ) : null}
       <table className="w-full table-fixed">
         <colgroup>
           <col />
