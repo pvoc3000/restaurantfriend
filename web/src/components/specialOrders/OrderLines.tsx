@@ -499,7 +499,7 @@ export function OrderLines({
               whole line rather than between its halves, and one `hover:` and one
               `opacity-40` still dress the lot. Several tbodies in one table is
               ordinary HTML; the drag needed no change at all. */}
-          {groups.map((g) => [
+          {groups.map((g, i) => [
             g.label ? (
               /* THE BAND'S WEIGHT IS ITS LEVEL — the app's two marks for a
                  break (see `DataGroup.subLabel`): black band on top, then a
@@ -507,6 +507,15 @@ export function OrderLines({
                  hairline for Cut, indented one step each. Each carries its
                  line count, and its qty and total under those columns. */
               <tbody key={`band-${g.key}`}>
+                {/* AIR ABOVE EVERY TOP BAND BUT THE FIRST (Mark, 2026-09-29:
+                    "padding between the item type groups"). A spacer ROW,
+                    because padding on the band's own cells would widen the
+                    black fill rather than the gap above it. */}
+                {g.level === 0 && i > 0 ? (
+                  <tr aria-hidden="true">
+                    <td colSpan={columnKeys.length} className="h-6 p-0" />
+                  </tr>
+                ) : null}
                 <tr className={g.level === 0 ? "bg-ink text-white" : "text-ink"}>
                   {canWrite ? <td className="p-0" /> : null}
                   <td
