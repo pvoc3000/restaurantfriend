@@ -24,6 +24,7 @@ import {
   resolveTransport,
   sendMail,
   TransportError,
+  withGapBeforeAttachment,
   type ProviderConfig,
 } from "../_shared/email.ts";
 
@@ -122,7 +123,7 @@ Deno.serve(async (req) => {
       to,
       cc: cc || undefined,
       subject,
-      text: body ?? "",
+      text: withGapBeforeAttachment(body ?? ""),
       attachment: { filename, base64: pdf_base64 },
     });
 

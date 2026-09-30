@@ -536,7 +536,7 @@ export function newMessageId(from: string | undefined | null): string {
 
 /**
  * A body that is followed by a PDF ends in a few blank lines (Mark,
- * 2026-09-30), so the attachment a mail client previews inline below the text
+ * 2026-09-30 — special orders, then POs), so the attachment a mail client previews inline below the text
  * doesn't butt up against the signature. Trailing whitespace is trimmed first,
  * so a body that already ends in blank lines gets the same gap, not a bigger one.
  */
