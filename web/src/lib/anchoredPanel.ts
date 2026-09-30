@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { describe, panelLog, viewport } from "@/components/ui/PanelDebug";
 
 /** Where a portalled panel should sit, in viewport coordinates. */
 export type AnchorBox = { top: number; left: number; width: number };
@@ -257,20 +256,6 @@ export function useAnchoredPanel({
     };
   }, [open]);
 
-  // PanelDebug (temporary): an owner UNMOUNTING with its panel open is a close
-  // no handler below would ever report.
-  const openRef = useRef(open);
-  useEffect(() => {
-    openRef.current = open;
-    panelLog(`panel ${open ? "OPEN" : "closed"} ${describe(triggerRef.current)} ${viewport()}`);
-  }, [open, triggerRef]);
-  useEffect(
-    () => () => {
-      if (openRef.current) panelLog("panel UNMOUNTED while open");
-    },
-    []
-  );
-
   // Measured off the trigger at open time, and again if the trigger resizes.
   // This is the FIRST pass and it always places the panel below — where it
   // actually ends up is settled by the fitting pass beneath, which is the only
@@ -343,7 +328,6 @@ export function useAnchoredPanel({
       // Worked out where it should be SEEN; `top` is written in the panel's
       // own coordinates, which the keyboard can shift — see `driftY`.
       const drift = driftY(panel);
-      if (Math.abs(drift) > 1) panelLog(`fit drift ${Math.round(drift)}`);
       top -= drift;
 
       // `align="right"` panels are drawn with `translateX(-100%)` by the caller,
@@ -368,10 +352,7 @@ export function useAnchoredPanel({
 
   useEffect(() => {
     if (!open) return;
-    const close = () => {
-      panelLog(`CLOSE resize ${window.innerWidth}×${window.innerHeight} ${viewport()}`);
-      onClose();
-    };
+    const close = () => onClose();
     /**
      * A scroll closes the panel — EXCEPT a scroll of the panel itself, and
      * EXCEPT one that did not actually move the trigger.
@@ -419,11 +400,7 @@ export function useAnchoredPanel({
       const was = anchor.current;
       if (el && was) {
         const r = el.getBoundingClientRect();
-        const moved = `Δ${Math.round(r.top - was.top)},${Math.round(r.left - was.left)}`;
-        if (Math.abs(r.top - was.top) <= 1 && Math.abs(r.left - was.left) <= 1) {
-          panelLog(`scroll ${describe(e.target)} ${moved} kept ${viewport()}`);
-          return;
-        }
+        if (Math.abs(r.top - was.top) <= 1 && Math.abs(r.left - was.left) <= 1) return;
         /**
          * THE KEYBOARD'S OWN SCROLL IS FOLLOWED, NOT OBEYED (Mark, 2026-09-30,
          * on the iPad: "both the picklist menu and keyboard try to open, both
@@ -449,7 +426,6 @@ export function useAnchoredPanel({
         const pageScroll = !(e.target instanceof Element);
         if (panelHasFocus && pageScroll) {
           const drift = driftY(panel);
-          panelLog(`FOLLOW scroll ${moved} drift ${Math.round(drift)} ${viewport()}`);
           anchor.current = { top: r.top, left: r.left };
           // Placed where it should be SEEN, less the keyboard's drift; the
           // fitting pass then settles it above or below.
@@ -460,9 +436,6 @@ export function useAnchoredPanel({
           });
           return;
         }
-        panelLog(`CLOSE scroll ${describe(e.target)} ${moved} ${viewport()}`);
-      } else {
-        panelLog(`CLOSE scroll ${describe(e.target)} no anchor`);
       }
       onClose();
     };
@@ -471,7 +444,6 @@ export function useAnchoredPanel({
         // Stopped here so an Escape aimed at the panel doesn't also reach a
         // dialog or a page-level handler behind it.
         e.stopPropagation();
-        panelLog("CLOSE escape");
         onClose();
         triggerRef.current?.focus();
       }
@@ -479,7 +451,6 @@ export function useAnchoredPanel({
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node;
       if (panelRef.current?.contains(t) || triggerRef.current?.contains(t)) return;
-      panelLog(`CLOSE mousedown ${describe(t)}`);
       onClose();
     };
     window.addEventListener("scroll", onScroll, true);

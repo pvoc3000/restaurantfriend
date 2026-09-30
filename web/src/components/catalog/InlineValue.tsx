@@ -14,7 +14,6 @@ import {
   fieldPlaceholder,
 } from "@/components/ui/fieldMetrics";
 import { PickList, type PickOption } from "@/components/ui/PickList";
-import { panelLog } from "@/components/ui/PanelDebug";
 import { useCalcField } from "@/components/ui/CalcPad";
 
 /**
@@ -594,7 +593,6 @@ export function InlineValue({
     setSaving(true);
     setError(null);
     setPending({ v: next });
-    panelLog(`write ${column} = ${String(next)}`);
 
     // A caller-supplied write replaces the statement and nothing else. It is
     // checked FIRST so none of the row-identity machinery below applies: a
@@ -653,7 +651,6 @@ export function InlineValue({
       if (reopen) setEditing(true);
       return;
     }
-    panelLog(`refresh after ${column}`);
     router.refresh();
   }
 
