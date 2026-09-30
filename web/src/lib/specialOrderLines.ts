@@ -281,11 +281,14 @@ export function addedLineName(
  * tab … by item type, item, price")
  * ========================================================================== */
 
-export type LineGrouping = "none" | "type" | "item" | "price";
+export type LineGrouping = "none" | "type" | "cut" | "size" | "item" | "price";
 
 export const LINE_GROUPINGS: { value: LineGrouping; label: string }[] = [
   { value: "none", label: "None" },
   { value: "type", label: "Item type" },
+  // Cut and size (Mark, 2026-09-29), beside type: the three taxonomy fields.
+  { value: "cut", label: "Item cut" },
+  { value: "size", label: "Item size" },
   { value: "item", label: "Item" },
   { value: "price", label: "Price" },
 ];
@@ -298,6 +301,8 @@ type GroupableLine = {
   name: string;
   item_donut: string | null;
   item_type: string | null;
+  item_cut?: string | null;
+  item_size?: string | null;
   unit_price: number | string | null;
 };
 
@@ -320,6 +325,10 @@ export function groupLines<T extends GroupableLine>(
   if (grouping === "none") return [{ key: "", label: "", rows }];
   const keyOf = (r: T): string => {
     if (grouping === "type") return (r.item_type ?? "").trim();
+    // EVERY LETTER IS ONE CUT: `Letter - "T"` and `Letter - "H"` are the same
+    // shape, and banding by the literal cut would give each letter its own.
+    if (grouping === "cut") return isLetterCut(r.item_cut) ? "Letter" : (r.item_cut ?? "").trim();
+    if (grouping === "size") return (r.item_size ?? "").trim();
     if (grouping === "item") return (r.item_donut ?? "").trim() || r.name.trim();
     return r.unit_price === null || r.unit_price === "" ? "" : Number(r.unit_price).toFixed(2);
   };
@@ -334,7 +343,14 @@ export function groupLines<T extends GroupableLine>(
       ? Number(a) - Number(b)
       : a.localeCompare(b, "en", { numeric: true, sensitivity: "base" });
   });
-  const empty = grouping === "type" ? "No type" : grouping === "item" ? "No item" : "No price";
+  const empty = {
+    none: "",
+    type: "No type",
+    cut: "No cut",
+    size: "No size",
+    item: "No item",
+    price: "No price",
+  }[grouping];
   return keys.map((k) => ({
     key: k,
     label: k === "" ? empty : grouping === "price" ? `$${k}` : k,

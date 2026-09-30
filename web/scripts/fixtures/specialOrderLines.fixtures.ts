@@ -285,3 +285,16 @@ test("groupLines: Price is ordered as a NUMBER — $12.00 after $4.60", () => {
   const g = groupLines([L("Z", "Giant", "Raised", 12), L("A", "Mini", "Raised", 4.6)], "price");
   eq(g.map((x) => x.label), ["$4.60", "$12.00"]);
 });
+
+test("groupLines: Item cut bands every letter as ONE cut, and Item size by size", () => {
+  const rows = [
+    { ...L("T", "Toast", "Raised", 5.1), item_cut: 'Letter - "T"', item_size: "Regular" },
+    { ...L("H", "Fruit", "Raised", 5.1), item_cut: 'Letter - "H"', item_size: "Regular" },
+    { ...L("M", "Samoa", "Raised", 3), item_cut: "Promise Ring", item_size: "Mini" },
+    { ...L("N", "Plain", "Raised", 3), item_cut: null, item_size: null },
+  ];
+  const cut = groupLines(rows, "cut");
+  eq(cut.map((x) => x.label), ["Letter", "Promise Ring", "No cut"]);
+  eq(cut[0].rows.map((r) => r.id), ["T", "H"]);
+  eq(groupLines(rows, "size").map((x) => x.label), ["Mini", "Regular", "No size"]);
+});

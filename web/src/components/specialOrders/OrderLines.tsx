@@ -13,7 +13,6 @@ import { InlineValue } from "@/components/catalog/InlineValue";
 import { ColumnHeader } from "@/components/catalog/ColumnHeader";
 import { useResizableColumns } from "@/lib/columnWidths";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { ControlField } from "@/components/ui/ControlField";
 import { PickList } from "@/components/ui/PickList";
 import { useLineGrouping } from "@/lib/lineGroupingPref";
 import { StickyFooter } from "@/components/ui/StickyFooter";
@@ -426,12 +425,14 @@ export function OrderLines({
 
   return (
     <section className="space-y-2">
-      {/* THE GROUP BY SITS BESIDE THE TABLE'S NAME (Mark, 2026-09-29),
-          captioned above like every picker (`ui/ControlField`), bottom-aligned
-          so the heading and the menu share a floor. */}
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+      {/* THE GROUP BY SITS BESIDE THE TABLE'S NAME, ITS CAPTION INLINE (Mark,
+          2026-09-29: "make the label inline instead of above"). Beside a
+          heading, a caption above would push the menu below the heading's
+          line; inline, the heading, caption and menu share one centre line. */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <SectionHeading count={ordered.length}>Items</SectionHeading>
-        <ControlField label="Group by">
+        <div className="flex items-center gap-2">
+          <span className="text-xs uppercase tracking-[0.12em] text-subtle">Group by</span>
           <PickList
             variant="field"
             fit
@@ -440,7 +441,7 @@ export function OrderLines({
             onPick={(next) => setGrouping(next as LineGrouping)}
             options={LINE_GROUPINGS}
           />
-        </ControlField>
+        </div>
       </div>
 
       <div ref={scrollerRef} className="overflow-x-auto">
