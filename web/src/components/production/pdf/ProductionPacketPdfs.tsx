@@ -60,7 +60,6 @@ export type PacketPart =
   | "fryer"
   | "decorator"
   | "donut"
-  | "ab"
   | "weekly";
 
 // NO HINTS (Mark, 2026-08-28). Each part used to carry a gloss — "one per shop
@@ -72,9 +71,9 @@ export type PacketPart =
 // 2026-09-01: "remove the 'production items sheet' 'AB Items' and 'weekly
 // production' options from the checkbox list"). Four parts, not seven.
 //
-// The three RENDERERS are deliberately left in place — `DonutSheetPage` and
-// `RhythmSheetPage` are still reached through `parts`, and `PacketPart` still
-// names all seven. They are what `_production.mer` was read for, and putting a
+// The RENDERERS are deliberately left in place — `DonutSheetPage` and
+// `WeeklySheetPage` are still reached through `parts`, and `PacketPart` still
+// names them (the AB sheet was deleted with AB, 2026-09-30). They are what `_production.mer` was read for, and putting a
 // row back is one line here rather than a rebuild. Nothing passes those keys
 // today, so they are unreachable from the app; that is a known cost of keeping
 // the door rather than the corridor.
@@ -150,6 +149,8 @@ const styles = {
 
     // A box somebody writes in — the app's 1px box, as on every document.
     writeIn: { width: 34, height: 14, borderWidth: 1, borderColor: INK, marginLeft: 4 },
+    // Room for "7.5" in a baker's hand.
+    batchWriteIn: { width: 60, height: 18, borderWidth: 1, borderColor: INK },
 
     // The tray ruler: a cell per tray NUMBER, the count written inside the ones
     // the run fills. NOT the counting strip — answered question 3 says so.
@@ -295,8 +296,7 @@ export function ProductionPacketPdf({
           {want.has("fryer") ? <TrayGuidePage kitchen={k} packet={packet} grain="finish" /> : null}
           {want.has("decorator") ? <TrayGuidePage kitchen={k} packet={packet} grain="item" /> : null}
           {want.has("donut") ? <DonutSheetPage kitchen={k} packet={packet} /> : null}
-          {want.has("ab") ? <RhythmSheetPage kitchen={k} packet={packet} kind="ab" /> : null}
-          {want.has("weekly") ? <RhythmSheetPage kitchen={k} packet={packet} kind="weekly" /> : null}
+          {want.has("weekly") ? <WeeklySheetPage kitchen={k} packet={packet} /> : null}
         </Fragmentish>
       ))}
     </Document>
@@ -576,6 +576,25 @@ function TrayGuidePage({
           </View>
         ))
       )}
+
+      {/* TOTAL BATCHES (Mark, 2026-09-30) — the baker's guide only. The bakers
+          write how many batches of each donut they made; the opening or mid
+          supervisor copies these into the shift report's Donut batches page,
+          which asks for exactly this list (`batchDonuts`). Kept whole on one
+          page, so the box is never split from its heading. */}
+      {grain === "subtype" && kitchen.batchDonuts.length > 0 ? (
+        <View wrap={false}>
+          <View style={styles.typeBand}>
+            <Text style={styles.typeBandText}>TOTAL BATCHES</Text>
+          </View>
+          {kitchen.batchDonuts.map((name) => (
+            <View key={name} style={styles.sheetRow}>
+              <Text style={[styles.cell, { flexGrow: 1 }]}>{name}</Text>
+              <View style={styles.batchWriteIn} />
+            </View>
+          ))}
+        </View>
+      ) : null}
       </View>
 
       <PacketFooter>{`${GUIDE_TITLE[grain]} · Kitchen ${kitchen.kitchenCode}`}</PacketFooter>
@@ -677,29 +696,22 @@ function DonutSheetPage({ kitchen, packet }: { kitchen: PacketKitchen; packet: P
   );
 }
 
-function RhythmSheetPage({
-  kitchen,
-  packet,
-  kind,
-}: {
-  kitchen: PacketKitchen;
-  packet: PacketData;
-  kind: "ab" | "weekly";
-}) {
-  const rows: SheetElement[] = kind === "ab" ? kitchen.ab : kitchen.weekly;
+/** The AB sheet beside it went with AB itself (Mark, 2026-09-30). */
+function WeeklySheetPage({ kitchen, packet }: { kitchen: PacketKitchen; packet: PacketData }) {
+  const rows: SheetElement[] = kitchen.weekly;
   return (
     <Page size="LETTER" style={styles.page} wrap>
       <PacketMasthead packet={packet} />
       <View style={styles.body}>
       <SheetHeader
-        title={kind === "ab" ? "AB ELEMENT SHEET" : "WEEKLY ELEMENT SHEET"}
+        title="WEEKLY ELEMENT SHEET"
         kitchen={kitchen}
         blurb="The standing rhythm for this kitchen and this day — stock up to par"
       />
 
       {rows.length === 0 ? (
         <Text style={styles.emptyNote}>
-          Nothing on the {kind === "ab" ? "AB" : "weekly"} rhythm for {kitchen.kitchenCode} on{" "}
+          Nothing on the weekly rhythm for {kitchen.kitchenCode} on{" "}
           {packetDate(kitchen.date)}.
         </Text>
       ) : (
@@ -734,7 +746,7 @@ function RhythmSheetPage({
       )}
       </View>
 
-      <PacketFooter>{`${kind === "ab" ? "AB" : "Weekly"} element sheet · Kitchen ${kitchen.kitchenCode}`}</PacketFooter>
+      <PacketFooter>{`Weekly element sheet · Kitchen ${kitchen.kitchenCode}`}</PacketFooter>
     </Page>
   );
 }

@@ -21,11 +21,14 @@ import {
   batchLogRangeHref,
   type BatchLogWindow,
 } from "@/lib/batchLogFilters";
+import { scheduleLabel } from "@/lib/production";
 
 export type BatchLogRow = {
   id: string;
   log_date: string;
   kitchenCode: string;
+  /** Which schedule generated it (153) — null for a FileMaker log, which mixed them. */
+  schedule: string | null;
   status: string;
   generatedByName: string | null;
   generated_at: string | null;
@@ -37,11 +40,12 @@ export type BatchLogRow = {
 };
 
 type Tier = "open" | "today" | "complete" | "all";
-type Grouping = "date" | "location" | "none";
+type Grouping = "date" | "location" | "schedule" | "none";
 
 const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: BatchLogRow) => string> = {
   date: (r) => batchDate(r.log_date),
   location: (r) => r.kitchenCode,
+  schedule: (r) => scheduleLabel(r.schedule),
 };
 
 /** What the BANDS sort by, which is not what they say — a date's label sorts
@@ -49,6 +53,7 @@ const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: BatchLogRow) => string>
 const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: BatchLogRow) => string> = {
   date: (r) => r.log_date,
   location: (r) => r.kitchenCode,
+  schedule: (r) => scheduleLabel(r.schedule),
 };
 
 /**
@@ -119,7 +124,7 @@ export function BatchLogsIndex({
       if (tier === "today" && r.log_date !== today) return false;
       if (tier === "complete" && r.status !== "complete") return false;
       if (!q) return true;
-      return [r.log_date, r.kitchenCode, r.generatedByName ?? "", r.note ?? ""]
+      return [r.log_date, r.kitchenCode, scheduleLabel(r.schedule), r.generatedByName ?? "", r.note ?? ""]
         .join(" ")
         .toLowerCase()
         .includes(q);
@@ -131,6 +136,7 @@ export function BatchLogsIndex({
       switch (sort.key) {
         case "date": return r.log_date;
         case "location": return r.kitchenCode;
+        case "schedule": return scheduleLabel(r.schedule);
         case "status": return r.status;
         case "batches": return r.batches;
         case "done": return r.batches === 0 ? -1 : r.done / r.batches;
@@ -191,6 +197,19 @@ export function BatchLogsIndex({
       width: 110,
       sortValue: (r) => r.kitchenCode,
       render: (r) => <span className="font-medium">{r.kitchenCode}</span>,
+    },
+    {
+      key: "schedule",
+      label: "Schedule",
+      width: 120,
+      sortValue: (r) => scheduleLabel(r.schedule),
+      render: (r) =>
+        r.schedule ? (
+          <span>{scheduleLabel(r.schedule)}</span>
+        ) : (
+          // A FileMaker log: every schedule on one day, before logs had one.
+          <span className="text-faint">—</span>
+        ),
     },
     {
       key: "batches",
@@ -348,6 +367,7 @@ export function BatchLogsIndex({
               { value: "none", label: "None" },
               { value: "date", label: "Date" },
               { value: "location", label: "Location" },
+              { value: "schedule", label: "Schedule" },
             ]}
             fit
           />

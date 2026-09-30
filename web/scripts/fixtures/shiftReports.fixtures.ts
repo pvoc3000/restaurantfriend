@@ -21,27 +21,24 @@ import {
 // pagesForShift — the mirror rule
 // ---------------------------------------------------------------------------
 
-test("closing gets eight pages, and every other shift five", () => {
+test("closing gets eight pages, opening and mid six, off-site five", () => {
   // Each gained ONE when the checklist page landed (2026-08-29): every shift
-  // can be asked for a walk, including a mid.
-  //
-  // Opening was SIX until 2026-09-09, when the batch report was retired and its
-  // page went with it — which is what makes it five like the other two, by
-  // coincidence rather than by rule (see `OPENING_PAGES`).
+  // can be asked for a walk, including a mid. Opening and mid gained Donut
+  // batches on 2026-09-30.
   eq(pagesForShift("closing").length, 8, "closing");
-  eq(pagesForShift("opening").length, 5, "opening");
-  eq(pagesForShift("mid").length, 5, "mid");
+  eq(pagesForShift("opening").length, 6, "opening");
+  eq(pagesForShift("mid").length, 6, "mid");
   eq(pagesForShift("off_site").length, 5, "off_site");
 });
 
-test("THE BATCH REPORT IS RETIRED — the elements page is on NO shift", () => {
-  // Mark, 2026-09-09: "we are no longer doing the batch report, so we can skip
-  // that page for the morning shift." The page TYPE survives, and so does its
-  // component and every query behind it — all of them behind a
-  // `wants("elements")` that this makes permanently false. This is what says
-  // so out loud, so putting the page back is a decision rather than a slip.
-  for (const shift of ["closing", "opening", "mid", "off_site"] as const) {
-    no(pagesForShift(shift).includes("elements"), `${shift} must not ask for the bake`);
+test("DONUT BATCHES are the opening and mid reports' — never closing or off-site", () => {
+  // Mark, 2026-09-30: "The opening/mid report." The closer counts what was
+  // LEFT (premades); off-site has no kitchen for a batch log to be about.
+  for (const shift of ["opening", "mid"] as const) {
+    ok(pagesForShift(shift).includes("elements"), `${shift} records the bakers' batches`);
+  }
+  for (const shift of ["closing", "off_site"] as const) {
+    no(pagesForShift(shift).includes("elements"), `${shift} must not ask for batches`);
   }
 });
 
@@ -94,7 +91,7 @@ test("pagesForShift returns a COPY — a caller sorting it cannot corrupt the ne
 
 test("the banner numbers what it was given", () => {
   const pages = pagesForShift("opening");
-  eq(pageBanner(pages[2], 2, pages.length), "Shift report — page 3 of 5 — Checklist");
+  eq(pageBanner(pages[2], 2, pages.length), "Shift report — page 3 of 6 — Donut batches");
 });
 
 // ---------------------------------------------------------------------------
@@ -212,16 +209,32 @@ test("READINESS IS SHIFT-DEPENDENT: an opening report is complete with no paper 
   eq(opening, [], "an opening report must not be asked about the closer's work");
 });
 
-test("NOBODY IS ASKED ABOUT BATCHES ANY MORE — the page is on no shift", () => {
-  // This asserted the opposite until 2026-09-09, and it was right to: an
-  // opening report that had counted 1 of 4 batches was blocked from sending.
-  // With the batch report retired the clause is unreachable on every shift,
-  // because it is guarded by `pages.includes("elements")`.
-  //
-  // Kept rather than deleted, and inverted, because it is the one thing that
-  // would go red if somebody put the page back without noticing that the
-  // blocker comes with it.
-  for (const shift of ["closing", "opening", "mid", "off_site"] as const) {
+test("AN UNCOUNTED DONUT BLOCKS the opening and mid report, like an uncounted premade", () => {
+  // Retired 2026-09-09 and back 2026-09-30 as one total per donut. A donut the
+  // bakers did not make is a 0, not a blank.
+  for (const shift of ["opening", "mid"] as const) {
+    const out = submitBlockers({
+      ...READY,
+      shift,
+      countedBatches: 1,
+      scheduledBatches: 4,
+    });
+    ok(
+      out.some((line) => line === "3 of 4 donuts have no batch count."),
+      `${shift}: ${out.join(" · ")}`
+    );
+    eq(
+      submitBlockers({ ...READY, shift, countedBatches: 4, scheduledBatches: 4 }).filter((l) =>
+        /batch/i.test(l)
+      ),
+      [],
+      `${shift} fully counted`
+    );
+  }
+});
+
+test("closing and off-site are never asked about batches", () => {
+  for (const shift of ["closing", "off_site"] as const) {
     const out = submitBlockers({
       ...READY,
       shift,
@@ -239,7 +252,7 @@ test("NOBODY IS ASKED ABOUT BATCHES ANY MORE — the page is on no shift", () =>
   }
 });
 
-test("a mid shift is asked about neither", () => {
+test("a mid shift is not asked about premades or the closing tasks", () => {
   eq(
     submitReadiness({
       ...READY,
@@ -963,4 +976,17 @@ test("a re-send says CORRECTED in the subject and at the top of BOTH bodies", ()
     // copy before reading anything else.
     ok(body.indexOf("Corrected report.") < body.indexOf("<h2"), "the notice leads");
   }
+});
+
+test("the email lists DONUT BATCHES with each total, and a blank as a dash", () => {
+  const html = supervisorBody({
+    ...REPORT,
+    elements: [
+      { name: "Raised Donut", batches: 7.5 },
+      { name: "Mochi Donut", batches: null },
+    ],
+  });
+  ok(html.includes("Donut batches"), "the heading");
+  ok(html.includes(">7.5<"), "a half batch survives");
+  ok(/Mochi Donut<\/td><td[^>]*>—</.test(html), "an uncounted donut reads —");
 });

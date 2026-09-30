@@ -8,6 +8,7 @@ import { compareForPremadeSheet } from "@/lib/productionSchedule";
 import { localDateISO, localTime } from "@/lib/timeZone";
 import { isDayComplete } from "@/lib/sales";
 import { readSettings } from "@/lib/specialOrders";
+import { SHIFT_REPORT_BATCH_SCHEDULE } from "@/lib/production";
 import { ordersForKitchen } from "@/lib/specialOrderSchedule";
 import {
   pagesForShift,
@@ -325,12 +326,16 @@ export default async function RunShiftReportPage({
           .eq("schedule_date", reportDate)
           .order("created_at")
       : SKIP,
+    // The kitchen's DONUT log for the day (153) — one per kitchen, day and
+    // schedule, so `.maybeSingle()` is safe here. Absent until the page makes
+    // it: `ElementsPage` generates it when the supervisor reaches the page.
     wants("elements")
       ? supabase
           .from("production_batch_logs")
           .select("id")
           .eq("location_id", kitchenId)
           .eq("log_date", reportDate)
+          .eq("schedule", SHIFT_REPORT_BATCH_SCHEDULE)
           .maybeSingle()
       : SKIP,
     wants("sales")
@@ -464,18 +469,18 @@ export default async function RunShiftReportPage({
     premadeRows.sort(compareRows);
   }
 
-  // ---- elements: the kitchen's batch log for the day ----------------------
+  // ---- elements: the kitchen's Donut log for the day -----------------------
   let elementRows: ElementBatchRow[] = [];
   if (wants("elements") && batchLog) {
     const [{ data: batches }, { data: drafts }] = await Promise.all([
       supabase
         .from("production_batches")
-        .select("id, batch_number, batch_label, sort, production_elements(name)")
+        .select("id, sort, batch_count, production_elements(name)")
         .eq("log_id", batchLog.id as string)
         .order("sort", { nullsFirst: false }),
       supabase
         .from("shift_report_batches")
-        .select("batch_id, yield_count, yield_unit, status, notes")
+        .select("batch_id, batch_count")
         .eq("report_id", id),
     ]);
     const draftById = new Map(
@@ -484,15 +489,16 @@ export default async function RunShiftReportPage({
     elementRows = ((batches as Record<string, unknown>[] | null) ?? []).map((b) => {
       const d = draftById.get(b.id as string);
       const el = b.production_elements as { name: string } | null;
+      // THIS REPORT'S DRAFT, else what the batch already holds — the opening
+      // and mid reports share one log, so whichever comes second opens on the
+      // first one's numbers rather than on empty boxes.
+      const drafted = d?.batch_count;
+      const saved = b.batch_count;
       return {
         batchId: b.id as string,
-        batchNumber: b.batch_number as string,
         elementName: el?.name ?? "—",
-        batchLabel: (b.batch_label as string | null) ?? null,
-        yieldCount: d?.yield_count == null ? null : Number(d.yield_count),
-        yieldUnit: (d?.yield_unit as string | null) ?? null,
-        status: (d?.status as string | null) ?? null,
-        notes: (d?.notes as string | null) ?? null,
+        batchCount:
+          drafted != null ? Number(drafted) : saved != null ? Number(saved) : null,
       };
     });
   }
@@ -623,7 +629,7 @@ export default async function RunShiftReportPage({
     netSalesCents,
     countedLines: premadeRows.filter((r) => r.made !== null || r.leftover !== null).length,
     scheduledLines: premadeRows.length,
-    countedBatches: elementRows.filter((r) => r.yieldCount !== null).length,
+    countedBatches: elementRows.filter((r) => r.batchCount !== null).length,
     scheduledBatches: elementRows.length,
     // DERIVED, never a `task_checklist_done` column — see the note on
     // `ReadinessInput.checklist`.
@@ -781,6 +787,10 @@ export default async function RunShiftReportPage({
         key="elements"
         reportId={id}
         orgId={report.org_id as string}
+        kitchenId={kitchenId}
+        kitchenCode={kitchenCode}
+        reportDate={reportDate}
+        hasLog={Boolean(batchLog)}
         rows={elementRows}
         editable={editable}
       />
@@ -881,11 +891,7 @@ export default async function RunShiftReportPage({
         note: r.countNote,
       })),
     })),
-    elements: elementRows.map((r) => ({
-      name: r.elementName,
-      yield: r.yieldCount === null ? null : `${r.yieldCount}${r.yieldUnit ? ` ${r.yieldUnit}` : ""}`,
-      status: r.status,
-    })),
+    elements: elementRows.map((r) => ({ name: r.elementName, batches: r.batchCount })),
     ratings: ratingRows.map((r) => ({
       employeeName: r.employeeName,
       position: r.position,

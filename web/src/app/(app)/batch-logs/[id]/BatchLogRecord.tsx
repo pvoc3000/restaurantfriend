@@ -10,6 +10,7 @@ import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { ControlField } from "@/components/ui/ControlField";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { batchDate } from "@/lib/productionBatches";
+import { scheduleLabel } from "@/lib/production";
 import { type BatchRow } from "@/components/production/BatchItemsTable";
 import { BatchLogItems } from "@/components/production/BatchLogItems";
 import { type BatchFieldsRow } from "@/components/production/BatchFields";
@@ -45,7 +46,7 @@ export async function BatchLogRecord({
   const { data: log, error } = await supabase
     .from("production_batch_logs")
     .select(
-      `id, org_id, location_id, log_date, status, note,
+      `id, org_id, location_id, log_date, schedule, status, note,
        generated_by, generated_at, printed_by, printed_at`
     )
     .eq("id", id)
@@ -69,7 +70,7 @@ export async function BatchLogRecord({
      batch_amount, batch_unit,
      par_count, par_size, par_unit,
      on_hand_count, on_hand_size, on_hand_unit,
-     yield_count, yield_size, yield_unit, notes, photo_path, photo_name,
+     yield_count, yield_size, yield_unit, batch_count, notes, photo_path, photo_name,
      production_elements ( name, element_type )`;
 
   const [batchesResult, { data: employees }, { data: members }] = await Promise.all([
@@ -114,6 +115,8 @@ export async function BatchLogRecord({
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
   const kitchenCode = codeById.get(log.location_id as string) ?? "—";
   const logDate = log.log_date as string;
+  // Which schedule generated it (153); a FileMaker log has none.
+  const schedule = log.schedule ? scheduleLabel(log.schedule as string) : null;
 
   // Every photo signed in ONE round trip, not one per batch — `createSignedUrls`
   // is plural for exactly this, and a URL built to expire must not outlive the
@@ -214,6 +217,7 @@ export async function BatchLogRecord({
       yield_count: num(b.yield_count),
       yield_size: num(b.yield_size),
       yield_unit: (b.yield_unit ?? null) as string | null,
+      batch_count: num(b.batch_count),
       generated: (b.is_generated ?? false) as boolean,
       migrated: migratedOf(b),
       notes: (b.notes ?? null) as string | null,
@@ -249,6 +253,7 @@ export async function BatchLogRecord({
       yield_count: num(b.yield_count),
       yield_size: num(b.yield_size),
       yield_unit: (b.yield_unit ?? null) as string | null,
+      batch_count: num(b.batch_count),
       notes: (b.notes ?? null) as string | null,
       photo_path: path,
       photo_name: (b.photo_name ?? null) as string | null,
@@ -276,7 +281,7 @@ export async function BatchLogRecord({
   const crumbs = (
     <Breadcrumbs
       trail={trail}
-      current={`${batchDate(logDate)} · ${kitchenCode}`}
+      current={`${batchDate(logDate)} · ${kitchenCode}${schedule ? ` · ${schedule}` : ""}`}
       trailing={
         touch ? (
           // THE TABLET'S ACTIONS MENU, where the footer's two commands went
@@ -316,7 +321,7 @@ export async function BatchLogRecord({
       <header className="flex flex-wrap items-start gap-x-4 gap-y-2">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-4">
           <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            {kitchenCode} — {batchDate(logDate)}
+            {kitchenCode} — {schedule ? `${schedule} — ` : ""}{batchDate(logDate)}
           </h1>
           <p className="text-sm text-muted">
             {rows.length === 0 ? "Nothing on this log yet" : `${done} of ${rows.length} done`}

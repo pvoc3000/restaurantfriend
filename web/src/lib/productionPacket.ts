@@ -33,6 +33,7 @@ import {
 } from "./productionSchedule";
 import type { CostElement, CostLine } from "./productionCost";
 import { splitScheduleTitle } from "./specialOrderSchedule";
+import { SHIFT_REPORT_BATCH_SCHEDULE } from "./production";
 
 export type PacketSchedule = {
   id: string;
@@ -58,8 +59,12 @@ export type PacketKitchen = {
   lines: ScheduleLine[];
   /** Dough and components the night takes out of the catalog. */
   demand: ElementDemand[];
-  /** Elements on the AB rhythm for this kitchen and weekday. */
-  ab: SheetElement[];
+  /**
+   * The donuts on this kitchen's DONUT batch log (153), for the baker tray
+   * guide's "Total batches" box — the bakers write each total there and the
+   * opening or mid supervisor copies it into the shift report.
+   */
+  batchDonuts: string[];
   /** Elements on the WEEKLY rhythm. */
   weekly: SheetElement[];
 };
@@ -281,7 +286,9 @@ export async function fetchPacketData(
     ),
     supabase
       .from("production_element_locations")
-      .select("element_id, location_id, stock_count, stock_size, stock_unit")
+      .select(
+        "element_id, location_id, stock_count, stock_size, stock_unit, on_batch_log, batch_sort, is_active"
+      )
       .in("location_id", kitchenIds)
       .then((r) => r.data ?? []),
   ]);
@@ -310,7 +317,7 @@ export async function fetchPacketData(
     fetchAll<Record<string, unknown>>(
       supabase,
       "production_elements",
-      "id, name, element_type, schedule_class, kind, manual_cost, manual_cost_unit",
+      "id, name, element_type, schedule_class, kind, manual_cost, manual_cost_unit, is_active",
       "name"
     ),
   ]);
@@ -340,6 +347,7 @@ export async function fetchPacketData(
         name: e.name as string,
         elementType: (e.element_type ?? null) as string | null,
         scheduleClass: String(e.schedule_class ?? "").toUpperCase(),
+        isActive: e.is_active !== false,
       },
     ])
   );
@@ -424,7 +432,7 @@ export async function fetchPacketData(
         shopCodes: [],
         lines: [],
         demand: [],
-        ab: [],
+        batchDonuts: [],
         weekly: [],
       };
       kitchens.set(key, k);
@@ -470,8 +478,18 @@ export async function fetchPacketData(
           a.name.localeCompare(b.name)
       );
 
-    k.ab = rhythm.filter((e) => e.scheduleClass === "AB");
     k.weekly = rhythm.filter((e) => e.scheduleClass === "WEEKLY");
+
+    // What the shift report's Donut batches page will ask for at this kitchen —
+    // the same three conditions `generate_production_batches` reads.
+    k.batchDonuts = elementLocs
+      .filter((r) => r.location_id === kitchenId && r.on_batch_log && r.is_active !== false)
+      .map((r) => ({ sort: (r.batch_sort ?? null) as number | null, meta: elementMeta.get(r.element_id as string) }))
+      .filter((r) => r.meta?.isActive && r.meta.scheduleClass === SHIFT_REPORT_BATCH_SCHEDULE)
+      .sort(
+        (a, b) => (a.sort ?? 9999) - (b.sort ?? 9999) || a.meta!.name.localeCompare(b.meta!.name)
+      )
+      .map((r) => r.meta!.name);
   }
 
   return {

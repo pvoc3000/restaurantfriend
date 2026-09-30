@@ -494,7 +494,7 @@ export function samplePacket(orgName: string): PacketData {
           { elementId: "e2", name: "Cake Batter", batches: 1, quantity: 30, unit: "lb", unresolved: [] },
           { elementId: "e3", name: "Vanilla Glaze", batches: null, quantity: 12, unit: "qt", unresolved: [] },
         ],
-        ab: [element("e4", "Lemon Curd", "AM", 2, "qt", 1), element("e5", "Raspberry Jam", "PM", 3, "qt", 2)],
+        batchDonuts: ["Raised Donut", "Vanilla Cake Donut", "Old Fashioned Donut", "Apple Fritter"],
         weekly: [element("e6", "Maple Glaze Base", "AM", 1, "gal", 1)],
       },
     ],

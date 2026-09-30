@@ -19,11 +19,11 @@ export type ElementLocationRow = {
   stock_unit: string | null;
   is_active: boolean;
   notes: string | null;
-  /** Migration 045 — the weekly round, which is what generation reads. */
-  on_weekly_log: boolean;
-  weekly_sort: number | null;
-  weekly_amount: number | null;
-  weekly_unit: string | null;
+  /** Migration 045, renamed by 153 — whether this kitchen generates the element onto its schedule's batch log. */
+  on_batch_log: boolean;
+  batch_sort: number | null;
+  batch_amount: number | null;
+  batch_unit: string | null;
 };
 
 /**
@@ -45,13 +45,14 @@ export type ElementLocationRow = {
  *
  * WHAT EACH COLUMN ACTUALLY DOES, because they are easy to confuse:
  *
- * - **Active** and **On round** are both required for generation and are not the
- *   same question. Inactive means this shop does not deal with the element at
- *   all; off the round means it deals with it but not on the weekly bake — an
- *   AB or donut element, made to order.
- * - **Order** is `weekly_sort`, which becomes the batch's `sort` and orders the
+ * - **Active** and **On batch log** are both required for generation and are
+ *   not the same question. Inactive means this shop does not deal with the
+ *   element at all; off the log means it deals with it but it is not generated
+ *   onto this kitchen's log for the element's SCHEDULE (Weekly, Donut or Ice
+ *   Cream — migration 153; it was the weekly round only until then).
+ * - **Order** is `batch_sort`, which becomes the batch's `sort` and orders the
  *   printed log.
- * - **Round asks for** is `weekly_amount` × `weekly_unit` — "make 2 X". It lands
+ * - **Asks for** is `batch_amount` × `batch_unit` — "make 2 X". It lands
  *   on the batch's `batch_amount` (no longer shown on the batch sheet since
  *   2026-09-10) and is distinct from **Par**, which is the stock level this
  *   shop keeps and lands as the batch's Par.
@@ -221,27 +222,27 @@ export function ElementLocationRows({
       : []),
     {
       key: "weekly",
-      label: "On round",
+      label: "On batch log",
       width: 110,
-      sortValue: (l) => (l.row?.on_weekly_log ? 0 : 1),
+      sortValue: (l) => (l.row?.on_batch_log ? 0 : 1),
       render: (l) =>
         !l.row ? (
           <span className={`${READ_ONLY_VALUE} text-subtle`}>—</span>
         ) : (
-          <WeeklyToggle
+          <BatchLogToggle
             id={l.row.id}
-            on={l.row.on_weekly_log}
+            on={l.row.on_batch_log}
             disabled={!editable}
-            label={`On ${l.location.code}'s weekly round`}
+            label={`On ${l.location.code}'s batch log`}
           />
         ),
     },
     {
-      key: "weekly_sort",
+      key: "batch_sort",
       label: "Order",
       width: 90,
       align: "right",
-      sortValue: (l) => l.row?.weekly_sort ?? Number.MAX_SAFE_INTEGER,
+      sortValue: (l) => l.row?.batch_sort ?? Number.MAX_SAFE_INTEGER,
       render: (l) =>
         !l.row ? (
           <span className={`${READ_ONLY_VALUE} text-subtle`}>—</span>
@@ -249,23 +250,23 @@ export function ElementLocationRows({
           <InlineValue
             table="production_element_locations"
             id={l.row.id}
-            column="weekly_sort"
+            column="batch_sort"
             kind="number"
-            value={l.row.weekly_sort}
-            ariaLabel={`Order on ${l.location.code}'s round`}
+            value={l.row.batch_sort}
+            ariaLabel={`Order on ${l.location.code}'s batch log`}
           />
         ) : (
           <span className={`${READ_ONLY_VALUE} tabular-nums`}>
-            {l.row.weekly_sort ?? "—"}
+            {l.row.batch_sort ?? "—"}
           </span>
         ),
     },
     {
       key: "asks",
-      label: "Round asks for",
+      label: "Asks for",
       width: 200,
       wrap: true,
-      sortValue: (l) => l.row?.weekly_amount ?? null,
+      sortValue: (l) => l.row?.batch_amount ?? null,
       render: (l) =>
         !l.row ? (
           <span className={`${READ_ONLY_VALUE} text-subtle`}>—</span>
@@ -274,24 +275,24 @@ export function ElementLocationRows({
             <InlineValue
               table="production_element_locations"
               id={l.row.id}
-              column="weekly_amount"
+              column="batch_amount"
               kind="number"
-              value={l.row.weekly_amount}
-              ariaLabel={`What ${l.location.code}'s round asks for`}
+              value={l.row.batch_amount}
+              ariaLabel={`What ${l.location.code}'s batch log asks for`}
             />
             <InlineValue
               table="production_element_locations"
               id={l.row.id}
-              column="weekly_unit"
-              value={l.row.weekly_unit}
-              ariaLabel={`The unit ${l.location.code}'s round asks in`}
+              column="batch_unit"
+              value={l.row.batch_unit}
+              ariaLabel={`The unit ${l.location.code}'s batch log asks in`}
             />
           </span>
         ) : (
           <span className={READ_ONLY_VALUE}>
-            {l.row.weekly_amount === null
+            {l.row.batch_amount === null
               ? "—"
-              : `${l.row.weekly_amount}${l.row.weekly_unit ? ` ${l.row.weekly_unit}` : ""}`}
+              : `${l.row.batch_amount}${l.row.batch_unit ? ` ${l.row.batch_unit}` : ""}`}
           </span>
         ),
     },
@@ -398,7 +399,7 @@ export function ElementLocationRows({
 }
 
 /**
- * `on_weekly_log` — its own control rather than an `InlineValue`, because
+ * `on_batch_log` — its own control rather than an `InlineValue`, because
  * `InlineValue` has no boolean kind and a checkbox is what a yes/no wants.
  *
  * Optimistic, and it PUTS THE BOX BACK on failure: an update matching no policy
@@ -406,7 +407,7 @@ export function ElementLocationRows({
  * the tick showing a state the database never took — `ActiveToggle`'s own
  * lesson, and the reason this `.select()`s its result.
  */
-function WeeklyToggle({
+function BatchLogToggle({
   id,
   on,
   disabled,
@@ -433,7 +434,7 @@ function WeeklyToggle({
         void (async () => {
           const { data, error } = await supabase
             .from("production_element_locations")
-            .update({ on_weekly_log: next })
+            .update({ on_batch_log: next })
             .eq("id", id)
             .select("id");
           setBusy(false);

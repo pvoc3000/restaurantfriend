@@ -27,7 +27,7 @@ async function fetchLogs(
     let query = supabase
       .from("production_batch_logs")
       .select(
-        `id, log_date, location_id, status, generated_by, generated_at,
+        `id, log_date, location_id, schedule, status, generated_by, generated_at,
          printed_at, note,
          production_batches ( id, status )`
       )
@@ -128,6 +128,7 @@ export default async function BatchLogsPage({
       id: l.id as string,
       log_date: l.log_date as string,
       kitchenCode: codeById.get(l.location_id as string) ?? "—",
+      schedule: (l.schedule ?? null) as string | null,
       status: (l.status ?? "open") as string,
       generatedByName: l.generated_by
         ? memberById.get(l.generated_by as string) ?? null

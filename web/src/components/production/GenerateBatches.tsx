@@ -6,9 +6,14 @@ import { createClient } from "@/lib/supabase/client";
 import { batchDate } from "@/lib/productionBatches";
 import { DateField } from "@/components/ui/DateField";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
-import { Checkbox } from "@/components/ui/Checkbox";
+import { Radio } from "@/components/ui/Radio";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { myEmployeeId } from "@/lib/myEmployee";
+import {
+  SCHEDULE_CLASSES,
+  SCHEDULE_CLASS_LABEL,
+  type ScheduleClass,
+} from "@/lib/production";
 
 /**
  * "Generate a batch log" — migration 045.
@@ -27,9 +32,15 @@ import { myEmployeeId } from "@/lib/myEmployee";
  * location like every other operational screen (design rule 3); to make
  * another kitchen's log, go and work at that kitchen.
  *
- * Generating the same day twice TOPS UP the same log rather than making a
- * second — the unique index on (location, date) says so, and the receipt says
- * which happened.
+ * IT ASKS FOR A SCHEDULE (migration 153; Mark, 2026-09-30: "When creating a new
+ * batch log, we then choose the schedule instead of the element types"). A log
+ * is ONE schedule's — Weekly, Donut or Ice Cream — and generates every element
+ * on that schedule that this kitchen has on its batch log. The element-type
+ * checkboxes 047 added are gone with it.
+ *
+ * Generating the same day and schedule twice TOPS UP the same log rather than
+ * making a second — the unique index on (location, date, schedule) says so, and
+ * the receipt says which happened.
  *
  * There is deliberately no preview of what it will produce. Computing it here
  * would be a TypeScript twin of the SQL rule — 016's `nextDeliveryDate` trap,
@@ -37,8 +48,6 @@ import { myEmployeeId } from "@/lib/myEmployee";
  * what actually happened instead.
  */
 
-/** A type on this kitchen's round, and how many elements carry it. */
-type RoundType = { value: string; label: string; count: number };
 
 type Created = { element_name: string; batch_number: string };
 type Skipped = { batch_id: string; element_name: string; reason: string };
@@ -49,6 +58,7 @@ type Receipt = {
   log_date: string;
   new_log: boolean;
   location_code: string;
+  schedule: ScheduleClass;
   created: Created[];
   skipped: Skipped[];
   warnings: Warning[];
@@ -79,75 +89,54 @@ export function GenerateBatches({
   const [running, setRunning] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [error, setError] = useState<string | null>(null);
-  /**
-   * The types on this kitchen's round, and which are ticked.
-   *
-   * ALL TICKED BY DEFAULT (Mark, 2026-08-09), which keeps the ordinary act one
-   * press: generating the whole round is what this button has always done and
-   * still is. The checkboxes are for the day you only want the glazes.
-   *
-   * `chosen === null` means "not loaded yet", told apart from the empty set —
-   * which is a real state (everything unticked) and must disable Generate
-   * rather than silently generating everything, since the RPC reads an empty
-   * array as "no types" and null as "all".
-   */
-  const [types, setTypes] = useState<RoundType[] | null>(null);
-  const [chosen, setChosen] = useState<Set<string> | null>(null);
+  const [schedule, setSchedule] = useState<ScheduleClass>("WEEKLY");
+  /** How many elements each schedule would generate here; null until read. */
+  const [counts, setCounts] = useState<Map<string, number> | null>(null);
 
   function openDialog() {
     setOpen(true);
     setReceipt(null);
     setError(null);
     setLogDate(today);
+    setCounts(null);
   }
 
   /**
-   * What is actually on this kitchen's round, read when the dialog opens.
-   *
-   * FROM THE ROUND, not from the whole catalog: offering all 16 of the app's
-   * element types would list nine that cannot produce a batch here, and
-   * unticking one of those would do nothing at all. DF02's round has seven.
-   *
-   * The COUNT rides along because it is what makes a tick meaningful — "Glaze
-   * 12" tells you what you are about to add where a bare label does not.
+   * How many elements each schedule holds AT THIS KITCHEN, read when the dialog
+   * opens — the count beside each choice says what Generate is about to add.
    */
   useEffect(() => {
-    if (!open || types !== null) return;
+    if (!open || counts !== null) return;
     let cancelled = false;
     void (async () => {
       const { data, error: err } = await supabase
         .from("production_element_locations")
-        .select("is_active, production_elements!inner ( element_type, is_active )")
+        .select("is_active, production_elements!inner ( schedule_class, is_active )")
         .eq("location_id", locationId)
-        .eq("on_weekly_log", true);
+        .eq("on_batch_log", true);
       if (cancelled) return;
       if (err) {
         setError(err.message);
-        setTypes([]);
-        setChosen(new Set());
+        setCounts(new Map());
         return;
       }
-      const counts = new Map<string, number>();
+      const next = new Map<string, number>();
       for (const row of (data ?? []) as unknown as {
         is_active: boolean;
-        production_elements: { element_type: string | null; is_active: boolean };
+        production_elements: { schedule_class: string | null; is_active: boolean };
       }[]) {
-        // The same three conditions the SQL generates on, so the list cannot
-        // promise a batch the function then declines to make.
+        // The conditions the SQL generates on, so a count cannot promise a
+        // batch the function then declines to make.
         if (!row.is_active || !row.production_elements.is_active) continue;
-        const key = row.production_elements.element_type ?? "";
-        counts.set(key, (counts.get(key) ?? 0) + 1);
+        const key = row.production_elements.schedule_class;
+        if (key) next.set(key, (next.get(key) ?? 0) + 1);
       }
-      const list = [...counts.entries()]
-        .map(([value, count]) => ({ value, label: value || "No type", count }))
-        .sort((a, b) => a.label.localeCompare(b.label));
-      setTypes(list);
-      setChosen(new Set(list.map((t) => t.value)));
+      setCounts(next);
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, types, locationId, supabase]);
+  }, [open, counts, locationId, supabase]);
 
   async function run(replace: boolean) {
     if (!logDate) return;
@@ -156,11 +145,8 @@ export function GenerateBatches({
     const { data, error } = await supabase.rpc("generate_production_batches", {
       p_location_id: locationId,
       p_log_date: logDate,
+      p_schedule: schedule,
       p_replace: replace,
-      // NULL when every type is ticked, so the ordinary run is the call 045
-      // always made and the array is only sent when it narrows something.
-      p_element_types:
-        chosen && types && chosen.size < types.length ? [...chosen] : null,
     });
     if (!error) {
       // PREPARED BY IS WHOEVER GENERATED IT (Mark, 2026-09-16). The SQL
@@ -182,10 +168,10 @@ export function GenerateBatches({
     setRunning(false);
     if (error) {
       setError(
-        // The parameter arrives with 047. Without it PostgREST reports no
-        // matching function, which names neither the migration nor the fix.
+        // The schedule parameter arrives with 153. Without it PostgREST reports
+        // no matching function, which names neither the migration nor the fix.
         /PGRST202|function public\.generate_production_batches/i.test(error.message)
-          ? `${error.message} — migration 047 has not been applied yet.`
+          ? `${error.message} — migration 153 has not been applied yet.`
           : error.message
       );
       return;
@@ -221,7 +207,7 @@ export function GenerateBatches({
                     disabled={running}
                     className={DIALOG_CANCEL_CLASS}
                   >
-                    Refresh these {receipt.skipped.length} from the round
+                    Refresh these {receipt.skipped.length}
                   </button>
                 ) : null}
                 <button
@@ -245,7 +231,7 @@ export function GenerateBatches({
                 <button
                   type="button"
                   onClick={() => run(false)}
-                  disabled={running || !logDate || chosen === null || chosen.size === 0}
+                  disabled={running || !logDate || counts === null}
                   className={DIALOG_COMMIT_CLASS}
                 >
                   {running ? "Generating…" : "Generate"}
@@ -259,7 +245,8 @@ export function GenerateBatches({
           {receipt ? (
             <div className="space-y-5 text-sm">
               <p className="text-muted">
-                {receipt.location_code} · {batchDate(receipt.log_date)}
+                {receipt.location_code} · {SCHEDULE_CLASS_LABEL[receipt.schedule] ?? receipt.schedule}{" "}
+                · {batchDate(receipt.log_date)}
                 {receipt.new_log ? " · new log" : " · added to the existing log"}
               </p>
 
@@ -268,8 +255,8 @@ export function GenerateBatches({
               >
                 {receipt.created.length === 0 ? (
                   <p className="text-muted">
-                    Nothing to add. Only WEEKLY-class elements are generated — an
-                    AB or donut batch is logged by hand.
+                    Nothing to add. Put an element on this kitchen&rsquo;s batch log
+                    from its Kitchens table.
                   </p>
                 ) : (
                   <ul className="divide-y divide-hairline border border-hairline">
@@ -292,8 +279,8 @@ export function GenerateBatches({
                 <Block title={`${receipt.skipped.length} already logged`}>
                   <p className="mb-2 text-muted">
                     Left exactly as they are. Refreshing them re-reads the
-                    round&rsquo;s amounts and recipe version and keeps every
-                    yield, status and note somebody entered.
+                    amounts and recipe version and keeps every yield, count,
+                    status and note somebody entered.
                   </p>
                   <ul className="divide-y divide-hairline border border-hairline">
                     {receipt.skipped.slice(0, 12).map((s) => (
@@ -331,8 +318,8 @@ export function GenerateBatches({
             </div>
           ) : (
             <div className="space-y-5">
-              {/* No explanatory paragraph (Mark, 2026-08-09). The type list
-                  below now says what will be generated, in the only terms that
+              {/* No explanatory paragraph (Mark, 2026-08-09). The schedule
+                  list below says what will be generated, in the only terms that
                   matter — the counts — so a sentence describing the rule was
                   restating what the reader can already see and count. */}
               <div className="grid gap-4 sm:grid-cols-2">
@@ -363,68 +350,28 @@ export function GenerateBatches({
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex items-baseline gap-3">
-                  <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                    Element types
-                  </span>
-                  {/* All / None, the WeekdayPicker's command in this dialog's
-                      terms: with seven boxes, "just the glazes" is six clicks
-                      without it and two with. */}
-                  {types && types.length > 1 && chosen ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setChosen(
-                          chosen.size === types.length
-                            ? new Set()
-                            : new Set(types.map((t) => t.value))
-                        )
-                      }
-                      className="text-[11px] uppercase tracking-[0.08em] text-subtle hover:text-ink"
-                    >
-                      {chosen.size === types.length ? "None" : "All"}
-                    </button>
-                  ) : null}
-                </div>
-
-                {types === null ? (
-                  <p className="text-sm text-muted">Reading the round…</p>
-                ) : types.length === 0 ? (
-                  <p className="text-sm text-muted">
-                    Nothing is on {locationCode}&rsquo;s weekly round, so there is
-                    nothing to generate.
-                  </p>
-                ) : (
-                  <ul className="divide-y divide-hairline border border-hairline">
-                    {types.map((t) => {
-                      const on = chosen?.has(t.value) ?? false;
-                      return (
-                        <li
-                          key={t.value}
-                          className="flex items-center gap-3 px-3 py-1.5 text-sm hover:bg-neutral-50"
-                        >
-                          {/* `ui/Checkbox` IS the button and takes the label as
-                              children — so the box and its word are one target,
-                              which is what a 20px square needs. Nesting it in a
-                              row-wide button of my own would have been a button
-                              inside a button. */}
-                          <Checkbox
-                            checked={on}
-                            onChange={() => {
-                              const next = new Set(chosen ?? []);
-                              if (on) next.delete(t.value);
-                              else next.add(t.value);
-                              setChosen(next);
-                            }}
-                          >
-                            <span className={on ? "" : "text-muted"}>{t.label}</span>
-                          </Checkbox>
-                          <span className="ml-auto tabular-nums text-subtle">{t.count}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  Schedule
+                </span>
+                <Radio
+                  vertical
+                  ariaLabel="Which schedule to generate"
+                  value={schedule}
+                  onChange={setSchedule}
+                  options={SCHEDULE_CLASSES.map((value) => ({
+                    value,
+                    label: SCHEDULE_CLASS_LABEL[value],
+                    after: (
+                      <span className="tabular-nums text-subtle">
+                        {counts === null
+                          ? "…"
+                          : `${counts.get(value) ?? 0} ${
+                              (counts.get(value) ?? 0) === 1 ? "element" : "elements"
+                            }`}
+                      </span>
+                    ),
+                  }))}
+                />
               </div>
             </div>
           )}

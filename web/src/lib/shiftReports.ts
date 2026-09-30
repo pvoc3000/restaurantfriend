@@ -23,14 +23,10 @@ export { SHIFT_SLOT_LABEL };
 /**
  * The pages, in FileMaker's own order.
  *
- * `premades` and `elements` were MIRRORS and never both appeared: the opening
- * supervisor recorded what the overnight bake produced, the closer records what
- * was left of it (Mark, 2026-08-28). Mid and off-site got neither — an off-site
- * shift has no kitchen for a batch log to be about.
- *
- * `elements` IS ON NO SHIFT SINCE 2026-09-09 — the shop stopped keeping the
- * batch report. The page survives here and everywhere else it is named, behind
- * guards that are now always false; see `OPENING_PAGES`.
+ * `premades` and `elements` are MIRRORS and never both appear: the closer
+ * records what was left of the bake, and `elements` — "Donut batches" — is what
+ * the OPENING and MID supervisors record the bakers made (Mark, 2026-09-30).
+ * Off-site gets neither: it has no kitchen for a batch log to be about.
  */
 export type ShiftReportPage =
   | "info"
@@ -53,7 +49,9 @@ export const PAGE_TITLE: Record<ShiftReportPage, string> = {
   ratings: "Employees",
   sales: "Sales",
   premades: "Premades",
-  elements: "Elements made",
+  // The bakers' TOTAL batches of each donut (Mark, 2026-09-30). The key keeps
+  // its old name: it is the page the batch report used, reshaped.
+  elements: "Donut batches",
   checklist: "Checklist",
   report: "Report",
   tomorrow: "Tomorrow's production",
@@ -86,31 +84,30 @@ const CLOSING_PAGES: ShiftReportPage[] = [
 ];
 
 /**
- * NO ELEMENTS PAGE SINCE 2026-09-09 (Mark: "we are no longer doing the batch
- * report, so we can skip that page for the morning shift"). The opener recorded
- * what the overnight bake produced; the shop has stopped keeping that log, so
- * asking for it is asking somebody to fill in a form nobody reads.
- *
- * That leaves this list IDENTICAL to `SHORT_PAGES` and it stays a list of its
- * own, deliberately: the two are the same by coincidence rather than by rule.
- * Mid and off-site hold these five because there is no kitchen and no till;
- * opening holds them because one page was retired, and opening is the shift
- * most likely to grow one back. Merging them would put that decision behind a
- * name that argues against it.
- *
- * The `elements` page, its component and its queries all survive, unreached —
- * every one of them is behind a `wants("elements")` that is now always false,
- * so nothing lies and one line here brings it back.
+ * DONUT BATCHES CAME BACK 2026-09-30, reshaped (Mark: "how many batches of
+ * raised dough, vanilla cake … the bakers made each day in each kitchen. Total
+ * batches"). The page it replaced — a yield per batch, retired 2026-09-09 —
+ * was the batch report nobody read; this asks one number per donut, which the
+ * bakers write on the tray guide and the opener copies across.
  */
 const OPENING_PAGES: ShiftReportPage[] = [
   "info",
   "ratings",
+  "elements",
   "checklist",
   "report",
   "submit",
 ];
 
-/** Mid and off-site: no kitchen, no till to close. */
+/**
+ * Mid: the opening list, and not by coincidence — Mark named "the opening/mid
+ * report" together (2026-09-30), since whichever of the two is written after
+ * the bake can copy the tray guide's totals. Both write the same batch rows;
+ * the later one wins, and the page opens on what is already there.
+ */
+const MID_PAGES: ShiftReportPage[] = [...OPENING_PAGES];
+
+/** Off-site: no kitchen, no till to close. */
 const SHORT_PAGES: ShiftReportPage[] = [
   "info",
   "ratings",
@@ -126,6 +123,7 @@ const SHORT_PAGES: ShiftReportPage[] = [
 export function pagesForShift(shift: ShiftSlot): ShiftReportPage[] {
   if (shift === "closing") return [...CLOSING_PAGES];
   if (shift === "opening") return [...OPENING_PAGES];
+  if (shift === "mid") return [...MID_PAGES];
   return [...SHORT_PAGES];
 }
 
@@ -293,7 +291,7 @@ export function submitBlockers(input: ReadinessInput): string[] {
   if (pages.includes("elements") && input.countedBatches < input.scheduledBatches) {
     const left = input.scheduledBatches - input.countedBatches;
     out.push(
-      `${left} of ${input.scheduledBatches} ${left === 1 ? "batch has" : "batches have"} no yield recorded.`
+      `${left} of ${input.scheduledBatches} ${left === 1 ? "donut has" : "donuts have"} no batch count.`
     );
   }
 
@@ -447,7 +445,8 @@ export type EmailReport = {
       note: string | null;
     }[];
   }[];
-  elements: { name: string; yield: string | null; status: string | null }[];
+  /** Donut batches — the day's total per element. */
+  elements: { name: string; batches: number | null }[];
   ratings: EmailRating[];
   /**
    * The checklist linked to this report. `ReadinessInput.checklist`'s shape and
@@ -764,14 +763,13 @@ export function supervisorBody(report: EmailReport): string {
 
   if (report.elements.length > 0) {
     parts.push(
-      `<h3 style="${S.h3}">Elements made</h3><table style="${S.table}"><tr>` +
-        `<th style="${S.th}">Element</th><th style="${S.thr}">Yield</th>` +
-        `<th style="${S.th}">Status</th></tr>`
+      `<h3 style="${S.h3}">Donut batches</h3><table style="${S.table}"><tr>` +
+        `<th style="${S.th}">Donut</th><th style="${S.thr}">Batches</th></tr>`
     );
     for (const e of report.elements) {
       parts.push(
-        `<tr><td style="${S.td}">${esc(e.name)}</td><td style="${S.tdr}">${esc(e.yield ?? "—")}</td>` +
-          `<td style="${S.td}">${esc(e.status ?? "—")}</td></tr>`
+        `<tr><td style="${S.td}">${esc(e.name)}</td>` +
+          `<td style="${S.tdr}">${e.batches === null ? "—" : esc(e.batches.toLocaleString("en-US"))}</td></tr>`
       );
     }
     parts.push("</table>");

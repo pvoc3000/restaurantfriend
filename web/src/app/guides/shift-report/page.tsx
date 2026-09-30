@@ -35,10 +35,13 @@ function Note({ head, warn, children }: { head: string; warn?: boolean; children
 function Page({
   name,
   closingOnly,
+  shifts,
   children,
 }: {
   name: string;
   closingOnly?: boolean;
+  /** Which shifts, when it is neither every shift nor closing alone. */
+  shifts?: string;
   children: ReactNode;
 }) {
   return (
@@ -48,6 +51,8 @@ function Page({
         <div className={s.shifts}>
           {closingOnly ? (
             <span className={s.closing}>Closing</span>
+          ) : shifts ? (
+            <span className={s.closing}>{shifts}</span>
           ) : (
             <span>Every shift</span>
           )}
@@ -200,7 +205,7 @@ export default function ShiftReportGuide() {
         <p className={s.lede}>
           The black bar at the top shows where you are, for example <em>page 3 of 8</em>. A
           closing report has eight pages, plus one more for each extra schedule the day has (see
-          Premades). Opening, mid and off-site reports have five.
+          Premades). Opening and mid reports have six, and off-site reports five.
         </p>
 
         <div className={s.pages}>
@@ -253,6 +258,17 @@ export default function ShiftReportGuide() {
                 If nobody generated today’s schedule, the page is empty. Tap{" "}
                 <Ui>Generate today’s schedule</Ui> and the rows appear.
               </li>
+            </ul>
+          </Page>
+
+          <Page name="Donut batches" shifts="Opening · Mid">
+            <p>
+              For each donut, enter the <strong>Total batches</strong> the bakers made today. Copy
+              them from the <strong>Total batches</strong> box on the baker tray guide.
+            </p>
+            <ul>
+              <li>Half batches are fine: type 7.5.</li>
+              <li>If a donut wasn’t made, enter 0. The report won’t send with a donut left blank.</li>
             </ul>
           </Page>
 

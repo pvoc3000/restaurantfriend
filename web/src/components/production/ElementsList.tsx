@@ -16,6 +16,8 @@ import {
   ELEMENT_KINDS,
   elementKindLabel,
   ELEMENT_KIND_LABEL,
+  SCHEDULE_CLASSES,
+  scheduleLabel,
   type ElementKind,
 } from "@/lib/production";
 import {
@@ -46,26 +48,6 @@ export type ElementRow = {
   source: string | null;
   recipeCount: number;
 };
-
-/**
- * FileMaker's own three, in the order Mark named them (2026-08-09), and
- * measured against the live catalog the same day: WEEKLY 158, AB 47, DONUT 18.
- *
- * `production_elements.schedule_class` is plain text with no check constraint,
- * so this list is a PRESENTATION order rather than the vocabulary itself —
- * anything else the column holds is appended below rather than being made
- * unreachable. That is the "Sold as" lesson: a value left off a list with no
- * `allowNew` doesn't merely go unlisted, it becomes unfindable, while rows
- * carrying it keep rendering, which is what hid that gap for four days.
- */
-const SCHEDULE_ORDER = ["DONUT", "AB", "WEEKLY"];
-
-/** Title case for display; the stored values are shouted. */
-function scheduleLabel(value: string): string {
-  return value.length <= 2
-    ? value.toUpperCase()
-    : value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-}
 
 /** This list's own address — its URL, its record-set key, its crumb. */
 const PATH = "/elements";
@@ -131,17 +113,11 @@ export function ElementsList({
   // initialiser runs during the render that declares it — so the order of these
   // two lines is load-bearing, not style.
   const dimensions = useMemo<FilterDimension<ElementRow>[]>(() => {
-    // Whatever the column actually holds, Mark's three first.
-    const schedules = [...new Set(rows.map((r) => r.schedule_class).filter(Boolean) as string[])];
-    schedules.sort((a, b) => {
-      const ai = SCHEDULE_ORDER.indexOf(a.toUpperCase());
-      const bi = SCHEDULE_ORDER.indexOf(b.toUpperCase());
-      if (ai !== bi) return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
-      return a.localeCompare(b);
-    });
+    // The closed list (153), in `SCHEDULE_CLASSES`' order.
+    const schedules: readonly string[] = SCHEDULE_CLASSES;
 
     // FROM THE DATA, not a declared list. `element_type` is plain text with no
-    // check constraint — the same footing `schedule_class` is on — so the
+    // check constraint — the footing `schedule_class` was on until 153 — so the
     // vocabulary is whatever the catalog holds (16 values today: Topping 63,
     // Glaze 43, Ice Cream 24, down to Signature 1). Hardcoding it would mean a
     // type nobody could filter by the moment somebody typed a new one, and
@@ -387,7 +363,7 @@ export function ElementsList({
       hideWhenCompact: true,
       sortValue: (r) => r.schedule_class ?? "",
       sortTiebreaks: [(r) => r.name],
-      render: (r) => <span className="text-muted">{r.schedule_class ?? "—"}</span>,
+      render: (r) => <span className="text-muted">{scheduleLabel(r.schedule_class)}</span>,
     },
     {
       key: "cost",

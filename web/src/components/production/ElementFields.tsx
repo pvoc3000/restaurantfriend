@@ -6,6 +6,7 @@ import { InventoryItemPicker } from "@/components/catalog/InventoryItemPicker";
 import {
   ELEMENT_KIND_OPTIONS,
   SCHEDULE_CLASS_OPTIONS,
+  scheduleLabel,
   elementKindLabel,
   type ElementKind,
 } from "@/lib/production";
@@ -86,10 +87,8 @@ export function ElementFields({
         )}
       </Row>
 
-      {/* Free text until 2026-08-11, which is how DAILY and Daily could both
-          exist. `allowNew` because the catalog still holds AB and DONUT and a
-          closed list would make them unenterable — see SCHEDULE_CLASS_OPTIONS
-          for why the values are uppercase. */}
+      {/* Which batch log the element is generated on — a closed list since
+          153, so no `allowNew`. See SCHEDULE_CLASSES. */}
       <Row label="Schedule">
         {editable ? (
           <InlineValue
@@ -98,13 +97,12 @@ export function ElementFields({
             id={element.id}
             column="schedule_class"
             kind="pick"
-            allowNew
             ariaLabel="Schedule"
             value={element.schedule_class}
             options={SCHEDULE_CLASS_OPTIONS}
           />
         ) : (
-          <span className={READ_ONLY_VALUE}>{element.schedule_class ?? "—"}</span>
+          <span className={READ_ONLY_VALUE}>{scheduleLabel(element.schedule_class)}</span>
         )}
       </Row>
 

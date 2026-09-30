@@ -1,63 +1,104 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { PickList, type PickOption } from "@/components/ui/PickList";
-import { CountField, TextField } from "./fields";
+import { SHIFT_REPORT_BATCH_SCHEDULE } from "@/lib/production";
+import { CountField } from "./fields";
 import { STICKY_HEAD_ROW_UNDER_RUNNER } from "@/lib/tableHead";
 
 export type ElementBatchRow = {
   batchId: string;
-  batchNumber: string;
   elementName: string;
-  batchLabel: string | null;
-  yieldCount: number | null;
-  yieldUnit: string | null;
-  status: string | null;
-  notes: string | null;
+  /** This report's draft, else what the batch already holds. */
+  batchCount: number | null;
 };
 
-const STATUS: PickOption[] = [
-  { value: "complete", label: "Complete" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "to_do", label: "To Do" },
-  { value: "skipped", label: "Skipped" },
-  { value: "test", label: "Test" },
-];
-
 /**
- * What the overnight bake produced — the OPENING supervisor's page.
+ * DONUT BATCHES — the opening and mid supervisor's page (Mark, 2026-09-30):
+ * how many batches of each donut the bakers made today in this kitchen. One
+ * number per donut, the total, copied from the tray guide's box.
  *
- * The mirror of Premades and never shown beside it (Mark, 2026-08-28): the
- * opener reports what was made, the closer reports what was left of it.
+ * The rows are the kitchen's DONUT batch log for the day (153). REACHING THE
+ * PAGE MAKES IT: if the log is not there yet, this generates it — every element
+ * on the Donut schedule that this kitchen has on its batch log — and refreshes.
+ * Generating twice only tops up, so a second report the same day, or a log
+ * somebody already made on Batch Logs, is picked up rather than duplicated.
  *
- * Rows are today's `production_batch_logs` entry for this kitchen, which is
- * unique on (location, date) — so there is exactly one, and if it is missing
- * the week was never generated rather than the query being wrong.
+ * It checks the kitchen HAS donuts first, so a shop that bakes none does not
+ * collect an empty Donut log every morning.
+ *
+ * The numbers are a DRAFT (`shift_report_batches`) until Send writes them onto
+ * the batches — 070's rule for every page of this report.
  */
 export function ElementsPage({
   reportId,
   orgId,
+  kitchenId,
+  kitchenCode,
+  reportDate,
+  hasLog,
   rows,
   editable,
 }: {
   reportId: string;
   orgId: string;
+  kitchenId: string;
+  kitchenCode: string;
+  reportDate: string;
+  hasLog: boolean;
   rows: ElementBatchRow[];
   editable: boolean;
 }) {
   const router = useRouter();
-  const supabase = createClient();
   const [failed, setFailed] = useState<string | null>(null);
+  const [nothingHere, setNothingHere] = useState(false);
   const [, startTransition] = useTransition();
+  const started = useRef(false);
 
-  function save(batchId: string, patch: Record<string, number | string | null>) {
+  useEffect(() => {
+    if (hasLog || !editable || started.current) return;
+    started.current = true;
+    void (async () => {
+      const supabase = createClient();
+      const { count, error: countErr } = await supabase
+        .from("production_element_locations")
+        .select("id, production_elements!inner ( schedule_class, is_active )", {
+          count: "exact",
+          head: true,
+        })
+        .eq("location_id", kitchenId)
+        .eq("on_batch_log", true)
+        .eq("is_active", true)
+        .eq("production_elements.schedule_class", SHIFT_REPORT_BATCH_SCHEDULE)
+        .eq("production_elements.is_active", true);
+      if (countErr) {
+        setFailed(countErr.message);
+        return;
+      }
+      if (!count) {
+        setNothingHere(true);
+        return;
+      }
+      const { error } = await supabase.rpc("generate_production_batches", {
+        p_location_id: kitchenId,
+        p_log_date: reportDate,
+        p_schedule: SHIFT_REPORT_BATCH_SCHEDULE,
+      });
+      if (error) {
+        setFailed(error.message);
+        return;
+      }
+      router.refresh();
+    })();
+  }, [hasLog, editable, kitchenId, reportDate, router]);
+
+  function save(batchId: string, batchCount: number | null) {
     startTransition(async () => {
-      const { error } = await supabase
+      const { error } = await createClient()
         .from("shift_report_batches")
         .upsert(
-          { org_id: orgId, report_id: reportId, batch_id: batchId, ...patch },
+          { org_id: orgId, report_id: reportId, batch_id: batchId, batch_count: batchCount },
           { onConflict: "report_id,batch_id" }
         )
         .select("id");
@@ -70,87 +111,47 @@ export function ElementsPage({
     });
   }
 
+  if (failed) {
+    return <p className="text-center text-[16px] text-accent">{failed}</p>;
+  }
+
   if (rows.length === 0) {
     return (
-      <p className="text-center text-[16px]">
-        No batch log was generated for this kitchen today, so there is nothing to record. Generate
-        the week from Batch Logs and it will appear here.
+      <p className="text-center text-[16px] text-muted">
+        {nothingHere || (hasLog && editable)
+          ? `${kitchenCode} has no donuts on its batch log.`
+          : editable
+            ? "Setting up today’s donut batch log…"
+            : `No donut batches were recorded at ${kitchenCode} this day.`}
       </p>
     );
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      {failed ? <p className="text-sm text-accent">{failed}</p> : null}
-      {/* Same reason as Premades: fixed layout, or the input columns crowd the
-          headers out. */}
+    <div className="mx-auto max-w-xl space-y-4">
       <table className="w-full table-fixed">
         <colgroup>
-          <col className="w-[8%]" />
-          <col className="w-[22%]" />
-          <col className="w-[12%]" />
-          <col className="w-[12%]" />
-          <col className="w-[10%]" />
-          <col className="w-[16%]" />
-          <col className="w-[20%]" />
+          <col />
+          <col className="w-40" />
         </colgroup>
-        {/* Sticky under the runner's banner, like every other header on this
-            surface — even though this page is currently on no shift at all
-            (the batch report was retired 2026-09-09). One line, so that if it
-            ever comes back it comes back behaving like its neighbours rather
-            than as the one table whose labels scroll away. */}
         <thead>
           <tr
             className={`text-xs font-semibold uppercase tracking-[0.08em] ${STICKY_HEAD_ROW_UNDER_RUNNER}`}
           >
-            <th className="py-2 text-left">#</th>
-            <th className="py-2 text-left">Element</th>
-            <th className="py-2 text-left">Batch</th>
-            <th className="w-28 py-2 text-right">Yield</th>
-            <th className="w-28 py-2 text-left">Unit</th>
-            <th className="w-40 py-2 text-left">Status</th>
-            <th className="py-2 text-left">Note</th>
+            <th className="py-2 text-left">Donut</th>
+            <th className="py-2 text-right">Total batches</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.batchId} className="border-b border-hairline/60">
-              <td className="py-2 pr-3 text-[16px] text-muted">{r.batchNumber}</td>
               <td className="py-2 pr-3 text-[16px]">{r.elementName}</td>
-              <td className="py-2 pr-3 text-[16px] text-muted">{r.batchLabel ?? "—"}</td>
-              <td className="py-2 pr-2">
-                <CountField
-                  value={r.yieldCount}
-                  onCommit={(next) => save(r.batchId, { yield_count: next })}
-                  disabled={!editable}
-                  ariaLabel={`Yield, ${r.elementName}`}
-                />
-              </td>
-              <td className="py-2 pr-2">
-                <TextField
-                  value={r.yieldUnit}
-                  onCommit={(next) => save(r.batchId, { yield_unit: next })}
-                  disabled={!editable}
-                  ariaLabel={`Yield unit, ${r.elementName}`}
-                />
-              </td>
-              <td className="py-2 pr-2">
-                <PickList
-                  value={r.status}
-                  options={STATUS}
-                  onPick={(next) => save(r.batchId, { status: next })}
-                  variant="field"
-                  disabled={!editable}
-                  placeholder="—"
-                  ariaLabel={`Status, ${r.elementName}`}
-                />
-              </td>
               <td className="py-2">
-                <TextField
-                  value={r.notes}
-                  onCommit={(next) => save(r.batchId, { notes: next })}
+                <CountField
+                  value={r.batchCount}
+                  onCommit={(next) => save(r.batchId, next)}
                   disabled={!editable}
-                  ariaLabel={`Note, ${r.elementName}`}
+                  ariaLabel={`Total batches, ${r.elementName}`}
                 />
               </td>
             </tr>

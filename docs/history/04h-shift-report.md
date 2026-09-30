@@ -649,3 +649,19 @@
    schedule the same way ("Premades", "Special order — #9761 · Cafe Knotted").
    A section with no lines (the empty Premades page kept for its Generate
    button) is left out of the email. Fixture pins order and placement.
+
+   **DONUT BATCHES — the elements page is back, reshaped (Mark, 2026-09-30).**
+   "How many batches of raised dough, vanilla cake … the bakers made each day in
+   each kitchen. Total batches." On the OPENING and MID reports (Mark: "The
+   opening/mid report"), never closing or off-site; opening and mid go to six
+   pages. One number per donut — `shift_report_batches.batch_count`, flushed by
+   `submit_shift_report` onto `production_batches.batch_count` (and marking the
+   batch complete), taken back by reopen only if nobody changed it since (153).
+   **Reaching the page generates the kitchen's DONUT batch log** if it is not
+   there (it checks the kitchen has donuts first, so a shop with none does not
+   collect empty logs); a second report the same day, or a log made on Batch
+   Logs, is picked up — the page opens on what the batches already hold. The
+   numbers come off the baker tray guide's new TOTAL BATCHES box. An uncounted
+   donut BLOCKS the send, like an uncounted premade ("3 of 4 donuts have no
+   batch count.") — a donut not made is a 0. The email's section is "Donut
+   batches".

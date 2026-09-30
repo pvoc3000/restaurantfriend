@@ -7,11 +7,9 @@
  * and `PO_STATUS_LABEL` already rest on. An org cannot invent a fourth kind
  * without a migration, so a pick list over them needs no `allowNew`.
  *
- * Element TYPE and SCHEDULE CLASS are the opposite — a kitchen invents a
- * category faster than a migration can be written — so those are free text in
- * the schema and the screens offer a PickList, `allowNew`. Type lists whatever
- * already exists; schedule lists the two Mark named and lets the rest be typed
- * (see `SCHEDULE_CLASS_OPTIONS`).
+ * Element TYPE is the opposite — a kitchen invents a category faster than a
+ * migration can be written — so it is free text and the screens offer a
+ * PickList, `allowNew`. SCHEDULE is closed since 153 (see `SCHEDULE_CLASSES`).
  */
 
 export const ELEMENT_KINDS = ["made", "purchased", "manual"] as const;
@@ -37,25 +35,39 @@ export const ELEMENT_KIND_OPTIONS = ELEMENT_KINDS.map((value) => ({
 }));
 
 /**
- * The element's production rhythm — the Schedule field on element detail
- * (Mark, 2026-08-11: "a popup menu … Daily and Weekly").
+ * The element's SCHEDULE — which batch log it is generated on (migration 153;
+ * Mark, 2026-09-30: "there is a 'Weekly' schedule, a 'Donut' schedule, and an
+ * 'Ice Cream' schedule. Each element gets associated with one of them").
  *
- * THE VALUES ARE UPPERCASE AND THAT IS LOAD-BEARING, not house style.
- * `generate_production_batches` (044) selects `schedule_class = 'WEEKLY'` with
- * an exact string comparison, and `lib/productionPacket` builds the AB and
- * Weekly element sheets by filtering on `'AB'` / `'WEEKLY'`. A menu that wrote
- * "Weekly" would quietly drop 45 active elements out of batch generation while
- * the screen went on reading correctly. Only the LABEL is title case.
+ * A CLOSED list, and the database agrees: 153's check constraint holds these
+ * three and nothing else, `generate_production_batches` takes one of them, and
+ * `production_batch_logs.schedule` records which one a log came from. AB was
+ * retired the same day and cleared.
  *
- * `allowNew` at the call site, and it is not tidiness: the live catalog also
- * holds AB (47 elements) and DONUT (16), and `PickList` with a closed set does
- * not merely hide a value from the menu — it makes it UNENTERABLE, while the
- * stored ones keep rendering, which is what hides the gap (the `GAL`/`QT`
- * lesson in CLAUDE.md). AB in particular is the AB element sheet's only
- * source. Leaving them off the LIST is Mark's call; leaving them unreachable
- * would be a bug.
+ * THE VALUES ARE UPPERCASE AND THAT IS LOAD-BEARING: the generator and
+ * `lib/productionPacket`'s Weekly element sheet compare them exactly. Only the
+ * LABEL is title case.
  */
-export const SCHEDULE_CLASSES = ["DAILY", "WEEKLY"] as const;
+export const SCHEDULE_CLASSES = ["WEEKLY", "DONUT", "ICE CREAM"] as const;
+export type ScheduleClass = (typeof SCHEDULE_CLASSES)[number];
+
+export const SCHEDULE_CLASS_LABEL: Record<ScheduleClass, string> = {
+  WEEKLY: "Weekly",
+  DONUT: "Donut",
+  "ICE CREAM": "Ice Cream",
+};
+
+/** A stored schedule in words — "—" for none, the raw value if unknown. */
+export function scheduleLabel(value: string | null | undefined): string {
+  if (!value) return "—";
+  return SCHEDULE_CLASS_LABEL[value as ScheduleClass] ?? value;
+}
+
+/**
+ * The schedule the opening and mid shift reports generate and count (Mark,
+ * 2026-09-30): the bakers' total batches of each donut, per kitchen per day.
+ */
+export const SHIFT_REPORT_BATCH_SCHEDULE: ScheduleClass = "DONUT";
 
 /**
  * The element TYPE vocabulary — the recipe types, plus one (Mark, 2026-08-11:
@@ -93,7 +105,7 @@ export function elementTypeVocabulary(
 
 export const SCHEDULE_CLASS_OPTIONS = SCHEDULE_CLASSES.map((value) => ({
   value,
-  label: value.charAt(0) + value.slice(1).toLowerCase(),
+  label: SCHEDULE_CLASS_LABEL[value],
 }));
 
 export function elementKindLabel(kind: string | null): string {
