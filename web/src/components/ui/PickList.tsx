@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/fieldMetrics";
 import { createPortal, flushSync } from "react-dom";
 import { confirmDialog } from "@/lib/confirm";
+import { panelLog } from "@/components/ui/PanelDebug";
 import { createClient } from "@/lib/supabase/client";
 import {
   MENU_HEADER_CLASS,
@@ -313,6 +314,7 @@ export function PickList({
    */
   async function choose(next: string) {
     const picked = ordered.find((o) => o.value === next);
+    panelLog(`CLOSE chose “${next}”`);
     setOpen(false);
     setTerm("");
     setReviveError(null);
@@ -435,6 +437,7 @@ export function PickList({
           // Closing by pressing the trigger again is an abandonment like any
           // other, so it goes through `close` rather than flipping the flag.
           if (open) {
+            panelLog("CLOSE trigger pressed again");
             close();
             return;
           }
@@ -472,6 +475,9 @@ export function PickList({
             setOpen(true);
           });
           searchRef.current?.focus();
+          panelLog(
+            `opened; active=${document.activeElement === searchRef.current ? "find box" : document.activeElement?.tagName}`
+          );
         }}
         onKeyDown={onTriggerKey}
         className={

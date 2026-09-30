@@ -1,5 +1,6 @@
 import { AppHeader } from "@/components/AppHeader";
 import { CalcPad } from "@/components/ui/CalcPad";
+import { PanelDebugLog } from "@/components/ui/PanelDebug";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { IdleLock } from "@/components/IdleLock";
 import { InactiveLocationGate } from "@/components/InactiveLocationGate";
@@ -77,6 +78,9 @@ export default async function AppLayout({
           touch device — then it IS the keyboard: digits and operators
           together, so `lib/calc` expressions are typeable on an iPad. */}
       <CalcPad />
+      {/* TEMPORARY — the picker/keyboard diagnosis (2026-09-30). Nothing
+          unless `?panel-debug=1` has been visited on this device. */}
+      <PanelDebugLog />
       {/* A registered shared iPad locks back to its picker after five
           minutes idle. Nothing on a desk browser — the session only says
           `registeredDevice` when the device cookie is present. */}

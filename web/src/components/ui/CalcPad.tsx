@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { evaluateNumeric, looksUnfinished } from "@/lib/calc";
+import { describe, panelLog } from "@/components/ui/PanelDebug";
 
 /**
  * THE NUMERIC KEYPAD — our own, replacing iOS's, for every field `lib/calc`
@@ -418,6 +419,7 @@ export function CalcPad() {
       start = null;
       if (moved > TAP_SLOP || inside(e.target)) return;
       const hit = e.target instanceof Element ? e.target : null;
+      panelLog(`calcpad tap-away ${describe(hit)}`);
       const field = hit?.closest<HTMLElement>("input, textarea, select, [contenteditable='true']");
       if (field && !(field as HTMLInputElement).disabled) {
         field.focus({ preventScroll: true });
