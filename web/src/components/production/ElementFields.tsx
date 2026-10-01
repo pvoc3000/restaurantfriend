@@ -4,6 +4,7 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import type { PickOption } from "@/components/ui/PickList";
+import { OpenRecordLink } from "@/components/ui/OpenRecordLink";
 import {
   ELEMENT_KIND_OPTIONS,
   SCHEDULE_CLASS_OPTIONS,
@@ -190,33 +191,31 @@ export function ElementFields({
           typed `purchased` at migration and should never resolve to an
           ingredient — for those the honest fix is the Kind field above, not a
           link. The "no cost" line stays under an empty field, because an empty
-          box alone does not say what it costs you. */}
+          box alone does not say what it costs you. The arrow past the field's
+          right edge opens the item, outside the column so the field is as
+          wide as the rest (Mark, 2026-10-01). */}
       {element.kind === "purchased" ? (
         <Row label="Inventory item">
           {editable ? (
             <span className="flex flex-col items-start gap-1">
-              <span className="flex w-full items-center gap-2">
-                <span className="min-w-0 flex-1">
-                  <InlineValue
-                    kind="pick"
-                    boxed={BOXED_FIELDS}
-                    table="production_elements"
-                    id={element.id}
-                    column="inventory_item_id"
-                    ariaLabel="Inventory item"
-                    value={element.inventory_item_id}
-                    options={itemOptions}
-                    clearLabel="Not linked"
-                    activateTable="inventory_items"
-                  />
-                </span>
+              <span className="relative w-full">
+                <InlineValue
+                  kind="pick"
+                  boxed={BOXED_FIELDS}
+                  table="production_elements"
+                  id={element.id}
+                  column="inventory_item_id"
+                  ariaLabel="Inventory item"
+                  value={element.inventory_item_id}
+                  options={itemOptions}
+                  clearLabel="Not linked"
+                  activateTable="inventory_items"
+                />
                 {element.inventory_item_id ? (
-                  <Link
+                  <OpenRecordLink
                     href={`/items/${element.inventory_item_id}`}
-                    className="shrink-0 text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-                  >
-                    Open
-                  </Link>
+                    label="Open the inventory item"
+                  />
                 ) : null}
               </span>
               {element.inventory_item_id ? null : (

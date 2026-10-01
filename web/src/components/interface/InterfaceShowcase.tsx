@@ -47,6 +47,7 @@ import { FileDropZone } from "@/components/ui/FileDropZone";
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { MacTitleBar } from "@/components/ui/MacTitleBar";
 import { MenuButton } from "@/components/ui/MenuButton";
+import { OpenRecordLink } from "@/components/ui/OpenRecordLink";
 import { ActionMenu } from "@/components/ui/ActionMenu";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { PageLoading } from "@/components/ui/PageLoading";
@@ -364,6 +365,12 @@ function ChoosingBlock() {
         </Specimen>
         <Specimen name='PickList · inline boxed, grouped'>
           <PickList value={boxed} options={UNIT_OPTIONS} onPick={setBoxed} ariaLabel="Unit" boxed />
+        </Specimen>
+        <Specimen name="OpenRecordLink (beside a boxed PickList)">
+          <span className="relative block w-48">
+            <PickList value={inline} options={VENDOR_OPTIONS} onPick={setInline} ariaLabel="Vendor" boxed />
+            <OpenRecordLink href="/vendors" label="Open the vendor" />
+          </span>
         </Specimen>
         <Specimen name='PickList · variant="field"'>
           <PickList

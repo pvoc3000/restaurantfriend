@@ -11,6 +11,7 @@ import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
 import type { PickOption } from "@/components/ui/PickList";
+import { OpenRecordLink } from "@/components/ui/OpenRecordLink";
 
 export type VendorItemRecord = {
   id: string;
@@ -212,34 +213,32 @@ export function VendorItemFields({
             same act `InventoryItemPicker` performs on the table and in the ⋯
             menu. NOT clearable: unlinking takes the row off the order guide,
             and nothing asked for that door here. An inactive item revives on
-            the way in, `PickList`'s rule. "Open" keeps the walk to the item's
-            record, which the name used to be the link for. */}
-        <dd className="flex min-h-9 items-center gap-2">
+            the way in, `PickList`'s rule. The arrow beyond the field's right edge
+            keeps the walk to the item's record, which the name used to be the
+            link for — outside the column, so the field is as wide as the rest
+            (Mark, 2026-10-01). */}
+        <dd className="flex min-h-9 items-center">
           {editable ? (
-            <>
-              <span className="min-w-0 flex-1">
-                <InlineValue
-                  kind="pick"
-                  boxed={BOXED_FIELDS}
-                  table="vendor_items"
-                  id={vi.id}
-                  column="inventory_item_id"
-                  ariaLabel="Inventory item"
-                  value={vi.inventory_items?.id ?? null}
-                  options={itemOptions}
-                  nullable={false}
-                  activateTable="inventory_items"
-                />
-              </span>
+            <span className="relative w-full">
+              <InlineValue
+                kind="pick"
+                boxed={BOXED_FIELDS}
+                table="vendor_items"
+                id={vi.id}
+                column="inventory_item_id"
+                ariaLabel="Inventory item"
+                value={vi.inventory_items?.id ?? null}
+                options={itemOptions}
+                nullable={false}
+                activateTable="inventory_items"
+              />
               {vi.inventory_items && (
-                <Link
+                <OpenRecordLink
                   href={withFrom(`/items/${vi.inventory_items.id}`, here)}
-                  className="shrink-0 text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-                >
-                  Open
-                </Link>
+                  label="Open the inventory item"
+                />
               )}
-            </>
+            </span>
           ) : vi.inventory_items ? (
             <Link
               href={withFrom(`/items/${vi.inventory_items.id}`, here)}
