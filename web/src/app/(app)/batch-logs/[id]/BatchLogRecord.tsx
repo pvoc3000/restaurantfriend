@@ -10,6 +10,7 @@ import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { ControlField } from "@/components/ui/ControlField";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { batchDate } from "@/lib/productionBatches";
+import { dateInTimeZone, serverTimeZone } from "@/lib/today";
 import { scheduleLabel } from "@/lib/production";
 import { type BatchRow } from "@/components/production/BatchItemsTable";
 import { BatchLogItems } from "@/components/production/BatchLogItems";
@@ -358,7 +359,8 @@ export async function BatchLogRecord({
           {generatedByName ? ` by ${generatedByName}` : ""}
         </span>
         {log.printed_at ? (
-          <span className="text-muted">Printed {String(log.printed_at).slice(0, 10)}</span>
+          <span className="text-muted">Printed{" "}
+            {dateInTimeZone(String(log.printed_at), session.orgSettings.timezone ?? serverTimeZone())}</span>
         ) : (
           <span className="bg-mark-fill px-1">not printed</span>
         )}

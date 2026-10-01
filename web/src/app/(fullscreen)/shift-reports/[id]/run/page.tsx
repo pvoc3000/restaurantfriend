@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canEnterCounts, canReadHr } from "@/lib/roles";
-import { daysBefore, serverTimeZone, todayInTimeZone } from "@/lib/today";
+import { dateInTimeZone, daysBefore, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { compareForPremadeSheet } from "@/lib/productionSchedule";
 import { localDateISO, localTime } from "@/lib/timeZone";
 import { isDayComplete } from "@/lib/sales";
@@ -608,7 +608,8 @@ export default async function RunShiftReportPage({
     title: (s.title as string | null) ?? null,
     sellsCode: session.locations.find((l) => l.id === s.location_id)?.code ?? "—",
     source: s.source as string,
-    printedAt: (s.printed_at as string | null) ?? null,
+    // The org's day, not the UTC date a slice of the timestamptz would read.
+    printedAt: s.printed_at ? dateInTimeZone(s.printed_at as string, timeZone) : null,
   }));
 
   const netSalesCents = (settledToday ?? storedToday)?.netCents ?? null;

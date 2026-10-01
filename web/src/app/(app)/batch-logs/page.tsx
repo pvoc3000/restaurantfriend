@@ -5,6 +5,7 @@ import { getAppSession } from "@/lib/session";
 import { canLogBatch } from "@/lib/roles";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { addDays } from "@/lib/productionBatches";
+import { dateInTimeZone } from "@/lib/today";
 import { batchLogWindowBounds, parseBatchLogWindow } from "@/lib/batchLogFilters";
 import { BatchLogsIndex, type BatchLogRow } from "@/components/production/BatchLogsIndex";
 import { GenerateBatches } from "@/components/production/GenerateBatches";
@@ -134,7 +135,8 @@ export default async function BatchLogsPage({
         ? memberById.get(l.generated_by as string) ?? null
         : null,
       generated_at: (l.generated_at ?? null) as string | null,
-      printed_at: (l.printed_at ?? null) as string | null,
+      // The org's day, not the UTC date a slice of the timestamptz would read.
+      printed_at: l.printed_at ? dateInTimeZone(l.printed_at as string, timeZone) : null,
       note: (l.note ?? null) as string | null,
       batches: items.length,
       // DONE is complete OR skipped — a batch somebody decided not to make is

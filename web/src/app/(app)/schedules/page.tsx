@@ -6,6 +6,7 @@ import { SchedulesList, type ScheduleRow } from "@/components/production/Schedul
 import { SCHEDULE_WINDOW_DAYS, type SchedulePlan } from "@/lib/productionSchedule";
 import { canEditPage } from "@/lib/pageAccess";
 import { readSettings } from "@/lib/specialOrders";
+import { dateInTimeZone } from "@/lib/today";
 
 /**
  * The committed days — production brief phase 4.
@@ -38,7 +39,8 @@ export default async function SchedulesPage() {
   // rather than a catalog write.
   const editable = canEditPage(session.membership.role, "/schedules");
   const countable = canEnterCounts(session.membership.role);
-  const today = guideToday(session.orgSettings.timezone ?? serverTimeZone()).date;
+  const timeZone = session.orgSettings.timezone ?? serverTimeZone();
+  const today = guideToday(timeZone).date;
 
   // A window rather than the whole history: a fortnight either side is the
   // question this screen answers ("what is tonight, what did we do last week"),
@@ -130,7 +132,10 @@ export default async function SchedulesPage() {
       location_id: s.location_id as string,
       kitchen_location_id: s.kitchen_location_id as string,
       generatedAt: (s.generated_at ?? null) as string | null,
-      printedAt: (s.printed_at ?? null) as string | null,
+      // The DAY it was printed, in the org's zone. `printed_at` is a
+      // timestamptz, and slicing it reads the UTC date — so a packet printed
+      // after 5pm Pacific showed tomorrow's date (Mark, 2026-09-30).
+      printedAt: s.printed_at ? dateInTimeZone(s.printed_at as string, timeZone) : null,
       regenerations: (s.regeneration_count ?? 0) as number,
       note: (s.note ?? null) as string | null,
       lineCount: stat.lines,

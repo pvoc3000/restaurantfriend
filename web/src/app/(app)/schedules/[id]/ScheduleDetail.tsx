@@ -12,6 +12,7 @@ import { ScheduleLocationCell } from "@/components/production/ScheduleLocationCe
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { packetDate, planDeviation, plansInForce } from "@/lib/productionSchedule";
 import { meansNoAllergy } from "@/lib/specialOrders";
+import { dateInTimeZone, serverTimeZone } from "@/lib/today";
 import {
   ScheduleLines,
   type ScheduleLineRow,
@@ -388,7 +389,11 @@ export async function ScheduleDetail({
         <Field label="Printed">
           {schedule.printed_at ? (
             <span className={`${READ_ONLY_VALUE} text-muted`}>
-              {String(schedule.printed_at).slice(0, 10)}
+              {/* The org's day, not the UTC date a slice would read. */}
+              {dateInTimeZone(
+                String(schedule.printed_at),
+                session.orgSettings.timezone ?? serverTimeZone()
+              )}
             </span>
           ) : (
             <span className={`${READ_ONLY_VALUE}`}>
