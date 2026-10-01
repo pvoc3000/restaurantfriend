@@ -1,7 +1,12 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
+import { createClient } from "@/lib/supabase/client";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { money } from "@/lib/specialOrders";
 import { TimeCell } from "./TimeCell";
@@ -18,9 +23,14 @@ import { TimeCell } from "./TimeCell";
  *
  * FMP's DeliverLA request and schedule buttons are deliberately NOT
  * reimplemented (the brief's kill list): the carrier integration is somebody
- * else's API, and the distance stays a hand-entered pair with the Google link
- * surviving as a plain href.
+ * else's API, and the Google link survives as a plain href.
  *
+ * THE DISTANCE IS CALCULATED (Mark, 2026-10-01: "calculate delivery distance
+ * on the order screen too") — driving miles from the KITCHEN, by the
+ * `order-delivery-distance` function, when the address is saved and from the
+ * Calculate button beside it (the kitchen changed, or the first try failed).
+ * It still stays an editable cell. An empty delivery charge is filled from
+ * the org's rates; a charge already there is never moved.
  */
 export function OrderDelivery({
   id,
@@ -32,6 +42,64 @@ export function OrderDelivery({
   canWrite: boolean;
 }) {
   const address = (row.delivery_address as string | null) ?? "";
+  const router = useRouter();
+  const [measuring, setMeasuring] = useState(false);
+  const [measured, setMeasured] = useState<string | null>(null);
+
+  /** Measure from the kitchen and save it. Returns a sentence for the screen. */
+  async function measure(): Promise<void> {
+    setMeasuring(true);
+    setMeasured(null);
+    const { data, error } = await createClient().functions.invoke("order-delivery-distance", {
+      body: { order_id: id },
+    });
+    setMeasuring(false);
+    const r = (data ?? {}) as { state?: string; miles?: number; fee?: number | null; charge_set?: boolean; error?: string };
+    let note: string;
+    if (error) {
+      let message = error.message;
+      try {
+        const parsed = await (error as { context?: Response }).context?.json();
+        if (parsed?.error) message = parsed.error;
+      } catch {
+        // keep the generic message
+      }
+      note = `Distance not calculated: ${message}`;
+    } else if (r.state === "ok" || r.state === "outside_area") {
+      note =
+        r.state === "outside_area"
+          ? `${r.miles?.toFixed(1)} mi from the kitchen — beyond the farthest we estimate, so no charge was set.`
+          : r.charge_set && typeof r.fee === "number"
+            ? `${r.miles?.toFixed(1)} mi from the kitchen. Delivery charge set to ${money(r.fee)}.`
+            : `${r.miles?.toFixed(1)} mi from the kitchen.`;
+      router.refresh();
+    } else {
+      note =
+        r.state === "no_kitchen"
+          ? "Choose a kitchen on the Info tab to calculate the distance."
+          : r.state === "no_address"
+            ? "Enter an address to calculate the distance."
+            : r.state === "address_not_found"
+              ? "Google couldn’t find this address."
+              : r.state === "not_configured"
+                ? "Delivery rates aren’t set up in Settings."
+                : "Distance not calculated. Try again.";
+    }
+    setMeasured(note);
+  }
+
+  /** The address cell's write: save it, then measure the new one. */
+  async function writeAddress(next: string | number | null): Promise<{ error: string | null }> {
+    const { data, error } = await createClient()
+      .from("special_orders")
+      .update({ delivery_address: next })
+      .eq("id", id)
+      .select("id");
+    if (error || !data || data.length === 0) return { error: error?.message ?? "not saved" };
+    if (typeof next === "string" && next.trim().length >= 5) void measure();
+    else setMeasured(null);
+    return { error: null };
+  }
 
   return (
     <div className="space-y-12">
@@ -44,6 +112,7 @@ export function OrderDelivery({
                     boxed={BOXED_FIELDS}
                     table="special_orders" id={id} column="delivery_address" multiline
                     value={address || null} ariaLabel="Delivery address"
+                    onWrite={writeAddress}
                   />
                 ) : (
                   <span className={`${READ_ONLY_VALUE} whitespace-pre-wrap`}>{address || "—"}</span>
@@ -63,8 +132,25 @@ export function OrderDelivery({
                 ) : null}
               </Row>
               <Row label="Distance (miles)">
-                <Cell id={id} canWrite={canWrite} column="delivery_distance" value={row.delivery_distance as number | null}
-                      kind="number" label="Distance in miles" />
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <Cell id={id} canWrite={canWrite} column="delivery_distance" value={row.delivery_distance as number | null}
+                          kind="number" label="Distance in miles" />
+                  </div>
+                  {canWrite && address ? (
+                    <button
+                      type="button"
+                      className={SMALL_BUTTON_CLASS}
+                      onClick={() => void measure()}
+                      disabled={measuring}
+                    >
+                      {measuring ? "Calculating…" : "Calculate"}
+                    </button>
+                  ) : null}
+                </div>
+                {measured ? (
+                  <p className="pt-1 text-[12px] text-muted" role="status">{measured}</p>
+                ) : null}
               </Row>
               <Row label="Window opens">
                 {/* `TimeCell`, not `Cell`: these are `time` columns and read

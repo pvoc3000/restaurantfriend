@@ -5301,3 +5301,16 @@ The three live function bodies were md5-checked identical to 132/134/152 before
 editing. Live rates (Mark): $35 base, $2.50/mi, 50 mi max. Probed after
 deploy: Dodger Stadium → DF02, 3.4 mi, $43.50; Pasadena → DF01, 4.4 mi, $46;
 LAX → DF02, 18.1 mi, $80.25. The in-app order screen still does not calculate.
+
+**2026-10-01 — the order screen calculates the delivery distance** (Mark:
+"calculate delivery distance on the order screen too"). New edge function
+`order-delivery-distance` (DEPLOYED, default JWT check): runs entirely as the
+caller — reads the order, the org's rates and the kitchen's address under their
+RLS, measures with `_shared/deliveryQuote` from the KITCHEN, and writes
+`delivery_distance` (always) and `delivery_charge` (only when empty) with a
+plain update whose row count is checked. No service_role. The Delivery tab's
+address cell writes through `onWrite` and then measures; a Calculate button
+beside Distance re-measures (kitchen changed, first try failed). States are
+sentences under the field: no kitchen, no address, Google can't find it, rates
+not set, beyond the farthest estimate (distance only). Probed: anon → 401. Not
+yet exercised signed in, since that writes to a real order.
