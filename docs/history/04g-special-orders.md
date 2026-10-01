@@ -5325,7 +5325,7 @@ app relies on the column default — `create_customer_invoice` takes
 `p_processor` with no default, and 124's five-argument signature was dropped by
 145. Existing invoices are unchanged.
 
-**2026-10-01 — the Delivery tab: a carrier picklist, its email, and Request
+**2026-10-01 — 164 APPLIED, `send-special-order-email` DEPLOYED — the Delivery tab: a carrier picklist, its email, and Request
 Quote.** Company is a picklist of active vendors of type Delivery (stored as
 the vendor's name in `delivery_company`, as FileMaker's text always was; an old
 value matching no vendor stays as its own option). Choosing one copies the
