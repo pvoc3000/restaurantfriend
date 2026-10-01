@@ -101,6 +101,7 @@ import "./roles.fixtures";
 import "./specialOrderWrites.fixtures";
 import "./specialOrders.fixtures";
 import "./specialOrderDocs.fixtures";
+import "./deliveryQuote.fixtures";
 import "./specialOrderLines.fixtures";
 import "./specialOrderProgress.fixtures";
 import "./specialOrderSchedule.fixtures";

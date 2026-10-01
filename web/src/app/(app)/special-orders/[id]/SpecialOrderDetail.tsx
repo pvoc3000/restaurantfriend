@@ -95,7 +95,7 @@ const ORDER_COLUMNS = `
   title, event_date, event_time, ready_by_time,
   location_id, kitchen_location_id, fulfillment,
   delivery_address, delivery_distance, delivery_cost, delivery_company,
-  delivery_company_phone, delivery_tracking, delivery_window_start,
+  delivery_company_phone, delivery_company_email, delivery_tracking, delivery_window_start,
   delivery_window_end, delivery_boxes, delivery_weight_lbs,
   tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
   ignore_balance, square_item, taken_by, taken_by_employee_id,
@@ -161,6 +161,7 @@ export async function SpecialOrderDetail({
     { data: itemOverrideRows },
     { data: invoiceLinkRows },
     { data: carrierRows },
+    { data: shopRows },
   ] = await Promise.all([
     supabase.from("special_orders").select(ORDER_COLUMNS).eq("id", id).maybeSingle(),
     wantsLines
@@ -224,11 +225,15 @@ export async function SpecialOrderDetail({
     wantsCarriers
       ? supabase
           .from("vendors")
-          .select("name, vendor_locations ( location_id, rep_phone, is_active )")
+          .select("name, vendor_locations ( location_id, rep_phone, rep_email, is_active )")
           .eq("org_id", session.membership.org_id)
           .ilike("vendor_type", "delivery")
           .eq("is_active", true)
           .order("name")
+      : SKIP_MENU,
+    // Each shop's street address, for the quote request's pickup line.
+    wantsCarriers
+      ? supabase.from("locations").select("id, address").eq("org_id", session.membership.org_id)
       : SKIP_MENU,
   ]);
 
@@ -1307,13 +1312,24 @@ export async function SpecialOrderDetail({
               canEditKitchen={canEditItems}
               carriers={((carrierRows ?? []) as {
                 name: string;
-                vendor_locations: { location_id: string; rep_phone: string | null; is_active: boolean }[] | null;
+                vendor_locations:
+                  | { location_id: string; rep_phone: string | null; rep_email: string | null; is_active: boolean }[]
+                  | null;
               }[]).map((v) => ({
                 name: v.name,
-                phones: (v.vendor_locations ?? [])
-                  .filter((vl) => vl.is_active && vl.rep_phone && vl.rep_phone.trim())
-                  .map((vl) => ({ location_id: vl.location_id, phone: vl.rep_phone!.trim() })),
+                contacts: (v.vendor_locations ?? [])
+                  .filter((vl) => vl.is_active)
+                  .map((vl) => ({
+                    location_id: vl.location_id,
+                    phone: vl.rep_phone?.trim() || null,
+                    email: vl.rep_email?.trim() || null,
+                  })),
               }))}
+              shopAddresses={Object.fromEntries(
+                ((shopRows ?? []) as { id: string; address: unknown }[]).map((l) => [l.id, l.address])
+              )}
+              orgSettings={session.orgSettings as Record<string, unknown>}
+              orgName={session.orgName}
             />
           )}
 

@@ -5324,3 +5324,20 @@ Square is still offered. Migration 163 (APPLIED the same day) sets
 app relies on the column default — `create_customer_invoice` takes
 `p_processor` with no default, and 124's five-argument signature was dropped by
 145. Existing invoices are unchanged.
+
+**2026-10-01 — the Delivery tab: a carrier picklist, its email, and Request
+Quote.** Company is a picklist of active vendors of type Delivery (stored as
+the vendor's name in `delivery_company`, as FileMaker's text always was; an old
+value matching no vendor stays as its own option). Choosing one copies the
+vendor's `rep_phone` and `rep_email` at the order's kitchen (else any shop)
+into `delivery_company_phone` and the new `delivery_company_email` (164) in the
+same write (`alsoUpdate`). **Request Quote** fills the new
+`delivery_quote` template (Settings → Messages → Delivery quote request;
+FileMaker's script with `{org}` for its hardcoded signature and no Delivery
+Type line, since there is no such field) into an editable compose card, and
+`send-special-order-email`'s new `kind: "delivery_quote"` branch sends it from
+the special orders mailbox, unthreaded, and logs "Delivery quote requested from
+…". Tokens: `{pickup_address}` (the kitchen's shipping address),
+`{delivery_address}` on one line, `{boxes}`, `{weight}`, `{delivery_time}`
+(the window's END, as FileMaker sent), `{delivery_window}`. Fixtures:
+`deliveryQuote.fixtures.ts`.

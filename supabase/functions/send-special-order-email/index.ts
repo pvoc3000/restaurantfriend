@@ -142,6 +142,8 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     // 124: a customer invoice is its own send — one invoice, many orders.
     if (payload.customer_invoice_id) return await sendCustomerInvoice(req, payload);
+    // A delivery quote request goes to the CARRIER, with no document.
+    if (payload.kind === "delivery_quote") return await sendDeliveryQuoteRequest(req, payload);
 
     const {
       order_id,
@@ -544,5 +546,94 @@ async function sendCustomerInvoice(
   return json(200, {
     id: providerId,
     warning: warnings.length ? `sent, but ${warnings.join("; ")}` : undefined,
+  });
+}
+
+/**
+ * A DELIVERY QUOTE REQUEST (Mark, 2026-10-01: a "Request Quote" button on the
+ * Delivery tab, after FileMaker's script) — a plain email to the delivery
+ * company asking for a pickup time and a cost. The text was composed from the
+ * org's template and reviewed in the browser, as every other send here is.
+ *
+ * Same gates as a document (signed in, supervisor+), same mailbox, and the
+ * same rule that the email going out is the fact: the log line after it is
+ * bookkeeping and can only produce a warning. NOT threaded — the thread is the
+ * customer's, and this goes to somebody else. No attachment, no stage date.
+ */
+async function sendDeliveryQuoteRequest(
+  req: Request,
+  payload: { order_id?: string; to?: string; cc?: string; subject?: string; body?: string }
+): Promise<Response> {
+  const { order_id, to, cc, subject, body } = payload;
+  if (!order_id || !to || !subject || !body) {
+    return json(400, { error: "missing order_id, to, subject or body" });
+  }
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: req.headers.get("Authorization")! } } }
+  );
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return json(401, { error: "not signed in" });
+
+  const { data: order, error: orderError } = await supabase
+    .from("special_orders")
+    .select("id, org_id, number, delivery_company")
+    .eq("id", order_id)
+    .maybeSingle();
+  if (orderError) return json(400, { error: orderError.message });
+  if (!order) return json(404, { error: "special order not found" });
+
+  const { data: member } = await supabase
+    .from("org_members")
+    .select("role, display_name")
+    .eq("user_id", user.id)
+    .eq("org_id", order.org_id)
+    .maybeSingle();
+  if (!member || !ROLES.includes(member.role)) {
+    return json(403, { error: "supervisor role required to request a delivery quote" });
+  }
+
+  const { data: org } = await supabase
+    .from("orgs")
+    .select("name, settings")
+    .eq("id", order.org_id)
+    .maybeSingle();
+  const orgSettings = (org?.settings ?? {}) as {
+    email_provider?: ProviderConfig;
+    special_orders?: { email_provider?: ProviderConfig; reply_to?: string };
+    billing?: { email?: string };
+  };
+  const transport = resolveTransport({
+    explicit: orgSettings.special_orders?.email_provider,
+    orgProvider: orgSettings.email_provider,
+    orgName: org?.name ?? "Orders",
+    replyToFallbacks: [orgSettings.special_orders?.reply_to, orgSettings.billing?.email],
+  });
+
+  const providerId = await sendMail(transport, {
+    to,
+    cc: cc || undefined,
+    subject,
+    text: body,
+  });
+
+  const { error: logError } = await supabase.from("special_order_events").insert({
+    org_id: order.org_id,
+    order_id,
+    message: `Delivery quote requested from ${order.delivery_company ?? to} (${to}${
+      cc ? `, cc ${cc}` : ""
+    }) · ${providerId}`,
+    author: member.display_name ?? user.email ?? null,
+    author_id: user.id,
+    source: "app",
+  });
+
+  return json(200, {
+    id: providerId,
+    warning: logError ? `sent, but the log entry was not written: ${logError.message}` : undefined,
   });
 }

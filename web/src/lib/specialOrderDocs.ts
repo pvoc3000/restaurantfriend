@@ -628,7 +628,7 @@ export type EmailParts = { to: string; cc: string; subject: string; body: string
  * FileMaker hardcoded "The Donut Friend Team" into a script. We don't.
  */
 export const DEFAULT_TEMPLATES: Record<
-  DocumentKind | "statement" | "inquiry" | "customer_invoice" | "invoice_payment",
+  DocumentKind | "statement" | "inquiry" | "customer_invoice" | "invoice_payment" | "delivery_quote",
   { subject: string; body: string }
 > = {
   quote: {
@@ -725,6 +725,29 @@ export const DEFAULT_TEMPLATES: Record<
       "{balance_line}" +
       "{receipt_line}" +
       "\nIf anything needs changing, just reply to this message.\n",
+  },
+  /**
+   * A DELIVERY QUOTE REQUEST to the carrier (Mark, 2026-10-01), from the
+   * Request Quote button on the Delivery tab. FileMaker's script, with its
+   * hardcoded "The Donut Friend Team" signature replaced by `{org}` and its
+   * Delivery Type line left out (there is no such field here). Filled by
+   * `buildDeliveryQuoteEmail`.
+   */
+  delivery_quote: {
+    subject: "Delivery quote request — order #{number}, {event_date}",
+    body:
+      "Dear {delivery_company},\n\n" +
+      "{org} would like to request a quote for a delivery on {event_date}. The details are as follows:\n\n" +
+      "Date: {event_date}\n" +
+      "Pickup location: {pickup_address}\n" +
+      "Pieces: {boxes}\n" +
+      "Weight: {weight}\n" +
+      "Order #: {number}\n\n" +
+      "Destination: {delivery_address}\n" +
+      "Delivery time: {delivery_time}\n\n" +
+      "Please respond with a pickup time and cost.\n\n" +
+      "Thank you!\n\n" +
+      "{org}\n",
   },
   statement: {
     subject: "Statement {period}",
@@ -1108,4 +1131,77 @@ export function replySubject(inboundSubject: string | null | undefined): string 
   const s = (inboundSubject ?? "").trim();
   if (!s) return null;
   return /^re:/i.test(s) ? s : `Re: ${s}`;
+}
+
+/* ==========================================================================
+ * THE DELIVERY QUOTE REQUEST
+ * ========================================================================== */
+
+/** What the request is written from — the order's own delivery fields. */
+export type DeliveryQuoteFacts = {
+  number: string;
+  event_date: string | null;
+  delivery_company: string | null;
+  delivery_address: string | null;
+  delivery_boxes: number | null;
+  delivery_weight_lbs: number | null;
+  delivery_window_start: string | null;
+  delivery_window_end: string | null;
+  /** The kitchen's street address — where the carrier picks up. */
+  pickup_address: string | null;
+};
+
+/** "5107 York Blvd, Los Angeles, CA 90042" from `locations.address.shipping`
+ *  (the shop; `billing` is the office). The web twin of `originAddress` in
+ *  `supabase/functions/_shared/deliveryFee.ts`, which Deno owns. */
+export function shopStreetAddress(address: unknown): string | null {
+  const a = ((address ?? {}) as Record<string, unknown>).shipping as Record<string, unknown> | undefined;
+  if (!a) return null;
+  const v = (k: string) => (typeof a[k] === "string" ? (a[k] as string).trim() : "");
+  const street = [v("street1"), v("street2")].filter(Boolean).join(" ");
+  if (!street) return null;
+  const tail = [v("state"), v("zip")].filter(Boolean).join(" ");
+  return [street, v("city"), tail].filter(Boolean).join(", ");
+}
+
+/**
+ * The tokens a delivery quote request is filled from. A field nobody has
+ * filled in reads as an empty string, so the line still prints with nothing
+ * after its label — which tells the carrier it is unknown, where dropping the
+ * line would hide that it was ever asked.
+ */
+export function deliveryQuoteVars(facts: DeliveryQuoteFacts, orgName: string): Record<string, string> {
+  const oneLine = (v: string | null) => (v ?? "").replace(/\s*\n\s*/g, " ").trim();
+  const from = usTime(facts.delivery_window_start);
+  const to = usTime(facts.delivery_window_end);
+  return {
+    number: facts.number,
+    event_date: usDate(facts.event_date),
+    delivery_company: (facts.delivery_company ?? "").trim(),
+    pickup_address: oneLine(facts.pickup_address),
+    delivery_address: oneLine(facts.delivery_address),
+    boxes: facts.delivery_boxes === null ? "" : String(facts.delivery_boxes),
+    weight: facts.delivery_weight_lbs === null ? "" : `${facts.delivery_weight_lbs} lbs`,
+    // FileMaker sent the window's END — when it has to be there by.
+    delivery_time: to,
+    delivery_window: from && to ? `between ${from} and ${to}` : from ? `after ${from}` : to ? `by ${to}` : "",
+    org: orgName,
+  };
+}
+
+export function buildDeliveryQuoteEmail(
+  facts: DeliveryQuoteFacts,
+  orgSettings: Record<string, unknown>,
+  orgName: string
+): { subject: string; body: string } {
+  const so = (orgSettings?.special_orders ?? {}) as Record<string, unknown>;
+  const configured =
+    ((so.email ?? {}) as Record<string, { subject?: string; body?: string }>).delivery_quote ?? {};
+  const fallback = DEFAULT_TEMPLATES.delivery_quote;
+  const orDefault = (v: string | undefined, f: string) => (typeof v === "string" && v.trim() !== "" ? v : f);
+  const vars = deliveryQuoteVars(facts, orgName);
+  return {
+    subject: fillTemplate(orDefault(configured.subject, fallback.subject), vars),
+    body: fillTemplate(orDefault(configured.body, fallback.body), vars),
+  };
 }

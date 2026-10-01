@@ -97,6 +97,11 @@ const VAR_EXAMPLE: Record<string, string> = {
   due_on: "10/8/2026",
   orders: "the invoice’s lines, one per order, each with its amount",
   items: "what the customer built on the form, a line each, with an estimated subtotal — or nothing when they only described it",
+  pickup_address: "5107 York Blvd, Los Angeles, CA 90042 — the kitchen",
+  delivery_address: "the delivery address, on one line",
+  boxes: "4",
+  weight: "12 lbs",
+  delivery_time: "6:30 PM — when the delivery window closes",
 };
 
 /**
@@ -146,6 +151,12 @@ const TEMPLATES: {
     label: "Receipt",
     when: "Sent with the receipt PDF, once an order is settled.",
     vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "paid", "employee_name", "fulfillment_note"],
+  },
+  {
+    key: "delivery_quote",
+    label: "Delivery quote request",
+    when: "Sent to the delivery company from Request Quote on an order’s Delivery tab.",
+    vars: ["delivery_company", "org", "event_date", "pickup_address", "boxes", "weight", "number", "delivery_address", "delivery_time", "delivery_window"],
   },
   {
     key: "order",

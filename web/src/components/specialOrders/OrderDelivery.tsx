@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
+import { shopStreetAddress } from "@/lib/specialOrderDocs";
 import { createClient } from "@/lib/supabase/client";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { money } from "@/lib/specialOrders";
+import { RequestDeliveryQuote } from "./RequestDeliveryQuote";
 import { TimeCell } from "./TimeCell";
 
 /**
@@ -39,6 +41,9 @@ export function OrderDelivery({
   kitchenOptions,
   canEditKitchen,
   carriers,
+  shopAddresses,
+  orgSettings,
+  orgName,
 }: {
   id: string;
   row: Record<string, unknown>;
@@ -47,8 +52,12 @@ export function OrderDelivery({
   kitchenOptions: { value: string; label: string }[];
   /** The Info tab's rule: no kitchen change once production is scheduled. */
   canEditKitchen: boolean;
-  /** The vendors of type Delivery, each with its phone at each shop. */
+  /** The vendors of type Delivery, each with its phone and email at each shop. */
   carriers: Carrier[];
+  /** Each shop's `locations.address`, for the quote request's pickup line. */
+  shopAddresses: Record<string, unknown>;
+  orgSettings: Record<string, unknown>;
+  orgName: string;
 }) {
   const address = (row.delivery_address as string | null) ?? "";
   const kitchenId = (row.kitchen_location_id as string | null) ?? null;
@@ -65,14 +74,16 @@ export function OrderDelivery({
     ...carriers.map((c) => ({ value: c.name, label: c.name })),
     ...(company && !carriers.some((c) => c.name === company) ? [{ value: company, label: company }] : []),
   ];
-  /** Choosing a company sets THEIR PHONE in the same write: the vendor's
-   *  number at this order's kitchen, else at any shop, else none. */
-  const phoneFor = (next: string | number | null) => {
+  /** Choosing a company sets THEIR PHONE AND EMAIL in the same write: each is
+   *  the vendor's at this order's kitchen, else at any shop, else none. */
+  const contactFor = (next: string | number | null) => {
     const carrier = carriers.find((c) => c.name === next);
     if (!carrier) return null;
-    const phone =
-      carrier.phones.find((p) => p.location_id === kitchenId)?.phone ?? carrier.phones[0]?.phone ?? null;
-    return { delivery_company_phone: phone };
+    const pick = (key: "phone" | "email") =>
+      carrier.contacts.find((c) => c.location_id === kitchenId && c[key])?.[key] ??
+      carrier.contacts.find((c) => c[key])?.[key] ??
+      null;
+    return { delivery_company_phone: pick("phone"), delivery_company_email: pick("email") };
   };
   const [measuring, setMeasuring] = useState(false);
   const [measured, setMeasured] = useState<string | null>(null);
@@ -225,11 +236,38 @@ export function OrderDelivery({
               <Row label="Company" first>
                 <Cell id={id} canWrite={canWrite} column="delivery_company" kind="pick"
                       options={companyOptions} value={company}
-                      label="Delivery company" alsoUpdate={phoneFor} />
+                      label="Delivery company" alsoUpdate={contactFor} />
               </Row>
               <Row label="Their phone">
                 <Cell id={id} canWrite={canWrite} column="delivery_company_phone" value={row.delivery_company_phone as string | null}
                       label="Delivery company phone" />
+              </Row>
+              <Row label="Their email" first>
+                <Cell id={id} canWrite={canWrite} column="delivery_company_email" value={(row.delivery_company_email as string | null) ?? null}
+                      label="Delivery company email" />
+              </Row>
+              <Row label="Quote">
+                {canWrite ? (
+                  <RequestDeliveryQuote
+                    orderId={id}
+                    to={(row.delivery_company_email as string | null) ?? null}
+                    orgSettings={orgSettings}
+                    orgName={orgName}
+                    facts={{
+                      number: row.number as string,
+                      event_date: (row.event_date as string | null) ?? null,
+                      delivery_company: company,
+                      delivery_address: address || null,
+                      delivery_boxes: (row.delivery_boxes as number | null) ?? null,
+                      delivery_weight_lbs: (row.delivery_weight_lbs as number | null) ?? null,
+                      delivery_window_start: (row.delivery_window_start as string | null) ?? null,
+                      delivery_window_end: (row.delivery_window_end as string | null) ?? null,
+                      pickup_address: kitchenId ? shopStreetAddress(shopAddresses[kitchenId]) : null,
+                    }}
+                  />
+                ) : (
+                  <span className={READ_ONLY_VALUE}>—</span>
+                )}
               </Row>
               <Row label="Tracking" first>
                 <Cell id={id} canWrite={canWrite} column="delivery_tracking" value={row.delivery_tracking as string | null}
@@ -280,8 +318,11 @@ export function OrderDelivery({
   );
 }
 
-/** A vendor of type Delivery, and its phone at each shop that has one. */
-export type Carrier = { name: string; phones: { location_id: string; phone: string }[] };
+/** A vendor of type Delivery, and its phone and email at each shop. */
+export type Carrier = {
+  name: string;
+  contacts: { location_id: string; phone: string | null; email: string | null }[];
+};
 
 /**
  * FOUR COLUMNS, THE FIELDS IN THE FIRST TWO (Mark, 2026-10-01): the address
