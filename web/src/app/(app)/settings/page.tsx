@@ -2,7 +2,7 @@ import { getAppSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { canManageMembers } from "@/lib/roles";
 import { ShiftReportSettings } from "@/components/settings/ShiftReportSettings";
-import { SpecialOrderSettings } from "@/components/settings/SpecialOrderSettings";
+import { MessagesIntro, SpecialOrderSettings } from "@/components/settings/SpecialOrderSettings";
 import { AccountingSettings, type AccountingStatus } from "@/components/settings/AccountingSettings";
 import type { SalesMappingRow } from "@/components/settings/SalesMappingsTable";
 import { SharedDevices, type RegisteredDevice } from "@/components/settings/SharedDevices";
@@ -156,23 +156,29 @@ export default async function SettingsPage({
           )}
           {tab === "messages" && (
             <>
-              <SectionNav
-                orientation="horizontal"
-                ariaLabel="Which messages"
-                value={messagesTab}
-                items={MESSAGES_TABS.map((t) => ({
-                  key: t,
-                  label: MESSAGES_TAB_LABEL[t],
-                  href: messagesTabHref(t),
-                }))}
-              />
-              <SpecialOrderSettings
-                orgId={orgId}
-                settings={settings}
-                editable={editable}
-                section="messages"
-                messagesTab={messagesTab}
-              />
+              {/* The heading over the tabs it heads, and the tabs over what
+                  they show (Mark, 2026-10-01), held together: the column's
+                  own 64px gap is for sections. */}
+              <div className="space-y-6">
+                <MessagesIntro />
+                <SectionNav
+                  orientation="horizontal"
+                  ariaLabel="Which messages"
+                  value={messagesTab}
+                  items={MESSAGES_TABS.map((t) => ({
+                    key: t,
+                    label: MESSAGES_TAB_LABEL[t],
+                    href: messagesTabHref(t),
+                  }))}
+                />
+                <SpecialOrderSettings
+                  orgId={orgId}
+                  settings={settings}
+                  editable={editable}
+                  section="messages"
+                  messagesTab={messagesTab}
+                />
+              </div>
               {messagesTab === "internal" && (
                 <div className="border-t border-hairline pt-8">
                   <ShiftReportSettings settings={settings} editable={editable} />

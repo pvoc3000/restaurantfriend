@@ -189,6 +189,27 @@ const TEMPLATES: {
   },
 ];
 
+/**
+ * THE MESSAGES TAB'S HEADING AND ITS EXPLANATION, drawn ABOVE that tab's own
+ * tabs (Mark, 2026-10-01) — they describe every message, not the ones on the
+ * tab showing, so they sit over the choice rather than inside it. The count is
+ * all of them for the same reason.
+ */
+export function MessagesIntro() {
+  return (
+    <div className="space-y-6">
+      <SectionHeading count={TEMPLATES.length}>Messages we send</SectionHeading>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
+        Each box holds the wording that will be sent.{" "}
+        <strong>Clear one to go back to our default.</strong> Anything in
+        curly braces is filled in when the message is sent; a name we do not
+        recognise is left on the page as you typed it, so a typo is visible
+        rather than swallowed.
+      </p>
+    </div>
+  );
+}
+
 export function SpecialOrderSettings({
   orgId,
   settings,
@@ -247,14 +268,6 @@ export function SpecialOrderSettings({
         <>
       {/* ---- the messages ------------------------------------------- */}
       <section className="space-y-6">
-        <SectionHeading count={shown.length}>Messages we send</SectionHeading>
-        <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
-          Each box holds the wording that will be sent.{" "}
-          <strong>Clear one to go back to our default.</strong> Anything in
-          curly braces is filled in when the message is sent; a name we do not
-          recognise is left on the page as you typed it, so a typo is visible
-          rather than swallowed.
-        </p>
 
         {/* THE FIELD HOLDS THE DEFAULT, IT DOES NOT HINT AT IT (Mark,
             2026-09-22: "These placeholder texts are almost indistinguishable
