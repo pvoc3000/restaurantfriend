@@ -112,8 +112,7 @@ export function GenerateBatches({
       const { data, error: err } = await supabase
         .from("production_element_locations")
         .select("is_active, production_elements!inner ( schedule_class, is_active )")
-        .eq("location_id", locationId)
-        .eq("on_batch_log", true);
+        .eq("location_id", locationId);
       if (cancelled) return;
       if (err) {
         setError(err.message);

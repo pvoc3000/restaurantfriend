@@ -97,7 +97,6 @@ export function ElementsPage({
           head: true,
         })
         .eq("location_id", kitchenId)
-        .eq("on_batch_log", true)
         .eq("is_active", true)
         .eq("production_elements.schedule_class", SHIFT_REPORT_BATCH_SCHEDULE)
         .eq("production_elements.is_active", true);

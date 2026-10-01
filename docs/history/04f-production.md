@@ -1738,3 +1738,16 @@ should track and display which schedule they came from."
 Verified on the Docker harness (all 153 migrations replay): two logs on one
 day, top-up, 'AB' refused by the function and the constraint, `anon` denied,
 and a 7.5 count through `submit_shift_report` and back out by reopen.
+
+**ACTIVE AT A KITCHEN IS BEING ON ITS BATCH LOG — migration 157 (2026-09-30).**
+Mark, of the element's "On batch log" checkbox: "If an element is on the donut
+schedule and active, it's should be on the batch log. Right? … I can't think of
+one." Right: the tick dated from 045, when the weekly round had to be told
+apart from 70 active rows at DF01, mostly AB and unscheduled; once 153 filtered
+by schedule the two flags answered one question, and the kitchen row's
+`is_active` has no other reader. 157 drops `on_batch_log` (backup in
+`FMP Export/pre157-on-batch-log-2026-09-30.json`). Of the seven rows active,
+scheduled and unticked, Chocolate and Javabreaker Ice Cream (DF02) join their
+log (Mark: "should be active and on the list"); Banana Cake Donut (both),
+Strawberry Jam (both) and Waffle Cone Batter (DF02) were made inactive there.
+Seasonal donuts now come and go by the Kitchens table's Active.

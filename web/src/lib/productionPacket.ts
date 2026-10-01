@@ -287,7 +287,7 @@ export async function fetchPacketData(
     supabase
       .from("production_element_locations")
       .select(
-        "element_id, location_id, stock_count, stock_size, stock_unit, on_batch_log, batch_sort, is_active"
+        "element_id, location_id, stock_count, stock_size, stock_unit, batch_sort, is_active"
       )
       .in("location_id", kitchenIds)
       .then((r) => r.data ?? []),
@@ -483,7 +483,7 @@ export async function fetchPacketData(
     // What the shift report's Donut batches page will ask for at this kitchen —
     // the same three conditions `generate_production_batches` reads.
     k.batchDonuts = elementLocs
-      .filter((r) => r.location_id === kitchenId && r.on_batch_log && r.is_active !== false)
+      .filter((r) => r.location_id === kitchenId && r.is_active !== false)
       .map((r) => ({ sort: (r.batch_sort ?? null) as number | null, meta: elementMeta.get(r.element_id as string) }))
       .filter((r) => r.meta?.isActive && r.meta.scheduleClass === SHIFT_REPORT_BATCH_SCHEDULE)
       .sort(

@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/client";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { Checkbox } from "@/components/ui/Checkbox";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 
 export type ElementLocationRow = {
@@ -19,8 +18,6 @@ export type ElementLocationRow = {
   stock_unit: string | null;
   is_active: boolean;
   notes: string | null;
-  /** Migration 045, renamed by 153 — whether this kitchen generates the element onto its schedule's batch log. */
-  on_batch_log: boolean;
   batch_sort: number | null;
   batch_amount: number | null;
   batch_unit: string | null;
@@ -45,11 +42,12 @@ export type ElementLocationRow = {
  *
  * WHAT EACH COLUMN ACTUALLY DOES, because they are easy to confuse:
  *
- * - **Active** and **On batch log** are both required for generation and are
- *   not the same question. Inactive means this shop does not deal with the
- *   element at all; off the log means it deals with it but it is not generated
- *   onto this kitchen's log for the element's SCHEDULE (Weekly, Donut or Ice
- *   Cream — migration 153; it was the weekly round only until then).
+ * - **Active** IS being on this kitchen's batch log (157; Mark, 2026-09-30:
+ *   "If an element is on the donut schedule and active, it's should be on the
+ *   batch log"). An active element is generated onto the log for its SCHEDULE
+ *   — Weekly, Donut or Ice Cream — and taking a donut out for the season is
+ *   unticking Active here. An "On batch log" tick sat beside it from 045 to
+ *   157; once 153 filtered by schedule it answered the same question.
  * - **Order** is `batch_sort`, which becomes the batch's `sort` and orders the
  *   printed log.
  * - **Asks for** is `batch_amount` × `batch_unit` — "make 2 X". It lands
@@ -221,23 +219,6 @@ export function ElementLocationRows({
         ]
       : []),
     {
-      key: "weekly",
-      label: "On batch log",
-      width: 110,
-      sortValue: (l) => (l.row?.on_batch_log ? 0 : 1),
-      render: (l) =>
-        !l.row ? (
-          <span className={`${READ_ONLY_VALUE} text-subtle`}>—</span>
-        ) : (
-          <BatchLogToggle
-            id={l.row.id}
-            on={l.row.on_batch_log}
-            disabled={!editable}
-            label={`On ${l.location.code}'s batch log`}
-          />
-        ),
-    },
-    {
       key: "batch_sort",
       label: "Order",
       width: 90,
@@ -398,56 +379,6 @@ export function ElementLocationRows({
   );
 }
 
-/**
- * `on_batch_log` — its own control rather than an `InlineValue`, because
- * `InlineValue` has no boolean kind and a checkbox is what a yes/no wants.
- *
- * Optimistic, and it PUTS THE BOX BACK on failure: an update matching no policy
- * changes zero rows and PostgREST returns NO error, so a bare call would leave
- * the tick showing a state the database never took — `ActiveToggle`'s own
- * lesson, and the reason this `.select()`s its result.
- */
-function BatchLogToggle({
-  id,
-  on,
-  disabled,
-  label,
-}: {
-  id: string;
-  on: boolean;
-  disabled: boolean;
-  label: string;
-}) {
-  const supabase = createClient();
-  const router = useRouter();
-  const [checked, setChecked] = useState(on);
-  const [busy, setBusy] = useState(false);
-
-  return (
-    <Checkbox
-      checked={checked}
-      disabled={disabled || busy}
-      label={label}
-      onChange={(next) => {
-        setChecked(next);
-        setBusy(true);
-        void (async () => {
-          const { data, error } = await supabase
-            .from("production_element_locations")
-            .update({ on_batch_log: next })
-            .eq("id", id)
-            .select("id");
-          setBusy(false);
-          if (error || !data?.length) {
-            setChecked(!next);
-            return;
-          }
-          router.refresh();
-        })();
-      }}
-    />
-  );
-}
 
 /**
  * There is no row for this (element, location) yet, so there is nothing to
