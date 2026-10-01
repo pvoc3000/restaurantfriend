@@ -8,6 +8,8 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
+import { UNIT_PICK_OPTIONS } from "@/lib/units";
 
 export type ElementLocationRow = {
   id: string;
@@ -224,38 +226,65 @@ export function ElementLocationRows({
       // how somebody comes to believe they are two figures.
       label: "Par",
       width: 260,
-      wrap: true,
       sortValue: (l) => l.row?.stock_count ?? null,
       render: (l) =>
         !l.row ? (
           <span className={`${READ_ONLY_VALUE} text-subtle`}>—</span>
         ) : editable ? (
-          <span className="flex flex-wrap items-baseline gap-1">
-            <InlineValue
-              table="production_element_locations"
-              id={l.row.id}
-              column="stock_count"
-              kind="number"
-              value={l.row.stock_count}
-              ariaLabel={`How many ${l.location.code} keeps`}
-            />
-            <span className="text-subtle">×</span>
-            <InlineValue
-              table="production_element_locations"
-              id={l.row.id}
-              column="stock_size"
-              kind="number"
-              value={l.row.stock_size}
-              ariaLabel={`The size ${l.location.code} keeps`}
-            />
-            <InlineValue
-              table="production_element_locations"
-              id={l.row.id}
-              column="stock_unit"
-              value={l.row.stock_unit}
-              ariaLabel={`The unit ${l.location.code} keeps`}
-            />
-          </span>
+          // ONE LINE, BOXED, unit PICKED (Mark, 2026-09-30) — the batch record's
+          // Made editor in a table cell. A pen per box, `TemplateItemsTable`'s
+          // fix: this column's width is a WEIGHT, so fixed widths would push
+          // the unit out of the cell, and `InlineValue`'s editor would grow over
+          // its neighbour. `pb-[3px]` on every pen and `pr-[3px]` on the last
+          // leave room for the unit picker's 3px shadow, which `overflow-hidden`
+          // would otherwise clip, while keeping the three boxes level.
+          <div className="flex items-center gap-1">
+            <div className="min-w-0 flex-[2] overflow-hidden pb-[3px]">
+              <InlineValue
+                boxed={BOXED_FIELDS}
+                table="production_element_locations"
+                id={l.row.id}
+                column="stock_count"
+                kind="number"
+                align="right"
+                className="w-full"
+                value={l.row.stock_count}
+                ariaLabel={`How many ${l.location.code} keeps`}
+              />
+            </div>
+            <span className="shrink-0 pb-[3px] text-subtle">×</span>
+            <div className="min-w-0 flex-[2] overflow-hidden pb-[3px]">
+              <InlineValue
+                boxed={BOXED_FIELDS}
+                table="production_element_locations"
+                id={l.row.id}
+                column="stock_size"
+                kind="number"
+                align="right"
+                className="w-full"
+                value={l.row.stock_size}
+                ariaLabel={`The size ${l.location.code} keeps`}
+              />
+            </div>
+            {/* The app's unit vocabulary, `allowNew` as on the batch record —
+                the FileMaker pars carry units the list lacks ("BAGS", "TUB"),
+                and a closed list would make those unenterable while they
+                still rendered. */}
+            <div className="min-w-0 flex-[3] overflow-hidden pb-[3px] pr-[3px]">
+              <InlineValue
+                boxed={BOXED_FIELDS}
+                table="production_element_locations"
+                id={l.row.id}
+                column="stock_unit"
+                kind="pick"
+                options={UNIT_PICK_OPTIONS}
+                allowNew
+                className="w-full"
+                value={l.row.stock_unit}
+                ariaLabel={`The unit ${l.location.code} keeps`}
+              />
+            </div>
+          </div>
         ) : (
           <span className={READ_ONLY_VALUE}>{describeStock(l.row)}</span>
         ),
