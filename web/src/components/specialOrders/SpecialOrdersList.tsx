@@ -55,6 +55,7 @@ import {
 import { sortRows } from "@/lib/tableSort";
 import {
   KIND_LABEL,
+  FLAG_TODO,
   ORDER_KIND_FILTERS,
   STATUS_LABEL,
   countsAsOwed,
@@ -67,6 +68,19 @@ import {
   type SpecialOrderKind,
   type SpecialOrderStatus,
 } from "@/lib/specialOrders";
+
+/**
+ * THE TO-DO IS A CHIP (Mark, 2026-09-30: "make the to do field a chip so it
+ * stands out a little"). Green for Print Order — the kitchen's cue, as on the
+ * progress bar — red for Resolve Issue, yellow for everything else. Fills, not
+ * inks, so the text stays `text-ink` on all three.
+ */
+function todoFill(todo: string): string {
+  const t = todo.trim().toLowerCase();
+  if (t === "print order") return "bg-go";
+  if (t === FLAG_TODO.toLowerCase()) return "bg-stop";
+  return "bg-mark-fill";
+}
 
 export type SpecialOrderRow = {
   id: string;
@@ -898,7 +912,9 @@ export function SpecialOrdersList({
         return (
           <span className="block">
             {r.todo ? (
-              <span className="font-medium">{r.todo}</span>
+              <span className={`box-decoration-clone px-1.5 py-px font-medium text-ink ${todoFill(r.todo)}`}>
+                {r.todo}
+              </span>
             ) : (
               <span className="text-faint">—</span>
             )}
