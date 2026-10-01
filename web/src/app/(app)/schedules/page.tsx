@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canEnterCounts } from "@/lib/roles";
@@ -72,10 +74,7 @@ export default async function SchedulesPage() {
       .gte("schedule_date", from)
       .lte("schedule_date", to)
       .order("schedule_date", { ascending: false }),
-    supabase
-      .from("production_schedule_items")
-      .select("schedule_id, par, made, leftover")
-      .limit(20000),
+    windowLines(supabase, from, to),
     // The From column names a plan schedule's PLAN. A whole-table read of a
     // handful of rows, and it has to be every plan rather than the active ones:
     // `plansInForce` decides that itself, and a schedule at a shop whose plan
@@ -205,6 +204,41 @@ export default async function SchedulesPage() {
 
 /** Plain string arithmetic — `new Date("2026-08-07")` is UTC midnight, which is
  *  the previous day west of Greenwich. */
+/**
+ * The lines of the window's schedules, every one of them.
+ *
+ * POSTGREST RETURNS AT MOST 1,000 ROWS AND SAYS NOTHING ABOUT IT. This used to
+ * read the WHOLE table with `.limit(20000)`, which the cap silently overrules:
+ * at 1,957 lines it returned the oldest 1,000, so every night this week read
+ * Items 0 and To make 0 (Mark, 2026-09-30). Scoped to the window through the
+ * schedule's date — a month of nights is still ~4,000 lines — and paged, ordered
+ * by `id` so the pages cannot overlap or skip.
+ */
+async function windowLines(supabase: SupabaseClient, from: string, to: string) {
+  const PAGE = 1000;
+  const out: { schedule_id: string; par: number | null; made: number | null; leftover: number | null }[] = [];
+  for (let start = 0; ; start += PAGE) {
+    const { data, error } = await supabase
+      .from("production_schedule_items")
+      .select("schedule_id, par, made, leftover, production_schedules!inner(schedule_date)")
+      .gte("production_schedules.schedule_date", from)
+      .lte("production_schedules.schedule_date", to)
+      .order("id")
+      .range(start, start + PAGE - 1);
+    if (error) return { data: null, error };
+    for (const l of data ?? []) {
+      out.push({
+        schedule_id: l.schedule_id as string,
+        par: l.par as number | null,
+        made: l.made as number | null,
+        leftover: l.leftover as number | null,
+      });
+    }
+    if (!data || data.length < PAGE) break;
+  }
+  return { data: out, error: null };
+}
+
 function addDays(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
