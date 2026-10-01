@@ -898,7 +898,7 @@ export function SpecialOrdersList({
         return (
           <span className="block">
             {r.todo ? (
-              <span className="font-medium">{r.todo}</span>
+              <span className="font-bold">{r.todo}</span>
             ) : (
               <span className="text-faint">—</span>
             )}
