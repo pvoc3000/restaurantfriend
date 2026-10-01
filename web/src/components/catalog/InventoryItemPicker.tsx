@@ -17,86 +17,45 @@ type ItemRow = {
 };
 
 /**
- * Point a row at an inventory item — the fix for "this is filed under the wrong
- * item", and for the rows that were never filed at all.
+ * Point a vendor item at an inventory item — the fix for "this is filed under
+ * the wrong item", and for the rows that were never filed at all (72 rows the
+ * migration left unlinked).
  *
- * TWO TABLES USE IT, and it takes the table rather than owning one:
+ * TWO CALLERS, both on vendor item LISTS: the unlinked cell in
+ * `VendorItemsTable` and the ⋯ menu's command in `VendorItemActions`. The two
+ * RECORDS — the vendor item and the production element — use a `PickList` over
+ * `lib/inventoryItemOptions` instead (Mark, 2026-10-01), which is why this no
+ * longer takes a table, a seeded search or an inline layout: those were theirs.
  *
- *   `vendor_items`        — the original caller. 72 rows the migration left
- *                           unlinked, plus the ordinary mis-filing correction.
- *   `production_elements` — a PURCHASED element costs nothing until it resolves
- *                           to an inventory item, and until 2026-08-13 there was
- *                           no way to link one anywhere in the app. The element
- *                           record showed "Not linked — this element has no cost
- *                           until it is" and offered nothing to do about it,
- *                           which left 76 active elements permanently uncosted
- *                           and made the Uncosted tier a list of problems with
- *                           no fix (Mark: "this is something the user needs to
- *                           be able to do on our own").
- *
- * It writes ONE column and nothing else (Mark, 2026-07-23). On a vendor item,
- * favorites are keyed (item-location, weekday, vendor item), so any that
- * referenced the old item simply stop being reachable by the guide — quiet, not
- * broken, and they light up again if you point it back. Deleting them would
- * make a one-click correction irreversible, so don't add cleanup here.
+ * It writes ONE column and nothing else (Mark, 2026-07-23). Favorites are keyed
+ * (item-location, weekday, vendor item), so any that referenced the old item
+ * simply stop being reachable by the guide — quiet, not broken, and they light
+ * up again if you point it back. Deleting them would make a one-click
+ * correction irreversible, so don't add cleanup here.
  */
 export function InventoryItemPicker({
-  table,
   rowId,
   currentItemId,
-  initialTerm,
   allowUnlink = false,
-  variant = "inline",
   trigger,
   currentItemName,
   defaultOpen = false,
   onClose,
 }: {
-  /** The table holding the `inventory_item_id` column being written. */
-  table: "vendor_items" | "production_elements";
   rowId: string;
   currentItemId: string | null;
   /**
-   * What to put in the search box when it opens — the row's own name.
-   *
-   * With word-AND matching that is usually the answer already: 23 of the 76
-   * unlinked elements differ from their inventory item only by word order. The
-   * vendor item passes nothing, because its name is the VENDOR's wording for a
-   * product and searching our catalog with it mostly returns noise.
-   */
-  initialTerm?: string;
-  /**
    * Offer "Unlink" as well.
    *
-   * On for elements, because "none of these" is a REAL answer there rather than
-   * a mistake: of the 76 unlinked ones, a good few are cleaning duties and
-   * FileMaker metadata rows ("Fryer - replace filter", "Total Base") that got
-   * typed `purchased` at migration and should never resolve to an ingredient.
-   * Re-linking already fixes a mis-link; this is for the rows that should carry
+   * On for the ⋯ menu, the one place a LINKED vendor item opens this.
+   * Re-linking already fixes a mis-link; this is for the row that should carry
    * no link at all, and without it linking is a one-way door.
    */
   allowUnlink?: boolean;
   /**
-   * Where the search itself renders.
-   *
-   * `inline` grows the search box and its results underneath the button — right
-   * on a detail screen, which has the room and nothing below to displace.
-   *
-   * `cell` is for a TABLE cell, where growing is not available: the table is
-   * `table-fixed` with `truncate` cells, so an 80-unit-wide search box inside a
-   * 205px column is clipped rather than wrapped. The search goes in a
-   * `ui/Dialog` instead, which escapes the cell entirely and is already the
-   * app's floating panel — including the two properties a dialog rendered from
-   * a table cell needs, `text-ink` and `whitespace-normal`, which that cell's
-   * own `truncate` would otherwise cascade straight into.
-   */
-  variant?: "inline" | "cell";
-  /**
-   * What the button says in `cell` mode — the cell's own text, so the value you
-   * were already reading becomes the control that changes it.
-   *
-   * Ignored inline, where the button is "Link…" / "Change" and the row beside
-   * it carries the value.
+   * What the button says — the cell's own text, so the value you were already
+   * reading becomes the control that changes it. Omitted when a command opened
+   * this, because the command IS the button.
    */
   trigger?: ReactNode;
   /**
@@ -128,7 +87,7 @@ export function InventoryItemPicker({
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(defaultOpen);
-  const [term, setTerm] = useState(initialTerm ?? "");
+  const [term, setTerm] = useState("");
   const [results, setResults] = useState<ItemRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -175,7 +134,7 @@ export function InventoryItemPicker({
     setError(null);
 
     const { data, error } = await supabase
-      .from(table)
+      .from("vendor_items")
       .update({ inventory_item_id: inventoryItemId })
       .eq("id", rowId)
       .select("id");
@@ -189,7 +148,7 @@ export function InventoryItemPicker({
       setError("Not allowed — you need purchaser access to change this.");
       return;
     }
-    setTerm(initialTerm ?? "");
+    setTerm("");
     close();
     router.refresh();
   }
@@ -204,16 +163,12 @@ export function InventoryItemPicker({
       close();
       return;
     }
-    // Re-seed on OPEN, so a search you cleared and abandoned does not come back
-    // empty next time.
-    setTerm(initialTerm ?? "");
+    // Clear on OPEN, so an abandoned search does not come back next time.
+    setTerm("");
     setOpen(true);
   }
 
-  // The search and its results, wherever they end up rendering. In `cell` mode
-  // this fills a dialog, so the fixed 80-unit width that suits a detail screen
-  // would leave the panel half empty.
-  const wide = variant === "cell";
+  // The search and its results, filling the dialog.
   const search = (
     <span className="flex flex-col gap-1">
       <TextInput
@@ -223,20 +178,17 @@ export function InventoryItemPicker({
         aria-label="Search inventory items by name"
         clearLabel="Clear the search"
         search
-        // In a dialog, fill it; on a detail screen, the search box's own width.
-        fullWidth={wide}
+        fullWidth
         icon={<SearchGlyph />}
       />
       {canSearch && results.length === 0 && (
         <span className="text-xs text-subtle">No items match.</span>
       )}
-      {!canSearch && wide && (
+      {!canSearch && (
         <span className="text-xs text-subtle">Type at least two letters.</span>
       )}
       {canSearch && results.length > 0 && (
-        <ul
-          className={`overflow-auto border border-ink ${wide ? "max-h-[50vh] w-full" : "max-h-64 w-80"}`}
-        >
+        <ul className="max-h-[50vh] w-full overflow-auto border border-ink">
           {results.map((it) => {
             const isCurrent = it.id === currentItemId;
             return (
@@ -271,93 +223,16 @@ export function InventoryItemPicker({
     </span>
   );
 
-  if (variant === "cell") {
-    return (
-      <>
-        {/* The cell's own text IS the button — underlined at rest, because on an
-            iPad there is no hover to reveal that something is pressable, and a
-            value that looks like description is exactly how this control went
-            missing for 71 rows. */}
-        {/* No trigger at all when a command already opened this — a ⋯ menu item
-            IS the button, and a second one would render into the row it came
-            from. */}
-        {trigger !== undefined && (
-          <button
-            type="button"
-            onClick={toggle}
-            disabled={busy}
-            title={
-              currentItemId
-                ? "Point this at a different inventory item"
-                : "Link this to an inventory item"
-            }
-            className="max-w-full truncate underline decoration-neutral-400 underline-offset-[3px] hover:decoration-current disabled:opacity-35"
-          >
-            {busy ? "saving…" : trigger}
-          </button>
-        )}
-        {open && (
-          <Dialog
-            title={currentItemId ? "Change inventory item" : "Link inventory item"}
-            onClose={close}
-            busy={busy}
-            width="max-w-lg"
-            footer={
-              <>
-                <button
-                  type="button"
-                  onClick={close}
-                  disabled={busy}
-                  className={DIALOG_CANCEL_CLASS}
-                >
-                  Cancel
-                </button>
-                {/* Unlink lives HERE rather than as a second menu command, and
-                    that is the whole reason it is two taps: it takes the row off
-                    the order guide, and the sentence saying so has to be on
-                    screen beside the button that does it. Picking a different
-                    item from the list is the ordinary fix; this is for the row
-                    that should carry no link at all. */}
-                {allowUnlink && currentItemId && (
-                  <button
-                    type="button"
-                    onClick={() => void write(null)}
-                    disabled={busy}
-                    className={DIALOG_DANGER_CLASS}
-                  >
-                    {busy ? "Working…" : "Unlink"}
-                  </button>
-                )}
-              </>
-            }
-          >
-            <div className="space-y-2">
-              {currentItemName ? (
-                <p className="text-sm text-muted">
-                  Linked to{" "}
-                  <span className="text-ink">{currentItemName}</span>. Search the
-                  catalog to point it somewhere else, or unlink it — an unlinked
-                  vendor item keeps its history and its price, and drops off the
-                  order guide until it is linked again.
-                </p>
-              ) : (
-                <p className="text-sm text-muted">
-                  Search the catalog and link this vendor item to the inventory item
-                  it is bought as.
-                </p>
-              )}
-              {error && <p className="text-sm text-accent">{error}</p>}
-              {search}
-            </div>
-          </Dialog>
-        )}
-      </>
-    );
-  }
-
   return (
-    <span className="inline-flex flex-col gap-1">
-      <span className="inline-flex items-center gap-2">
+    <>
+      {/* The cell's own text IS the button — underlined at rest, because on an
+          iPad there is no hover to reveal that something is pressable, and a
+          value that looks like description is exactly how this control went
+          missing for 71 rows. */}
+      {/* No trigger at all when a command already opened this — a ⋯ menu item
+          IS the button, and a second one would render into the row it came
+          from. */}
+      {trigger !== undefined && (
         <button
           type="button"
           onClick={toggle}
@@ -365,32 +240,68 @@ export function InventoryItemPicker({
           title={
             currentItemId
               ? "Point this at a different inventory item"
-              : "Link this to an inventory item so it can be costed"
+              : "Link this to an inventory item"
           }
-          className="border border-ink px-1.5 py-0.5 text-xs text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+          className="max-w-full truncate underline decoration-neutral-400 underline-offset-[3px] hover:decoration-current disabled:opacity-35"
         >
-          {/* "Link…" when there is nothing to change — on an element the row
-              beside this says "Not linked", and "Change" there names an act
-              that has no object. */}
-          {open ? "Cancel" : currentItemId ? "Change" : "Link…"}
+          {busy ? "saving…" : trigger}
         </button>
-        {allowUnlink && currentItemId && !open ? (
-          <button
-            type="button"
-            onClick={() => write(null)}
-            disabled={busy}
-            title="Leave this with no inventory item, so it is not costed"
-            className="border border-ink px-1.5 py-0.5 text-xs text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-          >
-            Unlink
-          </button>
-        ) : null}
-        {busy && <span className="text-xs text-subtle">saving…</span>}
-      </span>
-
-      {error && <span className="text-xs text-accent">{error}</span>}
-
-      {open && search}
-    </span>
+      )}
+      {open && (
+        <Dialog
+          title={currentItemId ? "Change inventory item" : "Link inventory item"}
+          onClose={close}
+          busy={busy}
+          width="max-w-lg"
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={close}
+                disabled={busy}
+                className={DIALOG_CANCEL_CLASS}
+              >
+                Cancel
+              </button>
+              {/* Unlink lives HERE rather than as a second menu command, and
+                  that is the whole reason it is two taps: it takes the row off
+                  the order guide, and the sentence saying so has to be on
+                  screen beside the button that does it. Picking a different
+                  item from the list is the ordinary fix; this is for the row
+                  that should carry no link at all. */}
+              {allowUnlink && currentItemId && (
+                <button
+                  type="button"
+                  onClick={() => void write(null)}
+                  disabled={busy}
+                  className={DIALOG_DANGER_CLASS}
+                >
+                  {busy ? "Working…" : "Unlink"}
+                </button>
+              )}
+            </>
+          }
+        >
+          <div className="space-y-2">
+            {currentItemName ? (
+              <p className="text-sm text-muted">
+                Linked to{" "}
+                <span className="text-ink">{currentItemName}</span>. Search the
+                catalog to point it somewhere else, or unlink it — an unlinked
+                vendor item keeps its history and its price, and drops off the
+                order guide until it is linked again.
+              </p>
+            ) : (
+              <p className="text-sm text-muted">
+                Search the catalog and link this vendor item to the inventory item
+                it is bought as.
+              </p>
+            )}
+            {error && <p className="text-sm text-accent">{error}</p>}
+            {search}
+          </div>
+        </Dialog>
+      )}
+    </>
   );
 }

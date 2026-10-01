@@ -252,10 +252,8 @@ export function VendorItemsTable({
                 // with no route to the thing that links them.
                 <span className="text-accent">
                   <InventoryItemPicker
-                    table="vendor_items"
                     rowId={vi.id}
                     currentItemId={null}
-                    variant="cell"
                     trigger="unlinked"
                   />
                 </span>

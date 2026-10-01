@@ -276,11 +276,9 @@ export function VendorItemActions({
           mounted here and opens on mount, `ui/PickList`'s `defaultOpen`. */}
       {linking && inventoryItem && (
         <InventoryItemPicker
-          table="vendor_items"
           rowId={vendorItemId}
           currentItemId={inventoryItem.id}
           currentItemName={inventoryItem.name}
-          variant="cell"
           allowUnlink
           defaultOpen
           onClose={() => setLinking(false)}
