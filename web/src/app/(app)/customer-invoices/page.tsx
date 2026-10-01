@@ -101,6 +101,7 @@ export default async function CustomerInvoicesPage({
       rows={rows}
       initialFilters={params}
       initialSearch={parseFilterSearch(params)}
+      today={today}
       create={
         canEditPage(session.membership.role, "/customer-invoices")
           ? {

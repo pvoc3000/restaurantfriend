@@ -321,8 +321,12 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function isRealDate(iso: string): boolean {
   // A ROUND TRIP, not a regex — `new Date("2026-02-31")` does not fail, it
-  // rolls over to March 2nd (`invoiceDeliveryDate`'s lesson).
-  return ISO_DATE.test(iso) && toIso(utc(iso)) === iso;
+  // rolls over to March 2nd (`invoiceDeliveryDate`'s lesson). And a month
+  // past 12 is not a rollover but an Invalid Date, whose `toISOString` THROWS,
+  // so that is asked first or `?from=2026-13-45` takes the page down.
+  if (!ISO_DATE.test(iso)) return false;
+  const d = utc(iso);
+  return !Number.isNaN(d.getTime()) && toIso(d) === iso;
 }
 
 /**
@@ -338,4 +342,26 @@ export function parseRangeParams(
   const t = Array.isArray(to) ? to[0] : to;
   if (!f || !t || !isRealDate(f) || !isRealDate(t) || f > t) return null;
   return { from: f, to: t };
+}
+
+/**
+ * A range as ONE value, `from..to` — for a list whose filters travel as one
+ * `FilterValues` record, where a preset key and a picked pair have to share a
+ * slot (`lib/specialOrderRange`'s header has the reasoning). Backwards is a
+ * range too, `normalizeRange`'s rule; anything that is not two real dates is
+ * no range at all. DIGIT-SHAPED IS NOT A DATE: `2024-13-45` matches the
+ * pattern, and the special order list interpolates this token straight into a
+ * PostgREST filter, where a nonsense month comes back as a Postgres error in
+ * place of the whole list. Caught by a fixture, not by review.
+ */
+const RANGE_TOKEN = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/;
+
+export function parseRangeToken(raw: string): DateRange | null {
+  const m = RANGE_TOKEN.exec(raw);
+  if (!m || !isRealDate(m[1]) || !isRealDate(m[2])) return null;
+  return normalizeRange(m[1], m[2]);
+}
+
+export function rangeToken(range: DateRange): string {
+  return `${range.from}..${range.to}`;
 }

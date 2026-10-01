@@ -8,6 +8,16 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
+import { RangePicker } from "@/components/ui/RangePicker";
+import type { DateRange } from "@/lib/dateRange";
+import {
+  DEFAULT_INVOICE_RANGE,
+  INVOICE_RANGE_PRESETS,
+  inInvoiceRange,
+  invoiceRangeBounds,
+  invoiceRangeToken,
+  isInvoiceRangeToken,
+} from "@/lib/invoiceRange";
 import { SEARCH_PEN } from "@/components/ui/fieldMetrics";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { withFrom } from "@/lib/breadcrumbs";
@@ -69,9 +79,12 @@ export function CustomerInvoicesList({
   rows,
   initialFilters,
   initialSearch = "",
+  today,
   create = null,
 }: {
   rows: CustomerInvoiceRow[];
+  /** The org's day — the range presets are functions of it. */
+  today: string;
   initialFilters?: RawSearchParams;
   initialSearch?: string;
   /** Supervisor+: what New Invoice… needs. Null hides it. */
@@ -79,6 +92,18 @@ export function CustomerInvoicesList({
 }) {
   const dimensions = useMemo<FilterDimension<CustomerInvoiceRow>[]>(
     () => [
+      {
+        // THE ISSUED WINDOW, drawn as a `RangePicker` rather than a menu —
+        // still a dimension, so it rides the URL like the others (`?issued=`),
+        // and `accepts` lets a picked `from..to` through. `lib/invoiceRange`
+        // has the vocabulary and why All Time is where it rests.
+        key: "issued",
+        label: "Issued",
+        options: INVOICE_RANGE_PRESETS.map((p) => ({ value: p.key, label: p.label })),
+        accepts: isInvoiceRangeToken,
+        defaultValue: DEFAULT_INVOICE_RANGE,
+        matches: (r, v) => inInvoiceRange(r.issued_on, invoiceRangeBounds(v, today)),
+      },
       {
         key: "status",
         label: "Status",
@@ -99,8 +124,10 @@ export function CustomerInvoicesList({
         matches: (r, v) => r.shop === v,
       },
     ],
-    [rows]
+    [rows, today]
   );
+  // Every dimension but the window, which is not a menu.
+  const menuDimensions = useMemo(() => dimensions.filter((d) => d.key !== "issued"), [dimensions]);
 
   const [search, setSearch] = useState(() => {
     const live = urlFilterParams(PATH);
@@ -119,6 +146,12 @@ export function CustomerInvoicesList({
   const changeFilters = (next: FilterValues) => { setFilters(next); writeUrl(next, search, sort); };
   const changeSearch = (next: string) => { setSearch(next); writeUrl(filters, next, sort); };
   const changeSort = (next: ListSort) => { setSort(next); writeUrl(filters, search, next); };
+  const changeRange = (picked: DateRange | null) =>
+    changeFilters({ ...filters, issued: invoiceRangeToken(picked, today) });
+  const rangeBounds = useMemo(
+    () => invoiceRangeBounds(filters.issued ?? DEFAULT_INVOICE_RANGE, today),
+    [filters.issued, today]
+  );
 
   const searched = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -127,6 +160,13 @@ export function CustomerInvoicesList({
       [r.numberText, r.customer].some((v) => v.toLowerCase().includes(q))
     );
   }, [rows, search]);
+
+  // What the menus count over: the search AND the window, since the window is
+  // not one of the dimensions they are handed.
+  const ranged = useMemo(
+    () => searched.filter((r) => inInvoiceRange(r.issued_on, rangeBounds)),
+    [searched, rangeBounds]
+  );
 
   const visible = useMemo(
     () => applyListFilters(searched, dimensions, filters),
@@ -242,10 +282,10 @@ export function CustomerInvoicesList({
       <PageHeading title="Invoices" visible={visible.length} total={rows.length} noun="invoices" />
 
       <FilterMenus
-        rows={searched}
+        rows={ranged}
         total={rows.length}
         noun="invoices"
-        dimensions={dimensions}
+        dimensions={menuDimensions}
         values={filters}
         onChange={changeFilters}
         showCount={false}
@@ -259,21 +299,39 @@ export function CustomerInvoicesList({
           </div>
         }
         leading={
-          <div className={`${SEARCH_PEN} space-y-1.5`}>
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-              Search
-            </span>
-            <TextInput
-              value={search}
-              onValueChange={changeSearch}
-              fullWidth
-              search
-              aria-label="Search invoices"
-              clearLabel="Clear the search"
-              icon={<SearchGlyph />}
-            />
-          </div>
+          <>
+            <div className={`${SEARCH_PEN} space-y-1.5`}>
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                Search
+              </span>
+              <TextInput
+                value={search}
+                onValueChange={changeSearch}
+                fullWidth
+                search
+                aria-label="Search invoices"
+                clearLabel="Clear the search"
+                icon={<SearchGlyph />}
+              />
+            </div>
+            {/* The window straight after the search — where the PO, bill and
+                special order lists all put theirs. */}
+            <div className="w-44 space-y-1.5">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                Issued
+              </span>
+              <RangePicker
+                value={rangeBounds}
+                onChange={changeRange}
+                presets={INVOICE_RANGE_PRESETS}
+                today={today}
+                ariaLabel="Which invoices to show, by the date issued"
+                className="w-full"
+              />
+            </div>
+          </>
         }
+
       />
 
       <DataTable

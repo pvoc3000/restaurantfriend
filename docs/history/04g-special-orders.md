@@ -5354,3 +5354,18 @@ signature is `{org}`. `{pickup_time}` is the window's START, as FileMaker sent.
 No Delivery Type line. `send-special-order-email` takes `kind:
 "delivery_request"` through the same branch and logs "Delivery requested from
 …" (DEPLOYED).
+
+**2026-10-01 — the invoice list gets an Issued window** (Mark: "add a
+rangepicker to the customer invoices filter row with some sensible options").
+A `RangePicker` straight after the search, over `issued_on`, presets This Week ·
+Previous Week · This Month · Last Month · Last 90 Days · This Year · Last Year ·
+All Time (`lib/invoiceRange`). **ALL TIME IS THE RESTING VIEW** — what the list
+showed before — so an old overdue invoice never vanishes because the list
+opened on a window. It is `specialOrderRange`'s design, one `?issued=` token
+that is a preset key or `from..to`, but a CLIENT filter, since this page fetches
+every invoice. The `from..to` parser moved into `lib/dateRange`
+(`parseRangeToken`/`rangeToken`) so the two lists share it, and that move
+found `dateRange`'s `isRealDate` THROWING on a month past 12 (Invalid Date's
+`toISOString`) where the special-order copy had guarded it — which also meant a
+hand-typed `?from=2026-13-45` could take down the PO, bill or items list. Fixed
+at the source, with fixtures.

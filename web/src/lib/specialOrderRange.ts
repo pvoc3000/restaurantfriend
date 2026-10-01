@@ -39,7 +39,8 @@ import {
   RANGE_PRESETS,
   inRange,
   matchingPreset,
-  normalizeRange,
+  parseRangeToken,
+  rangeToken,
   type DateRange,
   type RangePreset,
 } from "./dateRange";
@@ -84,32 +85,9 @@ export const ORDER_RANGE_PRESETS: RangePreset[] = [
 /** The resting window, and the one the plain `/special-orders` shows. */
 export const DEFAULT_ORDER_RANGE = "upcoming";
 
-const CUSTOM = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/;
-
-/**
- * DIGIT-SHAPED IS NOT A DATE. `2024-13-45` matches the pattern and is not a
- * day, and this token is interpolated STRAIGHT INTO the PostgREST filter
- * (`event_date.gte.…`) — so a nonsense month in the address bar would come back
- * as a Postgres date-parse error in place of the whole list, rather than as the
- * list's resting view. Caught by a fixture, not by review.
- */
-function isRealDate(iso: string): boolean {
-  const d = new Date(`${iso}T00:00:00Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso;
-}
-
-/** A custom token's two dates, or null if it is not one. */
-function customPair(raw: string): DateRange | null {
-  const m = CUSTOM.exec(raw);
-  if (!m || !isRealDate(m[1]) || !isRealDate(m[2])) return null;
-  // Backwards is a range too — `normalizeRange`'s rule, because somebody
-  // reaching for a window from its far end is not making a mistake.
-  return normalizeRange(m[1], m[2]);
-}
-
 /** Is this a token this list understands? The filter bar's `accepts`. */
 export function isOrderRangeToken(value: string): boolean {
-  return ORDER_RANGE_PRESETS.some((p) => p.key === value) || customPair(value) !== null;
+  return ORDER_RANGE_PRESETS.some((p) => p.key === value) || parseRangeToken(value) !== null;
 }
 
 /**
@@ -122,7 +100,7 @@ export function isOrderRangeToken(value: string): boolean {
  */
 export function orderRangeBounds(token: string | null | undefined, today: string): DateRange | null {
   const raw = (token ?? "").trim();
-  const custom = customPair(raw);
+  const custom = parseRangeToken(raw);
   if (custom) return custom;
   const preset =
     ORDER_RANGE_PRESETS.find((p) => p.key === raw) ??
@@ -138,7 +116,7 @@ export function orderRangeBounds(token: string | null | undefined, today: string
 export function orderRangeToken(picked: DateRange | null, today: string): string {
   const preset = matchingPreset(picked, ORDER_RANGE_PRESETS, today);
   if (preset) return preset.key;
-  return picked ? `${picked.from}..${picked.to}` : "all";
+  return picked ? rangeToken(picked) : "all";
 }
 
 /**
