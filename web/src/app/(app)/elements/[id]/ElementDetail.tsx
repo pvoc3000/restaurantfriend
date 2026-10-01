@@ -60,7 +60,7 @@ export async function ElementDetail({
       supabase
         .from("production_element_locations")
         .select(
-          `id, location_id, par_by_weekday, stock_count, stock_size, stock_unit,
+          `id, location_id, stock_count, stock_size, stock_unit,
            is_active, notes`
         )
         .eq("element_id", id),
@@ -228,7 +228,6 @@ export async function ElementDetail({
         rows={(locations ?? []).map((l) => ({
           id: l.id as string,
           location_id: l.location_id as string,
-          par_by_weekday: (l.par_by_weekday ?? null) as number[] | null,
           notes: (l.notes ?? null) as string | null,
           stock_count: l.stock_count === null ? null : Number(l.stock_count),
           stock_size: l.stock_size === null ? null : Number(l.stock_size),

@@ -81,7 +81,7 @@ export function ElementActions({
 
   /**
    * DUPLICATE COPIES WHAT THE ELEMENT IS (Mark, 2026-09-30) — the master row,
-   * its per-kitchen rows (Active, Par, the weekday pars, Note) and its per-shop
+   * its per-kitchen rows (Active, Par, Note) and its per-shop
    * manual costs, `ProductionItemActions`' rule. NOT its recipes: a recipe is a
    * versioned document with its own Duplicate on its own record, and two
    * elements silently sharing a copied method is how one gets edited believing
@@ -139,7 +139,7 @@ export function ElementActions({
     const { data: kitchens, error: kErr } = await supabase
       .from("production_element_locations")
       .select(
-        "org_id, location_id, par_by_weekday, stock_count, stock_size, stock_unit, yield_by_weekday, is_active, notes"
+        "org_id, location_id, stock_count, stock_size, stock_unit, is_active, notes"
       )
       .eq("element_id", elementId);
     if (kErr) throw new Error(kErr.message);

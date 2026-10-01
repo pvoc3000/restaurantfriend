@@ -1768,3 +1768,12 @@ The shift report stuff was added today and also not necessary." `batch_sort`
 2026-09-30.json`) dropped. A generated batch's `sort` starts empty and a
 refresh no longer overwrites it; generation, the shift report's Donut batches
 page and the tray guide's Total batches box list by name.
+
+**AN ELEMENT'S WEEKDAY PARS REMOVED — migration 160 (2026-09-30).** Mark: "a
+relic from an earlier time. It was used for daily donut pars … 'make 1 batch of
+raised dough on M, T, W, 1.5 batches on Th, and 2 batches on F, Sa, Su'. Now we
+use the premade sheets that are calculated based on actual needs/demand." 036's
+`production_element_locations.par_by_weekday` and `yield_by_weekday` (FileMaker,
+59 of 184 rows; backup `FMP Export/pre160-element-weekday-pars-2026-09-30.json`)
+had no editor and no reader. Dropped. A production ITEM's weekday par
+(`production_item_locations`) is untouched.

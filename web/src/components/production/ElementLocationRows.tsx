@@ -14,7 +14,6 @@ import { UNIT_PICK_OPTIONS } from "@/lib/units";
 export type ElementLocationRow = {
   id: string;
   location_id: string;
-  par_by_weekday: number[] | null;
   stock_count: number | null;
   stock_size: number | null;
   stock_unit: string | null;
@@ -53,13 +52,10 @@ export type ElementLocationRow = {
  *   An "Asks for" amount ("make 2 X") sat beside it until 158 dropped it:
  *   generation copied it onto each batch and nothing read it there.
  *
- * PAR BY WEEKDAY IS DELIBERATELY READ-ONLY. Nothing in `web/src` reads
- * `production_element_locations.par_by_weekday` — it is displayed here and
- * nowhere else, and generation ignores it entirely (it reads Active and
- * the stock trio). An editor over it would take numbers and change
- * nothing, which is precisely the objection recorded against building one for
- * `production_item_locations.par_by_weekday` after 043. If it turns out to be
- * wanted, it wants a reader first.
+ * NO PAR BY WEEKDAY since 160 (Mark, 2026-09-30: "a relic … It was used for
+ * daily donut pars … Now we use the premade sheets that are calculated based
+ * on actual needs/demand"). It was a read-only column FileMaker filled and
+ * nothing read.
  *
  * Enumerating over `activeLocations`, never `locations` — design rule 3: a row
  * per location is exactly the case where three closed shops would sprout dead
@@ -316,23 +312,6 @@ export function ElementLocationRows({
         ) : (
           <span className={READ_ONLY_VALUE}>{l.row.notes ?? "—"}</span>
         ),
-    },
-    {
-      // Read-only on purpose — see the note above. It stays visible because the
-      // migration loaded real numbers into it and hiding them would be its own
-      // kind of lie.
-      key: "par",
-      label: "Par by weekday",
-      width: 220,
-      hideWhenCompact: true,
-      sortValue: undefined,
-      render: (l) => (
-        <span className="tabular-nums text-muted">
-          {l.row?.par_by_weekday?.some((v) => v !== null)
-            ? l.row.par_by_weekday.map((v) => (v === null ? "–" : String(v))).join("  ")
-            : "—"}
-        </span>
-      ),
     },
   ];
 
