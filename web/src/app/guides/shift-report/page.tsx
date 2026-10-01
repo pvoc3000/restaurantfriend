@@ -268,8 +268,8 @@ export default function ShiftReportGuide() {
             </p>
             <ul>
               <li>
-                Made is three boxes, like the batch log: how many, times a size, then the unit. For
-                7½ batches, type 7.5 in the first box and choose batch as the unit.
+                Made is a number and a unit. For 7½ batches, type 7.5 and choose batch as the
+                unit.
               </li>
               <li>
                 Under <strong>Prepared by</strong>, choose the baker who made each donut. If one
