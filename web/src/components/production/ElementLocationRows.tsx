@@ -225,10 +225,12 @@ export function ElementLocationRows({
       // column has always been headed Par. A second name for the same figure is
       // how somebody comes to believe they are two figures.
       label: "Par",
-      // 190 with the boxes 1 : 1 : 3 (Mark, 2026-09-30: "the numeric fields can
-      // be half their current size") — the numbers halved from 2 : 2 : 3 of 260
-      // and the unit picker kept its width, so the column gave back the rest.
-      width: 190,
+      // 135 with the boxes 2 : 2 : 3 (Mark, 2026-09-30) — first the numbers
+      // were halved ("the numeric fields can be half their current size"),
+      // then the unit ("the units field can be half its size as well"), each
+      // time with the column giving the space back rather than the others
+      // growing into it.
+      width: 135,
       sortValue: (l) => l.row?.stock_count ?? null,
       render: (l) =>
         !l.row ? (
@@ -242,7 +244,7 @@ export function ElementLocationRows({
           // leave room for the unit picker's 3px shadow, which `overflow-hidden`
           // would otherwise clip, while keeping the three boxes level.
           <div className="flex items-center gap-1">
-            <div className="min-w-0 flex-1 overflow-hidden pb-[3px]">
+            <div className="min-w-0 flex-[2] overflow-hidden pb-[3px]">
               <InlineValue
                 boxed={BOXED_FIELDS}
                 table="production_element_locations"
@@ -256,7 +258,7 @@ export function ElementLocationRows({
               />
             </div>
             <span className="shrink-0 pb-[3px] text-subtle">×</span>
-            <div className="min-w-0 flex-1 overflow-hidden pb-[3px]">
+            <div className="min-w-0 flex-[2] overflow-hidden pb-[3px]">
               <InlineValue
                 boxed={BOXED_FIELDS}
                 table="production_element_locations"
