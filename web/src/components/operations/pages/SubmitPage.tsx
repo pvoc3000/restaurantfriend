@@ -36,6 +36,7 @@
 export function SubmitPage({
   outstanding,
   blockers,
+  sendableBy,
 }: {
   /**
    * Already computed — see the note where it is. The page renders the SAME
@@ -52,8 +53,25 @@ export function SubmitPage({
    * which. Red for the second, since here something really is wrong.
    */
   blockers: string[];
+  /**
+   * The author's name when this is somebody else's draft and you cannot send
+   * it. Then the lists are NOT shown: they are computed from what you can read,
+   * and you cannot read the ratings, so they would tell you that nobody had
+   * been added — and nothing on them is yours to fix anyway.
+   */
+  sendableBy: string | null;
 }) {
   const blocked = blockers.length > 0;
+
+  if (sendableBy !== null) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <p className="text-[16px]">
+          This report is sent by {sendableBy}, or by a manager.
+        </p>
+      </div>
+    );
+  }
 
   if (blockers.length + outstanding.length === 0) {
     return (

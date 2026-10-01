@@ -68,6 +68,7 @@ export function RatingsPage({
   roster,
   positions,
   editable,
+  hiddenFrom,
 }: {
   reportId: string;
   orgId: string;
@@ -76,6 +77,14 @@ export function RatingsPage({
   /** The shop's own vocabulary — `employees.position`, "DF", "Sr. DF". */
   positions: PickOption[];
   editable: boolean;
+  /**
+   * The author's name when YOU CANNOT READ THIS REPORT'S RATINGS — 070's
+   * select is the author and managers only, so `rows` arrives empty whether or
+   * not anybody was added. Saying "No Employees" then states something the
+   * screen cannot know (2026-10-01, DF02: the employee had been on the report
+   * for an hour and a half).
+   */
+  hiddenFrom: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -147,7 +156,11 @@ export function RatingsPage({
           same swap it always did, now at the top. */}
       <div className="flex min-h-9 flex-wrap items-center justify-between gap-4">
         <p className="text-sm text-muted">
-          {rows.length === 0 ? "No Employees" : ""}
+          {hiddenFrom !== null
+            ? `The employees on this report are seen only by ${hiddenFrom} and managers.`
+            : rows.length === 0
+              ? "No Employees"
+              : ""}
         </p>
         {editable ? (
           adding === null ? (

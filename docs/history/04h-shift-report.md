@@ -701,3 +701,26 @@
    every-donut picker's shadow was clipped by the sticky Notes header painting
    over it; the Prepared by header is lifted with `z-30!`. Headers are
    bottom-aligned.
+
+**SOMEBODY ELSE'S DRAFT NOW SAYS SO (2026-10-01).** Abigail reported DF02's
+opening report showing "No Employees" and "No employees have been added." on
+page 6, after she had added one. That employee had been saved at 11:07:47. The
+12:38 photos were taken while the shared iPad's session was **Karina's** (her
+PIN sign-in was at 12:23:17), and Abigail's own PIN unlock came at 12:46:46,
+fifteen seconds before she sent the report. The photo's first cell read
+**Close**, not Cancel, which is the runner's own tell for a report that isn't
+yours. 070's `shift_report_ratings_select` is author + owner/admin, so another
+supervisor's read returns zero rows with no error. The runner showed that as
+an empty report, and the Send gate counted it as one.
+Three display changes, no policy change: the runner shows a line under the bar
+(`readOnlyNote`) naming the author and who is signed in; the ratings page says
+the employees are seen only by the author and managers (`hiddenFrom`) in place
+of "No Employees"; the submit page shows "This report is sent by X, or by a
+manager." instead of lists computed from ratings it cannot read (`sendableBy`).
+The author's name comes from `org_members.display_name` (`members_read` is
+any member). Not walked live: the case needs a supervisor session on somebody
+else's draft.
+How the report ended up open under Karina's session is NOT established. Either
+it was opened from the list, or a second Safari tab survived a PIN switch.
+`IdleLock`'s clock is per tab, and nothing compares the cookie's user with the
+user the page was rendered for.

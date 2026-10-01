@@ -72,6 +72,7 @@ export function ShiftReportRunner({
   premadePages,
   openAtPage,
   blockers,
+  readOnlyNote,
   checklistRun,
 }: {
   reportId: string;
@@ -116,6 +117,12 @@ export function ShiftReportRunner({
    * whether tonight's paperwork is finished is a workflow rule.
    */
   blockers: string[];
+  /**
+   * Set when this is somebody else's DRAFT and you cannot change it — on the
+   * shared iPad, typically another supervisor's PIN is the session. Without it
+   * the report reads as empty rather than as not yours: see the run page.
+   */
+  readOnlyNote: { authorName: string; viewerName: string } | null;
   /**
    * The checklist linked to this report, ONLY while it is still open.
    *
@@ -487,6 +494,17 @@ export function ShiftReportRunner({
         {busy ? <ProgressBand label={busy} /> : null}
         {failed ? (
           <p className="mb-6 border border-accent px-4 py-3 text-sm text-accent">{failed}</p>
+        ) : null}
+        {readOnlyNote ? (
+          <p className="mb-6 text-sm">
+            <span className="bg-mark-fill px-1">
+              This is {readOnlyNote.authorName}’s report
+            </span>{" "}
+            <span className="text-muted">
+              — you are signed in as {readOnlyNote.viewerName}, so it is read-only. Only{" "}
+              {readOnlyNote.authorName} or a manager can change it or send it.
+            </span>
+          </p>
         ) : null}
         {isSent ? (
           <p className="mb-6 text-sm">

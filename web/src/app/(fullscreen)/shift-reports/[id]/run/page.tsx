@@ -267,6 +267,18 @@ export default async function RunShiftReportPage({
     !isSent && (report.created_by === session.userId || canReadHr(role));
   const canSend = editable;
 
+  /**
+   * SOMEBODY ELSE'S DRAFT SAYS SO (2026-10-01). On the shared iPad a report
+   * can be open while another supervisor's PIN is the session — DF02's opening
+   * report was read as Karina's at 12:38 — and the runner rendered it as an
+   * EMPTY report: 070 lets only the author and managers read the ratings, so
+   * page 2 said "No Employees" and page 6 said none had been added, while the
+   * row had been saved at 11:07. Nothing was lost; the screen just never said
+   * whose report it was looking at, so it read as the app losing work.
+   */
+  /** Not yours and you are not a manager — the ratings select returns NOTHING. */
+  const ratingsHidden = report.created_by !== session.userId && !canReadHr(role);
+
   const locationCode =
     session.locations.find((l) => l.id === report.location_id)?.code ?? "—";
   const kitchenCode = session.locations.find((l) => l.id === kitchenId)?.code ?? locationCode;
@@ -288,6 +300,7 @@ export default async function RunShiftReportPage({
     { data: tomorrowSchedules },
     { data: plans },
     { data: previousMail },
+    { data: authorRow },
   ] = await Promise.all([
     supabase.rpc("special_order_takers", { p_org_id: report.org_id }),
     // Supervisors and managers only, for page 1's picker — migration 080. The
@@ -386,7 +399,20 @@ export default async function RunShiftReportPage({
     // database without 107 answers with an error that is simply ignored (no
     // correction marking) instead of failing the whole report.
     supabase.from("shift_reports").select("previously_emailed_at").eq("id", id).maybeSingle(),
+    // WHOSE REPORT THIS IS, by name — for the screen to say so when it is not
+    // yours. `members_read` is any member, so a supervisor can read it.
+    supabase
+      .from("org_members")
+      .select("display_name")
+      .eq("org_id", report.org_id)
+      .eq("user_id", report.created_by)
+      .maybeSingle(),
   ]);
+
+  const authorName =
+    ((authorRow as { display_name: string | null } | null)?.display_name ?? "").trim() ||
+    "Whoever started it";
+  const viewerName = (session.membership.display_name ?? "").trim() || session.email;
 
   const nameById = new Map<string, string>(
     ((takers as { id: string; name: string }[] | null) ?? []).map((t) => [t.id, t.name])
@@ -689,6 +715,7 @@ export default async function RunShiftReportPage({
         roster={roster}
         positions={positions}
         editable={editable}
+        hiddenFrom={ratingsHidden ? authorName : null}
       />
     ),
     report: (
@@ -699,7 +726,14 @@ export default async function RunShiftReportPage({
         editable={editable}
       />
     ),
-    submit: <SubmitPage key="submit" outstanding={outstanding} blockers={blockers} />,
+    submit: (
+      <SubmitPage
+        key="submit"
+        outstanding={outstanding}
+        blockers={blockers}
+        sendableBy={!isSent && !editable ? authorName : null}
+      />
+    ),
   };
 
   if (wants("checklist")) {
@@ -953,6 +987,9 @@ export default async function RunShiftReportPage({
       premadePages={premadePages}
       openAtPage={Number.isFinite(openAt) ? openAt : null}
       blockers={blockers}
+      readOnlyNote={
+        !isSent && !editable ? { authorName, viewerName } : null
+      }
       // Sending FINISHES the checklist (Mark, 2026-09-01), so the runner needs
       // to know whether there is one and whether it is still open. Only the id
       // and the status: the confirm that used to stand between the two acts is
