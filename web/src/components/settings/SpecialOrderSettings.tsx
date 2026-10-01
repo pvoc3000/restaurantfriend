@@ -7,6 +7,7 @@ import { SquareItemSetting } from "./SquareItemSetting";
 
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import type { MessagesTab } from "@/lib/orgSettings";
 import { DEFAULT_FULFILLMENT_NOTES, DEFAULT_TEMPLATES } from "@/lib/specialOrderDocs";
 
 /**
@@ -119,12 +120,15 @@ const VAR_EXAMPLE: Record<string, string> = {
  */
 const TEMPLATES: {
   key: keyof typeof DEFAULT_TEMPLATES;
+  /** Which of the Messages tab's own tabs it sits on (`MessagesTab`). */
+  group: MessagesTab;
   label: string;
   when: string;
   vars: string[];
 }[] = [
   {
     key: "inquiry",
+    group: "orders",
     label: "Inquiry received",
     // Worth spelling out: this one is not just a courtesy. Its Message-ID
     // becomes the thread root every later message replies onto.
@@ -136,42 +140,49 @@ const TEMPLATES: {
   },
   {
     key: "quote",
+    group: "orders",
     label: "Quote",
     when: "Sent with the quote PDF. {approve_line} is the approval link, and only appears when there is one.",
     vars: ["number", "title", "title_suffix", "first_name", "full_name", "event_date", "event_time", "event_time_clause", "cutoff_clause", "location", "total", "employee_name", "fulfillment_note", "approve_line"],
   },
   {
     key: "customer_invoice",
+    group: "invoices",
     label: "Invoice",
     when: "Sent with an invoice — one order or several, like a wholesale week. {pay_line} is the pay link, and only appears when there is one.",
     vars: ["number", "first_name", "full_name", "total", "due_on", "orders", "pay_line", "employee_name"],
   },
   {
     key: "invoice_payment",
+    group: "invoices",
     label: "Payment received",
     when: "Sent automatically when a customer pays an invoice with its pay link.",
     vars: ["number", "first_name", "full_name", "amount", "method", "balance", "balance_line", "receipt_line", "employee_name"],
   },
   {
     key: "receipt",
+    group: "orders",
     label: "Receipt",
     when: "Sent with the receipt PDF, once an order is settled.",
     vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "paid", "employee_name", "fulfillment_note"],
   },
   {
     key: "delivery_quote",
+    group: "delivery",
     label: "Delivery quote request",
     when: "Sent to the delivery company from Request Quote on an order’s Delivery tab.",
     vars: ["delivery_company", "org", "event_date", "pickup_address", "boxes", "weight", "number", "delivery_address", "delivery_time", "delivery_window"],
   },
   {
     key: "delivery_request",
+    group: "delivery",
     label: "Delivery request",
     when: "Sent to the delivery company from Request delivery on an order’s Delivery tab, to book it.",
     vars: ["delivery_company", "org", "event_date", "pickup_address", "pickup_time", "pickup_phone", "boxes", "weight", "number", "delivery_address", "delivery_time", "delivery_window", "contact_name", "contact_phone", "customer_email", "notify_emails"],
   },
   {
     key: "order",
+    group: "internal",
     label: "Kitchen order",
     when: "Internal — the kitchen document, which carries no prices.",
     vars: ["number", "event_date"],
@@ -183,10 +194,13 @@ export function SpecialOrderSettings({
   settings,
   editable,
   section,
+  messagesTab = "orders",
 }: {
   orgId: string;
   settings: Settings;
   editable: boolean;
+  /** Which of the Messages tab's own tabs is showing. */
+  messagesTab?: MessagesTab;
   /**
    * Which of the org settings screen's tabs this is rendering for (Mark,
    * 2026-09-05, moved the same day): `messages` is every piece of WORDING a
@@ -225,6 +239,7 @@ export function SpecialOrderSettings({
 
   const text = (v: unknown) => (typeof v === "string" && v !== "" ? v : null);
   const num = (v: unknown) => (typeof v === "number" ? v : null);
+  const shown = TEMPLATES.filter((t) => t.group === messagesTab);
 
   return (
     <div className="space-y-16">
@@ -232,7 +247,7 @@ export function SpecialOrderSettings({
         <>
       {/* ---- the messages ------------------------------------------- */}
       <section className="space-y-6">
-        <SectionHeading count={TEMPLATES.length}>Messages we send</SectionHeading>
+        <SectionHeading count={shown.length}>Messages we send</SectionHeading>
         <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
           Each box holds the wording that will be sent.{" "}
           <strong>Clear one to go back to our default.</strong> Anything in
@@ -263,7 +278,7 @@ export function SpecialOrderSettings({
             fallback resolves again, and the default reappears — which is the
             honest answer, since a template with no words is not a thing that
             can be sent. */}
-        {TEMPLATES.map((t) => {
+        {shown.map((t) => {
           const fallback = DEFAULT_TEMPLATES[t.key];
           const configured = emails[t.key] ?? {};
           return (
@@ -360,6 +375,10 @@ export function SpecialOrderSettings({
           );
         })}
 
+        {/* ORDERS ONLY: the paragraph the quote and the receipt share, and
+            the Cc every customer paper carries. */}
+        {messagesTab === "orders" && (
+          <>
         {/* THE TWO PARAGRAPHS `{fulfillment_note}` CHOOSES BETWEEN. They sit
             with the messages rather than under "What the documents say"
             because they are message wording, and they are settings rather than
@@ -432,9 +451,12 @@ export function SpecialOrderSettings({
           <p className="text-[12px] text-subtle">
             Quotes, invoices and receipts staff send. Empty since 2026-09-24 —
             the sent copy is already in the specialorders@ mailbox, and the shop
-            is told separately when a customer acts (below).
+            is told separately when a customer acts (the Internal tab).
           </p>
         </div>
+
+          </>
+        )}
 
         {/* "Copy quote approvals to" (`approval_cc`) IS GONE (2026-09-24): the
             approval confirmation no longer Cc's the shop, which gets its own
@@ -447,6 +469,7 @@ export function SpecialOrderSettings({
             taken online (Square or QuickBooks). The key is still called
             `inquiry_notify`, from when it was only the first of the three.
             Empty really is nobody: none of them is sent. */}
+        {messagesTab === "internal" && (
         <div className="max-w-2xl space-y-1 border-t border-hairline pt-5">
           <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
             Tell us when a customer acts, at
@@ -465,6 +488,7 @@ export function SpecialOrderSettings({
             commas; leave empty for none.
           </p>
         </div>
+        )}
       </section>
       {/* ---- the public form ---------------------------------------- */}
       <section className="space-y-4">

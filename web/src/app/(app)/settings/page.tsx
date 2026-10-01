@@ -11,6 +11,10 @@ import { SectionNav } from "@/components/ui/SectionNav";
 import {
   SETTINGS_TABS,
   SETTINGS_TAB_LABEL,
+  MESSAGES_TABS,
+  MESSAGES_TAB_LABEL,
+  messagesTabHref,
+  parseMessagesTab,
   parseSettingsTab,
   settingsTabHref,
 } from "@/lib/orgSettings";
@@ -41,11 +45,13 @@ import {
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string | string[] }>;
+  searchParams: Promise<{ tab?: string | string[]; messages?: string | string[] }>;
 }) {
   const session = await getAppSession();
   if (!session) return null;
-  const tab = parseSettingsTab((await searchParams).tab);
+  const params = await searchParams;
+  const tab = parseSettingsTab(params.tab);
+  const messagesTab = parseMessagesTab(params.messages);
 
   const editable = canManageMembers(session.membership.role);
 
@@ -150,10 +156,28 @@ export default async function SettingsPage({
           )}
           {tab === "messages" && (
             <>
-              <SpecialOrderSettings orgId={orgId} settings={settings} editable={editable} section="messages" />
-              <div className="border-t border-hairline pt-8">
-                <ShiftReportSettings settings={settings} editable={editable} />
-              </div>
+              <SectionNav
+                orientation="horizontal"
+                ariaLabel="Which messages"
+                value={messagesTab}
+                items={MESSAGES_TABS.map((t) => ({
+                  key: t,
+                  label: MESSAGES_TAB_LABEL[t],
+                  href: messagesTabHref(t),
+                }))}
+              />
+              <SpecialOrderSettings
+                orgId={orgId}
+                settings={settings}
+                editable={editable}
+                section="messages"
+                messagesTab={messagesTab}
+              />
+              {messagesTab === "internal" && (
+                <div className="border-t border-hairline pt-8">
+                  <ShiftReportSettings settings={settings} editable={editable} />
+                </div>
+              )}
             </>
           )}
           {tab === "accounting" && (
