@@ -26,6 +26,7 @@ import {
   vendorTabHref,
 } from "@/lib/vendors";
 import { canEditPage } from "@/lib/pageAccess";
+import { loadInventoryItemOptions } from "@/lib/inventoryItemOptions";
 import { todayInTimeZone } from "@/lib/today";
 import {
   VendorPurchaseOrders,
@@ -96,6 +97,14 @@ export async function VendorDetail({
   const workingShop = session.activeLocation;
   const wantsOrders = tab === "purchase-orders" && Boolean(workingShop);
   const wantsInvoices = tab === "bills" && Boolean(workingShop);
+
+  // The Item column's picklist — the whole catalog, only on Items and only for
+  // someone who may edit. Started here so it rides alongside the wave below
+  // rather than adding a round trip after it.
+  const itemOptionsPromise =
+    wantsItems && canEditPage(session.membership.role, "/vendors")
+      ? loadInventoryItemOptions(supabase)
+      : Promise.resolve([]);
 
   // Every location's config is listed (not just the active one) — the vendor's
   // account number and minimum differ per shop, and seeing them together is the
@@ -351,6 +360,7 @@ export async function VendorDetail({
   const here = { href: `/vendors/${id}${queryString}`, label: v.name };
   // The Page Permissions sheet: staff and supervisors READ a vendor.
   const editable = canEditPage(session.membership.role, "/vendors");
+  const itemOptions = await itemOptionsPromise;
 
   // Built once and rendered twice — see the two navs below.
   const tabOptions = VENDOR_TABS.map((t) => ({
@@ -503,6 +513,7 @@ export async function VendorDetail({
                 <VendorItemsTable
                   vendorItems={itemsWithAge}
                   showItem
+                  itemOptions={itemOptions}
                   scroll
                   fillViewport
                   from={here}

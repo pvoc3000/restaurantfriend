@@ -33,22 +33,19 @@ export type ChosenItem = {
 /**
  * FIND AN INVENTORY ITEM AND HAND IT BACK. IT WRITES NOTHING.
  *
- * `InventoryItemPicker` is the same search wired to an UPDATE, and it cannot be
- * used where there is no row to update yet — a create dialog that had already
+ * The records and the vendor items table link an item with a `PickList` that
+ * writes on the pick (`lib/inventoryItemOptions`), and that cannot be used
+ * where there is no row to update yet — a create dialog that had already
  * written something by the time you pressed Cancel is a dialog that lies about
  * what Cancel means. That is `CustomerPicker`'s rule (a new customer is held as
  * a DRAFT and written in the same act as the order), and a purchase request is
  * the second place it comes up.
  *
- * So the two are deliberately separate rather than one component with a mode:
- * every line of the writing one is about the write — the row count that catches
- * a silently-refused update, the `router.refresh()`, the unlink door — and none
- * of it means anything here. What they share is the QUERY, and that shape
- * (word-AND `ilike`, active first, capped at 25) is small enough that the honest
- * place for it is each component rather than `lib/catalog`: that module is PURE
- * and is compiled into the Node fixture run, so importing the browser client
- * into it would drag `@supabase/ssr` along behind. `inventorySearchWords` — the
- * half that IS pure — already lives there and is shared.
+ * The search is server-side (word-AND `ilike`, active first, capped at 25),
+ * and lives here rather than in `lib/catalog`: that module is PURE and is
+ * compiled into the Node fixture run, so importing the browser client into it
+ * would drag `@supabase/ssr` along behind. `inventorySearchWords` — the half
+ * that IS pure — lives there.
  */
 export function InventoryItemChooser({
   value,

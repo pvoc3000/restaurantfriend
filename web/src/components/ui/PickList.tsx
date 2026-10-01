@@ -295,9 +295,10 @@ export function PickList({
   const ordered: PickOption[] = sinkInactive(listed, inactiveLabel);
 
   // EVERY WORD, IN ANY ORDER (Mark, 2026-10-01), so "flour bread" finds
-  // "Bread Flour" — `InventoryItemPicker`'s search rule, which this replaced on
-  // the vendor item record. A whole-phrase match was the one thing that list
-  // could do and this one couldn't.
+  // "Bread Flour" — the rule of the inventory item search this replaced on the
+  // vendor item and element records and the vendor items table. A
+  // whole-phrase match was the one thing that search could do and this
+  // couldn't.
   const q = term.trim().toLowerCase();
   const words = q.split(/\s+/).filter(Boolean);
   const shown = q

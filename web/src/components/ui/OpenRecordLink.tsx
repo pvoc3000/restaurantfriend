@@ -17,13 +17,31 @@ import Link from "next/link";
  * square-capped strokes — inside a target the field's own 36px tall, and it
  * fills grey on hover like every control you press.
  */
-export function OpenRecordLink({ href, label }: { href: string; label: string }) {
+export function OpenRecordLink({
+  href,
+  label,
+  placement = "outside",
+}: {
+  href: string;
+  label: string;
+  /**
+   * `outside` hangs past a `relative` wrapper's right edge — a detail record's
+   * field. `inline` is a flex sibling, 24px, for a TABLE cell (Mark,
+   * 2026-10-01, the vendor items grid's Item column), where outside would be
+   * on top of the next column.
+   */
+  placement?: "outside" | "inline";
+}) {
   return (
     <Link
       href={href}
       aria-label={label}
       title={label}
-      className="absolute left-full top-1/2 ml-1 grid h-9 w-8 -translate-y-1/2 place-items-center text-muted no-underline transition-colors hover:bg-neutral-100 hover:text-ink"
+      className={`grid shrink-0 place-items-center text-muted no-underline transition-colors hover:bg-neutral-100 hover:text-ink ${
+        placement === "outside"
+          ? "absolute left-full top-1/2 ml-1 h-9 w-8 -translate-y-1/2"
+          : "h-6 w-6"
+      }`}
     >
       <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden focusable="false">
         <path

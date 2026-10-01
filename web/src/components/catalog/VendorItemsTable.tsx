@@ -7,7 +7,8 @@ import { withFrom, type Crumb } from "@/lib/breadcrumbs";
 import type { StaleBucket } from "@/lib/lastOrdered";
 import { PACKAGE_DESC_OPTIONS } from "@/lib/units";
 import { InlineValue } from "./InlineValue";
-import { InventoryItemPicker } from "./InventoryItemPicker";
+import type { PickOption } from "@/components/ui/PickList";
+import { OpenRecordLink } from "@/components/ui/OpenRecordLink";
 import { ActiveToggle } from "./ActiveToggle";
 import { DataTable, type DataColumn } from "./DataTable";
 import { ListFilters, type ActiveFilter, type StaleFilter } from "./ListFilters";
@@ -48,6 +49,7 @@ export function VendorItemsTable({
   baseUnit,
   showVendor = false,
   showItem = false,
+  itemOptions = [],
   scroll = false,
   fillViewport = false,
   from,
@@ -60,6 +62,9 @@ export function VendorItemsTable({
   baseUnit?: string;
   showVendor?: boolean;
   showItem?: boolean;
+  /** Every inventory item, for the Item column's picklist — `showItem` with
+   *  `canEdit` only. Empty, the column is a link and nothing more. */
+  itemOptions?: PickOption[];
   /** Own scroll pane with a sticky header — for vendors with hundreds of items. */
   scroll?: boolean;
   /** With `scroll`: that pane ends at the foot of the window, however few rows
@@ -233,30 +238,50 @@ export function VendorItemsTable({
             // On the vendor's screen this column IS the row.
             pinned: true,
             sortValue: (vi: VendorItemWithItem) => vi.inventory_items?.name ?? null,
+            // An INLINE PICKLIST for an editor (Mark, 2026-10-01: "use the
+            // picklist in the vendor items table too, but the inline type"),
+            // where a linked row was a link and only "unlinked" opened a
+            // search dialog. The arrow inside the cell keeps the route to the
+            // item's record that the name used to be. Not clearable, like the
+            // vendor item record's: unlinking takes the row off the guide.
             render: (vi: VendorItemWithItem) =>
-              vi.inventory_items ? (
+              canEdit && itemOptions.length > 0 ? (
+                <span className="flex min-w-0 items-center gap-1">
+                  <span className="min-w-0 flex-1">
+                    <InlineValue
+                      kind="pick"
+                      table="vendor_items"
+                      id={vi.id}
+                      column="inventory_item_id"
+                      ariaLabel="Inventory item"
+                      value={vi.inventory_items?.id ?? null}
+                      placeholder="unlinked"
+                      // Red, as the dead text was — the 71 rows that need a
+                      // link should still stand out. IMPORTANT (`!`) because
+                      // PickList greys an empty face with `text-faint` on the
+                      // same element, and two colour utilities resolve by
+                      // stylesheet order, not by which one the caller passed.
+                      className={vi.inventory_items ? "" : "text-accent!"}
+                      options={itemOptions}
+                      nullable={false}
+                      activateTable="inventory_items"
+                    />
+                  </span>
+                  {vi.inventory_items && (
+                    <OpenRecordLink
+                      placement="inline"
+                      href={link(`/items/${vi.inventory_items.id}`)}
+                      label="Open the inventory item"
+                    />
+                  )}
+                </span>
+              ) : vi.inventory_items ? (
                 <Link
                   href={link(`/items/${vi.inventory_items.id}`)}
                   className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
                 >
                   {vi.inventory_items.name}
                 </Link>
-              ) : canEdit ? (
-                // "unlinked" IS the control (Mark, 2026-08-24: "clicking
-                // unlinked should pop up a list of inventory items"). It was
-                // dead text, and the picker that fixes it lived only on the
-                // vendor item's own detail screen — which nothing on this page
-                // links to, and which an unlinked row cannot reach through the
-                // order guide either, the guide being built from inventory
-                // items. So the 71 rows that need linking were the exact rows
-                // with no route to the thing that links them.
-                <span className="text-accent">
-                  <InventoryItemPicker
-                    rowId={vi.id}
-                    currentItemId={null}
-                    trigger="unlinked"
-                  />
-                </span>
               ) : (
                 <span className="text-accent">unlinked</span>
               ),
@@ -464,18 +489,6 @@ export function VendorItemsTable({
             // `link` carries the crumb, so the record comes back here rather
             // than to a bare list.
             openHref={link(`/vendor-items/${vi.id}`)}
-            // Only where the column that shows the link is on screen. On the
-            // ITEM's own screen every row is that item by definition, so
-            // re-pointing one from here would be a way to make a row vanish
-            // off the table you are looking at.
-            inventoryItem={
-              showItem
-                ? {
-                    id: vi.inventory_items?.id ?? null,
-                    name: vi.inventory_items?.name ?? null,
-                  }
-                : undefined
-            }
           />
         </span>
       ),

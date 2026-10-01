@@ -210,8 +210,8 @@ export function VendorItemFields({
         {/* A PICKLIST (Mark, 2026-10-01: "just use a picklist in place of the
             inventory item field"), where a Change button used to grow a search
             box and its results underneath. Picking writes the one column, the
-            same act `InventoryItemPicker` performs on the table and in the ⋯
-            menu. NOT clearable: unlinking takes the row off the order guide,
+            same picklist the vendor items table's Item column wears. NOT
+            clearable: unlinking takes the row off the order guide,
             and nothing asked for that door here. An inactive item revives on
             the way in, `PickList`'s rule. The arrow beyond the field's right edge
             keeps the walk to the item's record, which the name used to be the
