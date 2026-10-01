@@ -251,6 +251,41 @@ export function OrderDelivery({
           </section>
 
           <section className="space-y-3">
+            <SectionHeading>What goes out</SectionHeading>
+            <p className="max-w-[80ch] text-[13px] text-muted">
+              Boxes and weight print on the kitchen document, so whoever packs
+              it knows what the carrier is expecting.
+            </p>
+            <div className={GRID}>
+              <Row label="Boxes" first>
+                <Cell id={id} canWrite={canWrite} column="delivery_boxes" value={row.delivery_boxes as number | null}
+                      kind="number" label="Number of boxes" />
+              </Row>
+              <Row label="Weight (lbs)">
+                <Cell id={id} canWrite={canWrite} column="delivery_weight_lbs" value={row.delivery_weight_lbs as number | null}
+                      kind="number" label="Weight in pounds" />
+              </Row>
+              <Row label="What it costs us" first>
+                {/* `delivery_cost` is what the CARRIER charges; the customer's
+                    `delivery_charge` is beside it. Two columns because they
+                    routinely differ, and conflating them is how a delivery
+                    quietly stops making sense. */}
+                <Cell id={id} canWrite={canWrite} column="delivery_cost" value={row.delivery_cost as number | null}
+                      kind="number" label="What the carrier charges us" />
+              </Row>
+              {/* THE SAME COLUMN THE PAYMENTS TAB'S MONEY CARD WRITES (Mark,
+                  2026-09-29: "so we can enter it there as well as on the
+                  billing page"). Beside the cost, because what the carrier
+                  charges is what you are looking at when you set it. Both
+                  cells read the record, so an edit in one shows in the other. */}
+              <Row label="Delivery charge">
+                <Cell id={id} canWrite={canWrite} column="delivery_charge" value={row.delivery_charge as number | null}
+                      kind="number" label="Delivery charge" format={(v) => money(Number(v))} />
+              </Row>
+            </div>
+          </section>
+
+          <section className="space-y-3">
             <SectionHeading>Who carries it</SectionHeading>
             <div className={GRID}>
               <Row label="Company" first>
@@ -294,41 +329,6 @@ export function OrderDelivery({
               <Row label="Scheduled">
                 <Cell id={id} canWrite={canWrite} column="delivery_scheduled_at" value={row.delivery_scheduled_at as string | null}
                       kind="date" label="Delivery scheduled" />
-              </Row>
-            </div>
-          </section>
-
-          <section className="space-y-3">
-            <SectionHeading>What goes out</SectionHeading>
-            <p className="max-w-[80ch] text-[13px] text-muted">
-              Boxes and weight print on the kitchen document, so whoever packs
-              it knows what the carrier is expecting.
-            </p>
-            <div className={GRID}>
-              <Row label="Boxes" first>
-                <Cell id={id} canWrite={canWrite} column="delivery_boxes" value={row.delivery_boxes as number | null}
-                      kind="number" label="Number of boxes" />
-              </Row>
-              <Row label="Weight (lbs)">
-                <Cell id={id} canWrite={canWrite} column="delivery_weight_lbs" value={row.delivery_weight_lbs as number | null}
-                      kind="number" label="Weight in pounds" />
-              </Row>
-              <Row label="What it costs us" first>
-                {/* `delivery_cost` is what the CARRIER charges; the customer's
-                    `delivery_charge` is beside it. Two columns because they
-                    routinely differ, and conflating them is how a delivery
-                    quietly stops making sense. */}
-                <Cell id={id} canWrite={canWrite} column="delivery_cost" value={row.delivery_cost as number | null}
-                      kind="number" label="What the carrier charges us" />
-              </Row>
-              {/* THE SAME COLUMN THE PAYMENTS TAB'S MONEY CARD WRITES (Mark,
-                  2026-09-29: "so we can enter it there as well as on the
-                  billing page"). Beside the cost, because what the carrier
-                  charges is what you are looking at when you set it. Both
-                  cells read the record, so an edit in one shows in the other. */}
-              <Row label="Delivery charge">
-                <Cell id={id} canWrite={canWrite} column="delivery_charge" value={row.delivery_charge as number | null}
-                      kind="number" label="Delivery charge" format={(v) => money(Number(v))} />
               </Row>
             </div>
           </section>
