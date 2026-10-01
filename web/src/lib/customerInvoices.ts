@@ -55,9 +55,10 @@ export type InvoiceProcessor = "square" | "quickbooks";
  */
 export const DEFAULT_PROCESSOR: InvoiceProcessor = "quickbooks";
 
+/** QuickBooks first, the default (Mark, 2026-10-01). */
 export const PROCESSOR_OPTIONS: { value: InvoiceProcessor; label: string }[] = [
-  { value: "square", label: "Square" },
   { value: "quickbooks", label: "QuickBooks" },
+  { value: "square", label: "Square" },
 ];
 
 export const PROCESSOR_LABEL: Record<InvoiceProcessor, string> = {
