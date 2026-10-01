@@ -10,7 +10,7 @@ import { PACKAGE_DESC_OPTIONS, UNIT_PICK_OPTIONS } from "@/lib/units";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
-import { InventoryItemPicker } from "./InventoryItemPicker";
+import type { PickOption } from "@/components/ui/PickList";
 
 export type VendorItemRecord = {
   id: string;
@@ -105,11 +105,15 @@ export function VendorItemFields({
   vi,
   here,
   editable,
+  itemOptions,
 }: {
   vi: VendorItemRecord;
   here: Crumb;
   /** The Page Permissions sheet's cell for /vendor-items. */
   editable: boolean;
+  /** Every inventory item, for the Inventory item picklist. Empty when the
+   *  screen is read-only — a reader gets the link, not a list. */
+  itemOptions: PickOption[];
 }) {
   const unit = vi.inventory_items?.base_unit ?? "unit";
   const title = vendorItemTitle(vi, vi.inventory_items?.name, unit);
@@ -202,8 +206,41 @@ export function VendorItemFields({
         </dd>
 
         <dt className="text-subtle">Inventory item</dt>
-        <dd className="flex min-h-9 flex-wrap items-center gap-2">
-          {vi.inventory_items ? (
+        {/* A PICKLIST (Mark, 2026-10-01: "just use a picklist in place of the
+            inventory item field"), where a Change button used to grow a search
+            box and its results underneath. Picking writes the one column, the
+            same act `InventoryItemPicker` performs on the table and in the ⋯
+            menu. NOT clearable: unlinking takes the row off the order guide,
+            and nothing asked for that door here. An inactive item revives on
+            the way in, `PickList`'s rule. "Open" keeps the walk to the item's
+            record, which the name used to be the link for. */}
+        <dd className="flex min-h-9 items-center gap-2">
+          {editable ? (
+            <>
+              <span className="min-w-0 flex-1">
+                <InlineValue
+                  kind="pick"
+                  boxed={BOXED_FIELDS}
+                  table="vendor_items"
+                  id={vi.id}
+                  column="inventory_item_id"
+                  ariaLabel="Inventory item"
+                  value={vi.inventory_items?.id ?? null}
+                  options={itemOptions}
+                  nullable={false}
+                  activateTable="inventory_items"
+                />
+              </span>
+              {vi.inventory_items && (
+                <Link
+                  href={withFrom(`/items/${vi.inventory_items.id}`, here)}
+                  className="shrink-0 text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+                >
+                  Open
+                </Link>
+              )}
+            </>
+          ) : vi.inventory_items ? (
             <Link
               href={withFrom(`/items/${vi.inventory_items.id}`, here)}
               className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
@@ -213,11 +250,6 @@ export function VendorItemFields({
           ) : (
             <span className="text-accent">unlinked</span>
           )}
-          <InventoryItemPicker
-            table="vendor_items"
-            rowId={vi.id}
-            currentItemId={vi.inventory_items?.id ?? null}
-          />
         </dd>
 
         {/* The vendor's own words for the product — what they'd match against

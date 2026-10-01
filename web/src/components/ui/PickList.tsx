@@ -294,11 +294,17 @@ export function PickList({
   // and its reasons live in `sinkInactive`, beside the heading it produces.
   const ordered: PickOption[] = sinkInactive(listed, inactiveLabel);
 
+  // EVERY WORD, IN ANY ORDER (Mark, 2026-10-01), so "flour bread" finds
+  // "Bread Flour" — `InventoryItemPicker`'s search rule, which this replaced on
+  // the vendor item record. A whole-phrase match was the one thing that list
+  // could do and this one couldn't.
   const q = term.trim().toLowerCase();
+  const words = q.split(/\s+/).filter(Boolean);
   const shown = q
-    ? ordered.filter((o) =>
-        `${o.label} ${o.hint ?? ""} ${o.value}`.toLowerCase().includes(q)
-      )
+    ? ordered.filter((o) => {
+        const hay = `${o.label} ${o.hint ?? ""} ${o.value}`.toLowerCase();
+        return words.every((w) => hay.includes(w));
+      })
     : ordered;
   const exact = shown.some((o) => o.label.toLowerCase() === q);
   const offerNew = allowNew && q !== "" && !exact;
