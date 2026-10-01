@@ -15,6 +15,7 @@ import {
   invoiceLinesFor,
   readInvoiceTerms,
   sendIntent,
+  DEFAULT_PROCESSOR,
   PROCESSOR_OPTIONS,
   type InvoiceCandidate,
   type InvoiceProcessor,
@@ -61,7 +62,7 @@ export function CreateInvoiceDialog({
   const supabase = createClient();
   const router = useRouter();
   const [due, setDue] = useState<string | null>(null);
-  const [processor, setProcessor] = useState<InvoiceProcessor>("square");
+  const [processor, setProcessor] = useState<InvoiceProcessor>(DEFAULT_PROCESSOR);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

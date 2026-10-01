@@ -42,8 +42,18 @@ export type CustomerInvoice = {
   external_ref?: Record<string, unknown> | null;
 };
 
-/** Square (the pay link, the default) or QuickBooks Payments (131). */
+/** Square (the pay link) or QuickBooks Payments (131). */
 export type InvoiceProcessor = "square" | "quickbooks";
+
+/**
+ * WHAT A NEW INVOICE COLLECTS THROUGH unless somebody picks the other (Mark,
+ * 2026-10-01: "make paying through quickbooks the default option on special
+ * orders and invoices"). Square until then. Both create dialogs — an order's
+ * Create Invoice… and the invoices list's New invoice — start here, so they
+ * cannot disagree. It is only the dialog's starting value; the choice is still
+ * offered every time, and an existing invoice keeps what it has.
+ */
+export const DEFAULT_PROCESSOR: InvoiceProcessor = "quickbooks";
 
 export const PROCESSOR_OPTIONS: { value: InvoiceProcessor; label: string }[] = [
   { value: "square", label: "Square" },

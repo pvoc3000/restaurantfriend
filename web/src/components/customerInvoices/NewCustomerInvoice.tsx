@@ -10,7 +10,7 @@ import { DateField } from "@/components/ui/DateField";
 import { Radio } from "@/components/ui/Radio";
 import { CustomerPicker, type CustomerChoice } from "@/components/specialOrders/CustomerPicker";
 import { draftIsUsable, draftToRow } from "@/lib/customerSearch";
-import { addDays, PROCESSOR_OPTIONS, type InvoiceProcessor } from "@/lib/customerInvoices";
+import { addDays, DEFAULT_PROCESSOR, PROCESSOR_OPTIONS, type InvoiceProcessor } from "@/lib/customerInvoices";
 
 /**
  * NEW INVOICE… (Mark, 2026-09-27: "I would like to be able to create invoices
@@ -41,7 +41,7 @@ export function NewCustomerInvoice({
   const [customer, setCustomer] = useState<CustomerChoice>(null);
   const [shop, setShop] = useState<string>(shops[0]?.id ?? "");
   const [due, setDue] = useState<string | null>(addDays(today, termsDays));
-  const [processor, setProcessor] = useState<InvoiceProcessor>("square");
+  const [processor, setProcessor] = useState<InvoiceProcessor>(DEFAULT_PROCESSOR);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
