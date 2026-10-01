@@ -194,8 +194,8 @@ const DATE_IMPLIES: Partial<
   // which is why it clears 'Print Order' and not 'Adjust time to 9am or later'.
   // Offering to do what the database has already done is a dialog that changes
   // nothing, and on a stale client it offers it about a value that is gone.
-  // WHICHEVER HALF OF THE SIXTH RUNG IS STILL MISSING. `suggestedTodo` already
-  // sequences Print Order before Schedule Production, and scheduling is now a
+  // WHICHEVER HALF OF THE SIXTH RUNG IS STILL MISSING. The to-dos already
+  // sequence Print Order before Schedule Production, and scheduling is now a
   // COMMAND rather than only a date somebody types — so the order can reach this
   // rung from either side, and the offer has to know which. Printed already:
   // the ladder is done and the next thing is the receipt.

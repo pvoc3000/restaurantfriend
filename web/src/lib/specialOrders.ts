@@ -333,9 +333,9 @@ export const FLAG_TODO = "Resolve Issue";
  * order from outside — a new inquiry, a customer approving a quote — and it
  * clears itself the moment anyone here touches the record.
  *
- * Only the two places where the difference CHANGES AN ANSWER ask: the to-do
- * suggestion (news is not an issue to resolve) and production readiness (news
- * is not a reason to hold a schedule). Everything that just wants "does this
+ * Only the place where the difference CHANGES AN ANSWER asks: production
+ * readiness (news is not a reason to hold a schedule). The derived to-do
+ * suggestion asked too, until it was removed on 2026-09-30. Everything that just wants "does this
  * row want a human" — `needsAttention`, the red row, the progress tone, the
  * start page's ordering — reads `flag_reason` and is right to, because both
  * kinds mean exactly that.
@@ -848,22 +848,14 @@ export function needsAttention(
 }
 
 /**
- * The quiet hint beside the to-do cell — "invoice paid and unprinted, Print
- * Order?".
- *
- * Decision 4: **the app may suggest and must never write.** The manual `todo`
- * always overrides this on display, which is why the caller shows one or the
- * other rather than both.
- */
-/**
  * THE TO-DO A PAID ORDER GETS (Mark, 2026-09-22): "if the order is set for
  * delivery, when it's paid in full, the to do should be set to 'schedule
  * delivery'". A delivery order whose courier is not booked yet books it first;
  * everything else — and a delivery already booked — goes to the printer.
  *
  * One function, because three places say it and must agree: the offer after a
- * hand-recorded payment (`lib/orderWorkflow`), the derived suggestion below,
- * and migration 122's pay-link payment, which is the SQL copy of this rule.
+ * hand-recorded payment (`lib/orderWorkflow`) and migration 122's pay-link
+ * payment, which is the SQL copy of this rule.
  */
 export function paidTodo(order: {
   fulfillment?: string | null;
@@ -872,67 +864,6 @@ export function paidTodo(order: {
   return order.fulfillment === "delivery" && !order.delivery_scheduled_at
     ? "Schedule Delivery"
     : "Print Order";
-}
-
-export function suggestedTodo(
-  order: AttentionOrder,
-  /** Today in the org's timezone. Optional: without it the two "chase them"
-   *  suggestions simply never fire, which is the quiet answer, not a wrong one. */
-  today?: string
-): string | null {
-  if (order.kind !== "order" || order.status === "cancelled") return null;
-  // A PERSON'S FLAG NAMES A PROBLEM, so resolving it IS the next action.
-  // A SYSTEM flag (116) does not: "Quote approved online by Jane Doe" is news,
-  // and the next action is the one the ladder was already going to suggest —
-  // send the invoice. Answering "Resolve Issue" to good news is what made the
-  // flag feel like a chore rather than a notice.
-  if (isPersonFlag(order)) return FLAG_TODO;
-
-  /**
-   * EACH CASE ASKS WHETHER ITS OWN DOCUMENT HAS GONE OUT (Mark, 2026-08-20,
-   * with two orders that proved it). The old version only ever looked at the
-   * NEXT stage's date, so it could not tell "not sent yet" from "sent and
-   * unanswered" and suggested the send either way:
-   *
-   *   · 9863 — status `invoice`, invoiced on the 6th, unpaid. It suggested
-   *     "Send Invoice" for an invoice that had gone out sixteen days earlier.
-   *   · 9882 — status `quote`, quoted on the 12th, unreturned. It suggested
-   *     "Respond to Email/Call", which is what you do for a LEAD that has
-   *     written in, not for a quote sitting with a customer.
-   *
-   * WHEN THE BALL IS IN THEIR COURT THE SUGGESTION IS NOTHING, until it is
-   * genuinely late. There is no action for us while a fresh quote is out, and a
-   * to-do suggested on every such row is the noise that teaches people to
-   * ignore the column. The strip says "waiting on them" in yellow meanwhile,
-   * which is the honest state.
-   */
-  const late = today ? order.event_date !== null && order.event_date < today : false;
-
-  switch (order.status) {
-    case "lead":
-      // A quote already out is their move; it is not yet an invoice.
-      return order.quote_sent_at ? null : "Send Quote";
-    case "quote":
-      if (order.quote_returned_at) return "Send Invoice";
-      if (!order.quote_sent_at) return "Send Quote";
-      return null; // Out, unanswered — theirs.
-    case "invoice":
-      if (order.invoice_paid_at) return paidTodo(order);
-      if (!order.invoice_sent_at) return "Send Invoice";
-      // FileMaker's own word for an invoice that has gone out and not come
-      // back. Only once the event has passed — before that it is simply
-      // outstanding.
-      return late ? "Invoice Overdue!" : null;
-    case "order":
-      // A delivery waiting on its courier books that before printing; once
-      // `delivery_scheduled_at` is set, `paidTodo` answers Print Order.
-      if (!order.order_printed_at) return paidTodo(order);
-      if (!order.order_scheduled_at) return "Schedule Production";
-      if (!order.receipt_sent_at) return "Send Receipt";
-      return null;
-    default:
-      return null;
-  }
 }
 
 /* ==========================================================================

@@ -46,7 +46,6 @@ import {
   suggestedRushFee,
   topUpWindow,
   isPersonFlag,
-  suggestedTodo,
   type AttentionOrder,
   type MoneyOrder,
   unschedulableLines,
@@ -426,103 +425,6 @@ test("thresholds are configuration", () => {
   );
 });
 
-/* ==========================================================================
- * THE SUGGESTED TO-DO
- * ========================================================================== */
-
-/* -- the suggestion asks whether ITS OWN document has gone out ------------ */
-
-test("a quote that is out and unanswered suggests NOTHING", () => {
-  // Order 9882 verbatim — status `quote`, quoted on the 12th for the 22nd. It
-  // used to suggest "Respond to Email/Call", which is what you do for a LEAD
-  // that has written in, not for a quote sitting with a customer. There is no
-  // action for us while the ball is in their court, and a to-do on every such
-  // row is the noise that teaches people to ignore the column.
-  eq(
-    suggestedTodo(
-      order({ status: "quote", quote_sent_at: "2026-08-12", event_date: "2026-08-22" }),
-      "2026-08-20"
-    ),
-    null
-  );
-});
-
-test("an invoice that is out and unpaid suggests NOTHING until the event passes", () => {
-  // Order 9863 verbatim — invoiced on the 6th for the 22nd, and it suggested
-  // "Send Invoice" for an invoice that had gone out sixteen days earlier.
-  const o = {
-    status: "invoice" as const,
-    quote_sent_at: "2026-08-06",
-    quote_returned_at: "2026-08-06",
-    invoice_sent_at: "2026-08-06",
-  };
-  eq(suggestedTodo(order({ ...o, event_date: "2026-08-22" }), "2026-08-20"), null);
-  // …and once it has, FileMaker's own word for it.
-  eq(suggestedTodo(order({ ...o, event_date: "2026-08-18" }), "2026-08-20"), "Invoice Overdue!");
-});
-
-test("the send is still suggested when the document has NOT gone out", () => {
-  eq(suggestedTodo(order({ status: "quote", event_date: "2026-08-22" }), "2026-08-20"), "Send Quote");
-  eq(
-    suggestedTodo(
-      order({ status: "invoice", quote_returned_at: "a", event_date: "2026-08-22" }),
-      "2026-08-20"
-    ),
-    "Send Invoice"
-  );
-});
-
-test("a lead with a quote already out is their move, not an invoice", () => {
-  // It used to answer "Send Invoice" — you do not invoice a quote nobody has
-  // agreed to.
-  eq(suggestedTodo(order({ status: "lead", quote_sent_at: "2026-08-12" }), "2026-08-20"), null);
-});
-
-test("without a date the chase never fires, which is quiet rather than wrong", () => {
-  eq(
-    suggestedTodo(order({ status: "invoice", invoice_sent_at: "a", event_date: "2020-01-01" })),
-    null
-  );
-});
-
-test("suggestedTodo: a delivery books its courier before it is printed (2026-09-22)", () => {
-  eq(suggestedTodo(order({ status: "invoice", invoice_paid_at: "2026-08-01", fulfillment: "delivery" })), "Schedule Delivery");
-  eq(suggestedTodo(order({ status: "order", fulfillment: "delivery" })), "Schedule Delivery");
-  eq(
-    suggestedTodo(order({ status: "order", fulfillment: "delivery", delivery_scheduled_at: "2026-08-01" })),
-    "Print Order",
-    "booked → the printer is next"
-  );
-  eq(
-    suggestedTodo(order({ status: "order", fulfillment: "delivery", order_printed_at: "2026-08-01" })),
-    "Schedule Production",
-    "an order already printed is not sent back for its courier"
-  );
-  eq(suggestedTodo(order({ status: "order", fulfillment: "pickup" })), "Print Order");
-});
-
-test("suggestedTodo walks the ladder", () => {
-  eq(suggestedTodo(order({ status: "lead" })), "Send Quote");
-  eq(suggestedTodo(order({ status: "quote", quote_returned_at: "2026-08-01" })), "Send Invoice");
-  eq(suggestedTodo(order({ status: "invoice", invoice_paid_at: "2026-08-01" })), "Print Order");
-  eq(suggestedTodo(order({ status: "order", order_printed_at: "2026-08-01" })), "Schedule Production");
-  eq(
-    suggestedTodo(order({ status: "order", order_printed_at: "2026-08-01", order_scheduled_at: "2026-08-01" })),
-    "Send Receipt"
-  );
-  eq(
-    suggestedTodo(
-      order({
-        status: "order",
-        order_printed_at: "2026-08-01",
-        order_scheduled_at: "2026-08-01",
-        receipt_sent_at: "2026-08-02",
-      })
-    ),
-    null
-  );
-});
-
 test("a rush RATE resolves to the greater of the percentage and the floor", () => {
   // Mark's rule, 2026-09-22: "either the user facing percentage (i.e. 35%), or
   // $25, whichever is greater". Terms: 35% with a $25 minimum.
@@ -566,34 +468,6 @@ test("the rush rate reaches the TOTAL, and is not taxed", () => {
   eq(t.rushFee, 35);
   eq(t.tax, 10, "tax is on the goods alone — delivery and rush are services");
   eq(t.total, 145);
-});
-
-test("a flagged order's suggestion is Resolve Issue", () => {
-  eq(suggestedTodo(order({ flag_reason: "wrong date" })), "Resolve Issue");
-  // Absent `flag_source` reads as a person's flag, which is what keeps every
-  // caller that has not been taught to select it on pre-116 behaviour.
-  eq(suggestedTodo(order({ flag_reason: "wrong date", flag_source: "person" })), "Resolve Issue");
-});
-
-test("a SYSTEM flag is news, so the ladder keeps suggesting (116)", () => {
-  // "Resolve Issue" over "Quote approved online by Jane Doe" calls good news a
-  // problem. The suggestion is the step that news unlocks.
-  eq(
-    suggestedTodo(
-      order({
-        status: "quote",
-        quote_returned_at: "2026-08-01",
-        flag_reason: "Quote approved online by Jane Doe",
-        flag_source: "system",
-      })
-    ),
-    "Send Invoice"
-  );
-  // A new inquiry, likewise: still a lead with no quote out.
-  eq(
-    suggestedTodo(order({ status: "lead", flag_reason: "New Inquiry", flag_source: "system" })),
-    "Send Quote"
-  );
 });
 
 test("isPersonFlag: the two columns, and what absent means", () => {

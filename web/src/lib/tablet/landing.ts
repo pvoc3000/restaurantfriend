@@ -87,8 +87,8 @@ export const LANDING_GROUPS: readonly TileGroup[] = [
     ],
   },
   {
-    // "Selling" since 2026-09-29, with the menu.
-    label: "Selling",
+    // "Sales" since 2026-09-30, with the menu ("Selling" from 2026-09-29).
+    label: "Sales",
     tiles: [{ key: "special_orders", label: "View Orders", href: "/special-orders" }],
   },
 ];

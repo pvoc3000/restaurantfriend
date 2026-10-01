@@ -295,8 +295,8 @@ export function ordersForKitchen<
  * exactly one was a committed order. So the rung the module already calls
  * "paid — printing and scheduling remain" is the rung he schedules at, and
  * offering a quote would ask a kitchen to make donuts nobody has agreed to buy.
- * It is also the app's own sequencing: `suggestedTodo` at `order` runs Print
- * Order, then Schedule Production, then Send Receipt.
+ * It is also the app's own sequencing: at `order` the to-dos run Print Order,
+ * then Schedule Production, then Send Receipt.
  *
  * A FLAGGED order is offered but NOT TICKED, with its flag as the reason —
  * migration 013's dialog does exactly this for a vendor under its minimum

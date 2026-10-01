@@ -876,8 +876,8 @@ export function SpecialOrdersList({
       /**
        * ONLY A REAL TO-DO (Mark, 2026-09-30: "remove any suggested to dos in
        * the to-do column and only display real to dos. the suggested ones just
-       * clutter the screen"). The grey "Print Order?" hints `suggestedTodo`
-       * derived for every untouched row are gone; the column prints the
+       * clutter the screen"). The grey "Print Order?" hints the app
+       * derived for every untouched row are gone, and so is the function; the column prints the
        * `todo` somebody set, or a dash.
        *
        * THE DERIVED ATTENTION SENTENCE IS NOT PRINTED HERE (Mark, 2026-08-20:

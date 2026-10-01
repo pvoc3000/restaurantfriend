@@ -5245,5 +5245,6 @@ scheduled is not "complete"; "the suggested ones just clutter the screen".)
 `delivery_scheduled_at` that has climbed to paid draws 3 of 4 steps and stays
 yellow, and its tooltip adds "☐ Delivery scheduled". It is a hold, not a rung,
 so pickups' bars do not move. The To-do column no longer renders
-`suggestedTodo`; the function is kept (fixture-tested, and its rules mirror
-`paidTodo`) but nothing on screen calls it now.
+`suggestedTodo`, and the function and its fixtures were then deleted (Mark,
+same day). `paidTodo` stays: the payment offer and migration 122 use it. The
+menu section "Selling" was renamed "Sales" the same day.
