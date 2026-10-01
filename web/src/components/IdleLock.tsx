@@ -7,8 +7,11 @@ import {
   IDLE_MS,
   RESUME_KEY,
   SIGNED_IN_KEY,
+  deviceLastActivity,
   idleExpired,
+  readActivity,
   readSignedInUser,
+  recordActivity,
   recordSignedInUser,
   serializeResume,
   tabIsStale,
@@ -41,16 +44,28 @@ import {
  * the current person's home, or the lock screen if nobody is signed in. Without
  * this, a shift report left open in a second tab rendered as Karina's view of
  * Abigail's report, which looked empty because Karina cannot read its ratings.
+ *
+ * AND THE IDLE CLOCK IS THE DEVICE'S, not the tab's (2026-10-01). Every touch is
+ * also recorded in localStorage (`ACTIVE_KEY`), and a tab locks only when the
+ * later of its own touch and that one is five minutes old. Before this, a tab
+ * forgotten in the background could lock the iPad while somebody was working in
+ * another tab, and since the lock signs out the shared session, that was
+ * everybody's lock.
  */
 export function IdleLock({ userId }: { userId: string }) {
   useEffect(() => {
     let last = Date.now();
     let locking = false;
     recordSignedInUser(userId);
+    recordActivity(last);
 
+    // The same one-a-second throttle now covers the storage write, too.
     const touch = () => {
       const now = Date.now();
-      if (now - last >= 1000) last = now;
+      if (now - last >= 1000) {
+        last = now;
+        recordActivity(now);
+      }
     };
 
     /** Another tab changed who is signed in — this page is not theirs. */
@@ -64,7 +79,7 @@ export function IdleLock({ userId }: { userId: string }) {
     const check = () => {
       if (locking) return;
       if (leaveIfStale()) return;
-      if (idleExpired(last, Date.now())) {
+      if (idleExpired(deviceLastActivity(last, readActivity()), Date.now())) {
         locking = true;
         recordSignedInUser("");
         try {

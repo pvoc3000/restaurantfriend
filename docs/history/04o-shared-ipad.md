@@ -88,7 +88,10 @@ checks (for a background tab that was suspended). An unknown value (null:
 storage blocked or never written) never makes a tab leave. Consequence: locking
 one tab sends the others to the lock screen too. Not walked live: needs the
 registered iPad and two PINs.
-**KNOWN, NOT FIXED:** the idle clock is still per tab, so a forgotten
-background tab can idle-lock the device while somebody works in another one.
-That is older than this change, because `lockDevice` always signed out the
-shared cookie.
+**THE IDLE CLOCK IS THE DEVICE'S (Mark, same day).** It was per tab, so a
+forgotten background tab could idle-lock the iPad while somebody worked in
+another one. Every touch is now also written to `ACTIVE_KEY`
+(`rf.device.active`, localStorage), still at most once a second, and a tab locks
+only when `deviceLastActivity` (the later of its own touch and the recorded
+one, fixtures) is five minutes old. Unreadable storage falls back to the tab's
+own clock, which was the old behaviour.

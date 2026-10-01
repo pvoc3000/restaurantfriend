@@ -198,3 +198,40 @@ export function readSignedInUser(): string | null {
     return null;
   }
 }
+
+/**
+ * THE DEVICE'S LAST TOUCH, shared by its tabs (2026-10-01). Each tab used to
+ * keep its own idle clock, so a tab left in the background timed out and
+ * locked the iPad while somebody was working in another one. The lock signs
+ * out the one shared session, so it was never a per-tab act. Now every tab
+ * records each touch here, and a tab locks only when the DEVICE has been idle.
+ */
+export const ACTIVE_KEY = "rf.device.active";
+
+/**
+ * The later of this tab's own last touch and the device's recorded one.
+ * Anything unreadable counts as nothing recorded, so the tab falls back to its
+ * own clock, which is how it behaved before the clock was shared.
+ */
+export function deviceLastActivity(ownMs: number, stored: string | null): number {
+  const shared = stored === null || stored.trim() === "" ? NaN : Number(stored);
+  return Number.isFinite(shared) && shared > ownMs ? shared : ownMs;
+}
+
+/** Record a touch for every tab. Never throws. */
+export function recordActivity(atMs: number): void {
+  try {
+    localStorage.setItem(ACTIVE_KEY, String(atMs));
+  } catch {
+    // Blocked storage: each tab keeps its own clock, as before.
+  }
+}
+
+/** The recorded touch, raw, or null. Never throws. */
+export function readActivity(): string | null {
+  try {
+    return localStorage.getItem(ACTIVE_KEY);
+  } catch {
+    return null;
+  }
+}

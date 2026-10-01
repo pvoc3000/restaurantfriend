@@ -5,6 +5,7 @@
 
 import {
   IDLE_MS,
+  deviceLastActivity,
   LOCKOUT,
   idleExpired,
   isValidPin,
@@ -149,4 +150,19 @@ test("tabIsStale: a tab leaves only when somebody else, or nobody, is recorded",
   ok(tabIsStale(ID, OTHER), "another person unlocked in another tab");
   ok(tabIsStale(ID, ""), "the device was locked in another tab");
   no(tabIsStale(ID, null), "nothing recorded, or storage blocked");
+});
+
+test("deviceLastActivity: a touch in any tab keeps every tab awake", () => {
+  const t = 1_800_000_000_000;
+  eq(deviceLastActivity(t, String(t + 60_000)), t + 60_000, "another tab touched later");
+  eq(deviceLastActivity(t + 60_000, String(t)), t + 60_000, "this tab touched later");
+  no(idleExpired(deviceLastActivity(t, String(t + IDLE_MS - 1)), t + IDLE_MS), "idle here, busy there: no lock");
+  ok(idleExpired(deviceLastActivity(t, String(t)), t + IDLE_MS), "idle everywhere: lock");
+});
+
+test("deviceLastActivity: nothing readable falls back to this tab's own clock", () => {
+  const t = 1_800_000_000_000;
+  eq(deviceLastActivity(t, null), t, "absent or blocked");
+  eq(deviceLastActivity(t, ""), t, "empty");
+  eq(deviceLastActivity(t, "soon"), t, "not a number");
 });
