@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { RowMenu } from "@/components/ui/RowMenu";
-import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { ActionMenu } from "@/components/ui/ActionMenu";
+import { duplicateTitle } from "@/lib/productionPlans";
 import {
   Dialog,
   DIALOG_CANCEL_CLASS,
@@ -53,11 +54,12 @@ export function ElementActions({
   name: string;
   isActive: boolean;
   /**
-   * `row` — the ⋯ in a list's last column. `button` — a labelled red button for
-   * a detail screen, where a bare glyph alone at the end of a page "failed the
-   * only test that matters" (Mark, 2026-08-02, on the employee record).
+   * `row` — the ⋯ in a list's last column. `menu` — the record's Actions menu,
+   * top right of the title row (Mark, 2026-09-30: "an actionmenu in our usual
+   * spot … 'Duplicate Element' and 'Delete Element'"), which replaced the red
+   * Delete button at the foot of the record.
    */
-  variant: "row" | "button";
+  variant: "row" | "menu";
   /** A list refreshes in place; a detail screen is looking at nothing and has
    *  to navigate. An href rather than a callback, because half the callers are
    *  server components and a function cannot cross that boundary. */
@@ -75,6 +77,94 @@ export function ElementActions({
     setUsage(null);
     setError(null);
     setUsage(await readUsage(supabase, elementId));
+  }
+
+  /**
+   * DUPLICATE COPIES WHAT THE ELEMENT IS (Mark, 2026-09-30) — the master row,
+   * its per-kitchen rows (Active, Par, the weekday pars, Note) and its per-shop
+   * manual costs, `ProductionItemActions`' rule. NOT its recipes: a recipe is a
+   * versioned document with its own Duplicate on its own record, and two
+   * elements silently sharing a copied method is how one gets edited believing
+   * it is the other. Nor the FileMaker identity (`legacy_id`, `source`), which
+   * belongs to the original alone.
+   *
+   * Named "… copy" (`duplicateTitle`) because the name is unique per org, and
+   * written parent-first, every write checked; the screen lands on the copy.
+   */
+  async function duplicate() {
+    setBusy("duplicate");
+    setError(null);
+    try {
+      const newId = await duplicateElement();
+      router.refresh();
+      router.push(`/elements/${newId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function duplicateElement(): Promise<string> {
+    const [{ data: source, error: readErr }, { data: names, error: namesErr }] =
+      await Promise.all([
+        supabase
+          .from("production_elements")
+          .select(
+            "org_id, kind, name, element_type, type_sort, schedule_class, inventory_item_id, manual_cost, manual_cost_unit, is_active, notes"
+          )
+          .eq("id", elementId)
+          .maybeSingle(),
+        // ~470 rows, inside PostgREST's 1,000 cap; the range says so out loud.
+        supabase.from("production_elements").select("name").range(0, 1999),
+      ]);
+    if (readErr || !source) throw new Error(readErr?.message ?? "That element is no longer there.");
+    if (namesErr) throw new Error(namesErr.message);
+
+    const { data: created, error: createErr } = await supabase
+      .from("production_elements")
+      .insert({
+        ...source,
+        name: duplicateTitle(
+          (names ?? []).map((n) => String(n.name)),
+          String(source.name)
+        ),
+      })
+      .select("id")
+      .single();
+    if (createErr || !created)
+      throw new Error(createErr?.message ?? "The copy could not be created.");
+    const newId = created.id as string;
+
+    const { data: kitchens, error: kErr } = await supabase
+      .from("production_element_locations")
+      .select(
+        "org_id, location_id, par_by_weekday, stock_count, stock_size, stock_unit, yield_by_weekday, is_active, notes"
+      )
+      .eq("element_id", elementId);
+    if (kErr) throw new Error(kErr.message);
+    if (kitchens && kitchens.length > 0) {
+      const { error } = await supabase
+        .from("production_element_locations")
+        .insert(kitchens.map((k) => ({ ...k, element_id: newId })))
+        .select("id");
+      if (error) throw new Error(error.message);
+    }
+
+    const { data: costs, error: cErr } = await supabase
+      .from("production_element_location_costs")
+      .select("org_id, location_id, cost")
+      .eq("element_id", elementId);
+    if (cErr) throw new Error(cErr.message);
+    if (costs && costs.length > 0) {
+      const { error } = await supabase
+        .from("production_element_location_costs")
+        .insert(costs.map((c) => ({ ...c, element_id: newId })))
+        .select("element_id");
+      if (error) throw new Error(error.message);
+    }
+
+    return newId;
   }
 
   async function deactivate() {
@@ -148,17 +238,24 @@ export function ElementActions({
           ]}
         />
       ) : (
-        // RED like every destructive trigger on a screen, and bordered rather
-        // than filled — a filled cell would read as the primary action of the
-        // screen, which deleting an element is emphatically not.
-        <button
-          type="button"
-          onClick={() => void openConfirm()}
-          disabled={busy !== null}
-          className={`${DANGER_BUTTON_CLASS} inline-flex shrink-0 items-center whitespace-nowrap`}
-        >
-          Delete element
-        </button>
+        <span className="flex items-center gap-3">
+          {/* A failed duplicate has no dialog to report in, so it is said here. */}
+          {error && !confirming ? <span className="text-sm text-accent">{error}</span> : null}
+          <ActionMenu
+            label={busy === "duplicate" ? "Duplicating…" : "Actions"}
+            ariaLabel={`Actions for ${name}`}
+            disabled={busy !== null}
+            items={[
+              { label: "Duplicate Element", onSelect: () => void duplicate() },
+              {
+                label: "Delete Element…",
+                danger: true,
+                separatorBefore: true,
+                onSelect: () => void openConfirm(),
+              },
+            ]}
+          />
+        </span>
       )}
 
       {confirming && (

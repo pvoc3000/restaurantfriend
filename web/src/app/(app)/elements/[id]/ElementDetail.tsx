@@ -138,6 +138,20 @@ export async function ElementDetail({
           {!element.is_active ? (
             <span className="text-[12px] uppercase tracking-[0.12em] text-muted">Inactive</span>
           ) : null}
+          {/* THE RECORD'S ACTIONS, top right of the title row — the recipe and
+              batch log records' spot (Mark, 2026-09-30). It replaced the red
+              Delete button that sat at the foot of the record. */}
+          {editable ? (
+            <div className="ml-auto">
+              <ElementActions
+                elementId={id}
+                name={element.name as string}
+                isActive={(element.is_active ?? true) as boolean}
+                variant="menu"
+                afterDelete={{ href: "/elements" }}
+              />
+            </div>
+          ) : null}
         </div>
 
         <ElementFields
@@ -283,23 +297,6 @@ export async function ElementDetail({
         )}
       </section>
 
-      {/* ---- the end of the record --------------------------------------- */}
-      {/* Bottom LEFT, after everything — the placement Mark settled on for the
-          employee record in 2026-08-02 after trying it beside the name, under
-          the record book and bottom right. You pass what the element costs,
-          what it is made into and what has been made from it before you reach
-          the one control that destroys it. */}
-      {editable ? (
-        <div className="flex justify-start pt-4">
-          <ElementActions
-            elementId={id}
-            name={element.name as string}
-            isActive={(element.is_active ?? true) as boolean}
-            variant="button"
-            afterDelete={{ href: "/elements" }}
-          />
-        </div>
-      ) : null}
     </div>
   );
 }
