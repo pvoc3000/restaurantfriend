@@ -501,14 +501,23 @@ test("an ordinary order still draws, and cancelled still does not", () => {
 
 /* -- an unbooked delivery is not complete (Mark, 2026-09-30) -------------- */
 
-test("a PAID delivery with no delivery scheduled is yellow and one step short", () => {
+test("an unbooked delivery at ORDER is one step short but GREEN", () => {
   const p = order({ status: "order", fulfillment: "delivery" });
   ok(p.awaitingDelivery);
   eq(p.steps, 3);
   eq(p.length, 0.75, "not full");
-  eq(progressColor(p), [255, 212, 0], "yellow, not green");
+  eq(progressColor(p), [74, 156, 63], "green — the kitchen can take it");
   ok(progressRowStyle(p)!.backgroundImage.includes("75.000%"));
   ok(progressChecklist(p).endsWith("☐︎ Delivery scheduled"));
+});
+
+test("an unbooked delivery paid but still at INVOICE stays yellow", () => {
+  const p = order({ status: "invoice", fulfillment: "delivery", invoice_paid_at: "2026-08-19" });
+  ok(p.awaitingDelivery);
+  eq(p.length, 0.75);
+  eq(progressColor(p), [255, 212, 0]);
+  // …where a pickup in the same state is green, as before.
+  eq(progressColor(order({ status: "invoice", invoice_paid_at: "2026-08-19" })), [74, 156, 63]);
 });
 
 test("once the delivery is booked it is full and green", () => {

@@ -154,9 +154,19 @@ export type OrderProgress = {
    * NOT A RUNG. 82% of orders are pickups and the ladder header explains why
    * the booking was left off it; adding a rung would move every pickup's bar.
    * So it is a HOLD instead: a delivery order that has climbed to paid stops
-   * one step short of full and stays yellow until the courier is booked.
+   * one step short of full until the courier is booked. Its COLOUR is
+   * `ready`'s, below.
    */
   awaitingDelivery: boolean;
+  /**
+   * GREEN — the kitchen can take it. Paid (rung 5) and, for a delivery not
+   * yet booked, also at status `order` (Mark, 2026-09-30: "for delivery
+   * orders, when the order is paid for and its status is 'order' but delivery
+   * hasn't been scheduled yet, make the progress bar background green"). So
+   * the bar is short AND green: ready for the kitchen, not yet complete. An
+   * unbooked delivery still at `invoice`, though paid, stays yellow.
+   */
+  ready: boolean;
   ticks: ProgressTick[];
   /**
    * What the row's wash says, and the three cases are Mark's:
@@ -285,6 +295,7 @@ export function orderProgress(
     length: steps / drawn,
     steps,
     awaitingDelivery,
+    ready: done >= READY_RUNG && (!awaitingDelivery || order.status === "order"),
     ticks,
     tone,
   };
@@ -368,9 +379,9 @@ export const WASH_ALPHA = 0.2;
  */
 export const READY_RUNG = 5;
 export function progressColor(p: OrderProgress): [number, number, number] {
-  // An unbooked delivery is not ready, however far it has climbed — see
-  // `OrderProgress.awaitingDelivery`.
-  return p.done >= READY_RUNG && !p.awaitingDelivery ? GREEN : YELLOW;
+  // An unbooked delivery is green only once it is at `order` — see
+  // `OrderProgress.ready`.
+  return p.ready ? GREEN : YELLOW;
 }
 
 const rgba = ([r, g, b]: [number, number, number], a: number) => `rgba(${r}, ${g}, ${b}, ${a})`;

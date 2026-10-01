@@ -5248,3 +5248,6 @@ so pickups' bars do not move. The To-do column no longer renders
 `suggestedTodo`, and the function and its fixtures were then deleted (Mark,
 same day). `paidTodo` stays: the payment offer and migration 122 use it. The
 menu section "Selling" was renamed "Sales" the same day.
+Later the same day (Mark): an unbooked delivery at status `order` is GREEN while
+still one step short — ready for the kitchen, not yet complete
+(`OrderProgress.ready`). Paid but still at `invoice`, it stays yellow.
