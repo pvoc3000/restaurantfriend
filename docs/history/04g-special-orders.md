@@ -5252,7 +5252,7 @@ Later the same day (Mark): an unbooked delivery at status `order` is GREEN while
 still one step short — ready for the kitchen, not yet complete
 (`OrderProgress.ready`). Paid but still at `invoice`, it stays yellow.
 
-**2026-10-01 — 161 WRITTEN, NOT YET APPLIED: the app flags what needs doing; a
+**2026-10-01 — 161 APPLIED (same day, via the CLI): the app flags what needs doing; a
 system flag is a red BAR, a person's flag a red ROW.** Mark: "Set a system flag
 and a to do when we need to act". Inquiry → Respond to Email/Call (058,
 unchanged; Mark wrote "Call/Email", the stored value was kept because 117 and
