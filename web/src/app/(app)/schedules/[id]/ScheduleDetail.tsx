@@ -58,7 +58,7 @@ export async function ScheduleDetail({
     .select(
       `id, schedule_date, location_id, kitchen_location_id, source, source_ref, title,
        generated_at, generated_by, regenerated_at, regeneration_count,
-       printed_at, ignored_special_orders, note`
+       printed_at, printed_by, ignored_special_orders, note`
     )
     .eq("id", id)
     .maybeSingle();
@@ -262,6 +262,9 @@ export async function ScheduleDetail({
       : [];
 
   const trail = parseTrail(rawParams, { href: "/schedules", label: "Schedules" });
+  const printedBy = schedule.printed_by
+    ? nameByUser.get(schedule.printed_by as string) ?? null
+    : null;
   const generatedBy = schedule.generated_by
     ? nameByUser.get(schedule.generated_by as string) ?? null
     : null;
@@ -394,6 +397,7 @@ export async function ScheduleDetail({
                 String(schedule.printed_at),
                 session.orgSettings.timezone ?? serverTimeZone()
               )}
+              {printedBy ? ` (${printedBy})` : ""}
             </span>
           ) : (
             <span className={`${READ_ONLY_VALUE}`}>

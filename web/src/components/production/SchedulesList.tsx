@@ -44,6 +44,8 @@ export type ScheduleRow = {
   kitchen_location_id: string;
   generatedAt: string | null;
   printedAt: string | null;
+  /** The printer's display name, when they still have one. */
+  printedBy: string | null;
   regenerations: number;
   note: string | null;
   lineCount: number;
@@ -423,11 +425,14 @@ export function SchedulesList({
     {
       key: "printed",
       label: "Printed",
-      width: 130,
+      width: 200,
       sortValue: (r) => r.printedAt ?? "",
       render: (r) =>
         r.printedAt ? (
-          <span className="text-muted">{r.printedAt.slice(0, 10)}</span>
+          <span className="text-muted">
+            {r.printedAt}
+            {r.printedBy ? ` (${r.printedBy})` : ""}
+          </span>
         ) : (
           // Yellow: worth an eye, not wrong. A night with no paper in the
           // kitchen is what this list is scanned for.
