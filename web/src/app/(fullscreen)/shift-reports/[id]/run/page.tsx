@@ -480,8 +480,7 @@ export default async function RunShiftReportPage({
         .select(
           "id, sort, yield_count, yield_size, yield_unit, operator_employee_id, notes, production_elements(name)"
         )
-        .eq("log_id", batchLog.id as string)
-        .order("sort", { nullsFirst: false }),
+        .eq("log_id", batchLog.id as string),
       supabase
         .from("shift_report_batches")
         .select("batch_id, yield_count, yield_size, yield_unit, operator_employee_id, notes")
@@ -523,6 +522,8 @@ export default async function RunShiftReportPage({
         notes: pick("notes") as string | null,
       };
     });
+    // By name, as the tray guide's Total batches box lists them (159).
+    elementRows.sort((a, b) => a.elementName.localeCompare(b.elementName));
   }
 
   // ---- sales: three settled days, of which today is usually absent --------

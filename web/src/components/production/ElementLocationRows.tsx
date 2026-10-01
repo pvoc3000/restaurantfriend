@@ -18,7 +18,6 @@ export type ElementLocationRow = {
   stock_unit: string | null;
   is_active: boolean;
   notes: string | null;
-  batch_sort: number | null;
 };
 
 /**
@@ -46,16 +45,16 @@ export type ElementLocationRow = {
  *   — Weekly, Donut or Ice Cream — and taking a donut out for the season is
  *   unticking Active here. An "On batch log" tick sat beside it from 045 to
  *   157; once 153 filtered by schedule it answered the same question.
- * - **Order** is `batch_sort`, which becomes the batch's `sort` and orders the
- *   printed log.
+ * - There is no ORDER here since 159 (Mark: "I don't think an 'element'
+ *   order is needed"); a batch's own Order is set on the batch log.
  * - **Par** is the stock level this shop keeps, and lands as the batch's Par.
  *   An "Asks for" amount ("make 2 X") sat beside it until 158 dropped it:
  *   generation copied it onto each batch and nothing read it there.
  *
  * PAR BY WEEKDAY IS DELIBERATELY READ-ONLY. Nothing in `web/src` reads
  * `production_element_locations.par_by_weekday` — it is displayed here and
- * nowhere else, and generation ignores it entirely (it reads Active, the
- * order and the stock trio). An editor over it would take numbers and change
+ * nowhere else, and generation ignores it entirely (it reads Active and
+ * the stock trio). An editor over it would take numbers and change
  * nothing, which is precisely the objection recorded against building one for
  * `production_item_locations.par_by_weekday` after 043. If it turns out to be
  * wanted, it wants a reader first.
@@ -215,30 +214,6 @@ export function ElementLocationRows({
           } as DataColumn<Line>,
         ]
       : []),
-    {
-      key: "batch_sort",
-      label: "Order",
-      width: 90,
-      align: "right",
-      sortValue: (l) => l.row?.batch_sort ?? Number.MAX_SAFE_INTEGER,
-      render: (l) =>
-        !l.row ? (
-          <span className={`${READ_ONLY_VALUE} text-subtle`}>—</span>
-        ) : editable ? (
-          <InlineValue
-            table="production_element_locations"
-            id={l.row.id}
-            column="batch_sort"
-            kind="number"
-            value={l.row.batch_sort}
-            ariaLabel={`Order on ${l.location.code}'s batch log`}
-          />
-        ) : (
-          <span className={`${READ_ONLY_VALUE} tabular-nums`}>
-            {l.row.batch_sort ?? "—"}
-          </span>
-        ),
-    },
     {
       key: "stock",
       // PAR, not "Keeps on hand" (Mark, 2026-08-09: "why do we call it 'keeps

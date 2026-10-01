@@ -287,7 +287,7 @@ export async function fetchPacketData(
     supabase
       .from("production_element_locations")
       .select(
-        "element_id, location_id, stock_count, stock_size, stock_unit, batch_sort, is_active"
+        "element_id, location_id, stock_count, stock_size, stock_unit, is_active"
       )
       .in("location_id", kitchenIds)
       .then((r) => r.data ?? []),
@@ -484,12 +484,11 @@ export async function fetchPacketData(
     // the same three conditions `generate_production_batches` reads.
     k.batchDonuts = elementLocs
       .filter((r) => r.location_id === kitchenId && r.is_active !== false)
-      .map((r) => ({ sort: (r.batch_sort ?? null) as number | null, meta: elementMeta.get(r.element_id as string) }))
-      .filter((r) => r.meta?.isActive && r.meta.scheduleClass === SHIFT_REPORT_BATCH_SCHEDULE)
-      .sort(
-        (a, b) => (a.sort ?? 9999) - (b.sort ?? 9999) || a.meta!.name.localeCompare(b.meta!.name)
-      )
-      .map((r) => r.meta!.name);
+      .map((r) => elementMeta.get(r.element_id as string))
+      .filter((m) => m?.isActive && m.scheduleClass === SHIFT_REPORT_BATCH_SCHEDULE)
+      // By name — the shift report's page lists them the same way (159).
+      .map((m) => m!.name)
+      .sort((a, b) => a.localeCompare(b));
   }
 
   return {

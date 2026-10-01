@@ -1760,3 +1760,11 @@ batch record's "Asked for" came off on 2026-09-10. Both pairs dropped (backup
 `FMP Export/pre158-asks-for-2026-09-30.json`: 47 kitchen rows, 91 batches, none
 from FileMaker). `production_element_days`' own amount stays — the Weekly
 element sheet reads it.
+
+**THE ELEMENT'S ORDER REMOVED — migration 159 (2026-09-30).** Mark: "I don't
+think an 'element' order is needed. Batch logs order fields can start empty …
+The shift report stuff was added today and also not necessary." `batch_sort`
+(045's FileMaker ORDER, on 6 rows; backup `FMP Export/pre159-element-order-
+2026-09-30.json`) dropped. A generated batch's `sort` starts empty and a
+refresh no longer overwrites it; generation, the shift report's Donut batches
+page and the tray guide's Total batches box list by name.
