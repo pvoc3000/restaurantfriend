@@ -75,3 +75,20 @@ includes the query string, so view state comes back too. Only the IDLE lock
 writes it: Switch user is a deliberate goodbye. No expiry — "the next time"
 the same person unlocks, however much later. Not walked live (needs a PIN on
 the registered iPad).
+
+**A TAB SHOWING SOMEBODY ELSE'S PAGE LEAVES IT (Mark, 2026-10-01),** after
+DF02's opening shift report was read as Karina's view of Abigail's report (see
+04h). `SIGNED_IN_KEY` (`rf.device.user`, localStorage) holds who the device is
+signed in as, as far as its tabs know. `IdleLock` writes its user on mount, and
+the idle lock and `SwitchUser` write "" before locking. A tab whose rendered
+user differs (`tabIsStale`, fixtures) hard-navigates to "/", and the server
+then shows the current person's home or /lock. The check runs on the `storage`
+event (instant in the other tabs) and on the existing visibility/focus/interval
+checks (for a background tab that was suspended). An unknown value (null:
+storage blocked or never written) never makes a tab leave. Consequence: locking
+one tab sends the others to the lock screen too. Not walked live: needs the
+registered iPad and two PINs.
+**KNOWN, NOT FIXED:** the idle clock is still per tab, so a forgotten
+background tab can idle-lock the device while somebody works in another one.
+That is older than this change, because `lockDevice` always signed out the
+shared cookie.

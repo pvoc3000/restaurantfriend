@@ -3,7 +3,16 @@
 import { useEffect } from "react";
 
 import { lockDevice } from "@/app/deviceActions";
-import { IDLE_MS, RESUME_KEY, idleExpired, serializeResume } from "@/lib/sharedDevice";
+import {
+  IDLE_MS,
+  RESUME_KEY,
+  SIGNED_IN_KEY,
+  idleExpired,
+  readSignedInUser,
+  recordSignedInUser,
+  serializeResume,
+  tabIsStale,
+} from "@/lib/sharedDevice";
 
 /**
  * Locks a REGISTERED shared iPad after five minutes without a touch. Renders
@@ -24,21 +33,40 @@ import { IDLE_MS, RESUME_KEY, idleExpired, serializeResume } from "@/lib/sharedD
  *
  * Before locking it notes the page in localStorage (`RESUME_KEY`), so the same
  * person unlocking goes back to it rather than to the home page.
+ *
+ * IT ALSO LOCKS THE OTHER TABS (2026-10-01). Each page records who it was
+ * rendered for (`SIGNED_IN_KEY`). A tab still showing one person's page after
+ * somebody else has unlocked in another tab, or after the device was locked
+ * there, leaves the page with a hard navigation to "/". The server then shows
+ * the current person's home, or the lock screen if nobody is signed in. Without
+ * this, a shift report left open in a second tab rendered as Karina's view of
+ * Abigail's report, which looked empty because Karina cannot read its ratings.
  */
 export function IdleLock({ userId }: { userId: string }) {
   useEffect(() => {
     let last = Date.now();
     let locking = false;
+    recordSignedInUser(userId);
 
     const touch = () => {
       const now = Date.now();
       if (now - last >= 1000) last = now;
     };
 
+    /** Another tab changed who is signed in — this page is not theirs. */
+    const leaveIfStale = () => {
+      if (locking || !tabIsStale(userId, readSignedInUser())) return false;
+      locking = true;
+      window.location.assign("/");
+      return true;
+    };
+
     const check = () => {
       if (locking) return;
+      if (leaveIfStale()) return;
       if (idleExpired(last, Date.now())) {
         locking = true;
+        recordSignedInUser("");
         try {
           const path = window.location.pathname + window.location.search;
           localStorage.setItem(RESUME_KEY, serializeResume({ userId, path }));
@@ -58,12 +86,20 @@ export function IdleLock({ userId }: { userId: string }) {
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", check);
+    // Fires in every OTHER tab the moment one writes the key, so a tab that
+    // is on screen beside the change leaves at once. A tab in the background
+    // may be suspended and miss it; the visibility check above covers that.
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === SIGNED_IN_KEY || e.key === null) leaveIfStale();
+    };
+    window.addEventListener("storage", onStorage);
     const timer = window.setInterval(check, Math.min(IDLE_MS, 30_000));
 
     return () => {
       for (const e of events) window.removeEventListener(e, touch, { capture: true });
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", check);
+      window.removeEventListener("storage", onStorage);
       window.clearInterval(timer);
     };
   }, [userId]);

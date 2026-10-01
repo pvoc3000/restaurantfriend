@@ -151,3 +151,50 @@ export function resumePathFor(raw: string | null | undefined, userId: string): s
   if (/^\/(lock|login)(\/|\?|#|$)/.test(path)) return "/";
   return path;
 }
+
+/**
+ * WHO THIS DEVICE IS SIGNED IN AS, as far as its tabs know (2026-10-01).
+ *
+ * The auth cookie is shared by every tab, but each tab's page was rendered
+ * for whoever was signed in WHEN IT LOADED. So a second Safari tab can keep
+ * Abigail's shift report on screen after Karina has unlocked with her PIN in
+ * another tab, and the first refresh renders Abigail's report AS KARINA'S: an
+ * empty, read-only report that looks like lost work. That is what DF02's
+ * opening report showed on 2026-10-01.
+ *
+ * Every page mounted on a registered device writes its user here (`IdleLock`),
+ * and a lock or Switch user writes "" (nobody). A tab whose rendered user no
+ * longer matches leaves its page. It finds out from the `storage` event, or
+ * when it is next shown. localStorage, like `RESUME_KEY`: the server never
+ * needs it.
+ */
+export const SIGNED_IN_KEY = "rf.device.user";
+
+/**
+ * Whether a tab rendered for `renderedUserId` is showing somebody else's
+ * page. `stored` null means nothing is known (never written, or storage is
+ * blocked), and that is never a reason to leave — the server still refuses a
+ * missing session on its own.
+ */
+export function tabIsStale(renderedUserId: string, stored: string | null): boolean {
+  if (stored === null) return false;
+  return stored !== renderedUserId;
+}
+
+/** Record who is signed in on this device, or "" for nobody. Never throws. */
+export function recordSignedInUser(userId: string): void {
+  try {
+    localStorage.setItem(SIGNED_IN_KEY, userId);
+  } catch {
+    // Private mode or blocked storage: tabs simply are not compared.
+  }
+}
+
+/** What `recordSignedInUser` last wrote, or null. Never throws. */
+export function readSignedInUser(): string | null {
+  try {
+    return localStorage.getItem(SIGNED_IN_KEY);
+  } catch {
+    return null;
+  }
+}

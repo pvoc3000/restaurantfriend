@@ -5,6 +5,7 @@ import { useState } from "react";
 import { lockDevice } from "@/app/deviceActions";
 import { BAR_CELL } from "@/components/tablet/barCell";
 import { BarLabel, ICON_PERSON } from "@/components/tablet/BarLabel";
+import { recordSignedInUser } from "@/lib/sharedDevice";
 
 /**
  * The masthead's way out on a REGISTERED shared iPad: lock the device and
@@ -18,6 +19,8 @@ export function SwitchUser({ size = "md" }: { size?: "md" | "lg" }) {
   const [busy, setBusy] = useState(false);
   const lock = () => {
     setBusy(true);
+    // Nobody, as far as the other tabs know — they leave their pages too.
+    recordSignedInUser("");
     void lockDevice()
       .then(() => window.location.assign("/lock"))
       .catch(() => setBusy(false));

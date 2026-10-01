@@ -14,6 +14,7 @@ import {
   retryLabel,
   serializeDeviceCookie,
   serializeResume,
+  tabIsStale,
   type PinAttempt,
 } from "../../src/lib/sharedDevice";
 import { eq, no, ok, test } from "./harness";
@@ -140,4 +141,12 @@ test("resumePathFor: nothing stored, or nothing sensible, is the home page", () 
   eq(resumePathFor(serializeResume({ userId: ID, path: "/lock" }), ID), "/", "the lock itself");
   eq(resumePathFor(serializeResume({ userId: ID, path: "/login?x=1" }), ID), "/", "the login page");
   eq(resumePathFor(serializeResume({ userId: ID, path: "/locations" }), ID), "/locations", "not /lock");
+});
+
+test("tabIsStale: a tab leaves only when somebody else, or nobody, is recorded", () => {
+  const OTHER = "7ec6508c-1111-4222-8333-444444444444";
+  no(tabIsStale(ID, ID), "same person");
+  ok(tabIsStale(ID, OTHER), "another person unlocked in another tab");
+  ok(tabIsStale(ID, ""), "the device was locked in another tab");
+  no(tabIsStale(ID, null), "nothing recorded, or storage blocked");
 });
