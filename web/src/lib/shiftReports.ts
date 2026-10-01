@@ -425,7 +425,6 @@ export type EmailReport = {
   narrative: string | null;
   /** Provisional at report time — see `salesLine`. */
   netSalesCents: number | null;
-  tipsCents: number | null;
   salesAreProvisional: boolean;
   lastWeekNetCents: number | null;
   lastYearNetCents: number | null;
@@ -559,7 +558,10 @@ function changeLine(current: number | null, basis: number | null, label: string)
   return `<li style="${S.muted}">${esc(label)}: ${money(basis)} (${sign}${pct}%)</li>`;
 }
 
-/** The sales paragraph, which must never state a provisional figure as settled. */
+/**
+ * The sales paragraph, which must never state a provisional figure as settled.
+ * SALES ONLY — no tips (Mark, 2026-10-01).
+ */
 export function salesLine(report: EmailReport): string {
   if (report.netSalesCents === null) {
     return `<p style="${S.muted}">Square has not reported this day yet.</p>`;
@@ -568,8 +570,7 @@ export function salesLine(report: EmailReport): string {
     ? ` <span style="${S.mark}">provisional — the day closes at 1am</span>`
     : "";
   return [
-    `<p><strong>Net sales ${money(report.netSalesCents)}</strong>`,
-    ` · tips ${money(report.tipsCents)}${caveat}</p>`,
+    `<p><strong>Net sales ${money(report.netSalesCents)}</strong>${caveat}</p>`,
     "<ul>",
     changeLine(report.netSalesCents, report.lastWeekNetCents, "Last week"),
     changeLine(report.netSalesCents, report.lastYearNetCents, "Last year"),

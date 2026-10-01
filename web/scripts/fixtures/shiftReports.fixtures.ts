@@ -415,7 +415,6 @@ const REPORT: EmailReport = {
   correctsEmailSentAt: null,
   narrative: "Footwork today was pretty steady.",
   netSalesCents: 133307,
-  tipsCents: 7801,
   salesAreProvisional: true,
   lastWeekNetCents: 181519,
   lastYearNetCents: 171399,
@@ -749,6 +748,12 @@ test("no figure at all says what happened, and quotes nothing", () => {
   const none = salesLine({ ...REPORT, netSalesCents: null });
   ok(none.includes("has not reported"), none);
   no(none.includes("$"), "an absent day must not print a dollar sign");
+});
+
+test("the email is SALES ONLY — no tips, in either body (Mark, 2026-10-01)", () => {
+  for (const body of [supervisorBody(REPORT), managementBody(REPORT)]) {
+    no(/\btips?\b/i.test(body), "a tip figure reached the email");
+  }
 });
 
 test("the comparison is a percentage of the BASIS, and a zero basis is silent", () => {

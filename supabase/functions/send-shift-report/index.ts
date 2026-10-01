@@ -88,7 +88,6 @@ Deno.serve(async (req) => {
       supervisor_html,
       management_html,
       net_sales_cents,
-      tips_cents,
       sales_provisional,
     } = await req.json();
 
@@ -271,7 +270,6 @@ Deno.serve(async (req) => {
         // said rather than as a fact about the day. The record screen compares
         // it against the settled figure once Square reports one.
         net_sales_cents: net_sales_cents ?? null,
-        tips_cents: tips_cents ?? null,
         sales_provisional: sales_provisional ?? false,
       },
     });

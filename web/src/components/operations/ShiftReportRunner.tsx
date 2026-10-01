@@ -347,7 +347,6 @@ export function ShiftReportRunner({
         ? {
             ...emailReport,
             netSalesCents: liveSales.netCents,
-            tipsCents: liveSales.tipsCents,
             salesAreProvisional: liveSales.provisional,
           }
         : emailReport;
@@ -367,7 +366,6 @@ export function ShiftReportRunner({
           supervisor_html: wrapEmail(supervisorBody(forEmail)),
           management_html: wrapEmail(managementBody(forEmail)),
           net_sales_cents: forEmail.netSalesCents,
-          tips_cents: forEmail.tipsCents,
           sales_provisional: forEmail.salesAreProvisional,
         },
       });

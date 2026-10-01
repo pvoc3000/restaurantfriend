@@ -928,9 +928,8 @@ export default async function RunShiftReportPage({
       : null,
     narrative: (report.narrative as string | null) ?? null,
     netSalesCents,
-    tipsCents: (settledToday ?? storedToday)?.tipsCents ?? null,
-    // A stored part-day is quoted AS a part-day. The runner overrides all three
-    // of these at Send from whatever the Sales page is actually showing.
+    // A stored part-day is quoted AS a part-day. The runner overrides both of
+    // these at Send from whatever the Sales page is actually showing.
     salesAreProvisional: settledToday === null && storedToday !== null,
     lastWeekNetCents: salesByDate.get(lastWeekDate)?.netCents ?? null,
     lastYearNetCents: salesByDate.get(lastYearDate)?.netCents ?? null,
