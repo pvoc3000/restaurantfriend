@@ -690,7 +690,11 @@ export function BasketSummary({
           />
           {delivery.status !== "none" && (
             <Money
-              label={delivery.status === "ok" ? `Delivery (${delivery.miles.toFixed(1)} mi)` : "Delivery"}
+              label={
+                delivery.status === "ok"
+                  ? `Estimated delivery (${delivery.miles.toFixed(1)} mi)`
+                  : "Delivery"
+              }
               value={
                 delivery.status === "ok"
                   ? money(delivery.fee)
@@ -703,6 +707,15 @@ export function BasketSummary({
                         : "added to your quote"
               }
             />
+          )}
+          {/* ESTIMATE ONLY, said where the number is (Mark, 2026-10-01: "make it
+              extremely clear that the delivery cost is an estimate only").
+              The footnote below says it of the whole total; this says it of
+              the one line a customer is most likely to read as a price. */}
+          {delivery.status === "ok" && (
+            <p className="text-[13px] font-semibold leading-snug">
+              Delivery is an estimate only. The actual cost is confirmed in your quote.
+            </p>
           )}
           <div className="flex items-baseline justify-between gap-3 pt-1 text-[17px] font-semibold">
             <dt>Estimated total</dt>
@@ -717,8 +730,8 @@ export function BasketSummary({
 
       {lines.length > 0 && (
         <p className="text-[13px] leading-relaxed text-muted">
-          This is an estimate. Your quote confirms the final price, including any custom
-          work.
+          This is an estimate. Your quote confirms the final price, including delivery and
+          any custom work.
         </p>
       )}
     </section>
