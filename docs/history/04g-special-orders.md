@@ -5283,7 +5283,7 @@ its length and is red, at least one step so a new inquiry's bare lead still
 shows. `flagged` (a person's) stays full-width red. The To-do text is regular
 weight, not bold.
 
-**2026-10-01 — 162 WRITTEN: delivery is measured from the KITCHEN** (Mark: "not
+**2026-10-01 — 162 APPLIED, `submit-inquiry` and `inquiry-delivery-quote` DEPLOYED: delivery is measured from the KITCHEN** (Mark: "not
 a set location the user chooses in settings"; for a website lead, which has no
 kitchen yet, he chose the NEAREST shop over asking the customer or a default
 kitchen). `_shared/deliveryQuote` takes an optional `from` (the kitchen);
@@ -5298,5 +5298,6 @@ writing it as a pickup shop; `inquiry_price_location` loses the settings step;
 `origin_location_id` key is removed. `submit-inquiry` measures from the lead's
 stored kitchen. Settings → General → Delivery estimate lost "Measured from".
 The three live function bodies were md5-checked identical to 132/134/152 before
-editing. Not yet configured live (per-mile rate blank), so nothing changes for
-customers until it is set. The in-app order screen still does not calculate.
+editing. Live rates (Mark): $35 base, $2.50/mi, 50 mi max. Probed after
+deploy: Dodger Stadium → DF02, 3.4 mi, $43.50; Pasadena → DF01, 4.4 mi, $46;
+LAX → DF02, 18.1 mi, $80.25. The in-app order screen still does not calculate.
