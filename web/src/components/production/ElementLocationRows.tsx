@@ -19,8 +19,6 @@ export type ElementLocationRow = {
   is_active: boolean;
   notes: string | null;
   batch_sort: number | null;
-  batch_amount: number | null;
-  batch_unit: string | null;
 };
 
 /**
@@ -50,15 +48,14 @@ export type ElementLocationRow = {
  *   157; once 153 filtered by schedule it answered the same question.
  * - **Order** is `batch_sort`, which becomes the batch's `sort` and orders the
  *   printed log.
- * - **Asks for** is `batch_amount` × `batch_unit` — "make 2 X". It lands
- *   on the batch's `batch_amount` (no longer shown on the batch sheet since
- *   2026-09-10) and is distinct from **Par**, which is the stock level this
- *   shop keeps and lands as the batch's Par.
+ * - **Par** is the stock level this shop keeps, and lands as the batch's Par.
+ *   An "Asks for" amount ("make 2 X") sat beside it until 158 dropped it:
+ *   generation copied it onto each batch and nothing read it there.
  *
  * PAR BY WEEKDAY IS DELIBERATELY READ-ONLY. Nothing in `web/src` reads
  * `production_element_locations.par_by_weekday` — it is displayed here and
- * nowhere else, and generation ignores it entirely (045 reads the four weekly
- * columns and the stock trio). An editor over it would take numbers and change
+ * nowhere else, and generation ignores it entirely (it reads Active, the
+ * order and the stock trio). An editor over it would take numbers and change
  * nothing, which is precisely the objection recorded against building one for
  * `production_item_locations.par_by_weekday` after 043. If it turns out to be
  * wanted, it wants a reader first.
@@ -239,41 +236,6 @@ export function ElementLocationRows({
         ) : (
           <span className={`${READ_ONLY_VALUE} tabular-nums`}>
             {l.row.batch_sort ?? "—"}
-          </span>
-        ),
-    },
-    {
-      key: "asks",
-      label: "Asks for",
-      width: 200,
-      wrap: true,
-      sortValue: (l) => l.row?.batch_amount ?? null,
-      render: (l) =>
-        !l.row ? (
-          <span className={`${READ_ONLY_VALUE} text-subtle`}>—</span>
-        ) : editable ? (
-          <span className="flex flex-wrap items-baseline gap-1">
-            <InlineValue
-              table="production_element_locations"
-              id={l.row.id}
-              column="batch_amount"
-              kind="number"
-              value={l.row.batch_amount}
-              ariaLabel={`What ${l.location.code}'s batch log asks for`}
-            />
-            <InlineValue
-              table="production_element_locations"
-              id={l.row.id}
-              column="batch_unit"
-              value={l.row.batch_unit}
-              ariaLabel={`The unit ${l.location.code}'s batch log asks in`}
-            />
-          </span>
-        ) : (
-          <span className={READ_ONLY_VALUE}>
-            {l.row.batch_amount === null
-              ? "—"
-              : `${l.row.batch_amount}${l.row.batch_unit ? ` ${l.row.batch_unit}` : ""}`}
           </span>
         ),
     },

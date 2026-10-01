@@ -61,7 +61,7 @@ export async function ElementDetail({
         .from("production_element_locations")
         .select(
           `id, location_id, par_by_weekday, stock_count, stock_size, stock_unit,
-           is_active, notes, batch_sort, batch_amount, batch_unit`
+           is_active, notes, batch_sort`
         )
         .eq("element_id", id),
       // The TYPE menu is the recipe types, not the element types in use —
@@ -216,8 +216,6 @@ export async function ElementDetail({
           par_by_weekday: (l.par_by_weekday ?? null) as number[] | null,
           notes: (l.notes ?? null) as string | null,
           batch_sort: (l.batch_sort ?? null) as number | null,
-          batch_amount: (l.batch_amount ?? null) as number | null,
-          batch_unit: (l.batch_unit ?? null) as string | null,
           stock_count: l.stock_count === null ? null : Number(l.stock_count),
           stock_size: l.stock_size === null ? null : Number(l.stock_size),
           stock_unit: (l.stock_unit ?? null) as string | null,

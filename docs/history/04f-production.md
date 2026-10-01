@@ -1751,3 +1751,12 @@ scheduled and unticked, Chocolate and Javabreaker Ice Cream (DF02) join their
 log (Mark: "should be active and on the list"); Banana Cake Donut (both),
 Strawberry Jam (both) and Waffle Cone Batter (DF02) were made inactive there.
 Seasonal donuts now come and go by the Kitchens table's Active.
+
+**"ASKS FOR" REMOVED — migration 158 (2026-09-30).** Mark: "what is the purpose
+of the 'Asks for' field" → "remove it if it's not needed by anything." It was
+045's weekly amount (FileMaker's "make 2 X"), copied by generation onto each
+batch's `batch_amount`/`batch_unit`, and nothing read either pair since the
+batch record's "Asked for" came off on 2026-09-10. Both pairs dropped (backup
+`FMP Export/pre158-asks-for-2026-09-30.json`: 47 kitchen rows, 91 batches, none
+from FileMaker). `production_element_days`' own amount stays — the Weekly
+element sheet reads it.

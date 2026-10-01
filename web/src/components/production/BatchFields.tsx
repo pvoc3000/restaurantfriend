@@ -29,8 +29,6 @@ export type BatchFieldsRow = {
    */
   masterVersionId: string | null;
   scale_label: string | null;
-  batch_amount: number | null;
-  batch_unit: string | null;
   par_count: number | null;
   par_size: number | null;
   par_unit: string | null;
