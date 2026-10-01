@@ -107,6 +107,7 @@
 import {
   STAGES,
   stageState,
+  isPersonFlag,
   DEFAULT_ATTENTION,
   type AttentionOrder,
   type AttentionThresholds,
@@ -171,12 +172,15 @@ export type OrderProgress = {
   /**
    * What the row's wash says, and the three cases are Mark's:
    *   · `progress` — yellow, or green once ready to print and schedule;
-   *   · `flagged`  — FULL WIDTH and red, whatever the stages say, because a
-   *     flagged order is not a progress question;
+   *   · `flagged`  — a PERSON's flag: FULL WIDTH and red, whatever the stages
+   *     say, because a problem somebody recorded is not a progress question;
+   *   · `notice`   — a SYSTEM flag (Mark, 2026-10-01): the bar keeps its
+   *     length and turns red. The app is saying "act on this", not "something
+   *     is wrong", so how far along the order is still worth reading;
    *   · `none`     — cancelled. No bar at all, and the row greys out. An order
    *     that was called off is not partly done, it is not happening.
    */
-  tone: "progress" | "flagged" | "none";
+  tone: "progress" | "flagged" | "notice" | "none";
 };
 
 /** The ladder. `stages` names which of `STAGES` each rung reads. */
@@ -279,9 +283,11 @@ export function orderProgress(
   const tone: OrderProgress["tone"] =
     order.kind !== "order" || order.status === "cancelled"
       ? "none"
-      : order.flag_reason
+      : isPersonFlag(order)
         ? "flagged"
-        : "progress";
+        : order.flag_reason
+          ? "notice"
+          : "progress";
 
   const awaitingDelivery =
     order.kind === "order" && order.fulfillment === "delivery" && !order.delivery_scheduled_at;
@@ -467,23 +473,30 @@ export function progressRowStyle(
   // migration 058 every inquiry from the public form arrives flagged AND as a
   // bare lead, so checking "no bar at rung 1" first would leave every new
   // inquiry unmarked — the precise opposite of what flagging it is for.
+  //
+  // A PERSON's flag fills the row. A SYSTEM flag (`notice`, Mark, 2026-10-01)
+  // keeps the bar's own length and turns it red — but a bare lead draws
+  // nothing, so a notice draws at least the first step: a red flag nobody can
+  // see is no flag.
   const flagged = p.tone === "flagged";
+  const notice = p.tone === "notice";
 
   // THE LEAD RUNG DRAWS NOTHING. Not a zero-width bar — no background at all,
   // so the row is left exactly as the table painted it and the 3px edge rule
   // does not appear either. See the header.
-  if (!flagged && p.done <= 1) return null;
+  if (!flagged && !notice && p.done <= 1) return null;
+  const steps = notice ? Math.max(p.steps, 1) : p.steps;
 
-  const solid = flagged ? RED : progressColor(p);
+  const solid = flagged || notice ? RED : progressColor(p);
   // FOUR drawn steps — rungs 2 to 5, the team's work (see `length`). Rung 2
   // is the first that draws and rung 6 draws no further than rung 5, so the
-  // index is `p.steps - 1` (which also carries the unbooked-delivery hold).
+  // index is `steps - 1` (which also carries the unbooked-delivery hold).
   const drawn = p.total - 2;
   const snapped = snapStops(drawn, boundaries);
   // Only the LENGTH snaps; the colour is the rung, not where the rules fall.
-  const width = snapped ? snapped[p.steps - 1] : p.length;
+  const width = snapped ? snapped[steps - 1] : steps / drawn;
   const stop = flagged ? "100%" : `${(width * 100).toFixed(3)}%`;
-  const wash = rgba(solid, flagged ? 0.15 : WASH_ALPHA);
+  const wash = rgba(solid, flagged || notice ? 0.15 : WASH_ALPHA);
 
   return {
     backgroundImage: [

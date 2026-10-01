@@ -174,8 +174,8 @@ const DATE_IMPLIES: Partial<
   // Approved. The ball is ours again, and the next document is the invoice.
   quote_returned_at: () => [todo("Send Invoice")],
   invoice_sent_at: () => [status("invoice")],
-  // Mark's own pairing: paid means it is an Order, and the thing left is to
-  // print it. THE MONEY COMES FIRST (2026-09-19) — a date saying the invoice
+  // Mark's own pairing: paid means it is an Order, and the thing left is the
+  // receipt (Mark, 2026-10-01; it was printing until then). THE MONEY COMES FIRST (2026-09-19) — a date saying the invoice
   // was paid while the balance still shows the whole amount outstanding is the
   // record disagreeing with itself, and that is worth more than the ladder.
   invoice_paid_at: (o, m) => [

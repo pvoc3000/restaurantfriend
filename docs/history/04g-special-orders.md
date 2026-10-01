@@ -5251,3 +5251,34 @@ menu section "Selling" was renamed "Sales" the same day.
 Later the same day (Mark): an unbooked delivery at status `order` is GREEN while
 still one step short — ready for the kitchen, not yet complete
 (`OrderProgress.ready`). Paid but still at `invoice`, it stays yellow.
+
+**2026-10-01 — 161 WRITTEN, NOT YET APPLIED: the app flags what needs doing; a
+system flag is a red BAR, a person's flag a red ROW.** Mark: "Set a system flag
+and a to do when we need to act". Inquiry → Respond to Email/Call (058,
+unchanged; Mark wrote "Call/Email", the stored value was kept because 117 and
+the settle function match on it). Quote approved online → **Send Invoice** (new
+to-do; 116 already flagged it). Paid in full online (Square pay link or
+QuickBooks) → Schedule Delivery, or **Send Receipt** where it used to be Print
+Order — and a new 'customer' event, "Paid online through Square/QuickBooks",
+which 116's trigger turns into the flag. Only a payment that SETTLES an order
+flags it (a deposit asks nothing), and a hand-recorded payment flags nothing.
+Delivery booked on a PAID order whose receipt hasn't gone → **Send Receipt** and
+a system flag "Delivery scheduled"; on an unpaid order 122's behaviour is
+unchanged. `paidTodo` (the hand-payment offer) follows: Send Receipt.
+**`flag_raised_at` is new and load-bearing:** the delivery case is the first
+SYSTEM flag raised by a signed-in person's own write, and 054 logs that write
+as an authored event in the same statement, which 116 reads as "the team
+arrived" — the flag would have been cleared before anyone saw it. A system flag
+now clears only on an authored event in a LATER transaction.
+To-dos are still set only over an empty or answered one; a person's flag is
+never overwritten. Verified on a throwaway PG15 (condensed prelude; 116's
+triggers and 115's logger verbatim; 161 applied twice): approval → Send Invoice
++ flag, typed to-do kept, person flag kept; Square payment over a pickup and an
+unbooked delivery → Send Receipt / Schedule Delivery + flag, replay recorded
+nothing; QBO payment → flag; deposit → nothing; staff note clears the flag and
+keeps the to-do; booking the delivery → Send Receipt + "Delivery scheduled",
+surviving its own logging; next staff touch clears it; the receipt clears both.
+**The list:** `orderProgress` gained tone `notice` (system flag): the bar keeps
+its length and is red, at least one step so a new inquiry's bare lead still
+shows. `flagged` (a person's) stays full-width red. The To-do text is regular
+weight, not bold.

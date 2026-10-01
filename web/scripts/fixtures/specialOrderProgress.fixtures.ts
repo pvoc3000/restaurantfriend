@@ -218,13 +218,39 @@ test("A FLAGGED LEAD STILL DRAWS — and after 058 that is the common case", () 
   // the two rules meet on the commonest new row in the list. Flagged has to be
   // decided FIRST: the other order gives every new inquiry no bar at all, which
   // is the exact opposite of what flagging it is for.
-  const p = order({ flag_reason: "New Inquiry" });
+  const p = order({ flag_reason: "New Inquiry", flag_source: "system" });
   eq(p.done, 1, "a bare lead");
   eq(p.fraction, 0, "which on its own would draw nothing");
+  eq(p.tone, "notice", "the app raised it");
   const style = progressRowStyle(p)!;
   ok(style !== null, "but it draws");
   ok(style.backgroundImage.includes("210, 0, 0"), "red");
-  ok(style.backgroundImage.includes("100%"), "full width");
+  ok(style.backgroundImage.includes("25.000%"), "one step, not the full width");
+});
+
+test("A SYSTEM FLAG KEEPS THE BAR'S LENGTH AND TURNS IT RED (2026-10-01)", () => {
+  const p = order({
+    status: "quote",
+    quote_sent_at: "a",
+    quote_returned_at: "a",
+    flag_reason: "Quote approved online by Jane",
+    flag_source: "system",
+  });
+  eq(p.tone, "notice");
+  const style = progressRowStyle(p)!;
+  ok(style.backgroundImage.includes("210, 0, 0"), "red");
+  ok(style.backgroundImage.includes("50.000%"), "at its own length, two of four steps");
+  ok(!style.backgroundImage.includes("255, 212, 0"), "and not yellow");
+  // A PERSON's flag on the same order fills the row.
+  const person = order({
+    status: "quote",
+    quote_sent_at: "a",
+    quote_returned_at: "a",
+    flag_reason: "Wrong date",
+    flag_source: "person",
+  });
+  eq(person.tone, "flagged");
+  ok(progressRowStyle(person)!.backgroundImage.includes("100%"), "full width");
 });
 
 test("every rung before Invoice paid is YELLOW, whatever its length", () => {

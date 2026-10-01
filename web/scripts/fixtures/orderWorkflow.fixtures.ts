@@ -58,11 +58,11 @@ test("invoice sent date set → move to Invoice", () => {
   );
 });
 
-test("invoice paid date set → move to Order AND set the Print Order to-do", () => {
+test("invoice paid date set → move to Order AND set the Send Receipt to-do", () => {
   // Mark's own pairing, and the one rule that proposes two things at once.
   eq(
     cols(afterDateSet(order({ status: "invoice", invoice_paid_at: TODAY }), "invoice_paid_at")),
-    [["status", "order"], ["todo", "Print Order"]]
+    [["status", "order"], ["todo", "Send Receipt"]]
   );
 });
 
@@ -78,12 +78,12 @@ test("a DELIVERY paid in full → Schedule Delivery, unless it is already booked
         "invoice_paid_at"
       )
     ),
-    [["status", "order"], ["todo", "Print Order"]],
+    [["status", "order"], ["todo", "Send Receipt"]],
     "courier already booked"
   );
   eq(
     cols(afterDateSet(order({ status: "invoice", invoice_paid_at: TODAY, fulfillment: "pickup" }), "invoice_paid_at")),
-    [["status", "order"], ["todo", "Print Order"]],
+    [["status", "order"], ["todo", "Send Receipt"]],
     "pickup"
   );
 });
@@ -208,11 +208,11 @@ test("nothing already true is proposed", () => {
   eq(afterDateSet(order({ status: "quote", quote_sent_at: TODAY }), "quote_sent_at"), []);
   eq(
     afterDateSet(
-      order({ status: "order", todo: "Print Order", invoice_paid_at: TODAY }),
+      order({ status: "order", todo: "Send Receipt", invoice_paid_at: TODAY }),
       "invoice_paid_at"
     ),
     [],
-    "already Order and already told to print"
+    "already Order and already told to send the receipt"
   );
 });
 
@@ -231,7 +231,7 @@ test("a column is never proposed twice", () => {
 test("a settling payment offers the date AND what it implies", () => {
   eq(
     cols(afterPaymentSettled(order({ status: "invoice" }), TODAY)),
-    [["invoice_paid_at", TODAY], ["status", "order"], ["todo", "Print Order"]]
+    [["invoice_paid_at", TODAY], ["status", "order"], ["todo", "Send Receipt"]]
   );
 });
 
@@ -252,13 +252,13 @@ test("paid date set with a balance outstanding → offer to record it", () => {
         balance: 267.09,
       })
     ),
-    [["payment", `267.09 on ${TODAY}`], ["status", "order"], ["todo", "Print Order"]]
+    [["payment", `267.09 on ${TODAY}`], ["status", "order"], ["todo", "Send Receipt"]]
   );
 });
 
 test("…and the amount is the WHOLE balance, to the cent", () => {
   const [pay] = afterDateSet(
-    order({ status: "order", todo: "Print Order", invoice_paid_at: TODAY }),
+    order({ status: "order", todo: "Send Receipt", invoice_paid_at: TODAY }),
     "invoice_paid_at",
     { balance: 100 / 3 }
   );
@@ -274,7 +274,7 @@ test("…nothing when the balance is already clear", () => {
         balance: 0,
       })
     ),
-    [["status", "order"], ["todo", "Print Order"]]
+    [["status", "order"], ["todo", "Send Receipt"]]
   );
 });
 
@@ -283,7 +283,7 @@ test("…nor for a credit balance, which is not a payment to take", () => {
   // a thing to offer, and `<=` is what keeps it off the screen.
   eq(
     cols(
-      afterDateSet(order({ status: "order", todo: "Print Order", invoice_paid_at: TODAY }), "invoice_paid_at", {
+      afterDateSet(order({ status: "order", todo: "Send Receipt", invoice_paid_at: TODAY }), "invoice_paid_at", {
         balance: -4,
       })
     ),
@@ -294,7 +294,7 @@ test("…nor for a credit balance, which is not a payment to take", () => {
 test("…nor a third of a cent, which is arithmetic rather than a debt", () => {
   eq(
     cols(
-      afterDateSet(order({ status: "order", todo: "Print Order", invoice_paid_at: TODAY }), "invoice_paid_at", {
+      afterDateSet(order({ status: "order", todo: "Send Receipt", invoice_paid_at: TODAY }), "invoice_paid_at", {
         balance: 0.004,
       })
     ),
@@ -307,7 +307,7 @@ test("…NEVER on a wholesale day billed in arrears (`ignore_balance`)", () => {
   // every one of them carries a balance on purpose.
   eq(
     cols(
-      afterDateSet(order({ status: "order", todo: "Print Order", invoice_paid_at: TODAY }), "invoice_paid_at", {
+      afterDateSet(order({ status: "order", todo: "Send Receipt", invoice_paid_at: TODAY }), "invoice_paid_at", {
         balance: 613.5,
         ignore_balance: true,
       })
@@ -321,7 +321,7 @@ test("…and nothing at all when the caller passes no money", () => {
   // balance, and must not start asking about one.
   eq(
     cols(afterDateSet(order({ status: "invoice", invoice_paid_at: TODAY }), "invoice_paid_at")),
-    [["status", "order"], ["todo", "Print Order"]]
+    [["status", "order"], ["todo", "Send Receipt"]]
   );
 });
 
@@ -331,7 +331,7 @@ test("a settling payment still never proposes ANOTHER payment", () => {
   // worse than saying nothing.
   eq(
     cols(afterPaymentSettled(order({ status: "invoice" }), TODAY)),
-    [["invoice_paid_at", TODAY], ["status", "order"], ["todo", "Print Order"]]
+    [["invoice_paid_at", TODAY], ["status", "order"], ["todo", "Send Receipt"]]
   );
 });
 
@@ -395,12 +395,12 @@ test("the summary reads as a question, however many parts", () => {
     consequenceSummary(
       afterDateSet(order({ status: "invoice", invoice_paid_at: TODAY }), "invoice_paid_at")
     ),
-    "Move the order to Order, and set the to-do to Print Order?",
+    "Move the order to Order, and set the to-do to Send Receipt?",
     "only the first part keeps its capital"
   );
   eq(
     consequenceSummary(
-      afterDateSet(order({ status: "order", todo: "Print Order", invoice_paid_at: TODAY }), "invoice_paid_at", {
+      afterDateSet(order({ status: "order", todo: "Send Receipt", invoice_paid_at: TODAY }), "invoice_paid_at", {
         balance: 267.09,
       })
     ),

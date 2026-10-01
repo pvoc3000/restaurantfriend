@@ -898,7 +898,7 @@ export function SpecialOrdersList({
         return (
           <span className="block">
             {r.todo ? (
-              <span className="font-bold">{r.todo}</span>
+              <span>{r.todo}</span>
             ) : (
               <span className="text-faint">—</span>
             )}
@@ -1169,10 +1169,11 @@ export function SpecialOrdersList({
        * full width; anchoring either to a cell makes it as wide as that column.
        *
        * A CANCELLED ORDER GETS NO BAR (the style is `undefined`, not a zero
-       * width) and a FLAGGED one is full-width red whatever its stages say —
-       * Mark's two special cases, and both are right for the same reason: a
-       * flagged order is not a progress question, and a cancelled one is not
-       * partly done, it is not happening.
+       * width) and one a PERSON flagged is full-width red whatever its stages
+       * say — Mark's two special cases, and both are right for the same
+       * reason: a recorded problem is not a progress question, and a cancelled
+       * order is not partly done, it is not happening. A SYSTEM flag keeps its
+       * length and turns red (2026-10-01): the app asking for the next step.
        */
       rowStyle={
         SHOW_ROW_PROGRESS_WASH

@@ -851,19 +851,20 @@ export function needsAttention(
  * THE TO-DO A PAID ORDER GETS (Mark, 2026-09-22): "if the order is set for
  * delivery, when it's paid in full, the to do should be set to 'schedule
  * delivery'". A delivery order whose courier is not booked yet books it first;
- * everything else — and a delivery already booked — goes to the printer.
+ * everything else — and a delivery already booked — is waiting on its RECEIPT
+ * (Mark, 2026-10-01; it was Print Order until then).
  *
- * One function, because three places say it and must agree: the offer after a
- * hand-recorded payment (`lib/orderWorkflow`) and migration 122's pay-link
- * payment, which is the SQL copy of this rule.
+ * One function, because two places say it and must agree: the offer after a
+ * hand-recorded payment (`lib/orderWorkflow`) and migration 161's
+ * `settle_special_order_paid`, which is the SQL copy of this rule.
  */
 export function paidTodo(order: {
   fulfillment?: string | null;
   delivery_scheduled_at: string | null;
-}): "Schedule Delivery" | "Print Order" {
+}): "Schedule Delivery" | "Send Receipt" {
   return order.fulfillment === "delivery" && !order.delivery_scheduled_at
     ? "Schedule Delivery"
-    : "Print Order";
+    : "Send Receipt";
 }
 
 /* ==========================================================================
