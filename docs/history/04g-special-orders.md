@@ -5314,3 +5314,13 @@ beside Distance re-measures (kitchen changed, first try failed). States are
 sentences under the field: no kitchen, no address, Google can't find it, rates
 not set, beyond the farthest estimate (distance only). Probed: anon → 401. Not
 yet exercised signed in, since that writes to a real order.
+
+**2026-10-01 — new customer invoices collect through QUICKBOOKS by default**
+(Mark: "make paying through quickbooks the default option on special orders
+and invoices", then "change the database default to quickbooks too"). Both
+create dialogs start from `DEFAULT_PROCESSOR` in `lib/customerInvoices`;
+Square is still offered. Migration 163 (APPLIED the same day) sets
+`customer_invoices.processor`'s column default to 'quickbooks'. Nothing in the
+app relies on the column default — `create_customer_invoice` takes
+`p_processor` with no default, and 124's five-argument signature was dropped by
+145. Existing invoices are unchanged.
