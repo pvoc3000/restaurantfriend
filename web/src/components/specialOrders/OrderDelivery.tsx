@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
-import { shopStreetAddress } from "@/lib/specialOrderDocs";
+import { shopPhone, shopStreetAddress, type DeliveryQuoteFacts } from "@/lib/specialOrderDocs";
 import { createClient } from "@/lib/supabase/client";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { money } from "@/lib/specialOrders";
-import { RequestDeliveryQuote } from "./RequestDeliveryQuote";
+import { CarrierEmail } from "./CarrierEmail";
 import { TimeCell } from "./TimeCell";
 
 /**
@@ -63,6 +63,26 @@ export function OrderDelivery({
   const kitchenId = (row.kitchen_location_id as string | null) ?? null;
   const company = (row.delivery_company as string | null) ?? null;
   const router = useRouter();
+
+  /** What the two carrier emails are written from. */
+  const customer = (row.customers ?? null) as { email?: string | null } | null;
+  const kitchenAddress = kitchenId ? shopAddresses[kitchenId] : null;
+  const carrierFacts: DeliveryQuoteFacts = {
+    number: row.number as string,
+    event_date: (row.event_date as string | null) ?? null,
+    delivery_company: company,
+    delivery_address: address || null,
+    delivery_boxes: (row.delivery_boxes as number | null) ?? null,
+    delivery_weight_lbs: (row.delivery_weight_lbs as number | null) ?? null,
+    delivery_window_start: (row.delivery_window_start as string | null) ?? null,
+    delivery_window_end: (row.delivery_window_end as string | null) ?? null,
+    pickup_address: shopStreetAddress(kitchenAddress),
+    pickup_phone: shopPhone(kitchenAddress),
+    contact_name: (row.contact_name as string | null) ?? null,
+    contact_phone: (row.contact_phone as string | null) ?? null,
+    customer_email: customer?.email ?? (row.contact_email as string | null) ?? null,
+    org_email: ((orgSettings.billing ?? {}) as { email?: string }).email ?? null,
+  };
 
   // THE COMPANY IS CHOSEN FROM THE DELIVERY VENDORS (Mark, 2026-10-01), and
   // stored as the vendor's NAME in the same text column — some 7,300 FileMaker
@@ -246,25 +266,23 @@ export function OrderDelivery({
                 <Cell id={id} canWrite={canWrite} column="delivery_company_email" value={(row.delivery_company_email as string | null) ?? null}
                       label="Delivery company email" />
               </Row>
-              <Row label="Quote">
+              {/* THE TWO MESSAGES TO THE CARRIER (Mark, 2026-10-01): ask
+                  what it costs, then book it. */}
+              <Row label="Email them">
                 {canWrite ? (
-                  <RequestDeliveryQuote
-                    orderId={id}
-                    to={(row.delivery_company_email as string | null) ?? null}
-                    orgSettings={orgSettings}
-                    orgName={orgName}
-                    facts={{
-                      number: row.number as string,
-                      event_date: (row.event_date as string | null) ?? null,
-                      delivery_company: company,
-                      delivery_address: address || null,
-                      delivery_boxes: (row.delivery_boxes as number | null) ?? null,
-                      delivery_weight_lbs: (row.delivery_weight_lbs as number | null) ?? null,
-                      delivery_window_start: (row.delivery_window_start as string | null) ?? null,
-                      delivery_window_end: (row.delivery_window_end as string | null) ?? null,
-                      pickup_address: kitchenId ? shopStreetAddress(shopAddresses[kitchenId]) : null,
-                    }}
-                  />
+                  <div className="flex flex-wrap items-start gap-2">
+                    {(["delivery_quote", "delivery_request"] as const).map((kind) => (
+                      <CarrierEmail
+                        key={kind}
+                        kind={kind}
+                        orderId={id}
+                        to={(row.delivery_company_email as string | null) ?? null}
+                        orgSettings={orgSettings}
+                        orgName={orgName}
+                        facts={carrierFacts}
+                      />
+                    ))}
+                  </div>
                 ) : (
                   <span className={READ_ONLY_VALUE}>—</span>
                 )}

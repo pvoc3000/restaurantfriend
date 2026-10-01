@@ -102,6 +102,12 @@ const VAR_EXAMPLE: Record<string, string> = {
   boxes: "4",
   weight: "12 lbs",
   delivery_time: "6:30 PM — when the delivery window closes",
+  pickup_time: "4:30 PM — when the delivery window opens",
+  pickup_phone: "(213) 908-2745 — the kitchen’s phone",
+  contact_name: "the day-of contact",
+  contact_phone: "the day-of contact’s phone",
+  customer_email: "the customer’s email, else the day-of contact’s",
+  notify_emails: "info@donutfriend.com, the customer’s email — the org’s billing email first",
 };
 
 /**
@@ -157,6 +163,12 @@ const TEMPLATES: {
     label: "Delivery quote request",
     when: "Sent to the delivery company from Request Quote on an order’s Delivery tab.",
     vars: ["delivery_company", "org", "event_date", "pickup_address", "boxes", "weight", "number", "delivery_address", "delivery_time", "delivery_window"],
+  },
+  {
+    key: "delivery_request",
+    label: "Delivery request",
+    when: "Sent to the delivery company from Request delivery on an order’s Delivery tab, to book it.",
+    vars: ["delivery_company", "org", "event_date", "pickup_address", "pickup_time", "pickup_phone", "boxes", "weight", "number", "delivery_address", "delivery_time", "delivery_window", "contact_name", "contact_phone", "customer_email", "notify_emails"],
   },
   {
     key: "order",

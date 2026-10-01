@@ -3,7 +3,7 @@
 
 import { test, eq, ok, no } from "./harness";
 import {
-  buildDeliveryQuoteEmail,
+  buildCarrierEmail,
   deliveryQuoteVars,
   shopStreetAddress,
   type DeliveryQuoteFacts,
@@ -22,7 +22,7 @@ const facts: DeliveryQuoteFacts = {
 };
 
 test("the request reads like FileMaker's, signed by the org, never hardcoded", () => {
-  const { subject, body } = buildDeliveryQuoteEmail(facts, {}, "Donut Friend");
+  const { subject, body } = buildCarrierEmail("delivery_quote", facts, {}, "Donut Friend");
   eq(subject, "Delivery quote request — order #SO-10093, 10/3/2026");
   ok(body.startsWith("Dear DeliverLA,\n\n"));
   ok(body.includes("Donut Friend would like to request a quote for a delivery on 10/3/2026."));
@@ -36,9 +36,9 @@ test("the request reads like FileMaker's, signed by the org, never hardcoded", (
 
 test("a template in Settings replaces the default; a blank one does not", () => {
   const custom = { special_orders: { email: { delivery_quote: { subject: "Quote? {number}", body: "Hi {delivery_company} — {delivery_window}" } } } };
-  eq(buildDeliveryQuoteEmail(facts, custom, "DF"), { subject: "Quote? SO-10093", body: "Hi DeliverLA — between 4:30 PM and 6:30 PM" });
+  eq(buildCarrierEmail("delivery_quote", facts, custom, "DF"), { subject: "Quote? SO-10093", body: "Hi DeliverLA — between 4:30 PM and 6:30 PM" });
   const blank = { special_orders: { email: { delivery_quote: { subject: " ", body: "" } } } };
-  eq(buildDeliveryQuoteEmail(facts, blank, "DF").subject, "Delivery quote request — order #SO-10093, 10/3/2026");
+  eq(buildCarrierEmail("delivery_quote", facts, blank, "DF").subject, "Delivery quote request — order #SO-10093, 10/3/2026");
 });
 
 test("an unknown field prints as nothing after its label, so the carrier sees it is unknown", () => {
@@ -56,4 +56,33 @@ test("shopStreetAddress: the shop's SHIPPING address, on one line", () => {
   );
   eq(shopStreetAddress({ billing: { street1: "x" } }), null);
   eq(shopStreetAddress(null), null);
+});
+
+test("the delivery REQUEST books it: pickup time and phone, contact, notification emails", () => {
+  const { subject, body } = buildCarrierEmail(
+    "delivery_request",
+    {
+      ...facts,
+      pickup_phone: "(213) 908-2743",
+      contact_name: "Jane Doe",
+      contact_phone: "(323) 555-0100",
+      customer_email: "jane@example.com",
+      org_email: "info@donutfriend.com",
+    },
+    {},
+    "Donut Friend"
+  );
+  eq(subject, "Delivery request — order #SO-10093, 10/3/2026");
+  ok(body.includes("Donut Friend would like to schedule a delivery for 10/3/2026."));
+  ok(body.includes("Pickup time: 4:30 PM\nPickup phone: (213) 908-2743\n"), "the window's START, as FileMaker sent");
+  ok(body.includes("Contact: Jane Doe\nContact phone: (323) 555-0100\n"));
+  ok(body.includes("Email notifications:\ninfo@donutfriend.com, jane@example.com\n"));
+  ok(body.includes("Please respond with a tracking number and cost."));
+  no(body.includes("{"), "every token filled");
+});
+
+test("notification emails: the org's first, no duplicate, no dangling comma", () => {
+  eq(deliveryQuoteVars({ ...facts, org_email: "info@df.com", customer_email: null }, "DF").notify_emails, "info@df.com");
+  eq(deliveryQuoteVars({ ...facts, org_email: "Info@DF.com", customer_email: "info@df.com" }, "DF").notify_emails, "Info@DF.com");
+  eq(deliveryQuoteVars({ ...facts }, "DF").notify_emails, "");
 });

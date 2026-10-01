@@ -628,7 +628,12 @@ export type EmailParts = { to: string; cc: string; subject: string; body: string
  * FileMaker hardcoded "The Donut Friend Team" into a script. We don't.
  */
 export const DEFAULT_TEMPLATES: Record<
-  DocumentKind | "statement" | "inquiry" | "customer_invoice" | "invoice_payment" | "delivery_quote",
+  | DocumentKind
+  | "statement"
+  | "inquiry"
+  | "customer_invoice"
+  | "invoice_payment"
+  | CarrierEmailKind,
   { subject: string; body: string }
 > = {
   quote: {
@@ -731,7 +736,7 @@ export const DEFAULT_TEMPLATES: Record<
    * Request Quote button on the Delivery tab. FileMaker's script, with its
    * hardcoded "The Donut Friend Team" signature replaced by `{org}` and its
    * Delivery Type line left out (there is no such field here). Filled by
-   * `buildDeliveryQuoteEmail`.
+   * `buildCarrierEmail`.
    */
   delivery_quote: {
     subject: "Delivery quote request — order #{number}, {event_date}",
@@ -746,6 +751,36 @@ export const DEFAULT_TEMPLATES: Record<
       "Destination: {delivery_address}\n" +
       "Delivery time: {delivery_time}\n\n" +
       "Please respond with a pickup time and cost.\n\n" +
+      "Thank you!\n\n" +
+      "{org}\n",
+  },
+  /**
+   * A DELIVERY REQUEST — booking the carrier (Mark, 2026-10-01), from the
+   * Request delivery button beside Request Quote. FileMaker's script, with
+   * its hardcoded pickup phone, notification address and signature replaced
+   * by `{pickup_phone}` (the kitchen's), `{notify_emails}` (the org's email
+   * and the customer's) and `{org}`, and no Delivery Type line.
+   */
+  delivery_request: {
+    subject: "Delivery request — order #{number}, {event_date}",
+    body:
+      "Dear {delivery_company},\n\n" +
+      "{org} would like to schedule a delivery for {event_date}. The details are as follows:\n\n" +
+      "Date: {event_date}\n" +
+      "Pickup location: {pickup_address}\n" +
+      "Pickup time: {pickup_time}\n" +
+      "Pickup phone: {pickup_phone}\n" +
+      "Pieces: {boxes}\n" +
+      "Weight: {weight}\n" +
+      "Order #: {number}\n\n" +
+      "Destination: {delivery_address}\n" +
+      "Delivery time: {delivery_time}\n\n" +
+      "Contact: {contact_name}\n" +
+      "Contact phone: {contact_phone}\n\n" +
+      "Email notifications:\n" +
+      "{notify_emails}\n" +
+      "Confirmed, Picked Up, & Delivered notifications\n\n" +
+      "Please respond with a tracking number and cost.\n\n" +
       "Thank you!\n\n" +
       "{org}\n",
   },
@@ -1134,8 +1169,11 @@ export function replySubject(inboundSubject: string | null | undefined): string 
 }
 
 /* ==========================================================================
- * THE DELIVERY QUOTE REQUEST
+ * TO THE DELIVERY COMPANY — the quote request and the delivery request
  * ========================================================================== */
+
+/** The two messages to a delivery company: ask what it costs, then book it. */
+export type CarrierEmailKind = "delivery_quote" | "delivery_request";
 
 /** What the request is written from — the order's own delivery fields. */
 export type DeliveryQuoteFacts = {
@@ -1149,11 +1187,26 @@ export type DeliveryQuoteFacts = {
   delivery_window_end: string | null;
   /** The kitchen's street address — where the carrier picks up. */
   pickup_address: string | null;
+  /** The kitchen's phone, for the driver. */
+  pickup_phone?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  /** The customer's email (else the day-of contact's), for tracking notices. */
+  customer_email?: string | null;
+  /** The org's own address for the same notices — `settings.billing.email`. */
+  org_email?: string | null;
 };
 
 /** "5107 York Blvd, Los Angeles, CA 90042" from `locations.address.shipping`
  *  (the shop; `billing` is the office). The web twin of `originAddress` in
  *  `supabase/functions/_shared/deliveryFee.ts`, which Deno owns. */
+/** The shop's phone, from the same `shipping` block. */
+export function shopPhone(address: unknown): string | null {
+  const a = ((address ?? {}) as Record<string, unknown>).shipping as Record<string, unknown> | undefined;
+  const v = typeof a?.phone === "string" ? a.phone.trim() : "";
+  return v || null;
+}
+
 export function shopStreetAddress(address: unknown): string | null {
   const a = ((address ?? {}) as Record<string, unknown>).shipping as Record<string, unknown> | undefined;
   if (!a) return null;
@@ -1185,19 +1238,30 @@ export function deliveryQuoteVars(facts: DeliveryQuoteFacts, orgName: string): R
     // FileMaker sent the window's END — when it has to be there by.
     delivery_time: to,
     delivery_window: from && to ? `between ${from} and ${to}` : from ? `after ${from}` : to ? `by ${to}` : "",
+    // FileMaker's pickup time was the window's START.
+    pickup_time: from,
+    pickup_phone: (facts.pickup_phone ?? "").trim(),
+    contact_name: (facts.contact_name ?? "").trim(),
+    contact_phone: (facts.contact_phone ?? "").trim(),
+    customer_email: (facts.customer_email ?? "").trim(),
+    notify_emails: [facts.org_email, facts.customer_email]
+      .map((e) => (e ?? "").trim())
+      .filter((e, i, all) => e && all.findIndex((x) => x.toLowerCase() === e.toLowerCase()) === i)
+      .join(", "),
     org: orgName,
   };
 }
 
-export function buildDeliveryQuoteEmail(
+export function buildCarrierEmail(
+  kind: CarrierEmailKind,
   facts: DeliveryQuoteFacts,
   orgSettings: Record<string, unknown>,
   orgName: string
 ): { subject: string; body: string } {
   const so = (orgSettings?.special_orders ?? {}) as Record<string, unknown>;
   const configured =
-    ((so.email ?? {}) as Record<string, { subject?: string; body?: string }>).delivery_quote ?? {};
-  const fallback = DEFAULT_TEMPLATES.delivery_quote;
+    ((so.email ?? {}) as Record<string, { subject?: string; body?: string }>)[kind] ?? {};
+  const fallback = DEFAULT_TEMPLATES[kind];
   const orDefault = (v: string | undefined, f: string) => (typeof v === "string" && v.trim() !== "" ? v : f);
   const vars = deliveryQuoteVars(facts, orgName);
   return {

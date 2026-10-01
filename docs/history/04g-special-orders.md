@@ -5341,3 +5341,16 @@ the special orders mailbox, unthreaded, and logs "Delivery quote requested from
 `{delivery_address}` on one line, `{boxes}`, `{weight}`, `{delivery_time}`
 (the window's END, as FileMaker sent), `{delivery_window}`. Fixtures:
 `deliveryQuote.fixtures.ts`.
+
+**2026-10-01 — Request delivery** beside Request Quote (Mark, with FileMaker's
+booking script). `CarrierEmail` (was `RequestDeliveryQuote`) draws both from
+`buildCarrierEmail(kind, …)`; the new `delivery_request` template is on
+Settings → Messages. FileMaker's three hardcoded values became tokens:
+`{pickup_phone}` is the KITCHEN's shipping phone (FileMaker printed
+(213) 995-6191 for every shop — type it into the template if that number is
+the one carriers should call), `{notify_emails}` is `settings.billing.email`
+then the customer's email (else the day-of contact's), de-duplicated, and the
+signature is `{org}`. `{pickup_time}` is the window's START, as FileMaker sent.
+No Delivery Type line. `send-special-order-email` takes `kind:
+"delivery_request"` through the same branch and logs "Delivery requested from
+…" (DEPLOYED).

@@ -143,7 +143,9 @@ Deno.serve(async (req) => {
     // 124: a customer invoice is its own send — one invoice, many orders.
     if (payload.customer_invoice_id) return await sendCustomerInvoice(req, payload);
     // A delivery quote request goes to the CARRIER, with no document.
-    if (payload.kind === "delivery_quote") return await sendDeliveryQuoteRequest(req, payload);
+    if (payload.kind === "delivery_quote" || payload.kind === "delivery_request") {
+      return await sendDeliveryQuoteRequest(req, payload);
+    }
 
     const {
       order_id,
@@ -550,9 +552,9 @@ async function sendCustomerInvoice(
 }
 
 /**
- * A DELIVERY QUOTE REQUEST (Mark, 2026-10-01: a "Request Quote" button on the
- * Delivery tab, after FileMaker's script) — a plain email to the delivery
- * company asking for a pickup time and a cost. The text was composed from the
+ * A DELIVERY QUOTE REQUEST OR DELIVERY REQUEST (Mark, 2026-10-01: Request
+ * Quote and Request delivery on the Delivery tab, after FileMaker's scripts) —
+ * a plain email to the delivery company asking what it costs, or booking it. The text was composed from the
  * org's template and reviewed in the browser, as every other send here is.
  *
  * Same gates as a document (signed in, supervisor+), same mailbox, and the
@@ -562,9 +564,11 @@ async function sendCustomerInvoice(
  */
 async function sendDeliveryQuoteRequest(
   req: Request,
-  payload: { order_id?: string; to?: string; cc?: string; subject?: string; body?: string }
+  payload: { kind?: string; order_id?: string; to?: string; cc?: string; subject?: string; body?: string }
 ): Promise<Response> {
-  const { order_id, to, cc, subject, body } = payload;
+  const { kind, order_id, to, cc, subject, body } = payload;
+  // Request delivery (2026-10-01) is the same send with other words.
+  const booking = kind === "delivery_request";
   if (!order_id || !to || !subject || !body) {
     return json(400, { error: "missing order_id, to, subject or body" });
   }
@@ -624,7 +628,7 @@ async function sendDeliveryQuoteRequest(
   const { error: logError } = await supabase.from("special_order_events").insert({
     org_id: order.org_id,
     order_id,
-    message: `Delivery quote requested from ${order.delivery_company ?? to} (${to}${
+    message: `${booking ? "Delivery requested" : "Delivery quote requested"} from ${order.delivery_company ?? to} (${to}${
       cc ? `, cc ${cc}` : ""
     }) · ${providerId}`,
     author: member.display_name ?? user.email ?? null,
