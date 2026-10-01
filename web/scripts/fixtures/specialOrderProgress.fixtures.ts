@@ -498,3 +498,27 @@ test("an ordinary order still draws, and cancelled still does not", () => {
   ok(progressRowStyle(order({ status: "order" })) !== null);
   eq(order({ status: "cancelled" }).tone, "none");
 });
+
+/* -- an unbooked delivery is not complete (Mark, 2026-09-30) -------------- */
+
+test("a PAID delivery with no delivery scheduled is yellow and one step short", () => {
+  const p = order({ status: "order", fulfillment: "delivery" });
+  ok(p.awaitingDelivery);
+  eq(p.steps, 3);
+  eq(p.length, 0.75, "not full");
+  eq(progressColor(p), [255, 212, 0], "yellow, not green");
+  ok(progressRowStyle(p)!.backgroundImage.includes("75.000%"));
+  ok(progressChecklist(p).endsWith("☐︎ Delivery scheduled"));
+});
+
+test("once the delivery is booked it is full and green", () => {
+  const p = order({ status: "order", fulfillment: "delivery", delivery_scheduled_at: "2026-08-19" });
+  no(p.awaitingDelivery);
+  eq(p.length, 1);
+  eq(progressColor(p), [74, 156, 63]);
+});
+
+test("the hold only caps a full bar — an earlier delivery order draws as before", () => {
+  eq(order({ fulfillment: "delivery", quote_sent_at: "a" }).length, 0.25);
+  eq(order({ status: "order", fulfillment: "pickup" }).length, 1, "pickups untouched");
+});

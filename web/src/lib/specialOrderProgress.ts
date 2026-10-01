@@ -140,6 +140,23 @@ export type OrderProgress = {
    * green, which is the kitchen's cue.
    */
   length: number;
+  /**
+   * HOW MANY OF THE FOUR DRAWN STEPS ARE FILLED, 0..4 — `length` in whole
+   * steps, which is what the snapped bar indexes by.
+   */
+  steps: number;
+  /**
+   * A DELIVERY WITH NO DELIVERY SCHEDULED (Mark, 2026-09-30: "we should not
+   * consider a delivery order that doesn't have delivery scheduled as
+   * 'complete'. Those orders should still have an incomplete and yellow
+   * progress bar").
+   *
+   * NOT A RUNG. 82% of orders are pickups and the ladder header explains why
+   * the booking was left off it; adding a rung would move every pickup's bar.
+   * So it is a HOLD instead: a delivery order that has climbed to paid stops
+   * one step short of full and stays yellow until the courier is booked.
+   */
+  awaitingDelivery: boolean;
   ticks: ProgressTick[];
   /**
    * What the row's wash says, and the three cases are Mark's:
@@ -256,12 +273,18 @@ export function orderProgress(
         ? "flagged"
         : "progress";
 
+  const awaitingDelivery =
+    order.kind === "order" && order.fulfillment === "delivery" && !order.delivery_scheduled_at;
   const drawn = total - 2;
+  // The hold: a full bar is one step short until the delivery is booked.
+  const steps = Math.min(done - 1, awaitingDelivery ? drawn - 1 : drawn);
   return {
     done,
     total,
     fraction: (done - 1) / (total - 1),
-    length: Math.min(done - 1, drawn) / drawn,
+    length: steps / drawn,
+    steps,
+    awaitingDelivery,
     ticks,
     tone,
   };
@@ -307,6 +330,7 @@ export function progressChecklist(p: OrderProgress): string {
         t.state === "overdue" ? " — overdue" : t.state === "waiting" ? " — waiting on them" : "";
       return `${box} ${t.label}${note}`;
     })
+    .concat(p.awaitingDelivery ? ["\u2610\uFE0E Delivery scheduled"] : [])
     .join("\n");
 }
 
@@ -344,7 +368,9 @@ export const WASH_ALPHA = 0.2;
  */
 export const READY_RUNG = 5;
 export function progressColor(p: OrderProgress): [number, number, number] {
-  return p.done >= READY_RUNG ? GREEN : YELLOW;
+  // An unbooked delivery is not ready, however far it has climbed — see
+  // `OrderProgress.awaitingDelivery`.
+  return p.done >= READY_RUNG && !p.awaitingDelivery ? GREEN : YELLOW;
 }
 
 const rgba = ([r, g, b]: [number, number, number], a: number) => `rgba(${r}, ${g}, ${b}, ${a})`;
@@ -440,11 +466,11 @@ export function progressRowStyle(
   const solid = flagged ? RED : progressColor(p);
   // FOUR drawn steps — rungs 2 to 5, the team's work (see `length`). Rung 2
   // is the first that draws and rung 6 draws no further than rung 5, so the
-  // index is `min(done, 5) - 2`.
+  // index is `p.steps - 1` (which also carries the unbooked-delivery hold).
   const drawn = p.total - 2;
   const snapped = snapStops(drawn, boundaries);
   // Only the LENGTH snaps; the colour is the rung, not where the rules fall.
-  const width = snapped ? snapped[Math.min(p.done - 1, drawn) - 1] : p.length;
+  const width = snapped ? snapped[p.steps - 1] : p.length;
   const stop = flagged ? "100%" : `${(width * 100).toFixed(3)}%`;
   const wash = rgba(solid, flagged ? 0.15 : WASH_ALPHA);
 

@@ -62,7 +62,6 @@ import {
   matchesKindFilter,
   money,
   needsAttention,
-  suggestedTodo,
   type AttentionThresholds,
   type OrderTotals,
   type SpecialOrderKind,
@@ -875,8 +874,11 @@ export function SpecialOrdersList({
       sortValue: (r) => r.todo ?? "",
       sortTiebreaks: [(r) => r.number],
       /**
-       * Decision 4: the MANUAL to-do always overrides the derived hint on
-       * display.
+       * ONLY A REAL TO-DO (Mark, 2026-09-30: "remove any suggested to dos in
+       * the to-do column and only display real to dos. the suggested ones just
+       * clutter the screen"). The grey "Print Order?" hints `suggestedTodo`
+       * derived for every untouched row are gone; the column prints the
+       * `todo` somebody set, or a dash.
        *
        * THE DERIVED ATTENTION SENTENCE IS NOT PRINTED HERE (Mark, 2026-08-20:
        * "remove the yellow hint text in the first column. It's not needed").
@@ -893,15 +895,10 @@ export function SpecialOrdersList({
        * yellow, which is why it is not what was asked to go.
        */
       render: (r) => {
-        const hint = r.todo ? null : suggestedTodo(r as never, today);
         return (
           <span className="block">
             {r.todo ? (
               <span className="font-medium">{r.todo}</span>
-            ) : hint ? (
-              <span className="text-subtle italic" title="Suggested — nothing is written until you set it">
-                {hint}?
-              </span>
             ) : (
               <span className="text-faint">—</span>
             )}
