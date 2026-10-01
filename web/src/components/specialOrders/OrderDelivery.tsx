@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { createClient } from "@/lib/supabase/client";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -105,7 +105,7 @@ export function OrderDelivery({
     <div className="space-y-12">
           <section className="space-y-3">
             <SectionHeading>Where</SectionHeading>
-            <div className="grid gap-x-12 gap-y-4 sm:grid-cols-2">
+            <div className={GRID}>
               <Row label="Address" wide>
                 {canWrite ? (
                   <InlineValue
@@ -131,7 +131,7 @@ export function OrderDelivery({
                   </a>
                 ) : null}
               </Row>
-              <Row label="Distance (miles)">
+              <Row label="Distance (miles)" first>
                 <div className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
                     <Cell id={id} canWrite={canWrite} column="delivery_distance" value={row.delivery_distance as number | null}
@@ -140,7 +140,7 @@ export function OrderDelivery({
                   {canWrite && address ? (
                     <button
                       type="button"
-                      className={SMALL_BUTTON_CLASS}
+                      className={BUTTON_CLASS}
                       onClick={() => void measure()}
                       disabled={measuring}
                     >
@@ -159,7 +159,7 @@ export function OrderDelivery({
                           value={row.delivery_window_start as string | null}
                           label="Delivery window start" />
               </Row>
-              <Row label="Window closes">
+              <Row label="Window closes" first>
                 <TimeCell id={id} canWrite={canWrite} column="delivery_window_end"
                           value={row.delivery_window_end as string | null}
                           label="Delivery window end" />
@@ -169,8 +169,8 @@ export function OrderDelivery({
 
           <section className="space-y-3">
             <SectionHeading>Who carries it</SectionHeading>
-            <div className="grid gap-x-12 gap-y-4 sm:grid-cols-2">
-              <Row label="Company">
+            <div className={GRID}>
+              <Row label="Company" first>
                 <Cell id={id} canWrite={canWrite} column="delivery_company" value={row.delivery_company as string | null}
                       label="Delivery company" />
               </Row>
@@ -178,7 +178,7 @@ export function OrderDelivery({
                 <Cell id={id} canWrite={canWrite} column="delivery_company_phone" value={row.delivery_company_phone as string | null}
                       label="Delivery company phone" />
               </Row>
-              <Row label="Tracking">
+              <Row label="Tracking" first>
                 <Cell id={id} canWrite={canWrite} column="delivery_tracking" value={row.delivery_tracking as string | null}
                       label="Tracking number" />
               </Row>
@@ -195,8 +195,8 @@ export function OrderDelivery({
               Boxes and weight print on the kitchen document, so whoever packs
               it knows what the carrier is expecting.
             </p>
-            <div className="grid gap-x-12 gap-y-4 sm:grid-cols-2">
-              <Row label="Boxes">
+            <div className={GRID}>
+              <Row label="Boxes" first>
                 <Cell id={id} canWrite={canWrite} column="delivery_boxes" value={row.delivery_boxes as number | null}
                       kind="number" label="Number of boxes" />
               </Row>
@@ -204,7 +204,7 @@ export function OrderDelivery({
                 <Cell id={id} canWrite={canWrite} column="delivery_weight_lbs" value={row.delivery_weight_lbs as number | null}
                       kind="number" label="Weight in pounds" />
               </Row>
-              <Row label="What it costs us">
+              <Row label="What it costs us" first>
                 {/* `delivery_cost` is what the CARRIER charges; the customer's
                     `delivery_charge` is beside it. Two columns because they
                     routinely differ, and conflating them is how a delivery
@@ -227,17 +227,28 @@ export function OrderDelivery({
   );
 }
 
+/**
+ * FOUR COLUMNS, THE FIELDS IN THE FIRST TWO (Mark, 2026-10-01): the address
+ * spans two, every other field takes one, and the third and fourth stay empty.
+ * Auto-placement would carry the third field into column 3, so a field that
+ * begins a line says so (`first`) and the grid puts it back in column 1.
+ */
+const GRID = "grid gap-x-12 gap-y-4 sm:grid-cols-4";
+
 function Row({
   label,
   wide = false,
+  first = false,
   children,
 }: {
   label: string;
   wide?: boolean;
+  /** Begins a line — column 1. */
+  first?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className={`space-y-1 ${wide ? "sm:col-span-2" : ""}`}>
+    <div className={`space-y-1 ${wide ? "sm:col-span-2 sm:col-start-1" : first ? "sm:col-start-1" : ""}`}>
       <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{label}</dt>
       <dd>{children}</dd>
     </div>
