@@ -1286,7 +1286,7 @@ export async function SpecialOrderDetail({
 
           {/* ================= DELIVERY ================= */}
           {activeTab === "delivery" && (
-            <OrderDelivery id={id} row={row} canWrite={canWrite} />
+            <OrderDelivery id={id} row={row} canWrite={canWrite} kitchenOptions={locationOptions} canEditKitchen={canEditItems} />
           )}
 
           {/* ================= DOCUMENTS ================= */}

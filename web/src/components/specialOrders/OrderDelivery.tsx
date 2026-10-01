@@ -36,10 +36,16 @@ export function OrderDelivery({
   id,
   row,
   canWrite,
+  kitchenOptions,
+  canEditKitchen,
 }: {
   id: string;
   row: Record<string, unknown>;
   canWrite: boolean;
+  /** The Info tab's shop list, so the two kitchen cells offer the same shops. */
+  kitchenOptions: { value: string; label: string }[];
+  /** The Info tab's rule: no kitchen change once production is scheduled. */
+  canEditKitchen: boolean;
 }) {
   const address = (row.delivery_address as string | null) ?? "";
   const router = useRouter();
@@ -101,6 +107,19 @@ export function OrderDelivery({
     return { error: null };
   }
 
+  /** The kitchen cell's write: the distance is measured FROM the kitchen, so a
+   *  new one is measured again (when there is an address to measure to). */
+  async function writeKitchen(next: string | number | null): Promise<{ error: string | null }> {
+    const { data, error } = await createClient()
+      .from("special_orders")
+      .update({ kitchen_location_id: next })
+      .eq("id", id)
+      .select("id");
+    if (error || !data || data.length === 0) return { error: error?.message ?? "not saved" };
+    if (next && address.trim().length >= 5) void measure();
+    return { error: null };
+  }
+
   return (
     <div className="space-y-12">
           <section className="space-y-3">
@@ -131,7 +150,15 @@ export function OrderDelivery({
                   </a>
                 ) : null}
               </Row>
-              <Row label="Distance (miles)" first>
+              {/* THE THREE LINES (Mark, 2026-10-01): address across; kitchen,
+                  then distance with Calculate; window opens, then closes. The
+                  kitchen is here because the distance is measured from it. */}
+              <Row label="Kitchen" first>
+                <Cell id={id} canWrite={canEditKitchen} column="kitchen_location_id" kind="pick"
+                      options={kitchenOptions} value={(row.kitchen_location_id as string | null) ?? null}
+                      label="Kitchen" onWrite={writeKitchen} />
+              </Row>
+              <Row label="Distance (miles)">
                 <div className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
                     <Cell id={id} canWrite={canWrite} column="delivery_distance" value={row.delivery_distance as number | null}
@@ -152,14 +179,14 @@ export function OrderDelivery({
                   <p className="pt-1 text-[12px] text-muted" role="status">{measured}</p>
                 ) : null}
               </Row>
-              <Row label="Window opens">
+              <Row label="Window opens" first>
                 {/* `TimeCell`, not `Cell`: these are `time` columns and read
                     back as `10:00:00`. Same reason as the record's event time. */}
                 <TimeCell id={id} canWrite={canWrite} column="delivery_window_start"
                           value={row.delivery_window_start as string | null}
                           label="Delivery window start" />
               </Row>
-              <Row label="Window closes" first>
+              <Row label="Window closes">
                 <TimeCell id={id} canWrite={canWrite} column="delivery_window_end"
                           value={row.delivery_window_end as string | null}
                           label="Delivery window end" />
@@ -270,20 +297,30 @@ function Cell({
   kind,
   placeholder,
   format,
+  options,
+  onWrite,
 }: {
   id: string;
   canWrite: boolean;
   column: string;
   value: string | number | null;
   label: string;
-  kind?: "text" | "number" | "date";
+  kind?: "text" | "number" | "date" | "pick";
   placeholder?: string;
   format?: (v: string | number) => string;
+  options?: { value: string; label: string }[];
+  onWrite?: (next: string | number | null) => Promise<{ error: string | null }>;
 }) {
   if (!canWrite)
     return (
       <span className={READ_ONLY_VALUE}>
-        {value === null ? "—" : format ? format(value) : value}
+        {value === null
+          ? "—"
+          : options
+            ? options.find((o) => o.value === value)?.label ?? value
+            : format
+              ? format(value)
+              : value}
       </span>
     );
   return (
@@ -297,6 +334,8 @@ function Cell({
       ariaLabel={label}
       placeholder={placeholder}
       format={format}
+      options={options}
+      onWrite={onWrite}
     />
   );
 }
