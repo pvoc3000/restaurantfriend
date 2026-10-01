@@ -228,6 +228,16 @@ test("the address goes only with a DELIVERY (Mark, 2026-09-24: hidden for pickup
   eq(inquiryPayload(draft({ fulfillment: "delivery", address: " 5107 York Blvd " }), "o", "").address, "5107 York Blvd");
 });
 
+test("a DELIVERY's shop is the nearest one the estimate found, never a stale pickup pick", () => {
+  // Mark, 2026-10-01: delivery is measured from the kitchen, and a website
+  // delivery's kitchen is the nearest shop.
+  const picked = draft({ fulfillment: "pickup", locationId: "df01" });
+  eq(inquiryPayload(picked, "o", "", null, "df02").location_id, "df01", "a pickup sends its own shop");
+  const switched = draft({ fulfillment: "delivery", locationId: "df01", address: "1 Main St" });
+  eq(inquiryPayload(switched, "o", "", null, "df02").location_id, "df02", "a delivery sends the nearest");
+  eq(inquiryPayload(switched, "o", "").location_id, null, "and nothing when there was no estimate");
+});
+
 test("empty optional fields go as null, never as empty strings", () => {
   const p = inquiryPayload(draft({ occasion: "  " }), "org-1", "");
   eq(p.occasion, null, "whitespace is nothing");

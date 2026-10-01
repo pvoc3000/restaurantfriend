@@ -2,8 +2,10 @@
 // "Delivery estimate would be amazing if we can pull it off", priced "per mile
 // from the shop").
 //
-// base fee + per-mile rate × DRIVING miles from one origin shop, up to a
-// maximum distance, from `orgs.settings.special_orders.delivery`. Beyond the
+// base fee + per-mile rate × DRIVING miles from the KITCHEN (Mark, 2026-10-01:
+// "delivery should be measured from the kitchen location, not a set location"),
+// up to a maximum distance, from `orgs.settings.special_orders.delivery`. A
+// website lead has no kitchen yet, so it is the NEAREST shop (`deliveryQuote`). Beyond the
 // maximum there is no number at all — the form says "we'll quote it", because
 // a figure for somewhere we may not go is a promise.
 //
@@ -15,7 +17,6 @@
 // tests this very file (`squareOrder.ts`'s arrangement).
 
 export type DeliveryConfig = {
-  origin_location_id: string | null;
   base_fee: number | null;
   per_mile: number | null;
   max_miles: number | null;
@@ -28,19 +29,17 @@ export function readDeliveryConfig(raw: unknown): DeliveryConfig {
     const x = typeof v === "string" && v.trim() !== "" ? Number(v) : v;
     return typeof x === "number" && Number.isFinite(x) && x >= 0 ? x : null;
   };
-  const id = typeof r.origin_location_id === "string" && r.origin_location_id.trim() ? r.origin_location_id : null;
   return {
-    origin_location_id: id,
     base_fee: num(r.base_fee),
     per_mile: num(r.per_mile),
     max_miles: num(r.max_miles),
   };
 }
 
-/** An estimate is only offered once a shop and a per-mile rate are set — the
- *  same test `inquiry_menu`'s `delivery_estimate` flag makes. */
+/** An estimate is only offered once a per-mile rate is set — the same test
+ *  `inquiry_menu`'s `delivery_estimate` flag makes (migration 162). */
 export function deliveryConfigured(cfg: DeliveryConfig): boolean {
-  return cfg.origin_location_id !== null && cfg.per_mile !== null;
+  return cfg.per_mile !== null;
 }
 
 export const METERS_PER_MILE = 1609.344;

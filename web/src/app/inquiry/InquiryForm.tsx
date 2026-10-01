@@ -94,9 +94,15 @@ export function InquiryForm({ orgId }: { orgId: string }) {
   const [basket, setBasket] = useState<Basket>(EMPTY_BASKET);
   // The delivery estimate, KEYED BY THE ADDRESS it was worked out for: an
   // edited address makes it stale without an effect to clear it.
-  const [quoted, setQuoted] = useState<{ address: string; quote: DeliveryQuote } | null>(null);
+  // `from` is the NEAREST shop the estimate measured from (Mark, 2026-10-01):
+  // a delivery's kitchen, so the basket is priced there and the lead names it.
+  const [quoted, setQuoted] = useState<{ address: string; quote: DeliveryQuote; from: string | null } | null>(null);
 
-  const priceLocation = draft.fulfillment === "pickup" && draft.locationId ? draft.locationId : null;
+  const address = draft.address.trim();
+  const deliveryFrom =
+    draft.fulfillment === "delivery" && quoted && quoted.address === address ? quoted.from : null;
+  const priceLocation =
+    draft.fulfillment === "pickup" ? draft.locationId || null : deliveryFrom;
 
   const errors: InquiryErrors = validateInquiry(draft);
   const shown: InquiryErrors = touched ? errors : {};
@@ -105,7 +111,6 @@ export function InquiryForm({ orgId }: { orgId: string }) {
   const lines = useMemo(() => basketLines(basket, menu), [basket, menu]);
   const problems = useMemo(() => basketProblems(basket, menu, rules.minimums), [basket, menu, rules]);
 
-  const address = draft.address.trim();
   const delivery: DeliveryQuote =
     draft.fulfillment !== "delivery"
       ? { status: "none" }
@@ -192,12 +197,12 @@ export function InquiryForm({ orgId }: { orgId: string }) {
     if (draft.fulfillment !== "delivery" || !rules.delivery_estimate || !address) return;
     if (quoted && quoted.address === address && quoted.quote.status !== "unavailable") return;
     const asked = address;
-    setQuoted({ address: asked, quote: { status: "loading" } });
+    setQuoted({ address: asked, quote: { status: "loading" }, from: null });
     const supabase = createClient();
     const { data, error } = await supabase.functions.invoke("inquiry-delivery-quote", {
       body: { org_id: orgId, address: asked },
     });
-    const r = (data ?? {}) as { state?: string; fee?: number; miles?: number };
+    const r = (data ?? {}) as { state?: string; fee?: number; miles?: number; location_id?: string };
     const quote: DeliveryQuote =
       error || !r.state
         ? { status: "unavailable" }
@@ -206,7 +211,8 @@ export function InquiryForm({ orgId }: { orgId: string }) {
           : r.state === "outside_area"
             ? { status: "outside" }
             : { status: "unavailable" };
-    setQuoted((prev) => (prev && prev.address === asked ? { address: asked, quote } : prev));
+    const from = typeof r.location_id === "string" ? r.location_id : null;
+    setQuoted((prev) => (prev && prev.address === asked ? { address: asked, quote, from } : prev));
   }
 
   function set<K extends keyof InquiryDraft>(key: K, value: InquiryDraft[K]) {
@@ -227,7 +233,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
     setFailed(null);
     const supabase = createClient();
     const { data, error } = await supabase.functions.invoke("submit-inquiry", {
-      body: inquiryPayload(draft, orgId, honeypot, empty ? null : basketPayload(basket, menu)),
+      body: inquiryPayload(draft, orgId, honeypot, empty ? null : basketPayload(basket, menu), deliveryFrom),
     });
     setBusy(false);
 

@@ -5282,3 +5282,21 @@ surviving its own logging; next staff touch clears it; the receipt clears both.
 its length and is red, at least one step so a new inquiry's bare lead still
 shows. `flagged` (a person's) stays full-width red. The To-do text is regular
 weight, not bold.
+
+**2026-10-01 — 162 WRITTEN: delivery is measured from the KITCHEN** (Mark: "not
+a set location the user chooses in settings"; for a website lead, which has no
+kitchen yet, he chose the NEAREST shop over asking the customer or a default
+kitchen). `_shared/deliveryQuote` takes an optional `from` (the kitchen);
+without one it routes from every open physical shop with a street address and
+keeps the nearest, returning its `location_id`. `inquiry-delivery-quote`
+passes that id to the form, which prices the basket there and submits it as
+`location_id` on a delivery (never a stale pickup pick — `inquiryPayload`).
+162 makes `create_inquiry` treat a delivery's `p_location_id` as its price shop
+and so its kitchen (152 already made the kitchen the price shop), and stop
+writing it as a pickup shop; `inquiry_price_location` loses the settings step;
+`inquiry_menu` offers the estimate on a per-mile rate alone; the dead
+`origin_location_id` key is removed. `submit-inquiry` measures from the lead's
+stored kitchen. Settings → General → Delivery estimate lost "Measured from".
+The three live function bodies were md5-checked identical to 132/134/152 before
+editing. Not yet configured live (per-mile rate blank), so nothing changes for
+customers until it is set. The in-app order screen still does not calculate.

@@ -160,11 +160,8 @@ export function SpecialOrderSettings({
   settings,
   editable,
   section,
-  shops = [],
 }: {
   orgId: string;
-  /** The org's open physical shops, for the delivery estimate's origin. */
-  shops?: { id: string; label: string }[];
   settings: Settings;
   editable: boolean;
   /**
@@ -594,24 +591,15 @@ export function SpecialOrderSettings({
       </section>
 
       {/* ---- the delivery estimate (inquiry form) --------------------------
-          Base fee + a rate per DRIVING mile from one shop, worked out by the
-          `inquiry-delivery-quote` function (Google Routes). Beyond the maximum
-          the form says "we'll quote it". Until the shop and the per-mile rate
-          are both set, the form offers no estimate at all. Only the computed
-          fee ever reaches a customer; these numbers stay here. */}
+          Base fee + a rate per DRIVING mile from the order's KITCHEN — for a
+          website lead, the nearest shop (Mark, 2026-10-01: "not a set location
+          the user chooses in settings"). Google Routes, through
+          `_shared/deliveryQuote`. Beyond the maximum the form says "we'll
+          quote it". Until the per-mile rate is set, the form offers no
+          estimate at all. Only the computed fee ever reaches a customer. */}
       <section className="space-y-4">
         <SectionHeading>Delivery estimate</SectionHeading>
         <dl className="grid max-w-2xl grid-cols-[1fr_12rem] gap-x-6 gap-y-1 text-sm">
-          <dt className="py-0.5 text-subtle">Measured from</dt>
-          <dd className="py-0.5">
-            {editable
-              ? cell(["special_orders", "delivery", "origin_location_id"], text(delivery.origin_location_id), {
-                  kind: "pick",
-                  options: shops.map((s) => ({ value: s.id, label: s.label })),
-                  ariaLabel: "Delivery measured from",
-                })
-              : <span>{shops.find((s) => s.id === delivery.origin_location_id)?.label ?? "—"}</span>}
-          </dd>
           <Num label="Base fee ($)" path={["special_orders", "delivery", "base_fee"]} v={num(delivery.base_fee)} {...{ cell, editable }} />
           <Num label="Per mile ($)" path={["special_orders", "delivery", "per_mile"]} v={num(delivery.per_mile)} {...{ cell, editable }} />
           <Num label="Farthest we estimate (miles)" path={["special_orders", "delivery", "max_miles"]} v={num(delivery.max_miles)} {...{ cell, editable }} />

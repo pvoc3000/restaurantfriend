@@ -346,7 +346,11 @@ export function inquiryPayload(
   honeypot: string,
   /** `lib/inquiryOrder`'s `basketPayload` — 133's `p_items`. Null when the
    *  customer built nothing, which sends `{}` and makes 058's lead exactly. */
-  items: unknown = null
+  items: unknown = null,
+  /** A delivery's kitchen: the nearest shop the estimate measured from. A
+   *  pickup sends its chosen shop instead, and a delivery never sends one it
+   *  was left holding from before the switch. */
+  deliveryFrom: string | null = null
 ): Record<string, unknown> {
   const orNull = (s: string) => (s.trim() === "" ? null : s.trim());
   return {
@@ -360,7 +364,7 @@ export function inquiryPayload(
     // for pickup, "not necessary"). One typed before switching back to pickup
     // stays in the draft, in case they switch again, but is not sent.
     address: draft.fulfillment === "delivery" ? orNull(draft.address) : null,
-    location_id: orNull(draft.locationId),
+    location_id: draft.fulfillment === "delivery" ? deliveryFrom : orNull(draft.locationId),
     event_date: orNull(draft.eventDate),
     event_time: orNull(draft.eventTime),
     interest: orNull(draft.interest),

@@ -135,9 +135,6 @@ export default async function SettingsPage({
                 settings={settings}
                 editable={editable}
                 section="general"
-                shops={session.activeLocations
-                  .filter((l) => l.kind === "physical")
-                  .map((l) => ({ id: l.id, label: `${l.code} ${l.name}` }))}
               />
               {/* Say what this screen does NOT cover, so its absence is a
                   statement rather than something to hunt for. */}

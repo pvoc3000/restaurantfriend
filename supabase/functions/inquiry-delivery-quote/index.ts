@@ -103,8 +103,11 @@ Deno.serve(async (req) => {
 });
 
 /** Only what a customer may see. `outside_area` drops its miles on purpose:
- *  "we'll quote it" is the whole answer. */
+ *  "we'll quote it" is the whole answer. `location_id` is the NEAREST shop,
+ *  which the form prices the basket at and submits as the lead's kitchen —
+ *  public already, since `inquiry_shops` lists every shop's id. */
 function publicShape(r: DeliveryQuoteResult): Record<string, unknown> {
-  if (r.state === "ok") return { state: "ok", miles: r.miles, fee: r.fee };
+  if (r.state === "ok") return { state: "ok", miles: r.miles, fee: r.fee, location_id: r.location_id };
+  if (r.state === "outside_area") return { state: r.state, location_id: r.location_id };
   return { state: r.state };
 }

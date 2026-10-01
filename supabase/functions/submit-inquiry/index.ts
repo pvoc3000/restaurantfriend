@@ -174,7 +174,20 @@ async function estimateDelivery(
   if (!serviceKey) return "none";
   try {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
-    const result = await quoteDelivery(admin, orgId, address.replace(/\s+/g, " ").trim());
+    // FROM THE KITCHEN (Mark, 2026-10-01). The gate wrote it — the nearest
+    // shop the form found, else `inquiry_price_location`'s fallback — so the
+    // lead's distance is measured from the shop that will make it.
+    const { data: lead } = await admin
+      .from("special_orders")
+      .select("kitchen_location_id")
+      .eq("id", orderId)
+      .maybeSingle();
+    const result = await quoteDelivery(
+      admin,
+      orgId,
+      address.replace(/\s+/g, " ").trim(),
+      (lead?.kitchen_location_id as string | null) ?? null
+    );
     if (result.state === "ok") {
       await admin
         .from("special_orders")
