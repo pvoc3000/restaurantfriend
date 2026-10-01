@@ -5237,3 +5237,13 @@ two in-app doors only; `create_inquiry` never wrote `kitchen_location_id`, so
 every /inquiry lead arrived without one. 152 sets it to the pickup shop, or for
 a delivery to `v_price_loc` (the delivery origin, where 133 takes the tax
 from), and backfills the one open lead it missed. APPLIED 2026-09-29 (SO-10094 → DF02).
+
+**2026-09-30 — the list's progress bar holds for an unbooked delivery; the To-do
+column shows only real to-dos.** (Mark: a delivery order without delivery
+scheduled is not "complete"; "the suggested ones just clutter the screen".)
+`orderProgress` gained `awaitingDelivery` and `steps`: a delivery order with no
+`delivery_scheduled_at` that has climbed to paid draws 3 of 4 steps and stays
+yellow, and its tooltip adds "☐ Delivery scheduled". It is a hold, not a rung,
+so pickups' bars do not move. The To-do column no longer renders
+`suggestedTodo`; the function is kept (fixture-tested, and its rules mirror
+`paidTodo`) but nothing on screen calls it now.
