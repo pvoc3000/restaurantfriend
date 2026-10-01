@@ -38,6 +38,7 @@ export function OrderDelivery({
   canWrite,
   kitchenOptions,
   canEditKitchen,
+  carriers,
 }: {
   id: string;
   row: Record<string, unknown>;
@@ -46,9 +47,33 @@ export function OrderDelivery({
   kitchenOptions: { value: string; label: string }[];
   /** The Info tab's rule: no kitchen change once production is scheduled. */
   canEditKitchen: boolean;
+  /** The vendors of type Delivery, each with its phone at each shop. */
+  carriers: Carrier[];
 }) {
   const address = (row.delivery_address as string | null) ?? "";
+  const kitchenId = (row.kitchen_location_id as string | null) ?? null;
+  const company = (row.delivery_company as string | null) ?? null;
   const router = useRouter();
+
+  // THE COMPANY IS CHOSEN FROM THE DELIVERY VENDORS (Mark, 2026-10-01), and
+  // stored as the vendor's NAME in the same text column — some 7,300 FileMaker
+  // orders already hold names there, and the documents print it. A value from
+  // before that matches no vendor ("Postmates") stays visible as an option of
+  // its own, so opening an old order never blanks it.
+  const companyOptions = [
+    { value: "", label: "Not set" },
+    ...carriers.map((c) => ({ value: c.name, label: c.name })),
+    ...(company && !carriers.some((c) => c.name === company) ? [{ value: company, label: company }] : []),
+  ];
+  /** Choosing a company sets THEIR PHONE in the same write: the vendor's
+   *  number at this order's kitchen, else at any shop, else none. */
+  const phoneFor = (next: string | number | null) => {
+    const carrier = carriers.find((c) => c.name === next);
+    if (!carrier) return null;
+    const phone =
+      carrier.phones.find((p) => p.location_id === kitchenId)?.phone ?? carrier.phones[0]?.phone ?? null;
+    return { delivery_company_phone: phone };
+  };
   const [measuring, setMeasuring] = useState(false);
   const [measured, setMeasured] = useState<string | null>(null);
 
@@ -198,8 +223,9 @@ export function OrderDelivery({
             <SectionHeading>Who carries it</SectionHeading>
             <div className={GRID}>
               <Row label="Company" first>
-                <Cell id={id} canWrite={canWrite} column="delivery_company" value={row.delivery_company as string | null}
-                      label="Delivery company" />
+                <Cell id={id} canWrite={canWrite} column="delivery_company" kind="pick"
+                      options={companyOptions} value={company}
+                      label="Delivery company" alsoUpdate={phoneFor} />
               </Row>
               <Row label="Their phone">
                 <Cell id={id} canWrite={canWrite} column="delivery_company_phone" value={row.delivery_company_phone as string | null}
@@ -254,6 +280,9 @@ export function OrderDelivery({
   );
 }
 
+/** A vendor of type Delivery, and its phone at each shop that has one. */
+export type Carrier = { name: string; phones: { location_id: string; phone: string }[] };
+
 /**
  * FOUR COLUMNS, THE FIELDS IN THE FIRST TWO (Mark, 2026-10-01): the address
  * spans two, every other field takes one, and the third and fourth stay empty.
@@ -299,6 +328,7 @@ function Cell({
   format,
   options,
   onWrite,
+  alsoUpdate,
 }: {
   id: string;
   canWrite: boolean;
@@ -310,6 +340,7 @@ function Cell({
   format?: (v: string | number) => string;
   options?: { value: string; label: string }[];
   onWrite?: (next: string | number | null) => Promise<{ error: string | null }>;
+  alsoUpdate?: (next: string | number | null) => Record<string, string | number | null> | null;
 }) {
   if (!canWrite)
     return (
@@ -336,6 +367,7 @@ function Cell({
       format={format}
       options={options}
       onWrite={onWrite}
+      alsoUpdate={alsoUpdate}
     />
   );
 }

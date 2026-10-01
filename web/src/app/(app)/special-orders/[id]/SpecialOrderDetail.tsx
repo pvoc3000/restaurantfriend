@@ -147,6 +147,7 @@ export async function SpecialOrderDetail({
   const wantsLog = tab === "notes";
   const wantsDocuments = tab === "documents";
   const wantsMenu = tab === "items";
+  const wantsCarriers = tab === "delivery";
 
   const [
     { data: order, error },
@@ -159,6 +160,7 @@ export async function SpecialOrderDetail({
     { data: gridOverrideRows },
     { data: itemOverrideRows },
     { data: invoiceLinkRows },
+    { data: carrierRows },
   ] = await Promise.all([
     supabase.from("special_orders").select(ORDER_COLUMNS).eq("id", id).maybeSingle(),
     wantsLines
@@ -217,6 +219,17 @@ export async function SpecialOrderDetail({
       .from("customer_invoice_lines")
       .select("invoice_id, amount, kind, line_type, customer_invoices ( id, number, revision, revision_of, sent_at, paid_at, voided_at, due_on )")
       .eq("special_order_id", id),
+    // THE DELIVERY TAB'S CARRIERS (Mark, 2026-10-01): the active vendors of
+    // type Delivery, with each shop's phone, for the Company picklist.
+    wantsCarriers
+      ? supabase
+          .from("vendors")
+          .select("name, vendor_locations ( location_id, rep_phone, is_active )")
+          .eq("org_id", session.membership.org_id)
+          .ilike("vendor_type", "delivery")
+          .eq("is_active", true)
+          .order("name")
+      : SKIP_MENU,
   ]);
 
   if (error) {
@@ -1286,7 +1299,22 @@ export async function SpecialOrderDetail({
 
           {/* ================= DELIVERY ================= */}
           {activeTab === "delivery" && (
-            <OrderDelivery id={id} row={row} canWrite={canWrite} kitchenOptions={locationOptions} canEditKitchen={canEditItems} />
+            <OrderDelivery
+              id={id}
+              row={row}
+              canWrite={canWrite}
+              kitchenOptions={locationOptions}
+              canEditKitchen={canEditItems}
+              carriers={((carrierRows ?? []) as {
+                name: string;
+                vendor_locations: { location_id: string; rep_phone: string | null; is_active: boolean }[] | null;
+              }[]).map((v) => ({
+                name: v.name,
+                phones: (v.vendor_locations ?? [])
+                  .filter((vl) => vl.is_active && vl.rep_phone && vl.rep_phone.trim())
+                  .map((vl) => ({ location_id: vl.location_id, phone: vl.rep_phone!.trim() })),
+              }))}
+            />
           )}
 
           {/* ================= DOCUMENTS ================= */}
