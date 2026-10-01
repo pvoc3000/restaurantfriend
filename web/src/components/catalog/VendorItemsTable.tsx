@@ -242,8 +242,9 @@ export function VendorItemsTable({
             // picklist in the vendor items table too, but the inline type"),
             // where a linked row was a link and only "unlinked" opened a
             // search dialog. The arrow inside the cell keeps the route to the
-            // item's record that the name used to be. Not clearable, like the
-            // vendor item record's: unlinking takes the row off the guide.
+            // item's record that the name used to be. "Not linked" at the top
+            // unlinks (Mark, 2026-10-01), the ⋯ menu's Unlink having gone —
+            // the row keeps its history and price and drops off the guide.
             render: (vi: VendorItemWithItem) =>
               canEdit && itemOptions.length > 0 ? (
                 <span className="flex min-w-0 items-center gap-1">
@@ -263,7 +264,7 @@ export function VendorItemsTable({
                       // stylesheet order, not by which one the caller passed.
                       className={vi.inventory_items ? "" : "text-accent!"}
                       options={itemOptions}
-                      nullable={false}
+                      clearLabel="Not linked"
                       activateTable="inventory_items"
                     />
                   </span>

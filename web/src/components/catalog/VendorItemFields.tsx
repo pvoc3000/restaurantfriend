@@ -210,9 +210,10 @@ export function VendorItemFields({
         {/* A PICKLIST (Mark, 2026-10-01: "just use a picklist in place of the
             inventory item field"), where a Change button used to grow a search
             box and its results underneath. Picking writes the one column, the
-            same picklist the vendor items table's Item column wears. NOT
-            clearable: unlinking takes the row off the order guide,
-            and nothing asked for that door here. An inactive item revives on
+            same picklist the vendor items table's Item column wears. "Not
+            linked" at the top unlinks (Mark, 2026-10-01): the row keeps its
+            history and price and drops off the order guide until it is linked
+            again. An inactive item revives on
             the way in, `PickList`'s rule. The arrow beyond the field's right edge
             keeps the walk to the item's record, which the name used to be the
             link for — outside the column, so the field is as wide as the rest
@@ -229,7 +230,7 @@ export function VendorItemFields({
                 ariaLabel="Inventory item"
                 value={vi.inventory_items?.id ?? null}
                 options={itemOptions}
-                nullable={false}
+                clearLabel="Not linked"
                 activateTable="inventory_items"
               />
               {vi.inventory_items && (
