@@ -72,14 +72,18 @@ import {
 /**
  * THE TO-DO IS A CHIP (Mark, 2026-09-30: "make the to do field a chip so it
  * stands out a little"). Green for Print Order — the kitchen's cue, as on the
- * progress bar — red for Resolve Issue, yellow for everything else. Fills, not
- * inks, so the text stays `text-ink` on all three.
+ * progress bar — red for Resolve Issue, yellow for everything else.
+ *
+ * THE PROGRESS BAR'S OWN COLOURS (Mark, same day): its 3px rule is drawn in
+ * yellow-500, green-500 and red-500, which `specialOrderProgress` spells as
+ * the same hex. Black type on yellow and green; WHITE on red, where black
+ * measures ~3.6:1 and white ~5.6:1.
  */
 function todoFill(todo: string): string {
   const t = todo.trim().toLowerCase();
-  if (t === "print order") return "bg-go";
-  if (t === FLAG_TODO.toLowerCase()) return "bg-stop";
-  return "bg-mark-fill";
+  if (t === "print order") return "bg-[var(--rf-green-500)] text-ink";
+  if (t === FLAG_TODO.toLowerCase()) return "bg-accent text-white";
+  return "bg-mark text-ink";
 }
 
 export type SpecialOrderRow = {
@@ -912,7 +916,7 @@ export function SpecialOrdersList({
         return (
           <span className="block">
             {r.todo ? (
-              <span className={`box-decoration-clone px-1.5 py-px font-medium text-ink ${todoFill(r.todo)}`}>
+              <span className={`box-decoration-clone px-1.5 py-px font-medium ${todoFill(r.todo)}`}>
                 {r.todo}
               </span>
             ) : (
