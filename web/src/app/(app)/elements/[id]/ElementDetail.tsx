@@ -159,6 +159,7 @@ export async function ElementDetail({
             id,
             name: element.name as string,
             kind: element.kind as ElementKind,
+            is_active: (element.is_active ?? true) as boolean,
             element_type: (element.element_type ?? null) as string | null,
             schedule_class: (element.schedule_class ?? null) as string | null,
             manual_cost: element.manual_cost === null ? null : Number(element.manual_cost),

@@ -1,6 +1,7 @@
 "use client";
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { InventoryItemPicker } from "@/components/catalog/InventoryItemPicker";
 import {
@@ -37,6 +38,7 @@ export function ElementFields({
     id: string;
     name: string;
     kind: ElementKind;
+    is_active: boolean;
     element_type: string | null;
     schedule_class: string | null;
     manual_cost: number | null;
@@ -53,6 +55,20 @@ export function ElementFields({
 
   return (
     <dl className="grid max-w-[min(28rem,max(17rem,25%))] grid-cols-[minmax(7rem,auto)_1fr] items-center gap-x-4 gap-y-3 text-[14px]">
+      {/* ACTIVE FIRST (Mark, 2026-09-30), a switch — `ActiveToggle`'s record
+          dress, so it is not mistaken for a selection box. Inactive takes the
+          element off every batch log, picker and recipe sheet. */}
+      <Row label="Active">
+        <ActiveToggle
+          table="production_elements"
+          id={element.id}
+          active={element.is_active}
+          label="Active"
+          control="switch"
+          readOnly={!editable}
+        />
+      </Row>
+
       <Row label="Kind">
         {editable ? (
           <InlineValue
