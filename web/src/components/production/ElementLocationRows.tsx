@@ -306,6 +306,7 @@ export function ElementLocationRows({
           <span className={`${READ_ONLY_VALUE} text-subtle`}>—</span>
         ) : editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="production_element_locations"
             id={l.row.id}
             column="notes"
