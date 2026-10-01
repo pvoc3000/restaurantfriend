@@ -55,7 +55,6 @@ import {
 import { sortRows } from "@/lib/tableSort";
 import {
   KIND_LABEL,
-  FLAG_TODO,
   ORDER_KIND_FILTERS,
   STATUS_LABEL,
   countsAsOwed,
@@ -68,23 +67,6 @@ import {
   type SpecialOrderKind,
   type SpecialOrderStatus,
 } from "@/lib/specialOrders";
-
-/**
- * THE TO-DO IS A CHIP (Mark, 2026-09-30: "make the to do field a chip so it
- * stands out a little"). Green for Print Order — the kitchen's cue, as on the
- * progress bar — red for Resolve Issue, yellow for everything else.
- *
- * THE PROGRESS BAR'S OWN COLOURS (Mark, same day): its 3px rule is drawn in
- * yellow-500, green-500 and red-500, which `specialOrderProgress` spells as
- * the same hex. Black type on yellow and green; WHITE on red, where black
- * measures ~3.6:1 and white ~5.6:1.
- */
-function todoFill(todo: string): string {
-  const t = todo.trim().toLowerCase();
-  if (t === "print order") return "bg-[var(--rf-green-500)] text-ink";
-  if (t === FLAG_TODO.toLowerCase()) return "bg-accent text-white";
-  return "bg-mark text-ink";
-}
 
 export type SpecialOrderRow = {
   id: string;
@@ -916,9 +898,7 @@ export function SpecialOrdersList({
         return (
           <span className="block">
             {r.todo ? (
-              <span className={`box-decoration-clone px-1.5 py-px font-medium ${todoFill(r.todo)}`}>
-                {r.todo}
-              </span>
+              <span className="font-medium">{r.todo}</span>
             ) : (
               <span className="text-faint">—</span>
             )}
