@@ -3,7 +3,7 @@
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
-import { InventoryItemPicker } from "@/components/catalog/InventoryItemPicker";
+import type { PickOption } from "@/components/ui/PickList";
 import {
   ELEMENT_KIND_OPTIONS,
   SCHEDULE_CLASS_OPTIONS,
@@ -33,6 +33,7 @@ export function ElementFields({
   cost,
   types,
   editable,
+  itemOptions,
 }: {
   element: {
     id: string;
@@ -50,6 +51,9 @@ export function ElementFields({
   cost: Cost;
   types: string[];
   editable: boolean;
+  /** Every inventory item, for the Inventory item picklist. Empty when the
+   *  row is not an editor. */
+  itemOptions: PickOption[];
 }) {
   const gaps = unresolvedSummary(cost);
 
@@ -175,41 +179,64 @@ export function ElementFields({
           tier listed problems you could not act on (Mark: "this is something
           the user needs to be able to do on our own").
 
-          The picker is `catalog/InventoryItemPicker`, the same control the
-          vendor item uses, rather than a second one: it is the same act
-          against the same table of 790 items, and two versions of it would
-          drift the way `ui/Dialog`'s three copies did.
+          A PICKLIST since 2026-10-01 (Mark: "do the same for the production
+          element record", after the vendor item's), where a Link… button used
+          to grow a search box underneath. The options are the vendor item
+          record's, from `lib/inventoryItemOptions`, so the two cannot drift.
 
-          `allowUnlink` because "none of these" is a real answer here. Several
-          of the 76 are cleaning duties and FileMaker metadata rows ("Fryer -
-          replace filter", "Total Base") that were typed `purchased` at
-          migration and should never resolve to an ingredient — for those the
-          honest fix is the Kind field above, not a link. */}
+          CLEARABLE, unlike the vendor item's, because "none of these" is a
+          real answer here. Several of the 76 are cleaning duties and FileMaker
+          metadata rows ("Fryer - replace filter", "Total Base") that were
+          typed `purchased` at migration and should never resolve to an
+          ingredient — for those the honest fix is the Kind field above, not a
+          link. The "no cost" line stays under an empty field, because an empty
+          box alone does not say what it costs you. */}
       {element.kind === "purchased" ? (
         <Row label="Inventory item">
-          <span className="inline-flex flex-col items-start gap-1">
-            {element.inventory_item_id ? (
-              <Link
-                href={`/items/${element.inventory_item_id}`}
-                className={`${READ_ONLY_VALUE} hover:underline`}
-              >
-                {element.inventoryName ?? "Linked item"}
-              </Link>
-            ) : (
-              <span className={`${READ_ONLY_VALUE} text-muted`}>
-                Not linked — this element has no cost until it is.
+          {editable ? (
+            <span className="flex flex-col items-start gap-1">
+              <span className="flex w-full items-center gap-2">
+                <span className="min-w-0 flex-1">
+                  <InlineValue
+                    kind="pick"
+                    boxed={BOXED_FIELDS}
+                    table="production_elements"
+                    id={element.id}
+                    column="inventory_item_id"
+                    ariaLabel="Inventory item"
+                    value={element.inventory_item_id}
+                    options={itemOptions}
+                    clearLabel="Not linked"
+                    activateTable="inventory_items"
+                  />
+                </span>
+                {element.inventory_item_id ? (
+                  <Link
+                    href={`/items/${element.inventory_item_id}`}
+                    className="shrink-0 text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+                  >
+                    Open
+                  </Link>
+                ) : null}
               </span>
-            )}
-            {editable ? (
-              <InventoryItemPicker
-                table="production_elements"
-                rowId={element.id}
-                currentItemId={element.inventory_item_id}
-                initialTerm={element.name}
-                allowUnlink
-              />
-            ) : null}
-          </span>
+              {element.inventory_item_id ? null : (
+                <span className="text-[13px] text-muted">
+                  Not linked — this element has no cost until it is.
+                </span>
+              )}
+            </span>
+          ) : element.inventory_item_id ? (
+            <Link
+              href={`/items/${element.inventory_item_id}`}
+              className={`${READ_ONLY_VALUE} hover:underline`}
+            >
+              {element.inventoryName ?? "Linked item"}
+            </Link>
+          ) : (
+            <span className={`${READ_ONLY_VALUE} text-muted`}>
+              Not linked — this element has no cost until it is.
+            </span>
+          )}
         </Row>
       ) : null}
 

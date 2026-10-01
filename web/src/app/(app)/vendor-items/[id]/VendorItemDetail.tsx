@@ -17,7 +17,7 @@ import {
 import { VendorItemActions } from "@/components/catalog/VendorItemActions";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { canEditPage } from "@/lib/pageAccess";
-import type { PickOption } from "@/components/ui/PickList";
+import { loadInventoryItemOptions } from "@/lib/inventoryItemOptions";
 
 const SELECT = `
   id, brand, description, product_id, package_desc, package_content, price,
@@ -176,26 +176,8 @@ export async function VendorItemDetail({
   const editable = canEditPage(session.membership.role, "/vendor-items");
 
   // The whole catalog, for the Inventory item picklist — only when the field
-  // is an editor. Paged, because PostgREST stops at 1,000 rows without saying
-  // so and the catalog is ~790 today.
-  const itemOptions: PickOption[] = [];
-  for (let from = 0; editable; from += 1000) {
-    const { data: items } = await supabase
-      .from("inventory_items")
-      .select("id, name, base_unit, is_active")
-      .order("name")
-      .order("id")
-      .range(from, from + 999);
-    for (const it of items ?? []) {
-      itemOptions.push({
-        value: it.id,
-        label: it.name,
-        hint: it.base_unit,
-        inactive: !it.is_active,
-      });
-    }
-    if (!items || items.length < 1000) break;
-  }
+  // is an editor.
+  const itemOptions = editable ? await loadInventoryItemOptions(supabase) : [];
 
   return (
     <div className="space-y-6">

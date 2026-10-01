@@ -16,6 +16,7 @@ import { BATCH_STATUS_LABEL, batchDate, describeAmount } from "@/lib/productionB
 import { elementTypeVocabulary, type ElementKind } from "@/lib/production";
 import { ElementActions } from "@/components/production/ElementActions";
 import { canEditPage } from "@/lib/pageAccess";
+import { loadInventoryItemOptions } from "@/lib/inventoryItemOptions";
 
 /**
  * One element: what it is, what it costs today, where its recipes are, and what
@@ -99,6 +100,11 @@ export async function ElementDetail({
   }
   if (!element) notFound();
 
+  // The whole catalog, for the Inventory item picklist — only where that row
+  // renders as an editor: a PURCHASED element, on a screen you may edit.
+  const itemOptions =
+    editable && element.kind === "purchased" ? await loadInventoryItemOptions(supabase) : [];
+
   const node = graph?.byId.get(id) ?? null;
   const cost = node
     ? elementCost(node, graph!.byId, costs)
@@ -171,6 +177,7 @@ export async function ElementDetail({
           cost={cost}
           types={typeVocabulary}
           editable={editable}
+          itemOptions={itemOptions}
         />
       </div>
 

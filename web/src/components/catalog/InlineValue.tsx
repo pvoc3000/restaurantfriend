@@ -299,6 +299,7 @@ export function InlineValue({
   options,
   allowNew = false,
   clearable,
+  clearLabel,
   jsonColumn,
   jsonPath,
   jsonDocument,
@@ -379,6 +380,8 @@ export function InlineValue({
    * explicitly only to overrule that.
    */
   clearable?: boolean;
+  /** kind="pick" only — the clear row's word, when "None" isn't the right one. */
+  clearLabel?: string;
   /** The jsonb column to write, when this cell edits a key inside one. */
   jsonColumn?: string;
   /** Path to the key within that column, e.g. ["shipping", "street1"]. */
@@ -695,6 +698,7 @@ export function InlineValue({
           options={options ?? []}
           allowNew={allowNew}
           clearable={clearable ?? nullable}
+          clearLabel={clearLabel}
           disabled={saving}
           placeholder={placeholder}
           ariaLabel={ariaLabel ?? column}
