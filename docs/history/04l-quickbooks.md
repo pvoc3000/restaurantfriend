@@ -528,3 +528,6 @@ or a location — they rode inside each order's untaxed line under Special Order
   invoice KEPT, as `push_bill` does, and warns when QuickBooks dropped either.
 - 9 fixture cases in `quickbooks.fixtures`; the existing wholesale-week and
   taxed-order cases changed shape (delivery is no longer folded into NON).
+  **APPLIED 2026-10-01** (via `db query --linked`, in a transaction; the
+  status function verified widened, anon still refused) and `qbo-sync` +
+  `qbo-oauth` (`--no-verify-jwt`) deployed the same day.
