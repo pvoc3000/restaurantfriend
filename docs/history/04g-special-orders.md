@@ -5412,3 +5412,28 @@ smaller, i.e. 'Donut Friend SO-10098: Smith Wedding'. Build it."
   `submit-inquiry`, then ship the web change** — `fetchOrderDocData` selects
   `thread_subject`, so the web half without the column breaks every order
   document send.
+
+## Switching to pickup removes the delivery charge, after asking (168, 2026-10-02)
+
+Mark: "when the user changes an order from delivery to pickup, we either need
+to hide and disregard the delivery fee if there is one or delete it", then
+"you should prompt the user to make sure they want to clear the fee before
+doing so".
+
+- **Deleted, not disregarded:** an order's money is worked out twice
+  (`orderTotals` and `special_order_money`) and read by documents, invoices,
+  balances, Square and QuickBooks; a charge that is gone needs no second rule
+  in each. The change log keeps the old figure.
+- **`FulfillmentCell`** replaces the generic pick cell on the record: picking
+  Pickup on a delivery order with a charge asks "Remove the $X delivery
+  charge?" (Cancel keeps delivery and the fee), then writes `fulfillment` and
+  `delivery_charge = null` in ONE update.
+- **Migration 168**, a BEFORE UPDATE OF fulfillment trigger, does the same for
+  any other path, ONLY on a switch. Tested on a temp table in a rolled-back
+  transaction (switch clears; untouched pickup keeps; to-delivery no-op; both
+  columns in one statement still clears).
+- **Found, not changed:** 377 orders were already pickup WITH a charge,
+  including every Cafe Knotted standing-order day ($40, $50 since 10-05) —
+  real deliveries marked pickup — and SO-10055 (a lead) at $4,000.00. Money
+  keeps showing the Delivery charge row on any pickup order that carries one,
+  so nothing is counted but hidden; it hides only on pickup orders without one.

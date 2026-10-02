@@ -34,6 +34,7 @@ export function OrderTotals({
   inputs,
   rushSuggestion,
   shopRates,
+  isDelivery,
   canWrite,
 }: {
   id: string;
@@ -41,6 +42,8 @@ export function OrderTotals({
   inputs: MoneyOrder;
   /** Every active shop's code and rate — the Tax rate picker's list. */
   shopRates: { code: string; tax_rate: number | string | null }[];
+  /** `fulfillment === "delivery"` — whether a delivery charge belongs here. */
+  isDelivery: boolean;
   /** Decision 22's figure, or null outside the cutoff. */
   rushSuggestion: number | null;
   canWrite: boolean;
@@ -163,10 +166,17 @@ export function OrderTotals({
             <Cell id={id} canWrite={canWrite} column="discount_rate" value={inputs.discount_rate} label="Discount rate"
                   percent />
           </Line>
-          <Line label="Delivery charge">
-            <Cell id={id} canWrite={canWrite} column="delivery_charge" value={inputs.delivery_charge} label="Delivery charge"
-                  format={(v) => money(Number(v))} />
-          </Line>
+          {/* NOT ON A PICKUP ORDER (Mark, 2026-10-02) — switching to pickup
+              removes the charge (migration 168), so there is nothing to show.
+              Unless one is THERE: 377 orders were pickup with a charge before
+              168, the Cafe Knotted standing days among them, and a charge the
+              total counts must stay visible and editable. */}
+          {(isDelivery || Number(inputs.delivery_charge ?? 0) !== 0) && (
+            <Line label="Delivery charge">
+              <Cell id={id} canWrite={canWrite} column="delivery_charge" value={inputs.delivery_charge} label="Delivery charge"
+                    format={(v) => money(Number(v))} />
+            </Line>
+          )}
           {/* THE SUGGESTION SITS AFTER THE LABEL, which is the third place it
               has been and the one that costs nothing. Beside the FIELD it
               squeezed it to 88px where the other four were 96 (which is what

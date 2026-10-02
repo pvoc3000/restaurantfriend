@@ -49,6 +49,7 @@ import { applicationCounts, isSplitPayment, paymentsToCount, refundLeft, type Le
 import { CompletionDates } from "@/components/specialOrders/CompletionDates";
 import { StatusCatchUp } from "@/components/specialOrders/StatusCatchUp";
 import { OrderTotals } from "@/components/specialOrders/OrderTotals";
+import { FulfillmentCell } from "@/components/specialOrders/FulfillmentCell";
 import { OrderLog, type OrderEventRow } from "@/components/specialOrders/OrderLog";
 import { OrderCommandMenu } from "@/components/specialOrders/OrderCommandMenu";
 import { OrderDelivery } from "@/components/specialOrders/OrderDelivery";
@@ -1043,9 +1044,16 @@ export async function SpecialOrderDetail({
                           pickup shop — it is a fact about the order. The
                           Delivery TAB appears only when this says delivery;
                           see `tabsFor`. */}
-                      <Cell table="special_orders" id={id} column="fulfillment" kind="pick"
-                            options={FULFILLMENT_OPTIONS} value={(row.fulfillment as string) ?? "pickup"}
-                            canWrite={canWrite} ariaLabel="Pickup or delivery" />
+                      {/* Switching to pickup asks before it takes the
+                          delivery charge away (migration 168). */}
+                      {canWrite ? (
+                        <FulfillmentCell id={id} value={row.fulfillment as string | null}
+                                         deliveryCharge={row.delivery_charge as number | string | null} />
+                      ) : (
+                        <Cell table="special_orders" id={id} column="fulfillment" kind="pick"
+                              options={FULFILLMENT_OPTIONS} value={(row.fulfillment as string) ?? "pickup"}
+                              canWrite={false} ariaLabel="Pickup or delivery" />
+                      )}
                     </Row>
                     <Row label="Allergies">
                       <Cell table="special_orders" id={id} column="allergen_info"
@@ -1292,6 +1300,7 @@ export async function SpecialOrderDetail({
                     inputs={moneyInputs}
                     rushSuggestion={rushSuggestion}
                     shopRates={(rateRows ?? []) as { code: string; tax_rate: number | string | null }[]}
+                    isDelivery={row.fulfillment === "delivery"}
                     canWrite={canWrite}
                   />
                 </div>
