@@ -5493,3 +5493,8 @@ event time."
 - **Order:** the web change first (it no longer selects the columns), then
   170 — the other way round, the order page's select fails on the dropped
   columns.
+- **APPLIED 2026-10-02** at Mark's word (`db query --linked`, in a
+  transaction): ready times 8,092 → 8,093 and event times 8,210 → 8,212 (the
+  three blanks filled), both window columns gone, both triggers present, anon
+  cannot execute the function. SO-8291, SO-7110, SO-9357 and SO-10098 read
+  as expected.
