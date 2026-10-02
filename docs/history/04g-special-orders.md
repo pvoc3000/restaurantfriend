@@ -5526,3 +5526,16 @@ fields again."
   taxed or not), so that is an older FileMaker mismatch rather than this fix.
   SO-9849's total went $880.22 → $973.49 (the $84.60 plus its tax). SO-9868
   and SO-9844 no longer total below zero.
+
+## The rush fee pair excludes itself too (2026-10-02)
+
+Mark: "we need to do the same with rush fee as we did discount."
+
+- `OrderTotals`: a dollar rush fee clears `rush_rate` in the same write and a
+  rate clears `rush_fee`; each is disabled while the other holds a value;
+  clearing opens both. The dollar box no longer shows what a rate came to,
+  read-only — that figure is the right-hand column's "Rush fee".
+- A rate of 0 counts as SET (118: "no rush fee on this one"); a $0 fee does
+  not. `orderTotals` already lets a rate win, so nothing was ever counted
+  twice here.
+- Data: no order holds a rush rate yet, and none holds both, so no migration.

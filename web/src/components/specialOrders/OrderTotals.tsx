@@ -228,25 +228,30 @@ export function OrderTotals({
               ) : null
             }
           >
-            <Cell id={id} canWrite={canWrite && !hasRushRate} column="rush_fee"
-                  value={hasRushRate ? totals.rushFee : inputs.rush_fee} label="Rush fee"
-                  format={(v) => money(Number(v))} />
+            <Cell id={id} canWrite={canWrite} column="rush_fee"
+                  value={inputs.rush_fee} label="Rush fee"
+                  format={(v) => money(Number(v))}
+                  disabled={hasRushRate && !hasValue(inputs.rush_fee)}
+                  alsoUpdate={(next) => (hasValue(next) ? { rush_rate: null } : null)} />
           </Line>
           {/* THE RATE, BESIDE THE AMOUNT — `discount_amount` / `discount_rate`'s
               own pair, one row lower (migration 118). The two rows are one
               question asked in two units, which is the wording decision the
               discount labels already made.
 
-              WHERE THE RUSH PAIR DIFFERS FROM THE DISCOUNT PAIR: a discount's
-              two fields ADD, a rush rate WINS. So while a rate is set the
-              dollar box is READ-ONLY and shows what the rate came to —
-              `max(subtotal × rate, the minimum)`. Leaving it editable would
-              offer a box that accepts a number and then ignores it, which is
-              the trap this screen has spent three passes removing. Clear the
-              rate and the box is yours again. */}
+              ONE OR THE OTHER, LIKE THE DISCOUNT (Mark, 2026-10-02: "we need to
+              do the same with rush fee as we did discount"). Entering a dollar
+              fee empties the rate in the same write and the other way round;
+              each is disabled while the other holds a value; clearing it opens
+              both. It used to show what a rate came to in a read-only dollar
+              box — that figure is in the right-hand column as "Rush fee".
+              A RATE OF 0 COUNTS AS SET, unlike a $0 fee: it is somebody saying
+              "no rush fee on this one", which `orderTotals` honours. */}
           <Line label="Rush fee (%)">
             <Cell id={id} canWrite={canWrite} column="rush_rate" value={inputs.rush_rate ?? null}
-                  label="Rush fee rate" percent />
+                  label="Rush fee rate" percent
+                  disabled={hasValue(inputs.rush_fee) && !hasRushRate}
+                  alsoUpdate={(next) => (next === null || next === "" ? null : { rush_fee: null })} />
           </Line>
           {/* NO EXPLANATORY SENTENCE BESIDE THE SWITCH (Mark, 2026-08-19:
               "remove the note"). It read "Wholesale days are billed weekly, not
