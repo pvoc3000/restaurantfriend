@@ -27,8 +27,8 @@
  * read as the primary action of the screen" was about the ACCENT; a pale wash
  * under black type reads as a marked cell, which is what it is.
  *
- * The shadow went black with the border — `mac-danger`'s red shadow matched the
- * red EDGE it hung from, and there is no red edge any more. The hover and press
+ * TODAY (2026-10-01): red edge, white fill, red type, BLACK shadow — the
+ * history above is the wash it replaced; `mac-stop` keeps the record. The hover and press
  * are `mac-stop` in `styles/mac-look.css`, which is `.mac-primary`'s shape with
  * a different ground.
  *
