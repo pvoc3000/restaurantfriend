@@ -50,6 +50,7 @@ import { CompletionDates } from "@/components/specialOrders/CompletionDates";
 import { StatusCatchUp } from "@/components/specialOrders/StatusCatchUp";
 import { OrderTotals } from "@/components/specialOrders/OrderTotals";
 import { FulfillmentCell } from "@/components/specialOrders/FulfillmentCell";
+import { MarkNoteRead } from "@/components/specialOrders/MarkNoteRead";
 import { OrderLog, type OrderEventRow } from "@/components/specialOrders/OrderLog";
 import { OrderCommandMenu } from "@/components/specialOrders/OrderCommandMenu";
 import { OrderDelivery } from "@/components/specialOrders/OrderDelivery";
@@ -164,6 +165,7 @@ export async function SpecialOrderDetail({
     { data: carrierRows },
     { data: shopRows },
     { data: rateRows },
+    { data: noteRead },
   ] = await Promise.all([
     supabase.from("special_orders").select(ORDER_COLUMNS).eq("id", id).maybeSingle(),
     wantsLines
@@ -246,6 +248,9 @@ export async function SpecialOrderDetail({
           .eq("org_id", session.membership.org_id)
           .eq("is_active", true)
       : SKIP_MENU,
+    // Whether the customer's /inquiry note has been read (169) — the Notes
+    // tab's "!". One row or none.
+    supabase.from("special_order_note_reads").select("order_id").eq("order_id", id).maybeSingle(),
   ]);
 
   if (error) {
@@ -604,11 +609,21 @@ export async function SpecialOrderDetail({
       : null;
   const trail = parseTrail(rawParams, SPECIAL_ORDERS_CRUMB);
   const tabs = tabsFor(kind, (row.fulfillment as string | null) ?? "pickup");
+  // A NOTE FROM AN /INQUIRY THAT NOBODY HAS READ (Mark, 2026-10-02): a yellow
+  // "!" on the Notes tab until somebody opens it, which `MarkNoteRead` records
+  // (169). The customer's words are `notes_general` — `create_inquiry` writes
+  // them there.
+  const unreadInquiryNote =
+    row.source === "inquiry" &&
+    String(row.notes_general ?? "").trim() !== "" &&
+    !noteRead;
   const tabOptions = tabs.map((t) => ({
     key: t,
     label: ORDER_TAB_LABEL[t],
     href: orderTabHref(id, t, rawParams),
     count: t === "items" ? lines.length : undefined,
+    // Not while you are ON the tab: you are reading it.
+    alert: t === "notes" && unreadInquiryNote && tab !== "notes" ? "The customer’s inquiry has a note" : undefined,
   }));
   // A stale `?tab=delivery` on a template would otherwise render a tab the nav
   // does not offer, which reads as the nav being broken.
@@ -1201,6 +1216,9 @@ export async function SpecialOrderDetail({
               and this is where it belongs: notes want WIDTH — they are
               paragraphs — and the log wants HEIGHT, so neither fits under the
               other and both scroll their own rows. */}
+          {activeTab === "notes" && unreadInquiryNote && (
+            <MarkNoteRead orderId={id} orgId={session.membership.org_id} />
+          )}
           {activeTab === "notes" && (
             <OrderSplitLayout
               left={

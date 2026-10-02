@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AlertMark } from "@/components/ui/AlertMark";
 import { TabPicker } from "@/components/ui/TabPicker";
 
 /**
@@ -42,6 +43,8 @@ export type SectionNavItem<K extends string = string> = {
   href?: string;
   /** Shown after the label, dimmed and tabular. */
   count?: number;
+  /** Something in this section wants reading — `ui/AlertMark`'s yellow "!". */
+  alert?: string;
 };
 
 export function SectionNav<K extends string>({
@@ -104,6 +107,7 @@ export function SectionNav<K extends string>({
             key: item.key,
             label: item.label,
             count: item.count,
+            alert: item.alert,
             href: onSelect ? undefined : item.href ?? "#",
           }))}
         />
@@ -136,6 +140,7 @@ export function SectionNav<K extends string>({
             {item.count !== undefined && (
               <span className="font-normal tabular-nums opacity-55">{item.count}</span>
             )}
+            {item.alert ? <AlertMark label={item.alert} /> : null}
           </>
         );
 

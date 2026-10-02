@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertMark } from "@/components/ui/AlertMark";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -50,6 +51,9 @@ export type TabPickerOption<K extends string = string> = {
   label: ReactNode;
   /** Row count shown beside the label, dimmed. Omit for plain tabs. */
   count?: number;
+  /** Something on this tab wants reading: a yellow "!" after the label, and
+   *  this text for a screen reader (`ui/AlertMark`). */
+  alert?: string;
   title?: string;
   /** Navigate instead of set state — the cell renders as a Link. */
   href?: string;
@@ -145,6 +149,7 @@ export function TabPicker<K extends string>({
           >
             {o.label}
             {count}
+            {o.alert ? <AlertMark label={o.alert} /> : null}
           </Link>
         ) : (
           <button
@@ -157,6 +162,7 @@ export function TabPicker<K extends string>({
           >
             {o.label}
             {count}
+            {o.alert ? <AlertMark label={o.alert} /> : null}
           </button>
         );
       })}

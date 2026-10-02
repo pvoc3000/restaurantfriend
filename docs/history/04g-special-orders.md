@@ -5440,3 +5440,25 @@ doing so".
   real deliveries marked pickup — and SO-10055 (a lead) at $4,000.00. Money
   keeps showing the Delivery charge row on any pickup order that carries one,
   so nothing is counted but hidden; it hides only on pickup orders without one.
+
+## An unread /inquiry note flags the Notes tab (169, 2026-10-02)
+
+Mark: "if an inquiry comes in with a note, add some sort of alert on the label
+for the Notes tab. A '!' with a yellow background", then "the alert can be
+removed once the user has viewed the tab."
+
+- The customer's words are `notes_general` on a `source = 'inquiry'` order
+  (`create_inquiry` writes the interest and description there).
+- **`special_order_note_reads`** (169): one row per order once anybody opens
+  its Notes tab (`MarkNoteRead`, an insert-or-nothing on mount). Its own table
+  so a look never runs the order's update triggers or moves `updated_at`, and
+  so staff who may read an order can clear it. Membership-only policies.
+  Read for EVERYBODY, not per person: the question is whether the customer's
+  note has been read.
+- **`ui/AlertMark`**, reached through `alert` on `TabPicker` options and
+  `SectionNav` items: a bold "!" on the yellow fill. Hidden while you are on
+  the Notes tab.
+- Backfill: the 5 inquiry orders past the lead stage are marked read; the 3
+  open leads with notes keep the mark.
+- Without 169 the read query fails quietly: every inquiry order with a note
+  shows the mark and opening the tab cannot clear it. Nothing else breaks.

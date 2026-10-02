@@ -482,6 +482,18 @@ function ChoosingBlock() {
             ]}
           />
         </Specimen>
+        <Specimen name="TabPicker · alert (ui/AlertMark)" wide>
+          <TabPicker
+            ariaLabel="Which part of this order"
+            value="info"
+            options={[
+              { key: "info", label: "Info" },
+              { key: "items", label: "Items", count: 3 },
+              { key: "payments", label: "Payments" },
+              { key: "notes", label: "Notes", alert: "The customer’s inquiry has a note" },
+            ]}
+          />
+        </Specimen>
         <Specimen name='TabPicker · size="sm"'>
           <TabPicker
             size="sm"
