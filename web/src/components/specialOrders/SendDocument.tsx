@@ -307,7 +307,9 @@ export function SendDocument({
           },
           // `{cutoff_clause}` is the only token that needs to know what day it
           // is, and this is the org's day rather than the browser's.
-          today
+          today,
+          // The conversation subject's `{org}` (167).
+          org.name
         )
       );
       setPending({

@@ -34,6 +34,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { resolveTransport, sendMail, type ProviderConfig } from "../_shared/email.ts";
 import { notifyInvoicePaid } from "../_shared/shopNotify.ts";
+import { orderThread } from "../_shared/orderThread.ts";
 import { buildSquareOrder, type PayBreakdown } from "../_shared/squareOrder.ts";
 
 const CORS = {
@@ -359,8 +360,8 @@ Deno.serve(async (req) => {
 
     // The "Payment received" message on Settings → Messages, filled here on
     // the server. See `INVOICE_PAYMENT_TEMPLATE` for why this has its own
-    // copy. The customer is on the invoice; an invoice has no day-of contact,
-    // taker or thread to answer, as an order did.
+    // copy. The customer is on the invoice; an invoice has no day-of contact
+    // or taker. An invoice for ONE order answers that order's thread (167).
     const { data: invoiceRow } = await admin
       .from("customer_invoices")
       .select("number, customers(first_name, last_name, company, email)")
@@ -376,6 +377,7 @@ Deno.serve(async (req) => {
       special_orders?: {
         email_provider?: ProviderConfig;
         reply_to?: string;
+        thread_subject?: string;
         email?: {
           invoice_payment?: { subject?: string; body?: string };
         };
@@ -443,11 +445,35 @@ Deno.serve(async (req) => {
           replyToFallbacks: [orgSettings.special_orders?.reply_to, orgSettings.billing?.email],
         });
 
+        // ONE ORDER → ITS CONVERSATION (167), as the invoice's own email was:
+        // the order's fixed subject and its thread root. Several orders, the
+        // weekly wholesale invoice, keep the message's own subject.
+        const { data: invoiceLines } = await admin
+          .from("customer_invoice_lines")
+          .select("special_order_id")
+          .eq("invoice_id", claim.customer_invoice_id);
+        const orders = [
+          ...new Set((invoiceLines ?? []).map((l) => l.special_order_id as string | null).filter(Boolean)),
+        ] as string[];
+        const thread = orders.length === 1
+          ? await orderThread(admin, orders[0], transport.cfg.from, {
+              org: org?.name,
+              template: orgSettings.special_orders?.thread_subject,
+            })
+          : null;
+        const subject =
+          thread?.subject ?? fill(orDefault(configured.subject, INVOICE_PAYMENT_TEMPLATE.subject), values);
+
         await sendMail(transport, {
           to,
-          subject: fill(orDefault(configured.subject, INVOICE_PAYMENT_TEMPLATE.subject), values),
+          subject,
           text: fill(orDefault(configured.body, INVOICE_PAYMENT_TEMPLATE.body), values),
+          ...(thread?.headers ?? {}),
         });
+        if (thread) {
+          const threadProblem = await thread.record(subject);
+          if (threadProblem) warnings.push(threadProblem);
+        }
       } catch (e) {
         warnings.push(`the payment confirmation email was not sent: ${e instanceof Error ? e.message : String(e)}`);
       }

@@ -8,7 +8,7 @@ import { SquareItemSetting } from "./SquareItemSetting";
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import type { MessagesTab } from "@/lib/orgSettings";
-import { DEFAULT_FULFILLMENT_NOTES, DEFAULT_TEMPLATES } from "@/lib/specialOrderDocs";
+import { DEFAULT_FULFILLMENT_NOTES, DEFAULT_TEMPLATES, DEFAULT_THREAD_SUBJECT } from "@/lib/specialOrderDocs";
 
 /**
  * Everything this module SAYS, in one place a person can edit (Mark,
@@ -65,7 +65,7 @@ type Settings = Record<string, unknown>;
  * the templates butt them straight against what comes before.
  */
 const VAR_EXAMPLE: Record<string, string> = {
-  number: "9885",
+  number: "SO-10098",
   title: "Birthday",
   title_suffix: " — Birthday, or nothing",
   first_name: "Alexandra, or “there”",
@@ -125,6 +125,9 @@ const TEMPLATES: {
   label: string;
   when: string;
   vars: string[];
+  /** Goes under the ORDER's conversation subject (167), so it has no subject
+   *  of its own to edit. */
+  threaded?: boolean;
 }[] = [
   {
     key: "inquiry",
@@ -134,9 +137,9 @@ const TEMPLATES: {
     // becomes the thread root every later message replies onto.
     when:
       "Sent the moment somebody submits the public form. It also starts the " +
-      "email thread — the quote and the receipt for that order reply onto " +
-      "this message.",
+      "order’s email conversation.",
     vars: ["number", "first_name", "full_name", "employee_name", "org", "items"],
+    threaded: true,
   },
   {
     key: "quote",
@@ -144,19 +147,21 @@ const TEMPLATES: {
     label: "Quote",
     when: "Sent with the quote PDF. {approve_line} is the approval link, and only appears when there is one.",
     vars: ["number", "title", "title_suffix", "first_name", "full_name", "event_date", "event_time", "event_time_clause", "cutoff_clause", "location", "total", "employee_name", "fulfillment_note", "approve_line"],
+
+    threaded: true,
   },
   {
     key: "customer_invoice",
     group: "invoices",
     label: "Invoice",
-    when: "Sent with an invoice — one order or several, like a wholesale week. {pay_line} is the pay link, and only appears when there is one.",
+    when: "Sent with an invoice — one order or several, like a wholesale week. {pay_line} is the pay link, and only appears when there is one. An invoice for one order goes under that order’s subject instead of this one.",
     vars: ["number", "first_name", "full_name", "total", "due_on", "orders", "pay_line", "employee_name"],
   },
   {
     key: "invoice_payment",
     group: "invoices",
     label: "Payment received",
-    when: "Sent automatically when a customer pays an invoice with its pay link.",
+    when: "Sent automatically when a customer pays an invoice with its pay link. For an invoice covering one order, it goes under that order’s subject.",
     vars: ["number", "first_name", "full_name", "amount", "method", "balance", "balance_line", "receipt_line", "employee_name"],
   },
   {
@@ -165,6 +170,8 @@ const TEMPLATES: {
     label: "Receipt",
     when: "Sent with the receipt PDF, once an order is settled.",
     vars: ["number", "title_suffix", "first_name", "event_date", "event_time_clause", "paid", "employee_name", "fulfillment_note"],
+
+    threaded: true,
   },
   {
     key: "delivery_quote",
@@ -292,6 +299,58 @@ export function SpecialOrderSettings({
             fallback resolves again, and the default reappears — which is the
             honest answer, since a template with no words is not a thing that
             can be sent. */}
+        {/* THE ORDER'S CONVERSATION SUBJECT (167, Mark, 2026-10-02: "Donut
+            Friend SO-10098: Smith Wedding"). One subject for every customer
+            email about an order, so they thread — which is why the inquiry,
+            quote and receipt below have no Subject box of their own. */}
+        {messagesTab === "orders" && (
+          <div className="max-w-5xl space-y-2 border-t border-hairline pt-5">
+            <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em]">
+              Order email subject
+            </h3>
+            <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
+              Every email to the customer about an order goes under this subject, so
+              they stay in one conversation. It is fixed by the order’s first email;
+              renaming the order later keeps it.
+            </p>
+            <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:gap-10">
+              <dl className="min-w-0 max-w-2xl flex-1 space-y-3">
+                <div className="space-y-1">
+                  <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+                    Subject
+                  </dt>
+                  <dd>
+                    {editable
+                      ? cell(
+                          ["special_orders", "thread_subject"],
+                          text(so.thread_subject) ?? DEFAULT_THREAD_SUBJECT,
+                          { ariaLabel: "Order email subject", boxed: true }
+                        )
+                      : (
+                        <span className="block whitespace-pre-wrap border border-hairline px-1 py-0.5 text-[13px]">
+                          {text(so.thread_subject) ?? DEFAULT_THREAD_SUBJECT}
+                        </span>
+                      )}
+                  </dd>
+                </div>
+              </dl>
+              <div className="shrink-0 space-y-1 xl:w-72">
+                <p className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+                  Field token keys
+                </p>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
+                  {["org", "number", "title"].map((v) => (
+                    <Fragment key={v}>
+                      <dt className="whitespace-nowrap text-muted">{`{${v}}`}</dt>
+                      <dd className="text-subtle">{VAR_EXAMPLE[v] ?? ""}</dd>
+                    </Fragment>
+                  ))}
+                </dl>
+              </div>
+            </div>
+          </div>
+        )}
+
         {shown.map((t) => {
           const fallback = DEFAULT_TEMPLATES[t.key];
           const configured = emails[t.key] ?? {};
@@ -318,24 +377,26 @@ export function SpecialOrderSettings({
                   to make room for a legend. */}
               <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:gap-10">
               <dl className="min-w-0 max-w-2xl flex-1 space-y-3">
+                {!t.threaded && (
                 <div className="space-y-1">
-                  <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
-                    Subject
-                  </dt>
-                  <dd>
-                    {editable
-                      ? cell(
-                          ["special_orders", "email", t.key, "subject"],
-                          text(configured.subject) ?? fallback.subject,
-                          { ariaLabel: `${t.label} subject`, boxed: true }
-                        )
-                      : (
-                        <span className="block whitespace-pre-wrap border border-hairline px-1 py-0.5 text-[13px]">
-                          {configured.subject || fallback.subject}
-                        </span>
-                      )}
-                  </dd>
-                </div>
+                    <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+                      Subject
+                    </dt>
+                    <dd>
+                      {editable
+                        ? cell(
+                            ["special_orders", "email", t.key, "subject"],
+                            text(configured.subject) ?? fallback.subject,
+                            { ariaLabel: `${t.label} subject`, boxed: true }
+                          )
+                        : (
+                          <span className="block whitespace-pre-wrap border border-hairline px-1 py-0.5 text-[13px]">
+                            {configured.subject || fallback.subject}
+                          </span>
+                        )}
+                    </dd>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
                     Body

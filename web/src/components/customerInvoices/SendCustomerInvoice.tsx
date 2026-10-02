@@ -14,6 +14,7 @@ import {
   DEFAULT_TEMPLATES,
   fillTemplate,
   docOrgFrom,
+  orderEmailSubject,
   usDate,
   type DocOrg,
 } from "@/lib/specialOrderDocs";
@@ -255,7 +256,23 @@ export function SendCustomerInvoice({
       // WHO IS SENDING IT (147) — `{employee_name}`, the way an order's
       // documents sign off; the org's name when the sender has none.
       const { data: me } = await supabase.rpc("my_first_name", { p_org: orgId });
-      setCompose(invoiceEmail(view, number, settings, pay, viaQbo, (me as string | null) || doc.name));
+      // AN INVOICE FOR ONE ORDER JOINS THAT ORDER'S CONVERSATION (167): its
+      // subject, so it threads with the quote and the inquiry. Several orders —
+      // the weekly wholesale invoice — keep the invoice's own subject.
+      // `send-special-order-email` threads it on the same rule.
+      const invoiceOrders = [...new Set(view.lines.map((l) => l.special_order_id).filter(Boolean))];
+      let conversation: string | null = null;
+      if (invoiceOrders.length === 1) {
+        const { data: one } = await supabase
+          .from("special_orders")
+          .select("number, title, thread_subject")
+          .eq("id", invoiceOrders[0]!)
+          .maybeSingle();
+        if (one) conversation = orderEmailSubject(one, doc.name, settings);
+      }
+      setCompose(
+        invoiceEmail(view, number, settings, pay, viaQbo, (me as string | null) || doc.name, conversation)
+      );
       setPending({
         replacesInQbo,
         blob,
@@ -503,7 +520,9 @@ function invoiceEmail(
   settings: Record<string, unknown>,
   pay: string,
   viaQbo = false,
-  employeeName = ""
+  employeeName = "",
+  /** The order's conversation subject, for an invoice covering one order. */
+  conversation: string | null = null
 ): Compose {
   const so = (settings.special_orders ?? {}) as Record<string, unknown>;
   const templates = (so.email ?? {}) as Record<string, { subject?: string; body?: string }>;
@@ -525,7 +544,7 @@ function invoiceEmail(
   return {
     to: (view.customer?.email ?? "").trim(),
     cc: typeof so.email_cc === "string" ? so.email_cc : "",
-    subject: fillTemplate(orDefault(configured.subject, fallback.subject), vars),
+    subject: conversation ?? fillTemplate(orDefault(configured.subject, fallback.subject), vars),
     body: fillTemplate(orDefault(configured.body, fallback.body), vars),
   };
 }

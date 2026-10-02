@@ -5369,3 +5369,42 @@ found `dateRange`'s `isRealDate` THROWING on a month past 12 (Invalid Date's
 `toISOString`) where the special-order copy had guarded it — which also meant a
 hand-typed `?from=2026-13-45` could take down the PO, bill or items list. Fixed
 at the source, with fixtures.
+
+## One email conversation per order (migration 167, 2026-10-02)
+
+Mark: "something we lost from FMP that would be nice to have again: threaded
+emails … This is really only applicable to special orders." Then: "keep the
+subject the same even if the title changes, but make the subject a little
+smaller, i.e. 'Donut Friend SO-10098: Smith Wedding'. Build it."
+
+- **Two columns on `special_orders`:** `thread_message_id` (the Message-ID
+  every later customer email answers) and `thread_subject` (the subject they
+  all go under). Backfilled from 051's `inbound_message_id`, with the subject
+  "Re: " the inquiry confirmation's so the 12 existing inquiry threads hold.
+  `inbound_*` stay as the inquiry's own record.
+- **`_shared/orderThread.ts`** opens or continues the thread: an order with a
+  root gets `In-Reply-To`/`References`; one without gets a generated
+  `Message-ID` on this email, recorded only AFTER the send (`is null`-guarded),
+  so a failed send never leaves a root no message carries.
+- **The subject is fixed by the FIRST customer email and never rewritten.**
+  Template `orgs.settings.special_orders.thread_subject`, default
+  `{org} {number}: {title}` (no title → "Donut Friend SO-10098"). Pure rule in
+  `_shared/threadSubject.ts`, MIRRORED as `threadSubject` in
+  `lib/specialOrderDocs`; `threadSubject.fixtures.ts` runs both over the same
+  cases (checked: changing the server copy turns it red).
+- **What threads:** the inquiry confirmation (`submit-inquiry`, which now
+  starts the thread under the new subject — the inquiry's own subject template
+  is unused), quote, invoice and receipt (`send-special-order-email`; the
+  compose card shows `orderEmailSubject`), the approval confirmation
+  (`approve-quote`), and — for an invoice covering ONE order — the customer
+  invoice email and `square-pay`'s Payment received. **What does not:** the
+  kitchen sheet (it used to thread onto the inquiry like everything else, which
+  was wrong), the carrier emails (never did), statements, and multi-order
+  invoices, which keep their own subjects.
+- Settings → Messages → Orders gained **Order email subject**; the inquiry,
+  quote and receipt lost their Subject boxes (none had been customised).
+- Not verified by a real send. **Order of operations: apply 167, then deploy
+  `send-special-order-email`, `approve-quote`, `square-pay` and
+  `submit-inquiry`, then ship the web change** — `fetchOrderDocData` selects
+  `thread_subject`, so the web half without the column breaks every order
+  document send.

@@ -539,15 +539,28 @@ test("the quote email carries the totals and the approval paragraph", () => {
   const email = buildDocumentEmail("quote", order(), {}, {
     approve_line: "\nApprove here: https://example.com/q/abc\n",
   });
-  eq(email.subject, "Your quote #9885 — Pregnanacy Revela 8/16/2026");
+  // The ORDER's conversation subject (167), not a per-paper one.
+  eq(email.subject, "9885: Pregnanacy Revela 8/16/2026", "no org name passed");
+  eq(
+    buildDocumentEmail("quote", order(), {}, {}, null, "Donut Friend").subject,
+    "Donut Friend 9885: Pregnanacy Revela 8/16/2026"
+  );
   ok(email.body.includes("$5.60"), "the total is in the body");
   ok(email.body.includes("https://example.com/q/abc"), "the approval link is in the body");
   ok(email.body.includes("Alexandra"), "greeted by first name");
 });
 
-test("an order with no title gets no dangling em dash in the subject", () => {
-  const email = buildDocumentEmail("invoice", order({ title: null }), {});
-  eq(email.subject, "Your invoice #9885");
+test("an order with no title gets no dangling separator in the subject", () => {
+  const email = buildDocumentEmail("invoice", order({ title: null }), {}, {}, null, "Donut Friend");
+  eq(email.subject, "Donut Friend 9885");
+});
+
+test("the quote, invoice and receipt share the order's FIXED subject; the kitchen sheet does not", () => {
+  const fixed = order({ title: "Renamed since", thread_subject: "Donut Friend 9885: Smith Wedding" });
+  for (const k of ["quote", "invoice", "receipt"] as const) {
+    eq(buildDocumentEmail(k, fixed, {}, {}, null, "Donut Friend").subject, "Donut Friend 9885: Smith Wedding", k);
+  }
+  eq(buildDocumentEmail("order", fixed, {}, {}, null, "Donut Friend").subject, "Order #9885 — 8/16/2026");
 });
 
 test("a configured template overrides the generic one, per document", () => {
@@ -557,14 +570,20 @@ test("a configured template overrides the generic one, per document", () => {
       email_cc: "orders@example.com",
     },
   };
+  // The quote's own subject template no longer applies (167): it goes under
+  // the order's conversation subject. Its body and the Cc still come from here.
   const quote = buildDocumentEmail("quote", order(), settings);
-  eq(quote.subject, "Quote 9885 for Alexandra David");
+  eq(quote.subject, "9885: Pregnanacy Revela 8/16/2026");
   eq(quote.cc, "orders@example.com, alexlandayan@gmail.com");
-  // The INVOICE keeps the built-in template — overriding one document must not
-  // silently change the others.
   eq(
-    buildDocumentEmail("invoice", order(), settings).subject,
-    "Your invoice #9885 — Pregnanacy Revela 8/16/2026"
+    buildDocumentEmail("quote", order(), { special_orders: { thread_subject: "#{number} {title}" } }).subject,
+    "#9885 Pregnanacy Revela 8/16/2026",
+    "the org's conversation template"
+  );
+  // The kitchen sheet still takes its own configured subject.
+  eq(
+    buildDocumentEmail("order", order(), { special_orders: { email: { order: { subject: "K {number}" } } } }).subject,
+    "K 9885"
   );
 });
 
@@ -575,14 +594,19 @@ test("a BLANK stored template falls back to the default, never sends empty", () 
   // reads have to agree.
   const blank = { special_orders: { email: { quote: { subject: "", body: "   " } } } };
   const email = buildDocumentEmail("quote", order(), blank);
-  eq(email.subject, "Your quote #9885 — Pregnanacy Revela 8/16/2026");
+  ok(email.subject.trim() !== "", "never an empty subject");
   ok(email.body.includes("Thanks for your order!"), "the default body came back");
   // A real override still wins, including one that is only whitespace-padded.
   eq(
-    buildDocumentEmail("quote", order(), {
-      special_orders: { email: { quote: { subject: " Hello " } } },
+    buildDocumentEmail("order", order(), {
+      special_orders: { email: { order: { subject: " Hello " } } },
     }).subject,
     " Hello "
+  );
+  eq(
+    buildDocumentEmail("quote", order(), { special_orders: { thread_subject: "  " } }, {}, null, "DF").subject,
+    "DF 9885: Pregnanacy Revela 8/16/2026",
+    "a blank conversation template is the default"
   );
 });
 

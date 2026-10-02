@@ -295,6 +295,8 @@ export type OrderDocData = {
   kind: string;
   status: string | null;
   title: string | null;
+  /** The conversation subject its first customer email fixed (167). */
+  thread_subject?: string | null;
   event_date: string | null;
   event_time: string | null;
   ready_by_time: string | null;
@@ -433,6 +435,7 @@ export async function fetchOrderDocData(
            tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
            ignore_balance,
            notes_quote, notes_production, notes_invoice, notes_receipt,
+           thread_subject,
            customers ( id, first_name, last_name, company, phone, email )`
         )
         .in("id", orderIds),
@@ -557,6 +560,7 @@ export async function fetchOrderDocData(
       kind: row.kind as string,
       status: row.status as string | null,
       title: row.title as string | null,
+      thread_subject: (row.thread_subject as string | null) ?? null,
       event_date: row.event_date as string | null,
       event_time: row.event_time as string | null,
       ready_by_time: row.ready_by_time as string | null,
@@ -1104,7 +1108,9 @@ export function buildDocumentEmail(
   orgSettings: Record<string, unknown>,
   extras: Record<string, string> = {},
   /** The org's day, for `{cutoff_clause}`. See `templateVars`. */
-  today?: string | null
+  today?: string | null,
+  /** `orgs.name`, for the conversation subject's `{org}`. */
+  orgName = ""
 ): EmailParts {
   const so = (orgSettings?.special_orders ?? {}) as Record<string, unknown>;
   const templates = (so.email ?? {}) as Record<string, { subject?: string; body?: string }>;
@@ -1130,10 +1136,19 @@ export function buildDocumentEmail(
   return {
     to: documentRecipient(order),
     cc: documentCc(order, typeof so.email_cc === "string" ? so.email_cc : ""),
-    subject: fillTemplate(orDefault(configured.subject, fallback.subject), vars),
+    // THE CUSTOMER'S PAPERS GO UNDER THE ORDER'S CONVERSATION SUBJECT (167),
+    // so the quote, the invoice and the receipt thread with each other and
+    // with the inquiry. The kitchen sheet is not the customer's, and a
+    // statement spans orders, so those keep their own.
+    subject: CONVERSATION_KINDS.has(kind)
+      ? orderEmailSubject(order, orgName, orgSettings)
+      : fillTemplate(orDefault(configured.subject, fallback.subject), vars),
     body: fillTemplate(orDefault(configured.body, fallback.body), vars),
   };
 }
+
+/** The papers that go to the customer about ONE order — the ones that thread. */
+const CONVERSATION_KINDS = new Set<string>(["quote", "invoice", "receipt"]);
 
 /**
  * The reply the customer sees, threaded onto their own inquiry.
@@ -1166,6 +1181,56 @@ export function replySubject(inboundSubject: string | null | undefined): string 
   const s = (inboundSubject ?? "").trim();
   if (!s) return null;
   return /^re:/i.test(s) ? s : `Re: ${s}`;
+}
+
+/**
+ * THE ORDER'S CONVERSATION SUBJECT (migration 167, Mark, 2026-10-02: "Donut
+ * Friend SO-10098: Smith Wedding"). Every customer email about one order goes
+ * under it — the inquiry reply, the quote, the receipt, an invoice for that
+ * order alone, the approval and payment notes — so they stay one conversation
+ * in Mail.app and in Gmail, which splits on a changed subject even when the
+ * headers match. The first email sent fixes it on the order and it is never
+ * rewritten, so renaming the order does not split the thread.
+ *
+ * A MIRROR of `supabase/functions/_shared/threadSubject.ts`, which the server
+ * senders use; `threadSubject.fixtures.ts` runs both over the same cases.
+ */
+export const DEFAULT_THREAD_SUBJECT = "{org} {number}: {title}";
+
+export function threadSubject(
+  template: string | null | undefined,
+  values: { org: string | null | undefined; number: string | null | undefined; title: string | null | undefined }
+): string {
+  const t = typeof template === "string" && template.trim() !== "" ? template : DEFAULT_THREAD_SUBJECT;
+  const vars: Record<string, string> = {
+    org: (values.org ?? "").trim(),
+    number: (values.number ?? "").trim(),
+    title: (values.title ?? "").trim(),
+  };
+  return t
+    .replace(/\{(org|number|title)\}/g, (_, k: string) => vars[k])
+    .replace(/\s+/g, " ")
+    // An order with no title leaves "Donut Friend SO-10098:" — the separator
+    // goes with the missing words.
+    .replace(/^[\s:—–,-]+|[\s:—–,-]+$/g, "")
+    .trim();
+}
+
+/** The subject an email about this order goes under: the one it already has,
+ *  else the one its first email will fix. */
+export function orderEmailSubject(
+  order: { thread_subject?: string | null; number?: string | null; title?: string | null },
+  orgName: string,
+  orgSettings: Record<string, unknown>
+): string {
+  const fixed = (order.thread_subject ?? "").trim();
+  if (fixed) return fixed;
+  const so = (orgSettings?.special_orders ?? {}) as Record<string, unknown>;
+  return threadSubject(typeof so.thread_subject === "string" ? so.thread_subject : null, {
+    org: orgName,
+    number: order.number ?? "",
+    title: order.title ?? "",
+  });
 }
 
 /* ==========================================================================

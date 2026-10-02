@@ -8,6 +8,7 @@ import "./calcPad.fixtures";
 import "./refundSplit.fixtures";
 import "./taxCodes.fixtures";
 import "./taxRates.fixtures";
+import "./threadSubject.fixtures";
 import "./batchLogFilters.fixtures";
 import "./breakRules.fixtures";
 import "./timesheetIssues.fixtures";

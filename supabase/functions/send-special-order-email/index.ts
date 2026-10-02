@@ -18,10 +18,11 @@
 // Gmail rewrites a From it is not authorized for rather than refusing it, which
 // is the failure that looks like it worked.
 //
-// **It threads.** `In-Reply-To` and `References` carry the inbound
-// `Message-ID`, which retires FileMaker's subject-pasting kludge. Null on
-// anything that did not start as an inquiry, which is almost everything, so the
-// headers must be absent rather than empty.
+// **It threads.** Every paper to the customer answers the ORDER's thread root
+// and goes under its fixed subject (167, `_shared/orderThread`), so a whole
+// order is one conversation in Mail.app and Gmail. The root is the inquiry
+// confirmation's Message-ID where there was one, else the first email's own.
+// The kitchen sheet and the carrier emails are other conversations.
 //
 // **The email going out is the fact; every write after it is bookkeeping.** A
 // failed stamp returns a WARNING with a 200, never an error — reporting failure
@@ -40,6 +41,7 @@ import {
   withGapBeforeAttachment,
   type ProviderConfig,
 } from "../_shared/email.ts";
+import { orderThread } from "../_shared/orderThread.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -188,7 +190,7 @@ Deno.serve(async (req) => {
 
     const { data: order, error: orderError } = await supabase
       .from("special_orders")
-      .select("id, org_id, number, inbound_message_id, inbound_subject")
+      .select("id, org_id, number")
       .eq("id", order_id)
       .maybeSingle();
     if (orderError) return json(400, { error: orderError.message });
@@ -218,7 +220,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const orgSettings = (org?.settings ?? {}) as {
       email_provider?: ProviderConfig;
-      special_orders?: { email_provider?: ProviderConfig; reply_to?: string };
+      special_orders?: { email_provider?: ProviderConfig; reply_to?: string; thread_subject?: string };
       billing?: { email?: string };
     };
 
@@ -232,14 +234,17 @@ Deno.serve(async (req) => {
       replyToFallbacks: [orgSettings.special_orders?.reply_to, orgSettings.billing?.email],
     });
 
-    // Angle-bracketed on the wire; a stored value may or may not be, and
-    // sending `<<id>>` threads with nothing.
-    const rawMessageId = (order.inbound_message_id ?? "").trim();
-    const inReplyTo = rawMessageId
-      ? rawMessageId.startsWith("<")
-        ? rawMessageId
-        : `<${rawMessageId}>`
-      : undefined;
+    // THE ORDER'S CONVERSATION (167): every paper the CUSTOMER gets answers
+    // one thread root. The kitchen sheet is not theirs and stays out of it —
+    // until 167 it threaded onto the customer's inquiry like everything else.
+    // The subject is the caller's, composed and shown on the compose card
+    // (`orderEmailSubject`); the first send fixes it on the order.
+    const thread = kind === "order"
+      ? null
+      : await orderThread(supabase, order_id, transport.cfg.from, {
+          org: org?.name,
+          template: orgSettings.special_orders?.thread_subject,
+        });
 
     const providerId = await sendMail(transport, {
       to,
@@ -247,13 +252,16 @@ Deno.serve(async (req) => {
       subject,
       text: withGapBeforeAttachment(body ?? ""),
       attachment: { filename, base64: pdf_base64 },
-      inReplyTo,
-      references: inReplyTo,
+      ...(thread?.headers ?? {}),
     });
 
     /* ---- from here down, nothing may turn a sent email into a failure ---- */
 
     const warnings: string[] = [];
+    if (thread) {
+      const threadProblem = await thread.record(subject);
+      if (threadProblem) warnings.push(threadProblem);
+    }
     // The ORG's calendar day. `toISOString` was the UTC date, which stamped a
     // send after 5pm Pacific as tomorrow (found 2026-09-23 building 124).
     const today = orgToday((org?.settings as { timezone?: string } | null)?.timezone);
@@ -449,7 +457,7 @@ async function sendCustomerInvoice(
     .maybeSingle();
   const orgSettings = (org?.settings ?? {}) as {
     email_provider?: ProviderConfig;
-    special_orders?: { email_provider?: ProviderConfig; reply_to?: string };
+    special_orders?: { email_provider?: ProviderConfig; reply_to?: string; thread_subject?: string };
     billing?: { email?: string };
   };
 
@@ -460,17 +468,46 @@ async function sendCustomerInvoice(
     replyToFallbacks: [orgSettings.special_orders?.reply_to, orgSettings.billing?.email],
   });
 
+  // AN INVOICE FOR ONE ORDER JOINS THAT ORDER'S CONVERSATION (167); one
+  // covering several — the weekly wholesale invoice — belongs to no single
+  // order's thread and goes on its own, as before. The compose card chose the
+  // subject the same way (`SendCustomerInvoice`).
+  const { data: invoiceLines } = await supabase
+    .from("customer_invoice_lines")
+    .select("special_order_id")
+    .eq("invoice_id", invoice.id);
+  // Each ORDER once (an order is several lines since 141); a free line is no
+  // order's and has nowhere to be filed.
+  const invoiceOrders = [
+    ...new Set(
+      (invoiceLines ?? [])
+        .map((l) => l.special_order_id as string | null)
+        .filter((o): o is string => !!o)
+    ),
+  ];
+  const thread = invoiceOrders.length === 1
+    ? await orderThread(supabase, invoiceOrders[0], transport.cfg.from, {
+        org: org?.name,
+        template: orgSettings.special_orders?.thread_subject,
+      })
+    : null;
+
   const providerId = await sendMail(transport, {
     to,
     cc: cc || undefined,
     subject,
     text: withGapBeforeAttachment(body ?? ""),
     attachment: { filename, base64: pdf_base64 },
+    ...(thread?.headers ?? {}),
   });
 
   /* ---- from here down, nothing may turn a sent email into a failure ---- */
 
   const warnings: string[] = [];
+  if (thread) {
+    const threadProblem = await thread.record(subject);
+    if (threadProblem) warnings.push(threadProblem);
+  }
 
   let documentPath: string | null =
     `${invoice.org_id}/customer-invoices/${invoice.id}/${crypto.randomUUID()}.pdf`;
@@ -499,16 +536,7 @@ async function sendCustomerInvoice(
   // Its OWN object per order, under the order's folder like every document
   // there, so deleting it from one order cannot take it from another or from
   // the invoice's Sent history.
-  const { data: invoiceLines } = await supabase
-    .from("customer_invoice_lines")
-    .select("special_order_id")
-    .eq("invoice_id", invoice.id);
-  // Each ORDER once (an order is several lines since 141); a free line is no
-  // order's and has nowhere to be filed.
-  const invoiceOrders = (invoiceLines ?? [])
-    .map((l) => l.special_order_id as string | null)
-    .filter((o): o is string => !!o);
-  for (const orderId of [...new Set(invoiceOrders)]) {
+  for (const orderId of invoiceOrders) {
     const copyPath = `${invoice.org_id}/${orderId}/${crypto.randomUUID()}.pdf`;
     const { error: copyError } = await supabase.storage
       .from("special-order-attachments")

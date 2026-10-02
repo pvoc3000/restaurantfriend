@@ -50,6 +50,7 @@ import {
 } from "../_shared/email.ts";
 import { quoteDelivery } from "../_shared/deliveryQuote.ts";
 import { buildInquiryNotice } from "../_shared/shopNotices.ts";
+import { orderThread } from "../_shared/orderThread.ts";
 import { appLink, sendShopNotice } from "../_shared/shopNotify.ts";
 
 const CORS = {
@@ -434,6 +435,7 @@ Deno.serve(async (req) => {
         email_provider?: ProviderConfig;
         reply_to?: string;
         inquiry_cc?: string;
+        thread_subject?: string;
         email?: Record<string, { subject?: string; body?: string }>;
       };
       billing?: { email?: string };
@@ -459,13 +461,21 @@ Deno.serve(async (req) => {
         items: await itemsBlock(admin, state.order_id),
       };
       const configured = orgSettings.special_orders?.email?.inquiry ?? {};
-      const subject = fill(configured.subject ?? DEFAULT_SUBJECT, values);
 
-      // Generated BEFORE the send and stored AFTER it, and it is the same
-      // string both times — which is the entire point. Reading a Message-ID
-      // back off a provider is either impossible or a second API call, and
-      // getting it wrong fails silently forever.
-      const messageId = newMessageId(transport.cfg.from);
+      // THIS EMAIL STARTS THE ORDER'S CONVERSATION (167): its Message-ID is
+      // the root every later email answers, and its subject — "Donut Friend
+      // SO-10101: Smith Wedding", the org's `thread_subject` template — is the
+      // one they all go under. Generated BEFORE the send and stored AFTER it,
+      // the same string both times, which is the entire point: reading a
+      // Message-ID back off a provider is either impossible or a second API
+      // call, and getting it wrong fails silently forever. The inquiry's own
+      // subject template only stands in if the order cannot be read.
+      const thread = await orderThread(admin, state.order_id, transport.cfg.from, {
+        org: org?.name,
+        template: orgSettings.special_orders?.thread_subject,
+      });
+      const messageId = thread?.headers.messageId ?? newMessageId(transport.cfg.from);
+      const subject = thread?.subject ?? fill(configured.subject ?? DEFAULT_SUBJECT, values);
 
       await sendMail(transport, {
         to: state.contact_email,
@@ -475,15 +485,17 @@ Deno.serve(async (req) => {
         messageId,
       });
 
+      // The inquiry's own record, as before, and the thread beside it.
       const { error: stampError } = await admin
         .from("special_orders")
         .update({ inbound_message_id: messageId, inbound_subject: subject })
         .eq("id", state.order_id)
         .select("id");
-      if (stampError) {
+      const threadProblem = thread ? await thread.record(subject) : null;
+      if (stampError || threadProblem) {
         // The customer has the message; we have lost the ability to thread onto
         // it. Worth saying out loud, because the symptom later is silent.
-        warnings.push(`the reply thread was not recorded: ${stampError.message}`);
+        warnings.push(`the reply thread was not recorded: ${stampError?.message ?? threadProblem}`);
       }
 
       await admin.from("special_order_events").insert({

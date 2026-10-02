@@ -38,6 +38,7 @@ import {
   type ProviderConfig,
 } from "../_shared/email.ts";
 import { buildApprovalNotice } from "../_shared/shopNotices.ts";
+import { orderThread } from "../_shared/orderThread.ts";
 import { appLink, sendShopNotice } from "../_shared/shopNotify.ts";
 
 const CORS = {
@@ -153,7 +154,7 @@ Deno.serve(async (req) => {
     // unnamed embed is refused as ambiguous — `order` came back null.
     const { data: order } = await admin
       .from("special_orders")
-      .select("number, title, contact_email, contact_name, contact_phone, event_date, event_time, fulfillment, delivery_address, inbound_message_id, customers(email), locations!special_orders_location_id_fkey(name, public_name)")
+      .select("number, title, contact_email, contact_name, contact_phone, event_date, event_time, fulfillment, delivery_address, customers(email), locations!special_orders_location_id_fkey(name, public_name)")
       .eq("id", state.order_id)
       .maybeSingle();
     const { data: org } = await admin
@@ -167,6 +168,7 @@ Deno.serve(async (req) => {
       special_orders?: {
         email_provider?: ProviderConfig;
         reply_to?: string;
+        thread_subject?: string;
       };
       billing?: { email?: string };
     };
@@ -179,12 +181,12 @@ Deno.serve(async (req) => {
         replyToFallbacks: [orgSettings.special_orders?.reply_to, orgSettings.billing?.email],
       });
 
-      const rawMessageId = (order?.inbound_message_id ?? "").trim();
-      const inReplyTo = rawMessageId
-        ? rawMessageId.startsWith("<")
-          ? rawMessageId
-          : `<${rawMessageId}>`
-        : undefined;
+      // The ORDER's conversation (167) — the quote that was just approved went
+      // out under it, so the confirmation lands beside it.
+      const thread = await orderThread(admin, state.order_id, transport.cfg.from, {
+        org: org?.name,
+        template: orgSettings.special_orders?.thread_subject,
+      });
 
       const customerEmail =
         order?.contact_email ??
@@ -207,7 +209,8 @@ Deno.serve(async (req) => {
           `Your invoice will follow by email. If anything needs changing, just reply to this message.\n`;
         await sendMail(transport, {
           to: customerEmail,
-          subject: `Quote #${order?.number ?? ""} approved${order?.title ? ` — ${order.title}` : ""}`,
+          subject: thread?.subject ??
+            `Quote #${order?.number ?? ""} approved${order?.title ? ` — ${order.title}` : ""}`,
           text: attachSigned ? withGapBeforeAttachment(confirmation) : confirmation,
           // The signed copy rides along where there IS one; with none the
           // message is an ordinary text email rather than one carrying a
@@ -215,9 +218,12 @@ Deno.serve(async (req) => {
           attachment: attachSigned
             ? { filename: `Signed quote ${order?.number ?? ""}.pdf`, base64: pdf_base64 }
             : undefined,
-          inReplyTo,
-          references: inReplyTo,
+          ...(thread?.headers ?? {}),
         });
+        if (thread) {
+          const threadProblem = await thread.record(thread.subject);
+          if (threadProblem) warnings.push(threadProblem);
+        }
       }
     } catch (e) {
       warnings.push(
