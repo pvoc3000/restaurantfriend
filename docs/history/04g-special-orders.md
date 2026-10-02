@@ -5403,7 +5403,11 @@ smaller, i.e. 'Donut Friend SO-10098: Smith Wedding'. Build it."
   invoices, which keep their own subjects.
 - Settings → Messages → Orders gained **Order email subject**; the inquiry,
   quote and receipt lost their Subject boxes (none had been customised).
-- Not verified by a real send. **Order of operations: apply 167, then deploy
+- **APPLIED 2026-10-02** (via `db query --linked`, in a transaction, at Mark's
+  word; 12 roots and subjects carried over) and the four functions deployed
+  with their JWT settings unchanged (`submit-inquiry` `--no-verify-jwt`, the
+  other three verified). Not verified by a real send.
+  **Order of operations, for any rebuild: apply 167, then deploy
   `send-special-order-email`, `approve-quote`, `square-pay` and
   `submit-inquiry`, then ship the web change** — `fetchOrderDocData` selects
   `thread_subject`, so the web half without the column breaks every order
