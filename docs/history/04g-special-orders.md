@@ -5517,3 +5517,12 @@ fields again."
   discounted twice. 345 have payments (so they read as overpaid), none is on
   an app invoice, 29 are cancelled, and one is live: SO-9849, a quote for
   10/19 at $880.22 where it should be $84.60 higher.
+- **171 FIXED THEM, at Mark's word ("Fix all 492"), APPLIED 2026-10-02:**
+  `discount_amount` cleared where the rate was also set, the percentage kept.
+  Rows as they stood saved in `FMP Export/pre171-double-discounts-2026-10-02.json`.
+  After: none holds both; **255 of the 345 paid orders now balance to the
+  cent** (before, all read overpaid), 1 is overpaid, and 89 owe — $3,266.40,
+  every event before 2026-07-26, and NOT the cleared amount (0 of 89 equal it,
+  taxed or not), so that is an older FileMaker mismatch rather than this fix.
+  SO-9849's total went $880.22 → $973.49 (the $84.60 plus its tax). SO-9868
+  and SO-9844 no longer total below zero.
