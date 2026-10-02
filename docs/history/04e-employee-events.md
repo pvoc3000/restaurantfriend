@@ -200,3 +200,27 @@
    header composites a few pixels out of place — which reads exactly like a
    layout bug. A `screenshot` restores it. Measure again before believing any
    geometry, and check `innerWidth !== 0` first.
+
+   **2026-10-02 — THE EVENT DIALOG GREW UP (migration 166, Mark).** Four asks,
+   one pass. (1) "What happened" and "More detail" span the dialog; detail is a
+   5-row `FORM_TEXTAREA` (NewTask's), retiring the one-line field and the
+   "no ui/TextArea yet" excuse. (2) **"Action taken" had nothing to offer**: it
+   listed outcomes already on THIS person's events — empty for nearly everyone —
+   and its `allowNew` hid behind a search box nobody read as "type here". It now
+   offers `orgs.settings.hr.event_outcomes`, seeded Verbal Warning · Write Up ·
+   Check In · Documented. An org-wide list of what is in use was rejected on a
+   measurement: FileMaker left ~300 free-text spellings ("Verbal given",
+   "Verbally Warned", "verbal warning given"…). A new answer typed into the
+   picker is appended by `add_event_outcome` (invoker, atomic `jsonb_set`, so it
+   cannot clobber another settings key the way a client read-modify-write
+   would). There is no settings screen for pruning the list yet. (3)
+   **`employee_events.document_id`** → `employee_documents`, `on delete set
+   null`. One document per event. Attaching a file in the dialog FILES it in
+   the person's paperwork (object, row, then event; a failed event takes the
+   new document back out); or link one already on file. The table gains a
+   Document column ("View") and the expansion names the file — both open the
+   signed URL, like a Documents-tab chip. Only linked documents are signed on
+   the Events tab. (4) **Edit…** in the ⋯ menu beside Remove…, the SAME dialog
+   (`EmployeeEventDialog`) prefilled, so editing can never offer less than
+   creating did. A `shift` or `document_note` event keeps its kind as a fixed
+   label in the editor, for the Kind cell's one-way-door reason.

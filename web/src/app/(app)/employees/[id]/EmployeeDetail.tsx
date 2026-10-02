@@ -47,8 +47,8 @@ import {
   EmployeeEvents,
   type EmployeeEventRow,
 } from "@/components/hr/EmployeeEvents";
-import { NewEmployeeEvent } from "@/components/hr/NewEmployeeEvent";
-import { EVENT_SELECT } from "@/lib/employeeEvents";
+import { NewEmployeeEvent, type EventDialogContext } from "@/components/hr/NewEmployeeEvent";
+import { EVENT_SELECT, eventOutcomes } from "@/lib/employeeEvents";
 
 const Heading = SectionHeading;
 
@@ -101,7 +101,8 @@ export async function EmployeeDetail({
   const wantsEvents = tab === "events";
   // The Employment tab reads the documents to work out the food handler card's
   // state; only the Documents tab needs them SIGNED, which is the expensive half.
-  const wantsDocumentRows = tab === "documents" || tab === "employment";
+  // The Events tab reads them to offer linking one to an event (166).
+  const wantsDocumentRows = tab === "documents" || tab === "employment" || tab === "events";
 
   const [
     { data: employee, error },
@@ -314,6 +315,24 @@ export async function EmployeeDetail({
     (authorRows ?? []).map((a) => [a.id as string, employeeName(a as Pick<Employee, "first_name" | "last_name">)])
   );
 
+  // The documents events point at (166), signed in one batch like the
+  // Documents tab's — only these, not the whole file.
+  const docById = new Map(docs.map((d) => [d.id, d]));
+  const linkedDocIds = [
+    ...new Set(
+      eventRows.map((e) => e.document_id as string | null).filter((v): v is string => !!v && docById.has(v))
+    ),
+  ];
+  const { data: linkedSigned } = linkedDocIds.length
+    ? await supabase.storage
+        .from(EMPLOYEE_DOCS_BUCKET)
+        .createSignedUrls(
+          linkedDocIds.map((d) => docById.get(d)!.storage_path),
+          SIGNED_URL_TTL_SECONDS
+        )
+    : { data: null };
+  const linkedUrl = new Map(linkedDocIds.map((d, i) => [d, linkedSigned?.[i]?.signedUrl ?? null]));
+
   const events: EmployeeEventRow[] = eventRows.map((e) => ({
     id: e.id as string,
     occurred_on: e.occurred_on as string,
@@ -327,13 +346,19 @@ export async function EmployeeDetail({
     author:
       authorById.get((e.author_employee_id ?? "") as string) ?? ((e.author_name ?? null) as string | null),
     locationCode: codeById.get((e.location_id ?? "") as string) ?? null,
+    locationId: (e.location_id ?? null) as string | null,
+    documentId: (e.document_id ?? null) as string | null,
+    document: e.document_id && docById.has(e.document_id as string)
+      ? {
+          fileName: docById.get(e.document_id as string)!.file_name,
+          url: linkedUrl.get(e.document_id as string) ?? null,
+        }
+      : null,
   }));
 
-  // The outcomes already in use, so "Action taken" offers rather than asking
-  // anyone to remember how they phrased it last time.
-  const outcomes = [...new Set(events.map((e) => e.outcome).filter((o): o is string => !!o))]
-    .sort()
-    .slice(0, 40);
+  // What "Action taken" offers — the org's list (166), not this person's
+  // history, which for nearly everybody is empty.
+  const outcomes = eventOutcomes(session.orgSettings);
 
   // The signed-in person's own employee row, so a new event records who wrote
   // it without the dialog having to query for itself.
@@ -354,6 +379,19 @@ export async function EmployeeDetail({
 
   const trail = parseTrail(rawParams, EMPLOYEES_CRUMB);
   const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
+
+  // Everything New event and Edit… need, in one bundle so they cannot be
+  // handed different vocabularies.
+  const eventDialog: EventDialogContext = {
+    employeeId: person.id,
+    orgId: person.org_id,
+    userId: session.userId,
+    authorEmployeeId: (selfRow?.id ?? null) as string | null,
+    locations: session.activeLocations.map((l) => ({ id: l.id, code: l.code })),
+    today,
+    outcomes,
+    documents: docs.map((d) => ({ id: d.id, file_name: d.file_name, kind: d.kind, created_at: d.created_at })),
+  };
   // The card on file wins over the column; see `foodHandlerExpiry`.
   const foodCard = foodHandlerExpiry(documents, person.food_handler_expires);
   const fhc = expiryState(foodCard.on, today);
@@ -761,15 +799,7 @@ export async function EmployeeDetail({
             Events
           </Heading>
           {!eventError && (
-            <NewEmployeeEvent
-              employeeId={person.id}
-              orgId={person.org_id}
-              userId={session.userId}
-              authorEmployeeId={(selfRow?.id ?? null) as string | null}
-              locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
-              today={today}
-              outcomes={outcomes}
-            />
+            <NewEmployeeEvent context={eventDialog} />
           )}
         </div>
         {eventError ? (
@@ -780,7 +810,7 @@ export async function EmployeeDetail({
               : ""}
           </p>
         ) : (
-          <EmployeeEvents rows={events} shiftTotal={shiftTotal ?? 0} editable />
+          <EmployeeEvents rows={events} shiftTotal={shiftTotal ?? 0} dialog={eventDialog} />
         )}
       </section>
       )}

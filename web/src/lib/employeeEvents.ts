@@ -46,7 +46,7 @@ import { daysBefore } from "./today";
 // level to give the row back typed, and `"a" + "b"` widens to `string`, which
 // collapses every selected column to `GenericStringError`.
 export const EVENT_SELECT =
-  "id, employee_id, occurred_on, kind, score, shift, position, headline, detail, outcome, author_employee_id, author_name, location_id";
+  "id, employee_id, occurred_on, kind, score, shift, position, headline, detail, outcome, author_employee_id, author_name, location_id, document_id";
 
 /* -- the vocabulary -------------------------------------------------------- */
 
@@ -126,6 +126,18 @@ export const AD_HOC_EVENT_KINDS: EventKind[] = [
  */
 export function isDisciplinary(kind: string): boolean {
   return kind === "verbal_warning" || kind === "written_warning" || kind === "incident";
+}
+
+/**
+ * What "Action taken" offers: `orgs.settings.hr.event_outcomes` (migration
+ * 166), in the order it was written. Settings rather than a constant because it
+ * is the org's own wording (design rule 2); a new answer typed into the event
+ * dialog is appended there by `add_event_outcome`, so the list grows by use.
+ */
+export function eventOutcomes(settings: Record<string, unknown>): string[] {
+  const hr = settings.hr as { event_outcomes?: unknown } | undefined;
+  const list = hr?.event_outcomes;
+  return Array.isArray(list) ? list.filter((v): v is string => typeof v === "string" && v.trim() !== "") : [];
 }
 
 /* -- which shift ----------------------------------------------------------- */

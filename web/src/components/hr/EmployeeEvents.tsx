@@ -8,6 +8,7 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_DANGER_CLASS } from "@/components/ui/Dialog";
+import { EmployeeEventDialog, type EventDialogContext } from "@/components/hr/NewEmployeeEvent";
 import {
   AD_HOC_EVENT_KINDS,
   EVENT_KIND_LABEL,
@@ -31,6 +32,10 @@ export type EmployeeEventRow = {
   /** Resolved on the server: the linked employee's name, or FMP's own string. */
   author: string | null;
   locationCode: string | null;
+  locationId: string | null;
+  /** The linked paperwork row (166), signed on the server for viewing. */
+  documentId: string | null;
+  document: { fileName: string | null; url: string | null } | null;
 };
 
 type Tier = "narrative" | "shifts" | "all";
@@ -52,14 +57,16 @@ type Tier = "narrative" | "shifts" | "all";
 export function EmployeeEvents({
   rows,
   shiftTotal,
-  editable,
+  dialog,
 }: {
   /** Every narrative event, plus the most recent page of shift ratings. */
   rows: EmployeeEventRow[];
   /** How many shift ratings exist, which may exceed how many are here. */
   shiftTotal: number;
-  editable: boolean;
+  /** What Edit… needs; null makes the block read-only. */
+  dialog: EventDialogContext | null;
 }) {
+  const editable = dialog !== null;
   const [tier, setTier] = useState<Tier>("narrative");
 
   const counts = useMemo(() => {
@@ -165,6 +172,14 @@ export function EmployeeEvents({
         ),
     },
     {
+      key: "document",
+      label: "Document",
+      width: 110,
+      hideWhenCompact: true,
+      sortValue: (r) => r.document?.fileName ?? "",
+      render: (r) => <DocumentLink row={r} />,
+    },
+    {
       key: "author",
       label: "By",
       width: 140,
@@ -178,7 +193,7 @@ export function EmployeeEvents({
             key: "menu",
             label: "",
             width: 60,
-            render: (r: EmployeeEventRow) => <RemoveEvent row={r} />,
+            render: (r: EmployeeEventRow) => <EventActions row={r} dialog={dialog!} />,
           } as DataColumn<EmployeeEventRow>,
         ]
       : []),
@@ -196,10 +211,16 @@ export function EmployeeEvents({
       scroll
       group={{ sortKey: "date", label: (r) => r.occurred_on.slice(0, 4) }}
       expand={{
-        canExpand: (r) => Boolean(r.detail || r.outcome),
+        canExpand: (r) => Boolean(r.detail || r.outcome || r.document),
         render: (r) => (
           <div className="space-y-2 px-4 py-3 text-sm">
             {r.detail ? <p className="max-w-[90ch] whitespace-pre-line">{r.detail}</p> : null}
+            {r.document ? (
+              <p className="text-muted">
+                <span className="text-[11px] uppercase tracking-[0.12em] text-subtle">Document</span>{" "}
+                <DocumentLink row={r} full />
+              </p>
+            ) : null}
             {r.outcome ? (
               <p className="text-muted">
                 <span className="text-[11px] uppercase tracking-[0.12em] text-subtle">Action taken</span>{" "}
@@ -246,10 +267,65 @@ export function EmployeeEvents({
   );
 }
 
-function RemoveEvent({ row }: { row: EmployeeEventRow }) {
+/**
+ * The linked paperwork, opened the way a Documents-tab chip opens it: the
+ * signed URL in a new tab. `full` names the file (the expansion has the room);
+ * the column says "View", because a file name is no use clipped to 110px.
+ */
+function DocumentLink({ row, full = false }: { row: EmployeeEventRow; full?: boolean }) {
+  if (!row.document) return <span className={READ_ONLY_VALUE}>—</span>;
+  const name = row.document.fileName ?? "Untitled";
+  if (!row.document.url) return <span className={READ_ONLY_VALUE}>{full ? name : "Unavailable"}</span>;
+  return (
+    <a
+      href={row.document.url}
+      target="_blank"
+      rel="noreferrer"
+      title={`Open ${name}`}
+      className={`${full ? "" : READ_ONLY_VALUE} text-ink underline hover:no-underline`}
+    >
+      {full ? name : "View"}
+    </a>
+  );
+}
+
+function EventActions({ row, dialog }: { row: EmployeeEventRow; dialog: EventDialogContext }) {
+  const [editing, setEditing] = useState(false);
+  const label = EVENT_KIND_LABEL[row.kind] ?? row.kind;
+  const [removing, setRemoving] = useState(false);
+  return (
+    <>
+      <RowMenu
+        label={`Actions for the ${label.toLowerCase()} on ${row.occurred_on}`}
+        items={[
+          { label: "Edit…", onSelect: () => setEditing(true) },
+          { label: "Remove…", onSelect: () => setRemoving(true) },
+        ]}
+      />
+      {editing && (
+        <EmployeeEventDialog
+          context={dialog}
+          editing={{
+            id: row.id,
+            kind: row.kind,
+            occurred_on: row.occurred_on,
+            locationId: row.locationId,
+            headline: row.headline,
+            detail: row.detail,
+            outcome: row.outcome,
+            documentId: row.documentId,
+          }}
+          onClose={() => setEditing(false)}
+        />
+      )}
+      {removing && <RemoveEvent row={row} onClose={() => setRemoving(false)} />}
+    </>
+  );
+}
+
+function RemoveEvent({ row, onClose }: { row: EmployeeEventRow; onClose: () => void }) {
   const router = useRouter();
   const supabase = createClient();
-  const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -268,7 +344,7 @@ function RemoveEvent({ row }: { row: EmployeeEventRow }) {
         setFailed(error?.message ?? "Nothing was removed.");
         return;
       }
-      setConfirming(false);
+      onClose();
       router.refresh();
     });
   }
@@ -276,40 +352,32 @@ function RemoveEvent({ row }: { row: EmployeeEventRow }) {
   const label = EVENT_KIND_LABEL[row.kind] ?? row.kind;
 
   return (
-    <>
-      <RowMenu
-        label={`Actions for the ${label.toLowerCase()} on ${row.occurred_on}`}
-        items={[{ label: "Remove…", onSelect: () => setConfirming(true) }]}
-      />
-      {confirming && (
-        <Dialog
-          title="Remove this event"
-          onClose={() => !pending && setConfirming(false)}
-          busy={pending}
-          footer={
-            <>
-              <button type="button" onClick={() => setConfirming(false)} disabled={pending} className={DIALOG_CANCEL_CLASS}>
-                Cancel
-              </button>
-              <button type="button" onClick={remove} disabled={pending} className={DIALOG_DANGER_CLASS}>
-                {pending ? "Removing…" : "Remove"}
-              </button>
-            </>
-          }
-        >
-          <div className="space-y-3 text-sm">
-            <p>
-              The {label.toLowerCase()} recorded on {row.occurred_on}
-              {row.headline ? ` — “${row.headline}”` : ""} will be deleted.
-            </p>
-            <p className="text-muted">
-              This is for a misfile — a note typed onto the wrong person. It is not how you record that
-              something was resolved; the record of what happened should outlive the handling of it.
-            </p>
-            {failed && <p className="text-accent">{failed}</p>}
-          </div>
-        </Dialog>
-      )}
-    </>
+    <Dialog
+      title="Remove this event"
+      onClose={() => !pending && onClose()}
+      busy={pending}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={pending} className={DIALOG_CANCEL_CLASS}>
+            Cancel
+          </button>
+          <button type="button" onClick={remove} disabled={pending} className={DIALOG_DANGER_CLASS}>
+            {pending ? "Removing…" : "Remove"}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-3 text-sm">
+        <p>
+          The {label.toLowerCase()} recorded on {row.occurred_on}
+          {row.headline ? ` — “${row.headline}”` : ""} will be deleted.
+        </p>
+        <p className="text-muted">
+          This is for a misfile — a note typed onto the wrong person. It is not how you record that
+          something was resolved; the record of what happened should outlive the handling of it.
+        </p>
+        {failed && <p className="text-accent">{failed}</p>}
+      </div>
+    </Dialog>
   );
 }
