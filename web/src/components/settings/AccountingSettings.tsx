@@ -257,7 +257,7 @@ export function AccountingSettings({
 
   return (
     <section className="space-y-4">
-      <SectionHeading>Accounting</SectionHeading>
+      <SectionHeading>QuickBooks Mapping</SectionHeading>
 
       <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
         Approved vendor bills are sent to QuickBooks Online as Bills, so they are

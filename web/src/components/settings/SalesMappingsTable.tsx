@@ -211,7 +211,7 @@ export function SalesMappingsTable({
 
   return (
     <section className="space-y-4">
-      <SectionHeading>Sales from Square</SectionHeading>
+      <SectionHeading>Square Sales Mapping</SectionHeading>
       <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
         Each shop-day&rsquo;s Square sales post to QuickBooks as one journal entry, one line per
         category, tender and role below. A category or tender the sync has seen and nobody has

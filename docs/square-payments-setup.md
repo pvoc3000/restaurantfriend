@@ -112,7 +112,7 @@ Square dashboard, then pick it in **"Wholesale Order" item** (and the sandbox
 twin for testing). Until you do, wholesale payments are sold as the Special
 Order item as before.
 
-Then map the new category in **Settings → Accounting → Sales from Square**:
+Then map the new category in **Settings → Accounting → Square Sales Mapping**:
 the Wholesale row appears after the first nightly sync that sees a sale in it,
 and until it's mapped (to Wholesale Income) that sale posts to Uncategorized
 Income and is named on the day's receipt. It never blocks the day.

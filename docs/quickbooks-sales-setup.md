@@ -28,8 +28,8 @@ clean beside Shogo's.
    refused by name. (The Square location id is editable there too; it used to
    be SQL-only.)
 
-3. **The mapping grid is filled in** — `Settings → Accounting → Sales from
-   Square`. It is ONE grid for the whole business, not one per shop, and it
+3. **The mapping grid is filled in** — `Settings → Accounting → Square Sales
+   Mapping`. It is ONE grid for the whole business, not one per shop, and it
    holds three kinds of row:
 
    | Kind | Rows | Where it comes from |
@@ -264,5 +264,5 @@ Expected differences, from the first real day compared:
 | The post and the read-back | `supabase/functions/qbo-sync/index.ts` — `post_daily_sales`, `find_journal_entries`, `post_square_payout`, `find_deposits` |
 | The payout pull | `supabase/functions/sync-square-sales/index.ts` (`loadPayouts`); the Payouts API notes are in `docs/square-setup.md` |
 | The schema | `supabase/migrations/104_sales_to_quickbooks.sql`, `105_square_payouts.sql` |
-| The grid | `Settings → Accounting → Sales from Square` (`accounting_sales_mappings`) |
+| The grid | `Settings → Accounting → Square Sales Mapping` (`accounting_sales_mappings`) |
 | Who may post | Purchaser and above, the Sales cell in the Page Permissions sheet. Who may map: managers and the owner |
