@@ -228,9 +228,10 @@ export function SpecialOrderSettings({
    * customer reads — the seven templates, the inquiry form's copy, the
    * documents' copy — and the mailbox they leave from; `general` is the timing
    * numbers. One component, because every cell writes the same jsonb
-   * document through the same `cell` helper.
+   * document through the same `cell` helper. `square` is the pay link's
+   * settings, on Integrations → Square since 2026-10-01 (Mark).
    */
-  section: "general" | "messages";
+  section: "general" | "messages" | "square";
 }) {
   const so = (settings.special_orders ?? {}) as Record<string, unknown>;
   const provider = (so.email_provider ?? {}) as Record<string, unknown>;
@@ -614,7 +615,7 @@ export function SpecialOrderSettings({
         </p>
       </section>
         </>
-      ) : (
+      ) : section === "general" ? (
         <>
       {/* ---- the numbers -------------------------------------------- */}
       <section className="space-y-4">
@@ -665,6 +666,10 @@ export function SpecialOrderSettings({
           <Num label="Farthest we estimate (miles)" path={["special_orders", "delivery", "max_miles"]} v={num(delivery.max_miles)} {...{ cell, editable }} />
         </dl>
       </section>
+        </>
+      ) : null}
+      {section === "square" ? (
+        <>
       {/* ---- the pay link (migrations 119, 120) --------------------------
           `orgs.settings.square_payments`, outside `special_orders` because
           wholesale invoices will read it too. The ids are PUBLIC by Square's
@@ -745,7 +750,7 @@ export function SpecialOrderSettings({
         </dl>
       </section>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

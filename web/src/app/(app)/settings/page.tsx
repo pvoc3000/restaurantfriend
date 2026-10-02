@@ -214,17 +214,27 @@ export default async function SettingsPage({
               />
               {integrationsTab === "quickbooks" ? (
                 <AccountingSettings orgId={orgId} editable={editable} initialStatus={accounting} />
-              ) : salesMappingsError ? (
-                <p className="max-w-2xl text-[13px] text-accent">
-                  The sales mapping grid is missing — migration 104 has not been applied yet. ({salesMappingsError})
-                </p>
               ) : (
-                <SalesMappingsTable
-                  orgId={orgId}
-                  rows={salesMappings}
-                  editable={editable}
-                  connected={accounting?.status === "connected"}
-                />
+                <div className="space-y-16">
+                  <SpecialOrderSettings
+                    orgId={orgId}
+                    settings={settings}
+                    editable={editable}
+                    section="square"
+                  />
+                  {salesMappingsError ? (
+                    <p className="max-w-2xl text-[13px] text-accent">
+                      The sales mapping grid is missing — migration 104 has not been applied yet. ({salesMappingsError})
+                    </p>
+                  ) : (
+                    <SalesMappingsTable
+                      orgId={orgId}
+                      rows={salesMappings}
+                      editable={editable}
+                      connected={accounting?.status === "connected"}
+                    />
+                  )}
+                </div>
               )}
             </div>
           )}
