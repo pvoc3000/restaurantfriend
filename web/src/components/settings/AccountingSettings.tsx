@@ -249,6 +249,15 @@ export function AccountingSettings({
 
   const expiry = usDate(status?.refresh_token_expires_at ?? null);
 
+  // THE SAVED TAX CODE IS GONE FROM QUICKBOOKS' ACTIVE LIST. Editing a rate in
+  // QuickBooks deactivates the old code and makes a new one under a new Id, so
+  // the Id saved here goes stale with every rate change, and the field kept
+  // showing the name it was saved with. `push_invoice` and
+  // `push_customer_invoice` refuse it too; this says so before anyone sends.
+  const staleTaxCode =
+    taxCodes !== null && Boolean(status?.tax_code_ref) &&
+    !taxCodes.some((t) => t.id === status?.tax_code_ref);
+
   return (
     <section className="space-y-4">
       <SectionHeading>QuickBooks Mapping</SectionHeading>
@@ -447,11 +456,25 @@ export function AccountingSettings({
                   ? "No tax codes in QuickBooks"
                   : "Choose a tax code"
               }
-              options={(taxCodes ?? []).map((t) => ({ value: t.id, label: t.name }))}
+              options={[
+                ...(staleTaxCode
+                  ? [{
+                      value: status!.tax_code_ref!,
+                      label: `${status?.tax_code_name ?? "Saved code"} (inactive in QuickBooks)`,
+                    }]
+                  : []),
+                ...(taxCodes ?? []).map((t) => ({ value: t.id, label: t.name })),
+              ]}
               onPick={(next) => void setDefault("tax", taxCodes?.find((t) => t.id === next) ?? null)}
               panelMinWidth={320}
             />
           </div>
+          {staleTaxCode && (
+            <p className="text-[13px] text-accent">
+              This tax code is inactive in QuickBooks, so invoices will not send.
+              Choose the current one.
+            </p>
+          )}
         </div>
       )}
 

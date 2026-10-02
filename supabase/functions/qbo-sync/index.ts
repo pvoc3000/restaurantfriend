@@ -276,6 +276,39 @@ function invoiceCodingWarnings(
   return out;
 }
 
+/**
+ * Refuses an invoice whose tax code QuickBooks has made INACTIVE, before it is
+ * written. QuickBooks itself accepts one without a word and taxes at the dead
+ * rate — measured 2026-10-02 on INV-10006, taxed at 9.5% under code 6 while
+ * the live rate was 10.25%.
+ *
+ * WHY THE CODE GOES STALE: editing a custom rate in QuickBooks does not change
+ * it. It renames the old code "… - Inactive", deactivates it and makes a new
+ * one under a NEW Id, so the Id saved in Settings (084) is left pointing at the
+ * old rate after every rate change — twice between 2026-09-29 and 10-01.
+ *
+ * One extra read, and only on an invoice that is taxed at all.
+ */
+async function inactiveTaxCodeRefusal(
+  admin: SupabaseClient,
+  conn: Parameters<typeof qboUpload>[1],
+  payload: Record<string, unknown>
+): Promise<string | null> {
+  const id = (payload.TxnTaxDetail as { TxnTaxCodeRef?: { value?: unknown } } | undefined)
+    ?.TxnTaxCodeRef?.value;
+  if (id === undefined || id === null || String(id).trim() === "") return null;
+  const res = (await qboFetch(admin, conn, `taxcode/${encodeURIComponent(String(id))}`)) as {
+    TaxCode?: { Active?: boolean; Name?: string };
+  };
+  const code = res?.TaxCode;
+  if (!code || code.Active !== false) return null;
+  return (
+    `The tax code chosen in Settings (${code.Name ?? `QuickBooks code ${id}`}) is inactive ` +
+    "in QuickBooks, so it would tax at an old rate. Choose the current one in " +
+    "Settings → Integrations → QuickBooks, then send again."
+  );
+}
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -2086,6 +2119,9 @@ Deno.serve(async (req) => {
         return json(400, { error: "The payload names a different QuickBooks customer." });
       }
 
+      const staleTax = await inactiveTaxCodeRefusal(admin, conn, req.payload);
+      if (staleTax) return json(400, { error: staleTax });
+
       // `conn`, the one loaded above, and ONLY that one: a token refresh updates
       // the object in place, and a second copy would still hold the spent one
       // when the attachment calls below reach for it.
@@ -2527,6 +2563,9 @@ Deno.serve(async (req) => {
             : "The payload names a QuickBooks invoice this one was never sent as.",
         });
       }
+
+      const staleTax = await inactiveTaxCodeRefusal(admin, conn, req.payload);
+      if (staleTax) return json(400, { error: staleTax });
 
       const { saved, retried } = await postDocument(admin, conn, "Invoice", req.payload);
       const doc = saved?.Invoice;

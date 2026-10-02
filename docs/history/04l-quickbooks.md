@@ -531,3 +531,18 @@ or a location — they rode inside each order's untaxed line under Special Order
   **APPLIED 2026-10-01** (via `db query --linked`, in a transaction; the
   status function verified widened, anon still refused) and `qbo-sync` +
   `qbo-oauth` (`--no-verify-jwt`) deployed the same day.
+
+- **A STALE TAX CODE IS REFUSED (2026-10-02).** INV-10006 went out taxed at
+  9.5% when DF01's rate is 10.25%. Settings held tax code Id **6**, and
+  **editing a custom rate in QuickBooks does not change it**: it renames the
+  old code "Sales Tax - Inactive", deactivates it and creates a NEW code under
+  a new Id (6 → 12 at 9.75% on 09-29 → 13 at 10.25% on 10-01). QuickBooks then
+  ACCEPTS the inactive code on an invoice without a fault and taxes at the dead
+  rate. The settings picker lists only active codes, so the stale choice never
+  showed. Now `inactiveTaxCodeRefusal` in `qbo-sync` reads the code before
+  `push_invoice` and `push_customer_invoice` write, and refuses an inactive one
+  (deployed 2026-10-02). Settings shows the saved code as "(inactive in
+  QuickBooks)" with a red line under it. **Every rate change in QuickBooks
+  means choosing the tax code again in Settings.** Not built: choosing the
+  code by matching the kitchen's `locations.tax_rate`, which would remove the
+  setting.
