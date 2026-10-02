@@ -23,3 +23,13 @@ test("the default tab writes no parameter, so /settings keeps one address", () =
   eq(settingsTabHref("accounting"), "/settings?tab=accounting");
   ok(SETTINGS_TABS.every((t) => SETTINGS_TAB_LABEL[t].length > 0), "every tab is labelled");
 });
+
+import { integrationsTabHref, parseIntegrationsTab } from "../../src/lib/orgSettings";
+
+test("the Integrations tab's own tabs: QuickBooks by default, Square by parameter", () => {
+  eq(parseIntegrationsTab(undefined), "quickbooks", "no parameter");
+  eq(parseIntegrationsTab("square"), "square");
+  eq(parseIntegrationsTab("bogus"), "quickbooks", "an unknown value falls back");
+  eq(integrationsTabHref("quickbooks"), "/settings?tab=accounting", "the first writes no parameter");
+  eq(integrationsTabHref("square"), "/settings?tab=accounting&integration=square");
+});

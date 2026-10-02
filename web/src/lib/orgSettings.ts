@@ -56,3 +56,29 @@ export function parseMessagesTab(raw: string | string[] | undefined): MessagesTa
 export function messagesTabHref(tab: MessagesTab): string {
   return tab === "orders" ? "/settings?tab=messages" : `/settings?tab=messages&messages=${tab}`;
 }
+
+/**
+ * The Integrations tab's own tabs (Mark, 2026-10-01): one per service.
+ *   · QuickBooks — the connection and its defaults (accounts, items, tax code).
+ *   · Square     — how each shop-day's Square sales post to QuickBooks.
+ * In the URL as `?tab=accounting&integration=…`, the first writing no
+ * parameter — so `qbo-oauth`'s return to `?tab=accounting` still lands on the
+ * QuickBooks tab, where its message is drawn.
+ */
+export type IntegrationsTab = "quickbooks" | "square";
+
+export const INTEGRATIONS_TABS: IntegrationsTab[] = ["quickbooks", "square"];
+
+export const INTEGRATIONS_TAB_LABEL: Record<IntegrationsTab, string> = {
+  quickbooks: "QuickBooks",
+  square: "Square",
+};
+
+export function parseIntegrationsTab(raw: string | string[] | undefined): IntegrationsTab {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return (INTEGRATIONS_TABS as string[]).includes(value ?? "") ? (value as IntegrationsTab) : "quickbooks";
+}
+
+export function integrationsTabHref(tab: IntegrationsTab): string {
+  return tab === "quickbooks" ? "/settings?tab=accounting" : `/settings?tab=accounting&integration=${tab}`;
+}

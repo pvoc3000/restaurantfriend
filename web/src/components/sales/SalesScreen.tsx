@@ -476,8 +476,8 @@ export function SalesScreen({
           <span className="bg-mark-fill px-1">
             {posting.unmappedNames} Square name{posting.unmappedNames === 1 ? "" : "s"} unmapped
           </span>{" "}
-          <Link href="/settings?tab=accounting" className="text-muted underline hover:text-ink">
-            Settings → Integrations
+          <Link href="/settings?tab=accounting&integration=square" className="text-muted underline hover:text-ink">
+            Settings → Integrations → Square
           </Link>
         </p>
       ) : null}

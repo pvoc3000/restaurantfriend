@@ -4,13 +4,17 @@ import { canManageMembers } from "@/lib/roles";
 import { ShiftReportSettings } from "@/components/settings/ShiftReportSettings";
 import { MessagesIntro, SpecialOrderSettings } from "@/components/settings/SpecialOrderSettings";
 import { AccountingSettings, type AccountingStatus } from "@/components/settings/AccountingSettings";
-import type { SalesMappingRow } from "@/components/settings/SalesMappingsTable";
+import { SalesMappingsTable, type SalesMappingRow } from "@/components/settings/SalesMappingsTable";
 import { SharedDevices, type RegisteredDevice } from "@/components/settings/SharedDevices";
 import { thisDeviceId } from "@/app/deviceActions";
 import { SectionNav } from "@/components/ui/SectionNav";
 import {
   SETTINGS_TABS,
   SETTINGS_TAB_LABEL,
+  INTEGRATIONS_TABS,
+  INTEGRATIONS_TAB_LABEL,
+  integrationsTabHref,
+  parseIntegrationsTab,
   MESSAGES_TABS,
   MESSAGES_TAB_LABEL,
   messagesTabHref,
@@ -45,13 +49,18 @@ import {
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string | string[]; messages?: string | string[] }>;
+  searchParams: Promise<{
+    tab?: string | string[];
+    messages?: string | string[];
+    integration?: string | string[];
+  }>;
 }) {
   const session = await getAppSession();
   if (!session) return null;
   const params = await searchParams;
   const tab = parseSettingsTab(params.tab);
   const messagesTab = parseMessagesTab(params.messages);
+  const integrationsTab = parseIntegrationsTab(params.integration);
 
   const editable = canManageMembers(session.membership.role);
 
@@ -59,8 +68,9 @@ export default async function SettingsPage({
   // itself is unreadable — 081 gave it zero policies — so this definer function
   // is the only way to learn anything about the connection, and it returns the
   // realm and the dates and never a credential.
-  // Only the Accounting tab reads it — each tab fetches only itself, the
-  // employee record's rule.
+  // Only the Integrations tab reads it — each tab fetches only itself, the
+  // employee record's rule. Both of its own tabs need the status (the Square
+  // grid's accounts are QuickBooks accounts); only Square reads the grid.
   let accounting: AccountingStatus | null = null;
   let salesMappings: SalesMappingRow[] = [];
   let salesMappingsError: string | null = null;
@@ -70,10 +80,12 @@ export default async function SettingsPage({
       supabase.rpc("accounting_connection_status", { p_org: session.membership.org_id }),
       // Migration 104's grid. A missing table is a sentence on the tab, never
       // a broken settings screen.
-      supabase
-        .from("accounting_sales_mappings")
-        .select("id, kind, square_key, square_name, account_ref, account_name, last_seen_at")
-        .eq("org_id", session.membership.org_id),
+      integrationsTab === "square"
+        ? supabase
+            .from("accounting_sales_mappings")
+            .select("id, kind, square_key, square_name, account_ref, account_name, last_seen_at")
+            .eq("org_id", session.membership.org_id)
+        : Promise.resolve({ data: [], error: null }),
     ]);
     accounting = Array.isArray(qbo) ? ((qbo[0] as AccountingStatus | undefined) ?? null) : null;
     salesMappings = (maps.data ?? []) as SalesMappingRow[];
@@ -187,13 +199,34 @@ export default async function SettingsPage({
             </>
           )}
           {tab === "accounting" && (
-            <AccountingSettings
-              orgId={orgId}
-              editable={editable}
-              initialStatus={accounting}
-              salesMappings={salesMappings}
-              salesMappingsError={salesMappingsError}
-            />
+            // One tab per service (Mark, 2026-10-01), held together over what
+            // they show as the Messages tabs are.
+            <div className="space-y-6">
+              <SectionNav
+                orientation="horizontal"
+                ariaLabel="Which integration"
+                value={integrationsTab}
+                items={INTEGRATIONS_TABS.map((t) => ({
+                  key: t,
+                  label: INTEGRATIONS_TAB_LABEL[t],
+                  href: integrationsTabHref(t),
+                }))}
+              />
+              {integrationsTab === "quickbooks" ? (
+                <AccountingSettings orgId={orgId} editable={editable} initialStatus={accounting} />
+              ) : salesMappingsError ? (
+                <p className="max-w-2xl text-[13px] text-accent">
+                  The sales mapping grid is missing — migration 104 has not been applied yet. ({salesMappingsError})
+                </p>
+              ) : (
+                <SalesMappingsTable
+                  orgId={orgId}
+                  rows={salesMappings}
+                  editable={editable}
+                  connected={accounting?.status === "connected"}
+                />
+              )}
+            </div>
           )}
           {tab === "devices" && (
             <SharedDevices
