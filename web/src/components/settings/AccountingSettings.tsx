@@ -54,7 +54,12 @@ export type AccountingStatus = {
   last_error: string | null;
 };
 
-type Choice = { id: string; name: string; type?: string };
+type Choice = { id: string; name: string; type?: string; rate?: number | null };
+
+/** "Sales Tax (10.25%)" — the rate QuickBooks will tax at, since a code's
+ *  name alone does not say (three have been called "Sales Tax"). */
+const taxCodeLabel = (t: Choice) =>
+  t.rate === null || t.rate === undefined ? t.name : `${t.name} (${Number(t.rate.toFixed(4))}%)`;
 
 const STATUS_WORD: Record<string, string> = {
   pending: "Not finished",
@@ -463,7 +468,7 @@ export function AccountingSettings({
                       label: `${status?.tax_code_name ?? "Saved code"} (inactive in QuickBooks)`,
                     }]
                   : []),
-                ...(taxCodes ?? []).map((t) => ({ value: t.id, label: t.name })),
+                ...(taxCodes ?? []).map((t) => ({ value: t.id, label: taxCodeLabel(t) })),
               ]}
               onPick={(next) => void setDefault("tax", taxCodes?.find((t) => t.id === next) ?? null)}
               panelMinWidth={320}

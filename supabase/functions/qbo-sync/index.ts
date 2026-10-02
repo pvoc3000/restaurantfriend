@@ -1221,9 +1221,43 @@ Deno.serve(async (req) => {
       return json(200, { [mode]: rows, enabled });
     }
 
-    if (mode === "customers" || mode === "tax_codes") {
-      const entity = mode === "customers" ? "Customer" : "TaxCode";
-      const fields = mode === "customers" ? "Id, DisplayName" : "Id, Name";
+    // A TAX CODE'S RATE IS THE SUM OF ITS COMPONENT RATES — a combined code
+    // ("CA-Los Angeles-Los Angeles") is state + county + district — and only
+    // the rates carry a value, so both are read. Shown in the Settings picker
+    // because the NAME says nothing: three codes in Donut Friend's file have
+    // been called "Sales Tax" (2026-10-02).
+    if (mode === "tax_codes") {
+      type Detail = { TaxRateRef?: { value?: string } };
+      const read = async (sql: string) =>
+        ((await qboFetch(admin, conn, `query?query=${encodeURIComponent(sql)}`)) as {
+          QueryResponse?: Record<string, Row[]>;
+        }).QueryResponse ?? {};
+      const codes = (await read("select * from TaxCode where Active = true maxresults 1000")).TaxCode ?? [];
+      const rates = new Map(
+        ((await read("select * from TaxRate maxresults 1000")).TaxRate ?? []).map((r) => [
+          String(r.Id),
+          Number(r.RateValue),
+        ])
+      );
+      const rows = codes.map((c) => {
+        const details =
+          ((c.SalesTaxRateList as { TaxRateDetail?: Detail[] } | undefined)?.TaxRateDetail ?? []);
+        const parts = details.map((d) => rates.get(String(d.TaxRateRef?.value)));
+        const known = details.length > 0 && parts.every((v) => v !== undefined && Number.isFinite(v));
+        return {
+          id: String(c.Id),
+          name: String(c.Name ?? ""),
+          // Percent, e.g. 10.25. Null when QuickBooks gave no rate to add up.
+          rate: known ? Math.round(parts.reduce((a, v) => a + (v as number), 0) * 10000) / 10000 : null,
+        };
+      });
+      rows.sort((a, b) => a.name.localeCompare(b.name));
+      return json(200, { tax_codes: rows });
+    }
+
+    if (mode === "customers") {
+      const entity = "Customer";
+      const fields = "Id, DisplayName";
       const q = `select ${fields} from ${entity} where Active = true maxresults 1000`;
       const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(q)}`)) as {
         QueryResponse?: Record<string, Row[]>;

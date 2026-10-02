@@ -546,3 +546,9 @@ or a location — they rode inside each order's untaxed line under Special Order
   means choosing the tax code again in Settings.** Not built: choosing the
   code by matching the kitchen's `locations.tax_rate`, which would remove the
   setting.
+  **The picker shows each code's rate** ("Sales Tax (10.25%)", same day):
+  `tax_codes` now reads `TaxRate` too and returns each active code's `rate`,
+  the SUM of its component rates (state + county + district on a combined
+  code). The saved `tax_code_name` stays the bare name. Measured: two codes
+  are both named "CA-Los Angeles-Los Angeles" (9.75% and 9.5%), and "Sales
+  Tax" and "CA-Los Angeles-Los Angeles-Culver City" are both 10.25%.
