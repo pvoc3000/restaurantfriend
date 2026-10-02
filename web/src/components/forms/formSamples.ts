@@ -103,8 +103,6 @@ function sampleOrder(paid: number, paymentNote = "Deposit"): OrderDocData {
     delivery_boxes: 12,
     delivery_company: "Sample Courier",
     delivery_company_phone: "(213) 555-0199",
-    delivery_window_start: "08:45",
-    delivery_window_end: "09:15",
     customer: {
       first_name: "Dana",
       last_name: "Whitfield",

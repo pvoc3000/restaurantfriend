@@ -109,8 +109,6 @@ function order(over: Partial<OrderDocData> = {}): OrderDocData {
     delivery_boxes: null,
     delivery_company: null,
     delivery_company_phone: null,
-    delivery_window_start: null,
-    delivery_window_end: null,
     customer: {
       first_name: "Alexandra",
       last_name: "David",
@@ -362,8 +360,8 @@ test("{fulfillment_note}: DELIVERY, word for word, tracking and all", () => {
     event_date: "2026-09-26",
     delivery_company: "DeliverLA",
     delivery_company_phone: "(310) 478-8000",
-    delivery_window_start: "16:30:00",
-    delivery_window_end: "18:30:00",
+    ready_by_time: "16:30:00",
+    event_time: "18:30:00",
     delivery_tracking: "1696665",
   });
   eq(
@@ -384,8 +382,8 @@ test("the tracking line DISAPPEARS when there is no tracking number", () => {
     event_date: "2026-09-26",
     delivery_company: "DeliverLA",
     delivery_company_phone: "(310) 478-8000",
-    delivery_window_start: "16:30:00",
-    delivery_window_end: "18:30:00",
+    ready_by_time: "16:30:00",
+    event_time: "18:30:00",
     delivery_tracking: null,
   });
   const note = fulfillmentNote(o, {}, templateVars(o));
@@ -398,7 +396,7 @@ test("a half-known delivery window still reads as a sentence", () => {
     const o = order({
       fulfillment: "delivery", event_date: "2026-09-26",
       delivery_company: "DeliverLA", delivery_company_phone: "(310) 478-8000",
-      delivery_window_start: from, delivery_window_end: to, delivery_tracking: null,
+      ready_by_time: from, event_time: to, delivery_tracking: null,
     });
     return fulfillmentNote(o, {}, templateVars(o));
   };
@@ -911,13 +909,14 @@ test("a draft becomes a row with the email folded and blanks nulled", () => {
 // 2026-09-29). Checked by restoring the old `After {event_time}` for both
 // kinds: the delivery case went red.
 test("documentTimeLabel: a delivery prints its window, never 'After'", () => {
-  const d = { fulfillment: "delivery" as const, event_time: "07:00:00" };
-  eq(documentTimeLabel(order({ ...d, delivery_window_start: "08:45:00", delivery_window_end: "09:15:00" })), "8:45 AM – 9:15 AM");
-  eq(documentTimeLabel(order({ ...d, delivery_window_start: "08:45:00" })), "8:45 AM");
-  eq(documentTimeLabel(order({ ...d, delivery_window_end: "09:15:00" })), "By 9:15 AM");
-  eq(documentTimeLabel(order(d)), "7:00 AM");
-});
-test("documentTimeLabel: a pickup is still 'After' its ready time", () => {
+  // The window is the ready time to the event time (170).
+  const d = { fulfillment: "delivery" as const };
+  eq(documentTimeLabel(order({ ...d, ready_by_time: "08:45:00", event_time: "09:15:00" })), "8:45 AM – 9:15 AM");
+  eq(documentTimeLabel(order({ ...d, ready_by_time: "08:45:00", event_time: null })), "8:45 AM");
+  eq(documentTimeLabel(order({ ...d, ready_by_time: null, event_time: "09:15:00" })), "9:15 AM", "an event time alone, bare");
+  eq(documentTimeLabel(order({ ...d, ready_by_time: "09:15:00", event_time: "09:15:00" })), "9:15 AM", "no 9:15 – 9:15");
+  eq(documentTimeLabel(order({ ...d, ready_by_time: null, event_time: null })), null);
+});test("documentTimeLabel: a pickup is still 'After' its ready time", () => {
   eq(documentTimeLabel(order({ fulfillment: "pickup", event_time: "07:00:00" })), "After 7:00 AM");
   eq(documentTimeLabel(order({ fulfillment: "pickup", event_time: null })), null);
 });

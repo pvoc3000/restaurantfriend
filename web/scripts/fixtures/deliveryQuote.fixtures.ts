@@ -16,8 +16,9 @@ const facts: DeliveryQuoteFacts = {
   delivery_address: "1000 Vin Scully Ave\nLos Angeles, CA 90012",
   delivery_boxes: 4,
   delivery_weight_lbs: 12,
-  delivery_window_start: "16:30:00",
-  delivery_window_end: "18:30:00",
+  // The window is the ready time to the event time (170).
+  ready_by_time: "16:30:00",
+  event_time: "18:30:00",
   pickup_address: "543 S Broadway, Los Angeles, CA 90013",
 };
 
@@ -29,7 +30,7 @@ test("the request reads like FileMaker's, signed by the org, never hardcoded", (
   ok(body.includes("Pickup location: 543 S Broadway, Los Angeles, CA 90013\n"));
   ok(body.includes("Pieces: 4\nWeight: 12 lbs\nOrder #: SO-10093\n"));
   ok(body.includes("Destination: 1000 Vin Scully Ave Los Angeles, CA 90012\n"), "the address on one line");
-  ok(body.includes("Delivery time: 6:30 PM\n"), "the window's END, as FileMaker sent");
+  ok(body.includes("Delivery time: 6:30 PM\n"), "the window's END — the event time — as FileMaker sent");
   ok(body.trimEnd().endsWith("Thank you!\n\nDonut Friend"));
   no(body.includes("{"), "every token filled");
 });
@@ -42,7 +43,7 @@ test("a template in Settings replaces the default; a blank one does not", () => 
 });
 
 test("an unknown field prints as nothing after its label, so the carrier sees it is unknown", () => {
-  const v = deliveryQuoteVars({ ...facts, delivery_boxes: null, delivery_weight_lbs: null, delivery_window_end: null, delivery_window_start: null }, "DF");
+  const v = deliveryQuoteVars({ ...facts, delivery_boxes: null, delivery_weight_lbs: null, event_time: null, ready_by_time: null }, "DF");
   eq(v.boxes, "");
   eq(v.weight, "");
   eq(v.delivery_time, "");

@@ -11,7 +11,6 @@ import { createClient } from "@/lib/supabase/client";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { money } from "@/lib/specialOrders";
 import { CarrierEmail } from "./CarrierEmail";
-import { TimeCell } from "./TimeCell";
 
 /**
  * Decision 8's other half: everything a DELIVERY needs.
@@ -74,8 +73,8 @@ export function OrderDelivery({
     delivery_address: address || null,
     delivery_boxes: (row.delivery_boxes as number | null) ?? null,
     delivery_weight_lbs: (row.delivery_weight_lbs as number | null) ?? null,
-    delivery_window_start: (row.delivery_window_start as string | null) ?? null,
-    delivery_window_end: (row.delivery_window_end as string | null) ?? null,
+    ready_by_time: (row.ready_by_time as string | null) ?? null,
+    event_time: (row.event_time as string | null) ?? null,
     pickup_address: shopStreetAddress(kitchenAddress),
     pickup_phone: shopPhone(kitchenAddress),
     contact_name: (row.contact_name as string | null) ?? null,
@@ -206,9 +205,10 @@ export function OrderDelivery({
                   </a>
                 ) : null}
               </Row>
-              {/* THE THREE LINES (Mark, 2026-10-01): address across; kitchen,
-                  then distance with Calculate; window opens, then closes. The
-                  kitchen is here because the distance is measured from it. */}
+              {/* Address across; kitchen, then distance with Calculate (Mark,
+                  2026-10-01). The kitchen is here because the distance is
+                  measured from it. The window that followed went in 170: it
+                  was the ready and event times again, kept on Info. */}
               <Row label="Kitchen" first>
                 <Cell id={id} canWrite={canEditKitchen} column="kitchen_location_id" kind="pick"
                       options={kitchenOptions} value={(row.kitchen_location_id as string | null) ?? null}
@@ -234,18 +234,6 @@ export function OrderDelivery({
                 {measured ? (
                   <p className="pt-1 text-[12px] text-muted" role="status">{measured}</p>
                 ) : null}
-              </Row>
-              <Row label="Window opens" first>
-                {/* `TimeCell`, not `Cell`: these are `time` columns and read
-                    back as `10:00:00`. Same reason as the record's event time. */}
-                <TimeCell id={id} canWrite={canWrite} column="delivery_window_start"
-                          value={row.delivery_window_start as string | null}
-                          label="Delivery window start" />
-              </Row>
-              <Row label="Window closes">
-                <TimeCell id={id} canWrite={canWrite} column="delivery_window_end"
-                          value={row.delivery_window_end as string | null}
-                          label="Delivery window end" />
               </Row>
             </div>
           </section>

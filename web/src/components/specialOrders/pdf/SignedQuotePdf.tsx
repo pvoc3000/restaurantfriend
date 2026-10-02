@@ -51,8 +51,6 @@ function asDocData(quote: QuoteSnapshot): OrderDocData {
     // carried the courier's details, and this document does not print them.
     delivery_company: null,
     delivery_company_phone: null,
-    delivery_window_start: null,
-    delivery_window_end: null,
     // `customerLabel` renders "last, first" from parts, and the snapshot holds
     // the finished string — so it goes in as a last name, which is the one
     // shape that comes back out unchanged.

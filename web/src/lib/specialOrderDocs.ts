@@ -321,14 +321,12 @@ export type OrderDocData = {
   delivery_address: string | null;
   delivery_tracking: string | null;
   delivery_boxes: number | null;
-  /** The courier and its window — what `{fulfillment_note}` reads. Measured
-   *  over 157 deliveries since 2025: company 156, phone 155, both window ends
-   *  155, and TRACKING ONLY 85. That last number is why the note drops a line
-   *  whose values are all empty. */
+  /** The courier — what `{fulfillment_note}` reads, with the ready and event
+   *  times as its window (168's successor, 170). Measured over 157 deliveries
+   *  since 2025: company 156, phone 155, and TRACKING ONLY 85. That last
+   *  number is why the note drops a line whose values are all empty. */
   delivery_company: string | null;
   delivery_company_phone: string | null;
-  delivery_window_start: string | null;
-  delivery_window_end: string | null;
   customer: CustomerName & { phone: string | null; email: string | null } | null;
   location_code: string | null;
   location_name: string | null;
@@ -430,7 +428,6 @@ export async function fetchOrderDocData(
            contact_name, contact_phone, contact_email,
            delivery_address, delivery_tracking, delivery_boxes,
            delivery_company, delivery_company_phone,
-           delivery_window_start, delivery_window_end,
            location_id, kitchen_location_id,
            tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
            ignore_balance,
@@ -581,8 +578,6 @@ export async function fetchOrderDocData(
       delivery_boxes: row.delivery_boxes as number | null,
       delivery_company: row.delivery_company as string | null,
       delivery_company_phone: row.delivery_company_phone as string | null,
-      delivery_window_start: row.delivery_window_start as string | null,
-      delivery_window_end: row.delivery_window_end as string | null,
       customer: row.customers ?? null,
       location_code: pickup?.code ?? null,
       location_name: pickup?.name ?? null,
@@ -854,6 +849,10 @@ export function cutoffClause(
 /**
  * `between 4:00 PM and 6:00 PM`, or `after 4:00 PM`, or nothing.
  *
+ * THE WINDOW IS THE READY TIME TO THE EVENT TIME (Mark, 2026-10-02: "window
+ * opens = ready time; window closes = event time"), migration 170 having
+ * dropped the two `delivery_window_*` columns that duplicated them.
+ *
  * The connecting words are here rather than in the note so the note reads the
  * same however much of the window is known — "It will arrive {delivery_window}
  * on {event_day}" is a sentence with all three shapes, including the empty one.
@@ -861,8 +860,8 @@ export function cutoffClause(
  * about the two that do not rather than about a common case.
  */
 function deliveryWindow(order: OrderDocData): string {
-  const from = usTime(order.delivery_window_start);
-  const to = usTime(order.delivery_window_end);
+  const from = usTime(order.ready_by_time);
+  const to = usTime(order.event_time);
   if (from && to) return `between ${from} and ${to}`;
   if (from) return `after ${from}`;
   if (to) return `by ${to}`;
@@ -883,12 +882,13 @@ function deliveryWindow(order: OrderDocData): string {
  */
 export function documentTimeLabel(order: OrderDocData): string | null {
   if (order.fulfillment === "delivery") {
-    const from = usTime(order.delivery_window_start);
-    const to = usTime(order.delivery_window_end);
-    if (from && to) return `${from} – ${to}`;
+    // The window is ready → event (170). An event time alone prints bare, as
+    // a delivery with no window always did.
+    const from = usTime(order.ready_by_time);
+    const to = usTime(order.event_time);
+    if (from && to) return from === to ? to : `${from} – ${to}`;
     if (from) return from;
-    if (to) return `By ${to}`;
-    return usTime(order.event_time) || null;
+    return to || null;
   }
   return order.event_time ? `After ${usTime(order.event_time)}` : null;
 }
@@ -1248,8 +1248,9 @@ export type DeliveryQuoteFacts = {
   delivery_address: string | null;
   delivery_boxes: number | null;
   delivery_weight_lbs: number | null;
-  delivery_window_start: string | null;
-  delivery_window_end: string | null;
+  /** The window's two ends (170): ready, then event. */
+  ready_by_time: string | null;
+  event_time: string | null;
   /** The kitchen's street address — where the carrier picks up. */
   pickup_address: string | null;
   /** The kitchen's phone, for the driver. */
@@ -1290,8 +1291,8 @@ export function shopStreetAddress(address: unknown): string | null {
  */
 export function deliveryQuoteVars(facts: DeliveryQuoteFacts, orgName: string): Record<string, string> {
   const oneLine = (v: string | null) => (v ?? "").replace(/\s*\n\s*/g, " ").trim();
-  const from = usTime(facts.delivery_window_start);
-  const to = usTime(facts.delivery_window_end);
+  const from = usTime(facts.ready_by_time);
+  const to = usTime(facts.event_time);
   return {
     number: facts.number,
     event_date: usDate(facts.event_date),
@@ -1300,10 +1301,11 @@ export function deliveryQuoteVars(facts: DeliveryQuoteFacts, orgName: string): R
     delivery_address: oneLine(facts.delivery_address),
     boxes: facts.delivery_boxes === null ? "" : String(facts.delivery_boxes),
     weight: facts.delivery_weight_lbs === null ? "" : `${facts.delivery_weight_lbs} lbs`,
-    // FileMaker sent the window's END — when it has to be there by.
+    // FileMaker sent the window's END — when it has to be there by: the
+    // event time.
     delivery_time: to,
     delivery_window: from && to ? `between ${from} and ${to}` : from ? `after ${from}` : to ? `by ${to}` : "",
-    // FileMaker's pickup time was the window's START.
+    // FileMaker's pickup time was the window's START: the ready time.
     pickup_time: from,
     pickup_phone: (facts.pickup_phone ?? "").trim(),
     contact_name: (facts.contact_name ?? "").trim(),

@@ -5465,3 +5465,31 @@ removed once the user has viewed the tab."
 - **APPLIED 2026-10-02** at Mark's word (`db query --linked`, in a
   transaction): RLS on, 2 policies, anon cannot read, 9 orders marked read by
   the backfill, 3 open leads flagged.
+
+## The delivery window is the ready and event times (170, 2026-10-02)
+
+Mark: "window opens = ready time; window closes = event time. Keep Event Time
+and Ready Time, and use in place of Window Opens and Window Closes", and "for
+delivery orders, if ready time is blank and an event time is entered, set the
+ready time to 2 hours before the event time. For pickup orders, set it to the
+event time."
+
+- **Measured first:** the window agreed with ready/event on all but one order
+  each way (SO-10098 — kept fields win); 1 ready and 2 event times were blank
+  where the window had a value, and the merge fills them. Every window value
+  is saved in `FMP Export/pre170-delivery-windows-2026-10-02.json` (8,245).
+- **170 drops `delivery_window_start` / `_end`.** No live function or view
+  named them.
+- **The app reads ready → event as the window:** `{delivery_window}`,
+  `{pickup_time}` (ready), `{delivery_time}` (event), the fulfillment note,
+  and the time under Delivery on the order's document (a ready time equal to
+  the event time prints once; an event time alone prints bare). The Delivery
+  tab lost its Window opens / Window closes rows; the times live on Info.
+- **Ready time from event time:** a BEFORE INSERT trigger and a BEFORE UPDATE
+  OF event_time trigger fill a BLANK ready time — delivery 2 hours before
+  (held at midnight rather than wrapping before 2 AM), pickup the same time.
+  A typed ready time is never moved; a cleared one stays clear until the event
+  time changes. Tested on a temp table in a rolled-back transaction.
+- **Order:** the web change first (it no longer selects the columns), then
+  170 — the other way round, the order page's select fails on the dropped
+  columns.
