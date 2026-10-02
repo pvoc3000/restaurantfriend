@@ -152,9 +152,20 @@ export function OrderTotals({
                     percent />
             )}
           </Line>
+          {/* ONE DISCOUNT OR THE OTHER (Mark, 2026-10-02: "if a user enters a
+              dollar discount amount, the percentage discount field should be
+              cleared disabled, and vice versa. Clearing it enables both
+              fields again"). Entering one empties the other in the same
+              write; each is disabled while the other holds a value. The two
+              still ADD in `orderTotals`, which is why both at once was a
+              trap: 492 FileMaker orders carry the percentage AND its dollar
+              figure, and were discounted twice. An order still holding both
+              keeps both enabled, so either can be cleared. */}
           <Line label="Discount ($)">
             <Cell id={id} canWrite={canWrite} column="discount_amount" value={inputs.discount_amount} label="Discount amount"
-                  format={(v) => money(Number(v))} />
+                  format={(v) => money(Number(v))}
+                  disabled={hasValue(inputs.discount_rate) && !hasValue(inputs.discount_amount)}
+                  alsoUpdate={(next) => (hasValue(next) ? { discount_rate: null } : null)} />
           </Line>
           {/* "(%)" RATHER THAN "(RATE)" (Mark, 2026-09-20), which pairs it with
               "Discount ($)" directly above: the two rows are one question asked
@@ -164,7 +175,9 @@ export function OrderTotals({
             {/* THE ONE MARK TYPED 20 INTO. It read "2000%" afterwards, which is
                 a 20× discount and would have taken the order below zero. */}
             <Cell id={id} canWrite={canWrite} column="discount_rate" value={inputs.discount_rate} label="Discount rate"
-                  percent />
+                  percent
+                  disabled={hasValue(inputs.discount_amount) && !hasValue(inputs.discount_rate)}
+                  alsoUpdate={(next) => (hasValue(next) ? { discount_amount: null } : null)} />
           </Line>
           {/* NOT ON A PICKUP ORDER (Mark, 2026-10-02) — switching to pickup
               removes the charge (migration 168), so there is nothing to show.
@@ -367,6 +380,13 @@ function Figure({
  */
 const MONEY_FIELD = "block w-24 shrink-0";
 
+/** A discount field that is SET — null, blank and 0 all mean "no discount". */
+function hasValue(v: string | number | null | undefined): boolean {
+  if (v === null || v === undefined || v === "") return false;
+  const n = Number(v);
+  return Number.isFinite(n) && n !== 0;
+}
+
 function Cell({
   id,
   canWrite,
@@ -375,9 +395,15 @@ function Cell({
   label,
   format,
   percent = false,
+  disabled = false,
+  alsoUpdate,
 }: {
   id: string;
   canWrite: boolean;
+  /** Greyed and unwritable, box kept — the discount pair's other half. */
+  disabled?: boolean;
+  /** Columns written in the SAME update — `InlineValue`'s own prop. */
+  alsoUpdate?: (next: string | number | null) => Record<string, string | number | null> | null;
   column: string;
   value: number | null;
   label: string;
@@ -415,6 +441,8 @@ function Cell({
       ariaLabel={label}
       scale={percent ? PERCENT_SCALE : undefined}
       format={label_}
+      disabled={disabled}
+      alsoUpdate={alsoUpdate}
     />
     </span>
   );

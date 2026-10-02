@@ -495,7 +495,9 @@ export function InlineValue({
    * a field that is editable in general and does not apply to this record
    * (a special order's Delivery scheduled on a pickup, 2026-09-16), so it sits
    * in line with its neighbours instead of reading as a different kind of
-   * field. Honoured by `kind="date"` only, today.
+   * field. Honoured by `kind="date"` and by the typed kinds' resting button
+   * (2026-10-02: an order's two discount fields, each disabled while the other
+   * holds a value), not yet by `pick` or `time`.
    */
   disabled?: boolean;
 }) {
@@ -898,13 +900,16 @@ export function InlineValue({
     <button
       type="button"
       onClick={open}
-      title="Click to edit"
+      disabled={disabled}
+      title={disabled ? undefined : "Click to edit"}
       aria-label={ariaLabel ?? column}
       // A stop for `ui/CalcPad`'s ‹ ›: at rest this cell is a button, and
       // clicking it opens the calculator field.
       data-rf-calc-opener={kind === "number" ? "" : undefined}
       // Dotted underline at rest — the quietest possible "this is editable".
-      className={`w-full ${INLINE_BOX} ${restLook(boxed, multiline, align, rows)} hover:bg-neutral-100 ${
+      className={`w-full ${INLINE_BOX} ${restLook(boxed, multiline, align, rows)} ${
+        disabled ? "opacity-35" : "hover:bg-neutral-100"
+      } ${
         align === "right" ? "text-right tabular-nums" : "text-left"
       } ${multiline ? "whitespace-pre-wrap" : ""} ${
         shown === null || shown === "" ? emptyClassName : ""

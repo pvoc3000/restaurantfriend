@@ -5498,3 +5498,22 @@ event time."
   three blanks filled), both window columns gone, both triggers present, anon
   cannot execute the function. SO-8291, SO-7110, SO-9357 and SO-10098 read
   as expected.
+
+## One discount or the other (2026-10-02)
+
+Mark: "if a user enters a dollar discount amount, the percentage discount
+field should be cleared disabled, and vice versa. Clearing it enables both
+fields again."
+
+- `OrderTotals`: entering a dollar discount writes `discount_rate = null` in
+  the SAME update (`alsoUpdate`), and the percentage the other way; each cell
+  is disabled while the other holds a value (null, blank and 0 are "no
+  discount"). An order holding both keeps both enabled so either can be
+  cleared. `InlineValue`'s `disabled` now reaches the typed kinds' resting
+  button (greyed, box kept), not only dates.
+- **Found: 492 FileMaker orders carry BOTH**, and `orderTotals` /
+  `special_order_money` ADD them — every one is the percentage plus its own
+  dollar figure (491 to the cent, SO-8432 one rounding step off), so each is
+  discounted twice. 345 have payments (so they read as overpaid), none is on
+  an app invoice, 29 are cancelled, and one is live: SO-9849, a quote for
+  10/19 at $880.22 where it should be $84.60 higher.
