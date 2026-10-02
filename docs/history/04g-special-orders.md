@@ -5431,7 +5431,10 @@ doing so".
 - **Migration 168**, a BEFORE UPDATE OF fulfillment trigger, does the same for
   any other path, ONLY on a switch. Tested on a temp table in a rolled-back
   transaction (switch clears; untouched pickup keeps; to-delivery no-op; both
-  columns in one statement still clears).
+  columns in one statement still clears). **APPLIED 2026-10-02** at Mark's
+  word (`db query --linked`, in a transaction): trigger present, anon cannot
+  execute the function, and the 377 existing pickup-with-charge orders were
+  untouched (377 before and after).
 - **Found, not changed:** 377 orders were already pickup WITH a charge,
   including every Cafe Knotted standing-order day ($40, $50 since 10-05) —
   real deliveries marked pickup — and SO-10055 (a lead) at $4,000.00. Money
