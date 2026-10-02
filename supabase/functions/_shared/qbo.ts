@@ -36,7 +36,7 @@
 //
 // TWO REFRESHES AT ONCE ARE DEFENDED AGAINST, since 2026-09-12. This header
 // used to accept the race as needing "two people pressing the same button in
-// the same second". It needed nothing of the kind: Settings → Accounting and the
+// the same second". It needed nothing of the kind: Settings → Integrations and the
 // vendor record's QuickBooks block each fire FOUR calls on open, and after an
 // idle hour all four refreshed with the same token — one won, the others were
 // refused, and each refusal marked the connection disconnected, overwriting the
@@ -257,7 +257,7 @@ export async function loadConnection(
   }
   if (!data) {
     throw new QboError(
-      "QuickBooks is not connected. Connect it in Settings → Accounting.",
+      "QuickBooks is not connected. Connect it in Settings → Integrations.",
       400
     );
   }
@@ -266,8 +266,8 @@ export async function loadConnection(
   if (conn.status !== "connected" || !conn.realm_id || !conn.refresh_token) {
     throw new QboError(
       conn.status === "disconnected"
-        ? "The QuickBooks connection has ended. Reconnect it in Settings → Accounting."
-        : "QuickBooks is not connected yet. Finish connecting in Settings → Accounting.",
+        ? "The QuickBooks connection has ended. Reconnect it in Settings → Integrations."
+        : "QuickBooks is not connected yet. Finish connecting in Settings → Integrations.",
       400
     );
   }
@@ -344,7 +344,7 @@ async function postToken(body: URLSearchParams): Promise<TokenResponse> {
   if (parsed?.error === "invalid_grant") {
     throw new QboError(
       "QuickBooks no longer accepts this connection — it was disconnected there, " +
-        "or went 100 days without being used. Reconnect it in Settings → Accounting.",
+        "or went 100 days without being used. Reconnect it in Settings → Integrations.",
       400
     );
   }
@@ -442,7 +442,7 @@ export async function accessTokenFor(
     // spend a credential we can never renew. Stop here and say so.
     throw new QboError(
       "QuickBooks issued a new sign-in token and it could not be saved, so the " +
-        `connection has to be made again in Settings → Accounting. (${error.message})`,
+        `connection has to be made again in Settings → Integrations. (${error.message})`,
       500
     );
   }
@@ -600,7 +600,7 @@ export async function qboFetch(
       { access_token: token }
     );
     throw new QboError(
-      "QuickBooks rejected the connection. Reconnect it in Settings → Accounting.",
+      "QuickBooks rejected the connection. Reconnect it in Settings → Integrations.",
       400
     );
   }

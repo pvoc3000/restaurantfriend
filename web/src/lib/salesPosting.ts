@@ -477,7 +477,7 @@ export function buildJournalEntry(input: BuildInput): JournalBuild {
   push("Debit", feesCents, feesCents ? need("fees") : null, "Square fees", { kind: "fee", key: "fees" });
 
   for (const role of missingRoles) {
-    refusals.push(`No account is set for “${SALES_ROLE_LABEL[role]}” — Settings → Accounting → Sales from Square.`);
+    refusals.push(`No account is set for “${SALES_ROLE_LABEL[role]}” — Settings → Integrations → Square Sales Mapping.`);
   }
 
   if (lines.length === 0 && refusals.length === 0) {
@@ -799,8 +799,8 @@ export function buildDeposit(input: {
 
   const bank = roleAccount(mappings, "bank");
   const account = roleAccount(mappings, "card");
-  if (!bank) refusals.push(`No account is set for “${SALES_ROLE_LABEL.bank}” — Settings → Accounting → Sales from Square.`);
-  if (!account) refusals.push(`No account is set for “${SALES_ROLE_LABEL.card}” — Settings → Accounting → Sales from Square.`);
+  if (!bank) refusals.push(`No account is set for “${SALES_ROLE_LABEL.bank}” — Settings → Integrations → Square Sales Mapping.`);
+  if (!account) refusals.push(`No account is set for “${SALES_ROLE_LABEL.card}” — Settings → Integrations → Square Sales Mapping.`);
 
   const doc = docNumberForPayout(payout);
   if (!doc.ok) refusals.push(doc.reason);

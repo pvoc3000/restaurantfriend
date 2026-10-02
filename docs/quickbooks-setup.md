@@ -144,7 +144,7 @@ In this order. Steps 1 and 2 can be done in either order but both come before 3.
    ```
    npx supabase secrets set --project-ref kltxioacvneshbyhxtaj QBO_CREDS='{"client_id":"PASTE","client_secret":"PASTE"}'
    ```
-3. **Settings → Accounting**: set the environment picker to **Production**,
+3. **Settings → Integrations**: set the environment picker to **Production**,
    then press **Reconnect** and choose the real company at Intuit.
 4. **Read the banner.** "connected to a different company … were cleared" is
    the good outcome. If it says **part of the old company's settings could not
@@ -208,7 +208,7 @@ goes through `qbo-sync`, which sees the column, so Settings saves the tax code
 and says so — while every reader in the app goes through
 `accounting_connection_status()`, which 084 did not widen, so the picker goes
 back to reading *"Choose a tax code"* and the first taxable order refuses with
-*"No QuickBooks tax code is set. Choose one in Settings → Accounting"*, naming
+*"No QuickBooks tax code is set. Choose one in Settings → Integrations"*, naming
 the screen where you just set it. If you see that sentence, 085 has not run.
 
 A zero-tax order will not show it: a push only needs a tax code when something

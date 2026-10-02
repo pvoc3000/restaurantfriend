@@ -12,7 +12,7 @@ export const SETTINGS_TABS: SettingsTab[] = ["general", "messages", "accounting"
 export const SETTINGS_TAB_LABEL: Record<SettingsTab, string> = {
   general: "General",
   messages: "Messages",
-  accounting: "Accounting",
+  accounting: "Integrations",
   devices: "Shared devices",
 };
 

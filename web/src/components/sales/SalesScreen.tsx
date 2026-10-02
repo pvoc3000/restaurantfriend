@@ -477,7 +477,7 @@ export function SalesScreen({
             {posting.unmappedNames} Square name{posting.unmappedNames === 1 ? "" : "s"} unmapped
           </span>{" "}
           <Link href="/settings?tab=accounting" className="text-muted underline hover:text-ink">
-            Settings → Accounting
+            Settings → Integrations
           </Link>
         </p>
       ) : null}

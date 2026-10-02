@@ -210,7 +210,7 @@ export function billPushRefusals(inputs: BillPushInputs): string[] {
     );
   }
   if (!accountRef) {
-    out.push("No expense account is set. Choose one in Settings → Accounting.");
+    out.push("No expense account is set. Choose one in Settings → Integrations.");
   }
   if (bill.total === null || bill.total === undefined) {
     out.push("This bill has no total.");
@@ -439,7 +439,7 @@ export function expenseAccountFor(
       source: "vendor_location",
     };
   }
-  // The org's floor, from Settings → Accounting, so a vendor nobody has
+  // The org's floor, from Settings → Integrations, so a vendor nobody has
   // configured still posts somewhere rather than refusing.
   const fallback = orgDefault?.ref?.trim();
   if (fallback) {
@@ -604,13 +604,13 @@ export function invoicePushRefusals(inputs: InvoicePushInputs): string[] {
     out.push(`No QuickBooks customer is linked to ${customerName}. Pick one on their record.`);
   }
   if (!itemRef) {
-    out.push("No QuickBooks item is set. Choose one in Settings → Accounting.");
+    out.push("No QuickBooks item is set. Choose one in Settings → Integrations.");
   }
   out.push(...feeItemRefusals(inputs.delivery ?? 0, inputs.rush ?? 0, inputs));
   // Only when there is tax to charge: an untaxed order needs no code, and
   // demanding one would block every order for a customer who pays none.
   if (!inputs.taxCodeRef && Number(inputs.tax) > 0) {
-    out.push("No QuickBooks tax code is set. Choose one in Settings → Accounting.");
+    out.push("No QuickBooks tax code is set. Choose one in Settings → Integrations.");
   }
   if (!Number.isFinite(total)) out.push("This order has no total.");
   else if (total < 0) {
@@ -694,10 +694,10 @@ function feeItemRefusals(
 ): string[] {
   const out: string[] = [];
   if (round2(delivery) > 0 && !refs.deliveryItemRef) {
-    out.push("No QuickBooks item is set for delivery. Choose one in Settings → Accounting.");
+    out.push("No QuickBooks item is set for delivery. Choose one in Settings → Integrations.");
   }
   if (round2(rush) > 0 && !refs.rushItemRef) {
-    out.push("No QuickBooks item is set for rush fees. Choose one in Settings → Accounting.");
+    out.push("No QuickBooks item is set for rush fees. Choose one in Settings → Integrations.");
   }
   return out;
 }
@@ -939,10 +939,10 @@ export function customerInvoiceRefusals(inputs: CustomerInvoicePushInputs): stri
   }
   if (live.length === 0) out.push("This invoice has no lines to bill.");
   if (live.some((l) => l.square_item === "special_order") && !inputs.itemRef) {
-    out.push("No QuickBooks item is set for special orders. Choose one in Settings → Accounting.");
+    out.push("No QuickBooks item is set for special orders. Choose one in Settings → Integrations.");
   }
   if (live.some((l) => l.square_item === "wholesale") && !inputs.wholesaleItemRef) {
-    out.push("No QuickBooks item is set for wholesale. Choose one in Settings → Accounting.");
+    out.push("No QuickBooks item is set for wholesale. Choose one in Settings → Integrations.");
   }
   out.push(
     ...feeItemRefusals(
@@ -952,7 +952,7 @@ export function customerInvoiceRefusals(inputs: CustomerInvoicePushInputs): stri
     )
   );
   if (!inputs.taxCodeRef && live.some((l) => Number(l.totals?.tax ?? 0) > 0)) {
-    out.push("No QuickBooks tax code is set. Choose one in Settings → Accounting.");
+    out.push("No QuickBooks tax code is set. Choose one in Settings → Integrations.");
   }
   for (const l of live) {
     if (!l.totals) {

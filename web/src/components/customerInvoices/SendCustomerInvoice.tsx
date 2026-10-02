@@ -585,7 +585,7 @@ export async function quickBooksInputs(
         | undefined)
     : undefined;
   if (row?.status !== "connected") {
-    throw new Error("QuickBooks is not connected. Connect it in Settings → Accounting.");
+    throw new Error("QuickBooks is not connected. Connect it in Settings → Integrations.");
   }
   return {
     invoice: {

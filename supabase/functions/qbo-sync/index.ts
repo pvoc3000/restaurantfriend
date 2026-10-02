@@ -1476,8 +1476,8 @@ Deno.serve(async (req) => {
       };
       const bankRef = roleRef("bank");
       const cardRef = roleRef("card");
-      if (!bankRef) return json(400, { error: "No account is set for the bank the payouts land in — Settings → Accounting → Sales from Square." });
-      if (!cardRef) return json(400, { error: "No account is set for card takings — Settings → Accounting → Sales from Square." });
+      if (!bankRef) return json(400, { error: "No account is set for the bank the payouts land in — Settings → Integrations → Square Sales Mapping." });
+      if (!cardRef) return json(400, { error: "No account is set for card takings — Settings → Integrations → Square Sales Mapping." });
 
       const p = req.payload;
       // The DocNumber rule, restated: the end-to-end id, else a prefix of

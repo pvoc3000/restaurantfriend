@@ -246,7 +246,7 @@ export function PostToQuickBooksDialog({
                     </li>
                   ))}
                 </ul>
-                <p className="mt-1 text-ink/70">Map them under Settings → Accounting, then post again to correct the entries.</p>
+                <p className="mt-1 text-ink/70">Map them under Settings → Integrations, then post again to correct the entries.</p>
               </div>
             ) : null}
 

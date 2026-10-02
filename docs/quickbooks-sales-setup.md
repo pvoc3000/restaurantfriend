@@ -16,7 +16,7 @@ clean beside Shogo's.
 
 ## Before the first post
 
-1. **QuickBooks is connected** (`Settings → Accounting`), and in
+1. **QuickBooks is connected** (`Settings → Integrations`), and in
    `Account and settings → Advanced → Categories` both **Track classes** and
    **Track locations** are on. QuickBooks accepts a class or a location on a
    line and *silently drops it* when the preference is off; the post says so
@@ -28,7 +28,7 @@ clean beside Shogo's.
    refused by name. (The Square location id is editable there too; it used to
    be SQL-only.)
 
-3. **The mapping grid is filled in** — `Settings → Accounting → Square Sales
+3. **The mapping grid is filled in** — `Settings → Integrations → Square Sales
    Mapping`. It is ONE grid for the whole business, not one per shop, and it
    holds three kinds of row:
 
@@ -264,5 +264,5 @@ Expected differences, from the first real day compared:
 | The post and the read-back | `supabase/functions/qbo-sync/index.ts` — `post_daily_sales`, `find_journal_entries`, `post_square_payout`, `find_deposits` |
 | The payout pull | `supabase/functions/sync-square-sales/index.ts` (`loadPayouts`); the Payouts API notes are in `docs/square-setup.md` |
 | The schema | `supabase/migrations/104_sales_to_quickbooks.sql`, `105_square_payouts.sql` |
-| The grid | `Settings → Accounting → Square Sales Mapping` (`accounting_sales_mappings`) |
+| The grid | `Settings → Integrations → Square Sales Mapping` (`accounting_sales_mappings`) |
 | Who may post | Purchaser and above, the Sales cell in the Page Permissions sheet. Who may map: managers and the owner |
