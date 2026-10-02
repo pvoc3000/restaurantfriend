@@ -162,6 +162,7 @@ export async function SpecialOrderDetail({
     { data: invoiceLinkRows },
     { data: carrierRows },
     { data: shopRows },
+    { data: rateRows },
   ] = await Promise.all([
     supabase.from("special_orders").select(ORDER_COLUMNS).eq("id", id).maybeSingle(),
     wantsLines
@@ -234,6 +235,15 @@ export async function SpecialOrderDetail({
     // Each shop's street address, for the quote request's pickup line.
     wantsCarriers
       ? supabase.from("locations").select("id, address").eq("org_id", session.membership.org_id)
+      : SKIP_MENU,
+    // The rates the open shops charge — the Tax rate picker's list, on the
+    // tab that holds Money.
+    tab === "payments"
+      ? supabase
+          .from("locations")
+          .select("code, tax_rate")
+          .eq("org_id", session.membership.org_id)
+          .eq("is_active", true)
       : SKIP_MENU,
   ]);
 
@@ -1281,6 +1291,7 @@ export async function SpecialOrderDetail({
                     totals={totals}
                     inputs={moneyInputs}
                     rushSuggestion={rushSuggestion}
+                    shopRates={(rateRows ?? []) as { code: string; tax_rate: number | string | null }[]}
                     canWrite={canWrite}
                   />
                 </div>

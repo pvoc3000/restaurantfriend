@@ -257,8 +257,9 @@ export function AccountingSettings({
   // THE SAVED TAX CODE IS GONE FROM QUICKBOOKS' ACTIVE LIST. Editing a rate in
   // QuickBooks deactivates the old code and makes a new one under a new Id, so
   // the Id saved here goes stale with every rate change, and the field kept
-  // showing the name it was saved with. `push_invoice` and
-  // `push_customer_invoice` refuse it too; this says so before anyone sends.
+  // showing the name it was saved with. Since sending chooses the code by
+  // rate it can no longer tax at a dead rate, but a stale preference breaks
+  // no ties, so a tied rate would be refused.
   const staleTaxCode =
     taxCodes !== null && Boolean(status?.tax_code_ref) &&
     !taxCodes.some((t) => t.id === status?.tax_code_ref);
@@ -378,9 +379,10 @@ export function AccountingSettings({
       {connected && (
         <div className="max-w-[min(42rem,max(24rem,50%))] space-y-3 border-t border-hairline pt-4">
           <p className="text-[13px] text-muted">
-            A customer invoice is sent as its net amount under this item, and
-            QuickBooks works out the sales tax from this code — it will not
-            accept ours.
+            A customer invoice is sent as its net amount under this item.
+            QuickBooks works out the sales tax itself, under the active tax code
+            whose rate matches the order’s; when more than one does, it uses the
+            preferred code.
           </p>
           <div className="flex items-baseline justify-between gap-6">
             <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
@@ -448,12 +450,12 @@ export function AccountingSettings({
           </div>
           <div className="flex items-baseline justify-between gap-6">
             <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-              Tax code
+              Preferred tax code
             </span>
             <PickList
               variant="field"
               boxed
-              ariaLabel="Tax code customer invoices are sent under"
+              ariaLabel="Tax code used when several match the order’s rate"
               disabled={!editable || busy !== null}
               value={status?.tax_code_ref ?? null}
               placeholder={
@@ -476,7 +478,7 @@ export function AccountingSettings({
           </div>
           {staleTaxCode && (
             <p className="text-[13px] text-accent">
-              This tax code is inactive in QuickBooks, so invoices will not send.
+              This tax code is inactive in QuickBooks, so it is never chosen.
               Choose the current one.
             </p>
           )}

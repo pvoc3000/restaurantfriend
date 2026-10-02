@@ -10,6 +10,9 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { money, type MoneyOrder, type OrderTotals as Totals } from "@/lib/specialOrders";
 import { PERCENT_SCALE, percentLabel, toPercent } from "@/lib/percent";
+import { PickList } from "@/components/ui/PickList";
+import { useLatestWrite } from "@/lib/latestWrite";
+import { optionValue, parseTaxRatePick, taxRateOptions } from "@/lib/taxRates";
 
 /**
  * The money — DERIVED, every figure of it (decision 6).
@@ -30,11 +33,14 @@ export function OrderTotals({
   totals,
   inputs,
   rushSuggestion,
+  shopRates,
   canWrite,
 }: {
   id: string;
   totals: Totals;
   inputs: MoneyOrder;
+  /** Every active shop's code and rate — the Tax rate picker's list. */
+  shopRates: { code: string; tax_rate: number | string | null }[];
   /** Decision 22's figure, or null outside the cutoff. */
   rushSuggestion: number | null;
   canWrite: boolean;
@@ -136,8 +142,12 @@ export function OrderTotals({
                 2026-09-20) — `lib/percent` holds the pair and the reasoning.
                 The column keeps FileMaker's convention; the box in front of
                 you is in the units on the sign in the window. */}
-            <Cell id={id} canWrite={canWrite} column="tax_rate" value={inputs.tax_rate} label="Tax rate"
-                  percent />
+            {canWrite ? (
+              <TaxRateCell id={id} value={inputs.tax_rate} shopRates={shopRates} />
+            ) : (
+              <Cell id={id} canWrite={false} column="tax_rate" value={inputs.tax_rate} label="Tax rate"
+                    percent />
+            )}
           </Line>
           <Line label="Discount ($)">
             <Cell id={id} canWrite={canWrite} column="discount_amount" value={inputs.discount_amount} label="Discount amount"
@@ -396,6 +406,91 @@ function Cell({
       scale={percent ? PERCENT_SCALE : undefined}
       format={label_}
     />
+    </span>
+  );
+}
+
+/**
+ * THE TAX RATE IS CHOSEN, from the rates the shops charge (Mark, 2026-10-02),
+ * with typing kept for a rate no shop uses. Sending to QuickBooks now picks
+ * the tax code whose rate EQUALS this one, so a typo is a refused invoice
+ * rather than a wrong tax — `lib/taxRates` has the reasoning, and SO-10098's
+ * 10.5% is the case.
+ *
+ * Its own PickList rather than `InlineValue kind="pick"`, because a pick cell
+ * writes the option's value as it stands and this one has to turn it into a
+ * fraction first. The new rate shows on the tap and is written behind it
+ * (`lib/latestWrite`); a refused write puts the old one back.
+ */
+function TaxRateCell({
+  id,
+  value,
+  shopRates,
+}: {
+  id: string;
+  value: number | string | null;
+  shopRates: { code: string; tax_rate: number | string | null }[];
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const saved = value === null || value === "" ? null : Number(value);
+  const [shown, setShown] = useState<{ rate: number | null } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [seen, setSeen] = useState(saved);
+  if (seen !== saved) {
+    setSeen(saved);
+    setShown(null);
+  }
+  const current = shown ? shown.rate : saved;
+
+  const save = useLatestWrite<number | null>(
+    async (rate) => {
+      const { data, error: e } = await supabase
+        .from("special_orders")
+        .update({ tax_rate: rate })
+        .eq("id", id)
+        .select("id");
+      if (e) return e.message;
+      if (!data?.length) return "The rate wasn't saved — the database refused it silently.";
+      return null;
+    },
+    (failure) => {
+      if (failure) {
+        setError(failure);
+        setShown(null);
+      }
+      router.refresh();
+    }
+  );
+
+  return (
+    <span className={`${MONEY_FIELD} inline-flex flex-col`}>
+      <PickList
+        boxed={BOXED_FIELDS}
+        allowNew
+        clearable
+        align="right"
+        ariaLabel="Tax rate"
+        value={current === null ? null : optionValue(current)}
+        options={taxRateOptions(shopRates, current)}
+        panelMinWidth={200}
+        onPick={(next) => {
+          setError(null);
+          if (next === "") {
+            setShown({ rate: null });
+            save(null);
+            return;
+          }
+          const rate = parseTaxRatePick(next);
+          if (rate === null) {
+            setError("not a rate");
+            return;
+          }
+          setShown({ rate });
+          save(rate);
+        }}
+      />
+      {error ? <span className="text-xs text-accent">{error}</span> : null}
     </span>
   );
 }

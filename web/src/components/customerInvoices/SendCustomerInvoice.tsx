@@ -540,7 +540,7 @@ function blobToBase64(blob: Blob): Promise<string> {
 }
 
 /** What the QuickBooks push needs beyond the invoice view: the connection's
- *  items and tax code, and the customer's QuickBooks id. */
+ *  items, and the customer's QuickBooks id. */
 export async function quickBooksInputs(
   supabase: SupabaseClient,
   orgId: string,
@@ -580,7 +580,6 @@ export async function quickBooksInputs(
             wholesale_item_ref?: string | null;
             delivery_item_ref?: string | null;
             rush_item_ref?: string | null;
-            tax_code_ref?: string | null;
           }
         | undefined)
     : undefined;
@@ -603,7 +602,6 @@ export async function quickBooksInputs(
     wholesaleItemRef: row?.wholesale_item_ref ?? null,
     deliveryItemRef: row?.delivery_item_ref ?? null,
     rushItemRef: row?.rush_item_ref ?? null,
-    taxCodeRef: row?.tax_code_ref ?? null,
     // The KITCHEN's coding (165): each order's Class on its lines, free lines
     // the invoice shop's, and one Location for the header.
     departmentRef: kitchen ? coding.get(kitchen)?.qbo_location_ref ?? null : null,

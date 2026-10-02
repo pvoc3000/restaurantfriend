@@ -552,3 +552,29 @@ or a location — they rode inside each order's untaxed line under Special Order
   code). The saved `tax_code_name` stays the bare name. Measured: two codes
   are both named "CA-Los Angeles-Los Angeles" (9.75% and 9.5%), and "Sales
   Tax" and "CA-Los Angeles-Los Angeles-Culver City" are both 10.25%.
+
+- **THE TAX CODE IS CHOSEN BY RATE AT SEND TIME, AND NEVER STORED (Mark,
+  2026-10-02: "build it").** Supersedes the inactive-code refusal above.
+  `qbo-sync`'s `applyTaxCode` runs before both invoice pushes: it reads the
+  taxed rates FROM THE DATABASE (`special_orders.tax_rate` for `push_invoice`;
+  the invoice's `line_type = 'tax'` lines' `tax_rate` for
+  `push_customer_invoice`), reads the ACTIVE codes with their summed rates, and
+  OVERWRITES the payload's `TxnTaxDetail` with the match, or refuses. Pure rule
+  in `_shared/taxCodes.ts` (`chooseTaxCode`, fixture-tested): one match wins;
+  a tie goes to `accounting_connections.tax_code_ref`, which Settings now calls
+  **Preferred tax code**; no match, mixed rates on one invoice, or a tie with no
+  usable preference is a refusal that names the rate(s) or codes.
+  The browser builders no longer take a code: a taxed payload carries an EMPTY
+  `TxnTaxDetail` (`TAX_CODE_PENDING`) that the function always fills or
+  refuses — an empty one reaching QuickBooks would compute no tax, measured.
+  **The order's Tax rate is CHOSEN** (`OrderTotals`' `TaxRateCell`,
+  `lib/taxRates`): each active shop's rate naming its shops, 0% "not taxed",
+  and the order's own rate when it is none of those; typing a percentage is
+  still allowed. The list is the app's, never QuickBooks', so quoting does not
+  need QuickBooks connected.
+  **Found while building:** INV-10006's order SO-10098 was entered at **10.5%**
+  (tax line $7.65), a rate no other order and no QuickBooks code has — so the
+  invoice was wrong twice, and the new push refuses it until the order's rate
+  is fixed. The earlier note's "$7.47 at 10.25%" assumed the shop rate.
+  Not verified in a browser (the pane was signed out); the function was
+  deployed and its `tax_codes` mode read back through the shared module.

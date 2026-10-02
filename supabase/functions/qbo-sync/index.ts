@@ -45,6 +45,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { splitRefund } from "../_shared/refundSplit.ts";
+import { chooseTaxCode, taxCodesWithRates } from "../_shared/taxCodes.ts";
 import {
   INTUIT_AUTHORIZE,
   QBO_SCOPE,
@@ -277,36 +278,59 @@ function invoiceCodingWarnings(
 }
 
 /**
- * Refuses an invoice whose tax code QuickBooks has made INACTIVE, before it is
- * written. QuickBooks itself accepts one without a word and taxes at the dead
- * rate — measured 2026-10-02 on INV-10006, taxed at 9.5% under code 6 while
- * the live rate was 10.25%.
- *
- * WHY THE CODE GOES STALE: editing a custom rate in QuickBooks does not change
- * it. It renames the old code "… - Inactive", deactivates it and makes a new
- * one under a NEW Id, so the Id saved in Settings (084) is left pointing at the
- * old rate after every rate change — twice between 2026-09-29 and 10-01.
- *
- * One extra read, and only on an invoice that is taxed at all.
+ * Every active QuickBooks tax code with its total rate. Only a code's rates
+ * carry a value, so both lists are read — `_shared/taxCodes` adds them up.
  */
-async function inactiveTaxCodeRefusal(
+async function activeTaxCodes(
+  admin: SupabaseClient,
+  conn: Parameters<typeof qboUpload>[1]
+) {
+  const read = async (sql: string) =>
+    ((await qboFetch(admin, conn, `query?query=${encodeURIComponent(sql)}`)) as {
+      QueryResponse?: Record<string, Row[]>;
+    }).QueryResponse ?? {};
+  const codes = (await read("select * from TaxCode where Active = true maxresults 1000")).TaxCode ?? [];
+  const rates = (await read("select * from TaxRate maxresults 1000")).TaxRate ?? [];
+  return taxCodesWithRates(codes, rates);
+}
+
+/**
+ * THE TAX CODE IS CHOSEN HERE, BY RATE, AND WHATEVER THE CALLER SENT IS
+ * OVERWRITTEN (2026-10-02). `fractions` are the taxed rates of the orders on
+ * the invoice, read from the database by the caller — never from the payload.
+ * The active code at that rate wins; a tie goes to Settings' code
+ * (`accounting_connections.tax_code_ref`, now a preference); no match, mixed
+ * rates or a tie with no preference is a refusal. See `_shared/taxCodes`.
+ *
+ * Why not the stored code, as before: editing a rate in QuickBooks retires the
+ * code's Id, and QuickBooks taxes at a retired code's dead rate without a word
+ * (INV-10006, 9.5% under code 6).
+ *
+ * Only a payload that is taxed at all — one carrying `TxnTaxDetail` — costs the
+ * two reads. Returns the refusal, or null once the payload is set.
+ */
+async function applyTaxCode(
   admin: SupabaseClient,
   conn: Parameters<typeof qboUpload>[1],
-  payload: Record<string, unknown>
+  orgId: string,
+  payload: Record<string, unknown>,
+  fractions: number[]
 ): Promise<string | null> {
-  const id = (payload.TxnTaxDetail as { TxnTaxCodeRef?: { value?: unknown } } | undefined)
-    ?.TxnTaxCodeRef?.value;
-  if (id === undefined || id === null || String(id).trim() === "") return null;
-  const res = (await qboFetch(admin, conn, `taxcode/${encodeURIComponent(String(id))}`)) as {
-    TaxCode?: { Active?: boolean; Name?: string };
-  };
-  const code = res?.TaxCode;
-  if (!code || code.Active !== false) return null;
-  return (
-    `The tax code chosen in Settings (${code.Name ?? `QuickBooks code ${id}`}) is inactive ` +
-    "in QuickBooks, so it would tax at an old rate. Choose the current one in " +
-    "Settings → Integrations → QuickBooks, then send again."
+  if (!payload.TxnTaxDetail) return null;
+  const { data: pref } = await admin
+    .from("accounting_connections")
+    .select("tax_code_ref")
+    .eq("org_id", orgId)
+    .eq("provider", "qbo")
+    .maybeSingle();
+  const choice = chooseTaxCode(
+    fractions,
+    await activeTaxCodes(admin, conn),
+    (pref?.tax_code_ref as string | null | undefined) ?? null
   );
+  if (!choice.ok) return choice.error;
+  payload.TxnTaxDetail = { TxnTaxCodeRef: { value: choice.id } };
+  return null;
 }
 
 const CORS = {
@@ -1221,36 +1245,10 @@ Deno.serve(async (req) => {
       return json(200, { [mode]: rows, enabled });
     }
 
-    // A TAX CODE'S RATE IS THE SUM OF ITS COMPONENT RATES — a combined code
-    // ("CA-Los Angeles-Los Angeles") is state + county + district — and only
-    // the rates carry a value, so both are read. Shown in the Settings picker
-    // because the NAME says nothing: three codes in Donut Friend's file have
-    // been called "Sales Tax" (2026-10-02).
+    // Each with its rate, which the Settings picker shows: the NAME says
+    // nothing — three codes in Donut Friend's file have been "Sales Tax".
     if (mode === "tax_codes") {
-      type Detail = { TaxRateRef?: { value?: string } };
-      const read = async (sql: string) =>
-        ((await qboFetch(admin, conn, `query?query=${encodeURIComponent(sql)}`)) as {
-          QueryResponse?: Record<string, Row[]>;
-        }).QueryResponse ?? {};
-      const codes = (await read("select * from TaxCode where Active = true maxresults 1000")).TaxCode ?? [];
-      const rates = new Map(
-        ((await read("select * from TaxRate maxresults 1000")).TaxRate ?? []).map((r) => [
-          String(r.Id),
-          Number(r.RateValue),
-        ])
-      );
-      const rows = codes.map((c) => {
-        const details =
-          ((c.SalesTaxRateList as { TaxRateDetail?: Detail[] } | undefined)?.TaxRateDetail ?? []);
-        const parts = details.map((d) => rates.get(String(d.TaxRateRef?.value)));
-        const known = details.length > 0 && parts.every((v) => v !== undefined && Number.isFinite(v));
-        return {
-          id: String(c.Id),
-          name: String(c.Name ?? ""),
-          // Percent, e.g. 10.25. Null when QuickBooks gave no rate to add up.
-          rate: known ? Math.round(parts.reduce((a, v) => a + (v as number), 0) * 10000) / 10000 : null,
-        };
-      });
+      const rows = await activeTaxCodes(admin, conn);
       rows.sort((a, b) => a.name.localeCompare(b.name));
       return json(200, { tax_codes: rows });
     }
@@ -2116,7 +2114,7 @@ Deno.serve(async (req) => {
 
       const { data: order, error: orderErr } = await supabase
         .from("special_orders")
-        .select("id, kind, status, ignore_balance, customer_id, number, external_ref")
+        .select("id, kind, status, ignore_balance, customer_id, number, external_ref, tax_rate")
         .eq("id", req.order_id)
         .maybeSingle();
       if (orderErr) return json(500, { error: orderErr.message });
@@ -2153,8 +2151,8 @@ Deno.serve(async (req) => {
         return json(400, { error: "The payload names a different QuickBooks customer." });
       }
 
-      const staleTax = await inactiveTaxCodeRefusal(admin, conn, req.payload);
-      if (staleTax) return json(400, { error: staleTax });
+      const taxRefusal = await applyTaxCode(admin, conn, orgId, req.payload, [Number(order.tax_rate ?? 0)]);
+      if (taxRefusal) return json(400, { error: taxRefusal });
 
       // `conn`, the one loaded above, and ONLY that one: a token refresh updates
       // the object in place, and a second copy would still hold the spent one
@@ -2598,8 +2596,21 @@ Deno.serve(async (req) => {
         });
       }
 
-      const staleTax = await inactiveTaxCodeRefusal(admin, conn, req.payload);
-      if (staleTax) return json(400, { error: staleTax });
+      // The taxed rates: each order's TAX line carries the rate its tax was
+      // worked at (141), so the code matches what the customer's copy says.
+      if (req.payload.TxnTaxDetail) {
+        const { data: taxLines, error: taxErr } = await supabase
+          .from("customer_invoice_lines")
+          .select("tax_rate, amount")
+          .eq("invoice_id", inv.id)
+          .eq("line_type", "tax");
+        if (taxErr) return json(500, { error: taxErr.message });
+        const fractions = (taxLines ?? [])
+          .filter((l) => Number(l.amount) !== 0)
+          .map((l) => Number(l.tax_rate) || 0);
+        const taxRefusal = await applyTaxCode(admin, conn, orgId, req.payload, fractions);
+        if (taxRefusal) return json(400, { error: taxRefusal });
+      }
 
       const { saved, retried } = await postDocument(admin, conn, "Invoice", req.payload);
       const doc = saved?.Invoice;

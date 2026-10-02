@@ -468,7 +468,6 @@ function ar(over: Partial<InvoicePushInputs> = {}): InvoicePushInputs {
     customerRef: "142",
     customerName: "Cafe Knotted",
     itemRef: "1",
-    taxCodeRef: "2",
     total: 161.77,
     tax: 14.37,
     taxableNet: 147.4,
@@ -499,19 +498,18 @@ test("TxnTaxDetail NAMES A CODE and supplies no figure", () => {
   // Measured against a real company: an empty detail computed nothing, and a
   // supplied TotalTax was either dropped or overwritten with its own rate.
   const { body } = buildInvoicePayload(ar());
-  eq(body.TxnTaxDetail, { TxnTaxCodeRef: { value: "2" } }, "code only");
+  // The code is qbo-sync's to choose, by rate (2026-10-02): the builder only
+  // marks the invoice taxed.
+  eq(body.TxnTaxDetail, {}, "taxed, code left to qbo-sync");
   no(JSON.stringify(body).includes("TotalTax"), "we never state the amount");
 });
 
-test("a taxable order with no code configured is refused, an untaxed one is not", () => {
-  ok(
-    invoicePushRefusals(ar({ taxCodeRef: null })).some((r) => r.includes("tax code")),
-    "taxable order refused"
-  );
+test("no tax code is asked for: qbo-sync chooses it by rate (2026-10-02)", () => {
+  eq(invoicePushRefusals(ar()), [], "a taxable order needs no code here");
   eq(
-    invoicePushRefusals(ar({ taxCodeRef: null, tax: 0, taxableNet: 0, nonTaxableNet: 161.77 })),
+    invoicePushRefusals(ar({ tax: 0, taxableNet: 0, nonTaxableNet: 161.77 })),
     [],
-    "an untaxed order needs no code"
+    "nor an untaxed one"
   );
 });
 
@@ -928,7 +926,6 @@ function civ(over: Partial<CustomerInvoicePushInputs> = {}): CustomerInvoicePush
     wholesaleItemRef: "WH",
     deliveryItemRef: "DL",
     rushItemRef: "RU",
-    taxCodeRef: "2",
     lines: [1, 2, 3, 4, 5, 6, 7].map((n) => wholesaleDay(n)),
     ...over,
   };
@@ -962,7 +959,7 @@ test("a taxed special order splits TAX + delivery, and the parts sum to total �
   eq(lineOf(lines[1]).ItemRef.value, "DL", "delivery item");
   eq(lines[1].Description, "Order #10080 · Birthday · 9/30/2026 — delivery", "the delivery line says so");
   eq(round(Number(lines[0].Amount) + Number(lines[1].Amount)), round(158.8 - 11.4), "sum");
-  eq(body.TxnTaxDetail, { TxnTaxCodeRef: { value: "2" } }, "names the code");
+  eq(body.TxnTaxDetail, {}, "taxed, code left to qbo-sync");
 });
 
 test("the header carries dates, the pay switches, BillEmail and the number", () => {
@@ -1004,8 +1001,7 @@ test("each refusal fires", () => {
   ok(has(civ({ wholesaleItemRef: null }), "wholesale"), "no wholesale item");
   no(has(civ({ itemRef: null }), "special orders"), "special-order item not needed for a wholesale week");
   ok(has(civ({ lines: [taxedOrder], itemRef: null }), "special orders"), "no special-order item");
-  ok(has(civ({ lines: [taxedOrder], taxCodeRef: null }), "tax code"), "no tax code when taxed");
-  no(has(civ({ taxCodeRef: null }), "tax code"), "no code needed untaxed");
+  no(has(civ({ lines: [taxedOrder] }), "tax code"), "no code asked for when taxed — qbo-sync chooses it");
   ok(has(civ({ lines: [{ ...taxedOrder, amount: 108.8 }] }), "deposit"), "deposit taken outside");
   ok(has(civ({ lines: [] }), "no lines"), "empty");
   let threw = false;

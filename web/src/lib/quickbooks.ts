@@ -541,14 +541,6 @@ export type InvoicePushInputs = {
   /** `accounting_connections.invoice_item_ref`. */
   itemRef: string | null;
   /**
-   * `accounting_connections.tax_code_ref` (084). QuickBooks computes the tax
-   * ITSELF from this; ours is only compared against what it decides.
-   *
-   * Null sends no `TxnTaxDetail`, which is how QuickBooks is told not to tax —
-   * and with the detail present but EMPTY it computed nothing at all, measured.
-   */
-  taxCodeRef: string | null;
-  /**
    * From `orderTotals`. The push sends the two NET amounts and lets QuickBooks
    * work the tax out from its own rate; `tax` is what WE billed, kept only so
    * the push can say when the two disagree.
@@ -570,6 +562,18 @@ export type InvoicePushInputs = {
   classRef?: string | null;
   departmentRef?: string | null;
 };
+
+/**
+ * A TAXED INVOICE'S `TxnTaxDetail`, LEFT FOR `qbo-sync` TO FILL (2026-10-02).
+ *
+ * QuickBooks computes the tax itself from a CODE — an empty detail computed
+ * nothing, measured, and a TotalTax of ours is dropped or overwritten. Which
+ * code is no longer this file's choice: the function picks the active code
+ * whose rate equals the orders' own (`_shared/taxCodes`), because a code saved
+ * by Id goes stale with every rate edit in QuickBooks (INV-10006). It always
+ * overwrites this or refuses, so an empty detail never reaches QuickBooks.
+ */
+const TAX_CODE_PENDING = (): Record<string, unknown> => ({});
 
 /** The statuses an order may be sent at, and why the others may not. */
 export function invoicePushRefusals(inputs: InvoicePushInputs): string[] {
@@ -607,11 +611,6 @@ export function invoicePushRefusals(inputs: InvoicePushInputs): string[] {
     out.push("No QuickBooks item is set. Choose one in Settings → Integrations.");
   }
   out.push(...feeItemRefusals(inputs.delivery ?? 0, inputs.rush ?? 0, inputs));
-  // Only when there is tax to charge: an untaxed order needs no code, and
-  // demanding one would block every order for a customer who pays none.
-  if (!inputs.taxCodeRef && Number(inputs.tax) > 0) {
-    out.push("No QuickBooks tax code is set. Choose one in Settings → Integrations.");
-  }
   if (!Number.isFinite(total)) out.push("This order has no total.");
   else if (total < 0) {
     // A negative total is a credit, which QuickBooks models as a CreditMemo —
@@ -658,13 +657,8 @@ export function buildInvoicePayload(
   };
   if (inputs.departmentRef) body.DepartmentRef = { value: inputs.departmentRef };
 
-  // NAMES A CODE, because an empty detail computed nothing — measured — and no
-  // customer in the company carried a `DefaultTaxCodeRef` to fall back on.
-  // Supplying a TotalTax instead is either dropped or overwritten, which is why
-  // this hands QuickBooks the code and lets it do the arithmetic.
-  if (round2(taxableNet) > 0 && inputs.taxCodeRef) {
-    body.TxnTaxDetail = { TxnTaxCodeRef: { value: inputs.taxCodeRef } };
-  }
+  // TAXED, AND THE CODE IS `qbo-sync`'s TO NAME — see `TAX_CODE_PENDING`.
+  if (round2(taxableNet) > 0) body.TxnTaxDetail = TAX_CODE_PENDING();
 
   const docNumber = docNumberFor(order.number);
   if (docNumber) body.DocNumber = docNumber;
@@ -916,7 +910,6 @@ export type CustomerInvoicePushInputs = {
   /** 165: the items delivery and rush book to, whatever the order's item. */
   deliveryItemRef: string | null;
   rushItemRef: string | null;
-  taxCodeRef: string | null;
   /** The QuickBooks Location of the invoice's kitchen (`invoiceKitchen`). */
   departmentRef?: string | null;
   lines: CustomerInvoicePushLine[];
@@ -951,9 +944,6 @@ export function customerInvoiceRefusals(inputs: CustomerInvoicePushInputs): stri
       inputs
     )
   );
-  if (!inputs.taxCodeRef && live.some((l) => Number(l.totals?.tax ?? 0) > 0)) {
-    out.push("No QuickBooks tax code is set. Choose one in Settings → Integrations.");
-  }
   for (const l of live) {
     if (!l.totals) {
       out.push(`${l.description} could not be read.`);
@@ -1026,9 +1016,7 @@ export function buildCustomerInvoicePayload(
     AllowOnlineACHPayment: true,
   };
   if (inputs.departmentRef) body.DepartmentRef = { value: inputs.departmentRef };
-  if (taxed && inputs.taxCodeRef) {
-    body.TxnTaxDetail = { TxnTaxCodeRef: { value: inputs.taxCodeRef } };
-  }
+  if (taxed) body.TxnTaxDetail = TAX_CODE_PENDING();
   const docNumber = docNumberFor(invoice.number_text);
   if (docNumber) body.DocNumber = docNumber;
   if (invoice.due_on) body.DueDate = invoice.due_on;

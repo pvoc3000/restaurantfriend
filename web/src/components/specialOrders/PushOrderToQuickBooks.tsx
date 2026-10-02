@@ -91,7 +91,6 @@ export function PushOrderToQuickBooks({
     itemRef: string | null;
     deliveryItemRef: string | null;
     rushItemRef: string | null;
-    taxCodeRef: string | null;
     classRef: string | null;
     departmentRef: string | null;
     customerRef: string | null;
@@ -121,7 +120,6 @@ export function PushOrderToQuickBooks({
               invoice_item_ref?: string | null;
               delivery_item_ref?: string | null;
               rush_item_ref?: string | null;
-              tax_code_ref?: string | null;
             }
           | undefined)
       : undefined;
@@ -132,7 +130,6 @@ export function PushOrderToQuickBooks({
       itemRef: row?.invoice_item_ref ?? null,
       deliveryItemRef: row?.delivery_item_ref ?? null,
       rushItemRef: row?.rush_item_ref ?? null,
-      taxCodeRef: row?.tax_code_ref ?? null,
       classRef: kitchen?.qbo_class_ref ?? null,
       departmentRef: kitchen?.qbo_location_ref ?? null,
       customerRef: qboVendorId((customer?.data?.external_ref ?? null) as AccountingRef | null),
@@ -177,7 +174,6 @@ export function PushOrderToQuickBooks({
     rushItemRef: ctx.rushItemRef,
     classRef: ctx.classRef,
     departmentRef: ctx.departmentRef,
-    taxCodeRef: ctx.taxCodeRef,
     total: totals.total,
     tax: totals.tax,
     delivery: totals.deliveryCharge,
