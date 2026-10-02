@@ -5462,3 +5462,6 @@ removed once the user has viewed the tab."
   open leads with notes keep the mark.
 - Without 169 the read query fails quietly: every inquiry order with a note
   shows the mark and opening the tab cannot clear it. Nothing else breaks.
+- **APPLIED 2026-10-02** at Mark's word (`db query --linked`, in a
+  transaction): RLS on, 2 policies, anon cannot read, 9 orders marked read by
+  the backfill, 3 open leads flagged.
