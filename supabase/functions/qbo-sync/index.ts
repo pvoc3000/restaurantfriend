@@ -247,6 +247,35 @@ const STALE_RETRY_NOTE =
   "This had been changed in QuickBooks since it was last sent from here, so it " +
   "was re-read first. Your update was applied on top of that change.";
 
+/**
+ * What QuickBooks KEPT of an invoice's kitchen coding (165), not what we sent:
+ * it accepts a DepartmentRef or a ClassRef and silently drops it when the
+ * matching preference is off — `push_bill`'s measurement, applied to sales.
+ */
+function invoiceCodingWarnings(
+  payload: Record<string, unknown>,
+  doc: Record<string, unknown> | undefined
+): string[] {
+  const out: string[] = [];
+  if (payload.DepartmentRef && !doc?.DepartmentRef) {
+    out.push(
+      "QuickBooks did not keep the location. Turn on Track locations in " +
+        "Account and settings → Advanced → Categories, then send again."
+    );
+  }
+  const classed = (lines: unknown) =>
+    ((lines as { SalesItemLineDetail?: { ClassRef?: unknown } }[] | undefined) ?? []).some(
+      (l) => Boolean(l.SalesItemLineDetail?.ClassRef)
+    );
+  if (classed(payload.Line) && !classed(doc?.Line)) {
+    out.push(
+      "QuickBooks did not keep the class. Turn on Track classes in " +
+        "Account and settings → Advanced → Categories, then send again."
+    );
+  }
+  return out;
+}
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -575,6 +604,10 @@ Deno.serve(async (req) => {
         invoice_item_name?: string | null;
         wholesale_item_ref?: string | null;
         wholesale_item_name?: string | null;
+        delivery_item_ref?: string | null;
+        delivery_item_name?: string | null;
+        rush_item_ref?: string | null;
+        rush_item_name?: string | null;
         tax_code_ref?: string | null;
         tax_code_name?: string | null;
       };
@@ -585,6 +618,10 @@ Deno.serve(async (req) => {
         "invoice_item_name",
         "wholesale_item_ref",
         "wholesale_item_name",
+        "delivery_item_ref",
+        "delivery_item_name",
+        "rush_item_ref",
+        "rush_item_name",
         "tax_code_ref",
         "tax_code_name",
       ] as const) {
@@ -2075,6 +2112,7 @@ Deno.serve(async (req) => {
       );
       const warnings: string[] = [];
       if (retried) warnings.push(STALE_RETRY_NOTE);
+      warnings.push(...invoiceCodingWarnings(req.payload, doc));
 
       // WHAT WAS ALREADY ATTACHED SURVIVES THIS WRITE. 081's merge is
       // `external_ref || p_ref` at the TOP level, so the whole `qbo` branch is
@@ -2497,6 +2535,7 @@ Deno.serve(async (req) => {
       }
       const warnings: string[] = [];
       if (retried) warnings.push(STALE_RETRY_NOTE);
+      warnings.push(...invoiceCodingWarnings(req.payload, doc));
 
       const ref = {
         qbo: {

@@ -499,3 +499,32 @@ cleared it; `router.refresh()` keeps client state, so only a full reload would
 have. The proposal is now KEYED on what `proposeBillLink` reads — vendor, shop,
 invoice number, total, credit flag — and any change drops it, so the next Send
 asks QuickBooks again under the current number.
+
+**DELIVERY AND RUSH ON THEIR OWN ITEMS; THE KITCHEN'S CLASS AND LOCATION ON
+SALES INVOICES** (2026-10-01, Mark, migration 165). Delivery fees were not
+reaching the QBO item "Delivery Fee", and no customer invoice carried a class
+or a location — they rode inside each order's untaxed line under Special Order
+(or Wholesale), uncoded. Now:
+- **Settings → Accounting has a Delivery item and a Rush item**, under the
+  Wholesale item (`accounting_connections.delivery_item_*`, `rush_item_*`,
+  reported by `accounting_connection_status()`, written by `set_defaults`,
+  cleared by `qbo-oauth` on a realm change). Rush got its own item at the same
+  time ("Misc service fee" or similar). A misc-fee item was NOT added: the app
+  has no charge type it would carry — other charges are Item or Delivery only.
+- **Each order is up to four lines**: taxed goods (TAX), untaxed goods (NON),
+  delivery (NON, Delivery item, "— delivery") and rush (NON, Rush item,
+  "— rush"). Wholesale orders too — only the goods follow Sold as. A free
+  "Delivery" other charge takes the Delivery item. `untaxedParts` cuts the
+  untaxed money; delivery and rush are exact, the goods take the remainder.
+  Both pushes (`buildCustomerInvoicePayload` and the one-order
+  `buildInvoicePayload`) build through one `saleLines`, so they cannot drift.
+- **Refused only when the money is there**: an invoice with delivery and no
+  Delivery item is refused, one without delivery needs none.
+- **Class on every line** is the order's KITCHEN's `locations.qbo_class_ref`
+  (a free line takes the invoice shop's). **Location is header-only** in
+  QuickBooks, so an invoice gets one: `invoiceKitchen` — the kitchen its orders
+  share, else (several kitchens, or only free lines) `customer_invoices.location_id`.
+  A shop with nothing mapped sends no ref. `qbo-sync` now checks what the
+  invoice KEPT, as `push_bill` does, and warns when QuickBooks dropped either.
+- 9 fixture cases in `quickbooks.fixtures`; the existing wholesale-week and
+  taxed-order cases changed shape (delivery is no longer folded into NON).

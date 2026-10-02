@@ -32,6 +32,7 @@ import {
   attachableMetadata,
   buildCustomerInvoicePayload,
   customerInvoiceRefusals,
+  invoiceKitchen,
   qboVendorId,
   recordedAttachments,
   taxDisagreement,
@@ -546,7 +547,7 @@ export async function quickBooksInputs(
   view: InvoiceView,
   number: string
 ): Promise<Omit<CustomerInvoicePushInputs, "billEmail">> {
-  const [conn, customer, org] = await Promise.all([
+  const [conn, customer, org, shops] = await Promise.all([
     supabase.rpc("accounting_connection_status", { p_org: orgId }),
     view.invoice.customer_id
       ? supabase
@@ -556,13 +557,29 @@ export async function quickBooksInputs(
           .maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("orgs").select("name").eq("id", orgId).maybeSingle(),
+    // Each shop's QuickBooks Class and Location (104), for the kitchen coding.
+    supabase.from("locations").select("id, qbo_class_ref, qbo_location_ref"),
   ]);
+  const coding = new Map(
+    ((shops.data ?? []) as { id: string; qbo_class_ref: string | null; qbo_location_ref: string | null }[]).map(
+      (l) => [l.id, l]
+    )
+  );
+  const shopOf = view.invoice.location_id;
+  const kitchenOf = (orderId: string) => view.orders.get(orderId)?.kitchen_location_id ?? shopOf;
+  const classOf = (shop: string | null) => (shop ? coding.get(shop)?.qbo_class_ref ?? null : null);
+  const kitchen = invoiceKitchen(
+    view.groups.flatMap((g) => (g.orderId ? [view.orders.get(g.orderId)?.kitchen_location_id ?? null] : [])),
+    shopOf
+  );
   const row = Array.isArray(conn.data)
     ? (conn.data[0] as
         | {
             status?: string;
             invoice_item_ref?: string | null;
             wholesale_item_ref?: string | null;
+            delivery_item_ref?: string | null;
+            rush_item_ref?: string | null;
             tax_code_ref?: string | null;
           }
         | undefined)
@@ -584,7 +601,12 @@ export async function quickBooksInputs(
     customerRef: qboVendorId((customer?.data?.external_ref ?? null) as AccountingRef | null),
     itemRef: row?.invoice_item_ref ?? null,
     wholesaleItemRef: row?.wholesale_item_ref ?? null,
+    deliveryItemRef: row?.delivery_item_ref ?? null,
+    rushItemRef: row?.rush_item_ref ?? null,
     taxCodeRef: row?.tax_code_ref ?? null,
+    // The KITCHEN's coding (165): each order's Class on its lines, free lines
+    // the invoice shop's, and one Location for the header.
+    departmentRef: kitchen ? coding.get(kitchen)?.qbo_location_ref ?? null : null,
     // One push line per ORDER (Mark, 2026-09-24) and per free line, each with
     // the money its own lines say (141). A deposit or "Less invoice" group's
     // figure differs from its charges, which `customerInvoiceRefusals`
@@ -597,6 +619,7 @@ export async function quickBooksInputs(
           amount: l.amount,
           square_item: "special_order" as const,
           cancelled: false,
+          classRef: classOf(shopOf),
           totals: groupTotals([l]),
         }));
       }
@@ -606,6 +629,7 @@ export async function quickBooksInputs(
           amount: g.net,
           square_item: g.lines[0]?.square_item ?? "special_order",
           cancelled: order?.status === "cancelled",
+          classRef: classOf(kitchenOf(g.orderId)),
           totals: g.kind === "order_total" ? order?.totals ?? null : groupTotals(g.lines),
         },
       ];

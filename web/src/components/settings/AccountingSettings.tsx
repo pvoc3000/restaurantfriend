@@ -42,6 +42,11 @@ export type AccountingStatus = {
   /** 131: the item a wholesale line (Sold as) is sent under. */
   wholesale_item_ref?: string | null;
   wholesale_item_name?: string | null;
+  /** 165: the items delivery charges and rush fees are sent under. */
+  delivery_item_ref?: string | null;
+  delivery_item_name?: string | null;
+  rush_item_ref?: string | null;
+  rush_item_name?: string | null;
   tax_code_ref: string | null;
   tax_code_name: string | null;
   refresh_token_expires_at: string | null;
@@ -211,7 +216,7 @@ export function AccountingSettings({
   }
 
   async function setDefault(
-    kind: "bill" | "item" | "wholesale" | "tax",
+    kind: "bill" | "item" | "wholesale" | "delivery" | "rush" | "tax",
     choice: Choice | null
   ) {
     setBusy("defaults");
@@ -232,7 +237,17 @@ export function AccountingSettings({
                 wholesale_item_ref: choice?.id ?? null,
                 wholesale_item_name: choice?.name ?? null,
               }
-            : { tax_code_ref: choice?.id ?? null, tax_code_name: choice?.name ?? null };
+            : kind === "delivery"
+              ? {
+                  delivery_item_ref: choice?.id ?? null,
+                  delivery_item_name: choice?.name ?? null,
+                }
+              : kind === "rush"
+                ? {
+                    rush_item_ref: choice?.id ?? null,
+                    rush_item_name: choice?.name ?? null,
+                  }
+                : { tax_code_ref: choice?.id ?? null, tax_code_name: choice?.name ?? null };
     const res = await call({ mode: "set_defaults", ...patch });
     setBusy(null);
     if (res) await loadStatus();
@@ -388,6 +403,38 @@ export function AccountingSettings({
               placeholder={items && items.length === 0 ? "No items in QuickBooks" : "Choose an item"}
               options={(items ?? []).map((i) => ({ value: i.id, label: i.name, hint: i.type }))}
               onPick={(next) => void setDefault("wholesale", items?.find((i) => i.id === next) ?? null)}
+              panelMinWidth={320}
+            />
+          </div>
+          <div className="flex items-baseline justify-between gap-6">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+              Delivery item
+            </span>
+            <PickList
+              variant="field"
+              boxed
+              ariaLabel="Item delivery charges are sent under"
+              disabled={!editable || busy !== null}
+              value={status?.delivery_item_ref ?? null}
+              placeholder={items && items.length === 0 ? "No items in QuickBooks" : "Choose an item"}
+              options={(items ?? []).map((i) => ({ value: i.id, label: i.name, hint: i.type }))}
+              onPick={(next) => void setDefault("delivery", items?.find((i) => i.id === next) ?? null)}
+              panelMinWidth={320}
+            />
+          </div>
+          <div className="flex items-baseline justify-between gap-6">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+              Rush item
+            </span>
+            <PickList
+              variant="field"
+              boxed
+              ariaLabel="Item rush fees are sent under"
+              disabled={!editable || busy !== null}
+              value={status?.rush_item_ref ?? null}
+              placeholder={items && items.length === 0 ? "No items in QuickBooks" : "Choose an item"}
+              options={(items ?? []).map((i) => ({ value: i.id, label: i.name, hint: i.type }))}
+              onPick={(next) => void setDefault("rush", items?.find((i) => i.id === next) ?? null)}
               panelMinWidth={320}
             />
           </div>

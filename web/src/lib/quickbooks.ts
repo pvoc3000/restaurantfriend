@@ -559,6 +559,16 @@ export type InvoicePushInputs = {
   taxableNet: number;
   /** Everything else net of tax: non-taxable items, delivery and rush. */
   nonTaxableNet: number;
+  /** The order's delivery and rush, sent on their own lines (165) — out of
+   *  `nonTaxableNet`, never on top of it. */
+  delivery?: number;
+  rush?: number;
+  /** `accounting_connections.delivery_item_ref` / `rush_item_ref` (165). */
+  deliveryItemRef?: string | null;
+  rushItemRef?: string | null;
+  /** The kitchen's QuickBooks Class (each line) and Location (the header). */
+  classRef?: string | null;
+  departmentRef?: string | null;
 };
 
 /** The statuses an order may be sent at, and why the others may not. */
@@ -596,6 +606,7 @@ export function invoicePushRefusals(inputs: InvoicePushInputs): string[] {
   if (!itemRef) {
     out.push("No QuickBooks item is set. Choose one in Settings → Accounting.");
   }
+  out.push(...feeItemRefusals(inputs.delivery ?? 0, inputs.rush ?? 0, inputs));
   // Only when there is tax to charge: an untaxed order needs no code, and
   // demanding one would block every order for a customer who pays none.
   if (!inputs.taxCodeRef && Number(inputs.tax) > 0) {
@@ -626,28 +637,26 @@ export function buildInvoicePayload(
   //
   // A US line's TaxCodeRef may only be TAX or NON — a real code id is refused
   // ("Valid line TaxCodes for US should be TAX or NON"), measured.
-  const lines: Record<string, unknown>[] = [];
-  const push = (amount: number, taxable: boolean, label: string) => {
-    if (round2(amount) <= 0) return;
-    lines.push({
-      Amount: round2(amount),
-      DetailType: "SalesItemLineDetail",
-      Description: label,
-      SalesItemLineDetail: {
-        ItemRef: { value: itemRef },
-        TaxCodeRef: { value: taxable ? "TAX" : "NON" },
-      },
-    });
-  };
   const name = order.number ? `Special order ${order.number}` : "Special order";
-  push(taxableNet, true, name);
-  push(nonTaxableNet, false, `${name} — not taxed`);
+  const lines = saleLines({
+    description: name,
+    taxableNet,
+    nonTaxableNet,
+    delivery: inputs.delivery ?? 0,
+    rush: inputs.rush ?? 0,
+    itemRef: itemRef!,
+    deliveryItemRef: inputs.deliveryItemRef ?? null,
+    rushItemRef: inputs.rushItemRef ?? null,
+    classRef: inputs.classRef ?? null,
+    alwaysSuffix: true,
+  });
 
   const body: Record<string, unknown> = {
     CustomerRef: { value: customerRef },
     Line: lines,
     PrivateNote: memoTag(inputs.orgName, order.id),
   };
+  if (inputs.departmentRef) body.DepartmentRef = { value: inputs.departmentRef };
 
   // NAMES A CODE, because an empty detail computed nothing — measured — and no
   // customer in the company carried a `DefaultTaxCodeRef` to fall back on.
@@ -670,6 +679,111 @@ export function buildInvoicePayload(
   }
 
   return { entity: "Invoice", path: "invoice", body };
+}
+
+/**
+ * DELIVERY AND RUSH ARE THEIR OWN ITEMS (165, Mark, 2026-10-01): a delivery
+ * charge books to the Delivery Fee item and a rush fee to its own, rather than
+ * riding inside the order's untaxed line under Special Order. Refused only when
+ * there is such money to send — an order with no delivery needs no item for it.
+ */
+function feeItemRefusals(
+  delivery: number,
+  rush: number,
+  refs: { deliveryItemRef?: string | null; rushItemRef?: string | null }
+): string[] {
+  const out: string[] = [];
+  if (round2(delivery) > 0 && !refs.deliveryItemRef) {
+    out.push("No QuickBooks item is set for delivery. Choose one in Settings → Accounting.");
+  }
+  if (round2(rush) > 0 && !refs.rushItemRef) {
+    out.push("No QuickBooks item is set for rush fees. Choose one in Settings → Accounting.");
+  }
+  return out;
+}
+
+/**
+ * The untaxed money cut into what it is: goods, delivery, rush. Delivery and
+ * rush are exact (they are lines of their own, never discounted), so the goods
+ * take the remainder and the three always sum to `nonTaxableNet`. A cent of
+ * rounding below zero is folded back into the fee it came out of.
+ */
+export function untaxedParts(
+  nonTaxableNet: number,
+  delivery: number,
+  rush: number
+): { goods: number; delivery: number; rush: number } {
+  let d = round2(Math.max(0, delivery));
+  let r = round2(Math.max(0, rush));
+  const goods = round2(nonTaxableNet - d - r);
+  if (goods < 0) {
+    if (d > 0) d = round2(d + goods);
+    else r = round2(r + goods);
+    return { goods: 0, delivery: d, rush: r };
+  }
+  return { goods, delivery: d, rush: r };
+}
+
+/**
+ * One order's QuickBooks lines: the taxed goods, the untaxed goods, the
+ * delivery and the rush — each only when it has money, each carrying the
+ * kitchen's Class. Both invoice pushes build through this, so the two cannot
+ * drift on how a charge is booked.
+ */
+function saleLines(o: {
+  description: string;
+  taxableNet: number;
+  nonTaxableNet: number;
+  delivery: number;
+  rush: number;
+  itemRef: string;
+  deliveryItemRef: string | null;
+  rushItemRef: string | null;
+  classRef: string | null;
+  /** The legacy push always said "— not taxed"; the customer invoice says it
+   *  only when the order also has a taxed line. */
+  alwaysSuffix?: boolean;
+}): Record<string, unknown>[] {
+  const parts = untaxedParts(o.nonTaxableNet, o.delivery, o.rush);
+  const lines: Record<string, unknown>[] = [];
+  const push = (amount: number, taxable: boolean, label: string, itemRef: string | null) => {
+    if (round2(amount) <= 0) return;
+    lines.push({
+      Amount: round2(amount),
+      DetailType: "SalesItemLineDetail",
+      Description: label,
+      SalesItemLineDetail: {
+        ItemRef: { value: itemRef },
+        TaxCodeRef: { value: taxable ? "TAX" : "NON" },
+        ...(o.classRef ? { ClassRef: { value: o.classRef } } : {}),
+      },
+    });
+  };
+  const both = round2(o.taxableNet) > 0 && parts.goods > 0;
+  push(o.taxableNet, true, o.description, o.itemRef);
+  push(
+    parts.goods,
+    false,
+    o.alwaysSuffix || both ? `${o.description} — not taxed` : o.description,
+    o.itemRef
+  );
+  push(parts.delivery, false, `${o.description} — delivery`, o.deliveryItemRef);
+  push(parts.rush, false, `${o.description} — rush`, o.rushItemRef);
+  return lines;
+}
+
+/**
+ * The one QuickBooks Location an invoice is booked to. Location sits on the
+ * HEADER only (Class goes on each line), so an invoice gets one: the kitchen
+ * its orders share, else — orders from more than one kitchen, or none — the
+ * invoice's own shop.
+ */
+export function invoiceKitchen(
+  orderKitchens: (string | null)[],
+  invoiceShop: string | null
+): string | null {
+  const distinct = [...new Set(orderKitchens.filter((k): k is string => !!k))];
+  return distinct.length === 1 ? distinct[0] : invoiceShop;
 }
 
 /**
@@ -762,6 +876,9 @@ export type CustomerInvoicePushLine = {
   amount: number;
   square_item: "special_order" | "wholesale";
   cancelled: boolean;
+  /** The QuickBooks Class of the kitchen that makes the order (165); a free
+   *  line takes the invoice shop's. */
+  classRef?: string | null;
   /** The order's money today — null when the order could not be read. */
   totals: {
     subtotal: number;
@@ -796,7 +913,12 @@ export type CustomerInvoicePushInputs = {
   billEmail: string | null;
   itemRef: string | null;
   wholesaleItemRef: string | null;
+  /** 165: the items delivery and rush book to, whatever the order's item. */
+  deliveryItemRef: string | null;
+  rushItemRef: string | null;
   taxCodeRef: string | null;
+  /** The QuickBooks Location of the invoice's kitchen (`invoiceKitchen`). */
+  departmentRef?: string | null;
   lines: CustomerInvoicePushLine[];
 };
 
@@ -822,6 +944,13 @@ export function customerInvoiceRefusals(inputs: CustomerInvoicePushInputs): stri
   if (live.some((l) => l.square_item === "wholesale") && !inputs.wholesaleItemRef) {
     out.push("No QuickBooks item is set for wholesale. Choose one in Settings → Accounting.");
   }
+  out.push(
+    ...feeItemRefusals(
+      live.reduce((a, l) => a + Number(l.totals?.deliveryCharge ?? 0), 0),
+      live.reduce((a, l) => a + Number(l.totals?.rushFee ?? 0), 0),
+      inputs
+    )
+  );
   if (!inputs.taxCodeRef && live.some((l) => Number(l.totals?.tax ?? 0) > 0)) {
     out.push("No QuickBooks tax code is set. Choose one in Settings → Accounting.");
   }
@@ -853,7 +982,9 @@ export function customerInvoiceRefusals(inputs: CustomerInvoicePushInputs): stri
  * both taxed and untaxed money — `buildInvoicePayload`'s reason: QuickBooks
  * computes the tax from the lines, and delivery and rush are not taxed. A
  * wholesale week (no tax) is exactly one NON line per day. The item follows
- * Sold as.
+ * Sold as — except delivery and rush, which since 165 are lines of their own
+ * on their own items, wholesale or not. Each line carries its kitchen's Class,
+ * the header the invoice kitchen's Location.
  */
 export function buildCustomerInvoicePayload(
   inputs: CustomerInvoicePushInputs
@@ -869,22 +1000,20 @@ export function buildCustomerInvoicePayload(
     if (billsNothing(l)) continue;
     const itemRef = l.square_item === "wholesale" ? inputs.wholesaleItemRef : inputs.itemRef;
     const { taxableNet, nonTaxableNet } = invoiceSplit(l.totals!);
-    const both = round2(taxableNet) > 0 && round2(nonTaxableNet) > 0;
-    const push = (amount: number, taxable: boolean, label: string) => {
-      if (round2(amount) <= 0) return;
-      if (taxable) taxed = true;
-      lines.push({
-        Amount: round2(amount),
-        DetailType: "SalesItemLineDetail",
-        Description: label,
-        SalesItemLineDetail: {
-          ItemRef: { value: itemRef },
-          TaxCodeRef: { value: taxable ? "TAX" : "NON" },
-        },
-      });
-    };
-    push(taxableNet, true, l.description);
-    push(nonTaxableNet, false, both ? `${l.description} — not taxed` : l.description);
+    if (round2(taxableNet) > 0) taxed = true;
+    lines.push(
+      ...saleLines({
+        description: l.description,
+        taxableNet,
+        nonTaxableNet,
+        delivery: l.totals!.deliveryCharge,
+        rush: l.totals!.rushFee,
+        itemRef: itemRef!,
+        deliveryItemRef: inputs.deliveryItemRef,
+        rushItemRef: inputs.rushItemRef,
+        classRef: l.classRef ?? null,
+      })
+    );
   }
 
   const body: Record<string, unknown> = {
@@ -896,6 +1025,7 @@ export function buildCustomerInvoicePayload(
     AllowOnlineCreditCardPayment: true,
     AllowOnlineACHPayment: true,
   };
+  if (inputs.departmentRef) body.DepartmentRef = { value: inputs.departmentRef };
   if (taxed && inputs.taxCodeRef) {
     body.TxnTaxDetail = { TxnTaxCodeRef: { value: inputs.taxCodeRef } };
   }

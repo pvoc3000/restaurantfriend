@@ -89,7 +89,11 @@ export function PushOrderToQuickBooks({
   const [ctx, setCtx] = useState<{
     connected: boolean;
     itemRef: string | null;
+    deliveryItemRef: string | null;
+    rushItemRef: string | null;
     taxCodeRef: string | null;
+    classRef: string | null;
+    departmentRef: string | null;
     customerRef: string | null;
     orderRef: AccountingRef | null;
     orgName: string;
@@ -100,23 +104,37 @@ export function PushOrderToQuickBooks({
   const [warnings, setWarnings] = useState<string[]>([]);
 
   const read = useCallback(async () => {
-    const [conn, customer, order, org] = await Promise.all([
+    const [conn, customer, order, org, shops] = await Promise.all([
       supabase.rpc("accounting_connection_status", { p_org: orgId }),
       customerId
         ? supabase.from("customers").select("external_ref").eq("id", customerId).maybeSingle()
         : Promise.resolve({ data: null }),
-      supabase.from("special_orders").select("external_ref").eq("id", orderId).maybeSingle(),
+      // The kitchen's QuickBooks Class and Location ride on the push (165).
+      supabase.from("special_orders").select("external_ref, kitchen_location_id").eq("id", orderId).maybeSingle(),
       supabase.from("orgs").select("name").eq("id", orgId).maybeSingle(),
+      supabase.from("locations").select("id, qbo_class_ref, qbo_location_ref"),
     ]);
     const row = Array.isArray(conn.data)
       ? (conn.data[0] as
-          | { status?: string; invoice_item_ref?: string | null; tax_code_ref?: string | null }
+          | {
+              status?: string;
+              invoice_item_ref?: string | null;
+              delivery_item_ref?: string | null;
+              rush_item_ref?: string | null;
+              tax_code_ref?: string | null;
+            }
           | undefined)
       : undefined;
+    const kitchen = ((shops.data ?? []) as { id: string; qbo_class_ref: string | null; qbo_location_ref: string | null }[])
+      .find((l) => l.id === order.data?.kitchen_location_id);
     return {
       connected: row?.status === "connected",
       itemRef: row?.invoice_item_ref ?? null,
+      deliveryItemRef: row?.delivery_item_ref ?? null,
+      rushItemRef: row?.rush_item_ref ?? null,
       taxCodeRef: row?.tax_code_ref ?? null,
+      classRef: kitchen?.qbo_class_ref ?? null,
+      departmentRef: kitchen?.qbo_location_ref ?? null,
       customerRef: qboVendorId((customer?.data?.external_ref ?? null) as AccountingRef | null),
       orderRef: (order.data?.external_ref ?? null) as AccountingRef | null,
       orgName: (org.data?.name as string | undefined) ?? "",
@@ -155,9 +173,15 @@ export function PushOrderToQuickBooks({
     customerName,
     orgName: ctx.orgName,
     itemRef: ctx.itemRef,
+    deliveryItemRef: ctx.deliveryItemRef,
+    rushItemRef: ctx.rushItemRef,
+    classRef: ctx.classRef,
+    departmentRef: ctx.departmentRef,
     taxCodeRef: ctx.taxCodeRef,
     total: totals.total,
     tax: totals.tax,
+    delivery: totals.deliveryCharge,
+    rush: totals.rushFee,
     ...split,
   };
   const refusals = invoicePushRefusals(inputs);

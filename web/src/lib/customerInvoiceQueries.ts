@@ -53,6 +53,8 @@ export type InvoiceOrder = {
   status: SpecialOrderStatus | null;
   tax_rate: number | null;
   square_item: "special_order" | "wholesale";
+  /** The shop that makes it — its QuickBooks Class and Location (165). */
+  kitchen_location_id: string | null;
   /** The order's money TODAY — what a deposit's breakdown is cut from. */
   totals: OrderTotals;
 };
@@ -147,7 +149,7 @@ export async function fetchInvoiceView(
       supabase
         .from("special_orders")
         .select(
-          `id, number, title, event_date, status, tax_rate, square_item, discount_amount, discount_rate,
+          `id, number, title, event_date, status, tax_rate, square_item, kitchen_location_id, discount_amount, discount_rate,
            delivery_charge, rush_fee, rush_rate, ignore_balance`
         )
         .in("id", orderIds),
@@ -179,6 +181,7 @@ export async function fetchInvoiceView(
         status: row.status,
         tax_rate: row.tax_rate,
         square_item: row.square_item,
+        kitchen_location_id: row.kitchen_location_id ?? null,
         totals: orderTotals(row as never, itemsOf.get(row.id) ?? [], paysOf.get(row.id) ?? [], rush),
       });
     }

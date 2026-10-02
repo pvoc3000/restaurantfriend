@@ -65,7 +65,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 4i. ✅ Which shops a member may work at (migration 073) — `docs/history/04i-location-access.md`
 4j. ✅ Password reset (migration 074 + `request-password-reset`) — `docs/history/04j-password-reset.md`
 4k. 🚧 Facility checks (checklists, tasks, maintenance, inspections, documents, equipment) — `docs/history/04k-facility-checks.md`
-4l. ✅ QuickBooks Online (bills, invoices, connection, credentials; 🚧 QuickBooks as a test processor on customer invoices, migration 131 + `qbo-webhook`) — `docs/history/04l-quickbooks.md`
+4l. ✅ QuickBooks Online (bills, invoices, connection, credentials; 🚧 QuickBooks as a test processor on customer invoices, migration 131 + `qbo-webhook`; 165 delivery and rush on their own items, kitchen Class/Location on sales invoices — WRITTEN, NOT APPLIED) — `docs/history/04l-quickbooks.md`
 4m. ✅ Page permissions (`lib/pageAccess.ts`, migration 092) — `docs/history/04m-page-permissions.md`
 4n. ✅ Tags (display signs priced at print time) — `docs/history/04n-tags.md`
 4o. ✅ Shared iPad PIN switching (migration 097) — `docs/history/04o-shared-ipad.md`

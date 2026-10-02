@@ -926,6 +926,8 @@ function civ(over: Partial<CustomerInvoicePushInputs> = {}): CustomerInvoicePush
     billEmail: "ap@knotted.example",
     itemRef: "SO",
     wholesaleItemRef: "WH",
+    deliveryItemRef: "DL",
+    rushItemRef: "RU",
     taxCodeRef: "2",
     lines: [1, 2, 3, 4, 5, 6, 7].map((n) => wholesaleDay(n)),
     ...over,
@@ -934,25 +936,31 @@ function civ(over: Partial<CustomerInvoicePushInputs> = {}): CustomerInvoicePush
 
 const lineOf = (l: Record<string, unknown>) => l.SalesItemLineDetail as Record<string, Record<string, unknown>>;
 
-test("a wholesale week is ONE NON line per day, on the wholesale item", () => {
+test("a wholesale week is a NON goods line per day on the wholesale item, delivery on its own", () => {
   const { body } = buildCustomerInvoicePayload(civ());
   const lines = body.Line as Record<string, unknown>[];
-  eq(lines.length, 7, "seven lines");
+  eq(lines.length, 14, "seven days, goods + delivery each");
   ok(lines.every((l) => lineOf(l).TaxCodeRef.value === "NON"), "all untaxed");
-  ok(lines.every((l) => lineOf(l).ItemRef.value === "WH"), "all wholesale item");
+  eq(lines.filter((l) => lineOf(l).ItemRef.value === "WH").length, 7, "goods on the wholesale item");
+  eq(lines.filter((l) => lineOf(l).ItemRef.value === "DL").length, 7, "delivery on the delivery item");
   eq(lines[0].Description, "Order #10071 · Knotted · 9/21/2026", "the line's own wording, no suffix");
+  eq(lines[0].Amount, 74.5, "goods");
+  eq(lines[1].Description, "Order #10071 · Knotted · 9/21/2026 — delivery", "delivery says so");
+  eq(lines[1].Amount, 10, "delivery");
   eq(body.TxnTaxDetail, undefined, "no tax detail when nothing is taxed");
 });
 
-test("a taxed special order splits TAX + NON, and the halves sum to total − tax", () => {
+test("a taxed special order splits TAX + delivery, and the parts sum to total − tax", () => {
   const { body } = buildCustomerInvoicePayload(civ({ lines: [taxedOrder] }));
   const lines = body.Line as Record<string, unknown>[];
   eq(lines.length, 2, "two parts");
   eq(lineOf(lines[0]).TaxCodeRef.value, "TAX", "taxable first");
   eq(lines[0].Amount, 120, "taxable part");
+  eq(lineOf(lines[0]).ItemRef.value, "SO", "special-order item");
   eq(lines[1].Amount, 27.4, "delivery untaxed");
-  eq(lines[1].Description, "Order #10080 · Birthday · 9/30/2026 — not taxed", "the NON half says so");
-  ok(lines.every((l) => lineOf(l).ItemRef.value === "SO"), "special-order item");
+  eq(lineOf(lines[1]).TaxCodeRef.value, "NON", "delivery is NON");
+  eq(lineOf(lines[1]).ItemRef.value, "DL", "delivery item");
+  eq(lines[1].Description, "Order #10080 · Birthday · 9/30/2026 — delivery", "the delivery line says so");
   eq(round(Number(lines[0].Amount) + Number(lines[1].Amount)), round(158.8 - 11.4), "sum");
   eq(body.TxnTaxDetail, { TxnTaxCodeRef: { value: "2" } }, "names the code");
 });
@@ -983,7 +991,7 @@ test("a pushed invoice updates: Id, SyncToken, sparse", () => {
 test("a cancelled order's zero line is left off, not refused", () => {
   const cancelled = { ...wholesaleDay(8, 0), cancelled: true };
   const { body } = buildCustomerInvoicePayload(civ({ lines: [wholesaleDay(1), cancelled] }));
-  eq((body.Line as unknown[]).length, 1, "one line");
+  eq((body.Line as unknown[]).length, 2, "the live day only — its goods and its delivery");
 });
 
 test("each refusal fires", () => {
@@ -1008,6 +1016,120 @@ test("each refusal fires", () => {
 function round(n: number) {
   return Math.round(n * 100) / 100;
 }
+
+// ---------------------------------------------------------------------------
+// 165 — delivery and rush on their own items; the kitchen's Class and Location
+// ---------------------------------------------------------------------------
+
+import { invoiceKitchen, untaxedParts } from "../../src/lib/quickbooks";
+
+// 100 taxed + 20 untaxed goods, 15 delivery, 25 rush, 9.5% → 9.50 tax.
+const mixedOrder: CustomerInvoicePushLine = {
+  description: "Order #10090 · Wedding · 10/4/2026",
+  amount: 169.5,
+  square_item: "special_order",
+  cancelled: false,
+  classRef: "CL-DF01",
+  totals: { subtotal: 120, taxableSubtotal: 100, discount: 0, deliveryCharge: 15, rushFee: 25, tax: 9.5, total: 169.5 },
+};
+
+test("an order with every kind of money is four lines, each on its own item", () => {
+  const { body } = buildCustomerInvoicePayload(civ({ lines: [mixedOrder] }));
+  const lines = body.Line as Record<string, unknown>[];
+  eq(
+    lines.map((l) => [l.Amount, lineOf(l).ItemRef.value, lineOf(l).TaxCodeRef.value]),
+    [
+      [100, "SO", "TAX"],
+      [20, "SO", "NON"],
+      [15, "DL", "NON"],
+      [25, "RU", "NON"],
+    ],
+    "taxed goods, untaxed goods, delivery, rush"
+  );
+  eq(lines[1].Description, "Order #10090 · Wedding · 10/4/2026 — not taxed", "untaxed goods say so");
+  eq(lines[3].Description, "Order #10090 · Wedding · 10/4/2026 — rush", "rush says so");
+  eq(round(lines.reduce((a, l) => a + Number(l.Amount), 0)), 160, "sum to total − tax");
+});
+
+test("a wholesale order's delivery and rush leave the wholesale item too", () => {
+  const day = { ...mixedOrder, square_item: "wholesale" as const };
+  const lines = buildCustomerInvoicePayload(civ({ lines: [day] })).body.Line as Record<string, unknown>[];
+  eq(lines.map((l) => lineOf(l).ItemRef.value), ["WH", "WH", "DL", "RU"], "items");
+});
+
+test("every line carries its kitchen's Class; the header the Location", () => {
+  const other = { ...wholesaleDay(1), classRef: "CL-DF02" };
+  const { body } = buildCustomerInvoicePayload(
+    civ({ lines: [mixedOrder, other], departmentRef: "DEP-1" })
+  );
+  const lines = body.Line as Record<string, unknown>[];
+  eq(lines.slice(0, 4).map((l) => lineOf(l).ClassRef?.value), ["CL-DF01", "CL-DF01", "CL-DF01", "CL-DF01"], "first order");
+  eq(lines.slice(4).map((l) => lineOf(l).ClassRef?.value), ["CL-DF02", "CL-DF02"], "second order");
+  eq(body.DepartmentRef, { value: "DEP-1" }, "location");
+});
+
+test("no coding mapped sends none — never an empty ref", () => {
+  const { body } = buildCustomerInvoicePayload(civ());
+  eq(body.DepartmentRef, undefined, "no location");
+  ok((body.Line as Record<string, unknown>[]).every((l) => !("ClassRef" in lineOf(l))), "no class key");
+});
+
+test("the delivery and rush items are refused only when there is such money", () => {
+  const has = (i: CustomerInvoicePushInputs, s: string) =>
+    customerInvoiceRefusals(i).some((r) => r.includes(s));
+  ok(has(civ({ deliveryItemRef: null }), "delivery"), "a week with delivery needs the item");
+  no(has(civ({ rushItemRef: null }), "rush"), "a week with no rush does not");
+  ok(has(civ({ lines: [mixedOrder], rushItemRef: null }), "rush"), "rush money needs the rush item");
+  const noDelivery = { ...wholesaleDay(1), totals: { ...wholesaleDay(1).totals!, subtotal: 84.5, deliveryCharge: 0 } };
+  no(has(civ({ lines: [noDelivery], deliveryItemRef: null }), "delivery"), "no delivery, no item needed");
+});
+
+test("untaxedParts: goods take the remainder, and the parts always sum", () => {
+  eq(untaxedParts(60, 15, 25), { goods: 20, delivery: 15, rush: 25 }, "plain");
+  eq(untaxedParts(40, 15, 25), { goods: 0, delivery: 15, rush: 25 }, "fees only");
+  eq(untaxedParts(39.99, 15, 25), { goods: 0, delivery: 14.99, rush: 25 }, "a cent short comes off delivery");
+  eq(untaxedParts(24.99, 0, 25), { goods: 0, delivery: 0, rush: 24.99 }, "or off rush when there is no delivery");
+});
+
+test("invoiceKitchen: the one kitchen the orders share, else the invoice shop", () => {
+  eq(invoiceKitchen(["k1", "k1"], "shop"), "k1", "shared");
+  eq(invoiceKitchen(["k1", "k2"], "shop"), "shop", "mixed");
+  eq(invoiceKitchen([], "shop"), "shop", "free lines only");
+  eq(invoiceKitchen([null, "k1"], "shop"), "k1", "an order with no kitchen does not split it");
+});
+
+test("the one-order push: delivery and rush on their own items, kitchen coding", () => {
+  const { body } = buildInvoicePayload(
+    ar({
+      taxableNet: 100,
+      nonTaxableNet: 60,
+      delivery: 15,
+      rush: 25,
+      deliveryItemRef: "DL",
+      rushItemRef: "RU",
+      classRef: "CL",
+      departmentRef: "DEP",
+      total: 169.5,
+      tax: 9.5,
+    })
+  );
+  const lines = body.Line as Record<string, unknown>[];
+  eq(
+    lines.map((l) => [l.Amount, lineOf(l).ItemRef.value, lineOf(l).ClassRef?.value]),
+    [
+      [100, "1", "CL"],
+      [20, "1", "CL"],
+      [15, "DL", "CL"],
+      [25, "RU", "CL"],
+    ],
+    "four lines"
+  );
+  eq(body.DepartmentRef, { value: "DEP" }, "location");
+  ok(
+    invoicePushRefusals(ar({ nonTaxableNet: 15, delivery: 15 })).some((r) => r.includes("delivery")),
+    "delivery money needs the delivery item"
+  );
+});
 
 
 // A customer of our own in QuickBooks (after the catch-all was retired)
