@@ -208,7 +208,14 @@ export function EmployeeEvents({
       defaultSort={{ key: "date", dir: "desc" }}
       columnChooser
       compactBelow={1100}
+      // The pane ends at the WINDOW, not at its last row (Mark, 2026-10-02: "it
+      // either needs to be removed … or extend to the bottom of the screen").
+      // Kept rather than removed: a long-serving person has ~1,000 shift
+      // ratings, and the scroll pane is what keeps the column labels and the
+      // tier picker in view over them. `fillViewport` is VendorDetail's answer
+      // to the same complaint about a short list stranded at the top.
       scroll
+      fillViewport
       group={{ sortKey: "date", label: (r) => r.occurred_on.slice(0, 4) }}
       expand={{
         canExpand: (r) => Boolean(r.detail || r.outcome || r.document),
