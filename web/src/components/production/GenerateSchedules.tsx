@@ -472,7 +472,13 @@ export function GenerateSchedules({
     const done: Pulled[] = [];
     const failed: Pulled[] = [];
     if (includeSpecial) {
-      for (const c of candidates ?? []) {
+      // `offered`, NEVER `candidates` (2026-10-03). The candidates are every
+      // order in the window at ANY kitchen and all the ready ones start ticked,
+      // while the dialog lists only this kitchen's. Looping over the candidates
+      // scheduled orders the dialog never showed: a DF02 run scheduled DF01's
+      // two orders, DF01's night then had schedules and no plan schedule, and
+      // its packet printed tray guides holding the special orders alone.
+      for (const c of offered) {
         if (!pullIds.has(c.order.id) || !c.order.event_date) continue;
         const entry = {
           number: c.order.number,

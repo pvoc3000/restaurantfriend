@@ -1777,3 +1777,27 @@ use the premade sheets that are calculated based on actual needs/demand." 036's
 59 of 184 rows; backup `FMP Export/pre160-element-weekday-pars-2026-09-30.json`)
 had no editor and no reader. Dropped. A production ITEM's weekday par
 (`production_item_locations`) is untouched.
+
+## 2026-10-03 — DF01's packet printed tray guides holding special orders only
+
+Mark: "on the baker, fryer, and decorator guides only the special orders are
+included. they are missing the plan's production schedule." The stored data was
+right (plan 37 lines / 951, two special-order schedules / 68) and
+`fetchPacketData` over the three returned 60 lines / 1,019, so the builder was
+never at fault. What happened, read off the timestamps:
+
+- 4:39pm, DF02: Generate for 10/03 created DF02's plan schedule AND scheduled
+  DF01's two orders (SO-10098, SO-10093). `GenerateSchedules.run()` looped over
+  `candidates` — every ready order in the window at ANY kitchen, all ticked by
+  default — while the dialog lists only the working kitchen's (`offered`). So
+  it wrote orders it never showed.
+- 10:44pm, DF01 closing report: the Tomorrow page saw two schedules, so Print
+  All Documents was the black button and Generate was not. The packet printed
+  with no plan schedule in it. The plan was generated at 10:52pm, after.
+
+Fixed: `run()` loops over `offered`; the Tomorrow page computes `planOwed` (no
+plan schedule, and a plan bakes at this kitchen that day), keeps Generate black
+and marks the gap in yellow until it exists. Printing is still allowed.
+NOT changed: ticking only special-order schedules on `/schedules` still prints
+guides for those alone (decision 11, one direction). Not verified in a browser
+— the Tomorrow page needs an open closing report, which is a write.

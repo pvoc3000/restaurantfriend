@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { GenerateSchedules } from "@/components/production/GenerateSchedules";
 import { PrintPacket } from "@/components/production/PrintPacket";
+import { sellingShopsForKitchen } from "@/lib/productionPlans";
 
 /**
  * One special order tomorrow — AN ID AND NOTHING ELSE.
@@ -119,6 +120,20 @@ export function TomorrowPage({
     });
   }
 
+  // IS THE PLAN'S SCHEDULE STILL OWED? (2026-10-03.) A special-order schedule
+  // can exist before the night is generated, and `schedules.length > 0` then
+  // made Print the black button over a night with no plan schedule — whose
+  // tray guides print the special orders alone and look complete. Owed only
+  // when a plan bakes here that day: a kitchen with no plan has nothing to
+  // generate, and its special orders are the whole night.
+  const planOwed =
+    nextProductionDate !== null &&
+    !schedules.some((s) => s.source === "plan") &&
+    sellingShopsForKitchen(plans, kitchenId, {
+      starts_on: nextProductionDate,
+      ends_on: nextProductionDate,
+    }).length > 0;
+
   if (!nextProductionDate) {
     return (
       <p className="text-center text-[16px]">
@@ -163,6 +178,14 @@ export function TomorrowPage({
             ))}
           </ul>
         )}
+        {planOwed && schedules.length > 0 ? (
+          <p className="text-[16px]">
+            <span className="bg-mark-fill px-1">
+              The plan&rsquo;s schedule for {kitchenCode} has not been generated
+            </span>{" "}
+            <span className="text-muted">— the tray guides would hold special orders only.</span>
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-center gap-3">
           {/* WHICHEVER ONE IS NEXT IS BLACK, and never both (Mark,
               2026-08-28). With no schedule for that night the only thing to do
@@ -179,7 +202,7 @@ export function TomorrowPage({
             kitchenId={kitchenId}
             kitchenCode={kitchenCode}
             plans={plans}
-            primary={schedules.length === 0}
+            primary={schedules.length === 0 || planOwed}
           />
           {schedules.length > 0 || orders.length > 0 ? (
             <PrintPacket
@@ -207,7 +230,7 @@ export function TomorrowPage({
               // next act is plainly still Generate, which is already filled. So
               // the fill is on having something generated, not on the button
               // merely being pressable.
-              primary={schedules.length > 0}
+              primary={schedules.length > 0 && !planOwed}
               // BOTH FLAGS, because one act now produces both papers. They stay
               // two columns — the submit page has to be able to say WHICH is
               // missing when somebody prints only one from a row above — but
