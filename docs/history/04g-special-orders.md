@@ -5558,3 +5558,18 @@ to `FMP Export/pre-merge-SO-10104-into-SO-10102-2026-10-02.json`.
 **The trap worth remembering for any future merge:** deleting an order runs
 `trg_special_order_takes_its_payments`, which DELETES every payment applied
 only to it. Re-point the applications before the delete, never after.
+
+## 2026-10-03 — Migration 172: standing orders stopped topping up after 170
+
+`/special-orders` showed "Standing orders were not topped up: column
+"delivery_window_start" of relation "special_orders" does not exist". 170
+dropped the two window columns; `ensure_standing_orders_materialized` still
+copied them, and PL/pgSQL checks a column only when the statement runs, so the
+drop succeeded and the function failed on its next insert. 172 is the live
+function (read with `pg_get_functiondef`) minus those two columns. APPLIED
+2026-10-03 by CLI at Mark's request; confirmed the live body no longer names
+them and the grants are unchanged (authenticated yes, anon no). Days existed
+through 10/16, so no standing day was missed. `trg_log_special_order` still
+lists the two labels and is left: its loop reads only columns the row has.
+**Before dropping a column, search `pg_proc.prosrc` for its name** — grepping
+the migrations finds the function's history, not what is live.
