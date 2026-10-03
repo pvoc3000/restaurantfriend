@@ -1801,3 +1801,27 @@ and marks the gap in yellow until it exists. Printing is still allowed.
 NOT changed: ticking only special-order schedules on `/schedules` still prints
 guides for those alone (decision 11, one direction). Not verified in a browser
 — the Tomorrow page needs an open closing report, which is a write.
+
+   **THE THREE TRAY GUIDES ARE LAID OUT ON FILEMAKER'S GEOMETRY (Mark,
+   2026-10-03: "follow the original design as closely as possible. Pay
+   particular attention to the size of the boxes, and the spacing of
+   elements… We still want our design aesthetic").** Measured off the real
+   2026-10-01 DF01 baker guide with `pdftotext -bbox`: 19pt side margins, the
+   ruler indented 25pt, 25 cells on a 22pt pitch and 22pt tall, tray number
+   top-left and count bottom-right, a 49pt step from one cut to the next, a
+   15pt type band over a 14pt size strip, the cut's name underlined with its
+   size in brackets, and "X TOTAL: n" under the ruler's left edge. Rendered
+   through `/forms`' sample and re-measured: pitch 21.9pt, step 48.6pt.
+   **The 19pt margin is these three pages only** (`GUIDE_X`; masthead, body and
+   footer all take it) — 25 cells of 22pt plus the indent is 575pt and the
+   other documents' 40pt margin leaves 532. Kept from the app: the masthead,
+   Helvetica in tracked caps, the ISO date, and GREY for a filled tray where
+   FileMaker's was green (colour is state). The count is black and bold where
+   the original's was grey. **Only the baker's original was supplied**: the
+   fryer's and decorator's rows use the same block, headed by the finish or the
+   donut with "(CUT - SIZE)" in the brackets, and a cut with several rows gets
+   its own total beneath them. **BATCH SIZE is still not printed** — see the
+   expected-discrepancy note above; the original's page also omits CAKE TOTAL,
+   which reads as a FileMaker sliding quirk, and it prints here. The type and
+   size bands are inside the first row's `wrap={false}` block, so a band is
+   never the last thing on a page.

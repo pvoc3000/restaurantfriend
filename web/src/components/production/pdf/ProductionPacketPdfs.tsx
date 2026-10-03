@@ -89,6 +89,10 @@ export const PACKET_PARTS: { key: PacketPart; label: string }[] = [
   { key: "decorator", label: "Decorator tray guide" },
 ];
 
+/** The tray guides' side margin and ruler indent, in points — FileMaker's. */
+const GUIDE_X = 19;
+const GUIDE_INDENT = 25;
+
 const styles = {
   ...docStyles,
   ...topGapDocStyles,
@@ -125,16 +129,11 @@ const styles = {
     sizeBandText: { ...caps(7, 0.12), fontFamily: "Helvetica-Bold" },
     sizeBandTotal: { fontSize: 8, fontFamily: "Helvetica-Bold", marginLeft: 10 },
 
-    subtypeHead: { flexDirection: "row", alignItems: "baseline", marginTop: 7 },
-    subtypeName: { ...caps(7.5, 0.08), fontFamily: "Helvetica-Bold" },
-    subtypeSize: { ...caps(6, 0.12), color: SUBTLE, marginLeft: 5 },
-
     row: { flexDirection: "row", alignItems: "center", marginTop: 3 },
     rowLabel: { width: 118, paddingRight: 4 },
     rowName: { fontSize: 8 },
     rowSub: { fontSize: 6.5, color: SUBTLE },
     rowPar: { width: 28, fontSize: 8.5, fontFamily: "Helvetica-Bold", textAlign: "right", paddingRight: 6 },
-    rowCount: { width: 28, fontSize: 8.5, fontFamily: "Helvetica-Bold", textAlign: "right", paddingRight: 6 },
 
     strip: { flexDirection: "row", borderWidth: 1, borderColor: INK, flexGrow: 1 },
     box: {
@@ -158,18 +157,72 @@ const styles = {
     batchWriteInLabel: { width: 60, paddingLeft: 3 },
     preparedByLabel: { width: 160, marginLeft: 8, paddingLeft: 3 },
 
+    /* ---- the three tray guides ----
+       LAID OUT ON FILEMAKER'S OWN GEOMETRY (Mark, 2026-10-03: "follow the
+       original design as closely as possible. Pay particular attention to the
+       size of the boxes, and the spacing of elements"), measured off the real
+       2026-10-01 DF01 baker guide with `pdftotext -bbox`: 19pt side margins,
+       the ruler indented 25pt, 25 cells on a 22pt pitch and 22pt tall, the
+       tray number top-left and the count bottom-right, a 49pt step from one
+       cut to the next. The type, the tracked caps, the masthead and the grey
+       fill are the app's; the measurements are the original's. The side
+       margin is narrower than every other document's 40pt BECAUSE of the box:
+       25 cells of 22pt plus the indent is 575pt, and a 40pt margin leaves 532. */
+    guideMasthead: { ...topGapDocStyles.masthead, paddingHorizontal: GUIDE_X },
+    guideBody: { paddingHorizontal: GUIDE_X },
+    guideFooter: { ...docStyles.footer, left: GUIDE_X, right: GUIDE_X },
+    guideTitle: { ...caps(18, -0.02), fontFamily: "Helvetica-Bold", marginTop: 2, lineHeight: 1.1 },
+    guideBlurb: { fontSize: 8, color: MUTED, marginTop: 2 },
+    guideDate: { fontSize: 13, fontFamily: "Helvetica-Bold", marginTop: 2 },
+    guideTotal: { fontSize: 8, color: MUTED, marginTop: 4 },
+    guideTypeBand: {
+      backgroundColor: INK,
+      height: 15,
+      justifyContent: "center",
+      paddingLeft: 4,
+      marginTop: 12,
+    },
+    guideTypeText: { ...caps(10, 0.08), fontFamily: "Helvetica-Bold", color: "#fff" },
+    guideSizeBand: {
+      backgroundColor: STRIP_FILL,
+      height: 14,
+      justifyContent: "center",
+      paddingLeft: 4,
+      marginBottom: 2,
+    },
+    guideSizeText: { ...caps(8, 0.1), fontFamily: "Helvetica-Bold" },
+    guideHead: { flexDirection: "row", alignItems: "baseline", height: 13, paddingTop: 3 },
+    guideName: { ...caps(8.5, 0.06), fontFamily: "Helvetica-Bold", textDecoration: "underline" },
+    guideOf: { ...caps(6, 0.12), color: SUBTLE, marginLeft: 5 },
     // The tray ruler: a cell per tray NUMBER, the count written inside the ones
     // the run fills. NOT the counting strip — answered question 3 says so.
+    guideRuler: {
+      flexDirection: "row",
+      marginLeft: GUIDE_INDENT,
+      marginTop: 2,
+      height: 22,
+      borderWidth: 1,
+      borderColor: INK,
+    },
     trayCell: {
       flexGrow: 1,
       flexBasis: 0,
-      borderRightWidth: 0.5,
-      borderRightColor: HAIRLINE,
-      minHeight: 18,
+      borderLeftWidth: 0.75,
+      borderLeftColor: INK,
+      justifyContent: "space-between",
+      paddingHorizontal: 1.5,
+      paddingTop: 1,
+      paddingBottom: 1,
     },
-    trayIndex: { fontSize: 5, color: SUBTLE, paddingLeft: 1 },
-    trayCount: { fontSize: 7.5, fontFamily: "Helvetica-Bold", textAlign: "center" },
+    trayIndex: { fontSize: 6, color: SUBTLE },
+    trayCount: { fontSize: 7.5, fontFamily: "Helvetica-Bold", textAlign: "right" },
     trayOn: { backgroundColor: STRIP_FILL },
+    guideSubtotal: { marginLeft: GUIDE_INDENT, marginTop: 2.5, height: 9.5 },
+    guideSubtotalText: { ...caps(6, 0.1) },
+    guideCutTotal: { marginLeft: GUIDE_INDENT, marginTop: 1, marginBottom: 5 },
+    guideCutTotalText: { ...caps(7, 0.1), fontFamily: "Helvetica-Bold" },
+    guideTypeTotal: { marginLeft: GUIDE_INDENT, marginTop: 8, marginBottom: -1 },
+    guideTypeTotalText: { ...caps(8.5, 0.06), fontFamily: "Helvetica-Bold" },
 
     subtotal: { flexDirection: "row", marginTop: 4, marginLeft: 118 },
     subtotalText: { ...caps(6, 0.12), color: SUBTLE },
@@ -204,9 +257,9 @@ const styles = {
 };
 
 /** The packet's masthead band, on every page: the org, and what this is. */
-function PacketMasthead({ packet }: { packet: PacketData }) {
+function PacketMasthead({ packet, guide }: { packet: PacketData; guide?: boolean }) {
   return (
-    <View style={styles.masthead} fixed>
+    <View style={guide ? styles.guideMasthead : styles.masthead} fixed>
       <Text style={styles.wordmark}>{packet.orgName}</Text>
       <View style={styles.mastheadRight}>
         <Text style={styles.mastheadLine}>Production packet</Text>
@@ -247,9 +300,9 @@ function SheetHeading({
 }
 
 /** The fixed footer: what this sheet is, and the page within the packet. */
-function PacketFooter({ children }: { children: string }) {
+function PacketFooter({ children, guide }: { children: string; guide?: boolean }) {
   return (
-    <View style={styles.footer} fixed>
+    <View style={guide ? styles.guideFooter : styles.footer} fixed>
       <Text style={styles.footerText}>{children}</Text>
       <Text
         style={styles.footerText}
@@ -510,72 +563,100 @@ function TrayGuidePage({
   const total = totalDonuts(kitchen.lines);
   return (
     <Page size="LETTER" style={styles.page} wrap>
-      <PacketMasthead packet={packet} />
-      <View style={styles.body}>
-      {/* The shops in the caption are the thing FileMaker could not say: this
+      <PacketMasthead packet={packet} guide />
+      <View style={styles.guideBody}>
+      {/* FileMaker's header, in the app's type: the guide's name with its one
+          sentence under it, the night and the night's total at the right. The
+          shops beside the total are the thing FileMaker could not say: this
           kitchen is filling more than one shop's case tonight. */}
-      <SheetHeading
-        kicker={`Kitchen ${kitchen.kitchenCode}`}
-        title={GUIDE_TITLE[grain]}
-        caption={[
-          kitchen.shopCodes.length > 1 ? `For ${kitchen.shopCodes.join(", ")}` : null,
-          `${fmt(total)} donuts`,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-        date={kitchen.date}
-      >
-        <Text style={styles.blurb}>{GUIDE_BLURB[grain]}</Text>
-      </SheetHeading>
+      <View style={styles.headingRow}>
+        <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
+          <Text style={styles.kicker}>Kitchen {kitchen.kitchenCode}</Text>
+          <Text style={styles.guideTitle}>{GUIDE_TITLE[grain]}</Text>
+          <Text style={styles.guideBlurb}>{GUIDE_BLURB[grain]}</Text>
+        </View>
+        <View style={styles.numberBlock}>
+          <Text style={styles.kicker}>Night</Text>
+          <Text style={styles.guideDate}>{isoDay(kitchen.date) || kitchen.date}</Text>
+          <Text style={styles.guideTotal}>
+            {[
+              kitchen.shopCodes.length > 1 ? `For ${kitchen.shopCodes.join(", ")}` : null,
+              `${fmt(total)} total donuts`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </Text>
+        </View>
+      </View>
 
       {rolled.length === 0 ? (
         <Text style={styles.emptyNote}>Nothing to make in this kitchen tonight.</Text>
       ) : (
         rolled.map((type) => (
           <View key={type.itemType}>
-            <View style={styles.typeBand}>
-              <Text style={styles.typeBandText}>{(type.itemType || "(no type)").toUpperCase()}</Text>
-              <Text style={styles.typeBandTotal}>{fmt(type.total)}</Text>
-            </View>
-
-            {type.sizes.map((size) => (
+            {type.sizes.map((size, sizeIndex) => (
               <View key={size.size}>
-                <View style={styles.sizeBand}>
-                  <Text style={styles.sizeBandText}>{(size.size || "(no size)").toUpperCase()}</Text>
-                  <Text style={styles.sizeBandTotal}>{fmt(size.total)}</Text>
-                </View>
+                {size.subtypes.map((sub, subIndex) => {
+                  const cut = (sub.subtype || "(no cut)").toUpperCase();
+                  const sizeName = (size.size || "(no size)").toUpperCase();
+                  return (
+                    <View key={`${size.size}|${sub.subtype}`}>
+                      {sub.rows.map((row, rowIndex) => {
+                        // The baker's row IS the cut, so it is headed by the cut
+                        // and its size, as FileMaker heads it. The fryer's and
+                        // decorator's rows are a finish or a donut WITHIN a cut,
+                        // so the cut joins the size in the brackets.
+                        const name = grain === "subtype" ? cut : (row.label || "—").toUpperCase();
+                        const of = grain === "subtype" || !sub.subtype ? sizeName : `${cut} - ${sizeName}`;
+                        const first = subIndex === 0 && rowIndex === 0;
+                        return (
+                          // The bands travel WITH the first row beneath them, so
+                          // a band is never the last thing on a page.
+                          <View key={row.key} wrap={false}>
+                            {first && sizeIndex === 0 ? (
+                              <View style={styles.guideTypeBand}>
+                                <Text style={styles.guideTypeText}>
+                                  {(type.itemType || "(no type)").toUpperCase()}
+                                </Text>
+                              </View>
+                            ) : null}
+                            {first ? (
+                              <View style={styles.guideSizeBand}>
+                                <Text style={styles.guideSizeText}>{sizeName}</Text>
+                              </View>
+                            ) : null}
+                            <View style={styles.guideHead}>
+                              <Text style={styles.guideName}>{name}</Text>
+                              <Text style={styles.guideOf}>({of})</Text>
+                            </View>
+                            <TrayRuler total={row.total} capacity={row.trayCapacity} />
+                            <View style={styles.guideSubtotal}>
+                              <Text style={styles.guideSubtotalText}>
+                                {name} TOTAL: {fmt(row.total)}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })}
 
-                {size.subtypes.map((sub) => (
-                  <View key={`${size.size}|${sub.subtype}`}>
-                    <View style={styles.subtypeHead}>
-                      <Text style={styles.subtypeName}>
-                        {(sub.subtype || "(no cut)").toUpperCase()}
-                      </Text>
-                      <Text style={styles.subtypeSize}>{size.size || "—"}</Text>
-                    </View>
-
-                    {sub.rows.map((row) => (
-                      <View key={row.key} style={styles.row} wrap={false}>
-                        <View style={styles.rowLabel}>
-                          <Text style={styles.rowName}>{row.label || "—"}</Text>
+                      {/* The cut's own total, where a cut has several rows. With
+                          one row — always, on the baker's guide — the line
+                          above already says it. */}
+                      {sub.rows.length > 1 ? (
+                        <View style={styles.guideCutTotal}>
+                          <Text style={styles.guideCutTotalText}>
+                            {cut} ({sizeName}) TOTAL: {fmt(sub.total)}
+                          </Text>
                         </View>
-                        <Text style={styles.rowCount}>{fmt(row.total)}</Text>
-                        <TrayRuler total={row.total} capacity={row.trayCapacity} />
-                      </View>
-                    ))}
-
-                    <View style={styles.subtotal}>
-                      <Text style={styles.subtotalText}>
-                        {(sub.subtype || "(no cut)").toUpperCase()} TOTAL: {fmt(sub.total)}
-                      </Text>
+                      ) : null}
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             ))}
 
-            <View style={styles.grandTotal}>
-              <Text style={styles.grandTotalText}>
+            <View style={styles.guideTypeTotal}>
+              <Text style={styles.guideTypeTotalText}>
                 {(type.itemType || "(no type)").toUpperCase()} TOTAL: {fmt(type.total)}
               </Text>
             </View>
@@ -611,7 +692,7 @@ function TrayGuidePage({
       ) : null}
       </View>
 
-      <PacketFooter>{`${GUIDE_TITLE[grain]} · Kitchen ${kitchen.kitchenCode}`}</PacketFooter>
+      <PacketFooter guide>{`${GUIDE_TITLE[grain]} · Kitchen ${kitchen.kitchenCode}`}</PacketFooter>
     </Page>
   );
 }
@@ -619,9 +700,17 @@ function TrayGuidePage({
 function TrayRuler({ total, capacity }: { total: number; capacity: number }) {
   const trays = trayRuler(total, capacity);
   return (
-    <View style={styles.strip}>
+    <View style={styles.guideRuler}>
       {Array.from({ length: TRAY_CELLS }, (_, i) => (
-        <View key={i} style={i < trays.length ? [styles.trayCell, styles.trayOn] : styles.trayCell}>
+        <View
+          key={i}
+          style={[
+            styles.trayCell,
+            i < trays.length ? styles.trayOn : {},
+            // The frame is the first cell's left edge.
+            i === 0 ? { borderLeftWidth: 0 } : {},
+          ]}
+        >
           <Text style={styles.trayIndex}>{i + 1}</Text>
           <Text style={styles.trayCount}>{i < trays.length ? fmt(trays[i]) : " "}</Text>
         </View>
