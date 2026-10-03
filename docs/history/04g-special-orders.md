@@ -5573,3 +5573,14 @@ through 10/16, so no standing day was missed. `trg_log_special_order` still
 lists the two labels and is left: its loop reads only columns the row has.
 **Before dropping a column, search `pg_proc.prosrc` for its name** — grepping
 the migrations finds the function's history, not what is live.
+
+**THE KITCHEN ORDER'S HEADER IS SMALLER (Mark, 2026-10-03: "the header area
+takes up too much space, about half the page").** Kitchen-only styles in
+`SpecialOrderPdfs.tsx` (`kH1`, `kNumber`, `statHead`, `statLine`, `kBlocks`,
+`kItems`); the shared `docStyles` heading is untouched, so the quote, invoice
+and receipt still set their title at 22pt. Title and number 22pt → 15pt;
+Kitchen / Day / time 20pt → 13pt, with the date and the shop code moved BESIDE
+their value instead of on a line beneath it; the gaps between the bands 18–20pt
+→ 12pt. On the `/forms` sample the item list starts about 80pt higher and the
+eight lines plus "End of list" now fit page 1. The pickup time keeps its yellow
+fill and the allergen band its place above the fields.

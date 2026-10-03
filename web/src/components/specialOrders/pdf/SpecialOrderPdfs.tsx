@@ -155,11 +155,23 @@ const s = {
   signSub: { fontSize: 7, color: MUTED, marginTop: 2 },
 
   /* ---- kitchen order ---- */
-  stats: { flexDirection: "row", gap: 22, marginTop: 20 },
+  /* The sheet's header is set SMALLER and TIGHTER than the customer documents'
+     (Mark, 2026-10-03: it took about half the page, and the page is for the
+     item list). Same parts, kitchen-only sizes — the shared heading styles are
+     not touched, so a quote's title is still 22pt. */
+  kH1: { ...docStyles.h1, ...caps(15, -0.02), marginTop: 2 },
+  kNumber: { ...docStyles.number, fontSize: 15, marginTop: 2 },
+  kCaption: { ...docStyles.caption, marginTop: 3 },
+  kBlocks: { ...docStyles.blocks, marginTop: 12 },
+  kItems: { ...docStyles.items, marginTop: 14 },
+  stats: { flexDirection: "row", gap: 22, marginTop: 12 },
   stat: { flexGrow: 1, flexBasis: 0 },
-  statValue: { fontSize: 20, fontFamily: "Helvetica-Bold", marginTop: 2 },
-  statSub: { ...caps(7.5, 0.12), color: SUBTLE, marginTop: 3 },
-  statMarked: { backgroundColor: MARK_FILL, paddingHorizontal: 6, paddingVertical: 3, alignSelf: "flex-start" },
+  statHead: { ...docStyles.sectionHead, paddingBottom: 3, marginBottom: 5 },
+  // minHeight is the yellow time box's height, so the three values share a line.
+  statLine: { flexDirection: "row", alignItems: "center", minHeight: 19 },
+  statValue: { fontSize: 13, fontFamily: "Helvetica-Bold" },
+  statSub: { ...caps(7, 0.12), color: SUBTLE, marginLeft: 8 },
+  statMarked: { backgroundColor: MARK_FILL, paddingHorizontal: 5, paddingVertical: 2 },
   kRow: { flexDirection: "row", paddingVertical: 5, alignItems: "flex-start" },
   kQty: { width: 44, fontSize: 13, fontFamily: "Helvetica-Bold", paddingLeft: 6 },
   kItem: { width: 250, paddingRight: 12 },
@@ -168,7 +180,7 @@ const s = {
   endOfList: { flexDirection: "row", alignItems: "center", marginTop: 16 },
   endRule: { flexGrow: 1, borderTopWidth: 0.75, borderTopColor: HAIRLINE },
   endText: { ...caps(7, 0.12), color: SUBTLE, marginHorizontal: 10 },
-  allergen: { flexDirection: "row", marginTop: 18, paddingHorizontal: 10, paddingVertical: 8 },
+  allergen: { flexDirection: "row", marginTop: 12, paddingHorizontal: 10, paddingVertical: 6 },
   allergenLabel: { ...caps(7, 0.12), fontFamily: "Helvetica-Bold", width: 118, paddingTop: 1.5 },
   allergenText: { flexGrow: 1, flexBasis: 0, fontSize: 10, fontFamily: "Helvetica-Bold" },
   handoff: { marginTop: 22 },
@@ -537,31 +549,37 @@ export function kitchenOrderPages(
               <View style={s.headingRow}>
                 <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 24 }}>
                   <Text style={s.kicker}>Kitchen order</Text>
-                  <Text style={s.h1}>{order.title || isoDay(order.event_date) || "Special order"}</Text>
-                  <Text style={s.caption}>{order.location_name ?? ""}</Text>
+                  <Text style={s.kH1}>{order.title || isoDay(order.event_date) || "Special order"}</Text>
+                  <Text style={s.kCaption}>{order.location_name ?? ""}</Text>
                 </View>
                 <View style={s.numberBlock}>
                   <Text style={s.kicker}>No.</Text>
-                  <Text style={s.number}>{order.number}</Text>
+                  <Text style={s.kNumber}>{order.number}</Text>
                 </View>
               </View>
 
               <View style={s.stats}>
                 <View style={s.stat}>
-                  <Text style={s.sectionHead}>Kitchen</Text>
-                  <Text style={s.statValue}>{order.kitchen_code ?? "—"}</Text>
-                </View>
-                <View style={s.stat}>
-                  <Text style={s.sectionHead}>Day</Text>
-                  <Text style={s.statValue}>{usWeekday(order.event_date).toUpperCase() || "—"}</Text>
-                  <Text style={s.statSub}>{order.event_date ?? ""}</Text>
-                </View>
-                <View style={s.stat}>
-                  <Text style={s.sectionHead}>{delivery ? "Delivery time" : "Pickup time"}</Text>
-                  <View style={s.statMarked}>
-                    <Text style={[s.statValue, { marginTop: 0 }]}>{time || "—"}</Text>
+                  <Text style={s.statHead}>Kitchen</Text>
+                  <View style={s.statLine}>
+                    <Text style={s.statValue}>{order.kitchen_code ?? "—"}</Text>
                   </View>
-                  <Text style={s.statSub}>{order.location_code ?? ""}</Text>
+                </View>
+                <View style={s.stat}>
+                  <Text style={s.statHead}>Day</Text>
+                  <View style={s.statLine}>
+                    <Text style={s.statValue}>{usWeekday(order.event_date).toUpperCase() || "—"}</Text>
+                    <Text style={s.statSub}>{order.event_date ?? ""}</Text>
+                  </View>
+                </View>
+                <View style={s.stat}>
+                  <Text style={s.statHead}>{delivery ? "Delivery time" : "Pickup time"}</Text>
+                  <View style={s.statLine}>
+                    <View style={s.statMarked}>
+                      <Text style={s.statValue}>{time || "—"}</Text>
+                    </View>
+                    <Text style={s.statSub}>{order.location_code ?? ""}</Text>
+                  </View>
                 </View>
               </View>
 
@@ -581,7 +599,7 @@ export function kitchenOrderPages(
                 </Text>
               </View>
 
-              <View style={s.blocks}>
+              <View style={s.kBlocks}>
                 <View style={s.block}>
                   <Text style={s.sectionHead}>Order</Text>
                   <Field label="Taken by" value={order.taken_by} />
@@ -602,7 +620,7 @@ export function kitchenOrderPages(
                 </View>
               </View>
 
-              <View style={s.items}>
+              <View style={s.kItems}>
                 <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
                   Items{" "}
                   <Text style={s.sectionCount}>{groups.reduce((a, g) => a + g.lines.length, 0)}</Text>
