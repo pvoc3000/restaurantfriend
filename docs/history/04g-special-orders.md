@@ -5539,3 +5539,22 @@ Mark: "we need to do the same with rush fee as we did discount."
   not. `orderTotals` already lets a rate win, so nothing was ever counted
   twice here.
 - Data: no order holds a rush rate yet, and none holds both, so no migration.
+
+## SO-10104 merged into SO-10102 (2026-10-02, a one-off data fix)
+
+SO-10102 (Catering, pickup 10/5 10:00) was paid; the customer added 50 of each
+donut, and a second order, SO-10104, was made and invoiced (INV-10008,
+QuickBooks, paid $264.60) instead of increasing the first. Mark: "Can we merge
+them?" — then "Merge and delete SO-10104".
+
+Done in one transaction that checked itself before committing: SO-10102's two
+lines went 280 → 330; INV-10008's three lines re-pointed to SO-10102 (wording
+unchanged, through the freeze's own `rf.invoice_line_write` bypass); the
+$264.60 application re-pointed; the two documents moved; a log note written;
+then SO-10104 deleted. After: total = paid = $1,746.36, unbilled $0, two
+invoices and two payments on one order, QuickBooks untouched. Rows saved first
+to `FMP Export/pre-merge-SO-10104-into-SO-10102-2026-10-02.json`.
+
+**The trap worth remembering for any future merge:** deleting an order runs
+`trg_special_order_takes_its_payments`, which DELETES every payment applied
+only to it. Re-point the applications before the delete, never after.
