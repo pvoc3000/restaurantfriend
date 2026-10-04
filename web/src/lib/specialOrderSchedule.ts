@@ -285,6 +285,34 @@ export function ordersForKitchen<
 }
 
 /**
+ * The orders a kitchen's PACKET prints for a date — `ordersForKitchen`, and
+ * then ONLY `status = 'order'` (Mark, 2026-10-04: "Anything else shouldn't be
+ * presented to the supervisor as an option").
+ *
+ * The shift report had asked for `kind = 'order'` and called the answer
+ * "committed". `kind` only says the row is not a standing-order template: a
+ * lead, a quote, an unpaid invoice and a cancelled order all carry it. So on
+ * 2026-10-03 DF01's closing packet printed a kitchen sheet for SO-10100, a
+ * quote nobody had approved, beside the one real order — and the sheet prints
+ * no status, so it read as an order to make.
+ *
+ * AN INVOICE IS NOT READY EITHER: invoiced and not paid for. This is the rung
+ * `pullReadiness` schedules at, so Generate and Print now agree about a night.
+ */
+export function ordersForPacket<
+  T extends {
+    kind?: string | null;
+    status: string | null;
+    kitchen_location_id: string | null;
+    location_id: string | null;
+  },
+>(orders: readonly T[], kitchenId: string): T[] {
+  return ordersForKitchen(orders, kitchenId).filter(
+    (o) => (o.kind ?? "order") === "order" && o.status === "order"
+  );
+}
+
+/**
  * Is this order READY FOR PRODUCTION? (Mark, 2026-08-27, asking that only those
  * be offered when generating a night.)
  *

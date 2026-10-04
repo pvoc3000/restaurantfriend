@@ -21,6 +21,7 @@ import {
   pullReadiness,
   scheduleDraft,
   ordersForKitchen,
+  ordersForPacket,
   scheduleKitchen,
   scheduleTitle,
   type PullCandidate,
@@ -394,6 +395,25 @@ test("ordersForKitchen: the packet gets THIS kitchen's orders and no others", ()
     night.length - 1,
     "every order but the orphan reaches exactly one kitchen"
   );
+});
+
+test("ordersForPacket: only status 'order' is printed", () => {
+  // The real night (2026-10-03, DF01's closing report): SO-10100 was a quote
+  // nobody had approved and its kitchen sheet printed beside SO-10096's.
+  const at = { kitchen_location_id: "df01", location_id: "df01" };
+  const night = [
+    { id: "10096", kind: "order", status: "order", ...at },
+    { id: "10100", kind: "order", status: "quote", ...at },
+    { id: "lead", kind: "order", status: "lead", ...at },
+    // Invoiced and not paid for — not ready (Mark, 2026-10-04).
+    { id: "invoice", kind: "order", status: "invoice", ...at },
+    { id: "cancelled", kind: "order", status: "cancelled", ...at },
+    { id: "template", kind: "template", status: null, ...at },
+    // Ready, and another kitchen's.
+    { id: "10053", kind: "order", status: "order", kitchen_location_id: "df02", location_id: "df02" },
+  ];
+  eq(ordersForPacket(night, "df01").map((o) => o.id), ["10096"], "df01");
+  eq(ordersForPacket(night, "df02").map((o) => o.id), ["10053"], "df02");
 });
 
 test("scheduleKitchen: kitchen, then pickup shop, then nothing", () => {

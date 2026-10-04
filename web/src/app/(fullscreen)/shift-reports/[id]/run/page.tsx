@@ -10,7 +10,7 @@ import { isDayComplete } from "@/lib/sales";
 import { readSettings } from "@/lib/specialOrders";
 import { SHIFT_REPORT_BATCH_SCHEDULE } from "@/lib/production";
 import { describeAmount } from "@/lib/productionBatches";
-import { ordersForKitchen } from "@/lib/specialOrderSchedule";
+import { ordersForPacket } from "@/lib/specialOrderSchedule";
 import {
   pagesForShift,
   submitBlockers,
@@ -378,7 +378,11 @@ export default async function RunShiftReportPage({
           // it in a second language. The cost is a handful of rows: this is ONE
           // date, and the whole org has 24 committed orders in the next
           // fortnight.
-          .select("id, kitchen_location_id, location_id")
+          //
+          // `status`, `number` and `title` since 2026-10-04: the packet prints
+          // only `status = 'order'` (`ordersForPacket`), and its dialog names
+          // each order it is about to print.
+          .select("id, number, title, status, kitchen_location_id, location_id")
           .eq("kind", "order")
           .eq("event_date", nextDay)
       : SKIP,
@@ -613,19 +617,26 @@ export default async function RunShiftReportPage({
    * the case that would not, since `createSpecialOrder` defaults the pickup
    * shop to where you are standing and deliberately does not default a kitchen.
    *
+   * ONLY `status = 'order'` (Mark, 2026-10-04) — `ordersForPacket`. A quote
+   * (SO-10100, 2026-10-03) had printed as a kitchen sheet because the query
+   * asks for `kind = 'order'`, which every lead, quote and invoice carries.
+   *
    * An order with NEITHER reaches no packet, which is the honest answer rather
    * than a gap: this is paper a kitchen bakes from, so printing it everywhere
    * would have it MADE TWICE. It is still on the Info page's "also that day"
    * (which includes the unassigned, and marks them) and on /special-orders.
    */
-  const orders: TomorrowOrder[] = ordersForKitchen(
+  const orders: TomorrowOrder[] = ordersForPacket(
     ((tomorrowOrders as Record<string, unknown>[] | null) ?? []).map((o) => ({
       id: o.id as string,
+      number: (o.number as string | null) ?? null,
+      title: (o.title as string | null) ?? null,
+      status: (o.status as string | null) ?? null,
       kitchen_location_id: (o.kitchen_location_id as string | null) ?? null,
       location_id: (o.location_id as string | null) ?? null,
     })),
     kitchenId
-  ).map((o) => ({ id: o.id }));
+  ).map((o) => ({ id: o.id, number: o.number, title: o.title }));
 
   const schedules: TomorrowSchedule[] = (
     (tomorrowSchedules as Record<string, unknown>[] | null) ?? []

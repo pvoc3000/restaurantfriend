@@ -11,16 +11,15 @@ import { PrintPacket } from "@/components/production/PrintPacket";
 import { sellingShopsForKitchen } from "@/lib/productionPlans";
 
 /**
- * One special order tomorrow — AN ID AND NOTHING ELSE.
+ * One special order tomorrow — what the packet needs to print it and NAME it.
  *
- * It carried a number, a title, a time and a printed date while this page
- * listed them. It no longer does (Mark, 2026-09-01: "we no longer need the
- * special orders section on page 7"), because Print All Documents prints them
- * and its dialog names the count — so the list was a second place saying what
- * the packet already says. What the page still needs is which orders to hand
- * the packet.
+ * This page stopped listing them on 2026-09-01 (Mark: "we no longer need the
+ * special orders section on page 7"), because Print All Documents prints them.
+ * The number and title came back on 2026-10-04 for the packet's dialog, which
+ * now names each order rather than counting them — a count of 2 could not say
+ * that one of the two was a quote.
  */
-export type TomorrowOrder = { id: string };
+export type TomorrowOrder = { id: string; number: string | null; title: string | null };
 
 export type TomorrowSchedule = {
   id: string;
@@ -222,7 +221,7 @@ export function TomorrowPage({
               // since 2026-08-01), so a packet built from the schedules would
               // print two sheets in thirty-three under a button claiming all of
               // them.
-              specialOrderIds={orders.map((o) => o.id)}
+              specialOrders={orders}
               printedOn={today}
               stampable={stampable}
               // NEVER BOTH BLACK (Mark, 2026-08-28). This button now also

@@ -61,9 +61,12 @@ function initialParts(offered: PacketPart[]): PacketPart[] {
 /** Parts a stored preference is allowed to speak for — see `initialParts`. */
 const SAVEABLE = new Set<PacketPart>(["premade", "baker", "fryer", "decorator"]);
 
+/** A special order the packet prints, with what the dialog names it by. */
+export type PacketOrder = { id: string; number: string | null; title: string | null };
+
 export function PrintPacket({
   scheduleIds,
-  specialOrderIds,
+  specialOrders,
   printedOn,
   stampable,
   label = "Print All Documents",
@@ -73,7 +76,10 @@ export function PrintPacket({
 }: {
   scheduleIds: string[];
   /**
-   * The night's SPECIAL ORDERS, as ids — the kitchen order sheets.
+   * The night's SPECIAL ORDERS — the kitchen order sheets. Each carries its
+   * number and title so the dialog can NAME what it is about to print (Mark,
+   * 2026-10-04); the caller hands over only orders ready for the kitchen
+   * (`ordersForPacket`).
    *
    * From the CALLER, never derived from `scheduleIds`, and the reason is a
    * measurement rather than a preference: a special order reaches
@@ -97,7 +103,7 @@ export function PrintPacket({
    * speaks about special orders, and silence there would be the absence that
    * looks like completeness all over again.
    */
-  specialOrderIds?: string[];
+  specialOrders?: PacketOrder[];
   /** The org's calendar day, for the kitchen sheets' AS OF line and stamp. */
   printedOn?: string;
   /**
@@ -126,8 +132,8 @@ export function PrintPacket({
   // What THIS caller can offer. The special-orders row appears whenever the
   // caller deals in them AT ALL — including when the answer is none — and never
   // on `/schedules`, which is four rows as before.
-  const offersSpecial = specialOrderIds !== undefined;
-  const orderIds = specialOrderIds ?? [];
+  const offersSpecial = specialOrders !== undefined;
+  const orderIds = (specialOrders ?? []).map((o) => o.id);
   const offered = PACKET_PARTS.filter((p) => p.key !== "special" || offersSpecial);
   const [open, setOpen] = useState(false);
   const [parts, setParts] = useState<PacketPart[]>(() => offered.map((p) => p.key));
@@ -336,7 +342,7 @@ export function PrintPacket({
 
             <ul className="divide-y divide-hairline border border-ink">
               {offered.map((p) => (
-                <li key={p.key} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                <li key={p.key} className="flex flex-wrap items-center gap-x-3 px-4 py-2.5 text-sm">
                   <Checkbox
                     checked={parts.includes(p.key)}
                     onChange={() => toggle(p.key)}
@@ -380,6 +386,19 @@ export function PrintPacket({
                         ? "Nothing to print"
                         : `${orderIds.length} ${orderIds.length === 1 ? "order" : "orders"}`}
                     </span>
+                  ) : null}
+                  {/* NAMED, not only counted (Mark, 2026-10-04). On 2026-10-03
+                      "2 orders" was one order and one unapproved quote, and
+                      nothing here could have said so. `basis-full` so the list
+                      claims its own line under the row. */}
+                  {p.key === "special" && orderIds.length > 0 ? (
+                    <ul className="basis-full pl-7 pt-1 text-muted">
+                      {(specialOrders ?? []).map((o) => (
+                        <li key={o.id}>
+                          {[o.number, o.title].filter(Boolean).join(" · ") || "Special order"}
+                        </li>
+                      ))}
+                    </ul>
                   ) : null}
                 </li>
               ))}

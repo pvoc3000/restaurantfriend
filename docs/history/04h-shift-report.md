@@ -724,3 +724,21 @@ How the report ended up open under Karina's session is NOT established. Either
 it was opened from the list, or a second Safari tab survived a PIN switch.
 `IdleLock`'s clock is per tab, and nothing compares the cookie's user with the
 user the page was rendered for.
+
+**THE PACKET PRINTED A QUOTE AS A KITCHEN ORDER (Mark, 2026-10-04, of DF01's
+closing report for 2026-10-03).** SO-10100 was a website inquiry quoted on
+10-02 and never approved. The Tomorrow page's query asked for `kind = 'order'`
+on the date and its comments called the result "committed"; `kind` only means
+"not a standing-order template", so leads, quotes, unpaid invoices and
+cancelled orders all matched. At 23:35:02 Generate scheduled SO-10096 alone
+(`pullReadiness` wants `status = 'order'`); at 23:35:25 Print All Documents
+printed and stamped both. The dialog said "2 orders" and the sheet prints no
+status. First occurrence: of 13 orders printed since 09-01 it was the only one
+not at `order`. 13 more non-orders were dated in the following month.
+Fixed: `ordersForPacket` in `lib/specialOrderSchedule` (kitchen, then
+`status = 'order'` only — an invoice is NOT ready, Mark: "invoiced but not paid
+for"), fixture-pinned; `PrintPacket` takes `specialOrders` (id, number, title)
+and lists each order under the Special Orders row. Not walked live in a
+browser. **Consequence to watch:** Cafe Knotted's standing days sit at
+`invoice` until paid (seven of them for 10-12…10-18 on 10-04), so a day still
+at `invoice` the night before prints no sheet.
