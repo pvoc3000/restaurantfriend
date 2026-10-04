@@ -179,6 +179,13 @@ export function CompareWithShogoDialog({
   }, [supabase, orgId, days, payouts, window, shopCodes]);
 
   const offCount = (rows ?? []).filter((r) => r.delta !== 0).length;
+  // THE FOOT OF THE TABLE (Mark, 2026-10-04). Credits are positive and debits
+  // negative, so a set of entries that BALANCES sums to zero: each total is the
+  // check that its side does, and the Δ total is the two sides' difference.
+  const totals = (rows ?? []).reduce(
+    (t, r) => ({ ours: t.ours + r.ours, theirs: t.theirs + r.theirs, delta: t.delta + r.delta }),
+    { ours: 0, theirs: 0, delta: 0 }
+  );
   const payoutById = new Map(payouts.map((p) => [p.id, p]));
   const doubled = (depositMatches ?? []).filter((m) => m.ours.length && m.theirs.length).length;
   const nowhere = (depositMatches ?? []).filter((m) => !m.ours.length && !m.theirs.length).length;
@@ -256,6 +263,26 @@ export function CompareWithShogoDialog({
                   </tr>
                 ))}
               </tbody>
+              {rows.length > 0 ? (
+                <tfoot>
+                  <tr className="border-t-2 border-ink font-semibold">
+                    <td className="py-1 pr-3" colSpan={3}>
+                      Total
+                    </td>
+                    {/* Always a figure, never the body's em dash: "$0.00" is
+                        the answer being looked for. Red when it is not zero. */}
+                    <td className={`py-1 pr-3 text-right tabular-nums ${totals.ours !== 0 ? "text-accent" : ""}`}>
+                      {formatCents(totals.ours)}
+                    </td>
+                    <td className={`py-1 pr-3 text-right tabular-nums ${totals.theirs !== 0 ? "text-accent" : ""}`}>
+                      {formatCents(totals.theirs)}
+                    </td>
+                    <td className={`py-1 text-right tabular-nums ${totals.delta !== 0 ? "text-accent" : ""}`}>
+                      {formatCents(totals.delta)}
+                    </td>
+                  </tr>
+                </tfoot>
+              ) : null}
             </table>
 
             <div className="space-y-2 pt-2">

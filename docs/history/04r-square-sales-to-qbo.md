@@ -118,3 +118,8 @@
    builder with a bank role stood in, 0 refusals** — no deposit has been
    posted, and none of this has been seen in the browser.
 
+
+**Compare with Shogo has a Total row (Mark, 2026-10-04)** — Ours, Shogo and Δ
+summed at the foot of the account table. The columns are signed (credit
+positive, debit negative), so a side that balances totals $0.00; a non-zero
+total is red. Not walked in a browser.
