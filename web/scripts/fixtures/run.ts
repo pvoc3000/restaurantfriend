@@ -20,6 +20,7 @@ import "./orgSettings.fixtures";
 import "./dateInput.fixtures";
 import "./timeInput.fixtures";
 import "./dateRange.fixtures";
+import "./shiftReportRange.fixtures";
 import "./dayPaint.fixtures";
 import "./columnVisibility.fixtures";
 import "./rowDrag.fixtures";

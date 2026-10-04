@@ -742,3 +742,14 @@ and lists each order under the Special Orders row. Not walked live in a
 browser. **Consequence to watch:** Cafe Knotted's standing days sit at
 `invoice` until paid (seven of them for 10-12…10-18 on 10-04), so a day still
 at `invoice` the night before prints no sheet.
+
+**THE LIST HAS A DATE WINDOW (Mark, 2026-10-04).** A `RangePicker` after the
+search, `lib/shiftReportRange`: Today · Yesterday · Last 7 Days · Last 30 Days
+(the default) · Last 90 Days · This Month · Last Month · This Year · All Time,
+or a picked pair. The rolling presets run THROUGH today (the PO list's
+reading), since the list opens on Drafts and today's draft must be in it. The
+window is `?range=` and bounds the SERVER query, which replaced the fixed
+28-day fetch and is paged past PostgREST's 1,000 rows. The missing-night
+sentence now reads its own 7-day query of closing reports, so it does not
+change with the window. Fixtures added; not walked in a browser (the pane
+cannot sign in).

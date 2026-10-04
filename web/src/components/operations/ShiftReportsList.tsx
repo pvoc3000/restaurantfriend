@@ -20,6 +20,13 @@ import {
   type ShiftSlot,
 } from "@/lib/shiftReports";
 import { daysBefore } from "@/lib/today";
+import { RangePicker } from "@/components/ui/RangePicker";
+import type { DateRange } from "@/lib/dateRange";
+import {
+  DEFAULT_SHIFT_REPORT_RANGE,
+  SHIFT_REPORT_RANGE_PRESETS,
+  shiftReportRangeToken,
+} from "@/lib/shiftReportRange";
 
 export type ShiftReportRow = {
   id: string;
@@ -54,8 +61,9 @@ export type ShiftReportRow = {
  */
 type Tier = "draft" | "sent" | "all";
 
-/** How far back the missing-night sweep looks. Shorter than the page's own
- *  window, because a gap three weeks old is history rather than a task. */
+/** How far back the missing-night sweep looks — a gap three weeks old is
+ *  history rather than a task. The page fetches these nights on their own
+ *  (`recentClosingDates`), so the sweep is independent of the date window. */
 const GAP_DAYS = 7;
 
 function isoWeekday(date: string): number {
@@ -69,6 +77,8 @@ function isoWeekday(date: string): number {
 export function ShiftReportsList({
   rows,
   today,
+  range,
+  recentClosingDates,
   orgId,
   locationId,
   locationCode,
@@ -77,6 +87,10 @@ export function ShiftReportsList({
 }: {
   rows: ShiftReportRow[];
   today: string;
+  /** The date window the rows were loaded for — null is all time. */
+  range: DateRange | null;
+  /** The last week's closing report dates, whatever `range` is showing. */
+  recentClosingDates: string[];
   orgId: string;
   locationId: string;
   locationCode: string;
@@ -90,6 +104,18 @@ export function ShiftReportsList({
   const [search, setSearch] = useState("");
   const [failed, setFailed] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  // The window is the URL's and the SERVER's: the page loads only the reports
+  // inside it. The default is left off the URL.
+  function changeRange(picked: DateRange | null) {
+    const token = shiftReportRangeToken(picked, today);
+    startTransition(() => {
+      router.replace(
+        token === DEFAULT_SHIFT_REPORT_RANGE ? "/shift-reports" : `/shift-reports?range=${token}`,
+        { scroll: false }
+      );
+    });
+  }
 
   /**
    * The nights that produced no report at all.
@@ -107,11 +133,11 @@ export function ShiftReportsList({
       days.push({ date, isoWeekday: isoWeekday(date) });
     }
     return missingNights({
-      reportDates: rows.filter((r) => r.shift === "closing").map((r) => r.reportDate),
+      reportDates: recentClosingDates,
       openDays,
       days,
     });
-  }, [rows, openDays, today]);
+  }, [recentClosingDates, openDays, today]);
 
   const withReason = useMemo(
     () =>
@@ -346,6 +372,22 @@ export function ShiftReportsList({
               search
               icon={<SearchGlyph />}
             />
+            {/* The window straight after the search, where the PO, bill and
+                invoice lists put theirs (Mark, 2026-10-04). Never empty: ✕
+                would only mean the default, so it is not offered. */}
+            <ControlField label="Dates">
+              <div className="w-52">
+                <RangePicker
+                  value={range}
+                  onChange={changeRange}
+                  presets={SHIFT_REPORT_RANGE_PRESETS}
+                  today={today}
+                  ariaLabel="Which shift reports to show, by date"
+                  placeholder="All Time"
+                  clearable={false}
+                />
+              </div>
+            </ControlField>
             {/* A captioned PICKLIST rather than tabs (Mark, 2026-09-10), the
                 purchasing lists' conversion: counts ride as hints, `fit`
                 sizes the trigger to its widest option. */}
