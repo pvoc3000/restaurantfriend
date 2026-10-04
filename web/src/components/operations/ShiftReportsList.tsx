@@ -101,6 +101,7 @@ export function ShiftReportsList({
   const router = useRouter();
   const supabase = createClient();
   const [tier, setTier] = useState<Tier>("draft");
+  const [shift, setShift] = useState<ShiftSlot | "all">("all");
   const [search, setSearch] = useState("");
   const [failed, setFailed] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -165,6 +166,7 @@ export function ShiftReportsList({
         if (tier === "sent") return r.status === "sent";
         return true;
       })
+      .filter((r) => shift === "all" || r.shift === shift)
       .filter((r) => {
         if (term === "") return true;
         // The narrative is searchable, which is what makes the archive worth
@@ -176,7 +178,7 @@ export function ShiftReportsList({
           SHIFT_SLOT_LABEL[r.shift].toLowerCase().includes(term)
         );
       });
-  }, [withReason, tier, search]);
+  }, [withReason, tier, shift, search]);
 
   async function remove(row: ShiftReportRow) {
     const ok = await confirmDialog({
@@ -352,7 +354,9 @@ export function ShiftReportsList({
         columnChooser
         empty={
           <p className="text-sm text-muted">
-            {tier === "draft"
+            {shift !== "all"
+              ? `No ${SHIFT_SLOT_LABEL[shift].toLowerCase()} reports here.`
+              : tier === "draft"
               ? "No drafts — everything here has been sent."
               : tier === "sent"
                 ? "Nothing has been sent yet."
@@ -387,6 +391,25 @@ export function ShiftReportsList({
                   clearable={false}
                 />
               </div>
+            </ControlField>
+            {/* Which shift (Mark, 2026-10-04). Counted like Show beside it,
+                over the rows the date window loaded. */}
+            <ControlField label="Shift">
+              <PickList
+                ariaLabel="Which shift"
+                variant="field"
+                value={shift}
+                onPick={(next) => setShift(next as typeof shift)}
+                options={[
+                  { value: "all", label: "All", hint: String(rows.length) },
+                  ...(Object.keys(SHIFT_SLOT_LABEL) as ShiftSlot[]).map((slot) => ({
+                    value: slot,
+                    label: SHIFT_SLOT_LABEL[slot],
+                    hint: String(rows.filter((r) => r.shift === slot).length),
+                  })),
+                ]}
+                fit
+              />
             </ControlField>
             {/* A captioned PICKLIST rather than tabs (Mark, 2026-09-10), the
                 purchasing lists' conversion: counts ride as hints, `fit`

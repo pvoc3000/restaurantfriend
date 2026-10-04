@@ -753,3 +753,6 @@ window is `?range=` and bounds the SERVER query, which replaced the fixed
 sentence now reads its own 7-day query of closing reports, so it does not
 change with the window. Fixtures added; not walked in a browser (the pane
 cannot sign in).
+A **Shift** picklist followed the same day (All · Opening · Mid · Closing ·
+Off-site, counted over the loaded window), filtering in the browser between
+Dates and Show. Not walked in a browser either.
