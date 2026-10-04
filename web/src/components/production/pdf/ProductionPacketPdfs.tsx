@@ -592,76 +592,80 @@ function TrayGuidePage({
       {rolled.length === 0 ? (
         <Text style={styles.emptyNote}>Nothing to make in this kitchen tonight.</Text>
       ) : (
-        rolled.map((type) => (
-          <View key={type.itemType}>
-            {type.sizes.map((size, sizeIndex) => (
-              <View key={size.size}>
-                {size.subtypes.map((sub, subIndex) => {
-                  const cut = (sub.subtype || "(no cut)").toUpperCase();
-                  const sizeName = (size.size || "(no size)").toUpperCase();
-                  return (
-                    <View key={`${size.size}|${sub.subtype}`}>
-                      {sub.rows.map((row, rowIndex) => {
-                        // The baker's row IS the cut, so it is headed by the cut
-                        // and its size, as FileMaker heads it. The fryer's and
-                        // decorator's rows are a finish or a donut WITHIN a cut,
-                        // so the cut joins the size in the brackets.
-                        const name = grain === "subtype" ? cut : (row.label || "—").toUpperCase();
-                        const of = grain === "subtype" || !sub.subtype ? sizeName : `${cut} - ${sizeName}`;
-                        const first = subIndex === 0 && rowIndex === 0;
-                        return (
-                          // The bands travel WITH the first row beneath them, so
-                          // a band is never the last thing on a page.
-                          <View key={row.key} wrap={false}>
-                            {first && sizeIndex === 0 ? (
-                              <View style={styles.guideTypeBand}>
-                                <Text style={styles.guideTypeText}>
-                                  {(type.itemType || "(no type)").toUpperCase()}
-                                </Text>
-                              </View>
-                            ) : null}
-                            {first ? (
-                              <View style={styles.guideSizeBand}>
-                                <Text style={styles.guideSizeText}>{sizeName}</Text>
-                              </View>
-                            ) : null}
-                            <View style={styles.guideHead}>
-                              <Text style={styles.guideName}>{name}</Text>
-                              <Text style={styles.guideOf}>({of})</Text>
-                            </View>
-                            <TrayRuler total={row.total} capacity={row.trayCapacity} />
-                            <View style={styles.guideSubtotal}>
-                              <Text style={styles.guideSubtotalText}>
-                                {name} TOTAL: {fmt(row.total)}
-                              </Text>
-                            </View>
-                          </View>
-                        );
-                      })}
-
-                      {/* The cut's own total, where a cut has several rows. With
-                          one row — always, on the baker's guide — the line
-                          above already says it. */}
-                      {sub.rows.length > 1 ? (
-                        <View style={styles.guideCutTotal}>
-                          <Text style={styles.guideCutTotalText}>
-                            {cut} ({sizeName}) TOTAL: {fmt(sub.total)}
-                          </Text>
-                        </View>
-                      ) : null}
+        /* A FLAT LIST OF BLOCKS, each `wrap={false}` and each a direct child
+           of the page's body — NOT type → size → cut → row nested Views
+           (2026-10-04, rows printing squashed over the footer). react-pdf's
+           splitter has a rule that when a container's FIRST child will not fit
+           it keeps the whole container on the current page, taking "nothing
+           placed in this container yet" for "the page is empty". So a row that
+           was the first of its cut, size or type, landing at a page's foot, was
+           crushed into whatever space was left with everything after it. With
+           no containers there is no first child: a block fits or it moves. The
+           bands ride in the first row's block and the totals in the last's, so
+           neither is ever alone on a page. */
+        rolled.flatMap((type) =>
+          type.sizes.flatMap((size, sizeIndex) =>
+            size.subtypes.flatMap((sub, subIndex) => {
+              const cut = (sub.subtype || "(no cut)").toUpperCase();
+              const sizeName = (size.size || "(no size)").toUpperCase();
+              const lastCut = sizeIndex === type.sizes.length - 1 && subIndex === size.subtypes.length - 1;
+              return sub.rows.map((row, rowIndex) => {
+                // The baker's row IS the cut, so it is headed by the cut and its
+                // size, as FileMaker heads it. The fryer's and decorator's rows
+                // are a finish or a donut WITHIN a cut, so the cut joins the
+                // size in the brackets.
+                const name = grain === "subtype" ? cut : (row.label || "—").toUpperCase();
+                const of = grain === "subtype" || !sub.subtype ? sizeName : `${cut} - ${sizeName}`;
+                const first = subIndex === 0 && rowIndex === 0;
+                const last = rowIndex === sub.rows.length - 1;
+                return (
+                  <View key={`${type.itemType}|${size.size}|${sub.subtype}|${row.key}`} wrap={false}>
+                    {first && sizeIndex === 0 ? (
+                      <View style={styles.guideTypeBand}>
+                        <Text style={styles.guideTypeText}>
+                          {(type.itemType || "(no type)").toUpperCase()}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {first ? (
+                      <View style={styles.guideSizeBand}>
+                        <Text style={styles.guideSizeText}>{sizeName}</Text>
+                      </View>
+                    ) : null}
+                    <View style={styles.guideHead}>
+                      <Text style={styles.guideName}>{name}</Text>
+                      <Text style={styles.guideOf}>({of})</Text>
                     </View>
-                  );
-                })}
-              </View>
-            ))}
+                    <TrayRuler total={row.total} capacity={row.trayCapacity} />
+                    <View style={styles.guideSubtotal}>
+                      <Text style={styles.guideSubtotalText}>
+                        {name} TOTAL: {fmt(row.total)}
+                      </Text>
+                    </View>
 
-            <View style={styles.guideTypeTotal}>
-              <Text style={styles.guideTypeTotalText}>
-                {(type.itemType || "(no type)").toUpperCase()} TOTAL: {fmt(type.total)}
-              </Text>
-            </View>
-          </View>
-        ))
+                    {/* The cut's own total, where a cut has several rows. With
+                        one row — always, on the baker's guide — the line above
+                        already says it. */}
+                    {last && sub.rows.length > 1 ? (
+                      <View style={styles.guideCutTotal}>
+                        <Text style={styles.guideCutTotalText}>
+                          {cut} ({sizeName}) TOTAL: {fmt(sub.total)}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {last && lastCut ? (
+                      <View style={styles.guideTypeTotal}>
+                        <Text style={styles.guideTypeTotalText}>
+                          {(type.itemType || "(no type)").toUpperCase()} TOTAL: {fmt(type.total)}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              });
+            })
+          )
+        )
       )}
 
       {/* TOTAL BATCHES (Mark, 2026-09-30) — the baker's guide only. The bakers

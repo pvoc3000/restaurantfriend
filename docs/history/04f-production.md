@@ -1825,3 +1825,22 @@ guides for those alone (decision 11, one direction). Not verified in a browser
    which reads as a FileMaker sliding quirk, and it prints here. The type and
    size bands are inside the first row's `wrap={false}` block, so a band is
    never the last thing on a page.
+
+   **ROWS AT THE FOOT OF A TRAY GUIDE PAGE PRINTED SQUASHED OVER THE FOOTER
+   (Mark, 2026-10-04) — a react-pdf splitter rule, not a style.** When a
+   container's FIRST child will not fit, `splitNodes` keeps the whole container
+   on the current page: its guard reads "nothing placed yet in THIS container"
+   as "the page is empty". The guides nested type → size → cut → row, so a row
+   that was the first of its cut, size or type and landed at a page's foot was
+   crushed into the space left, with everything after it in that container
+   (three fryer rows at once in the reproduction). `flexShrink: 0` changes
+   nothing — measured — because nothing is shrinking by flex; the container is
+   handed a height. **Fixed by flattening**: every row is one `wrap={false}`
+   block and a direct child of the body, the bands inside the first row's
+   block and the totals inside the last's. Reproduced with a 37-line night
+   through the real components (rulers at a 41pt and an 18pt pitch, one at
+   y=758 in a 748pt content area) and re-measured after: every pitch 49pt or
+   more, nothing below y=717. **THE PREMADE SCHEDULE NESTS THE SAME WAY and is
+   not changed**: Mark's 2026-10-04 packet shows no squashing there, but the
+   rule applies to it — if a premade row ever prints over the footer, this is
+   why, and the fix is the same.
