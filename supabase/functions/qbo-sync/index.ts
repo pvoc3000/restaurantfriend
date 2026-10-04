@@ -268,10 +268,16 @@ function invoiceCodingWarnings(
     ((lines as { SalesItemLineDetail?: { ClassRef?: unknown } }[] | undefined) ?? []).some(
       (l) => Boolean(l.SalesItemLineDetail?.ClassRef)
     );
+  // TWO SETTINGS DROP A LINE'S CLASS, not one (INV-10011, 2026-10-04). Track
+  // classes was ON; "Assign classes" was "One to entire transaction"
+  // (`ClassTrackingPerTxn`), under which QuickBooks keeps a class only on the
+  // header and discards the one on each line — and the old message sent Mark
+  // to a switch that was already on.
   if (classed(payload.Line) && !classed(doc?.Line)) {
     out.push(
-      "QuickBooks did not keep the class. Turn on Track classes in " +
-        "Account and settings → Advanced → Categories, then send again."
+      "QuickBooks did not keep the class. In Account and settings → Advanced → " +
+        "Categories, Track classes must be on and Assign classes set to " +
+        "“One to each row in transaction”. Then send again."
     );
   }
   return out;

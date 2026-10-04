@@ -578,3 +578,13 @@ or a location — they rode inside each order's untaxed line under Special Order
   is fixed. The earlier note's "$7.47 at 10.25%" assumed the shop rate.
   Not verified in a browser (the pane was signed out); the function was
   deployed and its `tax_codes` mode read back through the shared module.
+
+**"DID NOT KEEP THE CLASS" WITH TRACK CLASSES ON (Mark, 2026-10-04, INV-10011).**
+QuickBooks' Preferences read `ClassTrackingPerTxn: true`,
+`ClassTrackingPerTxnLine: false` — "Assign classes: One to entire transaction".
+In that mode a sales invoice keeps a class only on its header and DROPS the
+`ClassRef` the app sends on each line (location was kept; all 14 lines came
+back unclassed). Mark switched it to "One to each row in transaction".
+`invoiceCodingWarnings` now names both settings; `qbo-sync` deployed as
+version 49. The bill, journal-entry and deposit class warnings were left as
+they were — not measured under the old setting.
