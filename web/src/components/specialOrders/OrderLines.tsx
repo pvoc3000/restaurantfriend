@@ -401,6 +401,10 @@ export function OrderLines({
   }
 
   const subtotal = ordered.reduce((a, l) => a + lineTotal(l), 0);
+  /** The footer's count is of pieces, not lines, and says it in dozens too,
+   *  which is how the kitchen and the customer both think of an order. */
+  const pieces = ordered.reduce((a, l) => a + Number(l.qty ?? 0), 0);
+  const dozens = Number((pieces / 12).toFixed(2));
 
   /**
    * GROUP BY (Mark, 2026-09-29). Bands over runs of Item type, Item or Price,
@@ -843,7 +847,7 @@ export function OrderLines({
                 </colgroup>
                 <tbody>
                   <tr>
-                    <td colSpan={canWrite ? 5 : 4} className="py-2 pr-3">
+                    <td colSpan={canWrite ? 3 : 2} className="py-2 pr-3">
                       {canWrite ? (
                         <AddOrderLine
                           orderId={orderId}
@@ -865,7 +869,13 @@ export function OrderLines({
                         />
                       ) : null}
                     </td>
-                    <td className="px-3 py-2 text-right align-top font-semibold">Items</td>
+                    {/* Spans Qty, Price and Tax: the Tax column alone clips this. */}
+                    <td
+                      colSpan={3}
+                      className="px-3 py-2 text-right align-top font-semibold whitespace-nowrap tabular-nums"
+                    >
+                      {pieces} {pieces === 1 ? "Item" : "Items"} / {dozens} Dozen
+                    </td>
                     <td className="px-3 py-2 text-right align-top font-semibold tabular-nums">
                       {moneyWithCommas(subtotal)}
                     </td>
