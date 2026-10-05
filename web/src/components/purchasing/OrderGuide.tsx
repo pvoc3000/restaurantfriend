@@ -633,6 +633,12 @@ export function OrderGuide({
   const sectionCount = sections.filter((section) => section.showHeader).length;
 
   const totals = useMemo(() => vendorTotals(rows, entries), [rows, entries]);
+  /** The same running figures by vendor id, for the band that heads each
+   *  vendor when the guide is grouped that way. */
+  const totalByVendor = useMemo(
+    () => new Map(totals.map((t) => [t.vendor_id, t.subtotal])),
+    [totals]
+  );
   const grandTotal = totals.reduce((sum, t) => (t.short ? sum : sum + t.subtotal), 0);
   const shortTotal = totals.reduce((sum, t) => (t.short ? sum + t.subtotal : sum), 0);
 
@@ -1376,6 +1382,26 @@ export function OrderGuide({
                             {section.items.length}{" "}
                             {section.items.length === 1 ? "item" : "items"}
                           </span>
+                          {/* Grouped by vendor, the band IS that vendor's
+                              basket, so it carries the basket's running total
+                              against the minimum. The minimum comes off the
+                              rows, not `totals`, which has no entry for a
+                              vendor with nothing ordered yet. */}
+                          {grouping === "vendor" &&
+                            (() => {
+                              const first = section.items[0]?.lines[0];
+                              if (!first) return null;
+                              const minimum =
+                                first.vendor_minimum === null ? null : Number(first.vendor_minimum);
+                              return (
+                                <span className="whitespace-nowrap text-[12px] uppercase tracking-[0.12em] tabular-nums text-white/55">
+                                  {money(totalByVendor.get(first.vendor_id) ?? 0)}
+                                  {minimum !== null
+                                    ? ` / $${minimum.toLocaleString("en-US", { maximumFractionDigits: 2 })}`
+                                    : ""}
+                                </span>
+                              );
+                            })()}
                           {/* The section's own command lives in its band, as
                               the original had it: an explicit zero for every
                               line you walked past. Entered quantities are
