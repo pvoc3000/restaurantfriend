@@ -268,22 +268,22 @@ export function OrderGuide({
 
   /**
    * The triangle discloses the day's OTHER sources for one item, so it belongs
-   * only on the one list that is narrower than that — Favorites, the working
-   * mode (Mark, 2026-07-26). Everywhere else it would either mean nothing or
-   * mean something different:
+   * only on the lists that are narrower than that — Favorites, the working
+   * mode (Mark, 2026-07-26), and Will order (Mark, 2026-10-05), where reviewing
+   * a decision is exactly when you swap it for another source. Everywhere else
+   * it would either mean nothing or mean something different:
    * - All — already shows every day-relevant source; there is nothing behind it.
    * - Skipped — a burn-down of what you haven't looked at. Expanding it mixes
    *   in lines you've already priced, which isn't what that list is for.
-   * - Will order — you're reviewing decisions, not shopping for alternatives.
    * - Ignore ordering days — the expansion is DEFINED by the day gates and the
    *   switch lifts them, so day-filtering one item inside a day-blind list
    *   would be incoherent; the switch is already this feature's global form.
    *
    * When it's off, the header shows NO triangle at all — not the greyed one.
    * The grey means "this item has no other source today", which is a claim
-   * only Favorites is in a position to make.
+   * only a narrowed list is in a position to make.
    */
-  const canExpand = !ignoreDays && filter === "favorites";
+  const canExpand = !ignoreDays && (filter === "favorites" || filter === "will_order");
 
   /** Changing what the list shows drops the expansions with it. */
   function changeFilter(next: GuideFilter) {
@@ -1533,7 +1533,7 @@ export function OrderGuide({
                                 than DataTable's small bordered box: this header
                                 is a 22px title read standing up and the control
                                 has to be hittable at arm's length. Absent
-                                entirely outside Favorites — see canExpand. */}
+                                entirely on All and Skipped — see canExpand. */}
                             {canExpand &&
                               (item.expandable ? (
                                 <button
