@@ -322,6 +322,11 @@ export function GenerateSchedules({
     // overwrites a fast second one and the list quietly describes the wrong
     // window.
     const seq = ++loadSeq.current;
+    // BACK TO "Looking…" while this is in flight, so `stillLooking` holds
+    // Generate. Otherwise a changed date leaves the previous window's orders
+    // in place, none of which are in the new run.
+    setCandidates(null);
+    setPullIds(new Set());
     const to = addDays(from, dayCount - 1);
     const { data: orders, error: e } = await supabase
       .from("special_orders")
@@ -527,6 +532,13 @@ export function GenerateSchedules({
   const pullCount = includeSpecial
     ? offered.filter((c) => pullIds.has(c.order.id)).length
     : 0;
+  // GENERATE WAITS FOR THE ORDER LIST (2026-10-04). The list arrives after the
+  // standing-order top-up and two queries, and until then `offered` is empty —
+  // so a Generate pressed in that second made the plan's schedule and pulled
+  // no orders, saying nothing. DF02's night for 10-04 was generated without
+  // Cafe Knotted's order that way, and the closing report had no page for it.
+  // A failed lookup sets `[]`, never null, so it cannot hold the button.
+  const stillLooking = includeSpecial && candidates === null;
 
   const withheldSentence =
     withheld.length === 0
@@ -604,10 +616,12 @@ export function GenerateSchedules({
                 <button
                   type="button"
                   onClick={() => run(false, false)}
-                  disabled={running || !start || (selected.size === 0 && pullCount === 0)}
+                  disabled={
+                    running || !start || stillLooking || (selected.size === 0 && pullCount === 0)
+                  }
                   className={DIALOG_COMMIT_CLASS}
                 >
-                  {running ? "Generating…" : "Generate"}
+                  {running ? "Generating…" : stillLooking ? "Looking…" : "Generate"}
                 </button>
               </>
             )

@@ -1844,3 +1844,24 @@ guides for those alone (decision 11, one direction). Not verified in a browser
    not changed**: Mark's 2026-10-04 packet shows no squashing there, but the
    rule applies to it — if a premade row ever prints over the footer, this is
    why, and the fix is the same.
+
+## 2026-10-04 — DF02's night for 10-04 was generated without Cafe Knotted's order
+
+Mark: the DF02 closing report email had no Cafe Knotted section. Because no
+schedule existed for SO-10053 (status `order`, paid, kitchen DF02, unflagged):
+the email prints a section per schedule. Karina's Generate at 5:31:25pm on
+10-03 made the plan schedule (`ignored_special_orders = false`) and no
+special-order schedule; the packet printed 14 seconds later.
+
+Most likely, NOT proven: Generate was pressed while the order list was still
+loading. `openWork` runs the standing-order top-up and then two queries, and
+until they answer `candidates` is null and `offered` is empty — the button was
+live the whole time a shop was ticked, and `run()` then pulled nothing and said
+nothing. The data cannot tell this from a hand-unticked order or a failed
+`schedule_special_order` the dialog listed. Older than the 10-03 change above.
+
+Fixed: Generate is disabled and reads "Looking…" while `includeSpecial` is on
+and `candidates === null`; `loadCandidates` resets to null when it starts, so a
+changed date holds the button too rather than running over the previous
+window's list. A failed lookup sets `[]` and does not hold it. Typecheck and
+lint pass; not walked in a browser — opening the dialog runs the top-up.
