@@ -1865,3 +1865,61 @@ and `candidates === null`; `loadCandidates` resets to null when it starts, so a
 changed date holds the button too rather than running over the previous
 window's list. A failed lookup sets `[]` and does not hold it. Typecheck and
 lint pass; not walked in a browser — opening the dialog runs the top-up.
+
+## 2026-10-04 — A schedule remembers the plans it came from (migration 173, NOT YET APPLIED)
+
+Mark: DF01 was planned to make DF02's donuts on Monday 10-05 and for one day
+DF02 had to make its own. In FileMaker he generated, changed the kitchen and
+locked the schedule. Here a schedule's Made at has been a picker since
+2026-09-30, but `generate_production_schedules` found an existing schedule by
+shop, date AND kitchen, so a moved schedule looked like a missing one and the
+next Generate made a second. Reproduced on the harness with the live function:
+generate, move to DF02, generate again → two schedules with the same lines.
+
+Considered and dropped: a dated kitchen override beside the par overrides on
+`/production-day`. Mark did not know that screen existed (nothing links to it;
+it is URL only) and does not see what it adds over generating and editing the
+schedule. A "moved from kitchen" column was dropped too. Mark: "remembering
+the plan it came from is more powerful than remembering the kitchen it was
+moved from … the app can check if a schedule was already generated for that
+plan for that day, and skip it if it has."
+
+Built:
+- `production_schedules.plan_ids uuid[]`, written at generation from
+  `production_day`'s own `plan_ids`. A list because overlapping plans into one
+  kitchen still make ONE schedule with summed pars (decision 9). Mark had
+  assumed two schedules; told why it is one (counts, par overrides and the
+  premade sheet are one number per item per shop per day) he kept it. No active
+  plans overlap today, so the list holds one.
+- The generator finds the schedule by plan overlap, for that shop and date,
+  whatever its kitchen. The kitchen still decides when there is no plan to
+  match on (nothing recorded, or a day made only of par-override additions).
+  A regeneration rewrites the moved schedule in place and it stays where it
+  was moved. The kitchen that already holds a schedule is processed first, so
+  when one of two plans on a schedule later changes kitchen, a regeneration
+  leaves the first plan's lines on the old schedule and makes a new one for
+  the second. If another plan's schedule sits at the kitchen a new one would
+  need, nothing is written and each item gets a `kitchen_taken` warning
+  ("Not scheduled" on the receipt) instead of the run failing on
+  `production_schedules_plan_day`.
+- Backfill, measured over the 64 plan schedules on 2026-10-04: 61 match exactly
+  one plan on shop, date and weekday kitchen, none match two; the other 3 had
+  been moved by hand and are matched on shop and date where exactly one plan
+  covers them. `is_active` is not asked, so the 24 summer schedules name their
+  plan again.
+- `plansInForce` returns the recorded plans when there are any and derives as
+  before otherwise, so the From column and the record's "From …" line survive
+  a moved kitchen and a retired plan.
+
+Not changed: `production_day`, `/production-day` (still unlinked), the Made at
+picker, and `sellingShopsForKitchen` — the generate dialog still offers a
+kitchen the shops its PLANS name, and the generator then skips what exists.
+
+Verified: prelude + live function + 173 on Docker PG15, both ways. Before 173
+the move duplicates; with it the second Generate skips, a regenerate replaces
+in place at DF02, the two-plan and taken-kitchen cases behave as above, a
+schedule with nothing recorded still matches on kitchen, and the migration
+applies twice. `production_day` was a stub reading a table, so the real
+function's `plan_ids` were not exercised there. 2,220 fixtures pass; the new
+ones go red when the recorded branch is disabled. Not walked in a browser:
+/schedules selects `plan_ids`, which does not exist until 173 is applied.

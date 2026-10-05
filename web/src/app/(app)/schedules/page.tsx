@@ -68,7 +68,7 @@ export default async function SchedulesPage() {
       // from the select's literal type, and `"a" + "b"` widens to `string`,
       // which turns every field access into a GenericStringError.
       .select(
-        `id, schedule_date, location_id, kitchen_location_id, source, title,
+        `id, schedule_date, location_id, kitchen_location_id, source, title, plan_ids,
          generated_at, generated_by, printed_at, printed_by, regeneration_count, note`
       )
       .gte("schedule_date", from)
@@ -94,7 +94,9 @@ export default async function SchedulesPage() {
         Could not load schedules: {error.message}
         {/production_schedule/.test(error.message)
           ? " — migration 040 has not been applied yet."
-          : ""}
+          : /plan_ids/.test(error.message)
+            ? " — migration 173 has not been applied yet."
+            : ""}
       </p>
     );
   }
@@ -141,6 +143,7 @@ export default async function SchedulesPage() {
       // list already holds the codes for display.
       location_id: s.location_id as string,
       kitchen_location_id: s.kitchen_location_id as string,
+      plan_ids: (s.plan_ids ?? []) as string[],
       generatedAt: (s.generated_at ?? null) as string | null,
       // The DAY it was printed, in the org's zone. `printed_at` is a
       // timestamptz, and slicing it reads the UTC date — so a packet printed

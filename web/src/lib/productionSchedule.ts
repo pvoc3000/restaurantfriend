@@ -520,10 +520,25 @@ export type ScheduleOrigin = {
   schedule_date: string;
   location_id: string;
   kitchen_location_id: string;
+  /**
+   * The plans the schedule was generated from — `production_schedules.plan_ids`
+   * (migration 173). Empty or absent on a schedule nothing was recorded for.
+   */
+  plan_ids?: readonly string[] | null;
 };
 
 /**
- * The plans in force for a schedule's shop, kitchen and day.
+ * The plans a schedule came from.
+ *
+ * RECORDED SINCE 173, AND THE RECORD WINS. Generation writes the plans that fed
+ * a schedule onto it, so a schedule whose Made at was moved for a day still
+ * names its plan, and so does one whose plan has since been retired or re-dated
+ * — neither of which the derivation below can do, because it asks today's plans
+ * about the schedule's present kitchen.
+ *
+ * THE DERIVATION REMAINS for a schedule with nothing recorded: one that 173's
+ * backfill could not place. It is the plans in force for the schedule's shop,
+ * kitchen and day.
  *
  * Mirrors `production_day`'s own `planned` CTE — active, this SELLING location,
  * and the date inside `[starts_on, ends_on]` — plus the kitchen, because a shop
@@ -545,6 +560,12 @@ export function plansInForce<T extends SchedulePlan>(
   schedule: ScheduleOrigin,
   plans: readonly T[]
 ): T[] {
+  const recorded = schedule.plan_ids ?? [];
+  if (recorded.length > 0) {
+    // A plan deleted since leaves its id behind and simply names nothing.
+    const named = plans.filter((p) => recorded.includes(p.id));
+    if (named.length > 0) return named;
+  }
   return plans.filter(
     (p) =>
       p.is_active &&
@@ -566,13 +587,10 @@ export function plansInForce<T extends SchedulePlan>(
  * such row and so distinguished none of them, where "SUMMER 2026 (DF01)" is the
  * thing you would actually go and look at.
  *
- * IT IS DERIVED, NOT SNAPSHOTTED, and that is worth knowing: nothing records
- * which plans fed a generation, so this answers "which plans are in force for
- * that shop and day" — which is exactly the claim the record screen already
- * makes in words ("From the plans active that day"). The cost is that
- * activating or retiring a plan changes what an OLD schedule says it came from.
- * Snapshotting `plan_ids` at generation is the fix if that ever bites, and it
- * is a migration.
+ * IT WAS DERIVED UNTIL 173, which is the migration this comment used to ask
+ * for: generation now records `plan_ids` on the schedule and `plansInForce`
+ * reads them, so retiring a plan or moving a schedule's kitchen no longer
+ * changes what an old schedule says it came from.
  *
  * Several plans can be in force at once — decision 9 makes a shop's menu their
  * union and their pars SUM — so the label has to hold more than one. Measured

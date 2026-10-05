@@ -56,7 +56,7 @@ export async function ScheduleDetail({
   const { data: schedule, error } = await supabase
     .from("production_schedules")
     .select(
-      `id, schedule_date, location_id, kitchen_location_id, source, source_ref, title,
+      `id, schedule_date, location_id, kitchen_location_id, source, source_ref, title, plan_ids,
        generated_at, generated_by, regenerated_at, regeneration_count,
        printed_at, printed_by, ignored_special_orders, note`
     )
@@ -235,10 +235,8 @@ export async function ScheduleDetail({
       tray_capacity: Number(i.tray_capacity ?? 24),
     }));
 
-  // Derived, not snapshotted: nothing records which plans fed a generation, so
-  // this is "which were in force for this shop, kitchen and day" — the claim
-  // this sentence has always made, now with the names in it. See
-  // `scheduleSourceLabel` for what that costs.
+  // The plans recorded on the schedule at generation (173), or — for one with
+  // nothing recorded — those in force for this shop, kitchen and day.
   const sourcePlans =
     (schedule.source ?? "plan") === "plan"
       ? plansInForce(
@@ -248,6 +246,7 @@ export async function ScheduleDetail({
             schedule_date: schedule.schedule_date as string,
             location_id: schedule.location_id as string,
             kitchen_location_id: schedule.kitchen_location_id as string,
+            plan_ids: (schedule.plan_ids ?? []) as string[],
           },
           (planRows ?? []).map((pl) => ({
             id: pl.id as string,

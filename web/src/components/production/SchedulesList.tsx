@@ -42,6 +42,8 @@ export type ScheduleRow = {
   title: string | null;
   location_id: string;
   kitchen_location_id: string;
+  /** The plans it was generated from (173) — what the From column names. */
+  plan_ids: string[];
   generatedAt: string | null;
   printedAt: string | null;
   /** The printer's display name, when they still have one. */

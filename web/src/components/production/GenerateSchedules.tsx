@@ -126,6 +126,7 @@ const WARNING_TITLE: Record<string, string> = {
   kitchen_split_override: "Override went to one kitchen",
   kitchen_assumed: "Kitchen assumed",
   not_made: "Not made",
+  kitchen_taken: "Not scheduled",
 };
 
 export function GenerateSchedules({

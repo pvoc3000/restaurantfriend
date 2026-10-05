@@ -235,8 +235,9 @@ begin
 
           -- Another plan's schedule is sitting at this kitchen, so a new one
           -- here would be the second schedule for one shop, date and kitchen
-          -- that `production_schedules_plan_day` forbids. Left alone and
-          -- reported, rather than failing the whole run on a unique key.
+          -- that `production_schedules_plan_day` forbids. Nothing is written
+          -- and each item is named on the receipt, rather than failing the whole
+          -- run on a unique key.
           select s.id into v_blocker
             from production_schedules s
            where s.location_id = v_loc_id
@@ -246,20 +247,19 @@ begin
 
           if v_blocker is not null then
             select l.code into v_kit_code from locations l where l.id = v_kitchen;
-            select count(*), count(*) filter (where li.made is not null
-                                                 or li.leftover is not null)
-              into v_lines, v_actuals
-              from production_schedule_items li where li.schedule_id = v_blocker;
-
-            if not exists (select 1 from jsonb_array_elements(v_skipped) e
-                            where e->>'schedule_id' = v_blocker::text) then
-              v_skipped := v_skipped || jsonb_build_object(
-                'schedule_id', v_blocker, 'date', v_date,
-                'location_id', v_loc_id, 'location_code', v_loc_code,
-                'kitchen_location_id', v_kitchen, 'kitchen_code', v_kit_code,
-                'reason', 'kitchen_taken', 'line_count', v_lines,
-                'has_actuals', v_actuals > 0);
-            end if;
+            for w in
+              select d.item_name
+                from production_day(v_loc_id, v_date) d
+               where d.kitchen_location_id = v_kitchen
+                 and d.par > 0 and not d.is_suppressed
+               order by d.item_name
+            loop
+              v_warnings := v_warnings || jsonb_build_object(
+                'kind', 'kitchen_taken', 'date', v_date, 'location_code', v_loc_code,
+                'item_name', w.item_name,
+                'detail', format('not scheduled; another %s schedule is already at %s',
+                                 v_loc_code, v_kit_code));
+            end loop;
             continue;
           end if;
         end if;

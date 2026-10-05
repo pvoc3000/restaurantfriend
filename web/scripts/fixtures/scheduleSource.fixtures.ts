@@ -144,6 +144,39 @@ test("plansInForce: the kitchen is asked of the SCHEDULE'S OWN WEEKDAY", () => {
   eq(plansInForce(schedule({ ...thu, kitchen_location_id: DF01 }), [split]).length, 0, "not DF01 on Thursday");
 });
 
+test("plansInForce: the plans RECORDED on the schedule win (173)", () => {
+  // DF02's plan bakes at DF01 on a Friday; the schedule was moved to DF02 for
+  // the day. The derivation asks the plan about DF02 and finds nothing.
+  const fall = plan({ id: "fall", title: "Fall 2026 - DF02", location_id: DF02 });
+  const moved = { location_id: DF02, kitchen_location_id: DF02 };
+  eq(plansInForce(schedule(moved), [fall]).length, 0, "derived: lost by the move");
+  eq(
+    plansInForce(schedule({ ...moved, plan_ids: ["fall"] }), [fall]).map((p) => p.title),
+    ["Fall 2026 - DF02"],
+    "recorded: still named"
+  );
+  eq(scheduleSourceLabel(schedule({ ...moved, plan_ids: ["fall"] }), [fall]), "Fall 2026 - DF02", "label");
+
+  // A retired or re-dated plan is still the plan the schedule came from.
+  const retired = plan({ id: "summer", is_active: false, ends_on: "2026-08-20" });
+  eq(plansInForce(schedule(), [retired]).length, 0, "derived: retired");
+  eq(plansInForce(schedule({ plan_ids: ["summer"] }), [retired]).length, 1, "recorded: retired");
+
+  // The record is not widened by whatever else happens to be in force.
+  const other = plan({ id: "other", title: "EVERYDAY" });
+  eq(
+    plansInForce(schedule({ plan_ids: ["plan-1"] }), [plan(), other]).map((p) => p.id),
+    ["plan-1"],
+    "only the recorded plan"
+  );
+});
+
+test("plansInForce: nothing recorded, or a deleted plan, falls back to the derivation", () => {
+  eq(plansInForce(schedule({ plan_ids: [] }), [plan()]).length, 1, "empty");
+  eq(plansInForce(schedule({ plan_ids: null }), [plan()]).length, 1, "null");
+  eq(plansInForce(schedule({ plan_ids: ["gone"] }), [plan()]).length, 1, "deleted plan");
+});
+
 test("plansInForce: the date range includes BOTH its ends", () => {
   const bounded = plan({ starts_on: "2026-08-08", ends_on: "2026-08-28" });
   eq(plansInForce(schedule({ schedule_date: "2026-08-08" }), [bounded]).length, 1, "first day");
