@@ -1866,7 +1866,7 @@ changed date holds the button too rather than running over the previous
 window's list. A failed lookup sets `[]` and does not hold it. Typecheck and
 lint pass; not walked in a browser — opening the dialog runs the top-up.
 
-## 2026-10-04 — A schedule remembers the plans it came from (migration 173, NOT YET APPLIED)
+## 2026-10-04 — A schedule remembers the plans it came from (migration 173, APPLIED 2026-10-04)
 
 Mark: DF01 was planned to make DF02's donuts on Monday 10-05 and for one day
 DF02 had to make its own. In FileMaker he generated, changed the kitchen and
@@ -1923,3 +1923,7 @@ applies twice. `production_day` was a stub reading a table, so the real
 function's `plan_ids` were not exercised there. 2,220 fixtures pass; the new
 ones go red when the recorded branch is disabled. Not walked in a browser:
 /schedules selects `plan_ids`, which does not exist until 173 is applied.
+
+Applied 2026-10-04 at Mark's request (`db query --linked -f`, one transaction):
+all 64 plan schedules now carry exactly one plan, the 27 special-order
+schedules none, and `anon` still cannot execute the generator.
