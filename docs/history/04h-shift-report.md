@@ -757,7 +757,7 @@ A **Shift** picklist followed the same day (All · Opening · Mid · Closing ·
 Off-site, counted over the loaded window), filtering in the browser between
 Dates and Show. Not walked in a browser either.
 
-## 2026-10-06 — Donut batches asks only for what the kitchen made (migration 175, NOT APPLIED)
+## 2026-10-06 — Donut batches asks only for what the kitchen made (migration 175, APPLIED 2026-10-06)
 
 Mark: DF02's opening report for 10-06 emailed nine donut rows, all 0, though
 DF01 had made DF02's case. The page generated a Donut log for the report's own
