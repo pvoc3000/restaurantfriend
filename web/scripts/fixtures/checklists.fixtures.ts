@@ -21,6 +21,7 @@
 import { test, eq, ok, no } from "./harness";
 import {
   withLeftRun,
+  awaitsValue,
   CLOSING_ROLLOVER_HOUR,
   assessReading,
   businessDateFor,
@@ -504,4 +505,15 @@ test("withLeftRun: remembers a checklist once, newest last, and forgets the olde
   eq(withLeftRun([], "a"), ["a"]);
   eq(withLeftRun(["a", "b"], "a"), ["b", "a"], "left again moves to the end, not twice");
   eq(withLeftRun(["a", "b", "c"], "d", 3), ["b", "c", "d"], "capped");
+});
+
+test("awaitsValue: a number or text item is not done until it has its value", () => {
+  const item = { value_number: null, value_text: null };
+  ok(awaitsValue({ ...item, response_type: "number" }), "no reading");
+  no(awaitsValue({ ...item, response_type: "number", value_number: 0 }), "zero IS a reading");
+  ok(awaitsValue({ ...item, response_type: "text" }), "no text");
+  ok(awaitsValue({ ...item, response_type: "text", value_text: "   " }), "spaces are not an answer");
+  no(awaitsValue({ ...item, response_type: "text", value_text: "Karina" }), "text");
+  no(awaitsValue({ ...item, response_type: "check" }), "a check has no box");
+  no(awaitsValue({ ...item, response_type: "choice" }), "nor a choice");
 });

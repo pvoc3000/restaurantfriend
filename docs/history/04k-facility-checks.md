@@ -958,3 +958,27 @@ double-mount would otherwise count the first look as a leave.
 
 Verified: typecheck, lint, 2,241 fixtures. NOT walked in a browser: the test
 pane was signed out.
+
+## 2026-10-06 — A number or text item is not Done without its value
+
+Mark: "if a checklist item needs a numeric or text value entered, make it
+mandatory. Just clicking 'done' without entering a value isn't good enough."
+
+Built, in `WalkItem` (the only writer of an item's status), with
+`awaitsValue` in `lib/checklists`:
+- Done on a number or text item with no value does not write. It arms the row
+  (the button reads as pressed) and focuses the box, the same answer the note
+  gives for Issue and N/A. Leaving the box empty disarms it.
+- Entering text on a pending row marks it done, as a reading always has;
+  emptying the text on a done row returns it to pending. A row flagged Issue
+  or N/A keeps its flag either way, and neither asks for the value.
+- Fixed on the way: blurring an EMPTY reading box wrote `pending` every time,
+  so tabbing through a number item already flagged as an issue cleared the
+  flag and its note. An empty box left empty now writes nothing.
+
+Not done: choice items (Done without picking an option still works), a
+database constraint (the rule is the screen's), and rows already marked done
+with no value on existing checklists, which stay done.
+
+Verified: typecheck, lint, 2,242 fixtures. NOT walked in a browser: the test
+pane was signed out.

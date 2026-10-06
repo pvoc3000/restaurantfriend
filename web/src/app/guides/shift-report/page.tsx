@@ -298,6 +298,11 @@ export default function ShiftReportGuide() {
                 reading out of range is flagged as an issue automatically.
               </li>
               <li>
+                An item that asks for a number or a written answer is done when you enter it.
+                Tapping <Ui>Done</Ui> first puts you in the box. If you can’t get the answer,
+                mark it <Ui>Issue</Ui> or <Ui>N/A</Ui> and say why.
+              </li>
+              <li>
                 For a problem that needs fixing later, tap <Ui>Pin to checklists</Ui>. It will
                 show up on every checklist until someone completes it. If you don’t pin it, it
                 only appears in tonight’s report.

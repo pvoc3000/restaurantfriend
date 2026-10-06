@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
+  awaitsValue,
   readingLabel,
   statusForReading,
   type CheckStatus,
@@ -128,6 +129,7 @@ export function WalkItem({
   }
   const row: WalkItemRow = overlay ? { ...saved, ...overlay } : saved;
   const fileInput = useRef<HTMLInputElement>(null);
+  const valueInput = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState(row.note ?? "");
   const [text, setText] = useState(saved.value_text ?? "");
   const [value, setValue] = useState(
@@ -204,6 +206,15 @@ export function WalkItem({
       setArming(target);
       return;
     }
+    // A NUMBER OR TEXT ITEM IS NOT DONE WITHOUT ITS VALUE (Mark, 2026-10-06).
+    // The same answer as the note: arm the row and put the cursor in the box,
+    // and entering the value is what marks it done.
+    if (target === "done" && awaitsValue(row)) {
+      onError(null);
+      setArming("done");
+      valueInput.current?.focus();
+      return;
+    }
     setArming(null);
     void write({
       status: target,
@@ -218,6 +229,10 @@ export function WalkItem({
       onError(`“${raw}” is not a number.`);
       return;
     }
+    if (arming === "done") setArming(null);
+    // An empty box left empty changes nothing — and must not, or tabbing
+    // through a row flagged as an issue would set it back to pending.
+    if (parsed === null && row.value_number == null) return;
     // THE ONE PLACE THE APP DECIDES ANYTHING: a reading outside the item's
     // expected range raises the issue by itself, so nobody has to remember that
     // 41°F is bad. An issue needs a note, so a bare out-of-range reading writes
@@ -270,6 +285,8 @@ export function WalkItem({
   }
 
   const needsNote = row.status === "issue" || row.status === "na";
+  /** Armed for a NOTE — an issue or an N/A. Armed for Done waits on the value. */
+  const armingNote = arming === "issue" || arming === "na" ? arming : null;
 
   return (
     <li className={`space-y-3 p-3 ${flagMissed && row.status === "pending" ? "bg-stop" : ""}`}>
@@ -365,6 +382,7 @@ export function WalkItem({
       {row.response_type === "number" && (
         <div className="flex flex-wrap items-center gap-2">
           <input
+            ref={valueInput}
             // `inputMode="decimal"` and 16px type: below 16 iOS Safari zooms the
             // whole page on focus, which on a walk means losing your place.
             inputMode="decimal"
@@ -443,12 +461,25 @@ export function WalkItem({
           // write on every keystroke with the server's value as the only
           // state, so each letter waited on a save and a full refresh before
           // it appeared.
+          ref={valueInput}
           value={text}
           disabled={!writable}
           onChange={(e) => setText(e.target.value)}
           onBlur={() => {
+            if (arming === "done") setArming(null);
             const v = text.trim() || null;
-            if (v !== (row.value_text ?? null)) void write({ value_text: v });
+            if (v === (row.value_text ?? null)) return;
+            // THE ANSWER IS WHAT MAKES IT DONE, the reading's rule: typing one
+            // on a pending row marks it, and emptying a done row unmarks it. A
+            // row flagged as an issue or N/A keeps its flag either way.
+            void write({
+              value_text: v,
+              ...(v !== null && row.status === "pending"
+                ? { status: "done" as CheckStatus }
+                : v === null && row.status === "done"
+                  ? { status: "pending" as CheckStatus, note: null }
+                  : {}),
+            });
           }}
           aria-label={`${row.prompt} answer`}
           className="h-11 w-full border border-hairline px-2 text-[16px] focus:border-ink focus:outline-none disabled:opacity-50"
@@ -482,7 +513,7 @@ export function WalkItem({
         </div>
       )}
 
-      {(arming || needsNote || note) && (
+      {(armingNote || needsNote || note) && (
         <textarea
           value={note}
           disabled={!writable}
@@ -490,7 +521,7 @@ export function WalkItem({
           // the attribute fires exactly once and the tablet's keyboard comes up
           // with it — where on page load `arming` is null, so a row that merely
           // carries an old note does not steal focus.
-          autoFocus={arming !== null}
+          autoFocus={armingNote !== null}
           onChange={(e) => setNote(e.target.value)}
           onKeyDown={(e) => {
             // ⌘↵ commits, `InlineValue`'s multiline convention — so the note can
@@ -501,8 +532,8 @@ export function WalkItem({
             }
           }}
           onBlur={() => {
-            if (arming) {
-              const target = arming;
+            if (armingNote) {
+              const target = armingNote;
               setArming(null);
               // An empty box is somebody changing their mind, not an error: the
               // status was never written, so there is nothing to complain about
@@ -524,7 +555,7 @@ export function WalkItem({
           }}
           rows={2}
           placeholder={
-            (arming ?? row.status) === "na" ? "Why not?" : "What is wrong?"
+            (armingNote ?? row.status) === "na" ? "Why not?" : "What is wrong?"
           }
           aria-label={`Note for ${row.prompt}`}
           className="w-full border border-hairline p-2 text-[16px] focus:border-ink focus:outline-none disabled:opacity-50"

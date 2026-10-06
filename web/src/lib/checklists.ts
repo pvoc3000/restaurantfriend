@@ -215,6 +215,24 @@ export function statusForReading(item: RangeSpec, value: number | null): CheckSt
   return readingIsOutOfRange(item, value) ? "issue" : "done";
 }
 
+/**
+ * Is this item still waiting for the value it asks for?
+ *
+ * A number or a text item is not Done until it has one (Mark, 2026-10-06:
+ * "Just clicking 'done' without entering a value isn't good enough"). Issue
+ * and N/A do not ask — a thermometer you cannot read is exactly an issue — and
+ * a check or a choice item has no box to leave empty.
+ */
+export function awaitsValue(item: {
+  response_type: ResponseType;
+  value_number: number | null;
+  value_text: string | null;
+}): boolean {
+  if (item.response_type === "number") return item.value_number == null;
+  if (item.response_type === "text") return (item.value_text ?? "").trim() === "";
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // The walk's own order
 // ---------------------------------------------------------------------------
