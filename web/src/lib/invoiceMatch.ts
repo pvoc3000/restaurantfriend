@@ -98,10 +98,14 @@ function duplicatedSkus(counts: Map<string, number>): string[] {
   return [...counts.entries()].filter(([, n]) => n > 1).map(([sku]) => sku);
 }
 
-/** Words worth comparing: 2+ characters, punctuation dropped. */
-function tokens(text: string): Set<string> {
+/** Words worth comparing: 2+ characters, punctuation dropped.
+ *
+ *  Null is a real input despite `InvoiceLine.description` being typed `string`:
+ *  the edge function stores a blank as null (`normalizeBlanks`), so a line the
+ *  reader could not describe arrives here with none, and has no words. */
+function tokens(text: string | null): Set<string> {
   return new Set(
-    text
+    (text ?? "")
       .toLowerCase()
       .split(/[^a-z0-9]+/)
       .filter((w) => w.length > 1)

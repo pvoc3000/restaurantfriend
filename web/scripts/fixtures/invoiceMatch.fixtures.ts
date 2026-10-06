@@ -126,6 +126,16 @@ test("the real Guittard pair — containment answers 1.0 where Jaccard refused",
   eq(matches[0].invoice, inv);
 });
 
+test("an invoice line the reader stored with no description does not throw", () => {
+  // `extract-invoice` turns a blank string into null before storing, so the
+  // type's `string` is not what arrives. PO 112-181310-01 would not reconcile.
+  const line = poLine({ product_id: "AAA111", description: "ORGANIC WHOLE MILK GALLON" });
+  const blank = invoiceLine({ description: null as unknown as string });
+  const { matches, unmatchedInvoice } = matchInvoiceToOrder([line], [blank]);
+  eq(matches[0].by, null);
+  eq(unmatchedInvoice.length, 1);
+});
+
 test("a SKU that finds nothing still falls through to the description", () => {
   // Both sides print a SKU and they disagree — a vendor renumbering a part, or
   // our snapshot going stale. The descriptions are the remaining evidence, so
