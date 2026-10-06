@@ -33,6 +33,7 @@ import {
   sumBreakdowns,
   type InvoiceCandidate,
 } from "../../src/lib/customerInvoices";
+import { missingTaxRate } from "../../src/lib/specialOrders";
 
 const day = (n: number, over: Partial<InvoiceCandidate> = {}): InvoiceCandidate => ({
   id: `o${n}`,
@@ -166,6 +167,24 @@ test("isCustomerInvoiceSnapshot: tells the two snapshots apart", () => {
   ok(isCustomerInvoiceSnapshot({ kind: "customer_invoice" }));
   eq(isCustomerInvoiceSnapshot({ number: "10070", lines: [] }), false);
   eq(isCustomerInvoiceSnapshot(null), false);
+});
+
+test("createRefusals: taxable items and no tax rate is refused, naming the order", () => {
+  const one = createRefusals([...week, day(8, { no_tax_rate: true })]);
+  eq(one.length, 1);
+  ok(one[0].includes("#10064") && one[0].includes("no tax rate"));
+  const two = createRefusals([day(8, { no_tax_rate: true }), day(9, { no_tax_rate: true })]);
+  ok(two[0].includes("#10064, #10065"));
+  eq(createRefusals(week.map((r) => ({ ...r, no_tax_rate: false }))), []);
+});
+
+test("missingTaxRate: an empty rate over taxable items, and 0 is a rate", () => {
+  eq(missingTaxRate(null, 93.6), true);
+  eq(missingTaxRate("", 93.6), true);
+  eq(missingTaxRate(0, 93.6), false, "0% is how an untaxed order is stated");
+  eq(missingTaxRate("0.00000", 93.6), false);
+  eq(missingTaxRate(0.1025, 93.6), false);
+  eq(missingTaxRate(null, 0), false, "nothing taxable, nothing to flag");
 });
 
 test("createRefusals: an order already on an invoice is refused before the database refuses it", () => {

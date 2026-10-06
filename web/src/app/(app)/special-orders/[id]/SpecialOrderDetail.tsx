@@ -28,6 +28,7 @@ import {
   type SpecialOrderStatus,
   customerContactName,
   isWholesaleOrder,
+  missingTaxRate,
 } from "@/lib/specialOrders";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
@@ -534,6 +535,7 @@ export async function SpecialOrderDetail({
     shop: codeFor(kitchenId),
     balance: totals.balance,
     on_invoice: liveInvoice !== null,
+    no_tax_rate: missingTaxRate(row.tax_rate as number | null, totals.taxableSubtotal),
     wholesale: isWholesaleOrder({
       square_item: (row.square_item as string | null) ?? null,
       standing_order_id: (row.standing_order_id as string | null) ?? null,
@@ -602,6 +604,7 @@ export async function SpecialOrderDetail({
           total: totals.total,
           unbilled,
           hasCustomer: !!customer,
+          noTaxRate: invoiceCandidate.no_tax_rate === true,
           defaultDepositRate: settings.depositRate,
           from: invoiceFrom,
           openInvoices,

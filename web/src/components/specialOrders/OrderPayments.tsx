@@ -70,6 +70,8 @@ export type OrderMoneyContext = {
   /** What is left to bill (141's `special_order_unbilled`). */
   unbilled: number;
   hasCustomer: boolean;
+  /** `missingTaxRate` — New Invoice refuses until a rate is set. */
+  noTaxRate: boolean;
   defaultDepositRate: number;
   from: { href: string; label: string };
   /** The invoices a payment can be applied to — open, with what each is due. */
@@ -353,6 +355,7 @@ export function OrderPayments({
           total={ctx.total}
           unbilled={ctx.unbilled}
           hasCustomer={ctx.hasCustomer}
+          noTaxRate={ctx.noTaxRate}
           defaultDepositRate={ctx.defaultDepositRate}
           from={ctx.from}
           onClose={() => setOpening(null)}

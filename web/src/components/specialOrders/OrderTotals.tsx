@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Checkbox } from "@/components/ui/Checkbox";
-import { money, type MoneyOrder, type OrderTotals as Totals } from "@/lib/specialOrders";
+import { missingTaxRate, money, type MoneyOrder, type OrderTotals as Totals } from "@/lib/specialOrders";
 import { PERCENT_SCALE, percentLabel, toPercent } from "@/lib/percent";
 import { PickList } from "@/components/ui/PickList";
 import { useLatestWrite } from "@/lib/latestWrite";
@@ -140,7 +140,17 @@ export function OrderTotals({
       <div className="grid max-w-[36rem] gap-x-24 gap-y-6 md:grid-cols-[auto_auto]">
         {/* --------- the inputs --------- */}
         <dl className="space-y-3 text-[14px]">
-          <Line label="Tax rate">
+          {/* TAXABLE ITEMS AND NO RATE IS FLAGGED (Mark, 2026-10-06): SO-10110
+              reached an invoice untaxed because an empty box here said
+              nothing. 0% is a rate and is not flagged. */}
+          <Line
+            label="Tax rate"
+            after={
+              missingTaxRate(inputs.tax_rate, totals.taxableSubtotal) ? (
+                <span className="bg-mark-fill px-1 text-[12px] font-normal text-ink">not set</span>
+              ) : undefined
+            }
+          >
             {/* Stored as a FRACTION (.0975) and TYPED AS A PERCENTAGE (Mark,
                 2026-09-20) — `lib/percent` holds the pair and the reasoning.
                 The column keeps FileMaker's convention; the box in front of

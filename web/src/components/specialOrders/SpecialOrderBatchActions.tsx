@@ -18,6 +18,7 @@ import {
   money,
   type SpecialOrderStatus,
   isWholesaleOrder,
+  missingTaxRate,
 } from "@/lib/specialOrders";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { DateField } from "@/components/ui/DateField";
@@ -128,6 +129,7 @@ export function SpecialOrderBatchActions({
     customer_name: customerLabel(r.customer),
     shop: r.kitchen_code ?? r.location_code,
     on_invoice: r.invoice_id !== null,
+    no_tax_rate: missingTaxRate(r.tax_rate, r.totals.taxableSubtotal),
     balance: r.totals.balance,
     wholesale: isWholesaleOrder(r),
   }));

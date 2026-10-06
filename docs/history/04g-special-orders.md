@@ -5584,3 +5584,33 @@ their value instead of on a line beneath it; the gaps between the bands 18–20p
 → 12pt. On the `/forms` sample the item list starts about 80pt higher and the
 eight lines plus "End of list" now fit page 1. The pickup time keeps its yellow
 fill and the allergen band its place above the fields.
+
+## 2026-10-06 — Migration 174: no invoice for taxable items with no tax rate
+
+Traci made INV-10013 for SO-10110 and the app refused to SEND it ("This invoice
+charges tax but none of its orders has a tax rate"). Mark: "the app should have
+refused to create the invoice without a tax rate set instead of refusing to
+send it."
+
+- **How the rate came to be empty:** SO-10110 was a DELIVERY lead from
+  `/inquiry` with no basket. A delivery has no pickup shop (162), so no rate
+  from one, and 133's fallback to the price shop's rate ran only when the form
+  sent items. Staff added the items a day later; nothing sets a rate then.
+- **Why nothing said so:** the order's total simply carried no tax, the invoice
+  copied it with $0 tax, and the only check was `qbo-sync` choosing a tax code
+  by rate. A Square-collected invoice would have gone out untaxed.
+- **174, three parts:** `create_inquiry` takes the price shop's rate whenever
+  there is no pickup shop, basket or not. `order_invoice_refusal` refuses an
+  order with taxable items and an EMPTY rate — every create passes through it
+  via `add_orders_to_customer_invoice`. 0 is a rate (Knotted's days are 0%) and
+  is allowed. In the app, `missingTaxRate` (`lib/specialOrders`) is the one
+  rule: the Money block marks Tax rate "not set", and both create dialogs
+  (`createRefusals`, `newInvoiceProblem`) say it before anything is written.
+- **Measured:** 39 orders have an empty rate, all FileMaker history, none live
+  in the last 30 days, so no backfill. Both functions compile in a throwaway
+  Postgres 15; the bodies are the live ones (`pg_get_functiondef`).
+- **Not changed:** `update_order_on_customer_invoice` and
+  `revise_customer_invoice` do not ask `order_invoice_refusal`, so clearing the
+  rate on an order already on a draft is still caught only at send.
+- **174 IS WRITTEN, NOT APPLIED.** The app half works without it; the database
+  refusal and the inquiry fix need it.

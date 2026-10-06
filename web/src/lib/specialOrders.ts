@@ -468,6 +468,19 @@ export function resolveRushFee(
 }
 
 /**
+ * TAXABLE ITEMS AND NO RATE AT ALL (Mark, 2026-10-06, SO-10110). The total
+ * then carries no tax and nothing says so. An EMPTY rate only: 0 is a rate,
+ * the way an untaxed order is stated. The order's Money block flags it and an
+ * invoice is refused for it (`order_invoice_refusal`, 174, asks the same).
+ */
+export function missingTaxRate(
+  taxRate: number | string | null | undefined,
+  taxableSubtotal: number
+): boolean {
+  return (taxRate === null || taxRate === undefined || taxRate === "") && Math.abs(taxableSubtotal) > 0.005;
+}
+
+/**
  * The whole of the order's money, from the inputs and nothing else.
  *
  * TWO ARITHMETIC DECISIONS worth stating, because a rewrite could plausibly go

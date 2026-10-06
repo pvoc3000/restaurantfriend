@@ -41,6 +41,7 @@ export function NewInvoiceDialog({
   total,
   unbilled,
   hasCustomer,
+  noTaxRate,
   defaultDepositRate,
   from,
   onClose,
@@ -52,6 +53,8 @@ export function NewInvoiceDialog({
   /** `unbilledAmount` — what an invoice may still ask for (141). */
   unbilled: number;
   hasCustomer: boolean;
+  /** Taxable items and an empty tax rate — nothing is invoiced until it is set. */
+  noTaxRate: boolean;
   /** Settings' deposit rate, a fraction. */
   defaultDepositRate: number;
   /** The invoice's breadcrumb back to this order. */
@@ -72,7 +75,7 @@ export function NewInvoiceDialog({
   const [error, setError] = useState<string | null>(null);
 
   const amountText = choice === "deposit" ? depositAmount : choice === "other" ? other : "";
-  const problem = newInvoiceProblem({ choice, amountText, unbilled, hasCustomer });
+  const problem = newInvoiceProblem({ choice, amountText, unbilled, hasCustomer, noTaxRate });
   const ready = problem === null && !busy;
 
   async function go() {
@@ -193,7 +196,7 @@ export function NewInvoiceDialog({
           <TextInput value={note} onValueChange={setNote} aria-label="Note on the Invoice" fullWidth disabled={busy} />
         </label>
 
-        {problem && (amountText.trim() || choice === "balance" || !hasCustomer) ? (
+        {problem && (amountText.trim() || choice === "balance" || !hasCustomer || noTaxRate) ? (
           <p className="text-[13px]">
             <span className="box-decoration-clone bg-mark-fill px-1">{problem}</span>
           </p>

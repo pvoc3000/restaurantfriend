@@ -81,9 +81,14 @@ export function newInvoiceProblem(args: {
   amountText: string;
   unbilled: number;
   hasCustomer: boolean;
+  /** `missingTaxRate` — taxable items and an empty rate (174). */
+  noTaxRate?: boolean;
 }): string | null {
   const { choice, unbilled } = args;
   if (!args.hasCustomer) return "Link a customer to this order before invoicing it.";
+  if (args.noTaxRate) {
+    return "This order has taxable items and no tax rate. Set one on the order (0% if it is not taxed).";
+  }
   if (unbilled <= 0.005) return "Nothing is left to bill on this order.";
   if (choice === "balance") return null;
   const amount = parseMoney(args.amountText);

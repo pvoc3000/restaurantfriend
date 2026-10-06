@@ -577,6 +577,8 @@ export type InvoiceCandidate = {
   on_invoice?: boolean;
   /** A wholesale order (`isWholesaleOrder`) — its invoice keeps the terms. */
   wholesale?: boolean;
+  /** Taxable items and an empty tax rate (`missingTaxRate`, 174). */
+  no_tax_rate?: boolean;
 };
 
 /**
@@ -604,6 +606,14 @@ export function createRefusals(rows: InvoiceCandidate[]): string[] {
   const taken = rows.filter((r) => r.on_invoice);
   if (taken.length) {
     out.push(`${plural(taken.length, "order is", "orders are")} already on an invoice — void that one first.`);
+  }
+  const untaxed = rows.filter((r) => r.no_tax_rate);
+  if (untaxed.length) {
+    out.push(
+      untaxed.length === 1
+        ? `Order #${untaxed[0].number} has taxable items and no tax rate. Set one on the order (0% if it is not taxed).`
+        : `${untaxed.length} orders have taxable items and no tax rate (${untaxed.map((r) => `#${r.number}`).join(", ")}). Set one on each (0% if it is not taxed).`
+    );
   }
   const settled = rows.filter((r) => r.kind === "order" && r.balance <= 0.005);
   if (settled.length) out.push(`${plural(settled.length, "order has", "orders have")} nothing owed.`);

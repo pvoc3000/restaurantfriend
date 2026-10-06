@@ -616,6 +616,7 @@ export function SendDocument({
           total={invoice.money.total}
           unbilled={invoice.money.unbilled}
           hasCustomer={invoice.money.hasCustomer}
+          noTaxRate={invoice.money.noTaxRate}
           defaultDepositRate={invoice.money.defaultDepositRate}
           from={invoice.money.from}
           onClose={() => setMoneyOpen(null)}

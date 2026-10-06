@@ -97,6 +97,7 @@ test("newInvoiceProblem: each option's refusal, in words", () => {
      "Nothing is left to bill on this order.", "billed more than it now comes to");
   eq(newInvoiceProblem({ ...base, choice: "deposit", amountText: "36.85" }), null);
   eq(newInvoiceProblem({ ...base, choice: "deposit", amountText: "" }), "Enter an amount.");
+  ok(newInvoiceProblem({ ...base, choice: "balance", amountText: "", noTaxRate: true })?.includes("no tax rate"));
   eq(newInvoiceProblem({ ...base, choice: "other", amountText: "400" }),
      "That is more than the $331.65 not yet billed.");
   eq(newInvoiceProblem({ ...base, choice: "deposit", amountText: "10", hasCustomer: false }),
