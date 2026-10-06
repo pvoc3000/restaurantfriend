@@ -12,6 +12,7 @@ import {
   lockoutFor,
   parseDeviceCookie,
   resumePathFor,
+  resumeScrollFor,
   resumeViewFor,
   retryLabel,
   serializeDeviceCookie,
@@ -187,4 +188,21 @@ test("resumeViewFor: nobody else, and no refused page, gets a view", () => {
     null,
     "not an object"
   );
+});
+
+test("resumeScrollFor: the same person gets their scroll back, numbers only", () => {
+  const raw = JSON.stringify({
+    userId: ID,
+    path: "/batch-logs/abc",
+    scroll: { "df01:/batch-logs/abc": 1200, "pane:x": "400", "pane:y": null },
+  });
+  eq(JSON.stringify(resumeScrollFor(raw, ID)), JSON.stringify({ "df01:/batch-logs/abc": 1200 }));
+});
+
+test("resumeScrollFor: nobody else, and no refused page, gets a position", () => {
+  const scroll = { "df01:/batch-logs/abc": 1200 };
+  const raw = serializeResume({ userId: ID, path: "/batch-logs/abc", scroll });
+  eq(resumeScrollFor(raw, "7ec6508c-1111-4222-8333-444444444444"), null, "another person");
+  eq(resumeScrollFor(serializeResume({ userId: ID, path: "/login", scroll }), ID), null, "refused");
+  eq(resumeScrollFor(serializeResume({ userId: ID, path: "/items" }), ID), null, "none stored");
 });

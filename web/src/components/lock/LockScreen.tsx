@@ -7,9 +7,11 @@ import {
   PIN_LENGTH,
   RESUME_KEY,
   resumePathFor,
+  resumeScrollFor,
   resumeViewFor,
   retryLabel,
 } from "@/lib/sharedDevice";
+import { handOverScrollMemory } from "@/lib/scrollMemory";
 import { handOverViewMemory } from "@/lib/viewMemory";
 import { MacTitleBar } from "@/components/ui/MacTitleBar";
 
@@ -63,6 +65,7 @@ export function LockScreen({
         localStorage.removeItem(RESUME_KEY);
         // And how they had it set up, for the page about to load.
         handOverViewMemory(resumeViewFor(raw, who.user_id));
+        handOverScrollMemory(resumeScrollFor(raw, who.user_id));
       } catch {
         // Storage unavailable: the home page, as before.
       }

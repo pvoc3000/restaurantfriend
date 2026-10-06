@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useScrollMemory } from "@/lib/scrollMemory";
 
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -160,6 +161,10 @@ export function BatchHistory({
     };
   }, [elementId, locationId, key, supabase, onHiddenCount]);
 
+  // Where you were in the list, per batch (Mark, 2026-10-06).
+  const listPane = useRef<HTMLDivElement>(null);
+  useScrollMemory(`pane:batch-history:${currentBatchId ?? key}`, listPane);
+
   return (
     <div className={fill ? "flex min-h-0 flex-col" : ""}>
       <h3 className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
@@ -170,6 +175,7 @@ export function BatchHistory({
           scroller takes its CONTENT height — sixty rows — and pushes the pane
           out of the frame instead of scrolling inside it. */}
       <div
+        ref={listPane}
         className={`mt-1 overflow-y-auto border border-hairline ${
           fill ? "min-h-0 flex-1" : "max-h-60"
         }`}

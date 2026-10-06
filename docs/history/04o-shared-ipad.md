@@ -88,8 +88,16 @@ deletes. `useRememberedView` became `useSyncExternalStore` so a restored value
 does not mismatch the server's fallback render at hydration. Newly remembered:
 `/batch-logs`' Status, Group by, search and sort, and the record's selected
 batch and pane tab — which also means they now survive leaving the screen and
-coming back within a session. NOT restored: scroll position, and History's
-Show skipped. Any other screen gets this by using `useRememberedView`.
+coming back within a session. Any other screen gets this by using
+`useRememberedView`.
+**SCROLL AND SHOW SKIPPED TOO (Mark, same day).** `lib/scrollMemory` is handed
+over the same way (`ResumePoint.scroll`, `resumeScrollFor`,
+`rf.scroll.handover`), so it covers EVERY screen's window and DataTable pane,
+not just the batch log; `snapshotScrollMemory` first flushes each live
+scroller, because the 120ms throttle may be holding the last move. The batch
+pane's own scrollers — Info, Ingredients, Instructions, History — were never
+in scroll memory and now are, keyed per batch. Show skipped is a
+`useRememberedView`.
 Not walked live (needs a PIN on the registered iPad; the test pane was signed
 out).
 

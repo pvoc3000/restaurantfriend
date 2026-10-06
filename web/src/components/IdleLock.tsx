@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { snapshotScrollMemory } from "@/lib/scrollMemory";
 import { snapshotViewMemory } from "@/lib/viewMemory";
 import { lockDevice } from "@/app/deviceActions";
 import {
@@ -37,7 +38,8 @@ import {
  *
  * Before locking it notes the page in localStorage (`RESUME_KEY`), so the same
  * person unlocking goes back to it rather than to the home page — and, with
- * it, how the page was set up (`lib/viewMemory`), which the lock's full page
+ * it, how the page was set up and scrolled (`lib/viewMemory`,
+ * `lib/scrollMemory`), which the lock's full page
  * load would otherwise throw away.
  *
  * IT ALSO LOCKS THE OTHER TABS (2026-10-01). Each page records who it was
@@ -87,7 +89,15 @@ export function IdleLock({ userId }: { userId: string }) {
         recordSignedInUser("");
         try {
           const path = window.location.pathname + window.location.search;
-          localStorage.setItem(RESUME_KEY, serializeResume({ userId, path, view: snapshotViewMemory() }));
+          localStorage.setItem(
+            RESUME_KEY,
+            serializeResume({
+              userId,
+              path,
+              view: snapshotViewMemory(),
+              scroll: snapshotScrollMemory(),
+            })
+          );
         } catch {
           // Private mode or blocked storage: the unlock lands on the home page.
         }

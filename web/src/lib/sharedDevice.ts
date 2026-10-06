@@ -129,6 +129,8 @@ export type ResumePoint = {
   path: string;
   /** How the page was set up — `lib/viewMemory`'s snapshot. See `resumeViewFor`. */
   view?: Record<string, unknown>;
+  /** Where each scroller was — `lib/scrollMemory`'s. See `resumeScrollFor`. */
+  scroll?: Record<string, number>;
 };
 
 export function serializeResume(point: ResumePoint): string {
@@ -170,6 +172,30 @@ export function resumeViewFor(
   raw: string | null | undefined,
   userId: string
 ): Record<string, unknown> | null {
+  return resumeField(raw, userId, "view");
+}
+
+/** The scroll positions, under `resumeViewFor`'s rule exactly. Anything that
+ *  is not a number is dropped rather than trusted. */
+export function resumeScrollFor(
+  raw: string | null | undefined,
+  userId: string
+): Record<string, number> | null {
+  const field = resumeField(raw, userId, "scroll");
+  if (!field) return null;
+  return Object.fromEntries(
+    Object.entries(field).filter(
+      (entry): entry is [string, number] =>
+        typeof entry[1] === "number" && Number.isFinite(entry[1])
+    )
+  );
+}
+
+function resumeField(
+  raw: string | null | undefined,
+  userId: string,
+  name: "view" | "scroll"
+): Record<string, unknown> | null {
   if (!raw) return null;
   let parsed: unknown;
   try {
@@ -178,10 +204,11 @@ export function resumeViewFor(
     return null;
   }
   if (typeof parsed !== "object" || parsed === null) return null;
-  const { path, view } = parsed as Record<string, unknown>;
-  if (resumePathFor(raw, userId) !== path) return null;
-  if (typeof view !== "object" || view === null || Array.isArray(view)) return null;
-  return view as Record<string, unknown>;
+  const point = parsed as Record<string, unknown>;
+  if (resumePathFor(raw, userId) !== point.path) return null;
+  const field = point[name];
+  if (typeof field !== "object" || field === null || Array.isArray(field)) return null;
+  return field as Record<string, unknown>;
 }
 
 /**

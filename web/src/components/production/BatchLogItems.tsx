@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { setSelectedBatch } from "@/lib/selectedBatch";
 import { useRememberedView } from "@/lib/viewMemory";
+import { useScrollMemory } from "@/lib/scrollMemory";
 import type { PickOption } from "@/components/ui/PickList";
 import { useExactViewportHeight } from "@/lib/tableHead";
 import { SectionNav } from "@/components/ui/SectionNav";
@@ -132,10 +133,14 @@ export function BatchLogItems({
    * line with the delete button?") while the rows it hides are three columns
    * away. Lifting it is what lets the two live in different boxes.
    *
-   * Not remembered between batches: it is a question about the element in front
-   * of you, and 42 hidden rounds on one flavour says nothing about the next.
+   * Remembered like the tab beside it (Mark, 2026-10-06: an idle lock should
+   * give it back too).
    */
-  const [showSkipped, setShowSkipped] = useState(false);
+  const [storedSkipped, setShowSkipped] = useRememberedView<boolean>(
+    "batch-log.show-skipped",
+    false
+  );
+  const showSkipped = storedSkipped === true;
   const [hiddenRounds, setHiddenRounds] = useState(0);
   const frame = useRef<HTMLDivElement>(null);
   // The tablet opens with the pane at half the frame: at 768px tall a 42% pane
@@ -180,6 +185,11 @@ export function BatchLogItems({
   // back during render has neither problem, and needs no state for the default.
   const selectedId = picked && fields[picked] ? picked : rows[0]?.id ?? null;
   const selected = selectedId ? fields[selectedId] ?? null : null;
+
+  // The Info tab's own scroller, per batch. Empty off the tab: the div is not
+  // there, and re-keying is what re-arms it when the tab comes back.
+  const infoPane = useRef<HTMLDivElement>(null);
+  useScrollMemory(pane === "info" && selectedId ? `pane:batch-info:${selectedId}` : "", infoPane);
 
   // PUBLISHED for the Actions menu, which on the tablet holds Delete Batch…
   // (Mark, 2026-09-12: the footer is gone). A module value, not state — the
@@ -328,7 +338,10 @@ export function BatchLogItems({
               // notes and Delete sat where they were. One scroller, and the
               // whole tab moves together; `fill` off on the fields for the same
               // reason.
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+              <div
+                ref={infoPane}
+                className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto pr-1"
+              >
                 <BatchFields
                   row={selected}
                   orgId={orgId}
@@ -368,7 +381,7 @@ export function BatchLogItems({
                   />
                   <button
                     type="button"
-                    onClick={() => setShowSkipped((v) => !v)}
+                    onClick={() => setShowSkipped(!showSkipped)}
                     className="text-[11px] uppercase tracking-[0.08em] text-muted hover:text-ink"
                   >
                     Show skipped

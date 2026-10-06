@@ -72,6 +72,49 @@ const WRITE_EVERY_MS = 120;
 
 const positions = new Map<string, number>();
 
+// THE ONE HARD LOAD THAT DOES RESTORE: unlocking after an idle lock (Mark,
+// 2026-10-06: "restore the scroll position"). Everything above about a launch
+// starting at the top still holds. This is `lib/viewMemory`'s handover, for the
+// same reason — the same person, on the page the lock took from them — and
+// `resumeScrollFor` gives it to nobody else. sessionStorage only for the
+// moment between the lock screen and the page it loads: read once, deleted.
+const HANDOVER_KEY = "rf.scroll.handover";
+
+if (typeof window !== "undefined") {
+  try {
+    const raw = sessionStorage.getItem(HANDOVER_KEY);
+    sessionStorage.removeItem(HANDOVER_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      for (const [key, y] of Object.entries(parsed)) {
+        if (typeof y === "number" && Number.isFinite(y)) positions.set(key, y);
+      }
+    }
+  } catch {
+    // Blocked storage or a corrupt value: the page starts at the top.
+  }
+}
+
+/** Every live scroller's "write what you have now" — the throttle may be
+ *  holding the last move, and a snapshot must not be 120ms stale. */
+const flushers = new Set<() => void>();
+
+/** Every remembered position, current ones included, for `IdleLock`. */
+export function snapshotScrollMemory(): Record<string, number> {
+  for (const flush of flushers) flush();
+  return Object.fromEntries(positions);
+}
+
+/** Leave a snapshot for the page this tab is about to load. Never throws. */
+export function handOverScrollMemory(scroll: Record<string, number> | null): void {
+  try {
+    if (scroll) sessionStorage.setItem(HANDOVER_KEY, JSON.stringify(scroll));
+    else sessionStorage.removeItem(HANDOVER_KEY);
+  } catch {
+    // Blocked storage: the page comes back at the top.
+  }
+}
+
 function read(key: string): number {
   return positions.get(key) ?? 0;
 }
@@ -274,6 +317,7 @@ export function useScrollMemory(key: string, ref?: RefObject<HTMLElement | null>
       if (moved) write(key, latest);
     };
 
+    flushers.add(flush);
     scroller.addEventListener("scroll", onScroll, { passive: true });
     scroller.addEventListener("wheel", surrender, { passive: true });
     scroller.addEventListener("touchstart", surrender, { passive: true });
@@ -281,6 +325,7 @@ export function useScrollMemory(key: string, ref?: RefObject<HTMLElement | null>
     if (restoring) requestAnimationFrame(settle);
 
     return () => {
+      flushers.delete(flush);
       scroller.removeEventListener("scroll", onScroll);
       scroller.removeEventListener("wheel", surrender);
       scroller.removeEventListener("touchstart", surrender);

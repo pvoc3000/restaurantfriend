@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useScrollMemory } from "@/lib/scrollMemory";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -190,6 +191,21 @@ export function BatchRecipe({
     };
   }, [versionId, supabase]);
 
+  // Where you were in the sheet, per batch (Mark, 2026-10-06). Keyed only once
+  // the sheet has loaded: the scrollers are not rendered before that, and the
+  // key changing is what arms the hook when they are.
+  const linesPane = useRef<HTMLDivElement>(null);
+  const stepsPane = useRef<HTMLDivElement>(null);
+  const scrollKey = current?.loaded ? `${batchId ?? versionId}` : "";
+  useScrollMemory(
+    scrollKey && show !== "instructions" ? `pane:batch-ingredients:${scrollKey}` : "",
+    linesPane
+  );
+  useScrollMemory(
+    scrollKey && show !== "ingredients" ? `pane:batch-instructions:${scrollKey}` : "",
+    stepsPane
+  );
+
   if (!versionId) {
     return (
       <p className="text-sm text-muted">
@@ -259,7 +275,7 @@ export function BatchRecipe({
       <div className={`grid min-h-0 flex-1 gap-4 ${show === "both" ? "lg:grid-cols-2" : ""}`}>
         {/* -- what goes in ------------------------------------------------- */}
         {show !== "instructions" ? (
-        <div className="min-h-0 overflow-y-auto border border-hairline">
+        <div ref={linesPane} className="min-h-0 overflow-y-auto border border-hairline">
           <table className={`w-full table-fixed border-collapse ${body}`}>
             {/* INGREDIENT · AMOUNT · NOTE (Mark, 2026-08-09), where FileMaker
                 prints amount first. The ingredient is what you scan down the
@@ -342,7 +358,7 @@ export function BatchRecipe({
 
         {/* -- what to do with it -------------------------------------------- */}
         {show !== "ingredients" ? (
-        <div className="min-h-0 overflow-y-auto border border-hairline p-2">
+        <div ref={stepsPane} className="min-h-0 overflow-y-auto border border-hairline p-2">
           {show === "both" ? (
             <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">
               Instructions
