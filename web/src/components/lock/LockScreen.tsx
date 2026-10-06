@@ -6,6 +6,7 @@ import { unlockWithPin, type LockMember } from "@/app/deviceActions";
 import {
   PIN_LENGTH,
   RESUME_KEY,
+  recordExtendedUser,
   resumePathFor,
   resumeScrollFor,
   resumeViewFor,
@@ -59,6 +60,8 @@ export function LockScreen({
       // Back to the page an idle lock left, if it was THIS person's; read
       // once and always cleared, so it never outlives the next unlock.
       let destination = "/";
+      // Nobody arrives with Stay unlocked already on.
+      recordExtendedUser("");
       try {
         const raw = localStorage.getItem(RESUME_KEY);
         destination = resumePathFor(raw, who.user_id);

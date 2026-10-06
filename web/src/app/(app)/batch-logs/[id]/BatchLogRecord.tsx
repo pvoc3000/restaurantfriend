@@ -14,6 +14,7 @@ import { dateInTimeZone, serverTimeZone } from "@/lib/today";
 import { scheduleLabel } from "@/lib/production";
 import { type BatchRow } from "@/components/production/BatchItemsTable";
 import { BatchLogItems } from "@/components/production/BatchLogItems";
+import { StayUnlocked } from "@/components/production/StayUnlocked";
 import { type BatchFieldsRow } from "@/components/production/BatchFields";
 import { BATCH_PHOTO_BUCKET, BATCH_PHOTO_TTL_SECONDS } from "@/lib/batchPhotos";
 import { BatchLogCommandMenu } from "@/components/production/BatchLogCommandMenu";
@@ -283,6 +284,9 @@ export async function BatchLogRecord({
           // row; `RecordNav` publishes to the bar there and renders nothing.
           <div className="flex items-center gap-3">
             <RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />
+            {/* The bar's Stay unlocked switch — only where there is an idle
+                lock to extend. Renders nothing here. */}
+            {session.registeredDevice ? <StayUnlocked userId={session.userId} /> : null}
             <BatchLogCommandMenu
               orgId={session.membership.org_id}
               logId={id}

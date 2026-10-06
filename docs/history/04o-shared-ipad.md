@@ -130,6 +130,28 @@ check interval went from 30s to 1s to drive the count. Every screen, not just
 the batch log. A lock on wake gets no warning. Not seen live: `IdleLock` only
 mounts on a registered device.
 
+**STAY UNLOCKED — TWENTY MINUTES, ON THE BATCH LOG ONLY (Mark, 2026-10-06).**
+His design: a deliberate switch, used sparingly, that any tap turns off. Built
+with one change he agreed to — SCROLLING does not turn it off, or nudging the
+recipe to the next step would cancel it unnoticed. `production/StayUnlocked`
+seats one cell in the tablet bar ("Stay 20 min"; on, inverted, "Until 10:42" —
+when it locks if untouched) and is mounted by the batch log RECORD, tablet
+shell and registered device only. `EXTEND_KEY` (`rf.device.extend`,
+localStorage, the user's id) because the idle clock is the device's;
+`idleLimitMs` (fixtures) gives 20 minutes to that user and 5 to anyone else,
+and the warning band follows the same limit. OFF on: any `pointerup` or
+`keydown` outside the switch itself (`IdleLock`; a touch scroll fires
+`pointercancel`, never `pointerup`), unmount or `pagehide` of the record, the
+idle lock, and every successful unlock. The 20 minutes are idle time: a scroll
+restarts them. It also requests a screen wake lock while on, so the iPad's
+own Auto-Lock does not darken the recipe; a refusal is silent.
+`BarAction.pressed` is new (an on switch inverts). **`BAR_CELL` now SHRINKS
+when the bar is over-full** (112px with room, down to 80): seven cells beside
+the record count is 894px on an 820px portrait iPad. Measured on a replica of
+the bar at 820: no overflow, cells 98–112px, both words on one line.
+NOT walked on the iPad: the switch, the tap/scroll distinction and the wake
+lock all need the registered device.
+
 **A TAB SHOWING SOMEBODY ELSE'S PAGE LEAVES IT (Mark, 2026-10-01),** after
 DF02's opening shift report was read as Karina's view of Abigail's report (see
 04h). `SIGNED_IN_KEY` (`rf.device.user`, localStorage) holds who the device is

@@ -7,7 +7,10 @@ import {
   IDLE_MS,
   deviceLastActivity,
   LOCKOUT,
+  EXTEND_MS,
   IDLE_WARN_MS,
+  extendedFor,
+  idleLimitMs,
   idleExpired,
   idleWarningSeconds,
   isValidPin,
@@ -218,4 +221,21 @@ test("idleWarningSeconds: counts down the last stretch and nothing else", () => 
   eq(idleWarningSeconds(t, t + IDLE_MS - 1), 1, "never zero while open");
   eq(idleWarningSeconds(t, t + IDLE_MS), null, "expired: the lock's turn");
   eq(idleWarningSeconds(t, t + IDLE_MS * 3), null, "long expired");
+});
+
+test("stay unlocked: twenty minutes for the person who switched it on, nobody else", () => {
+  const other = "7ec6508c-1111-4222-8333-444444444444";
+  eq(idleLimitMs(ID, ID), EXTEND_MS, "on for me");
+  eq(idleLimitMs(other, ID), IDLE_MS, "on for somebody else");
+  eq(idleLimitMs("", ID), IDLE_MS, "off");
+  eq(idleLimitMs(null, ID), IDLE_MS, "never set, or storage blocked");
+  no(extendedFor("", ""), "an empty user is never extended");
+});
+
+test("stay unlocked: the lock and its warning follow the longer limit", () => {
+  const t = 1_000_000;
+  no(idleExpired(t, t + IDLE_MS, EXTEND_MS), "five minutes is not the lock any more");
+  eq(idleWarningSeconds(t, t + IDLE_MS - 1000, EXTEND_MS), null, "and not the warning");
+  eq(idleWarningSeconds(t, t + EXTEND_MS - 10_000, EXTEND_MS), 10, "the warning before twenty");
+  ok(idleExpired(t, t + EXTEND_MS, EXTEND_MS), "twenty minutes is");
 });

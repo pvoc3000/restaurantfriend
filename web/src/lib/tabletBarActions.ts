@@ -28,6 +28,12 @@ export type BarAction = {
   icon: string;
   onClick: () => void;
   disabled?: boolean;
+  /**
+   * A SWITCH that is on: the cell inverts, white with black ink, and says so to
+   * a screen reader. Undefined for a plain command. First caller: the batch
+   * log's Stay unlocked (2026-10-06).
+   */
+  pressed?: boolean;
   /** Why it is disabled, or what it will do. */
   title?: string;
   /**
@@ -54,7 +60,7 @@ function drawn(a: BarAction[] | null): string {
     : a
         .map(
           (x) =>
-            `${x.key}|${x.word}|${x.icon}|${x.disabled ? 1 : 0}|${x.title ?? ""}|${x.side ?? "trailing"}`
+            `${x.key}|${x.word}|${x.icon}|${x.disabled ? 1 : 0}|${x.pressed ?? ""}|${x.title ?? ""}|${x.side ?? "trailing"}`
         )
         .join("\n");
 }

@@ -14,7 +14,7 @@ export function BarLabel({ icon, word }: { icon: string; word: string }) {
       <svg width="28" height="28" viewBox="0 -960 960 960" aria-hidden="true">
         <path fill="currentColor" d={icon} />
       </svg>
-      <span className="text-[12px] font-bold uppercase leading-none tracking-[0.08em]">{word}</span>
+      <span className="text-center text-[12px] font-bold uppercase leading-none tracking-[0.08em]">{word}</span>
     </span>
   );
 }
@@ -52,3 +52,6 @@ export const ICON_LOGOUT =
  */
 export const ICON_SETTINGS =
   "m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm112-260q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Z";
+/** Material Symbols `lock_open` at wght 700 — the batch log's Stay unlocked. */
+export const ICON_LOCK_OPEN =
+  "M252-677h317v-51q0-38.33-25.5-65.17Q518-820 480-820t-63.5 26.83Q391-766.33 391-728H265q0-91 62.5-154.5T480-946q90 0 152.5 63.5T695-728v51h13q51.97 0 88.99 37.01Q834-602.97 834-551v376q0 51.97-37.01 88.99Q759.97-49 708-49H252q-51.98 0-88.99-37.01Q126-123.03 126-175v-376q0-51.97 37.01-88.99Q200.02-677 252-677Zm0 502h456v-376H252v376Zm284.5-131.5Q560-330 560-363t-23.5-56.5Q513-443 480-443t-56.5 23.5Q400-396 400-363t23.5 56.5Q447-283 480-283t56.5-23.5ZM252-175v-376 376Z";

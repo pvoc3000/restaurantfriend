@@ -32,11 +32,13 @@ export function BarRecordNav() {
 
   const step = (href: string | null) => (href ? carryQuery(href, current, seat.carry) : null);
 
+  // `min-w-0`, so an over-full bar can squeeze these cells with the rest
+  // (`BAR_CELL`) instead of the nav holding its full width.
   return (
-    <nav aria-label="Record navigation" className="flex items-center tabular-nums">
+    <nav aria-label="Record navigation" className="flex min-w-0 items-center tabular-nums">
       <Cell href={step(position.first)} label="First" icon={ICON_FIRST_PAGE} />
       <Cell href={step(position.previous)} label="Previous" icon={ICON_CHEVRON_LEFT} />
-      <span className="px-2 text-[12px] font-bold uppercase tracking-[0.08em] text-white/70">
+      <span className="shrink-0 px-2 text-[12px] font-bold uppercase tracking-[0.08em] text-white/70">
         {position.index} of {position.total}
       </span>
       <Cell href={step(position.next)} label="Next" icon={ICON_CHEVRON_RIGHT} />

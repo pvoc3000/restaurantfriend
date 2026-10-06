@@ -6,11 +6,17 @@ import { snapshotScrollMemory } from "@/lib/scrollMemory";
 import { snapshotViewMemory } from "@/lib/viewMemory";
 import { lockDevice } from "@/app/deviceActions";
 import {
+  EXTEND_ACTION_KEY,
+  EXTEND_KEY,
   RESUME_KEY,
   SIGNED_IN_KEY,
   deviceLastActivity,
+  extendedFor,
   idleExpired,
+  idleLimitMs,
   idleWarningSeconds,
+  readExtendedUser,
+  recordExtendedUser,
   readActivity,
   readSignedInUser,
   recordActivity,
@@ -63,6 +69,13 @@ import {
  * one thing it renders. The band is its own target on purpose: somebody with
  * dough on their hands can hit it without pressing whatever is underneath.
  * A lock on WAKE gets no warning; the five minutes were up while it slept.
+ *
+ * FIVE MINUTES, OR TWENTY (Mark, 2026-10-06): the batch log's Stay unlocked
+ * switch — see `EXTEND_MS` in `lib/sharedDevice` for the rules. This component
+ * reads the limit on every check and is what turns the switch OFF: on any tap
+ * or key press, and on the lock itself. A tap is `pointerup`, which a touch
+ * scroll never fires (the browser sends `pointercancel`), and which iOS does
+ * deliver on plain text where it withholds `click`.
  */
 export function IdleLock({ userId }: { userId: string }) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
@@ -95,11 +108,13 @@ export function IdleLock({ userId }: { userId: string }) {
       if (locking) return;
       if (leaveIfStale()) return;
       const active = deviceLastActivity(last, readActivity());
+      const limit = idleLimitMs(readExtendedUser(), userId);
       // Another tab's touch counts here too, so the band goes when it does.
-      setSecondsLeft(idleWarningSeconds(active, Date.now()));
-      if (idleExpired(active, Date.now())) {
+      setSecondsLeft(idleWarningSeconds(active, Date.now(), limit));
+      if (idleExpired(active, Date.now(), limit)) {
         locking = true;
         recordSignedInUser("");
+        recordExtendedUser("");
         try {
           const path = window.location.pathname + window.location.search;
           localStorage.setItem(
@@ -120,6 +135,16 @@ export function IdleLock({ userId }: { userId: string }) {
       }
     };
 
+    /** Stay unlocked ends at the first tap or key — except the switch's own. */
+    const endExtension = (e: Event) => {
+      if (!extendedFor(readExtendedUser(), userId)) return;
+      const target = e.target instanceof Element ? e.target : null;
+      if (target?.closest(`[data-bar-action="${EXTEND_ACTION_KEY}"]`)) return;
+      recordExtendedUser("");
+    };
+    window.addEventListener("pointerup", endExtension, { passive: true, capture: true });
+    window.addEventListener("keydown", endExtension, { passive: true, capture: true });
+
     const events: (keyof WindowEventMap)[] = ["pointerdown", "keydown", "touchstart", "scroll"];
     for (const e of events) window.addEventListener(e, touch, { passive: true, capture: true });
     const onVisible = () => {
@@ -132,12 +157,16 @@ export function IdleLock({ userId }: { userId: string }) {
     // may be suspended and miss it; the visibility check above covers that.
     const onStorage = (e: StorageEvent) => {
       if (e.key === SIGNED_IN_KEY || e.key === null) leaveIfStale();
+      // Switched off in another tab with the band up: recount at once.
+      if (e.key === EXTEND_KEY) check();
     };
     window.addEventListener("storage", onStorage);
     // Every second, since the band counts in seconds. It was every thirty.
     const timer = window.setInterval(check, 1000);
 
     return () => {
+      window.removeEventListener("pointerup", endExtension, { capture: true });
+      window.removeEventListener("keydown", endExtension, { capture: true });
       for (const e of events) window.removeEventListener(e, touch, { capture: true });
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", check);

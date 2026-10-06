@@ -50,9 +50,62 @@ export function serializeDeviceCookie(cookie: DeviceCookie): string {
   return `${cookie.id}.${cookie.secret}`;
 }
 
-/** True once `now` is IDLE_MS or more past the last activity. */
-export function idleExpired(lastActivityMs: number, nowMs: number): boolean {
-  return nowMs - lastActivityMs >= IDLE_MS;
+/** True once `now` is `limitMs` (IDLE_MS, unless extended) past the last activity. */
+export function idleExpired(lastActivityMs: number, nowMs: number, limitMs = IDLE_MS): boolean {
+  return nowMs - lastActivityMs >= limitMs;
+}
+
+/**
+ * STAY UNLOCKED (Mark, 2026-10-06). A baker mid-batch reads the recipe without
+ * touching the iPad, so five minutes keeps locking somebody who is standing
+ * right there. A switch in the batch log's tablet bar gives THEM twenty, and it
+ * is built to be used sparingly:
+ *   · it is a deliberate tap, off by default, and only on the batch log;
+ *   · any tap or key press turns it off again (`IdleLock`), so it never
+ *     outlives the absence it was switched on for — SCROLLING does not, or
+ *     nudging the recipe to the next step would cancel it unnoticed;
+ *   · leaving the batch log turns it off, and so does any lock.
+ * The twenty minutes are idle time like the five: a scroll restarts them.
+ *
+ * `EXTEND_KEY` holds the user it was switched on for, in localStorage because
+ * the idle clock is the DEVICE's — a background tab must honour it too, or it
+ * would lock the iPad at five minutes regardless.
+ */
+export const EXTEND_MS = 20 * 60_000;
+export const EXTEND_KEY = "rf.device.extend";
+/** The bar command's key, which `IdleLock` must not treat as a cancelling tap. */
+export const EXTEND_ACTION_KEY = "stay-unlocked";
+/** Fired on `window` in the tab that changed it; other tabs get `storage`. */
+export const EXTEND_EVENT = "rf:extend";
+
+/** Whether the extension is on for THIS person. Anyone else's is nobody's. */
+export function extendedFor(stored: string | null, userId: string): boolean {
+  return stored !== null && stored !== "" && stored === userId;
+}
+
+/** How long this person may be idle before the lock. */
+export function idleLimitMs(stored: string | null, userId: string): number {
+  return extendedFor(stored, userId) ? EXTEND_MS : IDLE_MS;
+}
+
+/** Switch it on for `userId`, or off with "". Never throws. */
+export function recordExtendedUser(userId: string): void {
+  try {
+    if (userId) localStorage.setItem(EXTEND_KEY, userId);
+    else localStorage.removeItem(EXTEND_KEY);
+    window.dispatchEvent(new Event(EXTEND_EVENT));
+  } catch {
+    // Blocked storage: the lock stays at five minutes.
+  }
+}
+
+/** Who it is on for, or null. Never throws. */
+export function readExtendedUser(): string | null {
+  try {
+    return localStorage.getItem(EXTEND_KEY);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -68,8 +121,12 @@ export const IDLE_WARN_MS = 30_000;
  * otherwise null, and null again once it has expired (the lock's turn). Rounded
  * UP, so the band never reads "0 seconds" while the page is still open.
  */
-export function idleWarningSeconds(lastActivityMs: number, nowMs: number): number | null {
-  const left = IDLE_MS - (nowMs - lastActivityMs);
+export function idleWarningSeconds(
+  lastActivityMs: number,
+  nowMs: number,
+  limitMs = IDLE_MS
+): number | null {
+  const left = limitMs - (nowMs - lastActivityMs);
   if (left <= 0 || left > IDLE_WARN_MS) return null;
   return Math.ceil(left / 1000);
 }

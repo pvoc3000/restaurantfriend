@@ -1,7 +1,7 @@
 "use client";
 
 import { useBarActions } from "@/lib/tabletBarActions";
-import { BAR_CELL } from "./barCell";
+import { BAR_CELL, BAR_CELL_PRESSED } from "./barCell";
 import { BarLabel } from "./BarLabel";
 
 /**
@@ -25,7 +25,11 @@ export function BarActions({ side }: { side: "leading" | "trailing" }) {
         <button
           key={action.key}
           type="button"
-          className={BAR_CELL}
+          className={action.pressed ? BAR_CELL_PRESSED : BAR_CELL}
+          aria-pressed={action.pressed}
+          // Named, so `IdleLock` can tell the Stay unlocked switch's own tap
+          // from one that should turn it off.
+          data-bar-action={action.key}
           disabled={action.disabled}
           title={action.title}
           // The CURRENT handler at the moment of the press — the seated object's
