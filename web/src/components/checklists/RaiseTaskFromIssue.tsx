@@ -144,7 +144,7 @@ export function RaiseTaskFromIssue({
         type="button"
         onClick={raise}
         disabled={busy}
-        className="min-h-11 shrink-0 border border-ink bg-white px-3 text-[13px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+        className="mac-control min-h-11 shrink-0 border border-ink bg-white px-3 text-[13px] font-semibold uppercase tracking-[0.06em] text-ink disabled:opacity-35"
       >
         {busy ? "Pinning…" : "Pin to checklists"}
       </button>

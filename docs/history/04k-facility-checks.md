@@ -982,3 +982,23 @@ with no value on existing checklists, which stay done.
 
 Verified: typecheck, lint, 2,242 fixtures. NOT walked in a browser: the test
 pane was signed out.
+
+## 2026-10-06 — The walk's fields are black-edged and its buttons raised
+
+Mark: "give the text/number fields on a checklist a solid black border. make
+the buttons our action buttons with a drop shadow."
+
+- The reading box, the text answer and the note are `border-ink` on white
+  (they were hairline, going ink on focus). White stated, so a box on a red
+  missed row stays white.
+- Every button in a row carries `mac-control` at the tablet's own size
+  (`TAP`): Done · Issue · N/A, Photo, the choice options, the score keys, Pin
+  to checklists, and the pinned tasks' Mark done. At rest all are the white
+  ink-edged button — Photo, choices and scores were hairline. A chosen one is
+  black with `mac-own-hover mac-primary`; a set Issue stays accent red.
+
+Not touched: the Close and Finish cells in `WalkRunner`'s footer, and the
+All · Done · Remaining · Issues `TabPicker`.
+
+Verified: typecheck and lint. NOT seen in a browser: the test pane was signed
+out.

@@ -197,10 +197,10 @@ export function ChecklistWalk({
                       type="button"
                       onClick={() => void actOnTask(t, t.status !== "done")}
                       aria-pressed={t.status === "done"}
-                      className={`min-h-11 shrink-0 border px-3 text-xs font-semibold uppercase tracking-[0.06em] transition-colors ${
+                      className={`mac-control min-h-11 shrink-0 border px-3 text-xs font-semibold uppercase tracking-[0.06em] ${
                         t.status === "done"
-                          ? "border-ink bg-ink text-white"
-                          : "border-ink bg-white text-ink hover:bg-ink hover:text-white"
+                          ? "mac-own-hover mac-primary border-ink bg-ink text-white"
+                          : "border-ink bg-white text-ink"
                       }`}
                     >
                       {t.status === "done" ? "Done" : "Mark done"}

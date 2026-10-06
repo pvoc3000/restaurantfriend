@@ -49,9 +49,19 @@ export type WalkItemRow = {
 };
 
 /** 44px, which is the floor for a touch target, and 16px type — below which
- *  iOS Safari zooms the whole page on focus. */
+ *  iOS Safari zooms the whole page on focus.
+ *
+ *  `mac-control` — the app's raised action button (Mark, 2026-10-06: "make the
+ *  buttons our action buttons with a drop shadow"). Not `BUTTON_CLASS`, whose
+ *  `h-9` at 12px is the desk's size; this keeps the tablet's and takes the
+ *  dress. Layout only: each caller states its own colours, below. */
 const TAP =
-  "min-h-11 border px-3 text-[13px] font-semibold uppercase tracking-[0.06em] transition-colors";
+  "mac-control min-h-11 border px-3 text-[13px] font-semibold uppercase tracking-[0.06em]";
+/** At rest: the ordinary white button. */
+const TAP_OFF = "border-ink bg-white text-ink";
+/** Chosen: black, as `PRIMARY_BUTTON_CLASS` is — `mac-own-hover` keeps the
+ *  plain hover rule from painting it white again. */
+const TAP_ON = "mac-own-hover mac-primary border-ink bg-ink text-white";
 
 const STATE_BUTTONS: { status: CheckStatus; label: string }[] = [
   { status: "done", label: "Done" },
@@ -341,9 +351,9 @@ export function WalkItem({
                 className={`${TAP} ${
                   on
                     ? danger
-                      ? "border-accent bg-accent text-white"
-                      : "border-ink bg-ink text-white"
-                    : "border-ink bg-white text-ink hover:bg-ink hover:text-white"
+                      ? "mac-own-hover border-accent bg-accent text-white"
+                      : TAP_ON
+                    : TAP_OFF
                 } disabled:opacity-35`}
               >
                 {b.label}
@@ -370,7 +380,7 @@ export function WalkItem({
                 type="button"
                 disabled={busy}
                 onClick={() => fileInput.current?.click()}
-                className={`${TAP} ml-2 border-hairline bg-white text-ink hover:border-ink disabled:opacity-35`}
+                className={`${TAP} ${TAP_OFF} ml-2 disabled:opacity-35`}
               >
                 {busy ? "…" : "Photo"}
               </button>
@@ -391,7 +401,7 @@ export function WalkItem({
             onChange={(e) => setValue(e.target.value)}
             onBlur={commitValue}
             aria-label={`${row.prompt} reading`}
-            className="h-11 w-28 border border-hairline px-2 text-[16px] tabular-nums focus:border-ink focus:outline-none disabled:opacity-50"
+            className="h-11 w-28 border border-ink bg-white px-2 text-[16px] tabular-nums focus:outline-none disabled:opacity-50"
           />
           {row.unit && <span className="text-[14px] text-muted">{row.unit}</span>}
           {/* ONE MARK PER FACT. The quiet hint and the red chip say the same
@@ -443,9 +453,7 @@ export function WalkItem({
                   });
                 }}
                 className={`${TAP} ${
-                  on
-                    ? "border-ink bg-ink text-white"
-                    : "border-hairline bg-white text-ink hover:border-ink"
+                  on ? TAP_ON : TAP_OFF
                 } disabled:opacity-35`}
               >
                 {choice}
@@ -482,7 +490,7 @@ export function WalkItem({
             });
           }}
           aria-label={`${row.prompt} answer`}
-          className="h-11 w-full border border-hairline px-2 text-[16px] focus:border-ink focus:outline-none disabled:opacity-50"
+          className="h-11 w-full border border-ink bg-white px-2 text-[16px] focus:outline-none disabled:opacity-50"
         />
       )}
 
@@ -502,9 +510,7 @@ export function WalkItem({
                 void write({ score: row.score === n ? null : n })
               }
               className={`${TAP} w-11 justify-center ${
-                row.score === n
-                  ? "border-ink bg-ink text-white"
-                  : "border-hairline bg-white text-ink hover:border-ink"
+                row.score === n ? TAP_ON : TAP_OFF
               } disabled:opacity-35`}
             >
               {n}
@@ -558,7 +564,7 @@ export function WalkItem({
             (armingNote ?? row.status) === "na" ? "Why not?" : "What is wrong?"
           }
           aria-label={`Note for ${row.prompt}`}
-          className="w-full border border-hairline p-2 text-[16px] focus:border-ink focus:outline-none disabled:opacity-50"
+          className="w-full border border-ink bg-white p-2 text-[16px] focus:outline-none disabled:opacity-50"
         />
       )}
 
