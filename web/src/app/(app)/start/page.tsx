@@ -233,6 +233,7 @@ export default async function StartPage() {
     <Landing
       groups={groups}
       state={state}
+      today={today}
       request={
         active
           ? {

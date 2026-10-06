@@ -1,11 +1,9 @@
 "use client";
 
-import { useId, useState } from "react";
 import { MenuButton } from "@/components/ui/MenuButton";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { ATTACHMENT_ACCEPT_ATTR } from "@/lib/attachments";
-import { detectPage, loadImage, type ScanCrop, type ScanTone } from "@/lib/scanPages";
-import { ScanDialog, type ScanPage } from "./ScanDialog";
+import { useScanCapture } from "./useScanCapture";
 
 /**
  * THE ATTACH COMMAND on an order's or an invoice's paperwork — a menu of two
@@ -19,23 +17,14 @@ import { ScanDialog, type ScanPage } from "./ScanDialog";
  * `input.click()` is honoured only inside a user gesture, and `MenuButton` runs
  * `onSelect` in the same click that chose the row.
  *
- * SCAN OPENS THE CAMERA STRAIGHT AWAY rather than opening a dialog first, so
- * the common case — a one-page delivery slip — is Scan…, shoot, Attach. The
- * dialog appears once there is a page in it, to add the next page or to send.
- * `capture="environment"` is what asks iOS for the rear camera instead of the
- * Photo Library / Take Photo / Choose File sheet; File… keeps that sheet, which
- * is the reason it carries no `capture` (see `PoAttachments`). A browser with
- * no camera ignores `capture` and shows its ordinary picker, so on a Mac Scan…
- * still works as "put these photos together into one PDF".
+ * SCAN IS `useScanCapture` — the camera, the pages and `ScanDialog` (rotate,
+ * crop, preview, a remembered tone; Mark, 2026-09-18) — shared since
+ * 2026-10-05 with the tablet home screen's scan tiles. File… keeps iOS's
+ * Photo Library / Take Photo / Choose File sheet, which is the reason its
+ * input carries no `capture` (see `PoAttachments`).
  *
- * THE DIALOG ADJUSTS AS WELL AS COLLECTS (Mark, 2026-09-18) — rotate, crop,
- * preview, and a remembered tone. That is `ScanDialog`; this component holds
- * the pages and the inputs.
- *
- * The pages go through `lib/scanPages` — why one PDF, why downscaled, and why
- * the preview is drawn by the same code as the PDF, is there — and then into
- * the caller's own `onFiles`, which is the same upload and the same auto-read
- * a picked file gets.
+ * The scanned PDF goes into the caller's own `onFiles`, which is the same
+ * upload and the same auto-read a picked file gets.
  */
 export function AttachMenu({
   fileRef,
@@ -53,59 +42,7 @@ export function AttachMenu({
   kindLabel: string;
   triggerClassName?: string;
 }) {
-  const scanInputId = useId();
-  const [pages, setPages] = useState<ScanPage[]>([]);
-  const [building, setBuilding] = useState(false);
-  const [failed, setFailed] = useState<string | null>(null);
-
-  function openCamera() {
-    const el = document.getElementById(scanInputId);
-    if (el instanceof HTMLInputElement) el.click();
-  }
-
-  function discard() {
-    setPages([]);
-    setFailed(null);
-  }
-
-  async function addPhotos(files: File[]) {
-    setFailed(null);
-    try {
-      const loaded = await Promise.all(
-        files.map(async (file) => {
-          const img = await loadImage(file);
-          // The page found and squared up on the way in (`detectPage`); left
-          // whole when nothing page-like is found. A detector that throws is a
-          // photo without a crop, never a photo lost.
-          let crop: ScanCrop | null = null;
-          try {
-            crop = detectPage({ img, rotation: 0 });
-          } catch {
-            crop = null;
-          }
-          return { id: crypto.randomUUID(), img, rotation: 0 as const, crop };
-        })
-      );
-      setPages((prev) => [...prev, ...loaded]);
-    } catch {
-      setFailed("That photo could not be opened. Try taking it again.");
-    }
-  }
-
-  async function attach(tone: ScanTone) {
-    setBuilding(true);
-    setFailed(null);
-    try {
-      const { scanToPdf, scanFileName } = await import("@/lib/scanPages");
-      const pdf = await scanToPdf(pages, tone, scanFileName());
-      discard();
-      onFiles([pdf]);
-    } catch (e) {
-      setFailed(e instanceof Error ? e.message : "The pages could not be put together.");
-    } finally {
-      setBuilding(false);
-    }
-  }
+  const scan = useScanCapture({ kindLabel, onPdf: (pdf) => onFiles([pdf]) });
 
   return (
     <>
@@ -117,7 +54,7 @@ export function AttachMenu({
         disabled={busy}
         items={[
           { label: "File…", onSelect: () => fileRef.current?.click() },
-          { label: "Scan…", onSelect: openCamera },
+          { label: "Scan…", onSelect: scan.openCamera },
         ]}
       />
 
@@ -131,36 +68,7 @@ export function AttachMenu({
           if (e.target.files?.length) onFiles(Array.from(e.target.files));
         }}
       />
-      <input
-        id={scanInputId}
-        type="file"
-        // Photos only — a scan is a camera's output. Named formats rather than
-        // `image/*` for the HEIC reason in `lib/attachments`.
-        accept="image/jpeg,image/png,image/webp"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => {
-          const picked = Array.from(e.target.files ?? []);
-          // Cleared at once, so the same photo can be taken twice.
-          e.target.value = "";
-          if (picked.length > 0) void addPhotos(picked);
-        }}
-      />
-
-      {/* Open with a failure and no pages too: a first photo that will not
-          open would otherwise set an error nothing is on screen to show. */}
-      {(pages.length > 0 || failed) && (
-        <ScanDialog
-          pages={pages}
-          onPagesChange={setPages}
-          kindLabel={kindLabel}
-          onAddPage={openCamera}
-          onCancel={discard}
-          onAttach={(tone) => void attach(tone)}
-          building={building}
-          failed={failed}
-        />
-      )}
+      {scan.element}
     </>
   );
 }

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
-  documentPath,
+  uploadEmployeeDocument,
   expiryState,
   paperworkStatus,
   DOCUMENT_KIND_LABEL,
@@ -211,36 +211,18 @@ export function EmployeeDocuments({
     setError(null);
     for (const file of files) {
       setBusyLabel(`Uploading ${file.name}…`);
-      const path = documentPath(orgId, employeeId, file.name);
-
-      const { error: uploadError } = await supabase.storage
-        .from(EMPLOYEE_DOCS_BUCKET)
-        .upload(path, file, { contentType: file.type || undefined });
-      if (uploadError) {
-        setBusyLabel(null);
-        setError(`${file.name}: ${uploadError.message}`);
-        return;
-      }
-
-      const { error: rowError } = await supabase.from("employee_documents").insert({
-        org_id: orgId,
-        employee_id: employeeId,
-        storage_path: path,
+      // Storage, then the row — `uploadEmployeeDocument`. `expires` is NULL,
+      // never "": 034's rule, null means "this does not lapse".
+      const problem = await uploadEmployeeDocument(supabase, {
+        orgId,
+        employeeId,
+        file,
         kind,
-        // NULL, never "", and that is 034's rule rather than tidiness: null
-        // means "this does not lapse", which is the honest reading for a W-4 or
-        // a handbook receipt, and an empty string is not a date.
-        expires_on: expires,
-        file_name: file.name,
-        content_type: file.type || null,
-        byte_size: file.size,
+        expires,
       });
-      if (rowError) {
-        // The object is up but unrecorded. Take it back out rather than leaving
-        // a file nothing points at.
-        await supabase.storage.from(EMPLOYEE_DOCS_BUCKET).remove([path]);
+      if (problem) {
         setBusyLabel(null);
-        setError(`${file.name}: ${rowError.message}`);
+        setError(problem);
         return;
       }
     }

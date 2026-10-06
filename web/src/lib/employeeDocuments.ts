@@ -8,6 +8,7 @@
 // about a piece of paper in a drawer, and it can go stale the moment it's
 // ticked optimistically. Here "complete" cannot be true without the file.
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PickOption } from "@/components/ui/PickList";
 
 export const EMPLOYEE_DOCS_BUCKET = "employee-documents";
@@ -303,4 +304,53 @@ export function documentPath(
       ? fileName.slice(dot).toLowerCase()
       : "";
   return `${orgId}/${employeeId}/${crypto.randomUUID()}${ext}`;
+}
+
+/**
+ * Put one file in an employee's personnel file: the object, then its row.
+ *
+ * Storage first, then the row, and the object taken back out if the row will
+ * not write — the same order and the same reason as `uploadAttachment`. The
+ * employee record's Paperwork card and the tablet's Scan an Employee Document
+ * tile both file through here. Returns an error sentence, or null.
+ */
+export async function uploadEmployeeDocument(
+  supabase: SupabaseClient,
+  {
+    orgId,
+    employeeId,
+    file,
+    kind,
+    expires,
+  }: {
+    orgId: string;
+    employeeId: string;
+    file: File;
+    kind: DocumentKind;
+    /** Null means "does not lapse" (034) — never "". */
+    expires: string | null;
+  }
+): Promise<string | null> {
+  const path = documentPath(orgId, employeeId, file.name);
+
+  const { error: uploadError } = await supabase.storage
+    .from(EMPLOYEE_DOCS_BUCKET)
+    .upload(path, file, { contentType: file.type || undefined });
+  if (uploadError) return `${file.name}: ${uploadError.message}`;
+
+  const { error: rowError } = await supabase.from("employee_documents").insert({
+    org_id: orgId,
+    employee_id: employeeId,
+    storage_path: path,
+    kind,
+    expires_on: expires,
+    file_name: file.name,
+    content_type: file.type || null,
+    byte_size: file.size,
+  });
+  if (rowError) {
+    await supabase.storage.from(EMPLOYEE_DOCS_BUCKET).remove([path]);
+    return `${file.name}: ${rowError.message}`;
+  }
+  return null;
 }

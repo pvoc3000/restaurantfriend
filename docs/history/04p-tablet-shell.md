@@ -296,3 +296,33 @@ record's own screen — detected by the record book's seat being taken, so it
 covers every detail page without a list of routes, and leaves the record book
 the room it needs. Settings and Switch user/Sign out stay on the landing page.
 The runners are in `(fullscreen)` and have no bar at all.
+
+**2026-10-05 — TWO SCAN TILES, in a sixth group, "Scan"** (Mark: "scan a
+document and attach it to an employee file … scan a document and create &
+attach it to a new bill or an already existing one … Reuse as much of the
+scanning code from Receiving you can"). **Scan a Bill** and **Scan an Employee
+Document** are COMMAND tiles like Submit a Purchase Request: the tap opens the
+camera, the pages go through Receiving's own `ScanDialog`, and a filing panel
+on the landing page then asks where the PDF goes.
+**THE SCAN IS ONE HOOK NOW** — `purchasing/useScanCapture` (camera input,
+pages, `ScanDialog`, one PDF out), lifted out of `AttachMenu`, which is its
+first caller; `ScanDialog` gained `commitVerb` so the tiles' button reads "Use
+2 Pages" where the next step is a question, not the attach. **The two writes
+are shared the same way**: `uploadAttachment` (`lib/attachments`, used by
+`useAttachmentActions`) and `uploadEmployeeDocument` (`lib/employeeDocuments`,
+used by the employee record's Paperwork card).
+**The bill panel**: New bill (vendor, bill or credit memo) or Existing bill
+(the working shop's 200 most recent), and a document type from the attachment
+vocabulary. A new bill is `NewBill`'s write, dated today so the list's range
+shows it, and the screen lands on the bill, where Read is. Nothing is read from
+the tile. A bill created whose scan then failed to upload is remembered, so
+File again does not create a second.
+**The employee panel**: employee (former ones sunk under "Former"), kind,
+expiry. It STAYS on the home screen and says what it filed in the tile's line,
+because paperwork comes in stacks.
+**BOTH GATE ON WRITE, and that leaves a supervisor with neither.** `/bills` is
+purchaser+ and `/employees` manager+ on the sheet, and 021's policies refuse an
+employee document from anyone below manager, table and bucket both. Letting a
+supervisor scan into a personnel file is a migration, not a cell.
+**NOT exercised in a browser** — the test pane was signed out, and it has no
+camera in any case. tsc, eslint and 2,221 fixtures pass.

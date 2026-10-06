@@ -3,6 +3,7 @@
 // claim. Objects live in the PRIVATE `po-attachments` bucket (migration 018);
 // reads go through short-lived signed URLs.
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PickOption } from "@/components/ui/PickList";
 import type { InvoiceExtraction } from "./invoiceExtraction";
 
@@ -170,6 +171,67 @@ export function attachmentPath(orgId: string, owner: string, fileName: string): 
       ? fileName.slice(dot).toLowerCase()
       : "";
   return `${orgId}/${owner}/${crypto.randomUUID()}${ext}`;
+}
+
+/**
+ * Put one file on an order or a bill: the object, then its row.
+ *
+ * STORAGE FIRST, THEN THE ROW — a row that went in first and an upload that
+ * then failed leaves a card pointing at nothing — and an object whose row
+ * would not write is taken back out rather than left with nothing pointing at
+ * it. `useAttachmentActions` and the tablet's Scan a Bill tile both file
+ * through here, so the two cannot disagree about either half.
+ *
+ * It returns the row's id because an invoice's auto-read needs it. The client
+ * is a parameter, as in `lib/billFromExtraction`.
+ */
+export async function uploadAttachment(
+  supabase: SupabaseClient,
+  {
+    orgId,
+    poId,
+    billId,
+    file,
+    kind,
+  }: {
+    orgId: string;
+    poId: string | null;
+    billId: string | null;
+    file: File;
+    kind: AttachmentKind;
+  }
+): Promise<{ id: string; path: string } | { error: string }> {
+  // An order's own paperwork keeps 018's key; a bill with no order behind it
+  // files under `invoices/{id}`. Both are authorised by the same policies,
+  // which read the first segment only.
+  const owner = poId ?? (billId ? billOwner(billId) : null);
+  if (!owner) return { error: "Nothing to attach this to." };
+  const path = attachmentPath(orgId, owner, file.name);
+
+  const { error: uploadError } = await supabase.storage
+    .from(ATTACHMENT_BUCKET)
+    .upload(path, file, { contentType: file.type || undefined });
+  if (uploadError) return { error: `${file.name}: ${uploadError.message}` };
+
+  const { data: row, error: rowError } = await supabase
+    .from("purchase_order_attachments")
+    .insert({
+      org_id: orgId,
+      po_id: poId,
+      bill_id: billId,
+      storage_path: path,
+      kind,
+      file_name: file.name,
+      content_type: file.type || null,
+      byte_size: file.size,
+    })
+    .select("id")
+    .single();
+  if (rowError || !row) {
+    await supabase.storage.from(ATTACHMENT_BUCKET).remove([path]);
+    return { error: `${file.name}: ${rowError?.message ?? "could not record the file"}` };
+  }
+  return { id: row.id as string, path };
 }
 
 /** Whether to draw a thumbnail or a document row. */

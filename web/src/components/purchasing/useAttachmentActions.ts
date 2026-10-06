@@ -4,8 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
-  attachmentPath,
-  billOwner,
+  uploadAttachment,
   ATTACHMENT_BUCKET,
   type AttachmentKind,
   type PoAttachment,
@@ -133,48 +132,18 @@ export function useAttachmentActions({
     let statusProblem: string | null = null;
     for (const file of files) {
       setPhase({ kind: "uploading", label: `Uploading ${file.name}…` });
-      // An order's own paperwork keeps 018's key; an invoice with no order
-      // behind it files under `invoices/{id}`. Both are authorised by the same
-      // policies, which read the first segment only.
-      const owner = poId ?? (billId ? billOwner(billId) : null);
-      if (!owner) {
+      // Storage, then the row — `uploadAttachment`. The id it hands back is
+      // what auto-read gives the edge function.
+      const row = await uploadAttachment(supabase, {
+        orgId,
+        poId,
+        billId: billId ?? null,
+        file,
+        kind,
+      });
+      if ("error" in row) {
         setPhase(IDLE);
-        setError("Nothing to attach this to.");
-        return;
-      }
-      const path = attachmentPath(orgId, owner, file.name);
-
-      const { error: uploadError } = await supabase.storage
-        .from(ATTACHMENT_BUCKET)
-        .upload(path, file, { contentType: file.type || undefined });
-      if (uploadError) {
-        setPhase(IDLE);
-        setError(`${file.name}: ${uploadError.message}`);
-        return;
-      }
-
-      // `.select("id").single()` and not a bare insert: auto-read needs the id
-      // of the row it is about to hand to the edge function.
-      const { data: row, error: rowError } = await supabase
-        .from("purchase_order_attachments")
-        .insert({
-          org_id: orgId,
-          po_id: poId,
-          bill_id: billId ?? null,
-          storage_path: path,
-          kind,
-          file_name: file.name,
-          content_type: file.type || null,
-          byte_size: file.size,
-        })
-        .select("id")
-        .single();
-      if (rowError || !row) {
-        // The object is up but unrecorded. Take it back out rather than leaving
-        // a file nothing points at.
-        await supabase.storage.from(ATTACHMENT_BUCKET).remove([path]);
-        setPhase(IDLE);
-        setError(`${file.name}: ${rowError?.message ?? "could not record the file"}`);
+        setError(row.error);
         return;
       }
 
@@ -209,7 +178,7 @@ export function useAttachmentActions({
       // and "Read invoice" is still there to try again. Losing a successfully
       // stored invoice because a model call timed out would be the worse trade.
       if (kind === "invoice") {
-        await read({ id: row.id as string, file_name: file.name });
+        await read({ id: row.id, file_name: file.name });
       }
     }
     setPhase(IDLE);

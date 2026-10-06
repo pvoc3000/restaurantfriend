@@ -53,6 +53,7 @@ export function ScanDialog({
   pages,
   onPagesChange,
   kindLabel,
+  commitVerb = "Attach",
   onAddPage,
   onCancel,
   onAttach,
@@ -62,6 +63,9 @@ export function ScanDialog({
   pages: ScanPage[];
   onPagesChange: (update: (pages: ScanPage[]) => ScanPage[]) => void;
   kindLabel: string;
+  /** The commit button's verb. "Attach" where the scan goes straight onto a
+   *  record; a caller that asks a question first says "Use". */
+  commitVerb?: string;
   onAddPage: () => void;
   onCancel: () => void;
   onAttach: (tone: ScanTone) => void;
@@ -149,7 +153,7 @@ export function ScanDialog({
             disabled={building || cropping || count === 0}
             className={DIALOG_COMMIT_CLASS}
           >
-            {building ? "Preparing…" : `Attach ${count} ${count === 1 ? "Page" : "Pages"}`}
+            {building ? "Preparing…" : `${commitVerb} ${count} ${count === 1 ? "Page" : "Pages"}`}
           </button>
         </>
       }

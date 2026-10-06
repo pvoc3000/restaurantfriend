@@ -3,6 +3,8 @@ import Link from "next/link";
 import type { TileGroup, TileKey } from "@/lib/tablet/landing";
 
 import { RequestTile, type RequestContext } from "./RequestTile";
+import { ScanBillTile } from "./ScanBillTile";
+import { ScanEmployeeTile } from "./ScanEmployeeTile";
 import { TILE_CLASS } from "./tileClass";
 
 /** What a tile says about itself today, and where it really goes. */
@@ -24,11 +26,14 @@ export function Landing({
   groups,
   state,
   request,
+  today,
 }: {
   groups: TileGroup[];
   state: Partial<Record<TileKey, TileState>>;
   /** Who files, and where — null when there is no working shop to file for. */
   request: RequestContext | null;
+  /** The org's today — a scanned bill is dated with it. */
+  today: string;
 }) {
   return (
     <div className="mx-auto max-w-5xl space-y-10 text-[16px]">
@@ -48,6 +53,16 @@ export function Landing({
                 <li key={tile.key} className="flex">
                   {tile.key === "purchase_request" && request ? (
                     <RequestTile label={tile.label} note={s?.note ?? null} {...request} />
+                  ) : tile.key === "scan_bill" && request ? (
+                    <ScanBillTile
+                      label={tile.label}
+                      orgId={request.orgId}
+                      locationId={request.locationId}
+                      locationCode={request.locationCode}
+                      today={today}
+                    />
+                  ) : tile.key === "scan_employee" && request ? (
+                    <ScanEmployeeTile label={tile.label} orgId={request.orgId} />
                   ) : (
                     <Link href={s?.href ?? tile.href} className={TILE_CLASS}>
                       <span className="font-bold uppercase tracking-[0.04em] text-ink">{tile.label}</span>

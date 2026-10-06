@@ -57,9 +57,9 @@ test("every tile's href is a governed route the menu also knows", () => {
   }
 });
 
-test("the owner sees every tile in Mark's five groups", () => {
+test("the owner sees every tile in Mark's six groups", () => {
   const groups = tilesForRole("owner");
-  eq(groups.length, 5);
+  eq(groups.length, 6);
   eq(
     groups.flatMap((g) => g.tiles.map((t) => t.key)),
     LANDING_GROUPS.flatMap((g) => g.tiles.map((t) => t.key))
@@ -87,6 +87,17 @@ test("Submit a Purchase Request is for the roles that may file one", () => {
   ok(!has("staff"), "staff: no tile");
   ok(has("supervisor"), "supervisor: tile");
   ok(has("purchaser"), "purchaser: tile");
+});
+
+test("the scan tiles follow who may file, not who may look", () => {
+  const keys = (role: "staff" | "supervisor" | "purchaser" | "admin") =>
+    new Set(tilesForRole(role).flatMap((g) => g.tiles.map((t) => t.key)));
+  // Bills are a purchaser's; a personnel file is a manager's (021's policy).
+  ok(!keys("supervisor").has("scan_bill"), "supervisor: no bill tile");
+  ok(!keys("supervisor").has("scan_employee"), "supervisor: no employee tile");
+  ok(keys("purchaser").has("scan_bill"), "purchaser: bill tile");
+  ok(!keys("purchaser").has("scan_employee"), "purchaser: no employee tile");
+  ok(keys("admin").has("scan_bill") && keys("admin").has("scan_employee"), "manager: both");
 });
 
 test("a group left with no tiles is dropped, not shown empty", () => {

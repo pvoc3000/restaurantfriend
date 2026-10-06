@@ -28,7 +28,9 @@ export type TileKey =
   | "order_guide"
   | "purchase_orders"
   | "purchase_request"
-  | "special_orders";
+  | "special_orders"
+  | "scan_bill"
+  | "scan_employee";
 
 export type Tile = {
   key: TileKey;
@@ -90,6 +92,22 @@ export const LANDING_GROUPS: readonly TileGroup[] = [
     // "Sales" since 2026-09-30, with the menu ("Selling" from 2026-09-29).
     label: "Sales",
     tiles: [{ key: "special_orders", label: "View Orders", href: "/special-orders" }],
+  },
+  {
+    // Two COMMANDS, like Submit a Purchase Request (Mark, 2026-10-05): the
+    // tile opens the camera, and the scan is filed from the landing page. Each
+    // href is the screen whose row gates the write — a bill is a purchaser's,
+    // a personnel file a manager's, and 021's policy refuses anyone else.
+    label: "Scan",
+    tiles: [
+      { key: "scan_bill", label: "Scan a Bill", href: "/bills", needs: "write" },
+      {
+        key: "scan_employee",
+        label: "Scan an Employee Document",
+        href: "/employees",
+        needs: "write",
+      },
+    ],
   },
 ];
 
