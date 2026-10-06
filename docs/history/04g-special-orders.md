@@ -5612,5 +5612,7 @@ send it."
 - **Not changed:** `update_order_on_customer_invoice` and
   `revise_customer_invoice` do not ask `order_invoice_refusal`, so clearing the
   rate on an order already on a draft is still caught only at send.
-- **174 IS WRITTEN, NOT APPLIED.** The app half works without it; the database
-  refusal and the inquiry fix need it.
+- **APPLIED 2026-10-06** by CLI at Mark's request (`db query --linked`, in a
+  transaction). Confirmed after: both live bodies carry the 174 change and the
+  grants are as before (`create_inquiry` anon and authenticated;
+  `order_invoice_refusal` neither).
