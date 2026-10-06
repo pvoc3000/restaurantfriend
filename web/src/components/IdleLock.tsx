@@ -179,14 +179,18 @@ export function IdleLock({ userId }: { userId: string }) {
   if (secondsLeft === null) return null;
   return (
     // Above everything, CalcPad (80) included: this is about the whole device.
+    // `h-16` IS THE TABLET BAR'S HEIGHT (Mark, 2026-10-06) — `BAR_CELL`'s own
+    // 64px — so the band covers the bar exactly and nothing under it. A fixed
+    // height, not `--rf-header-h`: the runners have no bar and the band should
+    // be the same size there.
     <div
       role="alert"
-      className="fixed inset-x-0 top-0 z-[90] border-b-2 border-ink bg-accent px-6 py-5 text-center text-white"
+      className="fixed inset-x-0 top-0 z-[90] flex h-16 flex-col items-center justify-center border-b-2 border-ink bg-accent px-6 text-center text-white"
     >
-      <p className="text-[20px] font-bold uppercase tracking-[0.08em] tabular-nums">
+      <p className="text-[20px] font-bold uppercase leading-tight tracking-[0.08em] tabular-nums">
         Locking in {secondsLeft} {secondsLeft === 1 ? "second" : "seconds"}
       </p>
-      <p className="mt-1 text-[16px]">Touch the screen to stay signed in.</p>
+      <p className="text-[16px] leading-tight">Touch the screen to stay signed in.</p>
     </div>
   );
 }
