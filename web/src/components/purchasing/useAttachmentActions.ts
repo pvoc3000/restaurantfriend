@@ -89,8 +89,11 @@ export function useAttachmentActions({
    * Bills module either. An extraction is only ever a proposal to compare
    * against, which a person then accepts line by line; filing it as a bill is
    * a separate act, taken at close. See the note on the hook above.
+   *
+   * Resolves TRUE when a new reading was stored, so a caller can act on it once
+   * the refresh brings it back (the bill screen's offer of what differs).
    */
-  async function read(attachment: Pick<PoAttachment, "id" | "file_name">) {
+  async function read(attachment: Pick<PoAttachment, "id" | "file_name">): Promise<boolean> {
     setPhase({ kind: "reading", label: `Reading ${attachment.file_name ?? "the invoice"}…` });
     setError(null);
     const { data, error: fnError } = await supabase.functions.invoke("extract-invoice", {
@@ -112,16 +115,17 @@ export function useAttachmentActions({
         }
       }
       setError(message);
-      return;
+      return false;
     }
     if (data?.error) {
       setPhase(IDLE);
       setError(data.error);
-      return;
+      return false;
     }
 
     setPhase(IDLE);
     router.refresh();
+    return true;
   }
 
   // `File[]`, not `FileList`: files reach this by two routes now — the picker,

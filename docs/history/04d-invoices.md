@@ -1049,3 +1049,31 @@
    Bill is the path for that), a numberless reading is taken only when alone,
    and a credit reading never heads a bill. The confirm names the invoice it is
    taking from, or why it is taking none.
+   **READ AGAIN OFFERS WHAT THE PAGE SAYS DIFFERENTLY** (2026-10-06, Mark: "if
+   I tap 'read again' on a bill, can the app offer to fill in any information
+   on the bill that is different from what it sees on the scanned invoice?").
+   Until now a re-read rewrote the attachment's `extraction` and touched
+   nothing else; the only path from a reading to a bill's fields was filing,
+   which fills blanks only. `headerDifferences` (`lib/bills`) compares the bill
+   to the SHOWN document's reading and `BillReadingDifferences` lists each
+   field as Bill says / Invoice says, every row ticked, written by Use these.
+   It opens by itself when a Read again comes back with differences (`read()`
+   now resolves true on success; the screen waits for that attachment's
+   `extracted_at` to move, as state adjusted during render), and a yellow band
+   under Amounts with Review… stands for as long as they differ, so a bill
+   opened later is offered it too (Mark's answer to "only after Read again?").
+   **HEADER FIELDS ONLY, by Mark's choice** — lines are the next step and are
+   harder, because they are edited by hand and linked to order lines.
+   Compared: invoice number, invoice date, PRINTED due date, terms, tax,
+   freight, other; subtotal and total only on a bill with no lines (with lines
+   they are computed). Never offered: a field the page does not print (null is
+   NOT PRINTED, which protects a charge typed in because the reader missed
+   it), vendor, kind, discount. Open bills only — every field compared is one
+   089 locks. The write carries the inline fields' two consequences: a charge
+   moves the cached subtotal/total, and an invoice date or terms sets a due
+   date nobody has set. **MEASURED on the live table before shipping: 2 of 108
+   bills with a reading differ, 1 of them open** — so the standing band is not
+   noise. **KNOWN LIMIT:** a field corrected by hand because the READING is
+   wrong keeps the band up; there is nowhere to store "keep the bill's" without
+   a column. **NOT DRIVEN IN THE PANE** — it was signed out; verified by
+   `tsc`, lint, and `headerDifferences.fixtures.ts`.

@@ -8,7 +8,7 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS, SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { withFrom } from "@/lib/breadcrumbs";
 import { useFillToBottom } from "@/lib/fillHeight";
@@ -27,6 +27,8 @@ import {
   rescaledExtended,
   computedAmounts,
   dueDateFromTerms,
+  headerDifferences,
+  type HeaderDifferenceColumn,
   totalDisagreesWithDocument,
   toInvoiceLine,
   AGING_LABEL,
@@ -46,6 +48,7 @@ import type { SignedAttachment } from "@/lib/attachments";
 import { DocumentPane } from "./DocumentPane";
 import { useAttachmentActions } from "./useAttachmentActions";
 import { BillCommandMenu } from "./BillCommandMenu";
+import { BillReadingDifferences } from "./BillReadingDifferences";
 import { attachmentRejection, type AttachmentKind } from "@/lib/attachments";
 import {
   handAmendment,
@@ -302,6 +305,85 @@ export function BillDetail({
    * could only say so in a note behind a caret (Mark, 2026-09-02).
    */
   const amendment = shown?.extraction ? handAmendment(shown.extraction) : null;
+
+  /**
+   * Header fields where this record and the reading of the document on screen
+   * disagree, OFFERED (Mark, 2026-10-06) — see `headerDifferences` for what is
+   * left out and why.
+   *
+   * Empty unless the financials can be written: every field it compares is one
+   * 089 locks, and an offer the trigger would refuse is not an offer.
+   */
+  const differences = useMemo(
+    () =>
+      shown?.extraction && canEditFinancials
+        ? headerDifferences(bill, shown.extraction, { hasLines: lines.length > 0 })
+        : [],
+    [bill, shown, canEditFinancials, lines.length]
+  );
+  const [reviewing, setReviewing] = useState(false);
+  /**
+   * A Read again whose result has not come back yet: the document, and the
+   * `extracted_at` it carried before.
+   *
+   * `read()` resolves when the reading is STORED, and the props that carry it
+   * arrive a refresh later — so the dialog cannot open in the click's own
+   * handler. It opens on the render where that document's stamp has moved,
+   * which is state adjusted during render rather than an effect.
+   */
+  const [awaitingRead, setAwaitingRead] = useState<{
+    id: string;
+    stamp: string | null;
+  } | null>(null);
+  if (awaitingRead) {
+    const reread = attachments.find((a) => a.id === awaitingRead.id);
+    if (!reread) {
+      setAwaitingRead(null);
+    } else if (reread.extracted_at !== awaitingRead.stamp) {
+      setAwaitingRead(null);
+      if (shown?.id === reread.id && differences.length > 0) setReviewing(true);
+    }
+  }
+
+  async function readAgain(a: SignedAttachment) {
+    if (await read(a)) setAwaitingRead({ id: a.id, stamp: a.extracted_at });
+  }
+
+  /**
+   * Write the ticked fields, and what follows from them — the same two
+   * consequences the inline fields carry in `alsoUpdate`: a charge moves the
+   * cached totals, and an invoice date or terms sets a due date nobody has
+   * set yet.
+   */
+  async function applyDifferences(columns: HeaderDifferenceColumn[]): Promise<string | null> {
+    const patch: Record<string, string | number | null> = {};
+    for (const d of differences) {
+      if (columns.includes(d.column)) patch[d.column] = d.printed;
+    }
+    if (bill.due_date === null && !("due_date" in patch)) {
+      const due = dueDateFromTerms(
+        "invoice_date" in patch ? String(patch.invoice_date) : bill.invoice_date,
+        "terms" in patch ? String(patch.terms) : bill.terms
+      );
+      if (due !== null && ("invoice_date" in patch || "terms" in patch)) patch.due_date = due;
+    }
+    const sums = computedAmounts(lines, { ...bill, ...patch });
+    if (sums.total !== null) {
+      patch.subtotal = sums.subtotal;
+      patch.total = sums.total;
+    }
+    const { data, error } = await supabase
+      .from("vendor_bills")
+      .update(patch)
+      .eq("id", bill.id)
+      .select("id");
+    if (error) return error.message;
+    // Below purchaser+ this changes nothing and returns no error.
+    if (!data || data.length === 0) return "The bill was not changed.";
+    setReviewing(false);
+    router.refresh();
+    return null;
+  }
   /**
    * What the delivery actually produced for a line, from the purchase order it
    * is linked to.
@@ -1255,7 +1337,7 @@ export function BillDetail({
             // Through the hook, so a refused drop reads the same here as on PO
             // detail and lands in the same line as an upload failure.
             onDropRejected={(rejected) => reportError(attachmentRejection(rejected))}
-            onRead={(a) => void read(a)}
+            onRead={(a) => void readAgain(a)}
             onRemove={(a) => void remove(a)}
             fileRef={fileRef}
             kind={kind}
@@ -1612,6 +1694,31 @@ export function BillDetail({
               ))}
             </dl>
 
+            {/* What the page prints that this record does not say — offered,
+                and standing for as long as they differ, so a bill opened
+                later is offered it too (Mark, 2026-10-06). */}
+            {differences.length > 0 && (
+              <p className="flex flex-wrap items-center gap-3 border border-ink bg-mark-fill px-4 py-2 text-sm">
+                <span>
+                  The invoice reads differently in{" "}
+                  {differences.length === 1 ? "1 field" : `${differences.length} fields`}.
+                </span>
+                <button
+                  type="button"
+                  className={SMALL_BUTTON_CLASS}
+                  onClick={() => setReviewing(true)}
+                >
+                  Review…
+                </button>
+              </p>
+            )}
+            {reviewing && differences.length > 0 && (
+              <BillReadingDifferences
+                differences={differences}
+                onApply={applyDifferences}
+                onClose={() => setReviewing(false)}
+              />
+            )}
             {/* Yellow, never red — "worth your eye", the ≈/? rule. A total that
                 doesn't match its parts is usually a reading to correct, not a
                 vendor who can't add up. */}

@@ -99,6 +99,7 @@ import "./quickbooks.fixtures";
 import "./billStage.fixtures";
 import "./handAmendment.fixtures";
 import "./computedAmounts.fixtures";
+import "./headerDifferences.fixtures";
 import "./recipeCosts.fixtures";
 import "./receiving.fixtures";
 import "./recordSet.fixtures";

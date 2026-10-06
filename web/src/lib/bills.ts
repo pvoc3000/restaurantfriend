@@ -1510,3 +1510,121 @@ export function totalDisagreesWithDocument(
     `$${Number(printed).toFixed(2)}`
   );
 }
+
+// ---------------------------------------------------------------------------
+// Where the record and the page disagree
+// ---------------------------------------------------------------------------
+
+export type HeaderDifferenceColumn =
+  | "invoice_number"
+  | "invoice_date"
+  | "due_date"
+  | "terms"
+  | "subtotal"
+  | "tax"
+  | "freight"
+  | "other_charges"
+  | "total";
+
+export type HeaderDifference = {
+  column: HeaderDifferenceColumn;
+  label: string;
+  kind: "text" | "date" | "money";
+  /** What the bill holds now. Null is an empty field. */
+  current: string | number | null;
+  /** What the page prints. Never null — nothing printed is nothing to offer. */
+  printed: string | number;
+};
+
+/**
+ * The header fields where this bill says one thing and the reading of its
+ * document says another (Mark, 2026-10-06: after Read again, "offer to fill
+ * in any information on the bill that is different from what it sees").
+ *
+ * AN OFFER, like everything else a reading produces: the caller shows these
+ * and writes only the ones a person ticks. `absorbIntoInvoice` still fills
+ * blanks only and still never replaces a value on its own.
+ *
+ * WHAT IS LEFT OUT, and each for a reason:
+ *   · a field the page does not print. Null in a reading means NOT PRINTED
+ *     (`invoiceCharges`), so there is nothing to put in the bill's place — and
+ *     this is what keeps a charge typed by hand because the reader missed it
+ *     from being offered away again.
+ *   · the due date worked out from the terms. Only a PRINTED due date is the
+ *     page's own claim; `dueDateFromTerms` is ours.
+ *   · subtotal and total once the bill has lines. They are computed from the
+ *     lines then, and the screen already says when that sum and the page part.
+ *   · vendor and kind. A printed vendor name is not our vendor's name
+ *     (`printedVendorDisagreement`), and a credit the reader missed is set by
+ *     hand, so both would be offered back on every bill they were corrected on.
+ *   · discount, which a reading has no field for.
+ *
+ * Amounts follow the record's conventions: tax, freight, subtotal and total
+ * are positive magnitudes, and Other is signed as printed (091) — except on a
+ * credit reading, whose negatives are the document's direction and not the
+ * charge's.
+ */
+export function headerDifferences(
+  bill: Pick<
+    VendorBill,
+    | "invoice_number"
+    | "invoice_date"
+    | "due_date"
+    | "terms"
+    | "subtotal"
+    | "tax"
+    | "freight"
+    | "other_charges"
+    | "total"
+  >,
+  extraction: InvoiceExtraction,
+  { hasLines }: { hasLines: boolean }
+): HeaderDifference[] {
+  const out: HeaderDifference[] = [];
+  const charges = invoiceCharges(extraction);
+  const credit = isCreditReading(extraction);
+
+  const text = (column: "invoice_number" | "terms", label: string, printed: string | null | undefined) => {
+    const value = printed?.trim() || null;
+    if (value === null) return;
+    const current = bill[column]?.trim() || null;
+    if (current === value) return;
+    out.push({ column, label, kind: "text", current, printed: value });
+  };
+  const date = (column: "invoice_date" | "due_date", label: string, printed: string | null) => {
+    if (printed === null || bill[column] === printed) return;
+    out.push({ column, label, kind: "date", current: bill[column], printed });
+  };
+  const amount = (
+    column: "subtotal" | "tax" | "freight" | "other_charges" | "total",
+    label: string,
+    printed: number | null | undefined,
+    signed = false
+  ) => {
+    if (printed === null || printed === undefined) return;
+    const value = signed && !credit ? Number(printed) : Math.abs(Number(printed));
+    const held = bill[column];
+    // An empty charge is no charge, so a printed $0.00 is not a difference.
+    if (Math.abs(Number(held ?? 0) - value) <= MONEY_EPSILON) return;
+    out.push({
+      column,
+      label,
+      kind: "money",
+      current: held === null || held === undefined ? null : Number(held),
+      printed: value,
+    });
+  };
+
+  text("invoice_number", "Invoice number", extraction.invoice_number);
+  date("invoice_date", "Invoice date", isoDate(extraction.invoice_date));
+  date("due_date", "Due date", invoiceDueDate(extraction));
+  text("terms", "Terms", extraction.terms);
+  if (!hasLines) amount("subtotal", "Subtotal", charges.subtotal);
+  amount("tax", "Tax", charges.tax);
+  amount("freight", "Freight", charges.freight);
+  amount("other_charges", "Other", charges.other, true);
+  // The handwritten total where there is one — it is what the page says is
+  // owed (`handAmendment`).
+  if (!hasLines) amount("total", "Total", extraction.corrected_total ?? charges.total);
+  return out;
+}
