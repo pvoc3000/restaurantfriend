@@ -113,8 +113,10 @@ export function readExtendedUser(): string | null {
  * kept being timed out of the batch log mid-batch). Long enough to notice and
  * reach the iPad with a knuckle; short enough that the lock still means five
  * minutes.
+ *
+ * A MINUTE (Mark, the same day; it shipped at thirty seconds).
  */
-export const IDLE_WARN_MS = 30_000;
+export const IDLE_WARN_MS = 60_000;
 
 /**
  * Whole seconds until the lock, once it is `IDLE_WARN_MS` or less away —

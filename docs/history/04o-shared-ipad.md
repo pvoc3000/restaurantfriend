@@ -128,7 +128,8 @@ anywhere is activity and removes it; the band is its own target so a tap on it
 presses nothing underneath. `idleWarningSeconds` (fixtures) is the rule. The
 check interval went from 30s to 1s to drive the count. Every screen, not just
 the batch log. A lock on wake gets no warning. Not seen live: `IdleLock` only
-mounts on a registered device.
+mounts on a registered device. **A MINUTE AND RED (Mark, later that day):**
+`IDLE_WARN_MS` is 60s and the band is `bg-accent` with white ink.
 
 **STAY UNLOCKED — TWENTY MINUTES, ON THE BATCH LOG ONLY (Mark, 2026-10-06).**
 His design: a deliberate switch, used sparingly, that any tap turns off. Built

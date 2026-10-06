@@ -66,7 +66,8 @@ import {
  * IT SAYS SO FIRST (Mark, 2026-10-06). For the last `IDLE_WARN_MS` a band
  * across the top of the window counts down, and any touch — on the band or
  * anywhere else — is activity like any other and takes it away. This is the
- * one thing it renders. The band is its own target on purpose: somebody with
+ * one thing it renders. RED with white ink (Mark, the same day; it shipped
+ * yellow) — the app's loud tone, `bg-accent`. The band is its own target on purpose: somebody with
  * dough on their hands can hit it without pressing whatever is underneath.
  * A lock on WAKE gets no warning; the five minutes were up while it slept.
  *
@@ -180,7 +181,7 @@ export function IdleLock({ userId }: { userId: string }) {
     // Above everything, CalcPad (80) included: this is about the whole device.
     <div
       role="alert"
-      className="fixed inset-x-0 top-0 z-[90] border-b-2 border-ink bg-mark-fill px-6 py-5 text-center text-ink"
+      className="fixed inset-x-0 top-0 z-[90] border-b-2 border-ink bg-accent px-6 py-5 text-center text-white"
     >
       <p className="text-[20px] font-bold uppercase tracking-[0.08em] tabular-nums">
         Locking in {secondsLeft} {secondsLeft === 1 ? "second" : "seconds"}
