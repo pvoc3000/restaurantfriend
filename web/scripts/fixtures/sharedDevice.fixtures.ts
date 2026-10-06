@@ -7,7 +7,9 @@ import {
   IDLE_MS,
   deviceLastActivity,
   LOCKOUT,
+  IDLE_WARN_MS,
   idleExpired,
+  idleWarningSeconds,
   isValidPin,
   lockoutFor,
   parseDeviceCookie,
@@ -205,4 +207,15 @@ test("resumeScrollFor: nobody else, and no refused page, gets a position", () =>
   eq(resumeScrollFor(raw, "7ec6508c-1111-4222-8333-444444444444"), null, "another person");
   eq(resumeScrollFor(serializeResume({ userId: ID, path: "/login", scroll }), ID), null, "refused");
   eq(resumeScrollFor(serializeResume({ userId: ID, path: "/items" }), ID), null, "none stored");
+});
+
+test("idleWarningSeconds: counts down the last stretch and nothing else", () => {
+  const t = 1_000_000;
+  eq(idleWarningSeconds(t, t), null, "just touched");
+  eq(idleWarningSeconds(t, t + IDLE_MS - IDLE_WARN_MS - 1), null, "one ms before the warning");
+  eq(idleWarningSeconds(t, t + IDLE_MS - IDLE_WARN_MS), IDLE_WARN_MS / 1000, "the warning starts");
+  eq(idleWarningSeconds(t, t + IDLE_MS - 1500), 2, "rounded up");
+  eq(idleWarningSeconds(t, t + IDLE_MS - 1), 1, "never zero while open");
+  eq(idleWarningSeconds(t, t + IDLE_MS), null, "expired: the lock's turn");
+  eq(idleWarningSeconds(t, t + IDLE_MS * 3), null, "long expired");
 });

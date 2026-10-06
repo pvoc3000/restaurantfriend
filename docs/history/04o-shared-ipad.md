@@ -119,6 +119,17 @@ scroll position was measured with them open. Filter, grouping and vendor
 changes still close them, and a reload still starts closed.
 Not walked live.
 
+**THE LOCK WARNS FIRST (Mark, 2026-10-06),** chosen from five options for the
+batch log's timeouts (the others: a longer limit on that screen, a per-device
+limit, a faster unlock, locked-but-readable). For the last `IDLE_WARN_MS` (30s)
+`IdleLock` shows a yellow band across the top of the window, z-90, counting
+down — "Locking in 24 seconds / Touch the screen to stay signed in". Any touch
+anywhere is activity and removes it; the band is its own target so a tap on it
+presses nothing underneath. `idleWarningSeconds` (fixtures) is the rule. The
+check interval went from 30s to 1s to drive the count. Every screen, not just
+the batch log. A lock on wake gets no warning. Not seen live: `IdleLock` only
+mounts on a registered device.
+
 **A TAB SHOWING SOMEBODY ELSE'S PAGE LEAVES IT (Mark, 2026-10-01),** after
 DF02's opening shift report was read as Karina's view of Abigail's report (see
 04h). `SIGNED_IN_KEY` (`rf.device.user`, localStorage) holds who the device is

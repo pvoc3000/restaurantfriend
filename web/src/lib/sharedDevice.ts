@@ -55,6 +55,25 @@ export function idleExpired(lastActivityMs: number, nowMs: number): boolean {
   return nowMs - lastActivityMs >= IDLE_MS;
 }
 
+/**
+ * How long before the lock the screen says so (Mark, 2026-10-06, after a baker
+ * kept being timed out of the batch log mid-batch). Long enough to notice and
+ * reach the iPad with a knuckle; short enough that the lock still means five
+ * minutes.
+ */
+export const IDLE_WARN_MS = 30_000;
+
+/**
+ * Whole seconds until the lock, once it is `IDLE_WARN_MS` or less away —
+ * otherwise null, and null again once it has expired (the lock's turn). Rounded
+ * UP, so the band never reads "0 seconds" while the page is still open.
+ */
+export function idleWarningSeconds(lastActivityMs: number, nowMs: number): number | null {
+  const left = IDLE_MS - (nowMs - lastActivityMs);
+  if (left <= 0 || left > IDLE_WARN_MS) return null;
+  return Math.ceil(left / 1000);
+}
+
 export type PinAttempt = { userId: string | null; succeeded: boolean; at: number };
 
 export const LOCKOUT = {

@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { snapshotScrollMemory } from "@/lib/scrollMemory";
 import { snapshotViewMemory } from "@/lib/viewMemory";
 import { lockDevice } from "@/app/deviceActions";
 import {
-  IDLE_MS,
   RESUME_KEY,
   SIGNED_IN_KEY,
   deviceLastActivity,
   idleExpired,
+  idleWarningSeconds,
   readActivity,
   readSignedInUser,
   recordActivity,
@@ -21,7 +21,7 @@ import {
 
 /**
  * Locks a REGISTERED shared iPad after five minutes without a touch. Renders
- * nothing; mounted by both layouts only when the session says the browser
+ * only its warning band (below); mounted by both layouts only when the session says the browser
  * holds the device cookie, so a desk browser never carries a timer.
  *
  * Two clocks, deliberately. A `setInterval` alone under-fires on an iPad:
@@ -56,8 +56,17 @@ import {
  * forgotten in the background could lock the iPad while somebody was working in
  * another tab, and since the lock signs out the shared session, that was
  * everybody's lock.
+ *
+ * IT SAYS SO FIRST (Mark, 2026-10-06). For the last `IDLE_WARN_MS` a band
+ * across the top of the window counts down, and any touch — on the band or
+ * anywhere else — is activity like any other and takes it away. This is the
+ * one thing it renders. The band is its own target on purpose: somebody with
+ * dough on their hands can hit it without pressing whatever is underneath.
+ * A lock on WAKE gets no warning; the five minutes were up while it slept.
  */
 export function IdleLock({ userId }: { userId: string }) {
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+
   useEffect(() => {
     let last = Date.now();
     let locking = false;
@@ -70,6 +79,7 @@ export function IdleLock({ userId }: { userId: string }) {
       if (now - last >= 1000) {
         last = now;
         recordActivity(now);
+        setSecondsLeft(null);
       }
     };
 
@@ -84,7 +94,10 @@ export function IdleLock({ userId }: { userId: string }) {
     const check = () => {
       if (locking) return;
       if (leaveIfStale()) return;
-      if (idleExpired(deviceLastActivity(last, readActivity()), Date.now())) {
+      const active = deviceLastActivity(last, readActivity());
+      // Another tab's touch counts here too, so the band goes when it does.
+      setSecondsLeft(idleWarningSeconds(active, Date.now()));
+      if (idleExpired(active, Date.now())) {
         locking = true;
         recordSignedInUser("");
         try {
@@ -121,7 +134,8 @@ export function IdleLock({ userId }: { userId: string }) {
       if (e.key === SIGNED_IN_KEY || e.key === null) leaveIfStale();
     };
     window.addEventListener("storage", onStorage);
-    const timer = window.setInterval(check, Math.min(IDLE_MS, 30_000));
+    // Every second, since the band counts in seconds. It was every thirty.
+    const timer = window.setInterval(check, 1000);
 
     return () => {
       for (const e of events) window.removeEventListener(e, touch, { capture: true });
@@ -132,5 +146,17 @@ export function IdleLock({ userId }: { userId: string }) {
     };
   }, [userId]);
 
-  return null;
+  if (secondsLeft === null) return null;
+  return (
+    // Above everything, CalcPad (80) included: this is about the whole device.
+    <div
+      role="alert"
+      className="fixed inset-x-0 top-0 z-[90] border-b-2 border-ink bg-mark-fill px-6 py-5 text-center text-ink"
+    >
+      <p className="text-[20px] font-bold uppercase tracking-[0.08em] tabular-nums">
+        Locking in {secondsLeft} {secondsLeft === 1 ? "second" : "seconds"}
+      </p>
+      <p className="mt-1 text-[16px]">Touch the screen to stay signed in.</p>
+    </div>
+  );
 }
