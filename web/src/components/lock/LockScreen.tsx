@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 
 import { unlockWithPin, type LockMember } from "@/app/deviceActions";
-import { PIN_LENGTH, RESUME_KEY, resumePathFor, retryLabel } from "@/lib/sharedDevice";
+import {
+  PIN_LENGTH,
+  RESUME_KEY,
+  resumePathFor,
+  resumeViewFor,
+  retryLabel,
+} from "@/lib/sharedDevice";
+import { handOverViewMemory } from "@/lib/viewMemory";
 import { MacTitleBar } from "@/components/ui/MacTitleBar";
 
 /**
@@ -51,8 +58,11 @@ export function LockScreen({
       // once and always cleared, so it never outlives the next unlock.
       let destination = "/";
       try {
-        destination = resumePathFor(localStorage.getItem(RESUME_KEY), who.user_id);
+        const raw = localStorage.getItem(RESUME_KEY);
+        destination = resumePathFor(raw, who.user_id);
         localStorage.removeItem(RESUME_KEY);
+        // And how they had it set up, for the page about to load.
+        handOverViewMemory(resumeViewFor(raw, who.user_id));
       } catch {
         // Storage unavailable: the home page, as before.
       }

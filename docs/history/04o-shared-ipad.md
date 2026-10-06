@@ -76,6 +76,23 @@ writes it: Switch user is a deliberate goodbye. No expiry — "the next time"
 the same person unlocks, however much later. Not walked live (needs a PIN on
 the registered iPad).
 
+**AND THE PAGE COMES BACK SET UP THE WAY IT WAS (Mark, 2026-10-06),** after a
+complaint from the batch log: the unlock returned the page, but its pickers,
+search, sort, selected batch and pane tab were reset. That state is
+`lib/viewMemory`, in memory, and the lock is a full page load. `IdleLock` now
+stores `snapshotViewMemory()` beside the path (`ResumePoint.view`);
+`resumeViewFor` (fixtures) returns it only when `resumePathFor` is sending
+that same person back to that page; `LockScreen` hands it over in
+sessionStorage (`rf.view.handover`), which `viewMemory` reads once at load and
+deletes. `useRememberedView` became `useSyncExternalStore` so a restored value
+does not mismatch the server's fallback render at hydration. Newly remembered:
+`/batch-logs`' Status, Group by, search and sort, and the record's selected
+batch and pane tab — which also means they now survive leaving the screen and
+coming back within a session. NOT restored: scroll position, and History's
+Show skipped. Any other screen gets this by using `useRememberedView`.
+Not walked live (needs a PIN on the registered iPad; the test pane was signed
+out).
+
 **A TAB SHOWING SOMEBODY ELSE'S PAGE LEAVES IT (Mark, 2026-10-01),** after
 DF02's opening shift report was read as Karina's view of Abigail's report (see
 04h). `SIGNED_IN_KEY` (`rf.device.user`, localStorage) holds who the device is

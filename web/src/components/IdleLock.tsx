@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { snapshotViewMemory } from "@/lib/viewMemory";
 import { lockDevice } from "@/app/deviceActions";
 import {
   IDLE_MS,
@@ -35,7 +36,9 @@ import {
  * affordable.
  *
  * Before locking it notes the page in localStorage (`RESUME_KEY`), so the same
- * person unlocking goes back to it rather than to the home page.
+ * person unlocking goes back to it rather than to the home page — and, with
+ * it, how the page was set up (`lib/viewMemory`), which the lock's full page
+ * load would otherwise throw away.
  *
  * IT ALSO LOCKS THE OTHER TABS (2026-10-01). Each page records who it was
  * rendered for (`SIGNED_IN_KEY`). A tab still showing one person's page after
@@ -84,7 +87,7 @@ export function IdleLock({ userId }: { userId: string }) {
         recordSignedInUser("");
         try {
           const path = window.location.pathname + window.location.search;
-          localStorage.setItem(RESUME_KEY, serializeResume({ userId, path }));
+          localStorage.setItem(RESUME_KEY, serializeResume({ userId, path, view: snapshotViewMemory() }));
         } catch {
           // Private mode or blocked storage: the unlock lands on the home page.
         }

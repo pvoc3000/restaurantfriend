@@ -124,7 +124,12 @@ export function retryLabel(seconds: number): string {
  */
 export const RESUME_KEY = "rf.lock.resume";
 
-export type ResumePoint = { userId: string; path: string };
+export type ResumePoint = {
+  userId: string;
+  path: string;
+  /** How the page was set up — `lib/viewMemory`'s snapshot. See `resumeViewFor`. */
+  view?: Record<string, unknown>;
+};
 
 export function serializeResume(point: ResumePoint): string {
   return JSON.stringify(point);
@@ -150,6 +155,33 @@ export function resumePathFor(raw: string | null | undefined, userId: string): s
   if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) return "/";
   if (/^\/(lock|login)(\/|\?|#|$)/.test(path)) return "/";
   return path;
+}
+
+/**
+ * How the page was set up when the idle lock took it (Mark, 2026-10-06: a
+ * batch log came back with its pickers, search and tab reset, and "the screen
+ * should be exactly the way they left it"). The path alone could not say:
+ * that state is in memory, and the lock is a full page load.
+ *
+ * Null unless `resumePathFor` is sending this person back to the stored page —
+ * so anyone else, and any path that is refused, gets a clean screen.
+ */
+export function resumeViewFor(
+  raw: string | null | undefined,
+  userId: string
+): Record<string, unknown> | null {
+  if (!raw) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const { path, view } = parsed as Record<string, unknown>;
+  if (resumePathFor(raw, userId) !== path) return null;
+  if (typeof view !== "object" || view === null || Array.isArray(view)) return null;
+  return view as Record<string, unknown>;
 }
 
 /**

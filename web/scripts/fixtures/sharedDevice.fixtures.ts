@@ -12,6 +12,7 @@ import {
   lockoutFor,
   parseDeviceCookie,
   resumePathFor,
+  resumeViewFor,
   retryLabel,
   serializeDeviceCookie,
   serializeResume,
@@ -165,4 +166,25 @@ test("deviceLastActivity: nothing readable falls back to this tab's own clock", 
   eq(deviceLastActivity(t, null), t, "absent or blocked");
   eq(deviceLastActivity(t, ""), t, "empty");
   eq(deviceLastActivity(t, "soon"), t, "not a number");
+});
+
+test("resumeViewFor: the same person gets their view back with their page", () => {
+  const view = { "batch-items.status": "open", "batch-log.pane": "history" };
+  const raw = serializeResume({ userId: ID, path: "/batch-logs/abc", view });
+  eq(JSON.stringify(resumeViewFor(raw, ID)), JSON.stringify(view));
+});
+
+test("resumeViewFor: nobody else, and no refused page, gets a view", () => {
+  const view = { "batch-items.search": "glaze" };
+  const raw = serializeResume({ userId: ID, path: "/batch-logs/abc", view });
+  eq(resumeViewFor(raw, "7ec6508c-1111-4222-8333-444444444444"), null, "another person");
+  eq(resumeViewFor(serializeResume({ userId: ID, path: "/lock", view }), ID), null, "refused path");
+  eq(resumeViewFor(serializeResume({ userId: ID, path: "/batch-logs/abc" }), ID), null, "none stored");
+  eq(resumeViewFor("{not json", ID), null, "corrupt");
+  eq(resumeViewFor(null, ID), null, "absent");
+  eq(
+    resumeViewFor(JSON.stringify({ userId: ID, path: "/items", view: ["x"] }), ID),
+    null,
+    "not an object"
+  );
 });

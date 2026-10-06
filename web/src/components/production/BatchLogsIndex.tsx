@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
@@ -13,6 +13,7 @@ import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { usePublishRecordSet } from "@/lib/recordSet";
+import { useRememberedView } from "@/lib/viewMemory";
 import { batchDate } from "@/lib/productionBatches";
 import {
   BATCH_LOG_PRESETS,
@@ -41,6 +42,10 @@ export type BatchLogRow = {
 
 type Tier = "open" | "today" | "complete" | "all";
 type Grouping = "date" | "location" | "schedule" | "none";
+
+const isTier = (v: string): v is Tier => ["open", "today", "complete", "all"].includes(v);
+const isGroupingKey = (v: string): v is Grouping =>
+  ["date", "location", "schedule", "none"].includes(v);
 
 const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: BatchLogRow) => string> = {
   date: (r) => batchDate(r.log_date),
@@ -100,10 +105,18 @@ export function BatchLogsIndex({
   // what you came for. 046 changed the shape of the list under it — 439 of
   // DF02's 440 logs are complete history — so the default now hid 99.8% of the
   // screen and read as an empty page beside a chip saying "Complete 439".
-  const [tier, setTier] = useState<Tier>("all");
-  const [grouping, setGrouping] = useState<Grouping>("none");
-  const [term, setTerm] = useState("");
-  const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "date", dir: "desc" });
+  //
+  // REMEMBERED (Mark, 2026-10-06): an idle lock gives the list back as it was,
+  // and so does coming back from a log — see `lib/viewMemory`.
+  const [storedTier, setTier] = useRememberedView<string>("batch-logs.tier", "all");
+  const tier: Tier = isTier(storedTier) ? storedTier : "all";
+  const [storedGrouping, setGrouping] = useRememberedView<string>("batch-logs.grouping", "none");
+  const grouping: Grouping = isGroupingKey(storedGrouping) ? storedGrouping : "none";
+  const [term, setTerm] = useRememberedView("batch-logs.search", "");
+  const [sort, setSort] = useRememberedView<{ key: string; dir: SortDir }>("batch-logs.sort", {
+    key: "date",
+    dir: "desc",
+  });
 
   const router = useRouter();
 

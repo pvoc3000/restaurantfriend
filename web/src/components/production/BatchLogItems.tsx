@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { setSelectedBatch } from "@/lib/selectedBatch";
+import { useRememberedView } from "@/lib/viewMemory";
 import type { PickOption } from "@/components/ui/PickList";
 import { useExactViewportHeight } from "@/lib/tableHead";
 import { SectionNav } from "@/components/ui/SectionNav";
@@ -119,8 +120,12 @@ export function BatchLogItems({
   /** Handed to the table's filter row, after Group by. */
   filterExtra?: ReactNode;
 }) {
-  const [picked, setPicked] = useState<string | null>(null);
-  const [pane, setPane] = useState<Pane>("info");
+  // REMEMBERED (Mark, 2026-10-06), so an idle lock gives back the batch and the
+  // tab you were on — see `lib/viewMemory`. A batch that is not in this log
+  // falls through to the first row below, so the key need not name the log.
+  const [picked, setPicked] = useRememberedView<string | null>("batch-log.picked", null);
+  const [storedPane, setPane] = useRememberedView<string>("batch-log.pane", "info");
+  const pane: Pane = PANE_SECTIONS.some((t) => t.key === storedPane) ? (storedPane as Pane) : "info";
   /**
    * The history's own filter, held HERE because its switch sits on the footer
    * row beside Delete (Mark, 2026-08-09: "can the new show skipped toggle be in

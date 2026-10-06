@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 
 /**
  * HOW YOU HAD A LIST SET UP, kept while you walk from record to record (Mark,
@@ -28,24 +28,84 @@ import { useCallback, useState } from "react";
  * outlive the record it was set on.
  */
 const store = new Map<string, unknown>();
+const listeners = new Map<string, Set<() => void>>();
+
+/**
+ * THE ONE HARD LOAD THAT DOES RESTORE: unlocking after an idle lock (Mark,
+ * 2026-10-06 — a baker timed out mid batch log and had every picker to set
+ * again). The rule above still holds everywhere else. This is not tomorrow's
+ * stale search: it is the same person, minutes later, on the page the lock took
+ * from them, and `resumeViewFor` gives it to nobody else.
+ *
+ * `IdleLock` snapshots the store beside the page's path; `LockScreen` hands the
+ * snapshot over in sessionStorage — this tab's, read once here and deleted —
+ * because the unlock is a second full load and the Map cannot cross it.
+ */
+const HANDOVER_KEY = "rf.view.handover";
+
+if (typeof window !== "undefined") {
+  try {
+    const raw = sessionStorage.getItem(HANDOVER_KEY);
+    sessionStorage.removeItem(HANDOVER_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      for (const [key, value] of Object.entries(parsed)) store.set(key, value);
+    }
+  } catch {
+    // Blocked storage or a corrupt value: the screen starts clean.
+  }
+}
+
+/** Everything remembered, for `IdleLock` to keep across the lock. */
+export function snapshotViewMemory(): Record<string, unknown> {
+  return Object.fromEntries(store);
+}
+
+/** Leave a snapshot for the page this tab is about to load. Never throws. */
+export function handOverViewMemory(view: Record<string, unknown> | null): void {
+  try {
+    if (view) sessionStorage.setItem(HANDOVER_KEY, JSON.stringify(view));
+    else sessionStorage.removeItem(HANDOVER_KEY);
+  } catch {
+    // Blocked storage: the page comes back, without its view.
+  }
+}
 
 /**
  * `useState` that seeds from the store and writes through on every change.
  *
- * The key is read ONCE, when the component mounts — which is right for every
- * caller here (a constant per list) and would be wrong for a key that changes
- * under a live component, since the state would not re-seed. If one ever needs
- * that, compare the key during render the way `BatchHistory` does rather than
- * reaching for an effect.
+ * `useSyncExternalStore`, not `useState`, since the handover: the SERVER
+ * renders every control at its fallback, so a restored value read in a
+ * `useState` initializer would be a hydration mismatch. This hydrates at the
+ * fallback and re-renders with the stored value, which is what the hook is for.
+ *
+ * A value that came through the handover is JSON from storage, so a caller with
+ * a closed vocabulary checks it (see `BatchItemsTable`'s `isGrouping`).
  */
 export function useRememberedView<T>(key: string, fallback: T): [T, (next: T) => void] {
-  const [value, setValue] = useState<T>(() =>
-    store.has(key) ? (store.get(key) as T) : fallback
+  // The first fallback, kept: callers pass `[]` and `{…}` literals, and a
+  // snapshot that changes identity every render is a loop.
+  const [initial] = useState(fallback);
+  const subscribe = useCallback(
+    (notify: () => void) => {
+      const set = listeners.get(key) ?? new Set();
+      listeners.set(key, set);
+      set.add(notify);
+      return () => {
+        set.delete(notify);
+      };
+    },
+    [key]
+  );
+  const value = useSyncExternalStore(
+    subscribe,
+    () => (store.has(key) ? (store.get(key) as T) : initial),
+    () => initial
   );
   const set = useCallback(
     (next: T) => {
       store.set(key, next);
-      setValue(next);
+      for (const notify of listeners.get(key) ?? []) notify();
     },
     [key]
   );
