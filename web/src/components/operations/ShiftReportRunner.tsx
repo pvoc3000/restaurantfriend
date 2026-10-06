@@ -7,7 +7,7 @@ import { confirmDialog } from "@/lib/confirm";
 import { useScrollMemoryKey } from "@/lib/scrollMemory";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import {
-  pagesForShift,
+  pagesForReport,
   pageTitle,
   supervisorBody,
   managementBody,
@@ -137,7 +137,7 @@ export function ShiftReportRunner({
   // The walk, with the premades slot expanded to one step per schedule. Each
   // step carries its own key, so moving between two premades pages REMOUNTS
   // the page rather than carrying one schedule's half-typed state to the next.
-  const order = pagesForShift(shift).flatMap((p) =>
+  const order = pagesForReport(shift, pages.elements !== undefined).flatMap((p) =>
     p === "premades" && premadePages && premadePages.length > 0
       ? premadePages.map((s, i) => ({ key: `premades-${i}`, title: s.title, body: s.body }))
       : [{ key: p as string, title: pageTitle(p), body: pages[p] }]

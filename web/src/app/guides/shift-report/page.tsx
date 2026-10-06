@@ -266,6 +266,10 @@ export default function ShiftReportGuide() {
               For each donut, enter what the bakers <strong>Made</strong> today. Copy it from the{" "}
               <strong>Made</strong> box under Total batches on the baker tray guide.
             </p>
+            <p>
+              This page is left out on a day another shop baked your donuts. That shop’s report
+              records the batches.
+            </p>
             <ul>
               <li>
                 Made is a number and a unit. For 7½ batches, type 7.5 and choose batch as the

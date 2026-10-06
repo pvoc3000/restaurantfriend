@@ -127,6 +127,34 @@ export function pagesForShift(shift: ShiftSlot): ShiftReportPage[] {
   return [...SHORT_PAGES];
 }
 
+/**
+ * The pages of ONE report: the shift's, less Donut batches on a day this
+ * kitchen baked nothing (Mark, 2026-10-06). DF01 bakes DF02's donuts most
+ * days, and DF02's opening report still made a Donut log of its own, blocked
+ * the send until every row had a number, and emailed nine zeros.
+ *
+ * `bakesHere` is `kitchenBakes` below, asked by the page.
+ */
+export function pagesForReport(shift: ShiftSlot, bakesHere: boolean): ShiftReportPage[] {
+  const pages = pagesForShift(shift);
+  return bakesHere ? pages : pages.filter((p) => p !== "elements");
+}
+
+/**
+ * Did this kitchen bake on the report's day?
+ *
+ * A PLAN schedule naming it as the kitchen says so — the shop's own bake, or
+ * another shop's it makes. A special order's schedule does not count: on
+ * 2026-10-06 DF01 baked everything, and Cafe Knotted's standing order still
+ * named DF02, its own shop, as the kitchen.
+ *
+ * A log that already exists keeps its page whatever the schedules say, so a
+ * report that recorded batches goes on showing them.
+ */
+export function kitchenBakes(input: { hasLog: boolean; planSchedules: number }): boolean {
+  return input.hasLog || input.planSchedules > 0;
+}
+
 export function pageTitle(page: ShiftReportPage): string {
   return PAGE_TITLE[page];
 }

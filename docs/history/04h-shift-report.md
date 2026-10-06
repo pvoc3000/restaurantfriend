@@ -756,3 +756,25 @@ cannot sign in).
 A **Shift** picklist followed the same day (All · Opening · Mid · Closing ·
 Off-site, counted over the loaded window), filtering in the browser between
 Dates and Show. Not walked in a browser either.
+
+## 2026-10-06 — No Donut batches page at a kitchen that baked nothing
+
+Mark: DF02's opening report for 10-06 emailed nine donut rows, all 0, though
+DF01 had made everything. The page generated a Donut log for the report's own
+shop whenever that shop had donuts on its batch log, and an empty Made blocks
+the send, so the supervisor typed nine zeros.
+
+Built: `kitchenBakes` and `pagesForReport` in `lib/shiftReports`. The page is
+in the walk only when a PLAN schedule for the report's date names the report's
+kitchen, or a Donut log already exists there. Otherwise the runner drops it, so
+no log is generated, nothing blocks and the email has no section.
+
+Plan schedules only, measured the same day: on 10-06 Cafe Knotted's standing
+order (SO-10068) still named DF02 as its kitchen while DF02's plan schedule
+named DF01. Counting special-order schedules would have kept the page.
+
+Not handled: a kitchen whose only work that day is a special order gets no
+page; and if nobody generated the day's plan schedule, the page is missing at
+the kitchen that did bake until the schedule exists.
+
+Verified: typecheck, lint, 2,239 fixtures. Not walked in a browser.

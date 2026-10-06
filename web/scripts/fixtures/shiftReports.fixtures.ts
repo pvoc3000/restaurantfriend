@@ -1,6 +1,8 @@
 import { test, eq, ok, no } from "./harness";
 import {
   pagesForShift,
+  pagesForReport,
+  kitchenBakes,
   pageBanner,
   submitReadiness,
   submitBlockers,
@@ -87,6 +89,20 @@ test("pagesForShift returns a COPY — a caller sorting it cannot corrupt the ne
   const first = pagesForShift("closing");
   first.length = 0;
   eq(pagesForShift("closing").length, 8, "second call");
+});
+
+test("a kitchen that baked nothing has no Donut batches page", () => {
+  no(pagesForReport("opening", false).includes("elements"), "opening, nothing baked");
+  no(pagesForReport("mid", false).includes("elements"), "mid, nothing baked");
+  eq(pagesForReport("opening", false).length, 5, "the walk is one page shorter");
+  eq(pagesForReport("opening", true), pagesForShift("opening"), "baked here");
+  eq(pagesForReport("closing", false), pagesForShift("closing"), "closing never had it");
+});
+
+test("a plan schedule or an existing log says the kitchen baked", () => {
+  no(kitchenBakes({ hasLog: false, planSchedules: 0 }), "neither");
+  ok(kitchenBakes({ hasLog: false, planSchedules: 1 }), "a plan schedule made here");
+  ok(kitchenBakes({ hasLog: true, planSchedules: 0 }), "a log already recorded");
 });
 
 test("the banner numbers what it was given", () => {

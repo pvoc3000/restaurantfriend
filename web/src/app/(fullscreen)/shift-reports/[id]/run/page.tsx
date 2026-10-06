@@ -13,6 +13,7 @@ import { describeAmount } from "@/lib/productionBatches";
 import { ordersForPacket } from "@/lib/specialOrderSchedule";
 import {
   pagesForShift,
+  kitchenBakes,
   submitBlockers,
   submitReadiness,
   type EmailReport,
@@ -297,6 +298,7 @@ export default async function RunShiftReportPage({
     { data: ratings },
     { data: todaySchedules },
     { data: batchLog },
+    { data: bakeSchedules },
     { data: salesDays },
     { data: tomorrowOrders },
     { data: tomorrowSchedules },
@@ -353,6 +355,16 @@ export default async function RunShiftReportPage({
           .eq("log_date", reportDate)
           .eq("schedule", SHIFT_REPORT_BATCH_SCHEDULE)
           .maybeSingle()
+      : SKIP,
+    // Did this kitchen bake today? See `kitchenBakes` — one row is the answer.
+    wants("elements")
+      ? supabase
+          .from("production_schedules")
+          .select("id")
+          .eq("kitchen_location_id", kitchenId)
+          .eq("schedule_date", reportDate)
+          .eq("source", "plan")
+          .limit(1)
       : SKIP,
     wants("sales")
       ? supabase
@@ -853,7 +865,14 @@ export default async function RunShiftReportPage({
     ),
   }));
 
-  if (wants("elements")) {
+  // NO BODY, NO PAGE: the runner drops Donut batches when this is absent, and
+  // with it the log `ElementsPage` would have generated, the blocker and the
+  // email's section.
+  const bakesHere = kitchenBakes({
+    hasLog: Boolean(batchLog),
+    planSchedules: ((bakeSchedules as unknown[] | null) ?? []).length,
+  });
+  if (wants("elements") && bakesHere) {
     bodies.elements = (
       <ElementsPage
         key="elements"
