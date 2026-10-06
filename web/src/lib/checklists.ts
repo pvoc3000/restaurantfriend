@@ -359,6 +359,17 @@ export function outstandingCount(items: { status: CheckStatus }[]): number {
   return items.filter((i) => i.status === "pending").length;
 }
 
+/**
+ * The list of checklists that have been left, with one more on the end.
+ *
+ * Capped, newest last: a shop starts two or three walks a day and the list
+ * lives in localStorage, so without a cap it grows for as long as the iPad
+ * does. `lib/checklistVisits` is the reader.
+ */
+export function withLeftRun(left: string[], runId: string, keep = 60): string[] {
+  return [...left.filter((id) => id !== runId), runId].slice(-keep);
+}
+
 // ---------------------------------------------------------------------------
 // Scores
 // ---------------------------------------------------------------------------

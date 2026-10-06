@@ -76,6 +76,7 @@ export function WalkItem({
   locationId,
   runId,
   writable,
+  flagMissed = false,
   onError,
 }: {
   row: WalkItemRow;
@@ -83,6 +84,12 @@ export function WalkItem({
   locationId: string;
   runId: string;
   writable: boolean;
+  /**
+   * The walk has been left once already, so a row nobody answered is filled
+   * red (Mark, 2026-10-06). Decided here, on the row as just tapped, so the
+   * fill goes the moment it is answered.
+   */
+  flagMissed?: boolean;
   onError: (message: string | null) => void;
 }) {
   const router = useRouter();
@@ -265,7 +272,7 @@ export function WalkItem({
   const needsNote = row.status === "issue" || row.status === "na";
 
   return (
-    <li className="space-y-3 p-3">
+    <li className={`space-y-3 p-3 ${flagMissed && row.status === "pending" ? "bg-stop" : ""}`}>
       {/* STACKED ON A PHONE, side by side from `sm` up.
           `flex-wrap` alone was not enough and looked like it was: the text is
           `flex-1`, so its basis is 0, and the button cluster — which wraps

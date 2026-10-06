@@ -20,6 +20,7 @@ import {
 } from "@/lib/facilityTasks";
 import { STICKY_BAND_UNDER_RUNNER } from "@/lib/tableHead";
 import { useOptimisticRows } from "@/lib/useOptimisticRows";
+import { useLeftBefore, useNoteLeaving } from "@/lib/checklistVisits";
 import { WalkItem, type WalkItemRow } from "./WalkItem";
 
 export type WalkTask = CarryableTask & {
@@ -161,6 +162,12 @@ export function ChecklistWalk({
   }
 
   const remaining = outstandingCount(items);
+
+  // WHAT WAS MISSED IS FLAGGED ON THE WAY BACK, NEVER ON THE WAY IN (Mark,
+  // 2026-10-06). Seventy red rows on a checklist nobody has started says
+  // nothing; a red row on one you walked away from says you skipped it.
+  const leftBefore = useLeftBefore(runId);
+  useNoteLeaving(runId, writable && remaining > 0);
 
   return (
     <div className="space-y-6">
@@ -309,6 +316,7 @@ export function ChecklistWalk({
                 locationId={locationId}
                 runId={runId}
                 writable={writable}
+                flagMissed={leftBefore && writable}
                 onError={setFailed}
               />
             ))}

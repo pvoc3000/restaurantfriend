@@ -20,6 +20,7 @@
 
 import { test, eq, ok, no } from "./harness";
 import {
+  withLeftRun,
   CLOSING_ROLLOVER_HOUR,
   assessReading,
   businessDateFor,
@@ -497,4 +498,10 @@ test("a fractional sort is truncated, because the composition needs whole number
   eq(runItemSort(1, 10.7), 1010);
   eq(runItemSort(1.9, 10), 1010);
   eq(runItemSort(0, 999.9), 999);
+});
+
+test("withLeftRun: remembers a checklist once, newest last, and forgets the oldest", () => {
+  eq(withLeftRun([], "a"), ["a"]);
+  eq(withLeftRun(["a", "b"], "a"), ["b", "a"], "left again moves to the end, not twice");
+  eq(withLeftRun(["a", "b", "c"], "d", 3), ["b", "c", "d"], "capped");
 });

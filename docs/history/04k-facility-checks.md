@@ -936,3 +936,25 @@ still carries the page's one yellow mark (now a small "ISSUE" chip rather than
 "!"), there is still no repeating table header, and every value still goes
 through `pdfText` — "expected 34–40 °F" was re-checked in the extracted text
 and still prints as "34-40". Previous look at `63451a21`.
+
+## 2026-10-06 — A missed row is red once the checklist has been left
+
+Mark: "flag checklist rows that haven't been completed yet, but not until the
+user leaves the checklist page. I don't want to overwhelm them when they first
+look at a checklist … maybe fill in rows that haven't been completed with red."
+
+Built: `ChecklistWalk` notes that a walk was left with rows unanswered
+(`lib/checklistVisits`), and on the next visit `WalkItem` fills each pending
+row `bg-stop`. The fill goes the moment the row is answered. Both doors get it,
+since both mount `ChecklistWalk`: the shift report's Checklist page (leaving is
+turning the page) and `/checklists/[id]/run` (leaving is Close or Finish).
+
+Remembered in localStorage (`rf.checklists.left`, the last 60 walks), so it is
+per device: a walk left on one iPad opens unflagged on another. Only an open,
+editable walk is flagged or noted; a finished one reads as before. A leave is a
+React unmount, so the idle lock and a reload, which unload the page, do not
+count. The write waits a tick and a remount cancels it, because React's dev
+double-mount would otherwise count the first look as a leave.
+
+Verified: typecheck, lint, 2,241 fixtures. NOT walked in a browser: the test
+pane was signed out.
