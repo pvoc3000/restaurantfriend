@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import { useScrollMemoryKey } from "@/lib/scrollMemory";
+import { useRememberedView } from "@/lib/viewMemory";
 import { useShell } from "@/components/ShellProvider";
 import { ControlField } from "@/components/ui/ControlField";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -82,6 +83,9 @@ const SHOW_ITEM_PAR: boolean = false;
  * every load (design rule 4). Entries are written per line as you walk, so a
  * closed laptop loses nothing.
  */
+/** No item open — one array, so the remembered-view fallback is stable. */
+const NONE_OPEN: string[] = [];
+
 export function OrderGuide({
   rows,
   lastPurchases,
@@ -255,15 +259,28 @@ export function OrderGuide({
    * a filter change, a regrouping, or a reload. It's a glance, not a setting,
    * and a guide that came back with a scatter of items pre-opened would be
    * lying about where you'd got to. Keys are (group, item) — see expansionKey.
+   *
+   * ONE EXCEPTION (Mark, 2026-10-06): an idle lock gives the guide back exactly
+   * as it was, and the open items are part of that — the scroll position it
+   * also restores was measured WITH them open. So this is `lib/viewMemory`
+   * rather than `useState`, keyed by the list like the scroll key above. That
+   * also keeps them across a trip to an item and back, which is the same
+   * argument; a reload still starts closed.
    */
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [openKeys, setOpenKeys] = useRememberedView<string[]>(
+    `guide.expanded:${locationId}:${guideDate}:${weekday}`,
+    NONE_OPEN
+  );
+  const expanded = useMemo(
+    () => new Set(Array.isArray(openKeys) ? openKeys : NONE_OPEN),
+    [openKeys]
+  );
+  const setExpanded = (next: Set<string>) => setOpenKeys([...next]);
 
   function toggleExpanded(key: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(key)) next.add(key);
-      return next;
-    });
+    const next = new Set(expanded);
+    if (!next.delete(key)) next.add(key);
+    setExpanded(next);
   }
 
   /**

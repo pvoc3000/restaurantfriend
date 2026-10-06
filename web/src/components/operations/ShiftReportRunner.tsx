@@ -4,6 +4,7 @@ import { Fragment, useRef, useState, useSyncExternalStore, useTransition } from 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/lib/confirm";
+import { useScrollMemoryKey } from "@/lib/scrollMemory";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import {
   pagesForShift,
@@ -144,6 +145,20 @@ export function ShiftReportRunner({
   const [index, setIndex] = useState(() =>
     openAtPage === null ? 0 : Math.min(Math.max(openAtPage - 1, 0), order.length - 1)
   );
+  /**
+   * Turn the page, and say so in the URL (Mark, 2026-10-06). An idle lock
+   * returns you to the URL you were on, and `?page=` is what the server opens
+   * the runner at — so without this the unlock landed on page 1 of a report you
+   * were six pages into. `replaceState`, so Back still leaves the runner
+   * rather than walking its pages.
+   */
+  function turnTo(next: number) {
+    setIndex(next);
+    window.history.replaceState(null, "", `?page=${next + 1}`);
+  }
+  // Each page keeps its own scroll, so the premades come back where you were
+  // counting. The fullscreen layout mounts `ScrollMemory` for this.
+  useScrollMemoryKey(`shift-run:${reportId}:${index}`);
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -433,7 +448,7 @@ export function ShiftReportRunner({
           <button
             type="button"
             className={`${RUNNER_CELL} text-white`}
-            onClick={() => setIndex(index - 1)}
+            onClick={() => turnTo(index - 1)}
             disabled={busy !== null || first}
           >
             <BarLabel icon={ICON_ARROW_BACK} word="Back" />
@@ -460,7 +475,7 @@ export function ShiftReportRunner({
             <button
               type="button"
               className={`${RUNNER_CELL} text-white`}
-              onClick={() => setIndex(index + 1)}
+              onClick={() => turnTo(index + 1)}
               disabled={busy !== null}
             >
               <BarLabel icon={ICON_NEXT} word="Next" />

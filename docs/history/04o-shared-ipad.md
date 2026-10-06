@@ -101,6 +101,24 @@ in scroll memory and now are, keyed per batch. Show skipped is a
 Not walked live (needs a PIN on the registered iPad; the test pane was signed
 out).
 
+**THE SHIFT REPORT AND THE ORDER GUIDE, THE SAME (Mark, 2026-10-06).**
+RUNNER: the page you were on was plain state, so the unlock opened page 1. It
+now writes `?page=N` with `history.replaceState` as you turn pages — the
+parameter the server already opens at, so there is no flash of page 1 — and
+`(fullscreen)/layout` mounts `ScrollMemory`, keyed per report page
+(`shift-run:{id}:{index}`). Reopening a paused report from the list still has
+no `?page` and lands on page 1. A field you are mid-way through typing is NOT
+restored; the pages save on commit, as before. `/shift-reports`: Status, Shift
+and search are `useRememberedView`.
+GUIDE: filter, vendors, search, grouping and the walked date already survived
+(the `rf.guide.view` cookie and the URL), and scroll came back with the
+handover. What was left was the EXPANDED items, now `useRememberedView` keyed
+per list — which also keeps them across a trip to an item and back, a
+deliberate exception to "expansion does not stick" because the remembered
+scroll position was measured with them open. Filter, grouping and vendor
+changes still close them, and a reload still starts closed.
+Not walked live.
+
 **A TAB SHOWING SOMEBODY ELSE'S PAGE LEAVES IT (Mark, 2026-10-01),** after
 DF02's opening shift report was read as Karina's view of Abigail's report (see
 04h). `SIGNED_IN_KEY` (`rf.device.user`, localStorage) holds who the device is

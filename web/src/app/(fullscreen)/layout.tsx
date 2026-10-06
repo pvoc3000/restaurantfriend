@@ -1,4 +1,5 @@
 import { IdleLock } from "@/components/IdleLock";
+import { ScrollMemory } from "@/components/ScrollMemory";
 import { CalcPad } from "@/components/ui/CalcPad";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { getAppSession } from "@/lib/session";
@@ -23,9 +24,12 @@ import { getAppSession } from "@/lib/session";
  *     device, which is the whole reason that component exists.
  *
  * Deliberately NOT kept: `InactiveLocationGate` (a report already written for a
- * shop that has since closed must still be finishable) and `ScrollMemory`
- * (each page of the runner is its own short screen; there is no long list to
- * come back to).
+ * shop that has since closed must still be finishable).
+ *
+ * `ScrollMemory` was left out too, as "each page is its own short screen",
+ * and came back 2026-10-06: the premades page measures 2,000px, and an idle
+ * lock mid-count returned you to the top of it. The runner names a key per
+ * page (`useScrollMemoryKey`).
  */
 export default async function FullscreenLayout({
   children,
@@ -41,6 +45,7 @@ export default async function FullscreenLayout({
     <ConfirmProvider>
       <div className="flex min-h-screen flex-col bg-white">{children}</div>
       <CalcPad />
+      <ScrollMemory locationId={session.activeLocation?.id ?? null} />
       {/* Here too: a report left open on the counter is exactly the risk the
           lock exists for, and every runner persists as it goes, so a lock
           mid-count loses nothing. */}

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/lib/confirm";
+import { useRememberedView } from "@/lib/viewMemory";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { PickList } from "@/components/ui/PickList";
 import { ControlField } from "@/components/ui/ControlField";
@@ -100,9 +101,14 @@ export function ShiftReportsList({
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [tier, setTier] = useState<Tier>("draft");
-  const [shift, setShift] = useState<ShiftSlot | "all">("all");
-  const [search, setSearch] = useState("");
+  // REMEMBERED (Mark, 2026-10-06): an idle lock gives the list back as it was,
+  // and so does coming back from a report — see `lib/viewMemory`.
+  const [storedTier, setTier] = useRememberedView<string>("shift-reports.tier", "draft");
+  const tier: Tier = storedTier === "sent" || storedTier === "all" ? storedTier : "draft";
+  const [storedShift, setShift] = useRememberedView<string>("shift-reports.shift", "all");
+  const shift: ShiftSlot | "all" =
+    storedShift in SHIFT_SLOT_LABEL ? (storedShift as ShiftSlot) : "all";
+  const [search, setSearch] = useRememberedView("shift-reports.search", "");
   const [failed, setFailed] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 

@@ -119,7 +119,9 @@ export default async function RunShiftReportPage({
   /**
    * `?page=2` — where to open, 1-based.
    *
-   * Only the create dialog passes it, and it passes 2 because page 1 restates
+   * The runner also writes it as you turn pages (2026-10-06), so an idle lock
+   * or a reload comes back to the page you were on. Of the LINKS into the
+   * runner, only the create dialog passes it, and it passes 2 because page 1 restates
    * that dialog (Mark, 2026-09-01). A parameter rather than a rule inside the
    * runner, because "skip the first page" is true of the moment a report is
    * CREATED and false of resuming one: coming back to a paused report should
