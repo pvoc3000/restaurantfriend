@@ -129,11 +129,9 @@ export function pagesForShift(shift: ShiftSlot): ShiftReportPage[] {
 
 /**
  * The pages of ONE report: the shift's, less Donut batches on a day this
- * kitchen baked nothing (Mark, 2026-10-06). DF01 bakes DF02's donuts most
- * days, and DF02's opening report still made a Donut log of its own, blocked
- * the send until every row had a number, and emailed nine zeros.
- *
- * `bakesHere` is `kitchenBakes` below, asked by the page.
+ * kitchen has no donut to record (Mark, 2026-10-06). DF01 bakes DF02's donuts
+ * most days, and DF02's opening report still made a Donut log of its own,
+ * blocked the send until every row had a number, and emailed nine zeros.
  */
 export function pagesForReport(shift: ShiftSlot, bakesHere: boolean): ShiftReportPage[] {
   const pages = pagesForShift(shift);
@@ -141,18 +139,32 @@ export function pagesForReport(shift: ShiftSlot, bakesHere: boolean): ShiftRepor
 }
 
 /**
- * Did this kitchen bake on the report's day?
+ * WHICH DONUTS THIS KITCHEN IS ASKED ABOUT TODAY: the ones the day's schedules
+ * made here call for, plan or special order, that are on this kitchen's Donut
+ * batch log (Mark, 2026-10-06: "if DF02 made cafe knotted's order, then it
+ * should enter the production info for that order … the amount of non-vegan
+ * raised mix that was made, but that's it").
  *
- * A PLAN schedule naming it as the kitchen says so — the shop's own bake, or
- * another shop's it makes. A special order's schedule does not count: on
- * 2026-10-06 DF01 baked everything, and Cafe Knotted's standing order still
- * named DF02, its own shop, as the kitchen.
- *
- * A log that already exists keeps its page whatever the schedules say, so a
- * report that recorded batches goes on showing them.
+ * `scheduled` is every Donut element under an item on those schedules;
+ * `onLogHere` is the kitchen's active Donut elements — what generation makes.
  */
-export function kitchenBakes(input: { hasLog: boolean; planSchedules: number }): boolean {
-  return input.hasLog || input.planSchedules > 0;
+export function donutsToRecord(scheduled: string[], onLogHere: string[]): string[] {
+  const here = new Set(onLogHere);
+  return [...new Set(scheduled)].filter((id) => here.has(id));
+}
+
+/**
+ * Does a batch on the kitchen's Donut log belong on this report's page?
+ *
+ * Asked for today, or already holding an amount — a log made on Batch Logs
+ * carries every donut, and one somebody filled in must not vanish from the
+ * report because no schedule names it.
+ */
+export function showsDonutBatch(
+  batch: { elementId: string; recorded: boolean },
+  asked: string[]
+): boolean {
+  return batch.recorded || asked.includes(batch.elementId);
 }
 
 export function pageTitle(page: ShiftReportPage): string {

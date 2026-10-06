@@ -2,7 +2,8 @@ import { test, eq, ok, no } from "./harness";
 import {
   pagesForShift,
   pagesForReport,
-  kitchenBakes,
+  donutsToRecord,
+  showsDonutBatch,
   pageBanner,
   submitReadiness,
   submitBlockers,
@@ -99,10 +100,20 @@ test("a kitchen that baked nothing has no Donut batches page", () => {
   eq(pagesForReport("closing", false), pagesForShift("closing"), "closing never had it");
 });
 
-test("a plan schedule or an existing log says the kitchen baked", () => {
-  no(kitchenBakes({ hasLog: false, planSchedules: 0 }), "neither");
-  ok(kitchenBakes({ hasLog: false, planSchedules: 1 }), "a plan schedule made here");
-  ok(kitchenBakes({ hasLog: true, planSchedules: 0 }), "a log already recorded");
+test("only the donuts today's schedules at this kitchen call for are asked", () => {
+  // DF02 on a day DF01 bakes its case: Cafe Knotted's order is all it makes.
+  eq(donutsToRecord(["knotted"], ["raised", "knotted", "mochi"]), ["knotted"]);
+  // 22 items share one dough.
+  eq(donutsToRecord(["raised", "raised", "mochi"], ["raised", "mochi"]), ["raised", "mochi"]);
+  // Scheduled, but not on this kitchen's log: generation would make no row.
+  eq(donutsToRecord(["knotted"], ["raised"]), []);
+  eq(donutsToRecord([], ["raised"]), []);
+});
+
+test("a log's row shows when it is asked for or already filled in", () => {
+  ok(showsDonutBatch({ elementId: "knotted", recorded: false }, ["knotted"]), "asked");
+  ok(showsDonutBatch({ elementId: "raised", recorded: true }, ["knotted"]), "recorded");
+  no(showsDonutBatch({ elementId: "raised", recorded: false }, ["knotted"]), "neither");
 });
 
 test("the banner numbers what it was given", () => {

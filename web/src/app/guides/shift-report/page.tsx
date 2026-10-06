@@ -267,8 +267,8 @@ export default function ShiftReportGuide() {
               <strong>Made</strong> box under Total batches on the baker tray guide.
             </p>
             <p>
-              This page is left out on a day another shop baked your donuts. That shop’s report
-              records the batches.
+              The page lists only the donuts your shop made today. On a day another shop baked
+              everything, it is left out, and that shop’s report records the batches.
             </p>
             <ul>
               <li>

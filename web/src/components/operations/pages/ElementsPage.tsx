@@ -43,14 +43,12 @@ export type ElementBatchRow = {
  * unit (the batch log's count × size, with the count dropped 2026-10-01; 155
  * retired a separate batch count).
  *
- * The rows are the kitchen's DONUT batch log for the day (153). REACHING THE
- * PAGE MAKES IT: if the log is not there yet, this generates it — every element
- * on the Donut schedule that this kitchen has on its batch log — and refreshes.
- * Generating twice only tops up, so a second report the same day, or a log
- * somebody already made on Batch Logs, is picked up rather than duplicated.
- *
- * It checks the kitchen HAS donuts first, so a shop that bakes none does not
- * collect an empty Donut log every morning.
+ * The rows are the kitchen's DONUT batch log for the day (153), narrowed to
+ * the donuts today's schedules at this kitchen call for (Mark, 2026-10-06) —
+ * the page works that out and hands over `toGenerate`, the ones not on the log
+ * yet. REACHING THE PAGE MAKES THEM: generating only tops up, so a second
+ * report the same day, or a log somebody already made on Batch Logs, is picked
+ * up rather than duplicated. A kitchen with nothing to record has no page.
  *
  * PREPARED BY, one per donut (Mark, 2026-09-30) — the batch record's own field,
  * from `production_operators` because a supervisor cannot read `employees`.
@@ -64,7 +62,7 @@ export function ElementsPage({
   kitchenId,
   kitchenCode,
   reportDate,
-  hasLog,
+  toGenerate,
   rows,
   operators,
   editable,
@@ -74,7 +72,8 @@ export function ElementsPage({
   kitchenId: string;
   kitchenCode: string;
   reportDate: string;
-  hasLog: boolean;
+  /** Donut elements asked for today with no batch on the log yet. */
+  toGenerate: string[];
   rows: ElementBatchRow[];
   operators: PickOption[];
   editable: boolean;
@@ -84,44 +83,34 @@ export function ElementsPage({
   const [setupFailed, setSetupFailed] = useState<string | null>(null);
   /** A save failed — said above the table; the row has gone back already. */
   const [failed, setFailed] = useState<string | null>(null);
-  const [nothingHere, setNothingHere] = useState(false);
   const started = useRef(false);
 
   useEffect(() => {
-    if (hasLog || !editable || started.current) return;
+    if (toGenerate.length === 0 || !editable || started.current) return;
     started.current = true;
     void (async () => {
       const supabase = createClient();
-      const { count, error: countErr } = await supabase
-        .from("production_element_locations")
-        .select("id, production_elements!inner ( schedule_class, is_active )", {
-          count: "exact",
-          head: true,
-        })
-        .eq("location_id", kitchenId)
-        .eq("is_active", true)
-        .eq("production_elements.schedule_class", SHIFT_REPORT_BATCH_SCHEDULE)
-        .eq("production_elements.is_active", true);
-      if (countErr) {
-        setSetupFailed(countErr.message);
-        return;
-      }
-      if (!count) {
-        setNothingHere(true);
-        return;
-      }
-      const { error } = await supabase.rpc("generate_production_batches", {
+      const args = {
         p_location_id: kitchenId,
         p_log_date: reportDate,
         p_schedule: SHIFT_REPORT_BATCH_SCHEDULE,
+      };
+      let { error } = await supabase.rpc("generate_production_batches", {
+        ...args,
+        p_element_ids: toGenerate,
       });
+      // Before migration 175 the function takes no element list: generate the
+      // whole log, as it always did. The page still shows only what is asked.
+      if (error?.code === "PGRST202") {
+        ({ error } = await supabase.rpc("generate_production_batches", args));
+      }
       if (error) {
         setSetupFailed(error.message);
         return;
       }
       router.refresh();
     })();
-  }, [hasLog, editable, kitchenId, reportDate, router]);
+  }, [toGenerate, editable, kitchenId, reportDate, router]);
 
   // EVERY CHANGE SHOWS ON THE TAP (Mark, 2026-09-30: "make the app feel
   // better. Especially on tablets") — `useOptimisticRows`, as Ratings and
@@ -192,11 +181,9 @@ export function ElementsPage({
   if (rows.length === 0) {
     return (
       <p className="text-center text-[16px] text-muted">
-        {nothingHere || (hasLog && editable)
-          ? `${kitchenCode} has no donuts on its batch log.`
-          : editable
-            ? "Setting up today’s donut batch log…"
-            : `No donut batches were recorded at ${kitchenCode} this day.`}
+        {editable && toGenerate.length > 0
+          ? "Setting up today’s donut batch log…"
+          : `No donut batches were recorded at ${kitchenCode} this day.`}
       </p>
     );
   }

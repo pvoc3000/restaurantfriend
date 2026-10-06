@@ -757,24 +757,42 @@ A **Shift** picklist followed the same day (All · Opening · Mid · Closing ·
 Off-site, counted over the loaded window), filtering in the browser between
 Dates and Show. Not walked in a browser either.
 
-## 2026-10-06 — No Donut batches page at a kitchen that baked nothing
+## 2026-10-06 — Donut batches asks only for what the kitchen made (migration 175, NOT APPLIED)
 
 Mark: DF02's opening report for 10-06 emailed nine donut rows, all 0, though
-DF01 had made everything. The page generated a Donut log for the report's own
+DF01 had made DF02's case. The page generated a Donut log for the report's own
 shop whenever that shop had donuts on its batch log, and an empty Made blocks
-the send, so the supervisor typed nine zeros.
+the send, so the supervisor typed nine zeros. Then: "if DF02 made cafe
+knotted's order, then it should enter the production info for that order … the
+amount of non-vegan raised mix that was made, but that's it."
 
-Built: `kitchenBakes` and `pagesForReport` in `lib/shiftReports`. The page is
-in the walk only when a PLAN schedule for the report's date names the report's
-kitchen, or a Donut log already exists there. Otherwise the runner drops it, so
-no log is generated, nothing blocks and the email has no section.
+Built:
+- The page asks for the Donut elements under the items on that day's schedules
+  whose kitchen is the report's kitchen, plan or special order, that are active
+  at that kitchen (`donutsToRecord`). `production_item_elements` is the link.
+- A row on an existing log shows when it is asked for or already holds an
+  amount (`showsDonutBatch`). Rows left out are not counted by the send's gate
+  and are not in the email.
+- Nothing asked and nothing recorded: the page is not in the walk
+  (`pagesForReport`), no log is generated and the email has no section.
+- Migration 175 gives `generate_production_batches` an optional
+  `p_element_ids`; the page passes the asked donuts not yet on the log, so the
+  log holds only those. Null is every element, which Batch Logs still sends.
+  Until 175 is applied the page falls back to the old call (PGRST202) and the
+  log gets every donut, with the extra rows hidden on the report.
 
-Plan schedules only, measured the same day: on 10-06 Cafe Knotted's standing
-order (SO-10068) still named DF02 as its kitchen while DF02's plan schedule
-named DF01. Counting special-order schedules would have kept the page.
+Measured on live data with the page's own queries: 10-06 DF02 asks for Knotted
+Raised Donut only and DF01 for its eight; 10-05, when DF02 baked its own, DF02
+asks for nine. Every item on those schedules has a Donut element except
+"Senses Fall - Mini" (SO-10102), which has none, so its dough is not asked for
+unless another item calls for it.
 
-Not handled: a kitchen whose only work that day is a special order gets no
-page; and if nobody generated the day's plan schedule, the page is missing at
-the kitchen that did bake until the schedule exists.
+Not handled: if nobody generated the day's schedule, the kitchen that baked has
+no page until the schedule exists. A special order's kitchen is taken as
+recorded: Cafe Knotted's standing order names DF02.
 
-Verified: typecheck, lint, 2,239 fixtures. Not walked in a browser.
+Verified: typecheck, lint, 2,240 fixtures. 175 on Docker PG15 over a condensed
+prelude holding 159's function: applies twice, one function left, a named list
+makes only those and tops up, a WEEKLY element named on a DONUT log is not
+made, three named arguments make every donut, `anon` refused. Not walked in a
+browser.

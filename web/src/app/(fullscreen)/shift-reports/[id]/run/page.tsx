@@ -13,7 +13,8 @@ import { describeAmount } from "@/lib/productionBatches";
 import { ordersForPacket } from "@/lib/specialOrderSchedule";
 import {
   pagesForShift,
-  kitchenBakes,
+  donutsToRecord,
+  showsDonutBatch,
   submitBlockers,
   submitReadiness,
   type EmailReport,
@@ -298,7 +299,8 @@ export default async function RunShiftReportPage({
     { data: ratings },
     { data: todaySchedules },
     { data: batchLog },
-    { data: bakeSchedules },
+    { data: kitchenSchedules },
+    { data: kitchenDonuts },
     { data: salesDays },
     { data: tomorrowOrders },
     { data: tomorrowSchedules },
@@ -356,15 +358,29 @@ export default async function RunShiftReportPage({
           .eq("schedule", SHIFT_REPORT_BATCH_SCHEDULE)
           .maybeSingle()
       : SKIP,
-    // Did this kitchen bake today? See `kitchenBakes` — one row is the answer.
+    // What this kitchen made today, down to the dough: every schedule naming
+    // it as the kitchen, plan or special order, each item's elements with it.
+    // See `donutsToRecord`.
     wants("elements")
       ? supabase
           .from("production_schedules")
-          .select("id")
+          .select(
+            `id, production_schedule_items ( production_items ( production_item_elements (
+               element_id, production_elements ( schedule_class, is_active ) ) ) )`
+          )
           .eq("kitchen_location_id", kitchenId)
           .eq("schedule_date", reportDate)
-          .eq("source", "plan")
-          .limit(1)
+      : SKIP,
+    // The kitchen's Donut batch log membership — 157's rule, the same filter
+    // `generate_production_batches` applies.
+    wants("elements")
+      ? supabase
+          .from("production_element_locations")
+          .select("element_id, production_elements!inner ( schedule_class, is_active )")
+          .eq("location_id", kitchenId)
+          .eq("is_active", true)
+          .eq("production_elements.schedule_class", SHIFT_REPORT_BATCH_SCHEDULE)
+          .eq("production_elements.is_active", true)
       : SKIP,
     wants("sales")
       ? supabase
@@ -515,6 +531,29 @@ export default async function RunShiftReportPage({
   }
 
   // ---- elements: the kitchen's Donut log for the day -----------------------
+  type ScheduledDonuts = {
+    production_schedule_items: {
+      production_items: {
+        production_item_elements: {
+          element_id: string;
+          production_elements: { schedule_class: string | null; is_active: boolean } | null;
+        }[];
+      } | null;
+    }[];
+  };
+  const askedDonuts = donutsToRecord(
+    ((kitchenSchedules as unknown as ScheduledDonuts[] | null) ?? []).flatMap((s) =>
+      s.production_schedule_items.flatMap((i) =>
+        (i.production_items?.production_item_elements ?? [])
+          .filter((e) => e.production_elements?.schedule_class === SHIFT_REPORT_BATCH_SCHEDULE)
+          .map((e) => e.element_id)
+      )
+    ),
+    ((kitchenDonuts as { element_id: string }[] | null) ?? []).map((d) => d.element_id)
+  );
+  /** Asked for and not on the log yet — what reaching the page generates. */
+  let donutsToGenerate = askedDonuts;
+
   let elementRows: ElementBatchRow[] = [];
   let batchOperators: { value: string; label: string }[] = [];
   if (wants("elements") && batchLog) {
@@ -522,7 +561,7 @@ export default async function RunShiftReportPage({
       supabase
         .from("production_batches")
         .select(
-          "id, sort, yield_count, yield_size, yield_unit, operator_employee_id, notes, production_elements(name)"
+          "id, element_id, sort, yield_count, yield_size, yield_unit, operator_employee_id, notes, production_elements(name)"
         )
         .eq("log_id", batchLog.id as string),
       supabase
@@ -540,7 +579,21 @@ export default async function RunShiftReportPage({
     const draftById = new Map(
       ((drafts as Record<string, unknown>[] | null) ?? []).map((d) => [d.batch_id as string, d])
     );
-    elementRows = ((batches as Record<string, unknown>[] | null) ?? []).map((b) => {
+    const onLog = (batches as Record<string, unknown>[] | null) ?? [];
+    donutsToGenerate = askedDonuts.filter((id) => !onLog.some((b) => b.element_id === id));
+    // ONLY THE DONUTS THIS KITCHEN IS ASKED ABOUT — see `showsDonutBatch`. A
+    // row left out is not counted by the send's gate and is not in the email.
+    const shownBatches = onLog.filter((b) => {
+      const d = draftById.get(b.id as string) ?? b;
+      return showsDonutBatch(
+        {
+          elementId: b.element_id as string,
+          recorded: d.yield_count !== null || d.yield_size !== null,
+        },
+        askedDonuts
+      );
+    });
+    elementRows = shownBatches.map((b) => {
       const d = draftById.get(b.id as string);
       const el = b.production_elements as { name: string } | null;
       // THIS REPORT'S DRAFT, else what the batch already holds — the opening
@@ -868,11 +921,7 @@ export default async function RunShiftReportPage({
   // NO BODY, NO PAGE: the runner drops Donut batches when this is absent, and
   // with it the log `ElementsPage` would have generated, the blocker and the
   // email's section.
-  const bakesHere = kitchenBakes({
-    hasLog: Boolean(batchLog),
-    planSchedules: ((bakeSchedules as unknown[] | null) ?? []).length,
-  });
-  if (wants("elements") && bakesHere) {
+  if (wants("elements") && (askedDonuts.length > 0 || elementRows.length > 0)) {
     bodies.elements = (
       <ElementsPage
         key="elements"
@@ -881,7 +930,7 @@ export default async function RunShiftReportPage({
         kitchenId={kitchenId}
         kitchenCode={kitchenCode}
         reportDate={reportDate}
-        hasLog={Boolean(batchLog)}
+        toGenerate={donutsToGenerate}
         rows={elementRows}
         operators={batchOperators}
         editable={editable}
