@@ -1193,6 +1193,36 @@ test("every memo is the org's name then our reference, or just the reference", (
   no(JSON.stringify(body).includes("restaurantfriend"), "the app's name is gone");
 });
 
+// 176: an order an earlier invoice bills goes on a new one as WHAT WAS ADDED —
+// ordinary positive lines, so nothing here is a special case. Knotted's 10/10:
+// 560 billed and paid on INV-10000, then 1,300; 740 × $1.55, delivery billed once.
+test("what was added to a billed order is one ordinary line, with no delivery (176)", () => {
+  const more: CustomerInvoicePushLine = {
+    description: "Order #SO-10085 · Cafe Knotted · 10/10/2026 · in addition to INV-10000",
+    amount: 1147,
+    square_item: "wholesale",
+    cancelled: false,
+    totals: { subtotal: 1147, taxableSubtotal: 0, discount: 0, deliveryCharge: 0, rushFee: 0, tax: 0, total: 1147 },
+  };
+  eq(customerInvoiceRefusals(civ({ lines: [more] })), []);
+  const lines = buildCustomerInvoicePayload(civ({ lines: [more] })).body.Line as Record<string, unknown>[];
+  eq(lines.length, 1, "no delivery line: the first invoice billed it");
+  eq(lines[0].Amount, 1147);
+  eq(lineOf(lines[0]).ItemRef.value, "WH");
+  eq(lines[0].Description, more.description, "QuickBooks' line names the invoice it adds to");
+});
+
+test("the old shape — all of the order less an earlier invoice — is still refused (176)", () => {
+  const less: CustomerInvoicePushLine = {
+    description: "Order #SO-3 · Cafe Knotted · 10/10/2026",
+    amount: 150,
+    square_item: "wholesale",
+    cancelled: false,
+    totals: { subtotal: 350, taxableSubtotal: 0, discount: 0, deliveryCharge: 0, rushFee: 0, tax: 0, total: 350 },
+  };
+  ok(customerInvoiceRefusals(civ({ lines: [less] })).some((r) => r.includes("bills part of its order")));
+});
+
 test("a bill's memo carries the org's name after the PO", () => {
   const { body } = buildBillPayload({ ...inputs({ bill: bill({ po_numbers: ["132-181227-01"] }) }), orgName: "Donut Friend" });
   eq(body.PrivateNote, "PO 132-181227-01 · Donut Friend inv-1", "named");

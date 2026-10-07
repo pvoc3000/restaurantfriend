@@ -202,23 +202,32 @@ export default async function SpecialOrdersPage({
   }
 
   // WHICH ORDERS A CUSTOMER INVOICE BILLS (124): bulk Record Payment skips
-  // them and Create Invoice refuses them. A failed read (124 unapplied) leaves
-  // every order unbilled, which is what they were before it.
+  // them, and Create Invoice bills only what they do not (176). A failed read
+  // (124 unapplied) leaves every order unbilled, which is what they were
+  // before it.
   const invoiceOf = new Map<string, string>();
+  const billedOf = new Map<string, number>();
   if (ids.length > 0) {
     for (let from = 0; ; from += 1000) {
       const { data, error: invoiceError } = await supabase
         .from("customer_invoice_lines")
-        .select("special_order_id, invoice_id, customer_invoices!inner ( voided_at )")
+        .select("special_order_id, invoice_id, amount, kind, customer_invoices!inner ( voided_at, revision_of, sent_at )")
         .in("special_order_id", ids)
         .is("customer_invoices.voided_at", null)
-        // 139: the invoice billing its BALANCE — a deposit invoice does not
-        // stop the list's Create Invoice… or Record Payment.
-        .eq("kind", "balance")
         .order("id")
         .range(from, from + 999);
       if (invoiceError) break;
-      for (const l of data ?? []) invoiceOf.set(l.special_order_id as string, l.invoice_id as string);
+      for (const l of data ?? []) {
+        const order = l.special_order_id as string;
+        // 139: the invoice billing its BALANCE — a deposit invoice does not
+        // stop the list's Record Payment.
+        if (l.kind === "balance") invoiceOf.set(order, l.invoice_id as string);
+        // What is BILLED counts every line, a deposit's too, and not a draft
+        // revision's: the invoice it would replace is still the bill (143).
+        const inv = l.customer_invoices as unknown as { revision_of: string | null; sent_at: string | null } | null;
+        if (inv?.revision_of && !inv.sent_at) continue;
+        billedOf.set(order, (billedOf.get(order) ?? 0) + Number(l.amount || 0));
+      }
       if (!data || data.length < 1000) break;
     }
   }
@@ -248,6 +257,9 @@ export default async function SpecialOrdersPage({
       kitchen_code: codeOf(raw.kitchen_location_id as string | null),
       customer: (raw.customers as SpecialOrderRow["customer"]) ?? null,
       invoice_id: invoiceOf.get(o.id as string) ?? null,
+      invoice_billed: billedOf.has(o.id as string)
+        ? Math.round((billedOf.get(o.id as string) ?? 0) * 100) / 100
+        : null,
       totals: orderTotals(money, lines.get(o.id as string) ?? [], payments.get(o.id as string) ?? [], settings.rush),
     };
   });

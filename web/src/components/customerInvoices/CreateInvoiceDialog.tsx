@@ -34,8 +34,9 @@ import {
  * Cancelling that card leaves a draft, which is all an unsent invoice is.
  *
  * The amounts shown are what each order still owes; the database copies each
- * order's charges onto the invoice when it writes it (141), less anything its
- * other invoices bill, and applies money already taken when it is sent.
+ * order's charges onto the invoice when it writes it (141) — for an order an
+ * invoice already bills, only what was added since (176) — and applies money
+ * already taken when it is sent.
  */
 export function CreateInvoiceDialog({
   candidates,

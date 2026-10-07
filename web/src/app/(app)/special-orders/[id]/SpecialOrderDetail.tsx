@@ -534,7 +534,7 @@ export async function SpecialOrderDetail({
     customer_name: customer ? customerLabel(customer) : "",
     shop: codeFor(kitchenId),
     balance: totals.balance,
-    on_invoice: liveInvoice !== null,
+    unbilled: liveInvoices.length > 0 ? unbilled : undefined,
     no_tax_rate: missingTaxRate(row.tax_rate as number | null, totals.taxableSubtotal),
     wholesale: isWholesaleOrder({
       square_item: (row.square_item as string | null) ?? null,

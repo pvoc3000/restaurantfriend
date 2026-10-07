@@ -187,9 +187,22 @@ test("missingTaxRate: an empty rate over taxable items, and 0 is a rate", () => 
   eq(missingTaxRate(null, 0), false, "nothing taxable, nothing to flag");
 });
 
-test("createRefusals: an order already on an invoice is refused before the database refuses it", () => {
-  ok(createRefusals([...week, day(8, { on_invoice: true })])[0].includes("already on an invoice"));
-  eq(createRefusals(week.map((r) => ({ ...r, on_invoice: false }))), []);
+test("createRefusals: an order invoiced in full is refused before the database refuses it", () => {
+  ok(createRefusals([...week, day(8, { unbilled: 0 })])[0].includes("already invoiced in full"));
+  ok(createRefusals([day(8, { unbilled: -25 })])[0].includes("already invoiced in full"), "billed more than it comes to");
+  eq(createRefusals(week), [], "no invoice bills them, so nothing is said about it");
+});
+
+// 176: Knotted's 10/10 went from 560 to 1,300 after INV-10000 billed and was
+// paid for 560 — $2,065 now, $918 billed, so $1,147 is left to bill.
+test("createRefusals: an order an invoice bills PART of goes on another (176)", () => {
+  eq(createRefusals([day(1, { balance: 1147, unbilled: 1147 }), day(2, { balance: 837, unbilled: 837 })]), []);
+});
+
+test("invoiceLinesFor: a part-billed order shows what is not billed, paid or not (176)", () => {
+  eq(invoiceLinesFor([day(1, { balance: 1147, unbilled: 1147 })])[0].amount, 1147);
+  eq(invoiceLinesFor([day(1, { balance: 2065, unbilled: 1147 })])[0].amount, 1147, "the first invoice is still unpaid");
+  eq(invoiceLinesFor([day(1, { balance: 413.5 })])[0].amount, 413.5, "no invoice: what is owed, as before");
 });
 
 // 141: AN INVOICE OWNS ITS LINES. The figures are the throwaway-Postgres run's:
@@ -343,6 +356,48 @@ test("invoicePaper: one order is itemized, unless an other charge is Delivery", 
   ok(withFee.columns, "a Delivery charge has no place in the itemized Amount column");
   eq(withFee.rows[0].detail, undefined);
   ok(invoicePaper(groupInvoiceLines([line({ line_type: "item", description: "Setup", amount: 30 })], orders)).columns, "no orders: columns");
+});
+
+// 176: WHAT WAS ADDED. The lines are the throwaway-Postgres run's: INV-10000
+// billed and was paid for 560 a day; the days went to 1,300 and 1,100.
+//
+// Checked by breaking: `createRefusals` never matching an invoiced-in-full
+// order, and `invoiceLinesFor` showing the balance again, each turn a case
+// above red.
+const ADDED = " · in addition to INV-10000";
+const added = [
+  line({ special_order_id: "o1", description: "Knotted Bismark - 42g", qty: 740, unit_price: 1.55, amount: 1147, order_label: `Order #10057 · Cafe Knotted · 10/5/2026${ADDED}` }),
+  line({ special_order_id: "o2", description: "Knotted Bismark - 42g", qty: 540, unit_price: 1.55, amount: 837, order_label: `Order #10050 · Cafe Knotted · 10/6/2026${ADDED}` }),
+];
+
+test("what was added: each order bills its added quantity, and says which invoice it adds to (176)", () => {
+  const g = groupInvoiceLines(added, orders);
+  eq(g.map((x) => x.kind), ["charges", "charges"]);
+  eq(g.map((x) => x.net), [1147, 837]);
+  ok(g[0].label.endsWith(ADDED), "the band, the paper's row and QuickBooks' line all read the label");
+  const t = groupTotals(g[0].lines);
+  eq([t.subtotal, t.deliveryCharge, t.total], [1147, 0, 1147], "delivery was billed once, on the first invoice");
+  eq(t.total, g[0].net, "nothing is subtracted, so QuickBooks is sent what the paper says");
+  eq(invoiceTotalsBreakdown(added, 0).prior, 0, "no Invoiced earlier line");
+  eq(snapshotLines(g).map((l) => l.amount), [1147, 837], "the pay page");
+});
+
+test("what was added: one order is itemized by the added quantity; a price change has no quantity (176)", () => {
+  const paper = invoicePaper(
+    groupInvoiceLines(
+      [
+        line({ special_order_id: "o1", description: "Bismark", qty: 40, unit_price: 1.6, amount: 64, order_label: `Order #10057${ADDED}`, sort: 0 }),
+        line({ special_order_id: "o1", description: "Bismark — price change on 560 already invoiced", amount: 28, order_label: `Order #10057${ADDED}`, sort: 1 }),
+      ],
+      orders
+    )
+  );
+  no(paper.columns);
+  eq(paper.rows[0].amount, 92, "a price change is in the subtotal");
+  eq(paper.rows[0].detail?.rows, [
+    { label: "40 × Bismark @ $1.60", amount: 64 },
+    { label: "Bismark — price change on 560 already invoiced", amount: 28 },
+  ]);
 });
 
 test("paperText: the email says what the columns say, in lines", () => {

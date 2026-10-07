@@ -5616,3 +5616,65 @@ send it."
   transaction). Confirmed after: both live bodies carry the 174 change and the
   grants are as before (`create_inquiry` anon and authenticated;
   `order_invoice_refusal` neither).
+
+## 176 — an invoice bills what was added (2026-10-06)
+
+Knotted raised SO-10085 and SO-10086 (560 a day → 1,300 and 1,100) after
+INV-10000 had billed them and been PAID through QuickBooks. Mark put both on a
+new invoice, INV-10014, and the send refused: "A deposit or a "Less invoice"
+line cannot go on a QuickBooks invoice yet". Revise was no way out either —
+`revise_customer_invoice` refuses a QuickBooks invoice with money on it.
+
+- **What 141 did:** an order its other invoices already bill was copied as ALL
+  of its charges and then `prior_billing` ("Less invoice INV-10000", −$918.00).
+  Right to the cent and unreadable to QuickBooks, which works its own figures
+  out from the lines it is sent.
+- **Mark chose billed-by-quantity**, the way an ERP tracks quantity invoiced on
+  an order line, over teaching the push to net the figures (which would have
+  left the paper and QuickBooks saying different things).
+- **176:** `order_invoice_lines` copies WHAT WAS ADDED when every difference is
+  an addition: each item for the quantity its earlier invoice lines have not
+  billed (matched on `special_order_item_id`, at the order's price), an item
+  billed in full left off, and delivery / rush / discount / tax for what was
+  not billed of each. A PRICE that went up on billed units is its own line with
+  no quantity ("Bismark — price change on 560 already invoiced"), and a line
+  with no quantity is how the next copy knows not to count it as units. Any
+  rounding cent goes on the largest line, so the group still nets to
+  `special_order_unbilled` exactly. `write_order_invoice_lines` adds
+  " · in addition to INV-10000" to the group's `order_label`, which the band,
+  the paper's row, the pay page and QuickBooks' line all read.
+- **"Less invoice" stays** for what a quantity cannot say: an item that went
+  down, was removed (the FK's set null) or changed its tax; a price, delivery,
+  rush or tax that went down; a smaller discount; a changed tax rate; and an
+  earlier invoice that is a deposit or a pre-141 one-line order. Those copy
+  exactly as before, and are still Square-only. A decrease on a paid QuickBooks
+  invoice has no clean path — that is a credit memo, on the not-built list.
+- **Nothing else in SQL changed.** With no `prior_billing` line,
+  `customer_invoice_send_problems`, `customerInvoiceRefusals`, the pay
+  breakdown and the payment split all treat the group as ordinary charges.
+- **The list had refused first.** Create Invoice… treated any order on a live
+  invoice as "already on an invoice — void that one first"; the database never
+  had that rule. `InvoiceCandidate.on_invoice` became `unbilled` (set only when
+  an invoice bills the order): refused when nothing is left ("already invoiced
+  in full"), otherwise the dialog shows what is not billed. The list page sums
+  `invoice_billed` per order by `special_order_billed`'s rule (not void, not a
+  draft revision); the order record passes its existing `unbilled`.
+- **Verified** on a throwaway Postgres 15 with 001–175 replayed, as the owner
+  role, the scenario run BEFORE 176 (the Less-invoice lines and the refusal
+  reproduce exactly) and after (applied twice): Knotted's two days copy as
+  740 × $1.55 = $1,147.00 and 540 × $1.55 = $837.00, no delivery, send problems
+  empty, and a QuickBooks payment of $1,984.00 splits 1,147 / 837. Also: a taxed
+  and discounted order with a new item; one item down and one up (falls back);
+  a price rise then a third invoice ("in addition to INV-10000, INV-10001");
+  a price drop (falls back); deposit first (falls back); delivery-only added;
+  an item removed (falls back); revising either invoice; fractional quantities;
+  billed in full still refused. Every one nets to unbilled 0.00. It caught one
+  bug: a NEW item read as "tax changed" off the left join's empty row, which
+  sent the taxed case to the fallback.
+- **Measured on the live DB:** no invoice, draft or sent, carries a
+  `prior_billing` line, so nothing existing reads as changed; the live bodies
+  of both replaced functions are 143's and 141's.
+- **Not verified:** the list and the dialog in a browser (the pane was signed
+  out), and a real QuickBooks push of an added-quantity invoice.
+- **A draft copied before 176** would read "The order has changed" and
+  re-copy on Update; there are none.

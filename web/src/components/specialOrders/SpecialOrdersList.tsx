@@ -109,8 +109,11 @@ export type SpecialOrderRow = {
   rush_rate: number | null;
   ignore_balance: boolean;
   /** The customer invoice (not void) that bills this order, if any (124) —
-   *  what bulk Record Payment skips and Create Invoice refuses. */
+   *  what bulk Record Payment skips. */
   invoice_id: string | null;
+  /** What its live invoices bill of it, null when none does — Create Invoice
+   *  bills the rest (176), `special_order_billed`'s rule. */
+  invoice_billed: number | null;
 };
 
 const PATH = "/special-orders";

@@ -114,8 +114,9 @@ export function SpecialOrderBatchActions({
    * CREATE INVOICE (migration 124, Mark 2026-09-23) — the selected orders
    * become ONE customer invoice, one line each: Cafe Knotted's week. The
    * refusals are said in the dialog before anything is written; the database
-   * says the same things again, plus the one this list cannot know (an order
-   * already on an invoice).
+   * says the same things again. An order an invoice already bills goes on a
+   * new one for what was added since (176), and is refused only when nothing
+   * is left to bill.
    */
   const [invoicing, setInvoicing] = useState(false);
   const candidates: InvoiceCandidate[] = selected.map((r) => ({
@@ -128,7 +129,8 @@ export function SpecialOrderBatchActions({
     customer_id: r.customer?.id ?? null,
     customer_name: customerLabel(r.customer),
     shop: r.kitchen_code ?? r.location_code,
-    on_invoice: r.invoice_id !== null,
+    unbilled:
+      r.invoice_billed === null ? undefined : Math.round((r.totals.total - r.invoice_billed) * 100) / 100,
     no_tax_rate: missingTaxRate(r.tax_rate, r.totals.taxableSubtotal),
     balance: r.totals.balance,
     wholesale: isWholesaleOrder(r),

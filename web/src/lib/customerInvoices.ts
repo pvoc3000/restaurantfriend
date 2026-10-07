@@ -573,8 +573,12 @@ export type InvoiceCandidate = {
   /** Where the money lands (120): the kitchen, else the pickup shop. */
   shop: string | null;
   balance: number;
-  /** Already on a customer invoice that is not void. */
-  on_invoice?: boolean;
+  /**
+   * What its live invoices have NOT billed of it (`unbilledAmount`) — set only
+   * when an invoice already bills it. Since 176 such an order goes on another
+   * invoice for what was added; with nothing left it is refused.
+   */
+  unbilled?: number;
   /** A wholesale order (`isWholesaleOrder`) — its invoice keeps the terms. */
   wholesale?: boolean;
   /** Taxable items and an empty tax rate (`missingTaxRate`, 174). */
@@ -586,6 +590,8 @@ export type InvoiceCandidate = {
  * The SAME rules `create_customer_invoice` enforces, said before the dialog
  * opens rather than as a Postgres error after it commits. Since 127 the list
  * knows which orders are already invoiced too; the database still checks.
+ * An order an invoice bills only PART of is not refused (176): the new invoice
+ * bills what was added.
  */
 export function createRefusals(rows: InvoiceCandidate[]): string[] {
   const out: string[] = [];
@@ -603,9 +609,9 @@ export function createRefusals(rows: InvoiceCandidate[]): string[] {
   if (shops.size > 1) {
     out.push("These orders are made at different shops, so one payment cannot cover them.");
   }
-  const taken = rows.filter((r) => r.on_invoice);
+  const taken = rows.filter((r) => r.unbilled !== undefined && r.unbilled <= 0.005);
   if (taken.length) {
-    out.push(`${plural(taken.length, "order is", "orders are")} already on an invoice — void that one first.`);
+    out.push(`${plural(taken.length, "order is", "orders are")} already invoiced in full.`);
   }
   const untaxed = rows.filter((r) => r.no_tax_rate);
   if (untaxed.length) {
@@ -624,7 +630,8 @@ export function createRefusals(rows: InvoiceCandidate[]): string[] {
  * The lines, oldest event first, each for what the order still OWES — its
  * balance, not its total, so an order with a deposit already taken is not
  * billed for it twice. For Knotted's days, which carry no payments until the
- * invoice is paid, balance and total are the same figure.
+ * invoice is paid, balance and total are the same figure. An order already on
+ * an invoice shows what that invoice does not bill (176), paid or not.
  */
 export function invoiceLinesFor(
   rows: InvoiceCandidate[]
@@ -638,7 +645,7 @@ export function invoiceLinesFor(
     .map((r) => ({
       order_id: r.id,
       description: orderLineDescription(r),
-      amount: cents(r.balance),
+      amount: cents(r.unbilled ?? r.balance),
     }));
 }
 
