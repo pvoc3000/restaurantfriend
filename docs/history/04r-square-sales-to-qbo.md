@@ -123,3 +123,35 @@
 summed at the foot of the account table. The columns are signed (credit
 positive, debit negative), so a side that balances totals $0.00; a non-zero
 total is red. Not walked in a browser.
+
+
+**A TENDER FOLLOWS THE DATE OF ITS SALE, NOT THE DATE IT WAS PROCESSED (Mark,
+2026-10-07; `sync-square-sales` DEPLOYED the same day — *probe, don't read
+this line*).** DF01's entry for 2026-10-06 was refused $458.85 apart. The DF01
+HP register was offline from 5:20 PM to 9:07 PM; its 37 payments (34 card, 3
+cash) reached Square at 6:35 the next morning. The Sales cube dates an order
+when it is rung up and PaymentMethods dates a payment when it is processed, so
+the day's sales had no tender behind them — and 10-07 would have been out by
+the same amount the other way. `Sales.total_collected_amount` for the day
+($1,973.61) already included them, which is the tell: **collected minus the
+tender lines is the missing payment, to the cent.**
+The rule is `_shared/tenderDay` (pure, fixtures): a PAYMENT is counted on the
+reporting day `Sales` gives its ORDER; a REFUND, and a payment whose order
+`Sales` does not carry (62 of 17,868), keep the 01:00 rollover rule. The fees
+ride with their payment. Both pulls reach seven days past the window — orders
+behind and ahead, payments ahead — and go a fortnight at a time, refusing by
+name at the row limit.
+**Measured before it was written** (both shops, 08-01 → 10-06, 134 shop-days,
+against `total_collected_amount`): by the payment's hour, 1 day off; by the
+order's day, 0, moving those 37 payments and nothing else. **And after**, the
+new step run query for query through `query` mode over the compiled module:
+58 shop-days (09-08 → 10-06) all balance, and three stored lines change —
+DF01 10-06 card +$419.72, cash +$39.13, fees +$14.33.
+**What it costs:** the card money still PAYS OUT with the day it was
+processed, so Undeposited Square Funds carries that day's offline card takings
+until the next payout clears them; and Square's payment-dated reports show
+those payments a day later than the entry does. Mark chose this over moving
+the sales, which would have disagreed with Square's Sales Summary and with the
+net sales figure payroll reads.
+**A day synced BEFORE its offline payments upload still does not balance** —
+correctly; sync it again once they have.

@@ -212,7 +212,7 @@ cent, before a line of the pull was written (2026-09-17).
 | tax | `Sales.sales_tax_amount` | " |
 | tips | `Sales.tips_amount` | " |
 | gift cards sold | `Sales.gift_card_sales_amount` | " |
-| tender (payments − refunds) | `PaymentMethods.total_amount` by `payment_method` + `payment_external_source`, `status = COMPLETED` | **`local_reporting_timestamp` by the hour**, bucketed at the 01:00 rollover — the payment cubes carry no `reporting_day` |
+| tender (payments − refunds) | `PaymentMethods.total_amount` by `payment_method` + `payment_external_source`, `status = COMPLETED` | **the reporting day of the ORDER it paid** (`Sales` by `order_id`, since 2026-10-07 — a payment taken offline is processed the next morning and must still count with its sale); a refund, or a payment whose order `Sales` does not carry, by `local_reporting_timestamp` at the 01:00 rollover. `_shared/tenderDay` |
 | fee | `−PaymentMethods.fee_amount`, keyed by the tender | " |
 
 ```

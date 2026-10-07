@@ -28,6 +28,16 @@
 // a partial backfill harmless: re-running January re-lands January.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  addDays,
+  chunkDays,
+  hourReportingDay,
+  orderDays,
+  orderKey,
+  tenderDay,
+  TENDER_CHUNK_DAYS,
+  TENDER_REACH_DAYS,
+} from "../_shared/tenderDay.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -267,12 +277,18 @@ function readCells(
 //     carried once as `gift_card_sale` from the Sales cube, net of their own
 //     discounts (which `discounts_amount` deliberately excludes).
 //
-// THE TENDERS HAVE NO `reporting_day`. PaymentMethods carries only the raw
-// local timestamp, so they are pulled by the HOUR over the window and bucketed
-// here by the seller's own rollover — 1:00 AM, the boundary documented on
-// `daily_sales.business_date` and in `lib/sales`' REPORTING_DAY_ROLLOVER_HOUR.
-// That bucketing is what the identity above was measured against; a change to
-// Square's reporting-day setting moves this constant too.
+// THE TENDERS HAVE NO `reporting_day`, SO A PAYMENT TAKES ITS ORDER'S (Mark,
+// 2026-10-07: "follow the date of the sale, not the date the payment was
+// processed"). PaymentMethods carries only the raw local timestamp, and until
+// that day the tenders were bucketed by it at the seller's 1:00 AM rollover.
+// That is the day the payment REACHED Square, which is not the day of the sale
+// when a register was offline: DF01 on 2026-10-06 rang up $458.85 offline in
+// the evening, the payments uploaded at 6:35 the next morning, and the day's
+// entry was refused by exactly that amount. So each PAYMENT is counted on the
+// reporting day the Sales cube gives its order; a refund, and a payment whose
+// order Sales does not carry, keep the rollover rule. `_shared/tenderDay` is
+// the rule and its measurement; a change to Square's reporting-day setting
+// still moves the constant below.
 //
 // EVERY AMOUNT GOES THROUGH `moneyToCents` AND AN UNREADABLE ONE MARKS THE DAY
 // `incomplete`, which the builder refuses. A breakdown that is quietly short a
@@ -477,33 +493,67 @@ async function loadBreakdown(
     if (amt) d.lines.push({ kind: "service_charge", key: name, name, cents: amt });
   }
 
-  // --- 4. tenders and fees, by the hour, bucketed into the reporting day ----
+  // --- 4. tenders and fees, on the reporting day of the ORDER they paid -----
+  //
+  // Both pulls reach TENDER_REACH_DAYS past the window: the orders behind and
+  // ahead, so a payment in reach is known to belong to a day outside the
+  // window and is left for that day; the payments ahead, so one that uploaded
+  // late is found. Both go in pieces, because a row per order is a few
+  // thousand a fortnight and a query that reaches its limit says nothing.
+  const ROW_LIMIT = 50000;
+  const runAll = async (query: Record<string, unknown>, what: string) => {
+    const rows = await run({ ...query, limit: ROW_LIMIT });
+    if (rows.length >= ROW_LIMIT) {
+      throw new SquareError(`Square returned ${rows.length} ${what} rows, which is its limit — some are missing. Sync a shorter date range.`, 502);
+    }
+    return rows;
+  };
+  const orderRows: { loc: string; orderId: string; day: string }[] = [];
+  for (const [a, b] of chunkDays(addDays(from, -TENDER_REACH_DAYS), addDays(to, TENDER_REACH_DAYS), TENDER_CHUNK_DAYS)) {
+    const rows = await runAll({
+      measures: ["Sales.total_collected_amount"],
+      dimensions: ["Sales.location_id", "Sales.order_id"],
+      timeDimensions: [{ dimension: "Sales.reporting_day", dateRange: [a, b], granularity: "day" }],
+    }, "order");
+    for (const row of rows) {
+      const at = dayOf(row, "Sales");
+      const orderId = String(pickField(row, "Sales.order_id") ?? "");
+      if (at && orderId) orderRows.push({ loc: at.loc, orderId, day: at.date });
+    }
+  }
+  const dayOfOrder = orderDays(orderRows);
+
   const hh = String(REPORTING_DAY_ROLLOVER_HOUR).padStart(2, "0");
-  const payRows = await run({
-    measures: ["PaymentMethods.total_amount", "PaymentMethods.fee_amount"],
-    dimensions: [
-      "PaymentMethods.location_id", "PaymentMethods.payment_method",
-      "PaymentMethods.payment_external_source", "PaymentMethods.type", "PaymentMethods.status",
-    ],
-    timeDimensions: [{
-      dimension: "PaymentMethods.local_reporting_timestamp",
-      dateRange: [`${from}T${hh}:00:00.000`, `${addDaysISO(to, 1)}T${String(REPORTING_DAY_ROLLOVER_HOUR - 1).padStart(2, "0")}:59:59.999`],
-      granularity: "hour",
-    }],
-    limit: 50000,
-  });
+  const lastHour = `${String(REPORTING_DAY_ROLLOVER_HOUR - 1).padStart(2, "0")}:59:59.999`;
+  const payRows: Record<string, unknown>[] = [];
+  for (const [a, b] of chunkDays(from, addDays(to, TENDER_REACH_DAYS), TENDER_CHUNK_DAYS)) {
+    payRows.push(...await runAll({
+      measures: ["PaymentMethods.total_amount", "PaymentMethods.fee_amount"],
+      dimensions: [
+        "PaymentMethods.location_id", "PaymentMethods.order_id", "PaymentMethods.payment_method",
+        "PaymentMethods.payment_external_source", "PaymentMethods.type", "PaymentMethods.status",
+      ],
+      timeDimensions: [{
+        dimension: "PaymentMethods.local_reporting_timestamp",
+        dateRange: [`${a}T${hh}:00:00.000`, `${addDays(b, 1)}T${lastHour}`],
+        granularity: "hour",
+      }],
+    }, "payment"));
+  }
   const skippedStatus = new Map<string, number>();
   for (const row of payRows) {
     const loc = String(pickField(row, "PaymentMethods.location_id") ?? "");
-    const rawHour = pickField(row, "PaymentMethods.local_reporting_timestamp.hour") ??
-      pickField(row, "PaymentMethods.local_reporting_timestamp");
-    if (!loc || typeof rawHour !== "string") continue;
-    // The hour is LOCAL wall time written as if UTC (the cube's own contract),
-    // so subtracting the rollover in UTC gives the reporting date directly.
-    const t = new Date(rawHour.endsWith("Z") ? rawHour : `${rawHour}Z`);
-    if (Number.isNaN(t.getTime())) continue;
-    t.setUTCHours(t.getUTCHours() - REPORTING_DAY_ROLLOVER_HOUR);
-    const date = t.toISOString().slice(0, 10);
+    const ownDay = hourReportingDay(
+      pickField(row, "PaymentMethods.local_reporting_timestamp.hour") ??
+        pickField(row, "PaymentMethods.local_reporting_timestamp"),
+      REPORTING_DAY_ROLLOVER_HOUR
+    );
+    if (!loc || !ownDay) continue;
+    const date = tenderDay({
+      ownDay,
+      type: String(pickField(row, "PaymentMethods.type") ?? ""),
+      orderDay: dayOfOrder.get(orderKey(loc, String(pickField(row, "PaymentMethods.order_id") ?? ""))),
+    });
     if (date < from || date > to) continue;
     const status = String(pickField(row, "PaymentMethods.status") ?? "");
     if (status !== "COMPLETED") {

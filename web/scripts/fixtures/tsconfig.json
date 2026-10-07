@@ -47,6 +47,7 @@
     "../../../supabase/functions/_shared/shopNotices.ts",
     "../../../supabase/functions/_shared/refundSplit.ts",
     "../../../supabase/functions/_shared/taxCodes.ts",
-    "../../../supabase/functions/_shared/threadSubject.ts"
+    "../../../supabase/functions/_shared/threadSubject.ts",
+    "../../../supabase/functions/_shared/tenderDay.ts"
   ]
 }

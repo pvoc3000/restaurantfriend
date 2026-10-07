@@ -6,6 +6,7 @@
 import "./breakPunches.fixtures";
 import "./calcPad.fixtures";
 import "./refundSplit.fixtures";
+import "./tenderDay.fixtures";
 import "./taxCodes.fixtures";
 import "./taxRates.fixtures";
 import "./threadSubject.fixtures";
