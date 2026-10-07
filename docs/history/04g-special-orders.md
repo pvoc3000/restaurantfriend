@@ -5678,3 +5678,8 @@ line cannot go on a QuickBooks invoice yet". Revise was no way out either —
   out), and a real QuickBooks push of an added-quantity invoice.
 - **A draft copied before 176** would read "The order has changed" and
   re-copy on Update; there are none.
+- **APPLIED 2026-10-06** by CLI at Mark's request (`db query --linked`, in a
+  transaction). Confirmed after: both replaced bodies carry the 176 change, the
+  three helpers exist, none of the five is executable by anon or authenticated,
+  and a read-only `order_invoice_lines` for SO-10085 and SO-10086 returns
+  740 × $1.55 = $1,147.00 and 540 × $1.55 = $837.00, "in addition to INV-10000".
