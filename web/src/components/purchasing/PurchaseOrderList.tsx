@@ -243,6 +243,10 @@ export function PurchaseOrderList({
     () => visible.reduce((sum, po) => sum + po.ordered_total, 0),
     [visible]
   );
+  const pageReceivedTotal = useMemo(
+    () => visible.reduce((sum, po) => sum + po.received_total, 0),
+    [visible]
+  );
 
   function toggleOne(id: string) {
     setChecked((prev) => {
@@ -803,10 +807,20 @@ export function PurchaseOrderList({
             the button stops being the thing beside it. */}
         <div className="relative bottom-[5px] ml-auto text-right">
           <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-            Window total
+            Ordered total
           </div>
           <div className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
             {money(pageTotal)}
+          </div>
+        </div>
+        {/* What arrived, over the same visible rows (Mark, 2026-10-07). No
+            `ml-auto` of its own — the ordered total's pushes the pair right. */}
+        <div className="relative bottom-[5px] text-right">
+          <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+            Received total
+          </div>
+          <div className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
+            {money(pageReceivedTotal)}
           </div>
         </div>
 
