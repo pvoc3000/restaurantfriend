@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { TextInput } from "@/components/ui/TextInput";
+import { SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { inventorySearchWords } from "@/lib/catalog";
 
@@ -46,22 +47,45 @@ export type ChosenItem = {
  * compiled into the Node fixture run, so importing the browser client into it
  * would drag `@supabase/ssr` along behind. `inventorySearchWords` — the half
  * that IS pure — lives there.
+ *
+ * ONE FIELD, TWO STATES (Mark, 2026-10-06: "choosing an item in it leaves the
+ * field blank"). It used to keep the search box on screen after a choice, now
+ * empty, with the choice in a second box above it — so the field you had just
+ * filled in read as not filled in. A chosen item now TAKES THE SEARCH BOX'S
+ * PLACE, and Change brings the search back.
+ *
+ * Every button here calls `preventDefault` on its click, and that is not
+ * decoration: two callers wrap this in a `<label>`, and a label forwards a
+ * click inside it to its FIRST labelable descendant. After a choice that
+ * descendant is the Change button, so on an engine that forwards from a button
+ * the same click that chose the item also cleared it. A cancelled click is not
+ * forwarded.
  */
 export function InventoryItemChooser({
   value,
   onPick,
   autoFocus = false,
+  onNotListed,
 }: {
   /** What is currently chosen, or null. The caller owns it. */
   value: ChosenItem | null;
   /** Null when the choice is cleared. */
   onPick: (item: ChosenItem | null) => void;
   autoFocus?: boolean;
+  /**
+   * Offers "Not in the list" under the search, handing back what was typed so
+   * the caller can start its own free-text field from it. Omit it where an
+   * item is the only possible answer.
+   */
+  onNotListed?: (term: string) => void;
 }) {
   const supabase = createClient();
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<ItemRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Change puts you straight back in the search box, whatever the caller's
+  // `autoFocus` said about the first time the dialog opened.
+  const [changing, setChanging] = useState(false);
 
   // Server-side, and only once the term is worth running — 790 items is too
   // many to list.
@@ -99,23 +123,29 @@ export function InventoryItemChooser({
     setResults([]);
   }
 
+  if (value) {
+    return (
+      <div className="flex min-h-9 items-center gap-2 border border-ink bg-white px-3 py-1 text-sm">
+        <span className="min-w-0 flex-1 truncate">{value.name}</span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            setChanging(true);
+            onPick(null);
+          }}
+          className={`shrink-0 ${SMALL_BUTTON_CLASS}`}
+        >
+          Change
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      {value ? (
-        <div className="flex items-center gap-2 border border-ink px-2 py-1 text-sm">
-          <span className="min-w-0 flex-1 truncate">{value.name}</span>
-          <button
-            type="button"
-            onClick={() => onPick(null)}
-            className="shrink-0 border border-ink px-2 py-0.5 text-xs transition-colors hover:bg-ink hover:text-white"
-          >
-            Clear
-          </button>
-        </div>
-      ) : null}
-
       <TextInput
-        autoFocus={autoFocus}
+        autoFocus={autoFocus || changing}
         value={term}
         onValueChange={setTerm}
         clearLabel="Clear the search"
@@ -135,7 +165,6 @@ export function InventoryItemChooser({
       {canSearch && results.length > 0 && (
         <ul className="max-h-64 overflow-auto border border-ink">
           {results.map((it) => {
-            const isCurrent = it.id === value?.id;
             return (
               <li
                 key={it.id}
@@ -154,16 +183,31 @@ export function InventoryItemChooser({
                 </span>
                 <button
                   type="button"
-                  disabled={isCurrent}
-                  onClick={() => choose(it)}
-                  className="shrink-0 border border-ink px-2 py-0.5 text-xs transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    choose(it);
+                  }}
+                  className="shrink-0 border border-ink px-2 py-0.5 text-xs transition-colors hover:bg-ink hover:text-white"
                 >
-                  {isCurrent ? "chosen" : "Choose"}
+                  Choose
                 </button>
               </li>
             );
           })}
         </ul>
+      )}
+
+      {onNotListed && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            onNotListed(term.trim());
+          }}
+          className={`self-start ${SMALL_BUTTON_CLASS}`}
+        >
+          Not in the list
+        </button>
       )}
     </div>
   );

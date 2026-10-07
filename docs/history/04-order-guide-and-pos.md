@@ -973,6 +973,18 @@
    FIFO within a tier because a tiebreak always reads ascending. **No grouping**:
    the only candidate is the resting sort, so bands would be permanent over a
    twelve-row queue.
+   **THE CREATE DIALOG IS ONE ITEM, ITEM FIRST** (Mark, 2026-10-06: "people
+   are just loading up a bunch of items into a single request and bypassing
+   the chooser"). It opened on a two-line "What do we need" textarea with the
+   catalog search last and optional. Now: the search is the first field and
+   focused, and a chosen item's NAME is the `request_text`; something not
+   stocked is behind "Not in the list", a SINGLE-LINE box seeded from the
+   search term; Details is two rows; and **File and add another** keeps the
+   panel up for the next one (the 2026-08-21 "it closes on success" still
+   holds for File request). The chooser also had a real fault — the chosen
+   item showed in a box above an emptied search, and under a `<label>` the
+   click that chose could be forwarded to Clear — see `InventoryItemChooser`.
+   NOT verified in a browser: the test pane had no session.
    **THE GUIDE'S HEADER IS TWO COLUMNS** (Mark, 2026-08-22: "in the header area
    where the reminders live on the order guide, let's try splitting it into two
    columns, one for the reminders, and the other for purchase requests") —

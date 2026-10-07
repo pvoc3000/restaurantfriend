@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { FORM_TEXTAREA } from "@/components/ui/fieldMetrics";
@@ -9,7 +9,8 @@ import {
   DIALOG_CANCEL_CLASS,
   DIALOG_COMMIT_CLASS,
 } from "@/components/ui/Dialog";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS, SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
+import { TextInput } from "@/components/ui/TextInput";
 import { PickList } from "@/components/ui/PickList";
 import {
   InventoryItemChooser,
@@ -42,6 +43,23 @@ import {
  * the list behind you the moment the panel goes, and the status tab's count
  * moves with it — which is also the feedback if you happened to be looking at
  * the Ordered or Dismissed tab, where the new row itself wouldn't show.
+ *
+ * ONE ITEM A REQUEST, AND THE ITEM COMES FIRST (Mark, 2026-10-06). It opened
+ * on a two-line "What do we need" box with the catalog search last and
+ * optional, and people did what that shape asks for: typed the week's whole
+ * list into one request and never touched the search. A request like that
+ * cannot be linked to an item, cannot jump to its shelf on the guide, and
+ * cannot be marked ordered until every line of it is. So the dialog is now
+ * built around the unit instead of saying so in a sentence:
+ * - the SEARCH is the first field and has the focus, and choosing an item IS
+ *   the request — its name is what the queue shows;
+ * - something the catalog doesn't stock is one tap further ("Not in the
+ *   list") and is a SINGLE-LINE box, not a textarea, carrying over whatever
+ *   was typed into the search;
+ * - **File and add another** makes the second request cost one tap, which is
+ *   the real reason lists got typed — a separate request for each thing meant
+ *   reopening the dialog each time. It is the one case where the panel stays
+ *   up, and it says what it just filed because the list is behind it.
  *
  * IT IS NEVER ROLE-GATED. 001's `preq_insert` is membership-only and that is
  * the whole point of the feature: the person who notices the shelf is empty is
@@ -78,14 +96,23 @@ export function NewPurchaseRequest({
   const [details, setDetails] = useState("");
   const [priority, setPriority] = useState<RequestPriority>("normal");
   const [item, setItem] = useState<ChosenItem | null>(null);
+  // The catalog doesn't stock it, so `text` is the request instead of an item.
+  const [notListed, setNotListed] = useState(false);
+  // What "File and add another" just filed, and how many times — the count
+  // re-keys the item field so each round opens with the focus in the search.
+  const [filed, setFiled] = useState<string | null>(null);
+  const [round, setRound] = useState(0);
+  const detailsRef = useRef<HTMLTextAreaElement>(null);
 
-  const ready = text.trim().length > 0;
+  const label = item ? item.name : notListed ? text.trim() : "";
+  const ready = label.length > 0;
 
   function reset() {
     setText("");
     setDetails("");
     setPriority("normal");
     setItem(null);
+    setNotListed(false);
     setFailed(null);
   }
 
@@ -93,12 +120,12 @@ export function NewPurchaseRequest({
     if (pending) return;
     setOpen(false);
     reset();
+    setFiled(null);
   }
 
-  function add() {
+  function add(another: boolean) {
     if (!ready || pending) return;
     setFailed(null);
-    const label = text.trim();
 
     startTransition(async () => {
       /**
@@ -142,8 +169,14 @@ export function NewPurchaseRequest({
       // row when the panel is out of the way — `NewEmployee`'s order, for its
       // reason.
       router.refresh();
-      setOpen(false);
       reset();
+      if (another) {
+        setFiled(label);
+        setRound((n) => n + 1);
+      } else {
+        setOpen(false);
+        setFiled(null);
+      }
     });
   }
 
@@ -162,11 +195,10 @@ export function NewPurchaseRequest({
           title="New purchase request"
           onClose={close}
           busy={pending}
-          // Enter commits, guarded by exactly what the commit button asks. The
-          // request text is a textarea, where `Dialog` leaves Enter alone — so
-          // this only ever fires from the priority row or the item search.
+          // Enter commits, guarded by exactly what the commit button asks — so
+          // in the search box, where nothing is chosen yet, it does nothing.
           onSubmit={() => {
-            if (ready && !pending) add();
+            if (ready && !pending) add(false);
           }}
           width="max-w-xl"
           footer={
@@ -181,7 +213,15 @@ export function NewPurchaseRequest({
               </button>
               <button
                 type="button"
-                onClick={add}
+                onClick={() => add(true)}
+                disabled={!ready || pending}
+                className={DIALOG_CANCEL_CLASS}
+              >
+                File and add another
+              </button>
+              <button
+                type="button"
+                onClick={() => add(false)}
                 disabled={!ready || pending}
                 className={DIALOG_COMMIT_CLASS}
               >
@@ -196,26 +236,57 @@ export function NewPurchaseRequest({
               queue.
             </p>
 
-            <Field label="What do we need" required>
-              <textarea
-                value={text}
-                rows={2}
-                autoFocus
-                disabled={pending}
-                onChange={(e) => setText(e.target.value)}
-                className={FORM_TEXTAREA}
-              />
+            {filed && <p className="text-sm text-ink">Filed: {filed}</p>}
+
+            <Field label="Item" required group key={round}>
+              {notListed ? (
+                <>
+                  {/* ONE LINE, not a textarea: the box is the size of one
+                      item's name, which is the whole instruction. */}
+                  <TextInput
+                    autoFocus
+                    value={text}
+                    onValueChange={setText}
+                    clearLabel="Clear the item"
+                    fullWidth
+                    disabled={pending}
+                    aria-label="Item not in the list"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setNotListed(false)}
+                    disabled={pending}
+                    className={`self-start ${SMALL_BUTTON_CLASS}`}
+                  >
+                    Search the list
+                  </button>
+                </>
+              ) : (
+                <InventoryItemChooser
+                  value={item}
+                  onPick={(next) => {
+                    setItem(next);
+                    // Chosen, so the next thing to say is how much — and the
+                    // button that was pressed has just left the screen, taking
+                    // the focus with it.
+                    if (next) setTimeout(() => detailsRef.current?.focus(), 0);
+                  }}
+                  onNotListed={(term) => {
+                    setNotListed(true);
+                    setText(term);
+                  }}
+                  autoFocus
+                />
+              )}
             </Field>
 
-            {/* Optional, and it has to be: most requests genuinely are one
-                line, and a form that demands a paragraph for "we're out of
-                gloves" is a form people route around. The line above is what
-                the queue shows; this is what the purchaser needs before they
-                can buy the right thing. */}
+            {/* Optional, and it has to be: a form that demands a paragraph for
+                "we're out of gloves" is a form people route around. */}
             <Field label="Details">
               <textarea
+                ref={detailsRef}
                 value={details}
-                rows={4}
+                rows={2}
                 disabled={pending}
                 onChange={(e) => setDetails(e.target.value)}
                 className={FORM_TEXTAREA}
@@ -237,15 +308,6 @@ export function NewPurchaseRequest({
               />
             </Field>
 
-            {/* Optional, and last, because it is the least of it: a request is
-                a sentence first. Plenty are for something the catalog doesn't
-                stock, and the purchaser is usually the one who knows which item
-                it turned out to be — so this can be filled in later from the
-                queue instead. */}
-            <Field label="Which item, if you know">
-              <InventoryItemChooser value={item} onPick={setItem} />
-            </Field>
-
             {failed && <p className="text-sm text-accent">{failed}</p>}
           </div>
         </Dialog>
@@ -257,18 +319,36 @@ export function NewPurchaseRequest({
 function Field({
   label,
   required = false,
+  group = false,
   children,
 }: {
   label: string;
   required?: boolean;
+  /**
+   * The field holds SEVERAL controls (the item search and its buttons), so it
+   * must not be a `<label>`: a label forwards a click to its first control,
+   * whichever one was pressed.
+   */
+  group?: boolean;
   children: ReactNode;
 }) {
+  const caption = (
+    <span className="block text-[11px] uppercase tracking-[0.12em] text-subtle">
+      {label}
+      {required && <span className="text-accent"> *</span>}
+    </span>
+  );
+  if (group) {
+    return (
+      <div className="flex flex-col gap-1">
+        {caption}
+        {children}
+      </div>
+    );
+  }
   return (
     <label className="block space-y-1">
-      <span className="block text-[11px] uppercase tracking-[0.12em] text-subtle">
-        {label}
-        {required && <span className="text-accent"> *</span>}
-      </span>
+      {caption}
       {children}
     </label>
   );
