@@ -58,6 +58,7 @@ import {
 import { AGING_BUCKETS, type StatementDocument, type StatementRow } from "@/lib/customerStatement";
 
 import { customerLabel, lineTotal } from "@/lib/specialOrders";
+import { groupLines, type LineGrouping } from "@/lib/specialOrderLines";
 import { paperColumns, type InvoiceTotalsBreakdown, type PaperRow } from "@/lib/customerInvoices";
 import { dateInTimeZone, serverTimeZone } from "@/lib/today";
 import {
@@ -93,6 +94,16 @@ const s = {
   cPrice: { width: 48, textAlign: "right" },
   cNotes: { flexGrow: 1, flexBasis: 0, paddingLeft: 16, color: MUTED },
   cCost: { width: 60, textAlign: "right" },
+  /* The Items tab's bands (`OrderLines`): the black band is `groupBand`; under
+     an Item type, Size is bold over an ink rule and Cut lighter over a
+     hairline, each indented a step. A band's qty and cost sit under theirs. */
+  bandRow: { flexDirection: "row", alignItems: "flex-end" },
+  bandTop: { backgroundColor: INK, color: "#fff", paddingVertical: 4, marginTop: 10 },
+  bandSize: { borderBottomWidth: 0.75, borderBottomColor: INK, paddingTop: 7, paddingBottom: 2 },
+  bandCut: { borderBottomWidth: 0.75, borderBottomColor: HAIRLINE, paddingTop: 5, paddingBottom: 2, color: MUTED },
+  // cIndex + cItem wide, so the figures land under Qty and Cost.
+  bandLabel: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold", width: 190, paddingRight: 8 },
+  bandFigure: { fontSize: 8, fontFamily: "Helvetica-Bold", textAlign: "right" },
 
   /* ---- notes + totals ---- */
   foot: { flexDirection: "row", gap: 28, marginTop: 18, alignItems: "flex-start" },
@@ -265,10 +276,13 @@ export function OrderDocumentPdf({
   org,
   kind,
   approval,
+  grouping = "none",
 }: {
   orders: OrderDocData[];
   org: DocOrg;
   kind: CustomerDocumentKind;
+  /** The Items tab's Group by, so the paper lists what the screen lists. */
+  grouping?: LineGrouping;
   /** Decision 17's approval, on a quote only. */
   approval?: { name: string; at: string; reference: string } | null;
 }) {
@@ -357,16 +371,41 @@ export function OrderDocumentPdf({
                   <Text style={[s.th, s.cNotes]}>Notes</Text>
                   <Text style={[s.th, s.cCost]}>Cost</Text>
                 </View>
-                {order.lines.map((line, i) => (
-                  <View key={line.id} style={s.row} wrap={false}>
-                    <Text style={s.cIndex}>{i + 1}</Text>
-                    <Text style={[s.cItem, s.itemName]}>{line.name}</Text>
-                    <Text style={s.cQty}>{qtyText(line.qty)}</Text>
-                    <Text style={s.cPrice}>{money(line.unit_price)}</Text>
-                    <Text style={s.cNotes}>{line.notes ?? ""}</Text>
-                    <Text style={s.cCost}>{money(lineTotal(line))}</Text>
-                  </View>
-                ))}
+                {(() => {
+                  // Numbered down the page as printed, across the bands.
+                  let n = 0;
+                  return groupLines(order.lines, grouping).map((g) => (
+                    <View key={g.key}>
+                      {g.label ? (
+                        <View
+                          style={[s.bandRow, g.level === 0 ? s.bandTop : g.level === 1 ? s.bandSize : s.bandCut]}
+                          wrap={false}
+                          minPresenceAhead={30}
+                        >
+                          <Text style={[s.bandLabel, { paddingLeft: 6 + g.level * 10 }]}>{g.label}</Text>
+                          <Text style={[s.bandFigure, s.cQty]}>
+                            {qtyText(g.rows.reduce((a, r) => a + Number(r.qty ?? 0), 0))}
+                          </Text>
+                          <Text style={s.cPrice}> </Text>
+                          <Text style={s.cNotes}> </Text>
+                          <Text style={[s.bandFigure, s.cCost, { paddingRight: g.level === 0 ? 6 : 0 }]}>
+                            {money(g.rows.reduce((a, r) => a + lineTotal(r), 0))}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {(g.leaf ? g.rows : []).map((line) => (
+                        <View key={line.id} style={s.row} wrap={false}>
+                          <Text style={s.cIndex}>{++n}</Text>
+                          <Text style={[s.cItem, s.itemName]}>{line.name}</Text>
+                          <Text style={s.cQty}>{qtyText(line.qty)}</Text>
+                          <Text style={s.cPrice}>{money(line.unit_price)}</Text>
+                          <Text style={s.cNotes}>{line.notes ?? ""}</Text>
+                          <Text style={s.cCost}>{money(lineTotal(line))}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ));
+                })()}
               </View>
 
               <View style={s.foot} wrap={false}>
@@ -1108,8 +1147,10 @@ export function documentElement(
   org: DocOrg,
   approval?: { name: string; at: string; reference: string } | null,
   /** The org's today, for the kitchen sheet's AS OF line. */
-  printedOn?: string
+  printedOn?: string,
+  /** The Items tab's Group by. The kitchen sheet keeps its size classes. */
+  grouping?: LineGrouping
 ) {
   if (kind === "order") return <KitchenOrderPdf orders={orders} org={org} printedOn={printedOn} />;
-  return <OrderDocumentPdf orders={orders} org={org} kind={kind} approval={approval} />;
+  return <OrderDocumentPdf orders={orders} org={org} kind={kind} approval={approval} grouping={grouping} />;
 }

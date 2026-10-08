@@ -1,5 +1,6 @@
 "use client";
 
+import { readLineGrouping } from "@/lib/lineGroupingPref";
 import { useEffect, useRef, useState } from "react";
 import type { DocOrg } from "@/lib/specialOrderDocs";
 import { useExactViewportHeight } from "@/lib/tableHead";
@@ -119,6 +120,7 @@ async function buildElement(
           org={docOrg}
           kind={kind}
           approval={form === "signed-quote" ? s.sampleApproval : null}
+          grouping={readLineGrouping()}
         />
       );
     }

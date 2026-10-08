@@ -29,6 +29,15 @@ function read(): LineGrouping {
   }
 }
 
+/**
+ * The same choice, read once outside React — for a document being rendered
+ * (Mark, 2026-10-07: a quote, invoice or receipt lists its items the way the
+ * Items tab does). "none" wherever there is no browser preference to read.
+ */
+export function readLineGrouping(): LineGrouping {
+  return typeof window === "undefined" ? "none" : read();
+}
+
 export function useLineGrouping(): [LineGrouping, (next: LineGrouping) => void] {
   const value = useSyncExternalStore(subscribe, read, () => "none" as LineGrouping);
   const set = (next: LineGrouping) => {

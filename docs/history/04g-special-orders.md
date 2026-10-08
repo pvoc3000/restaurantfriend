@@ -5683,3 +5683,32 @@ line cannot go on a QuickBooks invoice yet". Revise was no way out either —
   three helpers exist, none of the five is executable by anon or authenticated,
   and a read-only `order_invoice_lines` for SO-10085 and SO-10086 returns
   740 × $1.55 = $1,147.00 and 540 × $1.55 = $837.00, "in addition to INV-10000".
+
+### 2026-10-07 — the quote, invoice and receipt list items the way the Items tab does (a trial)
+
+Mark: "display special order items in a quote, invoice, receipt, etc. in the
+same order and with the same grouping as in the items tab … Can we try that?"
+
+- **What changed:** `OrderDocumentPdf` takes a `grouping` and runs its lines
+  through `groupLines` — the Items tab's own function, so the bands, their
+  order, the Size and Cut levels under Item type and the skipped empty
+  sub-level are the screen's. Each band carries its qty and cost under those
+  columns. The row numbers count down the page as printed. `none` is the
+  document order (`sort`), as before, and draws exactly what it drew.
+- **Where the grouping comes from:** `readLineGrouping()` — the Group by of
+  the browser that renders the PDF, read at render time
+  (`renderOrderDocument`, so Send and the QuickBooks attachment; and `/forms`).
+- **NOT DONE, and each needs a decision first:**
+  - The Group by is a per-BROWSER preference, not a fact about the order. Two
+    people sending the same quote can send two layouts, and a customer's own
+    browser has no preference at all — so `/q`'s line list and the signed
+    quote rendered there stay ungrouped. Following the Items tab everywhere
+    means storing the grouping on the order (a migration).
+  - The customer invoice (`CustomerInvoicePdf`, `/pay`) prints its own frozen
+    `customer_invoice_lines`, which carry a description and no type, size or
+    cut. Grouping a one-order invoice's items means copying the taxonomy onto
+    the invoice line (a migration, and the copy functions).
+  - The kitchen sheet keeps its size classes.
+- **Verified** by a Node render of the quote over the /forms sample plus three
+  added lines, at None, Item type and Price; `tsc`, eslint and the 2,255
+  fixtures pass. **Not verified:** a real Send from the browser.
