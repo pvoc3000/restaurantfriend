@@ -1982,3 +1982,18 @@ transaction spans it. A logged batch says outright that deactivating is the
 only choice. NOT built: a bulk "replace this element with another" for the
 ingredient and item blockers — links only, until the case comes up for real.
 Not exercised in a browser; the test pane was signed out.
+
+## 2026-10-08 — "pan" is a unit, and the batch history's spellings are folded into it
+
+Mark: "I want to add the option 'pan' to the picklist for on hand and made on
+the batch log page." Those fields read the app-wide `UNIT_PICK_OPTIONS`, so
+`pan` joined `lib/units` in the package family (no conversion) and shows
+wherever a unit is picked. A typed value was never added to the list — it is
+stored on its own row only — which is why Crystal's "Pan" was offered to
+nobody else. **Data, run by hand in one transaction at Mark's direction:**
+`Pan`, `PAN`, `Pans` and `pans` became `pan` in `production_batches`
+(`par_unit`, `on_hand_unit`, `yield_unit` — 3,089 values on 1,806 batches) and
+in `production_element_locations.stock_unit` (21 rows, which seed a generated
+batch's par unit). LEFT ALONE: `QT Pan` 281, `Pan?` 32, `x Pan` 6, `pan?` 1.
+Backups: `FMP Export/pre-pan-fold-batches-2026-10-08.json` and
+`pre-pan-fold-element-locations-2026-10-08.json`.

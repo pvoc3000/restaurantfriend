@@ -20,7 +20,7 @@ within one or two.
 
 | Option set | Options | Uses | Where | Type new |
 | --- | --- | --- | --- | --- |
-| Unit (`UNIT_PICK_OPTIONS`, `lib/units`) | Measurement units grouped Count · Weight · Volume · Packages | 11 | Inventory item base unit (record, New Item) · vendor item pack unit (record, New Vendor Item) · batch amounts · element stock unit · item component unit · recipe line unit (2) · Add Ingredient · shift report "made" unit (adds "batch") | Yes, except the item's base unit and the vendor item record |
+| Unit (`UNIT_PICK_OPTIONS`, `lib/units`) | Measurement units grouped Count · Weight · Volume · Packages (case, bag, tub, box, sleeve, tray, flat, roll, pan) | 11 | Inventory item base unit (record, New Item) · vendor item pack unit (record, New Vendor Item) · batch amounts · element stock unit · item component unit · recipe line unit (2) · Add Ingredient · shift report "made" unit (adds "batch") | Yes, except the item's base unit and the vendor item record |
 | Sold as (`PACKAGE_DESC_OPTIONS`) | CS · EA · BAG · TUB · BOX · GAL · QT · SLEEVE · TRAY · FLAT · ROLL | 4 | Vendor item record · vendor items table · New Vendor Item · Add PO Lines (one-off) | No |
 | How orders are placed | Email PO · Online · In person · None — directory only | 2 | Vendor record · New Vendor | No |
 | PO status | Draft · Sent · Received · Closed · Void | 1 | Purchase order record | No |

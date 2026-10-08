@@ -53,6 +53,11 @@ const UNITS: Record<string, { family: UnitFamily; factor: number; label: string 
   tray: { family: "package", factor: 1, label: "tray" },
   flat: { family: "package", factor: 1, label: "flat" },
   roll: { family: "package", factor: 1, label: "roll" },
+  // What the kitchen counts made elements in (Mark, 2026-10-08: "I want to add
+  // the option 'pan' to the picklist for on hand and made on the batch log").
+  // The batch history already said so in eight spellings — pans 1,764, Pans
+  // 1,167, PAN 97, Pan 61 — which were folded into this one the same day.
+  pan: { family: "package", factor: 1, label: "pan" },
 };
 
 export function normalizeUnit(unit: string): string {
@@ -85,6 +90,7 @@ export const UNIT_OPTIONS: { value: string; label: string; family: UnitFamily }[
   "tray",
   "flat",
   "roll",
+  "pan",
 ].map((value) => ({ value, label: UNITS[value].label, family: UNITS[value].family }));
 
 /**
