@@ -47,6 +47,7 @@ function line(
     item_cut: null,
     item_finish: null,
     item_size: null,
+    hide_from_customer: false,
     ...taxonomy,
     notes,
     qty,

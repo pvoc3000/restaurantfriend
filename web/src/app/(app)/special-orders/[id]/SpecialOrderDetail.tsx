@@ -173,7 +173,7 @@ export async function SpecialOrderDetail({
       ? supabase
           .from("special_order_items")
           .select(
-            "id, sort, production_item_id, name, item_donut, item_type, item_cut, item_finish, item_size, notes, qty, unit_price, taxable"
+            "id, sort, production_item_id, name, item_donut, item_type, item_cut, item_finish, item_size, notes, qty, unit_price, taxable, hide_from_customer"
           )
           .eq("order_id", id)
           .order("sort", { ascending: true, nullsFirst: false })

@@ -8,6 +8,7 @@
  * from any screen.
  */
 
+import { customerLines } from "./specialOrderDocs";
 import type { LineGrouping } from "./specialOrderLines";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -185,7 +186,8 @@ export function quoteSnapshot(
     location_name: order.location_name,
     customer_name: customerLabel(order.customer),
     contact_name: order.contact_name,
-    lines: order.lines.map((l) => ({
+    // 179: a hidden line never reaches the link at all.
+    lines: customerLines(order.lines).map((l) => ({
       name: l.name,
       notes: l.notes,
       qty: l.qty,

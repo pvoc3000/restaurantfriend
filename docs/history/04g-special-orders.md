@@ -5774,3 +5774,39 @@ Mark: "make copies and standing orders inherit the grouping."
   transaction). Confirmed after: the live body names `line_grouping` twice
   (none before), and its grants are unchanged (authenticated yes, anon no).
   The function itself has not been run since — the next top-up is its test.
+
+### 2026-10-07 — Hide From Customer, a checkbox on an order line (migration 179)
+
+Mark: 'add a check box column to the special order items "Hide From Customer"
+that, when selected, hides that row on quotes, invoices, and receipts, but NOT
+kitchen orders. put the column after tax column.'
+
+- **179** adds `special_order_items.hide_from_customer` (false by default) and
+  adds it to the standing-order materializer's item insert (178's body, two
+  lines changed, diffed). `copy_special_order` copies whole rows and needed
+  nothing.
+- **The Items tab** has the column after Tax (`OrderLines`): `ui/Checkbox`,
+  written like Tax. Duplicate carries it. The spans that cross it (band, line
+  2's tail, the empty row, the footer's count) are each one wider, and the
+  table's minimum width went 54rem → 60rem.
+- **IT HIDES THE ROW, NOT THE MONEY.** Nothing that computes money reads the
+  column, so a hidden line with a price leaves rows that do not add up to the
+  subtotal. Deliberate and unguarded; the use is a no-charge line the kitchen
+  needs and the customer does not.
+- **Where the row is left off:** `customerLines` (lib/specialOrderDocs) feeds
+  `OrderDocumentPdf` — quote, invoice, receipt, and its Items count — and
+  `quoteSnapshot`, so a hidden line never reaches the `/q` link or the signed
+  quote. The kitchen order and the production packet read `order.lines`
+  directly and print it.
+- **The customer invoice** keeps the line in `customer_invoice_lines` (the SQL
+  copy is unchanged). `fetchInvoiceView` reads the flag LIVE through
+  `special_order_item_id` and marks the line `hidden`; `invoicePaper` leaves
+  it out of a one-order invoice's itemized rows, which is what the PDF, the
+  email's text and the pay page's snapshot are built from. So the one
+  departure from "frozen": un-hiding an item later changes a re-rendered
+  invoice's rows (never its amounts). The in-app invoice record shows every
+  line.
+- **Verified:** a Node render with one line hidden — absent from the quote
+  (Items 8 of 9), present on the kitchen order; fixtures for `customerLines`
+  and `invoicePaper`; `tsc`, eslint, 2,256 fixtures. **Not verified:** the
+  column in a browser, and a real invoice — both need 179 applied.

@@ -103,7 +103,7 @@ export type InvoiceView = {
 };
 
 const LINE_COLUMNS =
-  "id, special_order_id, line_type, description, qty, unit_price, amount, taxable, tax_rate, order_label, sort, square_item, kind";
+  "id, special_order_id, line_type, description, qty, unit_price, amount, taxable, tax_rate, order_label, sort, square_item, kind, special_order_item_id";
 
 export async function fetchInvoiceView(
   supabase: SupabaseClient,
@@ -155,13 +155,18 @@ export async function fetchInvoiceView(
         .in("id", orderIds),
       supabase
         .from("special_order_items")
-        .select("order_id, qty, unit_price, taxable, sort, id")
+        .select("order_id, qty, unit_price, taxable, sort, id, hide_from_customer")
         .in("order_id", orderIds)
         .order("sort", { ascending: true, nullsFirst: false })
         .order("id"),
       supabase.from("order_payments").select("order_id, amount").in("order_id", orderIds),
     ]);
     const itemsOf = new Map<string, { qty: number | null; unit_price: number | null; taxable: boolean }[]>();
+    // 179: mark the lines whose order item is hidden from the customer.
+    const hiddenItems = new Set((it ?? []).filter((l) => l.hide_from_customer).map((l) => l.id as string));
+    for (const l of lines) {
+      if (l.special_order_item_id && hiddenItems.has(l.special_order_item_id)) l.hidden = true;
+    }
     for (const l of it ?? []) {
       itemsOf.set(l.order_id as string, [
         ...(itemsOf.get(l.order_id as string) ?? []),

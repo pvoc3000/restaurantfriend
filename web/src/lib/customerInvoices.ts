@@ -139,6 +139,11 @@ export type CustomerInvoiceLine = {
   square_item: SquareItem;
   /** 139 — why an order's line is here; see `InvoiceLineKind`. */
   kind?: InvoiceLineKind;
+  /** The order item this line was copied from (143). */
+  special_order_item_id?: string | null;
+  /** 179 — that item is hidden from the customer, read LIVE when the invoice
+   *  is loaded. Its row is left off the paper; its amount stays in the sums. */
+  hidden?: boolean;
 };
 
 export type InvoiceStatus = "draft" | "sent" | "overdue" | "paid" | "void";
@@ -425,7 +430,7 @@ export type PaperRow = {
  * stay in the Totals window alone.
  */
 export function invoicePaper<
-  L extends Pick<CustomerInvoiceLine, "special_order_id" | "line_type" | "amount" | "sort" | "order_label" | "description" | "qty" | "unit_price" | "taxable">
+  L extends Pick<CustomerInvoiceLine, "special_order_id" | "line_type" | "amount" | "sort" | "order_label" | "description" | "qty" | "unit_price" | "taxable" | "hidden">
 >(groups: InvoiceGroup<L>[]): { columns: boolean; rows: PaperRow[] } {
   const orderCount = groups.filter((g) => g.orderId).length;
   const freeDelivery = groups.some((g) => !g.orderId && g.lines.some((l) => l.line_type === "delivery"));
@@ -448,7 +453,9 @@ export function invoicePaper<
     }
     const t = groupTotals(g.lines);
     const parts: PaperParts = { subtotal: t.subtotal, discount: -t.discount, delivery: t.deliveryCharge, rush: t.rushFee, tax: t.tax };
-    const items = g.lines.filter((l) => l.line_type === "item");
+    // 179: an item hidden from the customer is not listed. The order's row
+    // still charges for it — `t` above is over every line.
+    const items = g.lines.filter((l) => l.line_type === "item" && !l.hidden);
     return [
       {
         description: g.kind === "deposit" ? `${g.lines[0]?.description ?? "Deposit"} · ${g.label}` : g.label,

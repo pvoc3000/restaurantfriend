@@ -78,6 +78,7 @@ function asDocData(quote: QuoteSnapshot): OrderDocData {
       qty: l.qty,
       unit_price: l.unit_price,
       taxable: l.taxable,
+      hide_from_customer: false,
     })),
     payments: [],
     money: {

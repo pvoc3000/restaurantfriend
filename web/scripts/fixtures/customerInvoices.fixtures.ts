@@ -352,6 +352,10 @@ test("invoicePaper: one order is itemized, unless an other charge is Delivery", 
   no(itemized.columns);
   eq(itemized.rows[0].detail?.rows, [{ label: "370 × Knotted Bismark - 42g @ $1.55", amount: 573.5 }]);
   eq(itemized.rows[1].amount, 5, "an Item charge adds to the Subtotal the items do");
+  // 179: an item hidden from the customer is not listed; the order's row still charges for it.
+  const hid = invoicePaper(groupInvoiceLines(one.map((l) => (l.line_type === "item" ? { ...l, hidden: true } : l)), orders));
+  eq(hid.rows[0].detail, undefined, "its only item is hidden, so nothing is itemized");
+  eq(hid.rows[0].amount, itemized.rows[0].amount, "and the row charges what it charged");
   const withFee = invoicePaper(groupInvoiceLines([...one, line({ line_type: "delivery", description: "Delivery Fee", amount: 40, sort: 0 })], orders));
   ok(withFee.columns, "a Delivery charge has no place in the itemized Amount column");
   eq(withFee.rows[0].detail, undefined);

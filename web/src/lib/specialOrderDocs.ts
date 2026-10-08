@@ -206,7 +206,15 @@ export type DocumentLine = {
   qty: number;
   unit_price: number;
   taxable: boolean;
+  /** 179 — left off the quote, invoice and receipt (`customerLines`); the
+   *  kitchen order prints it, and its money stays in the totals. */
+  hide_from_customer: boolean;
 };
+
+/** The lines a CUSTOMER'S document lists. */
+export function customerLines<T extends { hide_from_customer?: boolean | null }>(lines: T[]): T[] {
+  return lines.filter((l) => !l.hide_from_customer);
+}
 
 /**
  * The kitchen document's second line — donut · type · cut · finish · size, in
@@ -478,7 +486,7 @@ export async function fetchOrderDocData(
         .from("special_order_items")
         .select(
           `id, order_id, sort, name, item_donut, item_type, item_cut, item_finish,
-           item_size, notes, qty, unit_price, taxable`
+           item_size, notes, qty, unit_price, taxable, hide_from_customer`
         )
         .in("order_id", orderIds)
         .order("sort", { ascending: true, nullsFirst: false }),
@@ -525,6 +533,7 @@ export async function fetchOrderDocData(
         qty: Number(l.qty),
         unit_price: Number(l.unit_price),
         taxable: Boolean(l.taxable),
+        hide_from_customer: Boolean(l.hide_from_customer),
       }));
     const payments = ((payRows ?? []) as unknown as {
       order_id: string;

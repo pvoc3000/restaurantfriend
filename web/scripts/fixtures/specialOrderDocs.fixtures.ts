@@ -19,6 +19,7 @@
 import { test, eq, ok, no } from "./harness";
 import {
   buildDocumentEmail,
+  customerLines,
   cutoffClause,
   fillFulfillmentNote,
   fulfillmentNote,
@@ -64,6 +65,7 @@ function line(over: Partial<DocumentLine> = {}): DocumentLine {
     id: over.id ?? "1",
     sort: over.sort ?? 1,
     name: over.name ?? "Give Up the Toast - Letter",
+    hide_from_customer: over.hide_from_customer ?? false,
     item_donut: over.item_donut ?? "Give Up the Toast",
     item_type: over.item_type === undefined ? "Raised" : over.item_type,
     item_cut: over.item_cut === undefined ? 'Letter - "W"' : over.item_cut,
@@ -920,4 +922,11 @@ test("documentTimeLabel: a delivery prints its window, never 'After'", () => {
 });test("documentTimeLabel: a pickup is still 'After' its ready time", () => {
   eq(documentTimeLabel(order({ fulfillment: "pickup", event_time: "07:00:00" })), "After 7:00 AM");
   eq(documentTimeLabel(order({ fulfillment: "pickup", event_time: null })), null);
+});
+
+
+test("customerLines: a hidden line leaves the customer's list, and the kitchen keeps it", () => {
+  const lines = [line({ id: "a" }), line({ id: "b", hide_from_customer: true }), line({ id: "c" })];
+  eq(customerLines(lines).map((l) => l.id), ["a", "c"]);
+  eq(sizeClassGroups(lines).flatMap((g) => g.lines).length, 3, "the kitchen order still prints it");
 });

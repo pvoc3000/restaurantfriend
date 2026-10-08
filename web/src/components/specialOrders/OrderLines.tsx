@@ -48,6 +48,8 @@ export type OrderLineRow = {
   qty: number | null;
   unit_price: number | null;
   taxable: boolean;
+  /** 179 — off the quote, invoice and receipt; still on the kitchen order. */
+  hide_from_customer: boolean;
 };
 
 /**
@@ -82,6 +84,8 @@ const LINE_WIDTHS: Record<string, number> = {
   qty: 88,
   price: 104,
   tax: 64,
+  // "Hide From Customer" wraps to two lines at this width (a label wraps).
+  hide: 92,
   total: 112,
   // The ⋯ menu. 44 rather than the ×'s 36: `RowMenu`'s trigger is a 36px square
   // and the cell has to hold it without clipping the hover wash.
@@ -245,6 +249,7 @@ export function OrderLines({
     "qty",
     "price",
     "tax",
+    "hide",
     "total",
     ...(canWrite ? ["actions"] : []),
   ];
@@ -365,6 +370,7 @@ export function OrderLines({
           qty: row.qty,
           unit_price: row.unit_price,
           taxable: row.taxable,
+          hide_from_customer: row.hide_from_customer,
         })
         .select("id");
       if (e) {
@@ -400,6 +406,22 @@ export function OrderLines({
       const { data, error: e } = await supabase
         .from("special_order_items")
         .update({ taxable: next })
+        .eq("id", row.id)
+        .select("id");
+      if (e) setError(e.message);
+      else if (!data?.length) setError("The change wasn't saved — the database refused it silently.");
+      else router.refresh();
+    });
+  }
+
+  /** 179. The row leaves the quote, invoice and receipt; its money does not
+   *  leave the totals, and the kitchen order still prints it. */
+  async function setHidden(row: OrderLineRow, next: boolean) {
+    setError(null);
+    start(async () => {
+      const { data, error: e } = await supabase
+        .from("special_order_items")
+        .update({ hide_from_customer: next })
         .eq("id", row.id)
         .select("id");
       if (e) setError(e.message);
@@ -493,7 +515,7 @@ export function OrderLines({
         {/* `table-fixed`, which is what makes a `<col>` width mean anything at
             all — in auto layout the browser sizes columns from their content
             and a dragged width is a suggestion it ignores. */}
-        <table ref={bodyRef} className="w-full min-w-[54rem] table-fixed border-collapse text-[14px]">
+        <table ref={bodyRef} className="w-full min-w-[60rem] table-fixed border-collapse text-[14px]">
           <colgroup>
             {columnKeys.map((key) => (
               <col key={key} style={{ width: colWidth(key) }} />
@@ -515,6 +537,7 @@ export function OrderLines({
                   ["qty", "Qty", "right"],
                   ["price", "Price", "right"],
                   ["tax", "Tax", "left"],
+                  ["hide", "Hide From Customer", "left"],
                   ["total", "Total", "right"],
                 ] as const
               ).map(([key, label, align]) => (
@@ -604,7 +627,7 @@ export function OrderLines({
                         <td className={`${cell} ${weight} text-right text-xs tabular-nums`}>
                           {g.rows.reduce((a, r) => a + Number(r.qty ?? 0), 0)}
                         </td>
-                        <td colSpan={2} className={cell} />
+                        <td colSpan={3} className={cell} />
                         <td className={`${cell} ${weight} text-right text-xs tabular-nums`}>
                           {money(g.rows.reduce((a, r) => a + lineTotal(r), 0))}
                         </td>
@@ -619,7 +642,7 @@ export function OrderLines({
               const production = isProductionLine(row);
               // Line 2's trailing filler: everything after Item and Note, plus
               // the ⋯ column when it is there.
-              const tailSpan = canWrite ? 5 : 4;
+              const tailSpan = canWrite ? 6 : 5;
               return (
                 <tbody
                   key={row.id}
@@ -719,6 +742,15 @@ export function OrderLines({
                       disabled={!canWrite || pending}
                       onChange={(next) => setTaxable(row, next)}
                       label={`${row.name} is taxable`}
+                    />
+                  </td>
+
+                  <td className="px-3 py-2 text-center">
+                    <Checkbox
+                      checked={row.hide_from_customer}
+                      disabled={!canWrite || pending}
+                      onChange={(next) => setHidden(row, next)}
+                      label={`Hide ${row.name} from the customer`}
                     />
                   </td>
 
@@ -842,7 +874,7 @@ export function OrderLines({
           <tbody>
             {ordered.length === 0 ? (
               <tr>
-                <td colSpan={canWrite ? 8 : 6} className="px-3 py-6 text-sm text-muted">
+                <td colSpan={canWrite ? 9 : 7} className="px-3 py-6 text-sm text-muted">
                   Nothing on this order yet.
                 </td>
               </tr>
@@ -877,7 +909,7 @@ export function OrderLines({
         <div>
           <StickyFooter>
             <div className="overflow-hidden border-t-2 border-ink lg:ml-48">
-              <table className="w-full min-w-[54rem] table-fixed border-collapse text-[14px]">
+              <table className="w-full min-w-[60rem] table-fixed border-collapse text-[14px]">
                 <colgroup>
                   {columnKeys.map((key) => (
                     <col key={key} style={{ width: colWidth(key) }} />
@@ -907,9 +939,9 @@ export function OrderLines({
                         />
                       ) : null}
                     </td>
-                    {/* Spans Qty, Price and Tax: the Tax column alone clips this. */}
+                    {/* Spans Qty, Price, Tax and Hide: the Tax column alone clips this. */}
                     <td
-                      colSpan={3}
+                      colSpan={4}
                       className="px-3 py-2 text-right align-top font-semibold whitespace-nowrap tabular-nums"
                     >
                       {pieces} {pieces === 1 ? "Item" : "Items"} / {dozens} Dozen

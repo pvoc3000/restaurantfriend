@@ -46,6 +46,7 @@
 import { Document, Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
   DOCUMENT_LABEL,
+  customerLines,
   documentTimeLabel,
   sizeClassGroups,
   taxonomyLine,
@@ -299,6 +300,8 @@ export function OrderDocumentPdf({
         const stamp = approval ? approvalStamp(approval.at, org.timeZone) : null;
         // The Items tab's Group by, so the paper lists what the screen lists.
         const grouping = order.line_grouping;
+        // 179: a line hidden from the customer is not listed, or counted.
+        const shownLines = customerLines(order.lines);
         return (
           <Page key={order.id} size="LETTER" style={s.page}>
             <View style={s.masthead} fixed>
@@ -362,7 +365,7 @@ export function OrderDocumentPdf({
 
               <View style={s.items}>
                 <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
-                  Items <Text style={s.sectionCount}>{order.lines.length}</Text>
+                  Items <Text style={s.sectionCount}>{shownLines.length}</Text>
                 </Text>
                 <View style={s.tableHead}>
                   <Text style={[s.th, s.cIndex]}> </Text>
@@ -375,7 +378,7 @@ export function OrderDocumentPdf({
                 {(() => {
                   // Numbered down the page as printed, across the bands.
                   let n = 0;
-                  return groupLines(order.lines, grouping).map((g, gi) => (
+                  return groupLines(shownLines, grouping).map((g, gi) => (
                     <View key={g.key}>
                       {/* THE ITEM TYPE BAND IS NOT PRINTED (Mark, 2026-10-07:
                           "Still sort by it but just hide the header") — the
