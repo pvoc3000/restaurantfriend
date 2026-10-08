@@ -41,6 +41,7 @@ import type { SheetVersion } from "./RecipeVersionSheet";
  */
 export function RecipeInfo({
   recipeId,
+  makes,
   version,
   versions,
   locationCode,
@@ -48,6 +49,9 @@ export function RecipeInfo({
   params,
 }: {
   recipeId: string;
+  /** The element this recipe makes — the family's own field, not the
+   *  version's, so the page hands it in ready-made. */
+  makes: React.ReactNode;
   version: SheetVersion;
   versions: SheetVersion[];
   locationCode: string | null;
@@ -178,6 +182,7 @@ export function RecipeInfo({
         <SectionHeading>Version {version.version_label}</SectionHeading>
         <div className="grid gap-x-10 gap-y-3 lg:grid-cols-2">
         <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] items-center gap-x-6 gap-y-2 text-[14px]">
+          <Fact label="Makes">{makes}</Fact>
           <Fact label="Description">
             <Editable id={version.id} column="description" value={version.description} editable={editable} />
           </Fact>

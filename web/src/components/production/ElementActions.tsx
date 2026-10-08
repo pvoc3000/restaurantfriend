@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { RowMenu } from "@/components/ui/RowMenu";
-import { ActionMenu } from "@/components/ui/ActionMenu";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
+import { LinkRecipe, type LinkableRecipe } from "./LinkRecipe";
 import { duplicateTitle } from "@/lib/productionPlans";
 import {
   Dialog,
@@ -48,6 +49,7 @@ export function ElementActions({
   isActive,
   variant,
   afterDelete = "refresh",
+  linkRecipes,
 }: {
   elementId: string;
   /** What to call it in the dialog and the menu's aria label. */
@@ -64,6 +66,11 @@ export function ElementActions({
    *  to navigate. An href rather than a callback, because half the callers are
    *  server components and a function cannot cross that boundary. */
   afterDelete?: "refresh" | { href: string };
+  /**
+   * `menu` only: every recipe family, which puts Link Recipe… in the menu.
+   * Passed for a MADE element — only a made element is costed from a recipe.
+   */
+  linkRecipes?: LinkableRecipe[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -219,6 +226,24 @@ export function ElementActions({
     else router.push(afterDelete.href);
   }
 
+  const actionMenu = (linkRow: ActionMenuItem | null) => (
+    <ActionMenu
+      label={busy === "duplicate" ? "Duplicating…" : "Actions"}
+      ariaLabel={`Actions for ${name}`}
+      disabled={busy !== null}
+      items={[
+        { label: "Duplicate Element", onSelect: () => void duplicate() },
+        ...(linkRow ? [linkRow] : []),
+        {
+          label: "Delete Element…",
+          danger: true,
+          separatorBefore: true,
+          onSelect: () => void openConfirm(),
+        },
+      ]}
+    />
+  );
+
   const blockers = usage ? deleteBlockers(usage) : [];
   const deletable = usage !== null && canDeleteElement(usage);
 
@@ -241,20 +266,13 @@ export function ElementActions({
         <span className="flex items-center gap-3">
           {/* A failed duplicate has no dialog to report in, so it is said here. */}
           {error && !confirming ? <span className="text-sm text-accent">{error}</span> : null}
-          <ActionMenu
-            label={busy === "duplicate" ? "Duplicating…" : "Actions"}
-            ariaLabel={`Actions for ${name}`}
-            disabled={busy !== null}
-            items={[
-              { label: "Duplicate Element", onSelect: () => void duplicate() },
-              {
-                label: "Delete Element…",
-                danger: true,
-                separatorBefore: true,
-                onSelect: () => void openConfirm(),
-              },
-            ]}
-          />
+          {linkRecipes ? (
+            <LinkRecipe elementId={elementId} elementName={name} recipes={linkRecipes}>
+              {(linkRow) => actionMenu(linkRow)}
+            </LinkRecipe>
+          ) : (
+            actionMenu(null)
+          )}
         </span>
       )}
 

@@ -153,7 +153,7 @@ export function NewElement({ orgId, types }: { orgId: string; types: string[] })
 
             <p className="text-[13px] text-muted">
               {kind === "made"
-                ? "A made element costs what its recipe costs. Add the recipe on the element’s own screen."
+                ? "A made element costs what its recipe costs. Link its recipe on the element’s own screen."
                 : kind === "purchased"
                   ? "A purchased element costs what its inventory item costs today. Link it on the element’s own screen."
                   : "A manual element carries a set cost per unit. Set it on the element’s own screen."}

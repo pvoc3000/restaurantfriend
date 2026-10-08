@@ -16,6 +16,7 @@ import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { RecipeVersions } from "@/components/production/RecipeVersions";
 import { RecipeCommandMenu } from "@/components/production/RecipeCommandMenu";
 import { RecipeMakes } from "@/components/production/RecipeMakes";
+import { READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { RecipeVersionSheet } from "@/components/production/RecipeVersionSheet";
 import { RecipeInfo } from "@/components/production/RecipeInfo";
 import { SectionNav } from "@/components/ui/SectionNav";
@@ -332,27 +333,9 @@ export async function RecipeDetail({
               <span className="text-[12px] uppercase tracking-[0.12em] text-muted">Inactive</span>
             ) : null}
           </div>
-          {/* A div, not a p: the editable Makes is a picklist, whose trigger
-              and sizer are not phrasing content. */}
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-muted">
-            <span>Makes</span>
-            {element && editable ? (
-              <RecipeMakes
-                recipeId={id}
-                elementId={element.id as string}
-                elementHref={elementHref}
-                elements={elementOptions}
-                recipes={recipeLinks}
-              />
-            ) : element ? (
-              <Link href={elementHref} className="font-medium text-ink hover:underline">
-                {element.name as string}
-              </Link>
-            ) : (
-              "—"
-            )}
-            {recipe.recipe_type ? <span>· {recipe.recipe_type as string}</span> : null}
-          </div>
+          {recipe.recipe_type ? (
+            <p className="text-[13px] text-muted">{recipe.recipe_type as string}</p>
+          ) : null}
         </div>
         <div className="ml-auto">
           <RecipeCommandMenu
@@ -437,6 +420,23 @@ export async function RecipeDetail({
             {tab === "info" ? (
               <RecipeInfo
                 recipeId={id}
+                makes={
+                  element && editable ? (
+                    <RecipeMakes
+                      recipeId={id}
+                      elementId={element.id as string}
+                      elementHref={elementHref}
+                      elements={elementOptions}
+                      recipes={recipeLinks}
+                    />
+                  ) : element ? (
+                    <Link href={elementHref} className={`${READ_ONLY_VALUE} hover:underline`}>
+                      {element.name as string}
+                    </Link>
+                  ) : (
+                    <span className={READ_ONLY_VALUE}>—</span>
+                  )
+                }
                 version={current}
                 versions={versions}
                 locationCode={session.activeLocation?.code ?? null}

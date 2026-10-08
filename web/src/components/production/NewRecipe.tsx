@@ -28,23 +28,16 @@ import type { ActionMenuItem } from "@/components/ui/ActionMenu";
  * It asks for the family's own fields and stops. Ingredients, steps, the scale
  * strip and the yield are the recipe sheet's, which is a screen in its own
  * right.
- *
- * FROM AN ELEMENT'S RECORD the element is already known, so `fixedElement`
- * states it instead of asking — the Makes field reads as text and the picker's
- * vocabulary is not needed.
  */
 export function NewRecipe({
   orgId,
-  elements = [],
-  fixedElement,
+  elements,
   types,
   children,
 }: {
   orgId: string;
   /** Every element, retired ones sunk under their own heading. */
-  elements?: PickOption[];
-  /** The element this recipe makes, when the caller is that element's record. */
-  fixedElement?: { id: string; name: string };
+  elements: PickOption[];
   /** The `recipe_type` vocabulary already in use — FMP's Glaze/Cake/Mix. */
   types: string[];
   /** Hand the command out as an Actions menu row; the dialog stays here. */
@@ -58,7 +51,7 @@ export function NewRecipe({
   const [failed, setFailed] = useState<string | null>(null);
 
   const [name, setName] = useState("");
-  const [elementId, setElementId] = useState(fixedElement?.id ?? "");
+  const [elementId, setElementId] = useState("");
   const [recipeType, setRecipeType] = useState("");
 
   // BOTH are required, and the element is the half that is not obvious:
@@ -70,7 +63,7 @@ export function NewRecipe({
     if (pending) return;
     setOpen(false);
     setName("");
-    setElementId(fixedElement?.id ?? "");
+    setElementId("");
     setRecipeType("");
     setFailed(null);
   }
@@ -173,18 +166,14 @@ export function NewRecipe({
             </Field>
 
             <Field label="Makes">
-              {fixedElement ? (
-                <span className="block text-[14px] leading-9">{fixedElement.name}</span>
-              ) : (
-                <PickList
-                  variant="field"
-                  value={elementId}
-                  onPick={setElementId}
-                  options={elements}
-                  ariaLabel="Which element this recipe makes"
-                  placeholder="Choose an element"
-                />
-              )}
+              <PickList
+                variant="field"
+                value={elementId}
+                onPick={setElementId}
+                options={elements}
+                ariaLabel="Which element this recipe makes"
+                placeholder="Choose an element"
+              />
             </Field>
 
             <Field label="Type">

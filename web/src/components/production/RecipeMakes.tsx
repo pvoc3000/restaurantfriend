@@ -7,12 +7,16 @@ import { createClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/lib/confirm";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { OpenRecordLink } from "@/components/ui/OpenRecordLink";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { recipeMoveNotes, type RecipeLink } from "@/lib/recipes";
 import { moveRecipe } from "./recipeWrites";
 
 /**
- * Which element a recipe makes, editable where it is read — the "Makes" line
- * under the recipe's name.
+ * Which element a recipe makes — the Makes field at the head of the recipe's
+ * Info tab (Mark, 2026-10-08: "move the 'makes' field into the info tab above
+ * the description. Give it a regular picklist"). The element record's
+ * Inventory item field is the pattern: a boxed picklist, with the arrow past
+ * its right edge opening the record it points at.
  *
  * Until this the element was chosen once, in New Recipe, and a recipe created
  * against the wrong one could not be put right.
@@ -64,19 +68,19 @@ export function RecipeMakes({
   }
 
   return (
-    <>
-      <span className="inline-flex items-center gap-1 font-medium text-ink">
+    <span className="flex flex-col items-start gap-1">
+      <span className="relative w-full">
         <PickList
+          boxed={BOXED_FIELDS}
           value={elementId}
           options={elements}
           onPick={(next) => void pick(next)}
           disabled={busy}
           ariaLabel="Which element this recipe makes"
-          panelMinWidth={280}
         />
-        <OpenRecordLink href={elementHref} label="Open the element" placement="inline" />
+        <OpenRecordLink href={elementHref} label="Open the element" />
       </span>
-      {error ? <span className="text-accent">{error}</span> : null}
-    </>
+      {error ? <span className="text-[13px] text-accent">{error}</span> : null}
+    </span>
   );
 }

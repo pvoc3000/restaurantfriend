@@ -1933,12 +1933,17 @@ schedules none, and `anon` still cannot execute the generator.
 element." Until this `production_recipes.element_id` had ONE writer, the New
 Recipe dialog, so a recipe made against the wrong element could not be put
 right and the element record's Recipes section was a read-only list — while
-`NewElement` told you to "add the recipe on the element's own screen". Three
+`NewElement` told you to "add the recipe on the element's own screen". Two
 controls, one column:
 - the recipe's **Makes** line is a picklist (`RecipeMakes`);
-- the element's Recipes section has **New recipe** (`NewRecipe` with
-  `fixedElement`, the element stated rather than asked for) and
-- **Link recipe** (`LinkRecipe`), which picks an existing recipe.
+- the element has **Link Recipe…** (`LinkRecipe`), which picks an existing
+  recipe.
+**Rearranged the same day at Mark's direction:** Makes moved off the title row
+into the Info tab's field block, above Description, as a boxed picklist with the
+open-record arrow (the element's Inventory item field is the pattern); New
+recipe was DELETED from the element record; Link Recipe… moved into the
+element's Actions menu, and stands as a button in the Recipes section only when
+a made element has no recipe. There is no Unlink — `element_id` is NOT NULL.
 A recipe still makes EXACTLY ONE element, so both links are a MOVE and there is
 no unlink. Both ask first, because costing takes an element's first recipe by
 name that has a master: `lib/recipes`' `costingRecipe` restates

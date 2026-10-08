@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { PickList } from "@/components/ui/PickList";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { recipeMoveNotes, type RecipeLink } from "@/lib/recipes";
 import { moveRecipe } from "./recipeWrites";
 
@@ -20,16 +21,22 @@ export type LinkableRecipe = RecipeLink & { elementName: string; isActive: boole
  * EVERY RECIPE ALREADY MAKES SOMETHING, so this is always a move. Each option
  * names the element the recipe makes today, and choosing one spells out what
  * the move does to both elements' costs before anything is written.
+ *
+ * TWO TRIGGERS, one dialog: a row in the element's Actions menu, and a button
+ * standing where the recipe would be on an element that has none.
  */
 export function LinkRecipe({
   elementId,
   elementName,
   recipes,
+  children,
 }: {
   elementId: string;
   elementName: string;
   /** Every recipe family in the org, this element's own included. */
   recipes: LinkableRecipe[];
+  /** Hand the command out as an Actions menu row; the dialog stays here. */
+  children?: (row: ActionMenuItem) => React.ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -68,9 +75,13 @@ export function LinkRecipe({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={BUTTON_CLASS}>
-        Link recipe
-      </button>
+      {children ? (
+        children({ label: "Link Recipe…", onSelect: () => setOpen(true) })
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} className={BUTTON_CLASS}>
+          Link recipe
+        </button>
+      )}
 
       {open && (
         <Dialog

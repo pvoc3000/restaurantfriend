@@ -15,7 +15,6 @@ import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { BATCH_STATUS_LABEL, batchDate, describeAmount } from "@/lib/productionBatches";
 import { elementTypeVocabulary, type ElementKind } from "@/lib/production";
 import { ElementActions } from "@/components/production/ElementActions";
-import { NewRecipe } from "@/components/production/NewRecipe";
 import { LinkRecipe } from "@/components/production/LinkRecipe";
 import { canEditPage } from "@/lib/pageAccess";
 import { loadInventoryItemOptions } from "@/lib/inventoryItemOptions";
@@ -158,6 +157,7 @@ export async function ElementDetail({
                 isActive={(element.is_active ?? true) as boolean}
                 variant="menu"
                 afterDelete={{ href: "/elements" }}
+                linkRecipes={element.kind === "made" ? recipeLinks : undefined}
               />
             </div>
           ) : null}
@@ -185,26 +185,14 @@ export async function ElementDetail({
       </div>
 
       <section className="space-y-2">
+        <SectionHeading count={(recipes ?? []).length}>Recipes</SectionHeading>
         {/* A recipe is linked from EITHER end, and both write the recipe's one
-            `element_id`: New recipe… starts one that makes this element, Link
-            recipe… moves an existing one here. Made elements only, since only
-            a made element is costed from a recipe. */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <SectionHeading count={(recipes ?? []).length}>Recipes</SectionHeading>
-          {editable && element.kind === "made" ? (
-            <div className="ml-auto flex flex-wrap gap-2">
-              <NewRecipe
-                orgId={session.membership.org_id}
-                fixedElement={{ id, name: element.name as string }}
-                types={[
-                  ...new Set(recipeLinks.map((r) => r.recipeType ?? "").filter((t) => t.trim() !== "")),
-                ].sort()}
-              />
-              <LinkRecipe elementId={id} elementName={element.name as string} recipes={recipeLinks} />
-            </div>
-          ) : null}
-        </div>
-        {(recipes ?? []).length === 0 ? (
+            `element_id`. Here it is Link Recipe… in the Actions menu — and,
+            on a made element with no recipe, this button where the recipe
+            would be (Mark, 2026-10-08). */}
+        {(recipes ?? []).length === 0 && editable && element.kind === "made" ? (
+          <LinkRecipe elementId={id} elementName={element.name as string} recipes={recipeLinks} />
+        ) : (recipes ?? []).length === 0 ? (
           <p className="text-[13px] text-muted">
             {element.kind === "made"
               ? "No recipe yet — a made element costs nothing until it has one."
