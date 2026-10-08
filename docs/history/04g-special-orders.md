@@ -5810,3 +5810,8 @@ kitchen orders. put the column after tax column.'
   (Items 8 of 9), present on the kitchen order; fixtures for `customerLines`
   and `invoicePaper`; `tsc`, eslint, 2,256 fixtures. **Not verified:** the
   column in a browser, and a real invoice — both need 179 applied.
+- **APPLIED 2026-10-07** by CLI at Mark's request (`db query --linked`, in a
+  transaction). Confirmed after: the column exists and all 48,061 lines read
+  false; the materializer's live body names `hide_from_customer` twice and
+  still names `line_grouping` twice; its grants are unchanged. The materializer
+  has not run since 178 or 179 — the next top-up is its test.
