@@ -590,3 +590,22 @@ export function parseChecklistView(raw: string | string[] | undefined): Checklis
 export function checklistViewHref(view: ChecklistView): string {
   return view === "walks" ? "/checklists" : `/checklists?view=${view}`;
 }
+
+/**
+ * What a checklist item asks for — ONE list for the template's items table and
+ * its Add dialog, which each carried their own until 2026-10-08.
+ *
+ * The Add dialog leaves `choice` out ON PURPOSE (`ADDABLE_RESPONSE_TYPE_OPTIONS`):
+ * 076 refuses a choice item with no choices, and that dialog cannot collect
+ * them. The kind is set on the row afterwards, beside where the options live.
+ */
+export const RESPONSE_TYPE_OPTIONS: { value: ResponseType; label: string; hint: string }[] = [
+  { value: "check", label: "Tick", hint: "looked at, or not" },
+  { value: "number", label: "Number", hint: "a temperature, a count" },
+  { value: "text", label: "Text", hint: "something written down" },
+  { value: "choice", label: "Choice", hint: "one of a short list" },
+];
+
+export const ADDABLE_RESPONSE_TYPE_OPTIONS = RESPONSE_TYPE_OPTIONS.filter(
+  (o) => o.value !== "choice"
+);

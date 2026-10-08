@@ -1,3 +1,4 @@
+import { sectionPickOptions } from "@/lib/locations";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
@@ -174,13 +175,12 @@ export default async function EquipmentRecordPage({
                 boxed={BOXED_FIELDS}
                 className={field}
                 ariaLabel="Where it stands"
-                options={[
-                  { value: "", label: "No section" },
-                  ...localSections.map((s) => ({
-                    value: s.id as string,
-                    label: s.display_name as string,
-                  })),
-                ]}
+                options={sectionPickOptions(
+                  localSections.map((s) => ({
+                    id: s.id as string,
+                    display_name: s.display_name as string,
+                  }))
+                )}
               />
             ) : (
               <span className={READ_ONLY_VALUE}>

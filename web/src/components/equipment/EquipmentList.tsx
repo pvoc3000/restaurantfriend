@@ -1,5 +1,6 @@
 "use client";
 
+import { sectionPickOptions } from "@/lib/locations";
 import { useMemo, useState, type ReactNode } from "react";
 import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
@@ -133,10 +134,7 @@ export function EquipmentList({
             value={r.shop_section_id ?? ""}
             kind="pick"
             ariaLabel={`Where ${r.name} stands`}
-            options={[
-              { value: "", label: "No section" },
-              ...sections.map((s) => ({ value: s.id, label: s.display_name })),
-            ]}
+            options={sectionPickOptions(sections)}
           />
         ) : (
           <span className={READ_ONLY_VALUE}>{r.section_name ?? ""}</span>

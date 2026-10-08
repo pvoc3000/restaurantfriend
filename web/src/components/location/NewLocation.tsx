@@ -1,5 +1,6 @@
 "use client";
 
+import { LOCATION_KIND_OPTIONS } from "@/lib/locations";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -155,10 +156,7 @@ export function NewLocation({ orgId, existingCodes }: { orgId: string; existingC
                 variant="field"
                 value={kind}
                 onPick={(v) => setKind(v as "physical" | "virtual")}
-                options={[
-                  { value: "physical", label: "Physical", hint: "a building you walk into" },
-                  { value: "virtual", label: "Virtual", hint: "off-site events, the online store" },
-                ]}
+                options={LOCATION_KIND_OPTIONS}
                 ariaLabel="Kind"
               />
             </Field>

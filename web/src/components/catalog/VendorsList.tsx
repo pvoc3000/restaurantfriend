@@ -1,5 +1,6 @@
 "use client";
 
+import { ACTIVE_TABS } from "./ListFilters";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { money } from "@/lib/catalog";
@@ -24,11 +25,6 @@ import { NewVendor } from "./NewVendor";
 import { PickList } from "@/components/ui/PickList";
 import type { VendorRow } from "@/app/(app)/vendors/page";
 
-const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
-  { key: "active", label: "Active" },
-  { key: "inactive", label: "Inactive" },
-  { key: "all", label: "All" },
-];
 
 const WIDTHS_STORAGE_KEY = "rf.vendors.columnWidths.v1";
 

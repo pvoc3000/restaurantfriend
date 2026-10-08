@@ -1,5 +1,6 @@
 "use client";
 
+import { REQUEST_PRIORITY_OPTIONS } from "@/lib/purchaseRequests";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
@@ -26,7 +27,6 @@ import {
 } from "@/lib/filterMenus";
 import {
   REQUESTS_NATURAL_SORT,
-  REQUEST_PRIORITIES,
   REQUEST_PRIORITY_LABEL,
   REQUEST_STATUS_LABEL,
   priorityRank,
@@ -221,10 +221,7 @@ export function PurchaseRequestsList({
             kind="pick"
             nullable={false}
             ariaLabel={`Priority for ${r.request_text}`}
-            options={REQUEST_PRIORITIES.map((p) => ({
-              value: p,
-              label: REQUEST_PRIORITY_LABEL[p],
-            }))}
+            options={REQUEST_PRIORITY_OPTIONS}
             // RED, not the mark colour (Mark, 2026-08-22). A high-priority
             // request is the same class of thing as a flagged special order —
             // not an error, a thing that cannot wait — and yellow on white is

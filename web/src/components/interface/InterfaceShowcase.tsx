@@ -1,5 +1,6 @@
 "use client";
 
+import { LOCATION_KIND_OPTIONS } from "@/lib/locations";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 
@@ -1487,10 +1488,7 @@ function PanelsBlock() {
               value={kind}
               onPick={setKind}
               ariaLabel="Kind"
-              options={[
-                { value: "physical", label: "Physical", hint: "a building you walk into" },
-                { value: "virtual", label: "Virtual", hint: "off-site events" },
-              ]}
+              options={LOCATION_KIND_OPTIONS}
             />
             <span className="text-subtle">Opens</span>
             <DateField variant="field" value={date} onChange={setDate} ariaLabel="Opens" />

@@ -441,3 +441,8 @@ export function explainShift(
 
   return notes;
 }
+
+/** How often a benefit is paid, as picklist options. */
+export const BENEFIT_UNIT_OPTIONS: { value: BenefitUnit; label: string; hint: string }[] = (
+  ["per_shift", "per_workday", "per_period"] as BenefitUnit[]
+).map((u) => ({ value: u, label: BENEFIT_UNIT_LABEL[u], hint: BENEFIT_UNIT_HINT[u] }));

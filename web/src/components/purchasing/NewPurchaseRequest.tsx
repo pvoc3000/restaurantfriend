@@ -1,5 +1,6 @@
 "use client";
 
+import { REQUEST_PRIORITY_OPTIONS } from "@/lib/purchaseRequests";
 import { useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -17,8 +18,6 @@ import {
   type ChosenItem,
 } from "@/components/catalog/InventoryItemChooser";
 import {
-  REQUEST_PRIORITIES,
-  REQUEST_PRIORITY_LABEL,
   type RequestPriority,
 } from "@/lib/purchaseRequests";
 
@@ -297,10 +296,7 @@ export function NewPurchaseRequest({
               <PickList
                 variant="field"
                 value={priority}
-                options={REQUEST_PRIORITIES.map((p) => ({
-                  value: p,
-                  label: REQUEST_PRIORITY_LABEL[p],
-                }))}
+                options={REQUEST_PRIORITY_OPTIONS}
                 onPick={(v) => setPriority((v || "normal") as RequestPriority)}
                 ariaLabel="Priority"
                 className="w-40"

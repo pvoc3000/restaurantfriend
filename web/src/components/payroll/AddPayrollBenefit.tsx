@@ -1,13 +1,14 @@
 "use client";
 
+import { EARNING_COLUMN_OPTIONS } from "@/lib/gustoExport";
+import { BENEFIT_UNIT_OPTIONS } from "@/lib/payrollBenefits";
 import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
 import { PickList } from "@/components/ui/PickList";
-import { EARNING_COLUMNS } from "@/lib/gustoExport";
-import { BENEFIT_UNIT_HINT, BENEFIT_UNIT_LABEL, type BenefitUnit } from "@/lib/payrollBenefits";
+import { type BenefitUnit } from "@/lib/payrollBenefits";
 
 /** `Overnight differential` → `overnight_differential`. */
 function toCode(name: string): string {
@@ -143,11 +144,7 @@ export function AddPayrollBenefit({ orgId }: { orgId: string }) {
               <Field label="How often" required>
                 <PickList
                   value={unit}
-                  options={(["per_shift", "per_workday", "per_period"] as BenefitUnit[]).map((u) => ({
-                    value: u,
-                    label: BENEFIT_UNIT_LABEL[u],
-                    hint: BENEFIT_UNIT_HINT[u],
-                  }))}
+                  options={BENEFIT_UNIT_OPTIONS}
                   variant="field"
                   ariaLabel="How often"
                   onPick={(v) => setUnit(v as BenefitUnit)}
@@ -159,7 +156,7 @@ export function AddPayrollBenefit({ orgId }: { orgId: string }) {
             <Field label="Gusto column" required>
               <PickList
                 value={column}
-                options={EARNING_COLUMNS.map((c) => ({ value: c, label: c }))}
+                options={EARNING_COLUMN_OPTIONS}
                 variant="field"
                 ariaLabel="Gusto column"
                 onPick={setColumn}

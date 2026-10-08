@@ -1,5 +1,7 @@
 "use client";
 
+import { sectionPickOptions } from "@/lib/locations";
+import { TASK_PRIORITY_OPTIONS } from "@/lib/facilityTasks";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -11,7 +13,7 @@ import { PickList } from "@/components/ui/PickList";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { BOXED_FIELD, BOXED_FIELDS, FORM_TEXTAREA } from "@/components/ui/fieldMetrics";
 import { SHIFT_SLOT_LABEL, SHIFT_SLOT_OPTIONS } from "@/lib/employeeEvents";
-import { TASK_PRIORITY_LABEL, type TaskKind, type TaskPriority } from "@/lib/facilityTasks";
+import { type TaskKind, type TaskPriority } from "@/lib/facilityTasks";
 import type { Assignee } from "./TasksScreen";
 
 /**
@@ -179,10 +181,7 @@ export function NewTask({
                   ariaLabel="Priority"
                   boxed={BOXED_FIELDS}
                   className={field}
-                  options={(["high", "normal", "low"] as const).map((p) => ({
-                    value: p,
-                    label: TASK_PRIORITY_LABEL[p],
-                  }))}
+                  options={TASK_PRIORITY_OPTIONS}
                   onPick={(v) => setPriority(v as TaskPriority)}
                 />
               </div>
@@ -274,10 +273,7 @@ export function NewTask({
                   ariaLabel="Section"
                   boxed={BOXED_FIELDS}
                   className={field}
-                  options={[
-                    { value: "", label: "No section" },
-                    ...sections.map((s) => ({ value: s.id, label: s.display_name })),
-                  ]}
+                  options={sectionPickOptions(sections)}
                   onPick={(next) => {
                     setSectionId(next);
                     setSectionWasFilled(false);

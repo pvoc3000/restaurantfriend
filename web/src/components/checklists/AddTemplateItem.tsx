@@ -1,5 +1,6 @@
 "use client";
 
+import { sectionPickOptions } from "@/lib/locations";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -8,13 +9,7 @@ import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { TextInput } from "@/components/ui/TextInput";
 import { PickList } from "@/components/ui/PickList";
 import { BOXED_FIELD, BOXED_FIELDS } from "@/components/ui/fieldMetrics";
-import type { ResponseType } from "@/lib/checklists";
-
-const ASKS: { value: ResponseType; label: string; hint: string }[] = [
-  { value: "check", label: "Tick", hint: "looked at, or not" },
-  { value: "number", label: "Number", hint: "a temperature, a count" },
-  { value: "text", label: "Text", hint: "something written down" },
-];
+import { ADDABLE_RESPONSE_TYPE_OPTIONS as ASKS, type ResponseType } from "@/lib/checklists";
 
 /**
  * Add one question to a template.
@@ -152,10 +147,7 @@ export function AddTemplateItem({
                 // Kept between adds, deliberately: you fill a shelf's questions
                 // together, so re-picking the section twenty times would be the
                 // typing this dialog exists to save.
-                options={[
-                  { value: "", label: "No section" },
-                  ...sections.map((s) => ({ value: s.id, label: s.display_name })),
-                ]}
+                options={sectionPickOptions(sections)}
                 onPick={setSectionId}
               />
             </div>

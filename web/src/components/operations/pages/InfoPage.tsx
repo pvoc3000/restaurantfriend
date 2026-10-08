@@ -1,5 +1,6 @@
 "use client";
 
+import { SHIFT_SLOT_OPTIONS } from "@/lib/employeeEvents";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -7,11 +8,9 @@ import { useOptimisticRows } from "@/lib/useOptimisticRows";
 import { DateField } from "@/components/ui/DateField";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { FieldLabel } from "./fields";
-import { SHIFT_SLOT_LABEL, type ShiftSlot } from "@/lib/shiftReports";
+import { type ShiftSlot } from "@/lib/shiftReports";
 
-const SHIFT_OPTIONS: PickOption[] = (
-  ["opening", "mid", "closing", "off_site"] as ShiftSlot[]
-).map((s) => ({ value: s, label: SHIFT_SLOT_LABEL[s] }));
+const SHIFT_OPTIONS = SHIFT_SLOT_OPTIONS;
 
 /**
  * FMP's page 1, hints and all.

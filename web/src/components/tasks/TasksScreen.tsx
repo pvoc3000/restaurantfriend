@@ -1,5 +1,7 @@
 "use client";
 
+import { sectionPickOptions } from "@/lib/locations";
+import { TASK_PRIORITY_OPTIONS } from "@/lib/facilityTasks";
 import { useMemo, useState, type ReactNode } from "react";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { useRouter } from "next/navigation";
@@ -237,10 +239,7 @@ export function TasksScreen({
             kind="pick"
             nullable={false}
             ariaLabel={`Priority for ${r.title}`}
-            options={(["high", "normal", "low"] as const).map((p) => ({
-              value: p,
-              label: TASK_PRIORITY_LABEL[p],
-            }))}
+            options={TASK_PRIORITY_OPTIONS}
             className={r.priority === "high" ? "text-accent" : ""}
           />
         ) : (
@@ -309,10 +308,7 @@ export function TasksScreen({
             value={r.shop_section_id ?? ""}
             kind="pick"
             ariaLabel={`Section for ${r.title}`}
-            options={[
-              { value: "", label: "No section" },
-              ...sections.map((s) => ({ value: s.id, label: s.display_name })),
-            ]}
+            options={sectionPickOptions(sections)}
           />
         ) : (
           <span className={READ_ONLY_VALUE}>{r.section_name ?? ""}</span>

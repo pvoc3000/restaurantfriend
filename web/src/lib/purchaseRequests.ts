@@ -81,3 +81,7 @@ export function hasNote(note: string | null | undefined): boolean {
  * the fallback, so the screen keeps one canonical address.
  */
 export const REQUESTS_NATURAL_SORT: ListSort = { key: "priority", dir: "desc" };
+
+/** Request priority as picklist options, most urgent first. */
+export const REQUEST_PRIORITY_OPTIONS: { value: RequestPriority; label: string }[] =
+  REQUEST_PRIORITIES.map((p) => ({ value: p, label: REQUEST_PRIORITY_LABEL[p] }));

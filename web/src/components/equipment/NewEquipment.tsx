@@ -1,5 +1,6 @@
 "use client";
 
+import { sectionPickOptions } from "@/lib/locations";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -170,10 +171,7 @@ export function NewEquipment({
                 ariaLabel="Where it stands"
                 boxed={BOXED_FIELDS}
                 className={field}
-                options={[
-                  { value: "", label: "No section" },
-                  ...sections.map((s) => ({ value: s.id, label: s.display_name })),
-                ]}
+                options={sectionPickOptions(sections)}
                 onPick={setSectionId}
               />
             </div>

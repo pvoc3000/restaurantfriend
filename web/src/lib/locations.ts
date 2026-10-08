@@ -72,3 +72,22 @@ export function locationTabHref(
   const query = search.toString();
   return `/locations/${id}${query ? `?${query}` : ""}`;
 }
+
+/** What a location is, in the words both New Location and its record use. */
+export const LOCATION_KIND_OPTIONS: { value: "physical" | "virtual"; label: string; hint: string }[] = [
+  { value: "physical", label: "Physical", hint: "a building you walk into" },
+  { value: "virtual", label: "Virtual", hint: "off-site events, the online store" },
+];
+
+/**
+ * A shop's sections as picklist options, led by "No section" — the way to take
+ * something OFF a shelf, and the label the guide gives to what lands nowhere.
+ */
+export function sectionPickOptions(
+  sections: { id: string; display_name: string }[]
+): { value: string; label: string }[] {
+  return [
+    { value: "", label: "No section" },
+    ...sections.map((s) => ({ value: s.id, label: s.display_name })),
+  ];
+}

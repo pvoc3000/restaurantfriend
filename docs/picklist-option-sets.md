@@ -133,23 +133,35 @@ reports, batch logs, plans, recipes, tags, timesheets, events), Group by menus
 timesheets, order lines), and per-screen ones such as Last ordered, Due,
 Layout, the price grid's shop, and the pay period.
 
-## 6. Things the sweep turned up
+## 6. Things the sweep turned up, and what was done (2026-10-08)
 
-1. **Answer type is defined twice, and the two disagree.** The template items
-   table offers Tick · Number · Text · Choice; Add Template Item offers only
-   Tick · Number · Text, so a Choice item cannot be created there.
-2. **Location kind is written out twice with different wording.** New Location
-   says "Physical — a building you walk into"; the location record says
-   lowercase "physical — a shop with shelves".
-3. **Active / Inactive / All is declared twice** (`ListFilters` and
-   `VendorsList`), identical today.
-4. **The shift list is declared three times** (`SHIFT_SLOT_OPTIONS` in
-   `lib/employeeEvents`, and a local `SHIFT_OPTIONS` in New Shift Report and
-   the Info page), identical today.
-5. **High · Normal · Low exists as two separate lists** (tasks, purchase
-   requests), each also built inline at both of its call sites.
-6. **"No section" + sections is assembled inline in six places**, and
-   Benefit frequency and Gusto column in two each. None is wrong; each is a
-   place a future change could miss.
-7. **Payment type accepts typed values at all four sites**, so anything typed
-   there is stored beside the nine fixed types.
+Fixed, each now one shared definition:
+
+1. **Location kind** was worded two ways ("Physical — a building you walk
+   into" in New Location, lowercase "physical — a shop with shelves" on the
+   record). Both read `LOCATION_KIND_OPTIONS` (`lib/locations`), in New
+   Location's wording.
+2. **Active / Inactive / All** was declared in `ListFilters` and again in
+   `VendorsList`. The second copy is gone.
+3. **The shift list** had local copies in New Shift Report and the shift
+   report's Info page. Both read `SHIFT_SLOT_OPTIONS`, so Off-site now carries
+   its hint there too.
+4. **High · Normal · Low** was built inline at each call site. Tasks read
+   `TASK_PRIORITY_OPTIONS`, purchase requests `REQUEST_PRIORITY_OPTIONS`. They
+   stay two lists, since they are two columns on two tables.
+5. **"No section" + sections** was assembled in seven places; all call
+   `sectionPickOptions` (`lib/locations`). The item's per-location row builds
+   its own, grouped, list and was left alone.
+6. **Benefit frequency and Gusto column** are `BENEFIT_UNIT_OPTIONS` and
+   `EARNING_COLUMN_OPTIONS`.
+7. **Answer type** is one list, `RESPONSE_TYPE_OPTIONS` (`lib/checklists`).
+
+Not changed, because the sweep was wrong to call them faults:
+
+- **Add Template Item leaves out "Choice" on purpose.** The database refuses a
+  choice item with no choices and that dialog cannot collect them, so the kind
+  is set on the row afterwards. The dialog now reads the shared list with
+  Choice filtered out, so the two cannot drift.
+- **Payment type accepts typed values on purpose** — "payment methods are a
+  business fact and not a schema one: the day Donut Friend takes a bank
+  transfer, nobody should need a migration" (`lib/specialOrders`).

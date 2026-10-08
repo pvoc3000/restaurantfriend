@@ -540,3 +540,8 @@ export function exportFileName(orgName: string, periodStart: string): string {
   const slug = orgName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   return `${slug || "payroll"}-${periodStart}.csv`;
 }
+
+/** The Gusto earning columns as picklist options. */
+export const EARNING_COLUMN_OPTIONS: { value: string; label: string }[] = EARNING_COLUMNS.map(
+  (c) => ({ value: c, label: c })
+);

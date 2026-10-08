@@ -1,5 +1,7 @@
 "use client";
 
+import { sectionPickOptions } from "@/lib/locations";
+import { RESPONSE_TYPE_OPTIONS } from "@/lib/checklists";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -38,12 +40,7 @@ export type TemplateItemRow = {
   position: string | null;
 };
 
-const ASKS: { value: ResponseType; label: string; hint: string }[] = [
-  { value: "check", label: "Tick", hint: "looked at, or not" },
-  { value: "number", label: "Number", hint: "a temperature, a count" },
-  { value: "text", label: "Text", hint: "something written down" },
-  { value: "choice", label: "Choice", hint: "one of a short list" },
-];
+const ASKS = RESPONSE_TYPE_OPTIONS;
 
 /**
  * CHOOSING "Choice" DOES NOT WRITE — it opens the options dialog, which writes
@@ -108,10 +105,7 @@ export function TemplateItemsTable({
 
   // "No section" is a real option with an EMPTY value, not the absence of one —
   // without it there is no way to take an item off a shelf.
-  const sectionOptions = [
-    { value: "", label: "No section" },
-    ...sections.map((s) => ({ value: s.id, label: s.display_name })),
-  ];
+  const sectionOptions = sectionPickOptions(sections);
   // NO "nothing in particular" ROW (Mark, 2026-09-03: "just let the field be
   // empty or blank"). `clearable` is how you take an item off a machine, and it
   // leaves the cell blank rather than making a phrase out of an empty value.

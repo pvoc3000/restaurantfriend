@@ -1,11 +1,12 @@
 "use client";
 
 
+import { EARNING_COLUMN_OPTIONS } from "@/lib/gustoExport";
+import { BENEFIT_UNIT_OPTIONS } from "@/lib/payrollBenefits";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { InlineValue } from "@/components/catalog/InlineValue";
-import { EARNING_COLUMNS } from "@/lib/gustoExport";
-import { BENEFIT_UNIT_HINT, BENEFIT_UNIT_LABEL, type BenefitUnit } from "@/lib/payrollBenefits";
+import { BENEFIT_UNIT_LABEL, type BenefitUnit } from "@/lib/payrollBenefits";
 
 export type PayrollBenefitRow = {
   id: string;
@@ -112,11 +113,7 @@ export function PayrollBenefitsList({
             kind="pick"
             value={b.unit}
             nullable={false}
-            options={(["per_shift", "per_workday", "per_period"] as BenefitUnit[]).map((u) => ({
-              value: u,
-              label: BENEFIT_UNIT_LABEL[u],
-              hint: BENEFIT_UNIT_HINT[u],
-            }))}
+            options={BENEFIT_UNIT_OPTIONS}
           />
         ) : (
           BENEFIT_UNIT_LABEL[b.unit]
@@ -136,7 +133,7 @@ export function PayrollBenefitsList({
             kind="pick"
             value={b.gusto_column}
             nullable={false}
-            options={EARNING_COLUMNS.map((c) => ({ value: c, label: c }))}
+            options={EARNING_COLUMN_OPTIONS}
           />
         ) : (
           <span className="text-[13px]">{b.gusto_column}</span>

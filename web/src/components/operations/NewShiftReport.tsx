@@ -1,19 +1,18 @@
 "use client";
 
+import { SHIFT_SLOT_OPTIONS } from "@/lib/employeeEvents";
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
-import { PickList, type PickOption } from "@/components/ui/PickList";
+import { PickList } from "@/components/ui/PickList";
 import { DateField } from "@/components/ui/DateField";
 import { SHIFT_SLOT_LABEL, type ShiftSlot } from "@/lib/shiftReports";
 import { daysBefore } from "@/lib/today";
 
-const SHIFT_OPTIONS: PickOption[] = (
-  ["opening", "mid", "closing", "off_site"] as ShiftSlot[]
-).map((s) => ({ value: s, label: SHIFT_SLOT_LABEL[s] }));
+const SHIFT_OPTIONS = SHIFT_SLOT_OPTIONS;
 
 /**
  * Starting a shift report.

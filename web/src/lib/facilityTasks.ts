@@ -293,3 +293,8 @@ export function taskLineLabel(task: { title: string; section_name?: string | nul
 export function issueAlreadyRaised(item: { task_id: string | null }): boolean {
   return item.task_id != null;
 }
+
+/** Task priority as picklist options, most urgent first. */
+export const TASK_PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = (
+  ["high", "normal", "low"] as const
+).map((p) => ({ value: p, label: TASK_PRIORITY_LABEL[p] }));

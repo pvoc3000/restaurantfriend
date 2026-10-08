@@ -1,3 +1,4 @@
+import { LOCATION_KIND_OPTIONS } from "@/lib/locations";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
@@ -297,10 +298,7 @@ export async function LocationDetail({
                       value={location.kind}
                       kind="pick"
                       nullable={false}
-                      options={[
-                        { value: "physical", label: "physical", hint: "a shop with shelves" },
-                        { value: "virtual", label: "virtual", hint: "offsite events, no address" },
-                      ]}
+                      options={LOCATION_KIND_OPTIONS}
                     />
                   ) : (
                     location.kind
