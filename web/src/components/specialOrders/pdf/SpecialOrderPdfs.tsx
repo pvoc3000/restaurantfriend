@@ -94,9 +94,10 @@ const s = {
   cPrice: { width: 48, textAlign: "right" },
   cNotes: { flexGrow: 1, flexBasis: 0, paddingLeft: 16, color: MUTED },
   cCost: { width: 60, textAlign: "right" },
-  /* The Items tab's bands (`OrderLines`): the black band is `groupBand`; under
-     an Item type, Size is bold over an ink rule and Cut lighter over a
-     hairline, each indented a step. A band's qty and cost sit under theirs. */
+  /* The Items tab's bands (`OrderLines`): a black band; under an Item type,
+     Size is bold over an ink rule and Cut lighter over a hairline, indented a
+     step. A band's qty and cost sit under theirs. The Item type band itself
+     is not printed — see the table. */
   bandRow: { flexDirection: "row", alignItems: "flex-end" },
   bandTop: { backgroundColor: INK, color: "#fff", paddingVertical: 4, marginTop: 10 },
   bandSize: { borderBottomWidth: 0.75, borderBottomColor: INK, paddingTop: 7, paddingBottom: 2 },
@@ -374,15 +375,20 @@ export function OrderDocumentPdf({
                 {(() => {
                   // Numbered down the page as printed, across the bands.
                   let n = 0;
-                  return groupLines(order.lines, grouping).map((g) => (
+                  return groupLines(order.lines, grouping).map((g, gi) => (
                     <View key={g.key}>
-                      {g.label ? (
+                      {/* THE ITEM TYPE BAND IS NOT PRINTED (Mark, 2026-10-07:
+                          "Still sort by it but just hide the header") — the
+                          lines keep its order, and a gap marks where it was. */}
+                      {g.dimension === "type" ? (
+                        gi > 0 ? <View style={{ height: 10 }} /> : null
+                      ) : g.label ? (
                         <View
                           style={[s.bandRow, g.level === 0 ? s.bandTop : g.level === 1 ? s.bandSize : s.bandCut]}
                           wrap={false}
                           minPresenceAhead={30}
                         >
-                          <Text style={[s.bandLabel, { paddingLeft: 6 + g.level * 10 }]}>{g.label}</Text>
+                          <Text style={[s.bandLabel, { paddingLeft: grouping === "type" ? (g.level - 1) * 10 : 6 }]}>{g.label}</Text>
                           <Text style={[s.bandFigure, s.cQty]}>
                             {qtyText(g.rows.reduce((a, r) => a + Number(r.qty ?? 0), 0))}
                           </Text>

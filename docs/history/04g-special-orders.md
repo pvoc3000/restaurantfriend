@@ -5712,3 +5712,9 @@ same order and with the same grouping as in the items tab … Can we try that?"
 - **Verified** by a Node render of the quote over the /forms sample plus three
   added lines, at None, Item type and Price; `tsc`, eslint and the 2,255
   fixtures pass. **Not verified:** a real Send from the browser.
+- **The Item type band is not printed** (Mark, same day: "I would hide the
+  type header though. Still sort by it but just hide the header"). The lines
+  keep the type's order and a 10pt gap marks each change of type; Size and Cut
+  keep their headings, moved one step left. On the PDF only — the Items tab
+  still draws the black band. Known cost: two types each holding Minis print
+  two "MINI" headings with nothing naming the type above them.
