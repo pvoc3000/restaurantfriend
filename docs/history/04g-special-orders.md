@@ -5750,3 +5750,5 @@ amount".
 - **APPLIED 2026-10-07** by CLI at Mark's request (`db query --linked`, in a
   transaction). Confirmed after: the check constraint is in place and all
   8,400 orders read `none`.
+- **Cost is the last column again** (Mark, same day): Item · Qty · Price ·
+  Notes · Cost. Item keeps its 200pt.

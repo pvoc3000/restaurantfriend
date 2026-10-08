@@ -89,7 +89,7 @@ const s = {
   /* ---- items (DataTable) ---- */
   row: { flexDirection: "row", paddingVertical: 4, alignItems: "flex-start" },
   cIndex: { width: 20, color: SUBTLE },
-  // Item took 30pt from Notes, and Cost sits beside Price (Mark, 2026-10-07).
+  // Item took 30pt from Notes (Mark, 2026-10-07).
   cItem: { width: 200, paddingRight: 8 },
   cQty: { width: 30, textAlign: "right" },
   cPrice: { width: 48, textAlign: "right" },
@@ -369,8 +369,8 @@ export function OrderDocumentPdf({
                   <Text style={[s.th, s.cItem]}>Item</Text>
                   <Text style={[s.th, s.cQty]}>Qty</Text>
                   <Text style={[s.th, s.cPrice]}>Price</Text>
-                  <Text style={[s.th, s.cCost]}>Cost</Text>
                   <Text style={[s.th, s.cNotes]}>Notes</Text>
+                  <Text style={[s.th, s.cCost]}>Cost</Text>
                 </View>
                 {(() => {
                   // Numbered down the page as printed, across the bands.
@@ -393,10 +393,10 @@ export function OrderDocumentPdf({
                               donut counts in the headers") — the cost only. */}
                           <Text style={s.cQty}> </Text>
                           <Text style={s.cPrice}> </Text>
-                          <Text style={[s.bandFigure, s.cCost]}>
+                          <Text style={s.cNotes}> </Text>
+                          <Text style={[s.bandFigure, s.cCost, { paddingRight: g.level === 0 ? 6 : 0 }]}>
                             {money(g.rows.reduce((a, r) => a + lineTotal(r), 0))}
                           </Text>
-                          <Text style={s.cNotes}> </Text>
                         </View>
                       ) : null}
                       {(g.leaf ? g.rows : []).map((line) => (
@@ -405,8 +405,8 @@ export function OrderDocumentPdf({
                           <Text style={[s.cItem, s.itemName]}>{line.name}</Text>
                           <Text style={s.cQty}>{qtyText(line.qty)}</Text>
                           <Text style={s.cPrice}>{money(line.unit_price)}</Text>
-                          <Text style={s.cCost}>{money(lineTotal(line))}</Text>
                           <Text style={s.cNotes}>{line.notes ?? ""}</Text>
+                          <Text style={s.cCost}>{money(lineTotal(line))}</Text>
                         </View>
                       ))}
                     </View>
