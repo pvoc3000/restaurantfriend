@@ -51,10 +51,6 @@ test("an item made from it blocks it", () => {
   ok(!canDeleteElement(usage({ componentOf: ["Angry Samoa"] })), "blocked");
 });
 
-test("being an item's dough blocks it", () => {
-  ok(!canDeleteElement(usage({ doughFor: ["Bananaversary"] })), "blocked");
-});
-
 test("a logged batch blocks it — that is production history", () => {
   const u = usage({ batches: 26 });
   eq(deleteBlockers(u).map((b) => b.key), ["batches"], "blockers");
@@ -65,7 +61,6 @@ test("a logged batch blocks it — that is production history", () => {
 test("blockers are reported in the order a person would want to hear them", () => {
   const u = usage({
     batches: 3,
-    doughFor: ["Bananaversary"],
     componentOf: ["Angry Samoa"],
     ingredientIn: ["Chocolate Glaze"],
     recipes: ["Raised Donut"],
@@ -74,7 +69,7 @@ test("blockers are reported in the order a person would want to hear them", () =
   // object literal happens to be written in.
   eq(
     deleteBlockers(u).map((b) => b.key),
-    ["recipes", "ingredientIn", "componentOf", "doughFor", "batches"],
+    ["recipes", "ingredientIn", "componentOf", "batches"],
     "order"
   );
 });

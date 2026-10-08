@@ -36,7 +36,7 @@ import {
  * a time to remove each is the case this exists for.
  *
  * WHAT MAKES THIS DIFFERENT FROM EVERY OTHER DELETE IN THE APP is that the
- * database has an opinion. Five of the seven references REFUSE (`lib/
+ * database has an opinion. Four of the six references REFUSE (`lib/
  * productionElements` lists them), so "Delete anyway" is not always on the
  * table — where something blocks, the dialog says what and offers only
  * Deactivate. Everywhere else in this app a confirm names what's unresolved and
@@ -397,8 +397,6 @@ function blockerSentence(b: ElementBlocker): string {
       return `It is an ingredient in ${n} ${n === 1 ? "recipe" : "recipes"} — ${names}.`;
     case "componentOf":
       return `${n} ${n === 1 ? "item is" : "items are"} made from it — ${names}.`;
-    case "doughFor":
-      return `It is the dough for ${n} ${n === 1 ? "item" : "items"} — ${names}.`;
     case "batches":
       return `${n} ${n === 1 ? "batch has" : "batches have"} been logged against it. That is production history.`;
   }
@@ -420,7 +418,7 @@ async function readUsage(
 ): Promise<ElementUsage> {
   const unreadable: string[] = [];
 
-  const [recipes, lines, components, dough, batches, locations, days] = await Promise.all([
+  const [recipes, lines, components, batches, locations, days] = await Promise.all([
     supabase.from("production_recipes").select("name").eq("element_id", elementId),
     // Two levels of embed: a line belongs to a VERSION, and the version is what
     // knows its recipe. The recipe is what a person recognises, so that is what
@@ -433,7 +431,6 @@ async function readUsage(
       .from("production_item_elements")
       .select("production_items ( name )")
       .eq("element_id", elementId),
-    supabase.from("production_items").select("name").eq("base_element_id", elementId),
     supabase
       .from("production_batches")
       .select("*", { count: "exact", head: true })
@@ -454,7 +451,6 @@ async function readUsage(
   note("the recipes", recipes.error);
   note("the recipe ingredients", lines.error);
   note("the items made from it", components.error);
-  note("the items it is the dough for", dough.error);
   note("the batch log", batches.error);
   note("its per-shop settings", locations.error);
   note("the weekly schedule", days.error);
@@ -477,7 +473,6 @@ async function readUsage(
           .filter((n): n is string => n !== null)
       ),
     ],
-    doughFor: (dough.data ?? []).map((d) => String(d.name)),
     batches: batches.count ?? 0,
     locations: locations.count ?? 0,
     scheduledDays: days.count ?? 0,

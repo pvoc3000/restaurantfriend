@@ -3,14 +3,22 @@
  * it (Mark, 2026-08-11: "I need a way to delete elements").
  *
  * THE FOREIGN KEYS AROUND `production_elements` ARE SPLIT DOWN THE MIDDLE, and
- * that split is the whole of this module. Two references CASCADE and five
+ * that split is the whole of this module. Two references CASCADE and four
  * REFUSE, so unlike every other delete in this app the answer is not "warn and
  * let the human through" — for half the catalog Postgres will simply say no.
  *
  *   cascade  production_element_locations (036) · production_element_days (040)
  *   restrict production_recipes (036) · production_recipe_lines (036)
- *            production_item_elements (037) · production_items.base_element_id
+ *            production_item_elements (037)
  *   no action production_batches (044)
+ *
+ * `production_items.base_element_id` WAS A FIFTH, and migration 049 dropped
+ * the column. This module went on reading it until 2026-10-08, so the check
+ * errored on every element, landed in `unreadable`, and NO element could be
+ * deleted from the app at all — the dialog said it "could not check the items
+ * it is the dough for" (Mark: "prevented for a couple different reasons I
+ * don't understand"). `ProductionItemActions` had already learned this one:
+ * probe the live columns, don't read the migration that created them.
  *
  * 036 wrote down the intent when it chose `restrict`: "deleting an element that
  * has recipes would take a versioned document with it. The app counts them and
@@ -32,8 +40,6 @@ export type ElementUsage = {
   ingredientIn: string[];
   /** Items whose BOM names it — `production_item_elements`. */
   componentOf: string[];
-  /** Items whose dough it is — `production_items.base_element_id`. */
-  doughFor: string[];
   /** Batches ever logged against it — `production_batches`. */
   batches: number;
   /** Per-shop rows that would go with it — cascade. */
@@ -54,7 +60,6 @@ export const EMPTY_ELEMENT_USAGE: ElementUsage = {
   recipes: [],
   ingredientIn: [],
   componentOf: [],
-  doughFor: [],
   batches: 0,
   locations: 0,
   scheduledDays: 0,
@@ -63,7 +68,7 @@ export const EMPTY_ELEMENT_USAGE: ElementUsage = {
 
 export type ElementBlocker = {
   /** Which reference is in the way. */
-  key: "recipes" | "ingredientIn" | "componentOf" | "doughFor" | "batches";
+  key: "recipes" | "ingredientIn" | "componentOf" | "batches";
   /** How many rows hold it. */
   count: number;
   /**
@@ -83,7 +88,7 @@ export const NAMES_SHOWN = 4;
 export function deleteBlockers(usage: ElementUsage): ElementBlocker[] {
   const out: ElementBlocker[] = [];
   const named = (
-    key: Extract<ElementBlocker["key"], "recipes" | "ingredientIn" | "componentOf" | "doughFor">,
+    key: Extract<ElementBlocker["key"], "recipes" | "ingredientIn" | "componentOf">,
     names: string[]
   ) => {
     if (names.length > 0) out.push({ key, count: names.length, names });
@@ -91,7 +96,6 @@ export function deleteBlockers(usage: ElementUsage): ElementBlocker[] {
   named("recipes", usage.recipes);
   named("ingredientIn", usage.ingredientIn);
   named("componentOf", usage.componentOf);
-  named("doughFor", usage.doughFor);
   if (usage.batches > 0) out.push({ key: "batches", count: usage.batches, names: [] });
   return out;
 }
