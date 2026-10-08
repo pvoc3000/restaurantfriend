@@ -5770,3 +5770,7 @@ Mark: "make copies and standing orders inherit the grouping."
   grouping later reaches only the days made after. All orders read `none`
   when it was written, so no backfill.
 - **Not verified:** not run anywhere — WRITTEN, NOT APPLIED.
+- **APPLIED 2026-10-07** by CLI at Mark's request (`db query --linked`, in a
+  transaction). Confirmed after: the live body names `line_grouping` twice
+  (none before), and its grants are unchanged (authenticated yes, anon no).
+  The function itself has not been run since — the next top-up is its test.
