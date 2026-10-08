@@ -1951,3 +1951,18 @@ name that has a master: `lib/recipes`' `costingRecipe` restates
 the element left and the element joined (fixtures: `recipeLinks`). The two
 element-side commands show on MADE elements only. NOT exercised in a browser
 when written — the test pane was signed out — only by `tsc`, lint and fixtures.
+
+## 2026-10-08 — two readers of a column 049 dropped
+
+`production_items.base_element_id` went in migration 049 and two places kept
+reading it. **Element delete** (`ElementActions.readUsage`): the read errored,
+landed in `unreadable`, and NO element could be deleted from the app — the
+dialog said it "could not check the items it is the dough for". The dough
+blocker is removed from `lib/productionElements`. **The production packet**
+(`fetchPacketData`): the read was `.then((r) => r.data ?? [])`, so the error
+became an empty item list and element demand was empty for every kitchen.
+Nothing printed was wrong, only because the Donut Element Sheet is the one page
+that prints demand and the dialog has not offered it since 2026-09-01. The read
+is gone (it only supplied ids the schedule lines already carry) and the
+loader's three other bare reads now throw through `rowsOrThrow`; their columns
+were checked against the live schema first. Not exercised by printing a packet.

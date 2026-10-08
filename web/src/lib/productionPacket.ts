@@ -219,6 +219,18 @@ async function fetchAll<T>(
   return out;
 }
 
+/**
+ * A single read's rows, or its error THROWN. `r.data ?? []` reads a failed
+ * query as an empty table, which is how a dropped column emptied element
+ * demand here without anybody being told.
+ */
+function rowsOrThrow<T>(table: string) {
+  return (r: { data: T[] | null; error: { message: string } | null }): T[] => {
+    if (r.error) throw new Error(`${table}: ${r.error.message}`);
+    return r.data ?? [];
+  };
+}
+
 /** ISO date -> ISO weekday, 1 = Monday. Never through `new Date(iso)` local. */
 function isoWeekday(iso: string): number {
   const jsDay = new Date(`${iso}T00:00:00Z`).getUTCDay();
@@ -271,8 +283,8 @@ export async function fetchPacketData(
       "id",
       (q) => (q as never as { in: (c: string, v: string[]) => unknown }).in("schedule_id", allIds)
     ),
-    supabase.from("locations").select("id, code").in("id", locationIds).then((r) => r.data ?? []),
-    supabase.from("org_members").select("user_id, display_name").then((r) => r.data ?? []),
+    supabase.from("locations").select("id, code").in("id", locationIds).then(rowsOrThrow("locations")),
+    supabase.from("org_members").select("user_id, display_name").then(rowsOrThrow("org_members")),
     fetchAll<Record<string, unknown>>(
       supabase,
       "production_element_days",
@@ -290,21 +302,21 @@ export async function fetchPacketData(
         "element_id, location_id, stock_count, stock_size, stock_unit, is_active"
       )
       .in("location_id", kitchenIds)
-      .then((r) => r.data ?? []),
+      .then(rowsOrThrow("production_element_locations")),
   ]);
 
   const itemIds = [...new Set(lines.map((l) => l.item_id as string))];
 
-  // The BOM, for element demand. Two queries, both bounded by the night's own
-  // item list rather than by the whole catalog.
-  const [items, edges, elements] = await Promise.all([
-    itemIds.length
-      ? supabase
-          .from("production_items")
-          .select("id, item_type, subtype, size, base_element_id")
-          .in("id", itemIds)
-          .then((r) => r.data ?? [])
-      : Promise.resolve([]),
+  // The BOM, for element demand, bounded by the night's own item list rather
+  // than by the whole catalog.
+  //
+  // NO READ OF `production_items` (2026-10-08). There was one, and it selected
+  // `base_element_id`, which migration 049 dropped — so it errored, the error
+  // was swallowed into an empty list, and element demand came out empty for
+  // every kitchen without a word. Nothing printed was wrong only because the
+  // one page that prints demand, the Donut Element Sheet, is not offered. All
+  // it ever supplied was the item's id, which the schedule lines already carry.
+  const [edges, elements] = await Promise.all([
     itemIds.length
       ? fetchAll<Record<string, unknown>>(
           supabase,
@@ -365,10 +377,7 @@ export async function fetchPacketData(
     });
   }
   const itemById = new Map<string, ItemDemandSource>(
-    items.map((i) => [
-      i.id as string,
-      { id: i.id as string, elements: edgesByItem.get(i.id as string) ?? [] },
-    ])
+    itemIds.map((id) => [id, { id, elements: edgesByItem.get(id) ?? [] }])
   );
 
   const stockByPair = new Map(
