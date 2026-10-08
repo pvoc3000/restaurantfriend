@@ -1,8 +1,8 @@
 # Picklist option sets
 
 A sweep of every picklist in `web/src` on 2026-10-08: each `ui/PickList`, each
-`InlineValue kind="pick"`, and the generic `ui/FilterMenus` menu. 263 call
-sites in 128 files. The call sites were extracted by script; the grouping into
+`InlineValue kind="pick"`, and the generic `ui/FilterMenus` menu. 247 call
+sites in 127 files. The call sites were extracted by script; the grouping into
 sets below was done by hand from that list, so treat a count as right to
 within one or two.
 
@@ -13,7 +13,6 @@ within one or two.
 | Record pickers (choose a row) | 68 |
 | QuickBooks and Square lists | 15 |
 | Filters and view menus | 50 |
-| `/interface` specimens (not real fields) | 16 |
 
 "Type new" means the field accepts a value that is not on the list.
 
