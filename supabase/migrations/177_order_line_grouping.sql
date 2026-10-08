@@ -15,6 +15,8 @@
 -- `LINE_GROUPINGS` in web/src/lib/specialOrderLines.ts; a new one is an edit
 -- to this check as well.
 --
+-- (CORRECTED by 178: `copy_special_order` DOES carry it — it copies the whole
+-- row. Only the standing-order materializer did not.)
 -- NOT COPIED by `copy_special_order` (113) or the standing-order materializer
 -- (172): both name their columns, so a copy and a standing order's days start
 -- at 'none'. Not logged: `trg_log_special_order` watches a named list.

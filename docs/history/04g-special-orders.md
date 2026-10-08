@@ -5754,3 +5754,19 @@ amount".
   Notes · Cost. Item keeps its 200pt.
 - **Item is 230pt** (Mark, same day: "a little more width"), Notes another
   30pt narrower.
+
+### 2026-10-07 — a standing order's days take its grouping (migration 178)
+
+Mark: "make copies and standing orders inherit the grouping."
+
+- **Copies already did.** The note above ("Not copied by `copy_special_order`")
+  was WRONG: 114's function copies the whole row through `to_jsonb` and strips
+  a named list that `line_grouping` is not on. Read off the live body. Nothing
+  to change for a duplicate, a template, or an order made from one.
+- **178** adds `line_grouping` to `ensure_standing_orders_materialized`'s
+  insert list and select — the live body (172's) with those two lines added,
+  diffed to confirm nothing else moved.
+- **Days already made are not touched**, and changing a standing order's
+  grouping later reaches only the days made after. All orders read `none`
+  when it was written, so no backfill.
+- **Not verified:** not run anywhere — WRITTEN, NOT APPLIED.
