@@ -232,3 +232,26 @@ export async function deleteRecipe(
   if (imagePaths.length) await supabase.storage.from(RECIPE_IMAGE_BUCKET).remove(imagePaths);
   return { ok: true };
 }
+
+/**
+ * Point a recipe at a different element. One column, because a recipe makes
+ * exactly one element — so this is always a move, never a second link.
+ *
+ * The row count is read back: RLS filters an update to zero rows without an
+ * error, and a bare update would report a link that was never made.
+ */
+export async function moveRecipe(
+  supabase: SupabaseClient,
+  recipeId: string,
+  elementId: string
+): Promise<{ ok: true } | { error: string }> {
+  const { data, error } = await supabase
+    .from("production_recipes")
+    .update({ element_id: elementId })
+    .eq("id", recipeId)
+    .select("id");
+  if (error) return { error: error.message };
+  if (!data || data.length === 0)
+    return { error: "Nothing changed — this recipe is not one you may edit." };
+  return { ok: true };
+}

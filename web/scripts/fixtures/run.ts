@@ -70,6 +70,7 @@ import "./productionBatches.fixtures";
 import "./productionCost.fixtures";
 import "./productionElements.fixtures";
 import "./recipeIngredients.fixtures";
+import "./recipeLinks.fixtures";
 import "./productionHistory.fixtures";
 import "./inquiry.fixtures";
 import "./inquiryOrder.fixtures";

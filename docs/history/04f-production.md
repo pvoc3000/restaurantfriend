@@ -1927,3 +1927,22 @@ ones go red when the recorded branch is disabled. Not walked in a browser:
 Applied 2026-10-04 at Mark's request (`db query --linked -f`, one transaction):
 all 64 plan schedules now carry exactly one plan, the 27 special-order
 schedules none, and `anon` still cannot execute the generator.
+
+**A RECIPE IS LINKED TO ITS ELEMENT FROM EITHER RECORD (2026-10-08).** Mark:
+"I can't figure out how to link an element to a recipe, or a recipe to an
+element." Until this `production_recipes.element_id` had ONE writer, the New
+Recipe dialog, so a recipe made against the wrong element could not be put
+right and the element record's Recipes section was a read-only list — while
+`NewElement` told you to "add the recipe on the element's own screen". Three
+controls, one column:
+- the recipe's **Makes** line is a picklist (`RecipeMakes`);
+- the element's Recipes section has **New recipe** (`NewRecipe` with
+  `fixedElement`, the element stated rather than asked for) and
+- **Link recipe** (`LinkRecipe`), which picks an existing recipe.
+A recipe still makes EXACTLY ONE element, so both links are a MOVE and there is
+no unlink. Both ask first, because costing takes an element's first recipe by
+name that has a master: `lib/recipes`' `costingRecipe` restates
+`loadProductionGraph`'s rule and `recipeMoveNotes` says what the move does to
+the element left and the element joined (fixtures: `recipeLinks`). The two
+element-side commands show on MADE elements only. NOT exercised in a browser
+when written — the test pane was signed out — only by `tsc`, lint and fixtures.

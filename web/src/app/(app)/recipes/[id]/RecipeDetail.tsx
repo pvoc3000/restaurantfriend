@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { loadProductionGraph, loadElementOptions } from "@/lib/productionQueries";
+import {
+  loadProductionGraph,
+  loadElementOptions,
+  loadRecipeLinks,
+} from "@/lib/productionQueries";
 import { versionBatchCost, laborCells, costContext } from "@/lib/productionCost";
 import { scaleColumns } from "@/lib/production";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -11,6 +15,7 @@ import { RecordNav } from "@/components/ui/RecordNav";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { RecipeVersions } from "@/components/production/RecipeVersions";
 import { RecipeCommandMenu } from "@/components/production/RecipeCommandMenu";
+import { RecipeMakes } from "@/components/production/RecipeMakes";
 import { RecipeVersionSheet } from "@/components/production/RecipeVersionSheet";
 import { RecipeInfo } from "@/components/production/RecipeInfo";
 import { SectionNav } from "@/components/ui/SectionNav";
@@ -52,7 +57,7 @@ export async function RecipeDetail({
     { data: recipe, error },
     { graph, error: graphError },
     { options: elementOptions },
-    { data: typeRows },
+    { recipes: recipeLinks },
   ] = await Promise.all([
     supabase
       .from("production_recipes")
@@ -78,8 +83,10 @@ export async function RecipeDetail({
       // costing graph beside it deliberately cannot answer (it loads retired
       // ones too, because a resolver has to price what is already on a recipe).
       loadElementOptions(supabase),
-      // The `recipe_type` vocabulary, for the menu's New Recipe dialog.
-      supabase.from("production_recipes").select("recipe_type"),
+      // Every recipe family: the `recipe_type` vocabulary for the menu's New
+      // Recipe dialog, and what the Makes picker reads to say what moving this
+      // recipe to another element would do to costs.
+      loadRecipeLinks(supabase),
     ]);
 
   if (error || graphError) {
@@ -289,6 +296,13 @@ export async function RecipeDetail({
     versions[0] ??
     null;
 
+  const elementHref = element
+    ? withFrom(`/elements/${element.id as string}`, {
+        href: `/recipes/${id}`,
+        label: recipe.name as string,
+      })
+    : "";
+
   return (
     <div className="space-y-8">
       <Breadcrumbs
@@ -318,23 +332,27 @@ export async function RecipeDetail({
               <span className="text-[12px] uppercase tracking-[0.12em] text-muted">Inactive</span>
             ) : null}
           </div>
-          <p className="text-[13px] text-muted">
-            Makes{" "}
-            {element ? (
-              <Link
-                href={withFrom(`/elements/${element.id as string}`, {
-                  href: `/recipes/${id}`,
-                  label: recipe.name as string,
-                })}
-                className="font-medium text-ink hover:underline"
-              >
+          {/* A div, not a p: the editable Makes is a picklist, whose trigger
+              and sizer are not phrasing content. */}
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-muted">
+            <span>Makes</span>
+            {element && editable ? (
+              <RecipeMakes
+                recipeId={id}
+                elementId={element.id as string}
+                elementHref={elementHref}
+                elements={elementOptions}
+                recipes={recipeLinks}
+              />
+            ) : element ? (
+              <Link href={elementHref} className="font-medium text-ink hover:underline">
                 {element.name as string}
               </Link>
             ) : (
               "—"
             )}
-            {recipe.recipe_type ? ` · ${recipe.recipe_type as string}` : ""}
-          </p>
+            {recipe.recipe_type ? <span>· {recipe.recipe_type as string}</span> : null}
+          </div>
         </div>
         <div className="ml-auto">
           <RecipeCommandMenu
@@ -349,8 +367,8 @@ export async function RecipeDetail({
             elements={elementOptions}
             types={[
               ...new Set(
-                (typeRows ?? [])
-                  .map((r) => (r.recipe_type as string | null) ?? "")
+                recipeLinks
+                  .map((r) => r.recipeType ?? "")
                   .filter((t) => t.trim() !== "")
               ),
             ].sort()}

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { loadProductionGraph } from "@/lib/productionQueries";
+import { loadProductionGraph, loadRecipeLinks } from "@/lib/productionQueries";
 import { elementCost, costContext } from "@/lib/productionCost";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
@@ -15,6 +15,8 @@ import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { BATCH_STATUS_LABEL, batchDate, describeAmount } from "@/lib/productionBatches";
 import { elementTypeVocabulary, type ElementKind } from "@/lib/production";
 import { ElementActions } from "@/components/production/ElementActions";
+import { NewRecipe } from "@/components/production/NewRecipe";
+import { LinkRecipe } from "@/components/production/LinkRecipe";
 import { canEditPage } from "@/lib/pageAccess";
 import { loadInventoryItemOptions } from "@/lib/inventoryItemOptions";
 
@@ -38,7 +40,7 @@ export async function ElementDetail({
   // until this shop's rate turns it into money.
   const costs = costContext(session.activeLocation);
 
-  const [{ data: element, error }, { graph }, { data: recipes }, { data: locations }, { data: types }] =
+  const [{ data: element, error }, { graph }, { data: recipes }, { data: locations }, { recipes: recipeLinks }] =
     await Promise.all([
       supabase
         .from("production_elements")
@@ -65,9 +67,10 @@ export async function ElementDetail({
            is_active, notes`
         )
         .eq("element_id", id),
-      // The TYPE menu is the recipe types, not the element types in use —
-      // `elementTypeVocabulary` says why.
-      supabase.from("production_recipes").select("recipe_type").not("recipe_type", "is", null),
+      // Every recipe family. The TYPE menu is the recipe types, not the element
+      // types in use — `elementTypeVocabulary` says why — and Link recipe…
+      // chooses from the same rows.
+      loadRecipeLinks(supabase),
     ]);
 
   // The last ten times this was made — what `production_batches_element_idx`
@@ -115,7 +118,7 @@ export async function ElementDetail({
     : element.inventory_items;
 
   const typeVocabulary = elementTypeVocabulary(
-    (types ?? []).map((t) => t.recipe_type as string | null)
+    recipeLinks.map((r) => r.recipeType)
   );
 
   const trail = parseTrail(rawParams, { href: "/elements", label: "Elements" });
@@ -182,7 +185,25 @@ export async function ElementDetail({
       </div>
 
       <section className="space-y-2">
-        <SectionHeading count={(recipes ?? []).length}>Recipes</SectionHeading>
+        {/* A recipe is linked from EITHER end, and both write the recipe's one
+            `element_id`: New recipe… starts one that makes this element, Link
+            recipe… moves an existing one here. Made elements only, since only
+            a made element is costed from a recipe. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <SectionHeading count={(recipes ?? []).length}>Recipes</SectionHeading>
+          {editable && element.kind === "made" ? (
+            <div className="ml-auto flex flex-wrap gap-2">
+              <NewRecipe
+                orgId={session.membership.org_id}
+                fixedElement={{ id, name: element.name as string }}
+                types={[
+                  ...new Set(recipeLinks.map((r) => r.recipeType ?? "").filter((t) => t.trim() !== "")),
+                ].sort()}
+              />
+              <LinkRecipe elementId={id} elementName={element.name as string} recipes={recipeLinks} />
+            </div>
+          ) : null}
+        </div>
         {(recipes ?? []).length === 0 ? (
           <p className="text-[13px] text-muted">
             {element.kind === "made"

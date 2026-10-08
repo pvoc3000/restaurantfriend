@@ -146,3 +146,77 @@ export function ingredientUpdate(
       return { label: null };
   }
 }
+
+/** One recipe family as the link between a recipe and its element sees it. */
+export type RecipeLink = {
+  id: string;
+  name: string;
+  /** `production_recipes.element_id` — the ONE element this recipe makes. */
+  elementId: string;
+  /** Whether the family has a master version, which is all costing reads. */
+  hasMaster: boolean;
+};
+
+/**
+ * The recipe an element is costed from: its first family BY NAME that has a
+ * master version.
+ *
+ * `loadProductionGraph` makes this choice with the same sort and the same test;
+ * this is that rule on its own so a screen can say what a move would do BEFORE
+ * it is made. Change one and the other has to follow.
+ */
+export function costingRecipe(recipes: RecipeLink[], elementId: string): RecipeLink | null {
+  return (
+    recipes
+      .filter((r) => r.elementId === elementId && r.hasMaster)
+      .sort((a, b) => a.name.localeCompare(b.name))[0] ?? null
+  );
+}
+
+/**
+ * What pointing a recipe at a different element does, in sentences for the
+ * confirm that precedes it.
+ *
+ * A recipe makes exactly one element, so linking it to another is always a
+ * MOVE, and a move can change what two elements cost: the one it leaves may
+ * lose the recipe it was costed from, and the one it joins is costed from
+ * whichever of its recipes sorts first. Empty when there is nothing to move.
+ */
+export function recipeMoveNotes(
+  recipes: RecipeLink[],
+  recipeId: string,
+  toElementId: string,
+  elementName: (id: string) => string
+): string[] {
+  const recipe = recipes.find((r) => r.id === recipeId);
+  if (!recipe || recipe.elementId === toElementId) return [];
+
+  const from = elementName(recipe.elementId);
+  const to = elementName(toElementId);
+  const moved = recipes.map((r) => (r.id === recipeId ? { ...r, elementId: toElementId } : r));
+  const notes = [`“${recipe.name}” will make ${to} instead of ${from}.`];
+
+  if (costingRecipe(recipes, recipe.elementId)?.id === recipeId) {
+    const next = costingRecipe(moved, recipe.elementId);
+    notes.push(
+      next
+        ? `${from} will be costed from “${next.name}”.`
+        : `${from} will have no recipe to cost it from.`
+    );
+  }
+
+  const before = costingRecipe(recipes, toElementId);
+  const after = costingRecipe(moved, toElementId);
+  if (after?.id === recipeId) {
+    notes.push(
+      before
+        ? `${to} is costed from “${before.name}” today. It will be costed from “${recipe.name}”, which comes first by name.`
+        : `${to} will be costed from “${recipe.name}”.`
+    );
+  } else if (before) {
+    notes.push(`${to} will still be costed from “${before.name}”, which comes first by name.`);
+  } else {
+    notes.push(`“${recipe.name}” has no master version, so ${to} will have no cost from it.`);
+  }
+  return notes;
+}

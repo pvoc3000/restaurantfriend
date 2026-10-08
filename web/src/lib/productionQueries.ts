@@ -155,6 +155,8 @@ export async function loadProductionGraph(
     linesByVersion.set(key, list);
   }
 
+  // `lib/recipes`' `costingRecipe` states this same rule for the screens that
+  // move a recipe between elements; change one and the other has to follow.
   // An element's master version is the master of its FIRST recipe family. An
   // element with two families (a summer and a winter formulation) has two, and
   // costing has to pick one; the first by name is at least stable, and the
@@ -401,6 +403,53 @@ export async function loadElementOptions(
       label: e.name as string,
       inactive: e.is_active === false,
     })),
+    error: null,
+  };
+}
+
+/**
+ * Every recipe family with the element it makes — the vocabulary for linking a
+ * recipe to an element from either record, and what `recipeMoveNotes` reads to
+ * say what a move would do to costs.
+ */
+export async function loadRecipeLinks(supabase: SupabaseClient): Promise<{
+  recipes: {
+    id: string;
+    name: string;
+    elementId: string;
+    elementName: string;
+    hasMaster: boolean;
+    isActive: boolean;
+    recipeType: string | null;
+  }[];
+  error: string | null;
+}> {
+  const { data, error } = await fetchAll(
+    supabase,
+    "production_recipes",
+    `id, name, element_id, is_active, recipe_type,
+     production_elements ( name ),
+     production_recipe_versions ( is_master )`,
+    "name"
+  );
+  if (error) return { recipes: [], error: error.message };
+  return {
+    recipes: data.map((r) => {
+      const element = (Array.isArray(r.production_elements)
+        ? r.production_elements[0]
+        : r.production_elements) as { name?: string } | null;
+      return {
+        id: r.id as string,
+        name: r.name as string,
+        elementId: r.element_id as string,
+        elementName: element?.name ?? "—",
+        hasMaster: ((r.production_recipe_versions ?? []) as { is_master: boolean }[]).some(
+          (v) => v.is_master
+        ),
+        isActive: r.is_active !== false,
+        recipeType: (r.recipe_type ?? null) as string | null,
+      };
+    }),
     error: null,
   };
 }
