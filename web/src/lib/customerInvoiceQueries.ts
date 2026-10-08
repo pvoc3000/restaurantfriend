@@ -10,6 +10,7 @@
  * one-line order sent before 141) the money a breakdown is cut from.
  */
 
+import { isLineGrouping } from "./specialOrderLines";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { refundLeft } from "./customerPayments";
 
@@ -150,12 +151,12 @@ export async function fetchInvoiceView(
         .from("special_orders")
         .select(
           `id, number, title, event_date, status, tax_rate, square_item, kitchen_location_id, discount_amount, discount_rate,
-           delivery_charge, rush_fee, rush_rate, ignore_balance`
+           delivery_charge, rush_fee, rush_rate, ignore_balance, line_grouping`
         )
         .in("id", orderIds),
       supabase
         .from("special_order_items")
-        .select("order_id, qty, unit_price, taxable, sort, id, hide_from_customer")
+        .select("order_id, qty, unit_price, taxable, sort, id, hide_from_customer, item_donut, item_type, item_cut, item_size")
         .in("order_id", orderIds)
         .order("sort", { ascending: true, nullsFirst: false })
         .order("id"),
@@ -164,8 +165,25 @@ export async function fetchInvoiceView(
     const itemsOf = new Map<string, { qty: number | null; unit_price: number | null; taxable: boolean }[]>();
     // 179: mark the lines whose order item is hidden from the customer.
     const hiddenItems = new Set((it ?? []).filter((l) => l.hide_from_customer).map((l) => l.id as string));
+    // …and give each its item's taxonomy and its order's Group by (177), so
+    // a one-order invoice's items band as the Items tab does.
+    const itemOf = new Map((it ?? []).map((l) => [l.id as string, l]));
+    const groupingOf = new Map(
+      ((o ?? []) as { id: string; line_grouping?: unknown }[]).map((r) => [
+        r.id,
+        isLineGrouping(r.line_grouping) ? r.line_grouping : ("none" as const),
+      ])
+    );
     for (const l of lines) {
       if (l.special_order_item_id && hiddenItems.has(l.special_order_item_id)) l.hidden = true;
+      if (l.special_order_id) l.grouping = groupingOf.get(l.special_order_id) ?? "none";
+      const item = l.special_order_item_id ? itemOf.get(l.special_order_item_id) : null;
+      if (item) {
+        l.item_donut = item.item_donut as string | null;
+        l.item_type = item.item_type as string | null;
+        l.item_cut = item.item_cut as string | null;
+        l.item_size = item.item_size as string | null;
+      }
     }
     for (const l of it ?? []) {
       itemsOf.set(l.order_id as string, [

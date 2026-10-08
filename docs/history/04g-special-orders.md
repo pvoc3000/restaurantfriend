@@ -5833,3 +5833,26 @@ kitchen orders. put the column after tax column.'
   transaction); confirmed validated. **Not verified:** that a refused write
   reads sensibly in the app — the Items tab cannot produce one, so nothing
   words the constraint's error for a person.
+
+### 2026-10-08 — the customer invoice PDF bands a one-order invoice's items
+
+Mark: "group the order items on an invoice pdf as well."
+
+- **No migration.** `fetchInvoiceView` already loads the invoice's orders and
+  their items; it now also reads the order's `line_grouping` and each item's
+  donut, type, cut and size, and puts them on the invoice line through
+  `special_order_item_id` — LIVE, like 179's `hidden`. The frozen lines and
+  the SQL copy are untouched, and so is every amount.
+- **`invoicePaper`** runs the items through `groupLines` and returns
+  `detail.groups` beside `detail.rows`; the rows are in band order.
+  `CustomerInvoicePdf` draws the groups by the order documents' rules: Item
+  type sorted by and not printed, a band shows its amount and no count.
+- **Only where items are listed at all:** a ONE-order invoice with no Delivery
+  other charge. A weekly invoice is a row per order and has no items to band.
+- **`/pay` and the email's text** read `detail.rows`, so they list the items
+  in the same order with no headings. Mark asked for the PDF.
+- **A line whose order item is gone**, and 176's added-quantity lines if they
+  carry no item id, have no taxonomy and fall in the empty band.
+- **Verified:** a Node render of a one-order invoice at Item type and Item
+  size; a fixture for the bands; `tsc`, eslint, 2,256 fixtures. **Not
+  verified:** a real invoice loaded from the database.

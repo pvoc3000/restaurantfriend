@@ -356,6 +356,15 @@ test("invoicePaper: one order is itemized, unless an other charge is Delivery", 
   const hid = invoicePaper(groupInvoiceLines(one.map((l) => (l.line_type === "item" ? { ...l, hidden: true } : l)), orders));
   eq(hid.rows[0].detail, undefined, "its only item is hidden, so nothing is itemized");
   eq(hid.rows[0].amount, itemized.rows[0].amount, "and the row charges what it charged");
+  // Banded by the order's Group by: sizes A→Z, the empty one last, document order within.
+  const mk = (description: string, item_size: string | null, amount: number, sort: number) => ({
+    ...line({ special_order_id: "o1", line_type: "item", description, amount, sort, order_label: "Order #1" }),
+    qty: 1, unit_price: amount, grouping: "size" as const, item_size,
+  });
+  const banded = invoicePaper(groupInvoiceLines([mk("Reg A", "Regular", 3, 1), mk("Mini", "Mini", 2, 2), mk("Box", null, 0, 3), mk("Reg B", "Regular", 4, 4)], orders));
+  eq(banded.rows[0].detail?.groups?.map((g) => [g.label, g.amount, g.rows.length]), [["Mini", 2, 1], ["Regular", 7, 2], ["No size", 0, 1]]);
+  eq(banded.rows[0].detail?.rows.map((r) => r.amount), [2, 3, 4, 0], "the flat rows follow the bands");
+  eq(itemized.rows[0].detail?.groups, undefined, "no Group by, no bands");
   const withFee = invoicePaper(groupInvoiceLines([...one, line({ line_type: "delivery", description: "Delivery Fee", amount: 40, sort: 0 })], orders));
   ok(withFee.columns, "a Delivery charge has no place in the itemized Amount column");
   eq(withFee.rows[0].detail, undefined);

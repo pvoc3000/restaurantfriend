@@ -865,14 +865,38 @@ export function CustomerInvoicePdf({
                       <View style={s.invBand} wrap={false}>
                         <Text style={[s.invBandText, s.invDesc]}>{l.description}</Text>
                       </View>
-                      {l.detail.rows.map((r, j) => (
-                        <View key={j} style={[s.invRow, s.invDetail]} wrap={false}>
-                          <Text style={[s.invDesc, r.amount < 0 ? { color: MUTED } : {}]}>{r.label}</Text>
-                          <Text style={[s.invAmount, r.amount < 0 ? { color: MUTED } : {}]}>
-                            {r.amount ? money(r.amount) : "—"}
-                          </Text>
-                        </View>
-                      ))}
+                      {/* BANDED AS THE ORDER'S ITEMS TAB IS (Mark, 2026-10-08),
+                          by the order documents' rules: the Item type band is
+                          sorted by and not printed, and a band shows its
+                          amount and no count. */}
+                      {(l.detail.groups ?? [{ label: "", level: 0, unprinted: false, amount: 0, rows: l.detail.rows }]).map(
+                        (g, gi) => (
+                          <View key={gi}>
+                            {g.unprinted ? (
+                              gi > 0 ? <View style={{ height: 10 }} /> : null
+                            ) : g.label ? (
+                              <View
+                                style={[s.bandRow, s.invDetail, l.detail?.groups?.[0]?.unprinted && g.level > 1 ? s.bandCut : s.bandSize]}
+                                wrap={false}
+                                minPresenceAhead={30}
+                              >
+                                <Text style={[s.bandLabel, { width: undefined, flexGrow: 1, flexBasis: 0, paddingLeft: Math.max(0, g.level - 1) * 10 }]}>
+                                  {g.label}
+                                </Text>
+                                <Text style={[s.bandFigure, s.invAmount]}>{money(g.amount)}</Text>
+                              </View>
+                            ) : null}
+                            {g.rows.map((r, j) => (
+                              <View key={j} style={[s.invRow, s.invDetail]} wrap={false}>
+                                <Text style={[s.invDesc, r.amount < 0 ? { color: MUTED } : {}]}>{r.label}</Text>
+                                <Text style={[s.invAmount, r.amount < 0 ? { color: MUTED } : {}]}>
+                                  {r.amount ? money(r.amount) : "—"}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        )
+                      )}
                     </View>
                   ) : (
                     <View key={i} style={s.invRow} wrap={false}>

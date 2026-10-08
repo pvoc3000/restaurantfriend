@@ -11,6 +11,7 @@
  * Fixture-tested; imports nothing that talks to a server.
  */
 
+import { groupLines, type LineGrouping } from "./specialOrderLines";
 import { usDate } from "./specialOrderDocs";
 import { businessDaysBefore } from "./specialOrders";
 
@@ -144,6 +145,14 @@ export type CustomerInvoiceLine = {
   /** 179 — that item is hidden from the customer, read LIVE when the invoice
    *  is loaded. Its row is left off the paper; its amount stays in the sums. */
   hidden?: boolean;
+  /** How the paper bands a one-order invoice's items: the order's Group by
+   *  (177) and the item's own taxonomy, both read LIVE like `hidden`. A line
+   *  whose order item is gone has none and falls in the empty band. */
+  grouping?: LineGrouping;
+  item_donut?: string | null;
+  item_type?: string | null;
+  item_cut?: string | null;
+  item_size?: string | null;
 };
 
 export type InvoiceStatus = "draft" | "sent" | "overdue" | "paid" | "void";
@@ -400,6 +409,16 @@ export const PAPER_COLUMNS: { key: keyof PaperParts; label: string }[] = [
   { key: "tax", label: "Tax" },
 ];
 
+/** One band of a one-order invoice's items — `groupLines`' band, for paper. */
+export type PaperDetailGroup = {
+  label: string;
+  level: number;
+  /** The Item type band: sorted by, never printed (the order PDFs' rule). */
+  unprinted: boolean;
+  amount: number;
+  rows: { label: string; amount: number }[];
+};
+
 export type PaperRow = {
   description: string;
   /** What the row charges: its parts added up, or an item's amount. */
@@ -407,7 +426,13 @@ export type PaperRow = {
   /** The row's money by column, when the paper has columns. */
   parts?: PaperParts;
   /** A one-order invoice's items, when the paper is itemized. */
-  detail?: { rows: { label: string; amount: number }[] };
+  detail?: {
+    /** In the order they print — the order's Group by, when it has one. */
+    rows: { label: string; amount: number }[];
+    /** The same rows under their bands, when the order is grouped. A band's
+     *  `rows` are empty unless it is a leaf. */
+    groups?: PaperDetailGroup[];
+  };
   /** An OTHER CHARGE (141's free line), not an order. */
   free?: boolean;
 };
@@ -430,7 +455,7 @@ export type PaperRow = {
  * stay in the Totals window alone.
  */
 export function invoicePaper<
-  L extends Pick<CustomerInvoiceLine, "special_order_id" | "line_type" | "amount" | "sort" | "order_label" | "description" | "qty" | "unit_price" | "taxable" | "hidden">
+  L extends Pick<CustomerInvoiceLine, "special_order_id" | "line_type" | "amount" | "sort" | "order_label" | "description" | "qty" | "unit_price" | "taxable" | "hidden" | "grouping" | "item_donut" | "item_type" | "item_cut" | "item_size">
 >(groups: InvoiceGroup<L>[]): { columns: boolean; rows: PaperRow[] } {
   const orderCount = groups.filter((g) => g.orderId).length;
   const freeDelivery = groups.some((g) => !g.orderId && g.lines.some((l) => l.line_type === "delivery"));
@@ -456,6 +481,30 @@ export function invoicePaper<
     // 179: an item hidden from the customer is not listed. The order's row
     // still charges for it — `t` above is over every line.
     const items = g.lines.filter((l) => l.line_type === "item" && !l.hidden);
+    const itemRow = (i: L) => ({
+      label:
+        i.qty !== null && i.unit_price !== null
+          ? `${qtyText(Number(i.qty))} × ${i.description} @ ${dollars(Number(i.unit_price))}`
+          : i.description,
+      amount: cents(Number(i.amount)),
+    });
+    // Banded as the order's Items tab is (Mark, 2026-10-08).
+    const grouping = items.find((i) => i.grouping)?.grouping ?? "none";
+    const bands =
+      grouping === "none"
+        ? null
+        : groupLines(
+            items.map((i) => ({
+              line: i,
+              name: i.description,
+              item_donut: i.item_donut ?? null,
+              item_type: i.item_type ?? null,
+              item_cut: i.item_cut ?? null,
+              item_size: i.item_size ?? null,
+              unit_price: i.unit_price,
+            })),
+            grouping
+          );
     return [
       {
         description: g.kind === "deposit" ? `${g.lines[0]?.description ?? "Deposit"} · ${g.label}` : g.label,
@@ -463,15 +512,18 @@ export function invoicePaper<
         parts,
         detail:
           !columns && g.kind === "charges" && items.length > 0
-            ? {
-                rows: items.map((i) => ({
-                  label:
-                    i.qty !== null && i.unit_price !== null
-                      ? `${qtyText(Number(i.qty))} × ${i.description} @ ${dollars(Number(i.unit_price))}`
-                      : i.description,
-                  amount: cents(Number(i.amount)),
-                })),
-              }
+            ? bands
+              ? {
+                  rows: bands.filter((b) => b.leaf).flatMap((b) => b.rows.map((r) => itemRow(r.line))),
+                  groups: bands.map((b) => ({
+                    label: b.label,
+                    level: b.level,
+                    unprinted: b.dimension === "type",
+                    amount: cents(b.rows.reduce((a, r) => a + Number(r.line.amount), 0)),
+                    rows: b.leaf ? b.rows.map((r) => itemRow(r.line)) : [],
+                  })),
+                }
+              : { rows: items.map(itemRow) }
             : undefined,
       },
     ];
