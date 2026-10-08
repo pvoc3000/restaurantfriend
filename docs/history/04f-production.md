@@ -1966,3 +1966,19 @@ that prints demand and the dialog has not offered it since 2026-09-01. The read
 is gone (it only supplied ids the schedule lines already carry) and the
 loader's three other bare reads now throw through `rowsOrThrow`; their columns
 were checked against the live schema first. Not exercised by printing a packet.
+
+## 2026-10-08 — the element delete dialog says what to do about each blocker
+
+Mark, deleting Cinnamon Streusel Topping: told to "take it off those first", "it's
+unclear what 'those' refer to … maybe the app should present the user with the
+options". Each blocker in `ElementActions` now names its records as LINKS and
+says what to do there: a recipe that makes it (delete it, or change its Makes
+field), a recipe it is an ingredient in, an item made from it. **Where the
+element's own recipes are the only blocker** (`canDeleteWithRecipes`, fixtures
+added) the footer offers "Delete element and recipe": `recipeDeleteCounts` says
+what the recipes hold first, then `deleteRecipe` runs per recipe and the
+element goes last, since the foreign key refuses the other order. No
+transaction spans it. A logged batch says outright that deactivating is the
+only choice. NOT built: a bulk "replace this element with another" for the
+ingredient and item blockers — links only, until the case comes up for real.
+Not exercised in a browser; the test pane was signed out.

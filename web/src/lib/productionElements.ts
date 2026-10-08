@@ -112,6 +112,23 @@ export function canDeleteElement(usage: ElementUsage): boolean {
   return deleteBlockers(usage).length === 0 && usage.unreadable.length === 0;
 }
 
+/**
+ * Whether the ONLY thing in the way is the recipes that make this element.
+ *
+ * That is the one blocker the dialog can clear itself (Mark, 2026-10-08:
+ * "maybe the app should present the user with the options to do what's needed
+ * so the element can be deleted"): a recipe belongs to this element alone, so
+ * deleting both is one decision. An ingredient line or an item's component
+ * sits inside somebody else's record and is fixed there, and a logged batch is
+ * history nothing clears.
+ */
+export function canDeleteWithRecipes(usage: ElementUsage): boolean {
+  const blockers = deleteBlockers(usage);
+  return (
+    blockers.length === 1 && blockers[0].key === "recipes" && usage.unreadable.length === 0
+  );
+}
+
 /** What a permitted delete still takes with it — the cascading side. */
 export function cascadeLosses(usage: ElementUsage): { locations: number; scheduledDays: number } {
   return { locations: usage.locations, scheduledDays: usage.scheduledDays };

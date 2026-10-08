@@ -6,6 +6,7 @@
 import {
   EMPTY_ELEMENT_USAGE,
   canDeleteElement,
+  canDeleteWithRecipes,
   cascadeLosses,
   deleteBlockers,
   describeDeleteError,
@@ -32,13 +33,28 @@ test("an unused element deletes and loses nothing", () => {
 });
 
 // ---------------------------------------------------------------------------
-// The five references that REFUSE
+// The four references that REFUSE
 // ---------------------------------------------------------------------------
 
 test("a recipe describing it blocks the delete", () => {
   const u = usage({ recipes: ["Raised Donut"] });
   eq(deleteBlockers(u).map((b) => b.key), ["recipes"], "blockers");
   ok(!canDeleteElement(u), "blocked");
+});
+
+test("its own recipes are the one blocker that can go with it", () => {
+  ok(canDeleteWithRecipes(usage({ recipes: ["Raised Donut", "Raised Donut copy"] })), "recipes only");
+});
+
+test("a recipe plus anything else cannot be cleared from the dialog", () => {
+  ok(!canDeleteWithRecipes(usage({ recipes: ["Raised Donut"], batches: 1 })), "batch");
+  ok(!canDeleteWithRecipes(usage({ recipes: ["Raised Donut"], componentOf: ["Angry Samoa"] })), "item");
+  ok(!canDeleteWithRecipes(usage({ recipes: ["Raised Donut"], unreadable: ["the batch log"] })), "unread");
+});
+
+test("an element nothing blocks has no recipes to take with it", () => {
+  ok(!canDeleteWithRecipes(usage({})), "nothing");
+  ok(!canDeleteWithRecipes(usage({ ingredientIn: ["Chocolate Glaze"] })), "ingredient only");
 });
 
 test("being an ingredient in someone else's recipe blocks it", () => {

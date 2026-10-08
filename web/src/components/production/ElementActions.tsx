@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
@@ -14,8 +15,10 @@ import {
   DIALOG_COMMIT_CLASS,
   DIALOG_DANGER_CLASS,
 } from "@/components/ui/Dialog";
+import { deleteRecipe, recipeDeleteCounts } from "./recipeWrites";
 import {
   canDeleteElement,
+  canDeleteWithRecipes,
   deleteBlockers,
   describeDeleteError,
   hasCascadeLosses,
@@ -23,6 +26,23 @@ import {
   type ElementBlocker,
   type ElementUsage,
 } from "@/lib/productionElements";
+
+/** A record a blocker names, so the dialog can link to where it is fixed. */
+type Ref = { id: string; name: string };
+
+/** The blockers' records, beside the counts `ElementUsage` holds by name. */
+type ElementRefs = { recipes: Ref[]; ingredientIn: Ref[]; componentOf: Ref[] };
+
+/** What deleting this element's own recipes would take with them. */
+type RecipeLoss = {
+  versions: number;
+  lines: number;
+  steps: number;
+  /** Batch log entries that name one of the versions and would lose the link. */
+  batches: number;
+  /** Step pictures to remove from storage, per recipe id. */
+  imagePaths: Map<string, string[]>;
+};
 
 /**
  * Deleting an element (Mark, 2026-08-11: "I need a way to delete elements …
@@ -42,6 +62,13 @@ import {
  * Deactivate. Everywhere else in this app a confirm names what's unresolved and
  * lets you through; that posture assumes the human can overrule the machine,
  * and here they cannot.
+ *
+ * WHAT IT CAN DO ABOUT A BLOCKER, IT OFFERS (Mark, 2026-10-08, on being told to
+ * "take it off those first": "it's unclear what 'those' refer to … maybe the
+ * app should present the user with the options"). Each blocker now names its
+ * records as links and says what to do there. Where the element's OWN recipes
+ * are all that is in the way, Delete takes them too, after saying what they
+ * hold. A logged batch says outright that deactivating is the only choice.
  */
 export function ElementActions({
   elementId,
@@ -76,6 +103,8 @@ export function ElementActions({
   const supabase = createClient();
   const [confirming, setConfirming] = useState(false);
   const [usage, setUsage] = useState<ElementUsage | null>(null);
+  const [refs, setRefs] = useState<ElementRefs>({ recipes: [], ingredientIn: [], componentOf: [] });
+  const [recipeLoss, setRecipeLoss] = useState<RecipeLoss | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,7 +112,11 @@ export function ElementActions({
     setConfirming(true);
     setUsage(null);
     setError(null);
-    setUsage(await readUsage(supabase, elementId));
+    setRecipeLoss(null);
+    const read = await readUsage(supabase, elementId);
+    setRefs(read.refs);
+    setRecipeLoss(read.recipeLoss);
+    setUsage(read.usage);
   }
 
   /**
@@ -195,6 +228,30 @@ export function ElementActions({
     router.refresh();
   }
 
+  /**
+   * The element's own recipes first, then the element — the foreign key
+   * refuses the other order. No transaction spans it: a failure part way
+   * through keeps what is left and says which recipe stopped it.
+   */
+  async function removeWithRecipes() {
+    if (!recipeLoss) return;
+    setBusy("delete");
+    setError(null);
+    for (const recipe of refs.recipes) {
+      const result = await deleteRecipe(
+        supabase,
+        recipe.id,
+        recipeLoss.imagePaths.get(recipe.id) ?? []
+      );
+      if ("error" in result) {
+        setBusy(null);
+        setError(`“${recipe.name}” could not be deleted: ${result.error}`);
+        return;
+      }
+    }
+    await remove();
+  }
+
   async function remove() {
     setBusy("delete");
     setError(null);
@@ -246,6 +303,9 @@ export function ElementActions({
 
   const blockers = usage ? deleteBlockers(usage) : [];
   const deletable = usage !== null && canDeleteElement(usage);
+  // Its own recipes are all that blocks, and what they hold could be counted.
+  const withRecipes = usage !== null && canDeleteWithRecipes(usage) && recipeLoss !== null;
+  const hasBatches = (usage?.batches ?? 0) > 0;
 
   return (
     <>
@@ -304,6 +364,18 @@ export function ElementActions({
                   {busy === "delete" ? "Deleting…" : "Delete"}
                 </button>
               )}
+              {withRecipes && (
+                <button
+                  type="button"
+                  onClick={() => void removeWithRecipes()}
+                  disabled={busy !== null}
+                  className={DIALOG_DANGER_CLASS}
+                >
+                  {busy === "delete"
+                    ? "Deleting…"
+                    : `Delete element and ${refs.recipes.length === 1 ? "recipe" : "recipes"}`}
+                </button>
+              )}
               {isActive && (
                 <button
                   type="button"
@@ -325,15 +397,29 @@ export function ElementActions({
             <div className="mt-3 space-y-3 text-sm">
               {blockers.length > 0 && (
                 <div className="space-y-2 border border-ink bg-mark-fill px-3 py-2 text-ink">
-                  <p className="font-semibold">This element cannot be deleted.</p>
-                  {blockers.map((b) => (
-                    <p key={b.key}>{blockerSentence(b)}</p>
-                  ))}
-                  <p>
-                    Take it off those first, or deactivate it — which keeps
-                    everything and takes it out of the pickers, the recipe sheets
-                    and the uncosted queue.
+                  <p className="font-semibold">
+                    {withRecipes
+                      ? `Deleting this element deletes its ${refs.recipes.length === 1 ? "recipe" : "recipes"} too.`
+                      : "This element cannot be deleted yet."}
                   </p>
+                  {blockers.map((b) => (
+                    <p key={b.key}>
+                      <BlockerLine
+                        blocker={b}
+                        refs={refs}
+                        takesRecipes={withRecipes}
+                        onNavigate={() => setConfirming(false)}
+                      />
+                    </p>
+                  ))}
+                  {withRecipes && recipeLoss ? <p>{recipeLossSentence(recipeLoss)}</p> : null}
+                  {hasBatches ? (
+                    <p>
+                      {isActive
+                        ? "It can only be deactivated, which keeps everything and takes it out of the pickers."
+                        : "It can only be deactivated, and it already is, so it is out of the pickers."}
+                    </p>
+                  ) : null}
                 </div>
               )}
 
@@ -348,7 +434,7 @@ export function ElementActions({
                 </p>
               )}
 
-              {deletable && hasCascadeLosses(usage) && (
+              {(deletable || withRecipes) && hasCascadeLosses(usage) && (
                 <div className="space-y-2 border border-ink bg-mark-fill px-3 py-2 text-ink">
                   <p className="font-semibold">These go with it.</p>
                   {usage.locations > 0 && (
@@ -386,20 +472,82 @@ export function ElementActions({
   );
 }
 
-/** One blocker, in words a person can act on. */
-function blockerSentence(b: ElementBlocker): string {
-  const n = b.count;
-  const names = listNames(b.names);
-  switch (b.key) {
+/**
+ * One blocker: what is in the way, each record a link to where it is fixed,
+ * and what to do there.
+ */
+function BlockerLine({
+  blocker,
+  refs,
+  takesRecipes,
+  onNavigate,
+}: {
+  blocker: ElementBlocker;
+  refs: ElementRefs;
+  /** Whether Delete will take the recipes too, or they have to go by hand. */
+  takesRecipes: boolean;
+  /** Close the dialog on the way out — a list keeps it mounted otherwise. */
+  onNavigate: () => void;
+}) {
+  const n = blocker.count;
+  const links = (rows: Ref[], href: (id: string) => string) =>
+    rows.map((r, i) => (
+      <Fragment key={r.id}>
+        {i > 0 ? ", " : ""}
+        <Link href={href(r.id)} onClick={onNavigate} className="font-medium underline">
+          {r.name}
+        </Link>
+      </Fragment>
+    ));
+  switch (blocker.key) {
     case "recipes":
-      return `${n} ${n === 1 ? "recipe describes" : "recipes describe"} it — ${names}. Deleting it would take a versioned document with it.`;
+      return (
+        <>
+          {n === 1 ? "A recipe makes it: " : `${n} recipes make it: `}
+          {links(refs.recipes, (id) => `/recipes/${id}`)}.{" "}
+          {takesRecipes
+            ? `To keep ${n === 1 ? "the recipe" : "one"}, open it and change its Makes field to another element.`
+            : `Open ${n === 1 ? "it" : "each"} and delete it, or change its Makes field to another element.`}
+        </>
+      );
     case "ingredientIn":
-      return `It is an ingredient in ${n} ${n === 1 ? "recipe" : "recipes"} — ${names}.`;
+      return (
+        <>
+          It is an ingredient in {n === 1 ? "a recipe" : `${n} recipes`}:{" "}
+          {links(refs.ingredientIn, (id) => `/recipes/${id}?tab=ingredients`)}. Open{" "}
+          {n === 1 ? "it" : "each"} and remove that ingredient, or choose another, in every
+          version that has it.
+        </>
+      );
     case "componentOf":
-      return `${n} ${n === 1 ? "item is" : "items are"} made from it — ${names}.`;
+      return (
+        <>
+          {n === 1 ? "An item is made from it: " : `${n} items are made from it: `}
+          {links(refs.componentOf, (id) => `/production-items/${id}`)}. Open{" "}
+          {n === 1 ? "it" : "each"} and remove this element from its components.
+        </>
+      );
     case "batches":
-      return `${n} ${n === 1 ? "batch has" : "batches have"} been logged against it. That is production history.`;
+      return (
+        <>
+          {n} {n === 1 ? "batch has" : "batches have"} been logged against it. That is
+          production history, and nothing removes it.
+        </>
+      );
   }
+}
+
+/** What the element's recipes hold, said before they are deleted with it. */
+function recipeLossSentence(loss: RecipeLoss): string {
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  return (
+    `That takes ${plural(loss.versions, "version", "versions")}, ` +
+    `${plural(loss.lines, "ingredient line", "ingredient lines")} and ` +
+    `${plural(loss.steps, "procedure step", "procedure steps")}. This cannot be undone.` +
+    (loss.batches > 0
+      ? ` ${plural(loss.batches, "batch log entry names", "batch log entries name")} one of those versions and will lose the link.`
+      : "")
+  );
 }
 
 /**
@@ -415,21 +563,21 @@ function blockerSentence(b: ElementBlocker): string {
 async function readUsage(
   supabase: ReturnType<typeof createClient>,
   elementId: string
-): Promise<ElementUsage> {
+): Promise<{ usage: ElementUsage; refs: ElementRefs; recipeLoss: RecipeLoss | null }> {
   const unreadable: string[] = [];
 
   const [recipes, lines, components, batches, locations, days] = await Promise.all([
-    supabase.from("production_recipes").select("name").eq("element_id", elementId),
+    supabase.from("production_recipes").select("id, name").eq("element_id", elementId).order("name"),
     // Two levels of embed: a line belongs to a VERSION, and the version is what
     // knows its recipe. The recipe is what a person recognises, so that is what
     // gets read out — the version label alone ("v11") names nothing.
     supabase
       .from("production_recipe_lines")
-      .select("id, production_recipe_versions ( production_recipes ( name ) )")
+      .select("id, production_recipe_versions ( production_recipes ( id, name ) )")
       .eq("element_id", elementId),
     supabase
       .from("production_item_elements")
-      .select("production_items ( name )")
+      .select("production_items ( id, name )")
       .eq("element_id", elementId),
     supabase
       .from("production_batches")
@@ -455,28 +603,49 @@ async function readUsage(
   note("its per-shop settings", locations.error);
   note("the weekly schedule", days.error);
 
+  // Distinct BY ID: a recipe naming the same element on three lines is one
+  // recipe to go and fix, not three.
+  const distinct = (rows: (Ref | null)[]): Ref[] => [
+    ...new Map(rows.filter((r): r is Ref => r !== null).map((r) => [r.id, r])).values(),
+  ];
+  const refs: ElementRefs = {
+    recipes: (recipes.data ?? []).map((r) => ({ id: String(r.id), name: String(r.name) })),
+    ingredientIn: distinct((lines.data ?? []).map((l) => recipeOf(l))),
+    componentOf: distinct((components.data ?? []).map((c) => embedded(c.production_items))),
+  };
+
+  // What the element's own recipes hold, for the delete that takes them too.
+  // A count that cannot be read leaves it null, and that delete is not offered.
+  let recipeLoss: RecipeLoss | null = null;
+  if (refs.recipes.length > 0) {
+    const counts = await Promise.all(
+      refs.recipes.map((r) => recipeDeleteCounts(supabase, r.id))
+    );
+    if (counts.every((c) => !("error" in c))) {
+      recipeLoss = { versions: 0, lines: 0, steps: 0, batches: 0, imagePaths: new Map() };
+      counts.forEach((c, i) => {
+        if ("error" in c) return;
+        recipeLoss!.versions += c.versions;
+        recipeLoss!.lines += c.lines;
+        recipeLoss!.steps += c.steps;
+        recipeLoss!.batches += c.batches;
+        recipeLoss!.imagePaths.set(refs.recipes[i].id, c.imagePaths);
+      });
+    }
+  }
+
   return {
-    recipes: (recipes.data ?? []).map((r) => String(r.name)),
-    // Distinct: a recipe naming the same element on three lines is one recipe
-    // to go and fix, not three.
-    ingredientIn: [
-      ...new Set(
-        (lines.data ?? [])
-          .map((l) => recipeNameOf(l))
-          .filter((n): n is string => n !== null)
-      ),
-    ],
-    componentOf: [
-      ...new Set(
-        (components.data ?? [])
-          .map((c) => embeddedName(c.production_items))
-          .filter((n): n is string => n !== null)
-      ),
-    ],
-    batches: batches.count ?? 0,
-    locations: locations.count ?? 0,
-    scheduledDays: days.count ?? 0,
-    unreadable,
+    usage: {
+      recipes: refs.recipes.map((r) => r.name),
+      ingredientIn: refs.ingredientIn.map((r) => r.name),
+      componentOf: refs.componentOf.map((r) => r.name),
+      batches: batches.count ?? 0,
+      locations: locations.count ?? 0,
+      scheduledDays: days.count ?? 0,
+      unreadable,
+    },
+    refs,
+    recipeLoss,
   };
 }
 
@@ -485,17 +654,17 @@ async function readUsage(
  * which one you get depends on the keys it infers — so both shapes are handled
  * rather than asserted. Getting this wrong reads as "nothing uses it".
  */
-function embeddedName(value: unknown): string | null {
+function embedded(value: unknown): Ref | null {
   const row = Array.isArray(value) ? value[0] : value;
   if (!row || typeof row !== "object") return null;
-  const name = (row as { name?: unknown }).name;
-  return typeof name === "string" ? name : null;
+  const { id, name } = row as { id?: unknown; name?: unknown };
+  return typeof id === "string" && typeof name === "string" ? { id, name } : null;
 }
 
-function recipeNameOf(line: unknown): string | null {
+function recipeOf(line: unknown): Ref | null {
   if (!line || typeof line !== "object") return null;
   const versions = (line as { production_recipe_versions?: unknown }).production_recipe_versions;
   const version = Array.isArray(versions) ? versions[0] : versions;
   if (!version || typeof version !== "object") return null;
-  return embeddedName((version as { production_recipes?: unknown }).production_recipes);
+  return embedded((version as { production_recipes?: unknown }).production_recipes);
 }
