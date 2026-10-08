@@ -89,8 +89,8 @@ const s = {
   /* ---- items (DataTable) ---- */
   row: { flexDirection: "row", paddingVertical: 4, alignItems: "flex-start" },
   cIndex: { width: 20, color: SUBTLE },
-  // Item took 30pt from Notes (Mark, 2026-10-07).
-  cItem: { width: 200, paddingRight: 8 },
+  // Item took 60pt from Notes, in two steps (Mark, 2026-10-07).
+  cItem: { width: 230, paddingRight: 8 },
   cQty: { width: 30, textAlign: "right" },
   cPrice: { width: 48, textAlign: "right" },
   cNotes: { flexGrow: 1, flexBasis: 0, paddingLeft: 16, color: MUTED },
@@ -104,7 +104,7 @@ const s = {
   bandSize: { borderBottomWidth: 0.75, borderBottomColor: INK, paddingTop: 7, paddingBottom: 2 },
   bandCut: { borderBottomWidth: 0.75, borderBottomColor: HAIRLINE, paddingTop: 5, paddingBottom: 2, color: MUTED },
   // cIndex + cItem wide, so the figure lands under Cost.
-  bandLabel: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold", width: 220, paddingRight: 8 },
+  bandLabel: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold", width: 250, paddingRight: 8 },
   bandFigure: { fontSize: 8, fontFamily: "Helvetica-Bold", textAlign: "right" },
 
   /* ---- notes + totals ---- */

@@ -5752,3 +5752,5 @@ amount".
   8,400 orders read `none`.
 - **Cost is the last column again** (Mark, same day): Item · Qty · Price ·
   Notes · Cost. Item keeps its 200pt.
+- **Item is 230pt** (Mark, same day: "a little more width"), Notes another
+  30pt narrower.
