@@ -123,6 +123,7 @@ function order(over: Partial<OrderDocData> = {}): OrderDocData {
     notes_production: null,
     notes_invoice: null,
     notes_receipt: null,
+    line_grouping: "none",
     payments: [],
     ...over,
     lines,

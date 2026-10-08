@@ -8,6 +8,7 @@
  * from any screen.
  */
 
+import type { LineGrouping } from "./specialOrderLines";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { invoiceSplit } from "./quickbooks";
@@ -154,7 +155,15 @@ export type QuoteSnapshot = {
     qty: number;
     unit_price: number;
     taxable: boolean;
+    /** What the bands group by. Absent on snapshots sent before 2026-10-07,
+     *  like `line_grouping`, and those list their lines as sent. */
+    item_donut?: string | null;
+    item_type?: string | null;
+    item_cut?: string | null;
+    item_size?: string | null;
   }[];
+  /** The order's Group by when the quote was sent (177). */
+  line_grouping?: LineGrouping;
   totals: OrderDocData["totals"];
   notes_quote: string | null;
   /** `timeZone` is absent on snapshots written before 2026-09-25. */
@@ -182,7 +191,12 @@ export function quoteSnapshot(
       qty: l.qty,
       unit_price: l.unit_price,
       taxable: l.taxable,
+      item_donut: l.item_donut,
+      item_type: l.item_type,
+      item_cut: l.item_cut,
+      item_size: l.item_size,
     })),
+    line_grouping: order.line_grouping,
     totals: order.totals,
     notes_quote: order.notes_quote,
     org,

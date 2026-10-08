@@ -117,6 +117,7 @@ function sampleOrder(paid: number, paymentNote = "Deposit"): OrderDocData {
     notes_production: "Box the minis 24 to a box.",
     notes_invoice: "Thank you! Balance due on delivery.",
     notes_receipt: "Paid in full — thank you!",
+    line_grouping: "type",
     lines: SAMPLE_LINES,
     payments,
     money: SAMPLE_MONEY,

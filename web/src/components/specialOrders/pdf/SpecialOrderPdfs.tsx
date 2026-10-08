@@ -58,7 +58,7 @@ import {
 import { AGING_BUCKETS, type StatementDocument, type StatementRow } from "@/lib/customerStatement";
 
 import { customerLabel, lineTotal } from "@/lib/specialOrders";
-import { groupLines, type LineGrouping } from "@/lib/specialOrderLines";
+import { groupLines } from "@/lib/specialOrderLines";
 import { paperColumns, type InvoiceTotalsBreakdown, type PaperRow } from "@/lib/customerInvoices";
 import { dateInTimeZone, serverTimeZone } from "@/lib/today";
 import {
@@ -89,21 +89,22 @@ const s = {
   /* ---- items (DataTable) ---- */
   row: { flexDirection: "row", paddingVertical: 4, alignItems: "flex-start" },
   cIndex: { width: 20, color: SUBTLE },
-  cItem: { width: 170, paddingRight: 8 },
+  // Item took 30pt from Notes, and Cost sits beside Price (Mark, 2026-10-07).
+  cItem: { width: 200, paddingRight: 8 },
   cQty: { width: 30, textAlign: "right" },
   cPrice: { width: 48, textAlign: "right" },
   cNotes: { flexGrow: 1, flexBasis: 0, paddingLeft: 16, color: MUTED },
   cCost: { width: 60, textAlign: "right" },
   /* The Items tab's bands (`OrderLines`): a black band; under an Item type,
      Size is bold over an ink rule and Cut lighter over a hairline, indented a
-     step. A band's qty and cost sit under theirs. The Item type band itself
+     step. A band's cost sits under Cost. The Item type band itself
      is not printed — see the table. */
   bandRow: { flexDirection: "row", alignItems: "flex-end" },
   bandTop: { backgroundColor: INK, color: "#fff", paddingVertical: 4, marginTop: 10 },
   bandSize: { borderBottomWidth: 0.75, borderBottomColor: INK, paddingTop: 7, paddingBottom: 2 },
   bandCut: { borderBottomWidth: 0.75, borderBottomColor: HAIRLINE, paddingTop: 5, paddingBottom: 2, color: MUTED },
-  // cIndex + cItem wide, so the figures land under Qty and Cost.
-  bandLabel: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold", width: 190, paddingRight: 8 },
+  // cIndex + cItem wide, so the figure lands under Cost.
+  bandLabel: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold", width: 220, paddingRight: 8 },
   bandFigure: { fontSize: 8, fontFamily: "Helvetica-Bold", textAlign: "right" },
 
   /* ---- notes + totals ---- */
@@ -277,13 +278,10 @@ export function OrderDocumentPdf({
   org,
   kind,
   approval,
-  grouping = "none",
 }: {
   orders: OrderDocData[];
   org: DocOrg;
   kind: CustomerDocumentKind;
-  /** The Items tab's Group by, so the paper lists what the screen lists. */
-  grouping?: LineGrouping;
   /** Decision 17's approval, on a quote only. */
   approval?: { name: string; at: string; reference: string } | null;
 }) {
@@ -299,6 +297,8 @@ export function OrderDocumentPdf({
         const grand = kind === "quote" ? t.total : t.balance;
         const marked = !(kind === "receipt" && t.balance <= 0);
         const stamp = approval ? approvalStamp(approval.at, org.timeZone) : null;
+        // The Items tab's Group by, so the paper lists what the screen lists.
+        const grouping = order.line_grouping;
         return (
           <Page key={order.id} size="LETTER" style={s.page}>
             <View style={s.masthead} fixed>
@@ -369,8 +369,8 @@ export function OrderDocumentPdf({
                   <Text style={[s.th, s.cItem]}>Item</Text>
                   <Text style={[s.th, s.cQty]}>Qty</Text>
                   <Text style={[s.th, s.cPrice]}>Price</Text>
-                  <Text style={[s.th, s.cNotes]}>Notes</Text>
                   <Text style={[s.th, s.cCost]}>Cost</Text>
+                  <Text style={[s.th, s.cNotes]}>Notes</Text>
                 </View>
                 {(() => {
                   // Numbered down the page as printed, across the bands.
@@ -389,14 +389,14 @@ export function OrderDocumentPdf({
                           minPresenceAhead={30}
                         >
                           <Text style={[s.bandLabel, { paddingLeft: grouping === "type" ? (g.level - 1) * 10 : 6 }]}>{g.label}</Text>
-                          <Text style={[s.bandFigure, s.cQty]}>
-                            {qtyText(g.rows.reduce((a, r) => a + Number(r.qty ?? 0), 0))}
-                          </Text>
+                          {/* No quantity here (Mark, 2026-10-07: "hide the
+                              donut counts in the headers") — the cost only. */}
+                          <Text style={s.cQty}> </Text>
                           <Text style={s.cPrice}> </Text>
-                          <Text style={s.cNotes}> </Text>
-                          <Text style={[s.bandFigure, s.cCost, { paddingRight: g.level === 0 ? 6 : 0 }]}>
+                          <Text style={[s.bandFigure, s.cCost]}>
                             {money(g.rows.reduce((a, r) => a + lineTotal(r), 0))}
                           </Text>
+                          <Text style={s.cNotes}> </Text>
                         </View>
                       ) : null}
                       {(g.leaf ? g.rows : []).map((line) => (
@@ -405,8 +405,8 @@ export function OrderDocumentPdf({
                           <Text style={[s.cItem, s.itemName]}>{line.name}</Text>
                           <Text style={s.cQty}>{qtyText(line.qty)}</Text>
                           <Text style={s.cPrice}>{money(line.unit_price)}</Text>
-                          <Text style={s.cNotes}>{line.notes ?? ""}</Text>
                           <Text style={s.cCost}>{money(lineTotal(line))}</Text>
+                          <Text style={s.cNotes}>{line.notes ?? ""}</Text>
                         </View>
                       ))}
                     </View>
@@ -1153,10 +1153,8 @@ export function documentElement(
   org: DocOrg,
   approval?: { name: string; at: string; reference: string } | null,
   /** The org's today, for the kitchen sheet's AS OF line. */
-  printedOn?: string,
-  /** The Items tab's Group by. The kitchen sheet keeps its size classes. */
-  grouping?: LineGrouping
+  printedOn?: string
 ) {
   if (kind === "order") return <KitchenOrderPdf orders={orders} org={org} printedOn={printedOn} />;
-  return <OrderDocumentPdf orders={orders} org={org} kind={kind} approval={approval} grouping={grouping} />;
+  return <OrderDocumentPdf orders={orders} org={org} kind={kind} approval={approval} />;
 }

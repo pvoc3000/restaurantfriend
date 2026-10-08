@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchOrderDocData, type DocumentKind } from "@/lib/specialOrderDocs";
-import { readLineGrouping } from "@/lib/lineGroupingPref";
 
 /**
  * Render one of a special order's documents to a PDF, in the browser.
@@ -12,7 +11,7 @@ import { readLineGrouping } from "@/lib/lineGroupingPref";
  * something.
  *
  * The quote, invoice and receipt list their items under the Items tab's Group
- * by (Mark, 2026-10-07) — this browser's choice, read at render time.
+ * by (Mark, 2026-10-07), which is stored on the order (177).
  *
  * It lives beside the PDFs rather than in `lib/`: `lib` is pure and is compiled
  * into the Node fixture run, so importing a component tree from there would
@@ -32,7 +31,7 @@ export async function renderOrderDocument(
   ]);
   if (data.orders.length === 0) throw new Error("Order not found");
   const order = data.orders[0];
-  const blob = await pdf(docs.documentElement(kind, [order], data.org, null, today, readLineGrouping())).toBlob();
+  const blob = await pdf(docs.documentElement(kind, [order], data.org, null, today)).toBlob();
   return { blob, order, org: data.org };
 }
 

@@ -5718,3 +5718,32 @@ same order and with the same grouping as in the items tab … Can we try that?"
   keep their headings, moved one step left. On the PDF only — the Items tab
   still draws the black band. Known cost: two types each holding Minis print
   two "MINI" headings with nothing naming the type above them.
+
+### 2026-10-07 — the grouping is stored on the order (migration 177)
+
+Mark: "store the grouping on the order", "hide the donut counts in the
+headers", and "move the cost column after the price column. Make the item
+column a little wider and the notes column a little smaller by the same
+amount".
+
+- **177** adds `special_orders.line_grouping` (`none` by default, checked
+  against `LINE_GROUPINGS`). `none` is what every order prints today.
+- **The Items tab** reads and writes it (`OrderLines`, `lib/latestWrite`).
+  Gated on the page's write permission, NOT the schedule's item lock — banding
+  changes nothing the kitchen makes. A read-only member can still regroup the
+  screen for the visit. `lib/lineGroupingPref` (the localStorage preference)
+  is deleted, and this supersedes the "per browser" note above.
+- **The documents** read `OrderDocData.line_grouping`. The quote snapshot
+  carries it and each line's donut, type, cut and size, so `/q` bands its list
+  and the signed quote is banded as sent. A snapshot from before this has
+  neither and lists its lines as sent.
+- **On the paper only:** a band shows its cost and no quantity; the columns
+  run Item · Qty · Price · Cost · Notes, with Item 200pt (was 170) and Notes
+  30pt narrower. The Items tab keeps its own columns and its quantities.
+- **Not copied** by `copy_special_order` or the standing-order materializer,
+  so a duplicate and a standing order's days start at None. **Still not
+  grouped:** the customer invoice and `/pay` (frozen lines carry no taxonomy).
+- **Verified:** Node renders of the quote at Item type, Item size and None,
+  and of a signed quote built through `quoteSnapshot`; `tsc`, eslint, 2,255
+  fixtures. **Not verified:** the Items tab's save and `/q` in a browser —
+  both need 177 applied first.

@@ -18,6 +18,7 @@
 // This module is imported DYNAMICALLY from the approval page's Approve
 // handler, so a customer merely READING a quote never downloads the renderer.
 
+import { isLineGrouping } from "@/lib/specialOrderLines";
 import { OrderDocumentPdf } from "./SpecialOrderPdfs";
 import type { OrderDocData } from "@/lib/specialOrderDocs";
 import type { QuoteSnapshot } from "@/lib/specialOrderSend";
@@ -62,15 +63,17 @@ function asDocData(quote: QuoteSnapshot): OrderDocData {
     notes_production: null,
     notes_invoice: null,
     notes_receipt: null,
+    // The signed copy is banded as the quote was sent.
+    line_grouping: isLineGrouping(quote.line_grouping) ? quote.line_grouping : "none",
     lines: quote.lines.map((l, i) => ({
       id: String(i),
       sort: i + 1,
       name: l.name,
-      item_donut: null,
-      item_type: null,
-      item_cut: null,
+      item_donut: l.item_donut ?? null,
+      item_type: l.item_type ?? null,
+      item_cut: l.item_cut ?? null,
       item_finish: null,
-      item_size: null,
+      item_size: l.item_size ?? null,
       notes: l.notes,
       qty: l.qty,
       unit_price: l.unit_price,

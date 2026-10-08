@@ -14,7 +14,7 @@ import { ColumnHeader } from "@/components/catalog/ColumnHeader";
 import { useResizableColumns } from "@/lib/columnWidths";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { PickList } from "@/components/ui/PickList";
-import { useLineGrouping } from "@/lib/lineGroupingPref";
+import { useLatestWrite } from "@/lib/latestWrite";
 import { StickyFooter } from "@/components/ui/StickyFooter";
 import { STICKY_HEAD_ROW, useOverflowOnlyWhenNeeded } from "@/lib/tableHead";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -27,6 +27,7 @@ import {
   cutOptions,
   donutOptions,
   groupLines,
+  isLineGrouping,
   isLetterCut,
   LINE_GROUPINGS,
   taxonomyOptions,
@@ -134,12 +135,19 @@ export function OrderLines({
   orgId,
   rows,
   canWrite,
+  grouping: savedGrouping,
+  canGroup,
   menu,
 }: {
   orderId: string;
   orgId: string;
   rows: OrderLineRow[];
   canWrite: boolean;
+  /** `special_orders.line_grouping` (177). */
+  grouping: string | null;
+  /** May the Group by be SAVED. Someone who may only read can still regroup
+   *  what they are looking at; it lasts until they leave. */
+  canGroup: boolean;
   /** The priced menu, resolved on the server — see `MenuItem`. */
   menu: MenuItem[];
 }) {
@@ -408,15 +416,45 @@ export function OrderLines({
 
   /**
    * GROUP BY (Mark, 2026-09-29). Bands over runs of Item type, Item or Price,
-   * each carrying its quantity and total under those columns. A per-browser
-   * display preference — see `lib/lineGroupingPref`.
+   * each carrying its quantity and total under those columns.
+   *
+   * STORED ON THE ORDER (Mark, 2026-10-07, migration 177), because the quote,
+   * invoice and receipt band their items the same way — so it is what the
+   * customer is sent, not how one browser likes to look at it. Shown on the
+   * tap and written behind (`lib/latestWrite`); a refused write puts it back.
    *
    * WHILE GROUPED THE LINES DO NOT DRAG. The drag writes the DOCUMENT order,
    * and a grouped view is not it: a line dropped between two bands would land
    * somewhere in the document nobody pointed at. The grip stays, dimmed, and
    * says why.
    */
-  const [grouping, setGrouping] = useLineGrouping();
+  const saved: LineGrouping = isLineGrouping(savedGrouping) ? savedGrouping : "none";
+  const [picked, setPicked] = useState<LineGrouping | null>(null);
+  const grouping = picked ?? saved;
+  const saveGrouping = useLatestWrite<LineGrouping>(
+    async (next) => {
+      const { data, error: e } = await supabase
+        .from("special_orders")
+        .update({ line_grouping: next })
+        .eq("id", orderId)
+        .select("id");
+      if (e) return e.message;
+      if (!data?.length) return "The grouping wasn't saved — the database refused it silently.";
+      return null;
+    },
+    (failure) => {
+      if (failure) {
+        setError(failure);
+        setPicked(null);
+      }
+      router.refresh();
+    }
+  );
+  const setGrouping = (next: LineGrouping) => {
+    setError(null);
+    setPicked(next);
+    if (canGroup) saveGrouping(next);
+  };
   const groups = groupLines(ordered, grouping);
   const grouped = grouping !== "none";
 

@@ -93,7 +93,7 @@ const CHIP =
 const LOG_PAGE = 200;
 
 const ORDER_COLUMNS = `
-  id, org_id, number, kind, status, todo, flag_reason, flag_source,
+  id, org_id, number, kind, status, todo, flag_reason, flag_source, line_grouping,
   customer_id, contact_name, contact_phone, contact_email, allergen_info,
   title, event_date, event_time, ready_by_time,
   location_id, kitchen_location_id, fulfillment,
@@ -1293,6 +1293,10 @@ export async function SpecialOrderDetail({
                     orgId={row.org_id as string}
                     rows={lines}
                     canWrite={canEditItems}
+                    // Not the schedule's lock: how the lines are banded
+                    // changes nothing the kitchen makes.
+                    grouping={row.line_grouping as string | null}
+                    canGroup={canWrite}
                     menu={menu}
                   />
                 </>

@@ -19,6 +19,7 @@
  * two stored subtotals produced.
  */
 
+import { isLineGrouping, type LineGrouping } from "./specialOrderLines";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -335,6 +336,9 @@ export type OrderDocData = {
   notes_production: string | null;
   notes_invoice: string | null;
   notes_receipt: string | null;
+  /** The Items tab's Group by, stored on the order (177): how the quote,
+   *  invoice and receipt band their items. */
+  line_grouping: LineGrouping;
   lines: DocumentLine[];
   payments: (MoneyPayment & { paid_on: string | null; payment_type: string | null; note: string | null })[];
   money: MoneyOrder;
@@ -432,7 +436,7 @@ export async function fetchOrderDocData(
            tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
            ignore_balance,
            notes_quote, notes_production, notes_invoice, notes_receipt,
-           thread_subject,
+           thread_subject, line_grouping,
            customers ( id, first_name, last_name, company, phone, email )`
         )
         .in("id", orderIds),
@@ -586,6 +590,7 @@ export async function fetchOrderDocData(
       notes_production: row.notes_production as string | null,
       notes_invoice: row.notes_invoice as string | null,
       notes_receipt: row.notes_receipt as string | null,
+      line_grouping: isLineGrouping(row.line_grouping) ? row.line_grouping : "none",
       lines,
       payments,
       money,

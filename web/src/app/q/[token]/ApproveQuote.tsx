@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/specialOrders";
+import { groupLines, isLineGrouping } from "@/lib/specialOrderLines";
 import { usDate, usTime } from "@/lib/specialOrderDocs";
 import { quoteStateMessage, type QuoteTokenState } from "@/lib/specialOrderSend";
 
@@ -164,15 +165,41 @@ export function ApproveQuote({ token }: { token: string }) {
           375px phone is a horizontal scroll, and what a customer checks is
           "did they get my order right", one item at a time. */}
       <section className="space-y-3">
-        {quote.lines.map((line, i) => (
-          <div key={i} className="flex items-baseline justify-between gap-4 border-b border-hairline pb-2">
-            <div className="min-w-0">
-              <p className="text-[15px]">{line.name}</p>
-              {line.notes && <p className="text-[13px] text-muted">{line.notes}</p>}
-            </div>
-            <p className="shrink-0 text-[15px] tabular-nums">
-              {line.qty} × {money(line.unit_price)}
-            </p>
+        {/* BANDED AS THE ORDER IS (177), so the page reads like the PDF it
+            came with. The Item type band is sorted by and not shown, and a
+            heading carries no count — the paper's two rules. A quote sent
+            before 2026-10-07 has no grouping and lists its lines as sent. */}
+        {groupLines(
+          quote.lines.map((l) => ({
+            ...l,
+            item_donut: l.item_donut ?? null,
+            item_type: l.item_type ?? null,
+          })),
+          isLineGrouping(quote.line_grouping) ? quote.line_grouping : "none"
+        ).map((g, gi) => (
+          <div key={g.key} className="space-y-3">
+            {g.dimension === "type" ? (
+              gi > 0 ? <div className="h-3" aria-hidden="true" /> : null
+            ) : g.label ? (
+              <p
+                className={`pt-2 text-[12px] font-semibold uppercase tracking-[0.1em] ${
+                  g.level > 1 ? "text-muted" : "border-b border-ink pb-1"
+                }`}
+              >
+                {g.label}
+              </p>
+            ) : null}
+            {(g.leaf ? g.rows : []).map((line, i) => (
+              <div key={i} className="flex items-baseline justify-between gap-4 border-b border-hairline pb-2">
+                <div className="min-w-0">
+                  <p className="text-[15px]">{line.name}</p>
+                  {line.notes && <p className="text-[13px] text-muted">{line.notes}</p>}
+                </div>
+                <p className="shrink-0 text-[15px] tabular-nums">
+                  {line.qty} × {money(line.unit_price)}
+                </p>
+              </div>
+            ))}
           </div>
         ))}
       </section>
