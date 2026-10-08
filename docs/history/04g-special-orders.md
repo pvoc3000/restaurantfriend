@@ -5824,3 +5824,12 @@ kitchen orders. put the column after tax column.'
   because the kitchen needs it. This supersedes "deliberate and unguarded"
   above. **UI only:** there is no database check, so a write from outside the
   Items tab could still pair the two. Not verified in a browser.
+- **180 — the database check** (Mark, 2026-10-08: "add the database check"):
+  `special_order_items_hidden_has_no_cost`, `not hide_from_customer or
+  round(qty × unit_price, 2) = 0`, nulls as zero — `lineTotal`'s arithmetic.
+  This supersedes "UI only" above. Measured first: 1 line hidden, 0 that would
+  fail; nothing in the schema or the edge functions rewrites a line's price or
+  quantity in bulk. **APPLIED 2026-10-08** by CLI (`db query --linked`, in a
+  transaction); confirmed validated. **Not verified:** that a refused write
+  reads sensibly in the app — the Items tab cannot produce one, so nothing
+  words the constraint's error for a person.
