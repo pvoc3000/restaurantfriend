@@ -5815,3 +5815,12 @@ kitchen orders. put the column after tax column.'
   false; the materializer's live body names `hide_from_customer` twice and
   still names `line_grouping` twice; its grants are unchanged. The materializer
   has not run since 178 or 179 — the next top-up is its test.
+- **Only a line with no cost can be hidden** (Mark, same day: "force a hidden
+  line's price to $0 or disable the checkbox if the row has a cost. You
+  decide"). DISABLED, not forced — zeroing a price to hide a row would change
+  what the customer owes as a side effect of a display choice. The Hide box is
+  disabled while `lineTotal` is not zero (a tooltip says why), and a hidden
+  line's Price is read-only until it is unticked; its Qty stays editable,
+  because the kitchen needs it. This supersedes "deliberate and unguarded"
+  above. **UI only:** there is no database check, so a write from outside the
+  Items tab could still pair the two. Not verified in a browser.

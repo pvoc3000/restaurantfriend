@@ -721,7 +721,9 @@ export function OrderLines({
                   </td>
 
                   <td className="px-3 py-2 text-right tabular-nums">
-                    {canWrite ? (
+                    {/* A HIDDEN LINE'S PRICE IS LOCKED (see the Hide cell): it
+                        has no cost, and a price would give it one. */}
+                    {canWrite && !row.hide_from_customer ? (
                       <InlineValue
                         boxed={BOXED_FIELDS}
                         table="special_order_items" id={row.id} column="unit_price" kind="number"
@@ -730,7 +732,9 @@ export function OrderLines({
                         format={(v) => `$${Number(v).toFixed(2)}`}
                       />
                     ) : (
-                      money(Number(row.unit_price ?? 0))
+                      <span title={row.hide_from_customer ? "Hidden from the customer — untick Hide to set a price" : undefined}>
+                        {money(Number(row.unit_price ?? 0))}
+                      </span>
                     )}
                   </td>
 
@@ -746,11 +750,23 @@ export function OrderLines({
                   </td>
 
                   <td className="px-3 py-2 text-center">
+                    {/* ONLY A LINE WITH NO COST CAN BE HIDDEN (Mark, 2026-10-07:
+                        "force a hidden line's price to $0 or disable the
+                        checkbox if the row has a cost. You decide"). Disabled,
+                        not forced: zeroing a price to hide a row would change
+                        what the customer owes as a side effect of a display
+                        choice. A line that is somehow hidden WITH a cost can
+                        still be unticked. */}
                     <Checkbox
                       checked={row.hide_from_customer}
-                      disabled={!canWrite || pending}
+                      disabled={!canWrite || pending || (!row.hide_from_customer && lineTotal(row) !== 0)}
                       onChange={(next) => setHidden(row, next)}
                       label={`Hide ${row.name} from the customer`}
+                      title={
+                        !row.hide_from_customer && lineTotal(row) !== 0
+                          ? "A line with a cost can't be hidden — set its price to $0 first"
+                          : undefined
+                      }
                     />
                   </td>
 
