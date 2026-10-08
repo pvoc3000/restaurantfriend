@@ -5856,3 +5856,8 @@ Mark: "group the order items on an invoice pdf as well."
 - **Verified:** a Node render of a one-order invoice at Item type and Item
   size; a fixture for the bands; `tsc`, eslint, 2,256 fixtures. **Not
   verified:** a real invoice loaded from the database.
+- **A band on the paper is its label alone** (Mark, 2026-10-08: "remove the
+  price subtotals from the headers on the pdf invoice, quote, and receipt as
+  well") — on the order documents and the customer invoice. `detail.groups`
+  still carries each band's `amount`; nothing prints it. The Items tab keeps
+  its quantities and totals.

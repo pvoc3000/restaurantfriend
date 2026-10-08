@@ -98,15 +98,13 @@ const s = {
   cCost: { width: 60, textAlign: "right" },
   /* The Items tab's bands (`OrderLines`): a black band; under an Item type,
      Size is bold over an ink rule and Cut lighter over a hairline, indented a
-     step. A band's cost sits under Cost. The Item type band itself
-     is not printed — see the table. */
+     step. A band is its label alone. The Item type band itself is not
+     printed — see the table. */
   bandRow: { flexDirection: "row", alignItems: "flex-end" },
   bandTop: { backgroundColor: INK, color: "#fff", paddingVertical: 4, marginTop: 10 },
   bandSize: { borderBottomWidth: 0.75, borderBottomColor: INK, paddingTop: 7, paddingBottom: 2 },
   bandCut: { borderBottomWidth: 0.75, borderBottomColor: HAIRLINE, paddingTop: 5, paddingBottom: 2, color: MUTED },
-  // cIndex + cItem wide, so the figure lands under Cost.
   bandLabel: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold", width: 250, paddingRight: 8 },
-  bandFigure: { fontSize: 8, fontFamily: "Helvetica-Bold", textAlign: "right" },
 
   /* ---- notes + totals ---- */
   foot: { flexDirection: "row", gap: 28, marginTop: 18, alignItems: "flex-start" },
@@ -391,15 +389,10 @@ export function OrderDocumentPdf({
                           wrap={false}
                           minPresenceAhead={30}
                         >
-                          <Text style={[s.bandLabel, { paddingLeft: grouping === "type" ? (g.level - 1) * 10 : 6 }]}>{g.label}</Text>
-                          {/* No quantity here (Mark, 2026-10-07: "hide the
-                              donut counts in the headers") — the cost only. */}
-                          <Text style={s.cQty}> </Text>
-                          <Text style={s.cPrice}> </Text>
-                          <Text style={s.cNotes}> </Text>
-                          <Text style={[s.bandFigure, s.cCost, { paddingRight: g.level === 0 ? 6 : 0 }]}>
-                            {money(g.rows.reduce((a, r) => a + lineTotal(r), 0))}
-                          </Text>
+                          <Text style={[s.bandLabel, { width: undefined, flexGrow: 1, flexBasis: 0, paddingLeft: grouping === "type" ? (g.level - 1) * 10 : 6 }]}>{g.label}</Text>
+                          {/* THE LABEL ALONE (Mark: "hide the donut counts in
+                              the headers", 2026-10-07, then "remove the price
+                              subtotals from the headers", 2026-10-08). */}
                         </View>
                       ) : null}
                       {(g.leaf ? g.rows : []).map((line) => (
@@ -867,8 +860,8 @@ export function CustomerInvoicePdf({
                       </View>
                       {/* BANDED AS THE ORDER'S ITEMS TAB IS (Mark, 2026-10-08),
                           by the order documents' rules: the Item type band is
-                          sorted by and not printed, and a band shows its
-                          amount and no count. */}
+                          sorted by and not printed, and a band is its label
+                          alone — no count, no amount. */}
                       {(l.detail.groups ?? [{ label: "", level: 0, unprinted: false, amount: 0, rows: l.detail.rows }]).map(
                         (g, gi) => (
                           <View key={gi}>
@@ -883,7 +876,6 @@ export function CustomerInvoicePdf({
                                 <Text style={[s.bandLabel, { width: undefined, flexGrow: 1, flexBasis: 0, paddingLeft: Math.max(0, g.level - 1) * 10 }]}>
                                   {g.label}
                                 </Text>
-                                <Text style={[s.bandFigure, s.invAmount]}>{money(g.amount)}</Text>
                               </View>
                             ) : null}
                             {g.rows.map((r, j) => (
