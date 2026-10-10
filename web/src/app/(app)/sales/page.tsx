@@ -1,3 +1,5 @@
+import { closedDates } from "@/lib/blackoutDates";
+import { fetchEntries } from "@/lib/calendarQueries";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { PageHeading } from "@/components/ui/PageHeading";
@@ -176,11 +178,19 @@ export default async function SalesPage({
     .not("square_location_id", "is", null)
     .order("code");
 
+  // The calendar's closed days over the range on screen (migration 181): a
+  // shop shut for a holiday is not a day Square failed to report.
+  const { entries: calendarEntries } = await fetchEntries(supabase, {
+    from: resolved.range.from,
+    to: resolved.range.to,
+  });
+
   const shops = (mapped ?? []).map((l) => ({
     id: l.id as string,
     code: l.code as string,
     openDays: (l.open_days as number[] | null) ?? null,
     isActive: (l.is_active as boolean | null) ?? null,
+    closedDates: closedDates(calendarEntries, l.id as string, resolved.range),
   }));
 
   // A SET, comma-separated, and EMPTY MEANS ALL — `FILTER_ALL`'s convention in

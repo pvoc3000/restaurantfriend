@@ -899,3 +899,35 @@ test("refundProcessor: each payment goes back the way it came", () => {
   eq(refundProcessor({ payment_type: "QuickBooks Payments", external_ref: "b", amount: 5 }), "quickbooks", "QuickBooks");
   eq(refundProcessor({ payment_type: "check", external_ref: "c", amount: 5 }), null, "a cheque is not refunded here");
 });
+
+/* -- 183: a blacked-out day is not made ---------------------------------- */
+// Checked by BREAKING: dropping `!blackedOut?.(d)` from the loop turns the
+// first case red, and the summary's sentence is pinned word for word.
+
+test("standing: a day the calendar blacks out is left out of the dates", () => {
+  const all = standingMaterializationDates(knottedMonThu, "2026-08-17", "2026-08-30");
+  const without = standingMaterializationDates(
+    knottedMonThu,
+    "2026-08-17",
+    "2026-08-30",
+    (date) => date === all[1],
+  );
+  eq(without, all.filter((d) => d !== all[1]));
+  eq(without.length, all.length - 1);
+});
+
+test("standing: the receipt says how many days the calendar left out", () => {
+  const blackout = { event_date: "2026-12-25", standing_number: "SO-1", title: null, name: "Christmas" };
+  eq(
+    materializationSummary({ ok: true, created: 3, existing: 0, blackouts: [blackout] }),
+    "Made 3 orders. 1 day was left out by the calendar.",
+  );
+  eq(
+    materializationSummary({ ok: true, created: 0, existing: 0, blackouts: [blackout, blackout] }),
+    "Nothing was made. 2 days were left out by the calendar.",
+  );
+  eq(
+    materializationSummary({ ok: true, created: 0, existing: 0, blackouts: [] }),
+    "There were no days to make in that range.",
+  );
+});

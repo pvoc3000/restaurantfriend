@@ -910,7 +910,11 @@ export type StandingOrder = {
 export function standingMaterializationDates(
   standing: StandingOrder,
   from: string,
-  through: string
+  through: string,
+  /** A day the calendar blacks out for standing orders (migration 183) — the
+   *  caller asks `blackoutFor` with the order's own two shops. Omitted, no day
+   *  is skipped, which is the rule as it stood before 183. */
+  blackedOut?: (date: string) => boolean
 ): string[] {
   if (standing.paused) return [];
   const days = standing.standing_days ?? [];
@@ -921,7 +925,7 @@ export function standingMaterializationDates(
 
   const out: string[] = [];
   for (let d = start; d <= end; d = addDays(d, 1)) {
-    if (days.includes(isoWeekday(d))) out.push(d);
+    if (days.includes(isoWeekday(d)) && !blackedOut?.(d)) out.push(d);
   }
   return out;
 }
@@ -950,6 +954,15 @@ export type MaterializationReceipt = {
     title: string | null;
   }[];
   warnings?: { standing_number?: string; title?: string | null; reason: string }[];
+  /** Days NOT made because the calendar blacks them out (migration 183).
+   *  Absent from a function older than 183, so every reader defaults it. */
+  blackouts?: {
+    event_date: string;
+    standing_number: string;
+    title: string | null;
+    /** The calendar entry's title — "Closed for Christmas". */
+    name: string;
+  }[];
 };
 
 /**
@@ -985,12 +998,19 @@ export function materializationSummary(receipt: MaterializationReceipt): string 
   }
   const made = receipt.created;
   const already = receipt.existing;
-  if (made === 0 && already === 0) return "There were no days to make in that range.";
+  // Said LAST and as its own sentence: a day the calendar blacked out is
+  // neither made nor a failure, and the list under the summary names each one.
+  const off = receipt.blackouts?.length ?? 0;
+  const skipped =
+    off === 0 ? "" : ` ${off} day${off === 1 ? " was" : "s were"} left out by the calendar.`;
+  if (made === 0 && already === 0) {
+    return off === 0 ? "There were no days to make in that range." : `Nothing was made.${skipped}`;
+  }
   if (made === 0) {
-    return `Nothing to make — all ${already} day${already === 1 ? "" : "s"} in that range already exist.`;
+    return `Nothing to make — all ${already} day${already === 1 ? "" : "s"} in that range already exist.${skipped}`;
   }
   const tail = already > 0 ? `, and ${already} already existed` : "";
-  return `Made ${made} order${made === 1 ? "" : "s"}${tail}.`;
+  return `Made ${made} order${made === 1 ? "" : "s"}${tail}.${skipped}`;
 }
 
 /* ==========================================================================

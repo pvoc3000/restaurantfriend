@@ -84,6 +84,7 @@ export function ShiftReportsList({
   locationId,
   locationCode,
   openDays,
+  closedDates,
   myEmployeeId,
 }: {
   rows: ShiftReportRow[];
@@ -96,6 +97,8 @@ export function ShiftReportsList({
   locationId: string;
   locationCode: string;
   openDays: number[];
+  /** Dates in the last week the calendar says this shop was closed. */
+  closedDates: string[];
   /** The signed-in member's own employee id — migration 080. */
   myEmployeeId: string | null;
 }) {
@@ -143,8 +146,9 @@ export function ShiftReportsList({
       reportDates: recentClosingDates,
       openDays,
       days,
+      closedDates: new Set(closedDates),
     });
-  }, [recentClosingDates, openDays, today]);
+  }, [recentClosingDates, openDays, closedDates, today]);
 
   const withReason = useMemo(
     () =>

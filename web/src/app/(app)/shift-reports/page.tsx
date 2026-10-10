@@ -1,3 +1,5 @@
+import { closedDates } from "@/lib/blackoutDates";
+import { fetchEntries } from "@/lib/calendarQueries";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canEnterCounts } from "@/lib/roles";
@@ -89,6 +91,7 @@ export default async function ShiftReportsPage({
     { data: takers },
     { data: myEmployeeId },
     { data: shop },
+    { entries: calendarEntries },
   ] = await Promise.all([
     loadReports(),
     // The last week's CLOSING reports, for the missing-night sentence. Its own
@@ -115,6 +118,9 @@ export default async function ShiftReportsPage({
     // reported Tuesday" a fact rather than a suspicion: the shop either was or
     // was not open that weekday.
     supabase.from("locations").select("open_days").eq("id", active.id).maybeSingle(),
+    // The calendar's exceptions to that weekly pattern (migration 181): a shop
+    // closed for Christmas owes no closing report.
+    fetchEntries(supabase, { from: daysBefore(today, GAP_DAYS), to: today }),
   ]);
 
   if (error) {
@@ -162,6 +168,9 @@ export default async function ShiftReportsPage({
       locationId={active.id}
       locationCode={active.code}
       openDays={(shop?.open_days as number[] | null) ?? []}
+      closedDates={[
+        ...closedDates(calendarEntries, active.id, { from: daysBefore(today, GAP_DAYS), to: today }),
+      ]}
       myEmployeeId={(myEmployeeId as string | null) ?? null}
     />
   );

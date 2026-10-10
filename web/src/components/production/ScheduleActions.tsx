@@ -176,7 +176,19 @@ export function ScheduleActions({
       setError(err.message);
       return;
     }
-    const receipt = data as { replaced?: { lines_after: number }[] };
+    const receipt = data as {
+      replaced?: { lines_after: number }[];
+      skipped?: { reason?: string; name?: string }[];
+    };
+    // 184: the calendar blacks this day out for production, so the generator
+    // left the schedule exactly as it was. Say so rather than "Regenerated".
+    const blackout = receipt.skipped?.find((s) => s.reason === "blackout");
+    if (blackout && !receipt.replaced?.length) {
+      setError(
+        `Not regenerated — the calendar has no production on this day (${blackout.name ?? "blackout"}).`
+      );
+      return;
+    }
     const after = receipt.replaced?.[0]?.lines_after;
     setDone(after === undefined ? "Regenerated." : `Regenerated — ${after} items.`);
     router.refresh();

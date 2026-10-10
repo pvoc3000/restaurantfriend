@@ -63,6 +63,7 @@ export function TomorrowPage({
   orgId,
   horizonDays,
   nextProductionDate,
+  productionOff,
   today,
   kitchenId,
   kitchenCode,
@@ -80,6 +81,9 @@ export function TomorrowPage({
    *  top-up that runs when the generate dialog opens. */
   horizonDays: number;
   nextProductionDate: string | null;
+  /** The calendar entry switching production off at this kitchen on that day
+   *  (migration 184), or null. Nothing is owed on such a day. */
+  productionOff: string | null;
   /** The org's calendar day — the kitchen sheet's AS OF line. */
   today: string;
   kitchenId: string;
@@ -127,6 +131,7 @@ export function TomorrowPage({
   // generate, and its special orders are the whole night.
   const planOwed =
     nextProductionDate !== null &&
+    !productionOff &&
     !schedules.some((s) => s.source === "plan") &&
     sellingShopsForKitchen(plans, kitchenId, {
       starts_on: nextProductionDate,
@@ -177,6 +182,14 @@ export function TomorrowPage({
             ))}
           </ul>
         )}
+        {productionOff ? (
+          <p className="text-[16px]">
+            <span className="bg-mark-fill px-1">
+              No production at {kitchenCode} on {nextProductionDate}
+            </span>{" "}
+            <span className="text-muted">— {productionOff}, on the calendar.</span>
+          </p>
+        ) : null}
         {planOwed && schedules.length > 0 ? (
           <p className="text-[16px]">
             <span className="bg-mark-fill px-1">

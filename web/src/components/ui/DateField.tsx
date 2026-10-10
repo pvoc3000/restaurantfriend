@@ -103,6 +103,7 @@ export function DateField({
   variant = "cell",
   boxed = false,
   max,
+  isDisabled,
 }: {
   /** An ISO yyyy-mm-dd, or null for no date. */
   value: string | null;
@@ -143,6 +144,12 @@ export function DateField({
    * reads the date validates it too (the order guide's `parseGuideDate` does).
    */
   max?: string;
+  /**
+   * Days greyed out in the calendar for a reason of the caller's own — the
+   * /inquiry form's blackout dates. Composed with `max`, and exactly as much a
+   * hint: the value can still be typed, so the caller validates it as well.
+   */
+  isDisabled?: (iso: string) => boolean;
 }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -332,7 +339,11 @@ export function DateField({
                 painted={current ? { from: current, to: current } : null}
                 onMonth={setMonth}
                 onTap={pick}
-                isDisabled={max ? (iso) => iso > max : undefined}
+                isDisabled={
+                  max || isDisabled
+                    ? (iso) => (!!max && iso > max) || (isDisabled?.(iso) ?? false)
+                    : undefined
+                }
                 autoFocusIso={current ?? today}
               />
               <div className="mt-3 flex gap-2">

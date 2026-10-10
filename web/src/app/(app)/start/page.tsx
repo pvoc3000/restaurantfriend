@@ -1,3 +1,5 @@
+import { blackoutFor } from "@/lib/blackoutDates";
+import { fetchEntries } from "@/lib/calendarQueries";
 import { DeskStart } from "@/components/start/DeskStart";
 import { Landing, type TileState } from "@/components/tablet/Landing";
 import { templatesForShift, type ScheduledTemplate } from "@/lib/checklists";
@@ -155,9 +157,19 @@ export default async function StartPage() {
           : SKIP,
       ]);
 
+    // The calendar's say on today and tomorrow at this shop (migration 181):
+    // closed today, or no production tomorrow. Three tiles read it.
+    const { entries: calendarEntries } = await fetchEntries(supabase, { from: today, to: tomorrow });
+    const closedToday =
+      blackoutFor(calendarEntries, { date: today, locationIds: [loc], effect: "closed" })?.title ?? null;
+    const productionOffTomorrow =
+      blackoutFor(calendarEntries, { date: tomorrow, locationIds: [loc], effect: "production" })
+        ?.title ?? null;
+
     if (want("shift_report") && !reports.error) {
       state.shift_report = shiftReportState(
-        (reports.data ?? []) as { id: string; shift: ShiftSlot }[]
+        (reports.data ?? []) as { id: string; shift: ShiftSlot }[],
+        closedToday
       );
     }
 
@@ -169,10 +181,13 @@ export default async function StartPage() {
       );
       const todaysRuns = (runs.data ?? []) as { id: string; template_id: string | null; status: string }[];
       const startedIds = new Set(todaysRuns.map((r) => r.template_id));
+      // A closed shop asks for no checklist, whatever its templates' weekdays.
+      const asked = closedToday ? [] : scheduled;
       state.checklist = checklistState({
-        asked: scheduled.length,
-        started: scheduled.filter((t) => startedIds.has(t.id)).length,
+        asked: asked.length,
+        started: asked.filter((t) => startedIds.has(t.id)).length,
         openRuns: todaysRuns.filter((r) => r.status === "open"),
+        closed: closedToday,
       });
     }
 
@@ -195,7 +210,10 @@ export default async function StartPage() {
     }
 
     if (want("schedules") && !schedules.error) {
-      state.schedules = schedulesState({ tomorrow: (schedules.data ?? []).length });
+      state.schedules = schedulesState({
+        tomorrow: (schedules.data ?? []).length,
+        productionOff: productionOffTomorrow,
+      });
     }
 
     if (want("tags") && !planDays.error) {

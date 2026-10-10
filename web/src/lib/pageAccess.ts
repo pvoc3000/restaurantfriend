@@ -114,6 +114,10 @@ export const PAGE_ACCESS: Record<string, Record<Role, PageAccess>> = {
   "/payroll-benefits":     row("X", "X", "-", "-", "W"),
 
   // ── Operations ────────────────────────────────────────────────────────────
+  // Not on the sheet (2026-10-09). Everyone reads; a supervisor or a purchaser
+  // writes a NOTE and only a manager writes a blackout — that half is a row
+  // rule, in 181's policies and `canSetBlackouts`, not a cell here.
+  "/calendar":             row("R", "W", "W", "W", "W"),
   "/shift-reports":        row("-", "W", "W", "W", "W"),
   "/sales":                row("-", "R", "W", "W", "W"),
   // The sheet's own row for the stub. Staff Read was tried and reverted the

@@ -323,6 +323,9 @@ export type SalesLocation = {
   /** `locations.is_active`. False means a shop that has CLOSED, or a channel
    *  kept for its history — either way, no new sales are expected. */
   isActive?: boolean | null;
+  /** Dates the calendar says this location was CLOSED
+   *  (`lib/blackoutDates.closedDates`, migration 181) — no sales expected. */
+  closedDates?: ReadonlySet<string>;
 };
 
 /**
@@ -347,6 +350,9 @@ export function expectsSalesOn(loc: SalesLocation, dateISO: string): boolean {
   // permanent false alarm, but if a closed shop's history ever needs auditing,
   // this is the line that will not help.
   if (loc.isActive === false) return false;
+  // CLOSED THAT DAY, by a calendar entry. The weekly pattern's exception: a
+  // shop that trades every Friday did not trade on Christmas Day.
+  if (loc.closedDates?.has(dateISO)) return false;
 
   const open = loc.openDays;
   if (open === null || open === undefined) return true;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
@@ -17,6 +17,8 @@ import {
   type SpecialOrderKind,
 } from "@/lib/specialOrders";
 import { createSpecialOrder } from "@/lib/createSpecialOrder";
+import { blackoutFor, blackoutSentence, type CalendarEntry } from "@/lib/blackoutDates";
+import { fetchEntries } from "@/lib/calendarQueries";
 import { CustomerPicker, type CustomerChoice } from "./CustomerPicker";
 import { draftIsUsable } from "@/lib/customerSearch";
 
@@ -101,6 +103,31 @@ export function NewSpecialOrder({
   const [address, setAddress] = useState("");
   const [locationId, setLocationId] = useState(defaultLocationId ?? "");
   const [customer, setCustomer] = useState<CustomerChoice>(null);
+
+  // The calendar's blackouts from today on (migration 181), read once when the
+  // dialog opens. The pickup shop and the kitchen are both asked about, as the
+  // record asks — here the kitchen is the shop you are standing in.
+  const [blackouts, setBlackouts] = useState<CalendarEntry[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    let stale = false;
+    void fetchEntries(supabase, { from: today }).then(({ entries }) => {
+      if (!stale) setBlackouts(entries);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [open, supabase, today]);
+  const blackout =
+    kind === "order"
+      ? blackoutFor(blackouts, {
+          date: eventDate,
+          locationIds: [locationId || null, defaultLocationId],
+          effect: "special_orders",
+        })
+      : null;
+  const blackoutWarning =
+    blackout && eventDate ? blackoutSentence(blackout, "special_orders", eventDate, kitchens) : null;
 
   /**
    * WHEN IT IS WANTED IS REQUIRED ON A REAL ORDER (Mark, 2026-08-18: "Event
@@ -336,6 +363,15 @@ export function NewSpecialOrder({
                 />
               </Field>
             </div>
+
+            {/* A WARNING, never a block (Mark, 2026-10-09): the calendar says no
+                special orders that day, and the person at the counter may know
+                better. The order is made exactly as it would have been. */}
+            {blackoutWarning && (
+              <p className="text-[13px]">
+                <span className="inline-block bg-mark-fill px-1">{blackoutWarning}</span>
+              </p>
+            )}
 
             {/* DECISION 8's PAIR, side by side, because they are two different
                 questions that look like one: the PICKUP shop is where the

@@ -149,6 +149,20 @@ export function MaterializeNow({
                     going quiet — paused, no weekdays, no items. Asked for BY
                     NAME, "nothing happened" with no reason is the answer that
                     sends somebody to look for a bug. */}
+                {/* Days the calendar blacked out (migration 183): not made,
+                    and named, so "why is there no order on the 25th" has its
+                    answer where the question is asked. */}
+                {receipt.blackouts?.length ? (
+                  <ul className="space-y-0.5 text-[13px]">
+                    {receipt.blackouts.map((b) => (
+                      <li key={`${b.standing_number}:${b.event_date}`}>
+                        <span className="bg-mark-fill px-1">
+                          <span className="tabular-nums">{b.event_date}</span> not made — {b.name}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 {receipt.warnings?.length ? (
                   <ul className="space-y-1 text-[13px]">
                     {receipt.warnings.map((w, i) => (

@@ -1,3 +1,5 @@
+import { blackoutFor } from "@/lib/blackoutDates";
+import { fetchEntries } from "@/lib/calendarQueries";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
@@ -48,7 +50,7 @@ export default async function ProductionDayPage({
       ? params.location
       : working.id;
 
-  const [{ data: day, error }, { data: catalog }, { data: existing }] = await Promise.all([
+  const [{ data: day, error }, { data: catalog }, { data: existing }, { entries: calendarEntries }] = await Promise.all([
     supabase.rpc("production_day", { p_location_id: locationId, p_date: date }),
     supabase
       .from("production_items")
@@ -60,7 +62,13 @@ export default async function ProductionDayPage({
       .select("id, kitchen_location_id")
       .eq("location_id", locationId)
       .eq("schedule_date", date),
+    fetchEntries(supabase, { from: date, to: date }),
   ]);
+  // The calendar switches production off at this shop that day (migration
+  // 184): the pars below are what the plans SAY, and Generate will skip it.
+  const productionOff =
+    blackoutFor(calendarEntries, { date, locationIds: [locationId], effect: "production" })?.title ??
+    null;
 
   if (error) {
     return (
@@ -123,6 +131,7 @@ export default async function ProductionDayPage({
       rows={rows}
       addable={addable}
       committed={committed}
+      productionOff={productionOff}
       editable={editable}
     />
   );

@@ -1,3 +1,5 @@
+import { blackoutFor } from "@/lib/blackoutDates";
+import { fetchEntries } from "@/lib/calendarQueries";
 import { notFound } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
@@ -202,7 +204,25 @@ export default async function RunShiftReportPage({
 
   const reportWeekday =
     ((new Date(`${report.report_date as string}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
-  const askedFor = templatesForShift(
+
+  // THE CALENDAR'S SAY (migration 181). A shop closed on the report's own day
+  // is asked for no checklist — which also stops the checklist page starting
+  // one by itself — and a kitchen with production switched off on the next
+  // production day owes no schedule.
+  const calendarFrom = report.report_date as string;
+  const calendarTo = (report.next_production_date as string | null) ?? calendarFrom;
+  const { entries: calendarEntries } = await fetchEntries(supabase, {
+    from: calendarFrom < calendarTo ? calendarFrom : calendarTo,
+    to: calendarFrom < calendarTo ? calendarTo : calendarFrom,
+  });
+  const shopClosed =
+    blackoutFor(calendarEntries, {
+      date: calendarFrom,
+      locationIds: [report.location_id as string],
+      effect: "closed",
+    }) !== null;
+
+  const askedForByWeekday = templatesForShift(
     (shiftTemplates ?? []).map((t) => ({
       id: t.id as string,
       kind: t.kind as "checklist" | "walkthrough" | "inspection",
@@ -213,6 +233,7 @@ export default async function RunShiftReportPage({
     reportWeekday,
     shift,
   );
+  const askedFor = shopClosed ? [] : askedForByWeekday;
 
   const walk = linkedRun ? await loadChecklistRun(supabase, linkedRun.id as string, session.userId) : null;
   const walkItems = walk?.data?.items ?? [];
@@ -946,6 +967,13 @@ export default async function RunShiftReportPage({
         orgId={report.org_id as string}
         horizonDays={readSettings(session.orgSettings).horizonDays}
         nextProductionDate={nextDay}
+        productionOff={
+          blackoutFor(calendarEntries, {
+            date: nextDay,
+            locationIds: [kitchenId],
+            effect: "production",
+          })?.title ?? null
+        }
         // The org's calendar day, for the kitchen order's AS OF line — that is
         // the day the sheet came off the printer, not the day of the event.
         today={today}

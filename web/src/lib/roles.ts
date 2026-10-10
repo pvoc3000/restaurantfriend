@@ -134,6 +134,15 @@ export function canManageMembers(role: Role): boolean {
 export const canRefundPayments = canManageMembers;
 
 /**
+ * Turn on one of a calendar entry's four switches — no special orders, no
+ * standing orders, no production, shop closed (migration 181's policies, which
+ * let a supervisor or a purchaser write an entry only while every switch is
+ * off). Deciding a shop is closed is a manager's call; writing "health
+ * inspector, 2pm" on the calendar is anybody's.
+ */
+export const canSetBlackouts = canManageMembers;
+
+/**
  * Read and write the HR record — migration 020's employees policies.
  *
  * The same set as canManageMembers today, and named separately on purpose:

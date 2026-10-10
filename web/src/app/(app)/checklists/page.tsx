@@ -1,3 +1,5 @@
+import { blackoutFor } from "@/lib/blackoutDates";
+import { fetchEntries } from "@/lib/calendarQueries";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canEditChecklists, canWalkChecklists } from "@/lib/roles";
@@ -153,6 +155,12 @@ export default async function ChecklistsPage({
   const isoWeekday = ((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
   const todaysRuns = (runs ?? []).filter((r) => r.business_date === today);
 
+  // CLOSED TODAY, by a calendar entry (migration 181): nothing is asked for,
+  // whatever the templates' weekdays say. A walk can still be started by hand.
+  const { entries: calendarEntries } = await fetchEntries(supabase, { from: today, to: today });
+  const closedToday =
+    blackoutFor(calendarEntries, { date: today, locationIds: [active.id], effect: "closed" }) !== null;
+
   const startable: StartableTemplate[] = templateRows
     .filter((t) => t.is_active)
     .map((t) => {
@@ -166,9 +174,11 @@ export default async function ChecklistsPage({
       // "Asked for today" means asked for on ANY of the shifts it names — the
       // list offers the walk, and which shift it belongs to is chosen when it
       // is started.
-      const askedToday = (["opening", "mid", "closing", "off_site"] as const).some(
-        (sh) => templatesForShift([scheduled], isoWeekday, sh).length > 0,
-      );
+      const askedToday =
+        !closedToday &&
+        (["opening", "mid", "closing", "off_site"] as const).some(
+          (sh) => templatesForShift([scheduled], isoWeekday, sh).length > 0,
+        );
       return {
         id: t.id,
         name: t.name,

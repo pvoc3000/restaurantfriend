@@ -62,6 +62,7 @@ export function DerivedDay({
   rows,
   addable,
   committed,
+  productionOff,
   editable,
 }: {
   orgId: string;
@@ -73,6 +74,8 @@ export function DerivedDay({
   rows: DayRow[];
   addable: OverrideItem[];
   committed: { id: string; kitchenCode: string }[];
+  /** The calendar entry switching production off here that day, or null. */
+  productionOff: string | null;
   editable: boolean;
 }) {
   const supabase = createClient();
@@ -370,6 +373,17 @@ export function DerivedDay({
           {counts.making} {counts.making === 1 ? "item" : "items"}
         </p>
       </div>
+
+      {productionOff ? (
+        <p className="text-sm">
+          <span className="bg-mark-fill px-1">
+            No production at {locationCode} on {packetDate(date)} — {productionOff}, on the calendar.
+          </span>{" "}
+          <span className="text-muted">
+            This is what the plans say; Generate Schedules will skip the day.
+          </span>
+        </p>
+      ) : null}
 
       {committed.length > 0 ? (
         // Not a warning: a generated day is the normal state after closing. But

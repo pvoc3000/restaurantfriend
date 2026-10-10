@@ -4,7 +4,7 @@
 // in a way nobody notices: previousRange being off by a day, lastYearRange
 // landing on the wrong weekday, and every "percentage of nothing" path.
 
-import { test, eq, ok } from "./harness";
+import { test, eq, ok, no } from "./harness";
 import {
   sumSales,
   tipFraction,
@@ -633,4 +633,25 @@ test("salesRangePresets: five presets, no custom, agreeing with resolveSalesRang
   eq(presets.map((p) => p.key), ["period", "last-period", "mtd", "last-30", "ytd"]);
   eq(presets[0].range("2026-08-23"), resolveSalesRange("period", "2026-08-23", PERIODS).range);
   eq(presets[2].label, "Month to Date");
+});
+
+/* -- closed days (migration 181) ----------------------------------------- */
+// Checked by BREAKING: removing the `closedDates` line from `expectsSalesOn`
+// turns both cases red.
+
+test("expectsSalesOn: a day the calendar closed the shop expects nothing", () => {
+  const shop = { id: "a", code: "DF01", openDays: [1, 2, 3, 4, 5, 6, 7], isActive: true };
+  ok(expectsSalesOn(shop, "2026-12-25"));
+  no(expectsSalesOn({ ...shop, closedDates: new Set(["2026-12-25"]) }, "2026-12-25"));
+  ok(expectsSalesOn({ ...shop, closedDates: new Set(["2026-12-25"]) }, "2026-12-26"));
+});
+
+test("missingDays: a closed day is not a gap", () => {
+  const shop = { id: "a", code: "DF01", openDays: null, isActive: true };
+  const range = { from: "2026-12-24", to: "2026-12-26" };
+  eq(missingDays([], [shop], range).length, 3);
+  eq(
+    missingDays([], [{ ...shop, closedDates: new Set(["2026-12-25"]) }], range).map((g) => g.business_date),
+    ["2026-12-24", "2026-12-26"],
+  );
 });

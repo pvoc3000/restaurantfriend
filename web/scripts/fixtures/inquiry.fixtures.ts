@@ -11,6 +11,7 @@ import {
   EMPTY_INQUIRY,
   INQUIRY_INTEREST_OPTIONS,
   INQUIRY_REQUIRED,
+  inquiryBlackoutOn,
   inquiryIsSubmittable,
   inquiryPayload,
   inquiryStateMessage,
@@ -19,7 +20,9 @@ import {
   looksLikeEmail,
   looksLikePhone,
   phoneDigits,
+  readInquiryBlackouts,
   validateInquiry,
+  type InquiryBlackouts,
   type InquiryDraft,
 } from "../../src/lib/inquiry";
 
@@ -265,4 +268,64 @@ test("the interest vocabulary is the Square form's own", () => {
   // 'Donut Letters' are values customers have already seen.
   ok(INQUIRY_INTEREST_OPTIONS.includes("Miniature Donuts"));
   ok(INQUIRY_INTEREST_OPTIONS.includes("Donut Letters"));
+});
+
+/* -------------------------------------------------------------------------
+ * Blackout dates (migrations 181, 182)
+ *
+ * Checked by BREAKING: dropping the fall to `default_location_id` lets a
+ * no-preference inquiry through a DF01-only blackout that `create_inquiry`
+ * would refuse; and removing the `unavailable` branch from `validateInquiry`
+ * turns the typed-date case red.
+ * ---------------------------------------------------------------------- */
+
+const BLACKOUTS: InquiryBlackouts = {
+  default_location_id: "df01",
+  entries: [
+    { title: "Closed for Halloween", starts_on: "2026-10-30", ends_on: "2026-10-31", location_ids: [] },
+    { title: "Floor refinishing", starts_on: "2026-11-03", ends_on: "2026-11-03", location_ids: ["df01"] },
+  ],
+};
+
+test("blackouts: an every-shop entry refuses the date whatever the shop", () => {
+  eq(inquiryBlackoutOn(BLACKOUTS, "2026-10-31", "df02")?.title, "Closed for Halloween");
+  eq(inquiryBlackoutOn(BLACKOUTS, "2026-10-31", null)?.title, "Closed for Halloween");
+  eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-01", null), null);
+});
+
+test("blackouts: a one-shop entry refuses that shop, and no preference falls to the default shop", () => {
+  eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-03", "df01")?.title, "Floor refinishing");
+  eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-03", "df02"), null, "another shop is open");
+  eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-03", null)?.title, "Floor refinishing", "no preference");
+});
+
+test("blackouts: a typed date is refused under the field, by name", () => {
+  const unavailable = (date: string) => inquiryBlackoutOn(BLACKOUTS, date, null);
+  eq(
+    validateInquiry(full({ eventDate: "2026-10-30" }), unavailable).eventDate,
+    "We’re not taking special orders for that date (Closed for Halloween).",
+  );
+  eq(validateInquiry(full({ eventDate: "2026-10-29" }), unavailable), {});
+  eq(validateInquiry(full({ eventDate: "2026-10-30" })), {}, "no list, no refusal here");
+});
+
+test("blackouts: the gate's refusal has its own words", () => {
+  const m = inquiryStateMessage("date_unavailable");
+  no(m.ok);
+  eq(m.title, "We’re not taking special orders for that date");
+});
+
+test("blackouts: a malformed answer is no blackouts, never a crash", () => {
+  eq(readInquiryBlackouts(null), { default_location_id: null, entries: [] });
+  eq(readInquiryBlackouts([]).entries, []);
+  eq(
+    readInquiryBlackouts({
+      default_location_id: "df01",
+      entries: [{ title: "X", starts_on: "2026-01-01", ends_on: "2026-01-01" }, { title: 3 }, null],
+    }),
+    {
+      default_location_id: "df01",
+      entries: [{ title: "X", starts_on: "2026-01-01", ends_on: "2026-01-01", location_ids: [] }],
+    },
+  );
 });

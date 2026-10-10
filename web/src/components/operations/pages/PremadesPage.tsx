@@ -194,7 +194,18 @@ export function PremadesPage({
         return;
       }
       setFailed(null);
-      const receipt = data as { created?: unknown[]; skipped?: unknown[] } | null;
+      const receipt = data as {
+        created?: unknown[];
+        skipped?: { reason?: string; name?: string }[];
+      } | null;
+      // 184: the calendar blacks the day out for production. Not "no plan" —
+      // a plan covers it and somebody decided not to bake.
+      const blackout = receipt?.skipped?.find((s) => s.reason === "blackout");
+      if (blackout && !receipt?.created?.length) {
+        setFailed(`The calendar has no production on this day (${blackout.name ?? "blackout"}).`);
+        router.refresh();
+        return;
+      }
       // Nothing created and nothing already there: no plan puts anything on
       // this shop's day, which the generator reports as an empty receipt.
       setNoPlan(!receipt?.created?.length && !receipt?.skipped?.length);

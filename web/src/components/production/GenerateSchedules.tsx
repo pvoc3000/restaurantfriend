@@ -74,6 +74,23 @@ type Created = {
 
 type Skipped = Created & { reason: string; has_actuals: boolean };
 
+/**
+ * A day the calendar blacked out for production (migration 184).
+ *
+ * It arrives in the function's `skipped[]` with `reason: 'blackout'` and NO
+ * schedule id, and is lifted out of that array by `readReceipt` — everything
+ * that reads `skipped` here means "a schedule that exists and could be
+ * regenerated", which a blacked-out day is not.
+ */
+type BlackedOut = {
+  date: string;
+  location_code: string;
+  /** Set when it is the KITCHEN that is blacked out, not the shop it bakes for. */
+  kitchen_code: string | null;
+  /** The calendar entry's title. */
+  name: string;
+};
+
 type Replaced = {
   schedule_id: string;
   date: string;
@@ -101,7 +118,29 @@ type Receipt = {
   skipped: Skipped[];
   replaced: Replaced[];
   warnings: Warning[];
+  blackouts: BlackedOut[];
 };
+
+/** The function's jsonb, with the blacked-out days split from the schedules
+ *  that already exist. A function older than 184 sends none, which reads as
+ *  an empty list. */
+function readReceipt(raw: unknown): Receipt {
+  type RawSkipped = Omit<Skipped, "kitchen_code"> & { kitchen_code: string | null; name?: string };
+  const r = raw as Omit<Receipt, "blackouts" | "skipped"> & { skipped?: RawSkipped[] };
+  const skipped = r.skipped ?? [];
+  return {
+    ...r,
+    skipped: skipped.filter((s) => s.reason !== "blackout") as Skipped[],
+    blackouts: skipped
+      .filter((s) => s.reason === "blackout")
+      .map((s) => ({
+        date: s.date,
+        location_code: s.location_code,
+        kitchen_code: s.kitchen_code,
+        name: s.name ?? "",
+      })),
+  };
+}
 
 /** A special order the run could bring along, judged by `pullReadiness`. */
 type Candidate = {
@@ -437,6 +476,7 @@ export function GenerateSchedules({
       skipped: [],
       replaced: [],
       warnings: [],
+      blackouts: [],
     };
 
     if (selected.size > 0) {
@@ -454,7 +494,7 @@ export function GenerateSchedules({
         setError(error.message);
         return;
       }
-      data = got as Receipt;
+      data = readReceipt(got);
     }
 
     /* ----------------------------------------------------------------------
@@ -782,6 +822,7 @@ function Receipt({
     receipt.created.length === 0 &&
     receipt.replaced.length === 0 &&
     receipt.skipped.length === 0 &&
+    receipt.blackouts.length === 0 &&
     (pulled?.done.length ?? 0) === 0 &&
     (pulled?.failed.length ?? 0) === 0;
 
@@ -830,6 +871,29 @@ function Receipt({
               {s.has_actuals ? (
                 <span className="text-mark"> · has counted quantities</span>
               ) : null}
+            </Row>
+          ))}
+        </Block>
+      ) : null}
+
+      {/* NEVER SILENTLY SKIPPED (migration 184): a day the calendar blacks out
+          for production is named, with the entry that did it. Regenerate does
+          not reach these — the entry is what has to change. */}
+      {receipt.blackouts.length > 0 ? (
+        <Block title={`Blackout dates — ${receipt.blackouts.length} skipped`}>
+          {receipt.blackouts.map((b) => (
+            <Row
+              key={`${b.date}:${b.location_code}:${b.kitchen_code ?? ""}`}
+              left={
+                <span className="font-semibold">
+                  {packetDate(b.date)} · {b.location_code}
+                  {b.kitchen_code && b.kitchen_code !== b.location_code
+                    ? ` (made at ${b.kitchen_code})`
+                    : ""}
+                </span>
+              }
+            >
+              {b.name}
             </Row>
           ))}
         </Block>

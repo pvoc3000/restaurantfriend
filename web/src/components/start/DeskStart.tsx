@@ -1,3 +1,5 @@
+import { closedDates } from "@/lib/blackoutDates";
+import { fetchEntries } from "@/lib/calendarQueries";
 import { GuideRequests } from "@/components/purchasing/GuideRequests";
 import { Reminders } from "@/components/purchasing/Reminders";
 import { SalesSummary, type SalesSummaryData } from "@/components/sales/SalesSummary";
@@ -186,7 +188,14 @@ export async function DeskStart({ session }: { session: AppSession }) {
 // Sales
 // ---------------------------------------------------------------------------
 
-type ShopRow = { id: string; code: string; openDays: number[] | null; isActive: boolean | null };
+type ShopRow = {
+  id: string;
+  code: string;
+  openDays: number[] | null;
+  isActive: boolean | null;
+  /** Days the calendar says the shop was closed (migration 181). */
+  closedDates: ReadonlySet<string>;
+};
 
 async function loadSales(
   supabase: Supabase,
@@ -231,6 +240,7 @@ async function loadSales(
     .eq("id", loc)
     .not("square_location_id", "is", null);
   if (error) return { data: null, error: error.message };
+  const { entries } = await fetchEntries(supabase, range);
 
   return {
     data: {
@@ -240,6 +250,7 @@ async function loadSales(
         code: l.code as string,
         openDays: (l.open_days as number[] | null) ?? null,
         isActive: (l.is_active as boolean | null) ?? null,
+        closedDates: closedDates(entries, l.id as string, range),
       })),
     },
     error: null,
@@ -766,6 +777,7 @@ async function loadShiftReports(
   ]);
   if (error) return { data: null, error: error.message };
   if (shopError) return { data: null, error: shopError.message };
+  const { entries } = await fetchEntries(supabase, { from: since, to: today });
 
   const rows = (reports ?? []) as {
     id: string;
@@ -782,6 +794,7 @@ async function loadShiftReports(
           id: s.id as string,
           code: s.code as string,
           openDays: (s.open_days as number[] | null) ?? [],
+          closedDates: closedDates(entries, s.id as string, { from: since, to: today }),
         })),
         rows,
         today,

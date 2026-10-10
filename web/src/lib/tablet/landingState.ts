@@ -20,7 +20,12 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
  * tonight's closing report" is the whole reason the tile exists. None or
  * several fall back to the list, which can show them side by side.
  */
-export function shiftReportState(drafts: readonly { id: string; shift: ShiftSlot }[]): TileState {
+export function shiftReportState(
+  drafts: readonly { id: string; shift: ShiftSlot }[],
+  /** The calendar entry closing the shop today (migration 181), if any. A
+   *  draft still wins: somebody is in, whatever the calendar says. */
+  closed: string | null = null
+): TileState {
   if (drafts.length === 1) {
     const d = drafts[0];
     return {
@@ -29,6 +34,7 @@ export function shiftReportState(drafts: readonly { id: string; shift: ShiftSlot
     };
   }
   if (drafts.length > 1) return { note: `${drafts.length} drafts today` };
+  if (closed) return { note: `Closed today — ${closed}` };
   return { note: "No report yet today" };
 }
 
@@ -41,9 +47,16 @@ export function checklistState(input: {
   asked: number;
   started: number;
   openRuns: readonly { id: string }[];
+  /** The calendar entry closing the shop today, if any. The caller passes
+   *  `asked: 0` with it — a closed shop asks for no checklist — and this is
+   *  what the tile says instead of "None asked for today". */
+  closed?: string | null;
 }): TileState {
   const href = input.openRuns.length === 1 ? `/checklists/${input.openRuns[0].id}/run` : undefined;
   const notStarted = Math.max(0, input.asked - input.started);
+  if (input.asked === 0 && input.closed && input.openRuns.length === 0) {
+    return { note: `Closed today — ${input.closed}`, href };
+  }
   if (input.asked === 0) return { note: "None asked for today", href };
   if (notStarted === 0 && input.openRuns.length === 0) return { note: "Done for today", href };
   const parts: string[] = [];
@@ -66,10 +79,15 @@ export function planState(titles: readonly string[]): TileState {
   return { note: `${titles[0]} + ${titles.length - 1} more` };
 }
 
-export function schedulesState(input: { tomorrow: number }): TileState {
-  return {
-    note: input.tomorrow > 0 ? "Tomorrow's schedule is made" : "Nothing generated for tomorrow yet",
-  };
+export function schedulesState(input: {
+  tomorrow: number;
+  /** The calendar entry switching production off at this kitchen tomorrow
+   *  (migration 184), if any — nothing is owed, so nothing is "not yet". */
+  productionOff?: string | null;
+}): TileState {
+  if (input.tomorrow > 0) return { note: "Tomorrow's schedule is made" };
+  if (input.productionOff) return { note: `No production tomorrow — ${input.productionOff}` };
+  return { note: "Nothing generated for tomorrow yet" };
 }
 
 export function tagsState(input: { onPlan: number }): TileState {

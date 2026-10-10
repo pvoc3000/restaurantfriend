@@ -49,6 +49,7 @@ export function StandingOrderBlock({
   number,
   madeCount,
   madeThrough,
+  blackedOut,
 }: {
   id: string;
   standingDays: number[];
@@ -64,6 +65,9 @@ export function StandingOrderBlock({
   madeCount: number;
   /** The furthest day it has made, or null when it has made none. */
   madeThrough: string | null;
+  /** Days inside the horizon that the calendar blacks out for THIS standing
+   *  order (migration 183), worked out on the server with its two shops. */
+  blackedOut: { date: string; name: string }[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -91,8 +95,16 @@ export function StandingOrderBlock({
   const upcoming = standingMaterializationDates(
     { standing_days: standingDays, starts_on: startsOn, ends_on: endsOn, paused },
     today,
-    through
+    through,
+    (date) => blackedOut.some((b) => b.date === date)
   );
+  // Only the days it would otherwise have run on — a Christmas that falls on a
+  // weekday this order never makes is not worth a sentence.
+  const skipped = standingMaterializationDates(
+    { standing_days: standingDays, starts_on: startsOn, ends_on: endsOn, paused },
+    today,
+    through
+  ).flatMap((date) => blackedOut.filter((b) => b.date === date));
 
   return (
     <section className="space-y-3">
@@ -185,6 +197,13 @@ export function StandingOrderBlock({
           <p className="text-muted">
             Next {horizonDays} days: <span className="tabular-nums">{upcoming.length}</span> order
             {upcoming.length === 1 ? "" : "s"}, from {upcoming[0]} to {upcoming[upcoming.length - 1]}.
+          </p>
+        )}
+        {skipped.length > 0 && (
+          <p>
+            <span className="bg-mark-fill px-1">
+              Left out by the calendar: {skipped.map((b) => `${b.date} — ${b.name}`).join("; ")}.
+            </span>
           </p>
         )}
         <p className="text-muted">

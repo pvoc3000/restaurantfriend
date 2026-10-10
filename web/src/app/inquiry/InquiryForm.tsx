@@ -5,11 +5,16 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { DateField } from "@/components/ui/DateField";
 import { TimePicker } from "@/components/ui/TimePicker";
 import { createClient } from "@/lib/supabase/client";
+import { entryAppliesTo, entryDates } from "@/lib/blackoutDates";
 import {
   EMPTY_INQUIRY,
+  inquiryBlackoutOn,
   inquiryPayload,
   inquiryStateMessage,
+  NO_INQUIRY_BLACKOUTS,
+  readInquiryBlackouts,
   validateInquiry,
+  type InquiryBlackouts,
   type InquiryDraft,
   type InquiryErrors,
   type InquiryShop,
@@ -92,6 +97,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
   const [menu, setMenu] = useState<InquiryMenuItem[]>([]);
   const [rules, setRules] = useState<InquiryRules>(EMPTY_RULES);
   const [basket, setBasket] = useState<Basket>(EMPTY_BASKET);
+  const [blackouts, setBlackouts] = useState<InquiryBlackouts>(NO_INQUIRY_BLACKOUTS);
   // The delivery estimate, KEYED BY THE ADDRESS it was worked out for: an
   // edited address makes it stale without an effect to clear it.
   // `from` is the NEAREST shop the estimate measured from (Mark, 2026-10-01):
@@ -104,7 +110,17 @@ export function InquiryForm({ orgId }: { orgId: string }) {
   const priceLocation =
     draft.fulfillment === "pickup" ? draft.locationId || null : deliveryFrom;
 
-  const errors: InquiryErrors = validateInquiry(draft);
+  // BLACKOUT DATES (migrations 181, 182). The shop asked about is the one the
+  // inquiry would be made at: the pickup shop, the shop a delivery was
+  // measured from, or — with neither yet — the org's default, which is what
+  // `create_inquiry` falls to. So the calendar greys out exactly the days the
+  // gate would refuse, and changing the shop can change them.
+  const unavailable = (date: string) => inquiryBlackoutOn(blackouts, date, priceLocation);
+  const upcomingBlackouts = blackouts.entries
+    .filter((e) => entryAppliesTo(e, [priceLocation ?? blackouts.default_location_id]))
+    .slice(0, 6);
+
+  const errors: InquiryErrors = validateInquiry(draft, unavailable);
   const shown: InquiryErrors = touched ? errors : {};
 
   const empty = basketIsEmpty(basket);
@@ -160,6 +176,25 @@ export function InquiryForm({ orgId }: { orgId: string }) {
         return;
       }
       setShops((data ?? []) as InquiryShop[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("inquiry_blackouts", { p_org_id: orgId });
+      if (cancelled) return;
+      if (error) {
+        // No list means no day is greyed out, and the gate still refuses one
+        // (182). The commonest cause is migration 181 not having been applied.
+        console.error("inquiry_blackouts failed", error.message);
+        return;
+      }
+      setBlackouts(readInquiryBlackouts(data));
     })();
     return () => {
       cancelled = true;
@@ -415,6 +450,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
               value={draft.eventDate || null}
               onChange={(next) => set("eventDate", next ?? "")}
               ariaLabel="Date you need it"
+              isDisabled={(iso) => unavailable(iso) !== null}
             />
           </Field>
           {/* `ui/TimePicker` beside `ui/DateField`, both in the form box, so
@@ -429,6 +465,23 @@ export function InquiryForm({ orgId }: { orgId: string }) {
             />
           </Field>
         </div>
+
+        {/* The dates we are not taking orders for, said before anybody picks
+            one (Mark, 2026-10-09: "Makes it clear on the inquiry form that no
+            special orders are available on certain dates"). The calendar greys
+            the same days; this is for the person who types. */}
+        {upcomingBlackouts.length > 0 && (
+          <p className="border-l-2 border-mark pl-3 text-[14px] leading-relaxed text-muted">
+            We’re not taking special orders for{" "}
+            {upcomingBlackouts.map((e, i) => (
+              <span key={`${e.starts_on}:${e.title}`}>
+                {i > 0 && (i === upcomingBlackouts.length - 1 ? " or " : ", ")}
+                <span className="whitespace-nowrap">{entryDates(e)}</span> ({e.title})
+              </span>
+            ))}
+            .
+          </p>
+        )}
 
         {menu.length > 0 && (
           <>

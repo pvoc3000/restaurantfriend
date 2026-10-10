@@ -1024,3 +1024,18 @@ test("the email lists DONUT BATCHES with each total and who made it, a blank as 
   ok(html.includes("Prepared by") && html.includes(">Leo Baker<"), "who made it");
   ok(html.includes(">Proofed slow<"), "the batch's note");
 });
+
+/* -- closed days (migration 181) ----------------------------------------- */
+// Checked by BREAKING: removing the `closedDates` filter from `missingNights`
+// turns the first case red.
+
+test("missingNights: a night the calendar closed the shop is not missing", () => {
+  const days = [
+    { date: "2026-12-24", isoWeekday: 4 },
+    { date: "2026-12-25", isoWeekday: 5 },
+    { date: "2026-12-26", isoWeekday: 6 },
+  ];
+  const input = { reportDates: ["2026-12-24"], openDays: [1, 2, 3, 4, 5, 6, 7], days };
+  eq(missingNights(input), ["2026-12-25", "2026-12-26"]);
+  eq(missingNights({ ...input, closedDates: new Set(["2026-12-25"]) }), ["2026-12-26"]);
+});

@@ -1,0 +1,78 @@
+import { createClient } from "@/lib/supabase/server";
+import { getAppSession } from "@/lib/session";
+import { canEditPage } from "@/lib/pageAccess";
+import { canSetBlackouts } from "@/lib/roles";
+import { serverTimeZone, todayInTimeZone } from "@/lib/today";
+import { gridRange, parseMonthParam, type CalendarItem, type CalendarLayer } from "@/lib/calendar";
+import { fetchEntries } from "@/lib/calendarQueries";
+import { CalendarScreen, type CalendarView } from "@/components/calendar/CalendarScreen";
+
+/**
+ * The calendar — build step 4s.
+ *
+ * Blackout dates, notes and events are typed here (`calendar_entries`,
+ * migration 181), and what the rest of the app knows is coming is drawn on the
+ * same month. It is a RECORD screen in design rule 3's sense, not an
+ * operational one: it shows every shop and filters by a set of them, because
+ * the question "what is on the 25th" is usually asked about all of them.
+ *
+ * `?month=2026-12` picks the month and is why changing it is a navigation —
+ * every layer is fetched for exactly the 42 days the grid draws. `?view=list`
+ * is the entries as a table, which loads all of them and no layers.
+ */
+export default async function CalendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string; view?: string; shops?: string }>;
+}) {
+  const params = await searchParams;
+  const session = await getAppSession();
+  const supabase = await createClient();
+  const role = session.membership.role;
+
+  const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
+  const view: CalendarView = params.view === "list" ? "list" : "month";
+  const month = parseMonthParam(params.month, today);
+  const range = gridRange(month);
+
+  // ENUMERATED, so the active list (design rule 3): a closed shop is not one
+  // anybody writes a blackout for.
+  const locations = session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }));
+  const known = new Set(locations.map((l) => l.id));
+  const shops = (params.shops ?? "").split(",").filter((id) => known.has(id));
+
+  const { entries, error } = await fetchEntries(supabase, view === "list" ? {} : range);
+
+  if (error) {
+    // Before 181 is applied this names the missing table rather than drawing
+    // an empty month, which would read as "nothing is planned".
+    return (
+      <p className="text-sm text-accent">
+        Could not load the calendar: {error}
+        {/calendar_entries/.test(error) ? " — migration 181 has not been applied yet." : ""}
+      </p>
+    );
+  }
+
+  const layers: CalendarLayer[] = ["entries"];
+  const layerItems: CalendarItem[] = [];
+
+  return (
+    <CalendarScreen
+      // Keyed by what the server chose, so the screen's own state (the shop
+      // filter it seeds from the URL) follows a navigation.
+      key={`${view}:${month}`}
+      orgId={session.membership.org_id}
+      view={view}
+      month={month}
+      today={today}
+      entries={entries}
+      layerItems={layerItems}
+      layers={layers}
+      locations={locations}
+      shops={shops}
+      canWrite={canEditPage(role, "/calendar")}
+      canSetBlackouts={canSetBlackouts(role)}
+    />
+  );
+}

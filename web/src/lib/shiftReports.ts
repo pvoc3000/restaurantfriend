@@ -395,12 +395,21 @@ export type MissingNightsInput = {
   openDays: readonly number[];
   /** The window to look back over, ending YESTERDAY: today is not late yet. */
   days: readonly { date: string; isoWeekday: number }[];
+  /**
+   * Dates the calendar says this shop was CLOSED (`calendar_entries.shop_closed`,
+   * migration 181; `lib/blackoutDates.closedDates`). `open_days` is the weekly
+   * pattern and this is its exceptions: a shop shut for Christmas owes no
+   * closing report, and a line that says it does is one that teaches people to
+   * ignore the line.
+   */
+  closedDates?: ReadonlySet<string>;
 };
 
 export function missingNights(input: MissingNightsInput): string[] {
   const have = new Set(input.reportDates);
   return input.days
     .filter((d) => input.openDays.includes(d.isoWeekday))
+    .filter((d) => !input.closedDates?.has(d.date))
     .filter((d) => !have.has(d.date))
     .map((d) => d.date);
 }

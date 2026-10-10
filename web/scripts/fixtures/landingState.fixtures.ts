@@ -79,3 +79,28 @@ test("batch logs: no log, all done, or how many to do", () => {
   eq(batchLogsState({ logs: 1, outstanding: 1 }).note, "1 batch to do");
   eq(batchLogsState({ logs: 2, outstanding: 7 }).note, "7 batches to do");
 });
+
+/* -- the calendar's say (migrations 181, 184) ---------------------------- */
+// Checked by BREAKING: dropping each `closed` / `productionOff` branch turns
+// its own case red, and a draft or a made schedule still wins over the calendar.
+
+test("shift report tile: closed today, unless somebody has a draft", () => {
+  eq(shiftReportState([], "Christmas").note, "Closed today — Christmas");
+  eq(shiftReportState([]).note, "No report yet today");
+  eq(shiftReportState([{ id: "r", shift: "closing" }], "Christmas").href, "/shift-reports/r/run");
+});
+
+test("checklist tile: a closed shop asks for nothing and says why", () => {
+  eq(checklistState({ asked: 0, started: 0, openRuns: [], closed: "Christmas" }).note, "Closed today — Christmas");
+  eq(checklistState({ asked: 0, started: 0, openRuns: [] }).note, "None asked for today");
+  eq(
+    checklistState({ asked: 0, started: 0, openRuns: [{ id: "x" }], closed: "Christmas" }).note,
+    "None asked for today",
+  );
+});
+
+test("schedules tile: production off tomorrow owes nothing", () => {
+  eq(schedulesState({ tomorrow: 0, productionOff: "Christmas" }).note, "No production tomorrow — Christmas");
+  eq(schedulesState({ tomorrow: 0 }).note, "Nothing generated for tomorrow yet");
+  eq(schedulesState({ tomorrow: 2, productionOff: "Christmas" }).note, "Tomorrow's schedule is made");
+});

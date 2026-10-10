@@ -99,7 +99,13 @@ export function isOverdueBill(r: StartBill, today: string): boolean {
 // Shift reports
 // ---------------------------------------------------------------------------
 
-export type ShopDays = { id: string; code: string; openDays: readonly number[] };
+export type ShopDays = {
+  id: string;
+  code: string;
+  openDays: readonly number[];
+  /** Dates the calendar says this shop was closed (migration 181). */
+  closedDates?: ReadonlySet<string>;
+};
 
 /**
  * Every shop's closing nights with no report, over the `lookback` days ending
@@ -122,7 +128,12 @@ export function missedClosingNights(
     const reportDates = reports
       .filter((r) => r.location_id === shop.id && r.shift === "closing")
       .map((r) => r.report_date);
-    for (const date of missingNights({ reportDates, openDays: shop.openDays, days })) {
+    for (const date of missingNights({
+      reportDates,
+      openDays: shop.openDays,
+      days,
+      closedDates: shop.closedDates,
+    })) {
       out.push({ code: shop.code, date });
     }
   }

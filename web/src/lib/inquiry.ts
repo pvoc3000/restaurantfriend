@@ -17,6 +17,8 @@
  * pins that one.
  */
 
+import { coveringEntry } from "./blackoutDates";
+
 /** Every state `create_inquiry` can answer with, and the two the transport can
  *  add. The page never composes a sentence from a code — see
  *  `inquiryStateMessage`. */
@@ -45,7 +47,71 @@ export type InquiryState =
   | "items_invalid"
   | "item_unavailable"
   | "letter_invalid"
-  | "minimum_not_met";
+  | "minimum_not_met"
+  // Migration 182 — a calendar entry says no special orders that day. The page
+  // disables those days and `validateInquiry` refuses a typed one, so a
+  // customer only meets this when an entry was added while the form was open.
+  | "date_unavailable";
+
+/**
+ * What `inquiry_blackouts` (181) hands the public form: the dates no special
+ * order is taken, and the shop an inquiry falls to when none is named.
+ */
+export type InquiryBlackouts = {
+  default_location_id: string | null;
+  entries: InquiryBlackout[];
+};
+
+export type InquiryBlackout = {
+  title: string;
+  starts_on: string;
+  ends_on: string;
+  /** Empty means every shop. */
+  location_ids: string[];
+};
+
+export const NO_INQUIRY_BLACKOUTS: InquiryBlackouts = { default_location_id: null, entries: [] };
+
+/** Read the RPC's jsonb defensively — a malformed answer is no blackouts. */
+export function readInquiryBlackouts(data: unknown): InquiryBlackouts {
+  if (!data || typeof data !== "object") return NO_INQUIRY_BLACKOUTS;
+  const raw = data as { default_location_id?: unknown; entries?: unknown };
+  const entries = Array.isArray(raw.entries) ? raw.entries : [];
+  return {
+    default_location_id: typeof raw.default_location_id === "string" ? raw.default_location_id : null,
+    entries: entries.flatMap((e): InquiryBlackout[] => {
+      const r = (e ?? {}) as Record<string, unknown>;
+      if (typeof r.title !== "string" || typeof r.starts_on !== "string" || typeof r.ends_on !== "string") {
+        return [];
+      }
+      return [
+        {
+          title: r.title,
+          starts_on: r.starts_on,
+          ends_on: r.ends_on,
+          location_ids: Array.isArray(r.location_ids)
+            ? r.location_ids.filter((id): id is string => typeof id === "string")
+            : [],
+        },
+      ];
+    }),
+  };
+}
+
+/**
+ * The entry that refuses `date` for an inquiry made at `locationId`, or null.
+ *
+ * `locationId` is the shop the customer chose (a pickup) or the one their
+ * delivery was measured from; with neither, the inquiry falls to
+ * `default_location_id`, exactly as `create_inquiry` resolves it (182).
+ */
+export function inquiryBlackoutOn(
+  blackouts: InquiryBlackouts,
+  date: string,
+  locationId: string | null,
+): InquiryBlackout | null {
+  return coveringEntry(blackouts.entries, date, [locationId ?? blackouts.default_location_id]);
+}
 
 export type InquiryFulfillment = "pickup" | "delivery";
 
@@ -185,7 +251,12 @@ export const INQUIRY_REQUIRED: readonly (keyof InquiryDraft)[] = [
  * somebody who has not decided when their party is would turn away exactly the
  * inquiries this shop wants.
  */
-export function validateInquiry(draft: InquiryDraft): InquiryErrors {
+export function validateInquiry(
+  draft: InquiryDraft,
+  /** The blackout covering a date, if any — `inquiryBlackoutOn`, with the shop
+   *  already decided by the caller. Omitted, no date is refused here. */
+  unavailable?: (date: string) => InquiryBlackout | null,
+): InquiryErrors {
   const errors: InquiryErrors = {};
 
   if (!draft.name.trim()) {
@@ -219,6 +290,10 @@ export function validateInquiry(draft: InquiryDraft): InquiryErrors {
     errors.eventDate = "Choose the date you need it.";
   } else if (!isRealDate(draft.eventDate)) {
     errors.eventDate = "That date doesn’t exist.";
+  } else if (unavailable?.(draft.eventDate)) {
+    // The calendar greys these days out, but a date can be typed.
+    const entry = unavailable(draft.eventDate)!;
+    errors.eventDate = `We’re not taking special orders for that date (${entry.title}).`;
   }
   if (!draft.eventTime.trim()) {
     errors.eventTime = "Choose a time.";
@@ -298,6 +373,12 @@ export function inquiryStateMessage(state: InquiryState | string): {
       return { ok: false, title: "Where are we delivering to?", body: "Add the delivery address, or choose pickup." };
     case "date_required":
       return { ok: false, title: "When do you need it?", body: "Choose a date." };
+    case "date_unavailable":
+      return {
+        ok: false,
+        title: "We’re not taking special orders for that date",
+        body: "Go back and choose another day, or email us if that date is the only one that works.",
+      };
     case "time_required":
       return { ok: false, title: "What time do you need it?", body: "Choose a time." };
     case "fulfillment_invalid":

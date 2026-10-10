@@ -233,6 +233,11 @@ export const SECTIONS: NavSection[] = [
       // tables it happens to write. The slug is untouched, so the `rf.nav`
       // cookie keeps working.
       //
+      // Calendar LEADS the section (Mark, 2026-10-09: "Operations", first). It
+      // is the one screen about the days themselves rather than about a shift
+      // or a document: blackout dates, notes and events are typed there, and
+      // what the rest of the app knows is coming is drawn on it.
+      { slug: "calendar", label: "Calendar", href: "/calendar", built: true },
       {
         slug: "shift-reports",
         label: "Shift Reports",

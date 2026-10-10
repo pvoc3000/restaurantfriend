@@ -4,7 +4,9 @@ import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
-import { serverTimeZone, todayInTimeZone } from "@/lib/today";
+import { daysAfter, serverTimeZone, todayInTimeZone } from "@/lib/today";
+import { blackoutFor, blackoutSentence } from "@/lib/blackoutDates";
+import { fetchEntries } from "@/lib/calendarQueries";
 import type { RawSearchParams } from "@/lib/filterMenus";
 import {
   KIND_LABEL,
@@ -446,6 +448,42 @@ export async function SpecialOrderDetail({
 
   const attention = needsAttention(row as never, today, totals, settings.attention);
 
+  // A BLACKOUT ON THE EVENT DATE (migration 181) — a WARNING and never a block
+  // (Mark, 2026-10-09: "staff should be warned"). It is deliberately NOT one of
+  // `needsAttention`'s reasons: that function also feeds the list's attention
+  // queue and the start page, and an order taken on a blacked-out day ON
+  // PURPOSE would sit in both until the day passed, which is how a queue stops
+  // being read. Here it is a fact about the date, said beside the record.
+  //
+  // A day made from a standing order is judged by the standing-order switch,
+  // since that is the one that would have stopped it being made.
+  let blackoutWarning: string | null = null;
+  const eventDate = row.event_date as string | null;
+  if (kind === "order" && row.status !== "cancelled" && eventDate && eventDate >= today) {
+    const { entries } = await fetchEntries(supabase, { from: eventDate, to: eventDate });
+    const effect = row.standing_order_id ? "standing_orders" : "special_orders";
+    const entry = blackoutFor(entries, {
+      date: eventDate,
+      locationIds: [row.location_id as string | null, row.kitchen_location_id as string | null],
+      effect,
+    });
+    if (entry) blackoutWarning = blackoutSentence(entry, effect, eventDate, session.locations);
+  }
+
+  // A standing order: the days inside its horizon that the calendar blacks out
+  // for it, so the Recurrence block's count agrees with what the top-up will
+  // actually make (183). Its two shops, as the materializer asks.
+  const standingBlackedOut: { date: string; name: string }[] = [];
+  if (kind === "standing_order") {
+    const through = daysAfter(today, Math.max(0, settings.horizonDays));
+    const { entries } = await fetchEntries(supabase, { from: today, to: through });
+    const shops = [row.location_id as string | null, row.kitchen_location_id as string | null];
+    for (let day = today; day <= through; day = daysAfter(day, 1)) {
+      const entry = blackoutFor(entries, { date: day, locationIds: shops, effect: "standing_orders" });
+      if (entry) standingBlackedOut.push({ date: day, name: entry.title });
+    }
+  }
+
   // Decision 22: the figure the terms promise, offered beside the empty cell.
   // Nothing writes it — `OrderTotals` renders it as a `→` you tap.
   const rushSuggestion = suggestedRushFee(
@@ -767,6 +805,11 @@ export async function SpecialOrderDetail({
               >
                 {attention}
               </span>
+            </p>
+          ) : null}
+          {blackoutWarning ? (
+            <p className="text-[13px]">
+              <span className="inline-block bg-mark-fill px-1">{blackoutWarning}</span>
             </p>
           ) : null}
         </div>
@@ -1184,6 +1227,7 @@ export async function SpecialOrderDetail({
                       number={row.number as string}
                       madeCount={madeCount ?? 0}
                       madeThrough={madeThrough}
+                      blackedOut={standingBlackedOut}
                     />
                   ) : kind === "order" ? (
                     <section className="space-y-3">
