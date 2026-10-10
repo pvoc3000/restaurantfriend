@@ -1,3 +1,4 @@
+import { layerColor, readLayerColors } from "@/lib/calendarColors";
 import { CalendarSettings, type SubscriptionRow } from "@/components/settings/CalendarSettings";
 import type { CalendarSubscription, FeedLink } from "@/lib/calendarFeeds";
 import { localDateISO, localTime } from "@/lib/timeZone";
@@ -124,7 +125,7 @@ export default async function SettingsPage({
     const [subs, links] = await Promise.all([
       supabase
         .from("calendar_subscriptions")
-        .select("id, name, location_ids, is_active, has_url, last_fetched_at, last_error")
+        .select("id, name, location_ids, is_active, has_url, last_fetched_at, last_error, color")
         .order("created_at"),
       supabase
         .from("calendar_feed_links")
@@ -260,6 +261,7 @@ export default async function SettingsPage({
                   shops={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
                   subscriptions={calendarSubscriptions}
                   links={calendarLinks}
+                  feedsColor={layerColor("feeds", readLayerColors(session.orgSettings))}
                   loadError={calendarError}
                 />
               ) : (

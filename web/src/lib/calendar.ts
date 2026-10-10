@@ -72,6 +72,9 @@ export type CalendarItem = {
   locationIds: string[];
   /** A typed entry with a switch on. Drawn filled, and leads its day. */
   blackout?: boolean;
+  /** A palette key of the item's OWN (an entry's, a subscribed calendar's) —
+   *  `lib/calendarColors`. Unset, it wears its layer's colour. */
+  color?: string | null;
   /** The `calendar_entries` row behind an `entries` item. */
   entryId?: string;
   /**
@@ -121,6 +124,7 @@ export function entryItems(entries: readonly CalendarEntry[], range: DateRange):
         detail: entry.note,
         locationIds: entry.location_ids,
         blackout: isBlackout(entry),
+        color: entry.color,
         entryId: entry.id,
         span:
           entry.starts_on === entry.ends_on

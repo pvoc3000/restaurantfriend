@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canEditPage, canReachPage } from "@/lib/pageAccess";
-import { canReadHr, canSetBlackouts } from "@/lib/roles";
+import { canManageMembers, canReadHr, canSetBlackouts } from "@/lib/roles";
+import { readLayerColors } from "@/lib/calendarColors";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { gridRange, parseMonthParam, type CalendarItem, type CalendarLayer } from "@/lib/calendar";
 import { fetchEntries, fetchLayerItems, staleSubscriptionIds } from "@/lib/calendarQueries";
@@ -92,7 +93,7 @@ export default async function CalendarPage({
       ),
       supabase
         .from("calendar_subscriptions")
-        .select("id, name, location_ids, is_active, has_url, last_fetched_at, last_error")
+        .select("id, name, location_ids, is_active, has_url, last_fetched_at, last_error, color")
         .eq("is_active", true)
         .order("created_at"),
       supabase
@@ -145,6 +146,8 @@ export default async function CalendarPage({
       shops={shops}
       canWrite={canEditPage(role, "/calendar")}
       canSetBlackouts={canSetBlackouts(role)}
+      layerColors={readLayerColors(session.orgSettings)}
+      orgSettings={canManageMembers(role) ? (session.orgSettings as Record<string, unknown>) : null}
       />
     </>
   );

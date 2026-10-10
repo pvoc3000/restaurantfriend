@@ -1,6 +1,6 @@
 # 04s — Calendar (blackout dates, layers, feeds in and out)
 
-Built 2026-10-09. Migrations 181–187, all APPLIED (187 on 2026-10-10); edge function
+Built 2026-10-09. Migrations 181–188, all APPLIED (187 and 188 on 2026-10-10); edge function
 `calendar-sync` deployed (v1, `verify_jwt: true`).
 
 Mark, 2026-10-09: "blackout dates. The idea is to create a space where the user
@@ -108,8 +108,21 @@ link that does not carry customer names.
 **EACH LAYER IS A COLOURED CHIP** (Mark, 2026-10-10: "apple style chips, with
 different colors for each event type instead of the glyphs") — a pale fill
 under dark type of the same hue, a blackout solid, and a key above the grid.
-THIS IS THE ONE SCREEN WHERE COLOUR IS NOT RECORD STATE; it stays in
-`MonthView.LAYER_CHIP` and is not a precedent for any other screen.
+THIS IS THE ONE SCREEN WHERE COLOUR IS NOT RECORD STATE, and it is not a
+precedent for any other screen.
+
+**COLOURS CAN BE CHOSEN, FROM A FIXED PALETTE, ORGANISATION-WIDE** (Mark,
+2026-10-10: "organisation-wide is right"). `lib/calendarColors` holds twelve
+swatches, each a checked fill-and-type pair, and resolves a chip's colour in
+this order: a blackout is always dark; then the item's OWN colour
+(`calendar_entries.color`, `calendar_subscriptions.color`, migration 188); then
+the organisation's for the layer (`orgs.settings.calendar.colors`); then the
+layer's default. A manager presses a chip in the key to change a layer; a
+layer set back to its default is REMOVED from the stored map, so the map holds
+only decisions. Orders, deliveries and tasks have no colour of their own —
+theirs means something. Not per person, on purpose: "the orange ones are
+unpaid" has to be true for everybody at the counter.
+**`CALENDAR_ENTRY_SELECT` names `color`, so the app needs 188.**
 
 **THE MONTH FILLS THE WINDOW** (Mark, 2026-10-10), measured with
 `lib/fillHeight.useFillToBottom`; how many lines a day shows follows the row

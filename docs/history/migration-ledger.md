@@ -362,3 +362,7 @@ database in a rolled-back transaction first. See `docs/history/04s-calendar.md`.
 **187 is APPLIED** (Claude, 2026-10-10) — `calendar_feed_by_token` says what
 the calendar page says: paid and unpaid order layers, "<kitchen>: <title>" at
 the ready time, "<vendor> (<shop>)". Dry-run first, as 181–186 were.
+
+**188 is APPLIED** (Claude, 2026-10-10) — `color` on `calendar_entries` and
+`calendar_subscriptions`, a palette key or null. Additive. The web app selects
+the column, so 188 goes on before any deploy that includes it.

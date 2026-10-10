@@ -3,52 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useFillToBottom } from "@/lib/fillHeight";
+import { chipClass, type LayerColors } from "@/lib/calendarColors";
 import { monthGrid } from "@/lib/dateRange";
 import {
   clockTime,
   weekLayout,
   type CalendarItem,
-  type CalendarLayer,
   type WeekBar,
 } from "@/lib/calendar";
 
 /** Sunday first — `monthGrid`'s order (Mark, 2026-09-10). */
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-
-/**
- * A COLOUR PER LAYER, as a chip (Mark, 2026-10-10: "apple style chips, with
- * different colors for each event type instead of the glyphs").
- *
- * This is the one screen where colour is not record state. Everywhere else in
- * the app it is, and the classic Mac look keeps to ink, white and the yellow
- * fill; a calendar is read by colour before it is read by word, which is the
- * reason Mark asked for it and the reason it stays HERE and nowhere else.
- *
- * A pale fill under dark type of the same hue — Apple Calendar's all-day chip
- * — so every one is legible (each pair is 7:1 or better) and a busy day reads
- * as bands rather than as a paragraph. Whole class strings, never assembled:
- * Tailwind only ships a class it can see written out.
- */
-export const LAYER_CHIP: Record<CalendarLayer, string> = {
-  menu_plan: "bg-teal-100 text-teal-900",
-  entries: "bg-yellow-200 text-yellow-950",
-  orders_paid: "bg-green-100 text-green-900",
-  orders_unpaid: "bg-orange-100 text-orange-900",
-  deliveries: "bg-sky-100 text-sky-900",
-  tasks: "bg-purple-100 text-purple-900",
-  pay_periods: "bg-slate-200 text-slate-800",
-  hr: "bg-pink-100 text-pink-900",
-  hr_events: "bg-red-100 text-red-900",
-  feeds: "bg-indigo-100 text-indigo-900",
-};
-
-/** A blackout: the one chip that is solid, so it leads its day by weight too. */
-export const BLACKOUT_CHIP = "bg-neutral-800 text-white";
-
-/** The chip's dress for an item — a blackout's, or its layer's. */
-export function chipClass(item: Pick<CalendarItem, "layer" | "blackout">): string {
-  return item.blackout ? BLACKOUT_CHIP : LAYER_CHIP[item.layer];
-}
 
 /** How many lines a day shows before "+N more", until the grid is measured. */
 const SHOWN = 4;
@@ -78,6 +43,7 @@ export function MonthView({
   month,
   today,
   days,
+  colors,
   onDay,
   onEntry,
 }: {
@@ -85,6 +51,8 @@ export function MonthView({
   today: string;
   /** Each day's items, already filtered and sorted (`lib/calendar.itemsByDay`). */
   days: ReadonlyMap<string, CalendarItem[]>;
+  /** The organisation's colour for each layer (`lib/calendarColors`). */
+  colors: LayerColors;
   onDay: (iso: string) => void;
   onEntry: (entryId: string) => void;
 }) {
@@ -178,7 +146,7 @@ export function MonthView({
                 style={{ top: CELL_TOP, gridAutoRows: "15px" }}
               >
                 {bars.map((bar) => (
-                  <Bar key={bar.item.key} bar={bar} onEntry={onEntry} />
+                  <Bar key={bar.item.key} bar={bar} colors={colors} onEntry={onEntry} />
                 ))}
                 {more.map((n, col) =>
                   n > 0 ? (
@@ -207,7 +175,15 @@ export function itemText(item: CalendarItem): string {
   return `${lead}${time}${item.title}`;
 }
 
-function Bar({ bar, onEntry }: { bar: WeekBar; onEntry: (entryId: string) => void }) {
+function Bar({
+  bar,
+  colors,
+  onEntry,
+}: {
+  bar: WeekBar;
+  colors: LayerColors;
+  onEntry: (entryId: string) => void;
+}) {
   const { item } = bar;
   // A chip in one day, or one banner across several (Mark, 2026-10-10). Inset
   // 4px from the cell's edge and rounded — except at an end that carries on
@@ -216,7 +192,7 @@ function Bar({ bar, onEntry }: { bar: WeekBar; onEntry: (entryId: string) => voi
   const ends = `${bar.continuesBefore ? "rounded-l-none" : "ml-1"} ${
     bar.continuesAfter ? "rounded-r-none" : "mr-1"
   }`;
-  const className = `pointer-events-auto block min-w-0 truncate rounded-[4px] px-1.5 text-left text-[11px] font-medium leading-[15px] hover:brightness-95 ${ends} ${chipClass(item)}`;
+  const className = `pointer-events-auto block min-w-0 truncate rounded-[4px] px-1.5 text-left text-[11px] font-medium leading-[15px] hover:brightness-95 ${ends} ${chipClass(item, colors)}`;
   const style = { gridColumn: `${bar.col + 1} / span ${bar.days}`, gridRow: bar.lane + 1 };
   const body = itemText(item);
 

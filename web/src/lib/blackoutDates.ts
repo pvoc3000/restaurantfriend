@@ -35,11 +35,14 @@ export type CalendarEntry = {
   no_production: boolean;
   shop_closed: boolean;
   note: string | null;
+  /** A palette key (`lib/calendarColors`, migration 188), or null/absent for
+   *  the layer's colour. Ignored on a blackout. */
+  color?: string | null;
 };
 
 /** The columns every reader selects. */
 export const CALENDAR_ENTRY_SELECT =
-  "id, title, starts_on, ends_on, location_ids, no_special_orders, no_standing_orders, no_production, shop_closed, note";
+  "id, title, starts_on, ends_on, location_ids, no_special_orders, no_standing_orders, no_production, shop_closed, note, color";
 
 /**
  * The four switches, in the order the screens show them. `label` reads as what

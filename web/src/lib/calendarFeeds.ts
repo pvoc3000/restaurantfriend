@@ -51,6 +51,8 @@ export type CalendarSubscription = {
   has_url: boolean;
   last_fetched_at: string | null;
   last_error: string | null;
+  /** A palette key (migration 188), or null for the layer's colour. */
+  color?: string | null;
 };
 
 /** How stale a subscription may be before the calendar page asks for a read. */
@@ -88,7 +90,7 @@ export type SubscriptionEventRow = {
  */
 export function subscriptionItems(
   rows: readonly SubscriptionEventRow[],
-  subscriptions: readonly Pick<CalendarSubscription, "id" | "name" | "location_ids">[],
+  subscriptions: readonly Pick<CalendarSubscription, "id" | "name" | "location_ids" | "color">[],
   range: { from: string; to: string },
 ): CalendarItem[] {
   const byId = new Map(subscriptions.map((s) => [s.id, s]));
@@ -107,6 +109,7 @@ export function subscriptionItems(
         title: row.title,
         detail: [sub.name, row.place].filter(Boolean).join(" · "),
         locationIds: sub.location_ids,
+        color: sub.color,
         span:
           row.starts_on === row.ends_on
             ? undefined

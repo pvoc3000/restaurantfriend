@@ -21,12 +21,29 @@ import {
 } from "@/lib/calendar";
 import type { CalendarEntry } from "@/lib/blackoutDates";
 import { useStoredSet } from "@/lib/storedSet";
-import { BLACKOUT_CHIP, LAYER_CHIP, MonthView } from "@/components/calendar/MonthView";
+import { MonthView } from "@/components/calendar/MonthView";
+import { ColorSwatches } from "@/components/calendar/ColorSwatches";
+import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
+import { createClient } from "@/lib/supabase/client";
+import {
+  BLACKOUT_CHIP,
+  colorChip,
+  layerColor,
+  withLayerColor,
+  type CalendarColor,
+  type LayerColors,
+} from "@/lib/calendarColors";
 import { DayPanel } from "@/components/calendar/DayPanel";
 import { EntryDialog, type EntryLocation } from "@/components/calendar/EntryDialog";
 import { EntriesList } from "@/components/calendar/EntriesList";
 
 export type CalendarView = "month" | "list";
+
+/** What the key calls a layer. Blackouts have their own, fixed, chip beside
+ *  the entries', so that one is "Notes and events" here. */
+function keyLabel(layer: { key: CalendarLayer; label: string }): string {
+  return layer.key === "entries" ? "Notes and events" : layer.label;
+}
 
 /** Which dialog is open: a day's panel, an entry, or a new entry on a day. */
 type Open =
@@ -60,6 +77,8 @@ export function CalendarScreen({
   shops,
   canWrite,
   canSetBlackouts,
+  layerColors,
+  orgSettings,
 }: {
   orgId: string;
   view: CalendarView;
@@ -79,8 +98,49 @@ export function CalendarScreen({
   shops: string[];
   canWrite: boolean;
   canSetBlackouts: boolean;
+  /** The organisation's colour per layer, from `orgs.settings`. */
+  layerColors: LayerColors;
+  /**
+   * The whole of `orgs.settings`, for a manager, so a layer's colour can be
+   * written back into it; NULL for everyone else, which is also what makes the
+   * key's chips plain labels instead of buttons. 001's `org_update` policy is
+   * owner/admin and would refuse the write regardless.
+   */
+  orgSettings: Record<string, unknown> | null;
 }) {
   const router = useRouter();
+  // Shown the moment it is picked; the server's copy arrives with the refresh.
+  const [colors, setColors] = useState<LayerColors>(layerColors);
+  const [recolouring, setRecolouring] = useState<CalendarLayer | null>(null);
+  const [colourError, setColourError] = useState<string | null>(null);
+
+  function setLayerColour(layer: CalendarLayer, color: CalendarColor) {
+    if (!orgSettings) return;
+    const before = colors;
+    setColourError(null);
+    setColors({ ...colors, [layer]: color });
+    // The whole document, with this one key changed — how every other org
+    // setting is written (`InlineValue`'s `jsonColumn`). Built from what the
+    // screen has already saved, so two changes in a row both land.
+    const base = Object.entries({ ...before, [layer]: color }).reduce(
+      (doc, [l, c]) => withLayerColor(doc, l as CalendarLayer, c as CalendarColor),
+      orgSettings,
+    );
+    void createClient()
+      .from("orgs")
+      .update({ settings: base })
+      .eq("id", orgId)
+      .select("id")
+      .then(({ data, error }) => {
+        if (error || !data?.length) {
+          setColors(before);
+          setColourError(error?.message ?? "The colour was not saved — the database refused it.");
+          return;
+        }
+        router.refresh();
+      });
+  }
+
   const [open, setOpen] = useState<Open | null>(null);
   const [shopFilter, setShopFilter] = useState<string[]>(shops);
   // Stored as the layers that are HIDDEN, so a layer added later shows by
@@ -243,8 +303,23 @@ export function CalendarScreen({
           {offered
             .filter((l) => !hiddenSet.has(l.key))
             .map((l) => (
-              <li key={l.key} className={`rounded-[4px] px-1.5 leading-[18px] ${LAYER_CHIP[l.key]}`}>
-                {l.key === "entries" ? "Notes and events" : l.label}
+              <li key={l.key}>
+                {/* A manager presses a chip to change that layer's colour, for
+                    everybody. For anyone else it is a label. */}
+                {orgSettings ? (
+                  <button
+                    type="button"
+                    onClick={() => setRecolouring(l.key)}
+                    aria-label={`Change the colour of ${keyLabel(l)}`}
+                    className={`rounded-[4px] px-1.5 leading-[18px] hover:brightness-95 ${colorChip(layerColor(l.key, colors))}`}
+                  >
+                    {keyLabel(l)}
+                  </button>
+                ) : (
+                  <span className={`block rounded-[4px] px-1.5 leading-[18px] ${colorChip(layerColor(l.key, colors))}`}>
+                    {keyLabel(l)}
+                  </span>
+                )}
               </li>
             ))}
         </ul>
@@ -255,6 +330,7 @@ export function CalendarScreen({
           month={month}
           today={today}
           days={days}
+          colors={colors}
           onDay={(date) => setOpen({ kind: "day", date })}
           onEntry={(id) => setOpen({ kind: "entry", id })}
         />
@@ -274,12 +350,37 @@ export function CalendarScreen({
           date={open.date}
           items={days.get(open.date) ?? []}
           shopCodes={shopCodes}
+          colors={colors}
           canWrite={canWrite}
           onEntry={(id) => setOpen({ kind: "entry", id })}
           onNew={() => setOpen({ kind: "new", date: open.date })}
           onClose={() => setOpen(null)}
         />
       )}
+      {colourError && <p className="text-sm text-accent">{colourError}</p>}
+      {recolouring && (
+        <Dialog
+          title={`Colour for ${keyLabel(CALENDAR_LAYERS.find((l) => l.key === recolouring)!)}`}
+          onClose={() => setRecolouring(null)}
+          width="max-w-lg"
+          footer={
+            <button type="button" onClick={() => setRecolouring(null)} className={DIALOG_CANCEL_CLASS}>
+              Done
+            </button>
+          }
+        >
+          <div className="space-y-4">
+            <ColorSwatches
+              value={layerColor(recolouring, colors)}
+              onChange={(next) => next && setLayerColour(recolouring, next)}
+              ariaLabel="Colour"
+              name="layer-colour"
+            />
+            <p className="text-sm text-muted">Everyone in the organisation sees this colour.</p>
+          </div>
+        </Dialog>
+      )}
+
       {open?.kind === "new" && (
         <EntryDialog
           orgId={orgId}

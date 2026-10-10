@@ -14,6 +14,8 @@ import { DateField } from "@/components/ui/DateField";
 import { PickSet } from "@/components/ui/PickSet";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { confirmDialog } from "@/lib/confirm";
+import { ColorSwatches } from "@/components/calendar/ColorSwatches";
+import { isCalendarColor, type CalendarColor } from "@/lib/calendarColors";
 import {
   BLACKOUT_SWITCHES,
   entryAppliesTo,
@@ -77,6 +79,9 @@ export function EntryDialog({
   const [through, setThrough] = useState<string | null>(entry?.ends_on ?? initialDate ?? null);
   const [shops, setShops] = useState<string[]>(entry?.location_ids ?? []);
   const [note, setNote] = useState(entry?.note ?? "");
+  const [color, setColor] = useState<CalendarColor | null>(
+    isCalendarColor(entry?.color) ? entry.color : null,
+  );
   const [switches, setSwitches] = useState<Switches>(
     entry
       ? {
@@ -155,6 +160,8 @@ export function EntryDialog({
       ends_on: through,
       location_ids: shops,
       note: note.trim() === "" ? null : note.trim(),
+      // A blackout is always drawn dark, so it keeps no colour of its own.
+      color: isBlackout(switches) ? null : color,
       ...switches,
     };
     startTransition(async () => {
@@ -295,6 +302,22 @@ export function EntryDialog({
             className="w-full"
           />
         </Field>
+
+        {/* A colour of its own (migration 188) — for a note or an event. A
+            blackout has none: a closed day looks the same every time. */}
+        {!blackout && (
+          <div className="space-y-1">
+            <span className="block text-[11px] uppercase tracking-[0.12em] text-subtle">Colour</span>
+            <ColorSwatches
+              value={color}
+              onChange={setColor}
+              ariaLabel="Colour"
+              name="entry-colour"
+              allowDefault
+              disabled={!editable}
+            />
+          </div>
+        )}
 
         {(canSetBlackouts || blackout) && (
           <fieldset className="space-y-2">

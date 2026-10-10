@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { CALENDAR_LAYERS, type CalendarItem } from "@/lib/calendar";
-import { chipClass, itemText } from "@/components/calendar/MonthView";
+import { itemText } from "@/components/calendar/MonthView";
+import { chipClass, type LayerColors } from "@/lib/calendarColors";
 
 const WEEKDAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTH = [
@@ -40,6 +41,7 @@ export function DayPanel({
   date,
   items,
   shopCodes,
+  colors,
   canWrite,
   onEntry,
   onNew,
@@ -49,6 +51,7 @@ export function DayPanel({
   items: readonly CalendarItem[];
   /** location id → code, to say which shop a line is about. */
   shopCodes: ReadonlyMap<string, string>;
+  colors: LayerColors;
   canWrite: boolean;
   onEntry: (entryId: string) => void;
   onNew: () => void;
@@ -84,7 +87,7 @@ export function DayPanel({
             const line = (
               <span className="flex items-baseline gap-3 py-2 text-sm">
                 <span className="min-w-0 flex-1">
-                  <span className={`rounded-[4px] px-1.5 py-0.5 font-medium ${chipClass(item)}`}>
+                  <span className={`rounded-[4px] px-1.5 py-0.5 font-medium ${chipClass(item, colors)}`}>
                     {itemText(item)}
                   </span>
                   {item.detail && <span className="mt-1 block text-muted">{item.detail}</span>}

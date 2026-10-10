@@ -16,6 +16,8 @@ import { RowMenu } from "@/components/ui/RowMenu";
 import { confirmDialog } from "@/lib/confirm";
 import { mintTokenValue } from "@/lib/specialOrderSend";
 import { entryShops } from "@/lib/blackoutDates";
+import { ColorSwatches } from "@/components/calendar/ColorSwatches";
+import { colorChip, isCalendarColor, type CalendarColor } from "@/lib/calendarColors";
 import {
   FEED_LAYERS,
   feedCarriesOrders,
@@ -52,6 +54,7 @@ export function CalendarSettings({
   shops,
   subscriptions,
   links,
+  feedsColor,
   loadError,
 }: {
   orgId: string;
@@ -59,6 +62,9 @@ export function CalendarSettings({
   shops: Shop[];
   subscriptions: SubscriptionRow[];
   links: FeedLink[];
+  /** The organisation's colour for subscribed calendars — what one wears
+   *  until it is given a colour of its own. */
+  feedsColor: CalendarColor;
   loadError: string | null;
 }) {
   const router = useRouter();
@@ -68,6 +74,21 @@ export function CalendarSettings({
   const [notice, setNotice] = useState<string | null>(null);
   const [adding, setAdding] = useState<"subscription" | "link" | null>(null);
   const [addressFor, setAddressFor] = useState<SubscriptionRow | null>(null);
+  const [colourFor, setColourFor] = useState<SubscriptionRow | null>(null);
+
+  function setColour(sub: SubscriptionRow, color: CalendarColor | null) {
+    setFailed(null);
+    startTransition(async () => {
+      const { data, error } = await supabase
+        .from("calendar_subscriptions")
+        .update({ color })
+        .eq("id", sub.id)
+        .select("id");
+      if (error) setFailed(error.message);
+      else if (!data?.length) setFailed("The colour was not saved — the database refused it.");
+      router.refresh();
+    });
+  }
 
   if (loadError) {
     return (
@@ -180,6 +201,23 @@ export function CalendarSettings({
       render: (s) => entryShops(s, shops),
     },
     {
+      key: "colour",
+      label: "Colour",
+      width: 130,
+      sortValue: (s) => s.color ?? "",
+      // Drawn as the chip its events wear on the calendar — its own colour, or
+      // the layer's when it has none.
+      render: (s) => (
+        <span
+          className={`inline-block rounded-[4px] px-1.5 text-[11px] font-medium leading-[18px] ${colorChip(
+            isCalendarColor(s.color) ? s.color : feedsColor,
+          )}`}
+        >
+          {isCalendarColor(s.color) ? "Its own" : "Layer colour"}
+        </span>
+      ),
+    },
+    {
       key: "read",
       label: "Last read",
       width: 190,
@@ -220,6 +258,7 @@ export function CalendarSettings({
                 items={[
                   { label: "Refresh now", onSelect: () => refresh(s) },
                   { label: "Change address…", onSelect: () => setAddressFor(s) },
+                  { label: "Change colour…", onSelect: () => setColourFor(s) },
                   { label: "Remove", danger: true, onSelect: () => void removeSubscription(s) },
                 ]}
               />
@@ -362,6 +401,30 @@ export function CalendarSettings({
           onClose={() => setAddressFor(null)}
         />
       )}
+      {colourFor && (
+        <Dialog
+          title={`Colour for ${colourFor.name}`}
+          onClose={() => setColourFor(null)}
+          width="max-w-lg"
+          footer={
+            <button type="button" onClick={() => setColourFor(null)} className={DIALOG_CANCEL_CLASS}>
+              Done
+            </button>
+          }
+        >
+          <ColorSwatches
+            // Read from the list, so the ring follows the save.
+            value={(() => {
+              const now = subscriptions.find((s) => s.id === colourFor.id)?.color;
+              return isCalendarColor(now) ? now : null;
+            })()}
+            onChange={(next) => setColour(colourFor, next)}
+            ariaLabel="Colour"
+            name="subscription-colour"
+            allowDefault
+          />
+        </Dialog>
+      )}
       {adding === "link" && <LinkDialog orgId={orgId} shops={shops} onClose={() => setAdding(null)} />}
     </div>
   );
@@ -391,6 +454,7 @@ function SubscriptionDialog({
   const [name, setName] = useState(existing?.name ?? "");
   const [url, setUrl] = useState("");
   const [picked, setPicked] = useState<string[]>(existing?.location_ids ?? []);
+  const [color, setColor] = useState<CalendarColor | null>(null);
   const [pending, startTransition] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -404,7 +468,7 @@ function SubscriptionDialog({
       if (!id) {
         const { data, error } = await supabase
           .from("calendar_subscriptions")
-          .insert({ org_id: orgId, name: name.trim(), location_ids: picked })
+          .insert({ org_id: orgId, name: name.trim(), location_ids: picked, color })
           .select("id")
           .single();
         if (error || !data) {
@@ -486,6 +550,18 @@ function SubscriptionDialog({
               boxed
             />
           </Field>
+        )}
+        {!existing && (
+          <div className="space-y-1">
+            <span className="block text-[11px] uppercase tracking-[0.12em] text-subtle">Colour</span>
+            <ColorSwatches
+              value={color}
+              onChange={setColor}
+              ariaLabel="Colour"
+              name="new-subscription-colour"
+              allowDefault
+            />
+          </div>
         )}
         <p className="max-w-[60ch] text-sm text-muted">
           The address is stored where nobody can read it back, so keep your own copy if you

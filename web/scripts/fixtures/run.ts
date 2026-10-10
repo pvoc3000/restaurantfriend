@@ -25,6 +25,7 @@ import "./blackoutDates.fixtures";
 import "./calendar.fixtures";
 import "./ics.fixtures";
 import "./calendarFeeds.fixtures";
+import "./calendarColors.fixtures";
 import "./shiftReportRange.fixtures";
 import "./dayPaint.fixtures";
 import "./columnVisibility.fixtures";

@@ -36,6 +36,7 @@ function toEntry(r: Row): CalendarEntry {
     no_production: Boolean(r.no_production),
     shop_closed: Boolean(r.shop_closed),
     note: (r.note ?? null) as string | null,
+    color: (r.color ?? null) as string | null,
   };
 }
 
