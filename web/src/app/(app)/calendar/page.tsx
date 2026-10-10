@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canEditPage } from "@/lib/pageAccess";
-import { canSetBlackouts } from "@/lib/roles";
+import { canEditPage, canReachPage } from "@/lib/pageAccess";
+import { canReadHr, canSetBlackouts } from "@/lib/roles";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { gridRange, parseMonthParam, type CalendarItem, type CalendarLayer } from "@/lib/calendar";
-import { fetchEntries } from "@/lib/calendarQueries";
+import { fetchEntries, fetchLayerItems } from "@/lib/calendarQueries";
 import { CalendarScreen, type CalendarView } from "@/components/calendar/CalendarScreen";
 
 /**
@@ -54,8 +54,24 @@ export default async function CalendarPage({
     );
   }
 
+  // WHICH LAYERS THIS PERSON MAY SEE is the Page Permissions sheet's answer for
+  // the screen each one comes from: if you may not open Purchase Orders you are
+  // not shown deliveries here. RLS refuses the rows regardless; this is what
+  // keeps a layer that would always be empty out of the menu.
   const layers: CalendarLayer[] = ["entries"];
-  const layerItems: CalendarItem[] = [];
+  if (canReachPage(role, "/special-orders")) layers.push("special_orders");
+  if (canReachPage(role, "/purchase-orders")) layers.push("deliveries");
+  if (canReachPage(role, "/tasks")) layers.push("tasks");
+  if (canReachPage(role, "/pay-periods")) layers.push("pay_periods");
+  if (canReadHr(role)) layers.push("hr", "hr_events");
+
+  let layerItems: CalendarItem[] = [];
+  let layerFailures: string[] = [];
+  if (view === "month") {
+    const fetched = await fetchLayerItems(supabase, layers, range);
+    layerItems = fetched.items;
+    layerFailures = fetched.failed.map((f) => `${f.layer}: ${f.message}`);
+  }
 
   return (
     <CalendarScreen
@@ -68,6 +84,7 @@ export default async function CalendarPage({
       today={today}
       entries={entries}
       layerItems={layerItems}
+      layerFailures={layerFailures}
       layers={layers}
       locations={locations}
       shops={shops}

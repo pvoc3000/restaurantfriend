@@ -10,6 +10,7 @@ import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { addMonths, monthLabel, monthStart } from "@/lib/dateRange";
 import {
   CALENDAR_LAYERS,
+  OPT_IN_LAYERS,
   entryItems,
   gridRange,
   itemsByDay,
@@ -53,6 +54,7 @@ export function CalendarScreen({
   today,
   entries,
   layerItems,
+  layerFailures,
   layers,
   locations,
   shops,
@@ -68,6 +70,8 @@ export function CalendarScreen({
   entries: CalendarEntry[];
   /** Every other layer's items for the grid, already built on the server. */
   layerItems: CalendarItem[];
+  /** A layer that could not be loaded, named — the rest still draw. */
+  layerFailures: string[];
   /** The layers this person may see — the menu offers these and no others. */
   layers: CalendarLayer[];
   locations: EntryLocation[];
@@ -82,15 +86,21 @@ export function CalendarScreen({
   // Stored as the layers that are HIDDEN, so a layer added later shows by
   // default for everybody who has already chosen.
   const [hidden, setHidden] = useStoredSet("rf.calendar.hiddenLayers");
+  // The OPT-IN layers (`OPT_IN_LAYERS`) are the other way round: hidden until
+  // somebody turns one on, so what is stored is the ones that were.
+  const [optedIn, setOptedIn] = useStoredSet("rf.calendar.shownLayers");
 
   const offered = useMemo(
     () => CALENDAR_LAYERS.filter((l) => layers.includes(l.key)),
     [layers],
   );
-  const hiddenSet = useMemo(
-    () => new Set(hidden.filter((k) => layers.includes(k as CalendarLayer)) as CalendarLayer[]),
-    [hidden, layers],
-  );
+  const hiddenSet = useMemo(() => {
+    const set = new Set(hidden.filter((k) => layers.includes(k as CalendarLayer)) as CalendarLayer[]);
+    for (const layer of OPT_IN_LAYERS) {
+      if (layers.includes(layer) && !optedIn.includes(layer)) set.add(layer);
+    }
+    return set;
+  }, [hidden, optedIn, layers]);
   // `PickSet` reads an empty value as ALL, which is exactly "nothing hidden".
   const shownLayers = hiddenSet.size === 0 ? [] : offered.filter((l) => !hiddenSet.has(l.key)).map((l) => l.key);
 
@@ -194,13 +204,16 @@ export function CalendarScreen({
                     label: `${LAYER_MARK[l.key]} ${l.label}`.trim(),
                   }))}
                   value={shownLayers}
-                  onChange={(next) =>
+                  onChange={(next) => {
+                    // An empty set from `PickSet` means ALL, opt-in layers too.
+                    const shown = next.length === 0 ? offered.map((l) => l.key) : next;
                     setHidden(
-                      next.length === 0
-                        ? []
-                        : offered.filter((l) => !next.includes(l.key)).map((l) => l.key),
-                    )
-                  }
+                      offered
+                        .filter((l) => !OPT_IN_LAYERS.includes(l.key) && !shown.includes(l.key))
+                        .map((l) => l.key),
+                    );
+                    setOptedIn(OPT_IN_LAYERS.filter((l) => shown.includes(l)));
+                  }}
                   allLabel="Everything"
                   label="What the calendar shows"
                   noun="layers"
@@ -211,6 +224,10 @@ export function CalendarScreen({
           </div>
         )}
       </div>
+
+      {layerFailures.length > 0 && (
+        <p className="text-sm text-accent">Could not load: {layerFailures.join("; ")}</p>
+      )}
 
       {view === "month" ? (
         <MonthView

@@ -14,12 +14,13 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
  */
 export const LAYER_MARK: Record<CalendarLayer, string> = {
   entries: "",
-  special_orders: "◆︎",
-  deliveries: "▲︎",
-  tasks: "■︎",
+  special_orders: "◆\uFE0E",
+  deliveries: "▲\uFE0E",
+  tasks: "■\uFE0E",
   pay_periods: "$",
-  hr: "✚︎",
-  feeds: "○︎",
+  hr: "✚\uFE0E",
+  hr_events: "✦\uFE0E",
+  feeds: "○\uFE0E",
 };
 
 /** How many lines a day shows before "+N more". */
