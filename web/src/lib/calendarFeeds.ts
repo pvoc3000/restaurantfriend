@@ -7,7 +7,8 @@ import type { CalendarItem } from "./calendar";
  *  for each of these and for nothing else. Never pay periods, never HR. */
 export const FEED_LAYERS: readonly { key: string; label: string }[] = [
   { key: "entries", label: "Notes and blackouts" },
-  { key: "special_orders", label: "Special orders" },
+  { key: "orders_paid", label: "Paid special orders" },
+  { key: "orders_unpaid", label: "Unpaid special orders" },
   { key: "deliveries", label: "Deliveries" },
   { key: "tasks", label: "Tasks and maintenance" },
 ];
@@ -29,9 +30,16 @@ export function feedUrl(origin: string, token: string): string {
   return `${origin.replace(/\/$/, "")}/calendar-feed/${token}.ics`;
 }
 
-/** "Notes and blackouts · Special orders", in the menu's order. */
+/** Does the link carry special orders at all — either layer, or 185's one key? */
+export function feedCarriesOrders(layers: readonly string[]): boolean {
+  return ["orders_paid", "orders_unpaid", "special_orders"].some((k) => layers.includes(k));
+}
+
+/** "Notes and blackouts · Paid special orders", in the menu's order. */
 export function feedLayersLabel(layers: readonly string[]): string {
-  const labels = FEED_LAYERS.filter((l) => layers.includes(l.key)).map((l) => l.label);
+  // 185's single `special_orders` key means both order layers (187).
+  const held = layers.includes("special_orders") ? [...layers, "orders_paid", "orders_unpaid"] : layers;
+  const labels = FEED_LAYERS.filter((l) => held.includes(l.key)).map((l) => l.label);
   return labels.length > 0 ? labels.join(" · ") : "Nothing";
 }
 

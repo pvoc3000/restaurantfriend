@@ -1,6 +1,6 @@
 # 04s — Calendar (blackout dates, layers, feeds in and out)
 
-Built 2026-10-09. Migrations 181–186, all APPLIED 2026-10-09; edge function
+Built 2026-10-09. Migrations 181–187, all APPLIED (187 on 2026-10-10); edge function
 `calendar-sync` deployed (v1, `verify_jwt: true`).
 
 Mark, 2026-10-09: "blackout dates. The idea is to create a space where the user
@@ -94,8 +94,16 @@ food handler cards, for current employees only.
 **SPECIAL ORDERS ARE TWO LAYERS** (Mark, 2026-10-10): "Paid special orders"
 is `status = 'order'`, "Unpaid special orders" is every other live status.
 Neither shows a cancelled order, a template or a standing order's parent. The
-status is read, not a balance re-derived. The published feed (185) still has
-the one `special_orders` layer.
+status is read, not a balance re-derived.
+
+**AN ORDER READS "<kitchen>: <ready time> <title>"** (Mark, 2026-10-10), and a
+delivery "<vendor> (<shop>)". The time is `ready_by_time`; the number, the
+customer and the event's own time are the day panel's second line.
+
+**187 BROUGHT THE FEED INTO LINE** (applied 2026-10-10): the same two order
+layers, the same wording, the ready time. 185's single `special_orders` key
+still means both layers. An order with no title falls back to its NUMBER on a
+link that does not carry customer names.
 
 **EACH LAYER IS A COLOURED CHIP** (Mark, 2026-10-10: "apple style chips, with
 different colors for each event type instead of the glyphs") — a pale fill

@@ -358,3 +358,7 @@ one; 184 `generate_production_schedules` skips one; 185 `calendar_feed_links` +
 `set_calendar_subscription_url`. 182–184 restate the live bodies from
 `pg_get_functiondef` with marked lines added. Each was dry-run on the live
 database in a rolled-back transaction first. See `docs/history/04s-calendar.md`.
+
+**187 is APPLIED** (Claude, 2026-10-10) — `calendar_feed_by_token` says what
+the calendar page says: paid and unpaid order layers, "<kitchen>: <title>" at
+the ready time, "<vendor> (<shop>)". Dry-run first, as 181–186 were.

@@ -18,6 +18,7 @@ import { mintTokenValue } from "@/lib/specialOrderSend";
 import { entryShops } from "@/lib/blackoutDates";
 import {
   FEED_LAYERS,
+  feedCarriesOrders,
   feedLayersLabel,
   feedUrl,
   type CalendarSubscription,
@@ -522,7 +523,7 @@ function LinkDialog({ orgId, shops, onClose }: { orgId: string; shops: Shop[]; o
         label: label.trim(),
         layers,
         location_ids: picked,
-        include_customer_names: names && layers.includes("special_orders"),
+        include_customer_names: names && feedCarriesOrders(layers),
       });
       if (error) {
         setFailed(error.message);
@@ -616,7 +617,7 @@ function LinkDialog({ orgId, shops, onClose }: { orgId: string; shops: Shop[]; o
               boxed
             />
           </Field>
-          {layers.includes("special_orders") && (
+          {feedCarriesOrders(layers) && (
             <Checkbox checked={names} onChange={setNames}>
               Include customer names on special orders
             </Checkbox>

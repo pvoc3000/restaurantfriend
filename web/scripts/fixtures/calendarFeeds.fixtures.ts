@@ -8,6 +8,7 @@
 
 import { test, eq, ok, no } from "./harness";
 import {
+  feedCarriesOrders,
   feedLayersLabel,
   feedUrl,
   subscriptionIsStale,
@@ -37,7 +38,15 @@ test("feedUrl ends in .ics and survives a trailing slash on the origin", () => {
 });
 
 test("feedLayersLabel is in the menu's order and ignores what a feed cannot carry", () => {
-  eq(feedLayersLabel(["special_orders", "entries"]), "Notes and blackouts · Special orders");
+  eq(feedLayersLabel(["orders_paid", "entries"]), "Notes and blackouts · Paid special orders");
+  eq(
+    feedLayersLabel(["special_orders"]),
+    "Paid special orders · Unpaid special orders",
+    "185's one key means both",
+  );
+  ok(feedCarriesOrders(["orders_unpaid"]));
+  ok(feedCarriesOrders(["special_orders"]));
+  no(feedCarriesOrders(["entries", "deliveries"]));
   eq(feedLayersLabel(["hr", "pay_periods"]), "Nothing");
 });
 
