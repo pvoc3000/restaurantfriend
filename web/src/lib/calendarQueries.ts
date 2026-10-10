@@ -76,7 +76,8 @@ export async function fetchLayerItems(
   supabase: SupabaseClient,
   layers: readonly CalendarLayer[],
   range: DateRange,
-  /** Every shop, closed ones included, to say a code beside a delivery. */
+  /** Every shop, closed ones included, to say a code beside a delivery and a
+   *  kitchen before an order. */
   locations: readonly { id: string; code: string }[] = [],
 ): Promise<{ items: CalendarItem[]; failed: { layer: CalendarLayer; message: string }[] }> {
   const want = (layer: CalendarLayer) => layers.includes(layer);
@@ -90,7 +91,7 @@ export async function fetchLayerItems(
       ? supabase
           .from("special_orders")
           .select(
-            "id, number, status, title, event_date, event_time, fulfillment, location_id, kitchen_location_id, customers ( first_name, last_name, company )",
+            "id, number, status, title, event_date, event_time, ready_by_time, fulfillment, location_id, kitchen_location_id, customers ( first_name, last_name, company )",
           )
           // A real order only: a template has no date, and a standing order's
           // DAYS are their own rows — the parent would draw its start date as
@@ -187,6 +188,8 @@ export async function fetchLayerItems(
         title: (o.title ?? null) as string | null,
         event_date: o.event_date as string,
         event_time: (o.event_time ?? null) as string | null,
+        ready_by_time: (o.ready_by_time ?? null) as string | null,
+        kitchen_code: locations.find((l) => l.id === o.kitchen_location_id)?.code ?? null,
         fulfillment: (o.fulfillment ?? null) as string | null,
         location_id: (o.location_id ?? null) as string | null,
         kitchen_location_id: (o.kitchen_location_id ?? null) as string | null,

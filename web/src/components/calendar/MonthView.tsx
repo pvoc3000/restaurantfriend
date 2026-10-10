@@ -201,8 +201,9 @@ export function MonthView({
 
 /** What a line says, shared by the cell and the day's panel. */
 export function itemText(item: CalendarItem): string {
+  const lead = item.lead ? `${item.lead}: ` : "";
   const time = item.time ? `${clockTime(item.time)} ` : "";
-  return `${time}${item.title}`;
+  return `${lead}${time}${item.title}`;
 }
 
 function Bar({ bar, onEntry }: { bar: WeekBar; onEntry: (entryId: string) => void }) {

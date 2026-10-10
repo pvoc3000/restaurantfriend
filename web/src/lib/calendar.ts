@@ -60,6 +60,8 @@ export type CalendarItem = {
   detail?: string | null;
   /** `HH:MM` when the thing has a time of day; sorts the day. */
   time?: string | null;
+  /** Said BEFORE the time, with a colon — an order's kitchen: "DF01: 9 AM …". */
+  lead?: string | null;
   /** Where a tap goes. An entry has none — it opens its own dialog. */
   href?: string | null;
   /** The shops it is about. EMPTY means it is not about a shop in particular. */
@@ -306,6 +308,11 @@ export function clockTime(time: string): string {
 // says them as items. Kept apart from the fetching so the wording — which is
 // all a calendar cell is — can be pinned by a fixture.
 
+/** `HH:MM`, or null for no time — and midnight is no time. */
+function realTime(time: string | null | undefined): string | null {
+  return time && !time.startsWith("00:00") ? time.slice(0, 5) : null;
+}
+
 function shops(...ids: (string | null | undefined)[]): string[] {
   return [...new Set(ids.filter((id): id is string => Boolean(id)))];
 }
@@ -318,15 +325,26 @@ export type CalendarOrderRow = {
   title: string | null;
   event_date: string;
   event_time: string | null;
+  /** When the kitchen has to have it done — the time the calendar shows. */
+  ready_by_time: string | null;
   fulfillment: string | null;
   location_id: string | null;
   kitchen_location_id: string | null;
+  /** The kitchen's code — "DF01". */
+  kitchen_code: string | null;
   /** "Company (Person)", already composed — `specialOrders.customerLabel`. */
   customer: string | null;
 };
 
 /**
- * A special order on its event date: "SO-10110 Cafe Knotted", at its time.
+ * A special order on its event date, as the KITCHEN reads it (Mark,
+ * 2026-10-10: "<kitchen>: <ready time> <title>") — "DF01: 9 AM Office party".
+ * A day made from a standing order is an order like any other and reads the
+ * same way.
+ *
+ * The time is `ready_by_time`, when it has to be done, not the event's own
+ * time, which is in the day panel's second line with the number and customer.
+ * An order with no title falls back to its customer, then its number.
  *
  * PAID IS `status = 'order'` and nothing else. The status is what a person set
  * when the money arrived and is what gates production, so the calendar reads it
@@ -337,13 +355,19 @@ export function specialOrderItems(rows: readonly CalendarOrderRow[]): CalendarIt
     key: `order:${o.id}`,
     layer: o.status === "order" ? "orders_paid" : "orders_unpaid",
     date: o.event_date,
+    lead: o.kitchen_code,
     // Midnight is how an order with no real time was stored (the FileMaker
-    // history is full of them): all-day, not a 12 AM appointment. The feed
+    // history is full of them): no time, not a 12 AM appointment. The feed
     // function (185) makes the same call.
-    time: o.event_time && !o.event_time.startsWith("00:00") ? o.event_time.slice(0, 5) : null,
-    title: [o.number, o.customer || o.title].filter(Boolean).join(" "),
+    time: realTime(o.ready_by_time),
+    title: o.title?.trim() || o.customer || o.number,
     detail:
-      [o.customer ? o.title : null, o.fulfillment === "delivery" ? "Delivery" : "Pickup"]
+      [
+        o.number,
+        o.customer,
+        o.fulfillment === "delivery" ? "Delivery" : "Pickup",
+        realTime(o.event_time) ? `event at ${clockTime(realTime(o.event_time)!)}` : null,
+      ]
         .filter(Boolean)
         .join(" · ") || null,
     href: `/special-orders/${o.id}`,

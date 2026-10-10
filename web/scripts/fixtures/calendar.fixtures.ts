@@ -126,54 +126,45 @@ test("a day reads: blackouts, then entries, then each layer by time", () => {
 
 /* -- what each layer says ------------------------------------------------ */
 
-test("special order: number and customer, its time, both its shops", () => {
-  const [o] = specialOrderItems([
-    {
-      id: "o1",
-      number: "SO-10110",
-      status: "order",
-      title: "Office party",
-      event_date: "2026-12-18",
-      event_time: "14:30:00",
-      fulfillment: "delivery",
-      location_id: null,
-      kitchen_location_id: "df01",
-      customer: "Acme (Pat Lee)",
-    },
-  ]);
-  eq(o.title, "SO-10110 Acme (Pat Lee)");
+const ORDER = {
+  id: "o1",
+  number: "SO-10110",
+  status: "order",
+  title: "Office party",
+  event_date: "2026-12-18",
+  event_time: "14:30:00",
+  ready_by_time: "12:30:00",
+  fulfillment: "delivery",
+  location_id: null,
+  kitchen_location_id: "df01",
+  kitchen_code: "DF01",
+  customer: "Acme (Pat Lee)",
+};
+
+test("special order: kitchen, READY time, title; the rest on the second line", () => {
+  const [o] = specialOrderItems([ORDER]);
+  eq(o.lead, "DF01");
+  eq(o.time, "12:30", "the ready time, not the event's");
+  eq(o.title, "Office party");
+  eq(o.detail, "SO-10110 · Acme (Pat Lee) · Delivery · event at 2:30 PM");
   eq(o.layer, "orders_paid", "status order is paid");
-  eq(o.detail, "Office party · Delivery");
-  eq(o.time, "14:30");
   eq(o.href, "/special-orders/o1");
   eq(o.locationIds, ["df01"]);
 });
 
-test("special order with no customer falls back to its title, said once", () => {
+test("special order: no title falls back to the customer, then the number", () => {
+  eq(specialOrderItems([{ ...ORDER, title: " " }])[0].title, "Acme (Pat Lee)");
+  eq(specialOrderItems([{ ...ORDER, title: null, customer: null }])[0].title, "SO-10110");
+});
+
+test("special order: a quote is unpaid, midnight is no time, one shop is said once", () => {
   const [o] = specialOrderItems([
-    {
-      id: "o2",
-      number: "SO-2",
-      status: "quote",
-      title: "Walk-in dozen",
-      event_date: "2026-12-18",
-      event_time: null,
-      fulfillment: "pickup",
-      location_id: "df02",
-      kitchen_location_id: "df02",
-      customer: null,
-    },
+    { ...ORDER, status: "quote", ready_by_time: "00:00:00", event_time: null, fulfillment: "pickup", location_id: "df01", customer: null },
   ]);
-  eq(o.title, "SO-2 Walk-in dozen");
-  eq(o.layer, "orders_unpaid", "a quote is not paid");
+  eq(o.layer, "orders_unpaid");
   eq(o.time, null);
-  eq(
-    specialOrderItems([{ ...({ id: "o3", number: "SO-3", status: "lead", title: null, event_date: "2026-12-18", fulfillment: "pickup", location_id: null, kitchen_location_id: null, customer: null }), event_time: "00:00:00" }])[0].time,
-    null,
-    "midnight is no time",
-  );
-  eq(o.detail, "Pickup");
-  eq(o.locationIds, ["df02"], "one shop, not the same one twice");
+  eq(o.detail, "SO-10110 · Pickup");
+  eq(o.locationIds, ["df01"]);
 });
 
 test("delivery, task, pay period, expiry and event each say what they are", () => {
@@ -226,8 +217,7 @@ test("clockTime: 12-hour, minutes only when there are some", () => {
 });
 
 test("paid is status 'order' and nothing else", () => {
-  const base = { id: "x", number: "SO-9", title: null, event_date: "2026-12-18", event_time: null, fulfillment: "pickup", location_id: null, kitchen_location_id: null, customer: null };
-  const layerOf = (status: string | null) => specialOrderItems([{ ...base, status }])[0].layer;
+  const layerOf = (status: string | null) => specialOrderItems([{ ...ORDER, status }])[0].layer;
   eq(layerOf("order"), "orders_paid");
   for (const status of ["lead", "quote", "invoice", null]) eq(layerOf(status), "orders_unpaid", String(status));
 });
