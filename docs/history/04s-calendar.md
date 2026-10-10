@@ -107,6 +107,12 @@ THIS IS THE ONE SCREEN WHERE COLOUR IS NOT RECORD STATE; it stays in
 `lib/fillHeight.useFillToBottom`; how many lines a day shows follows the row
 height it was given.
 
+**A MULTI-DAY ENTRY IS ONE BAR** (Mark, 2026-10-10), not a chip per day.
+`lib/calendar.weekLayout` merges each run of days inside a week and gives
+everything a LANE shared by that week; `MonthView` draws six week rows with a
+layer of bars over each. An end that carries into another week is cut square.
+When a week needs more lanes than fit, the last lane becomes "+N more".
+
 **AN ORDER AT MIDNIGHT IS DRAWN ALL-DAY.** `event_time = 00:00` is how an order
 with no real time was stored; the calendar and the feed both treat it as none.
 

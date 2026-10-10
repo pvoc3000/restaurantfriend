@@ -68,6 +68,12 @@ export type CalendarItem = {
   blackout?: boolean;
   /** The `calendar_entries` row behind an `entries` item. */
   entryId?: string;
+  /**
+   * Set on each day's item of something that covers MORE THAN ONE DAY: what
+   * joins the days (`key`) and the thing's own first and last day, which may
+   * lie outside the days on screen. `weekLayout` draws these as one bar.
+   */
+  span?: { key: string; from: string; to: string };
 };
 
 /* -- the month on screen ------------------------------------------------- */
@@ -110,6 +116,10 @@ export function entryItems(entries: readonly CalendarEntry[], range: DateRange):
         locationIds: entry.location_ids,
         blackout: isBlackout(entry),
         entryId: entry.id,
+        span:
+          entry.starts_on === entry.ends_on
+            ? undefined
+            : { key: `entry:${entry.id}`, from: entry.starts_on, to: entry.ends_on },
       });
     }
   }
@@ -170,6 +180,117 @@ export function itemsByDay(items: readonly CalendarItem[]): Map<string, Calendar
   }
   for (const list of days.values()) list.sort(compareItems);
   return days;
+}
+
+/* -- one week, laid out ---------------------------------------------------- */
+
+/** One thing drawn in a week: a chip in one day, or a bar across several. */
+export type WeekBar = {
+  item: CalendarItem;
+  /** 0–6, the day of the week it starts on IN THIS WEEK. */
+  col: number;
+  /** How many of this week's days it covers. */
+  days: number;
+  /** 0 is the top line under the day numbers. */
+  lane: number;
+  /** It began before this week / runs on past it — that end is drawn open. */
+  continuesBefore: boolean;
+  continuesAfter: boolean;
+};
+
+/**
+ * Where everything in one week goes (Mark, 2026-10-10: "for events that span
+ * multiple days, make them one continuous banner instead of multiple chips").
+ *
+ * A multi-day thing arrives as one item per day (`span` says they are one);
+ * here each run of them inside the week becomes ONE bar. Every bar is then
+ * given a LANE — a line shared by the whole week — so a bar sits at the same
+ * height on every day it crosses and the single-day chips fill in around it.
+ *
+ * ORDER OF PLACEMENT is what makes it read like a calendar: bars before chips,
+ * longer before shorter, earlier before later, a blackout before anything of
+ * its length — and each takes the highest lane free on ALL its days. The chips
+ * then keep the order `itemsByDay` gave their day.
+ *
+ * `capacity` is how many lanes a week has room for. If the week needs more, the
+ * LAST lane is given up to "+N more" on every day that has something hidden,
+ * and `more[col]` is that N. A bar that does not fit is hidden whole, and is
+ * counted on each of its days.
+ */
+export function weekLayout(
+  week: readonly string[],
+  days: ReadonlyMap<string, readonly CalendarItem[]>,
+  capacity: number,
+): { bars: WeekBar[]; more: number[] } {
+  type Pending = Omit<WeekBar, "lane"> & { order: number };
+  const pending: Pending[] = [];
+  const open = new Map<string, Pending>();
+  let order = 0;
+
+  week.forEach((date, col) => {
+    const seen = new Set<string>();
+    for (const item of days.get(date) ?? []) {
+      const key = item.span?.key;
+      if (key) {
+        seen.add(key);
+        const running = open.get(key);
+        if (running) {
+          running.days += 1;
+          continue;
+        }
+      }
+      const bar: Pending = {
+        item,
+        col,
+        days: 1,
+        continuesBefore: item.span ? item.span.from < week[0] : false,
+        continuesAfter: item.span ? item.span.to > week[week.length - 1] : false,
+        order: order++,
+      };
+      pending.push(bar);
+      if (key) open.set(key, bar);
+    }
+    // A run ends on the first day its key is absent (a filter can do that).
+    for (const key of [...open.keys()]) if (!seen.has(key)) open.delete(key);
+  });
+
+  const isBar = (p: Pending) => Boolean(p.item.span);
+  pending.sort(
+    (a, b) =>
+      Number(isBar(b)) - Number(isBar(a)) ||
+      (isBar(a) ? b.days - a.days || a.col - b.col : 0) ||
+      (isBar(a) ? Number(b.item.blackout ?? false) - Number(a.item.blackout ?? false) : 0) ||
+      a.order - b.order,
+  );
+
+  // taken[lane][col]
+  const taken: boolean[][] = [];
+  const placed: WeekBar[] = pending.map((p) => {
+    let lane = 0;
+    for (;;) {
+      const row = (taken[lane] ??= new Array<boolean>(week.length).fill(false));
+      let free = true;
+      for (let c = p.col; c < p.col + p.days; c += 1) if (row[c]) free = false;
+      if (free) {
+        for (let c = p.col; c < p.col + p.days; c += 1) row[c] = true;
+        break;
+      }
+      lane += 1;
+    }
+    return { item: p.item, col: p.col, days: p.days, lane, continuesBefore: p.continuesBefore, continuesAfter: p.continuesAfter };
+  });
+
+  const more = new Array<number>(week.length).fill(0);
+  const lanes = Math.max(1, capacity);
+  if (taken.length <= lanes) return { bars: placed, more };
+
+  // Too many: the last lane becomes the "+N more" line.
+  const visible = placed.filter((b) => b.lane < lanes - 1);
+  for (const b of placed) {
+    if (b.lane < lanes - 1) continue;
+    for (let c = b.col; c < b.col + b.days; c += 1) more[c] += 1;
+  }
+  return { bars: visible, more };
 }
 
 /** "2:30 PM" from `14:30` or `14:30:00`. */

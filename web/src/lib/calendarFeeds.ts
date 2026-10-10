@@ -99,6 +99,10 @@ export function subscriptionItems(
         title: row.title,
         detail: [sub.name, row.place].filter(Boolean).join(" · "),
         locationIds: sub.location_ids,
+        span:
+          row.starts_on === row.ends_on
+            ? undefined
+            : { key: `feed:${row.id}`, from: row.starts_on, to: row.ends_on },
       });
     }
   }

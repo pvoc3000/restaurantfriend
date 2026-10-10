@@ -22,6 +22,7 @@ import {
   specialOrderItems,
   taskItems,
   visibleItems,
+  weekLayout,
   type CalendarItem,
 } from "../../src/lib/calendar";
 import type { CalendarEntry } from "../../src/lib/blackoutDates";
@@ -229,4 +230,90 @@ test("paid is status 'order' and nothing else", () => {
   const layerOf = (status: string | null) => specialOrderItems([{ ...base, status }])[0].layer;
   eq(layerOf("order"), "orders_paid");
   for (const status of ["lead", "quote", "invoice", null]) eq(layerOf(status), "orders_unpaid", String(status));
+});
+
+/* -- one week, laid out -------------------------------------------------- */
+// Checked by BREAKING: without the merge a three-day closure is three chips;
+// placing chips before bars lets Monday's order push the bar down on Monday
+// only, so it cannot be drawn straight; and counting a hidden bar once instead
+// of on each of its days under-reports "+N more" on all but one of them.
+
+// The week of Sunday 2026-12-20.
+const WEEK = ["2026-12-20", "2026-12-21", "2026-12-22", "2026-12-23", "2026-12-24", "2026-12-25", "2026-12-26"];
+
+function layout(entries: CalendarEntry[], extra: CalendarItem[] = [], capacity = 6) {
+  const range = { from: "2026-11-29", to: "2027-01-09" };
+  return weekLayout(WEEK, itemsByDay([...entryItems(entries, range), ...extra]), capacity);
+}
+const shape = (bars: ReturnType<typeof weekLayout>["bars"]) =>
+  bars.map((b) => `${b.item.title}@${b.col}+${b.days} lane${b.lane}${b.continuesBefore ? " <" : ""}${b.continuesAfter ? " >" : ""}`);
+
+test("a multi-day entry is ONE bar across its days", () => {
+  const { bars } = layout([entry({ title: "Closed", starts_on: "2026-12-24", ends_on: "2026-12-26", shop_closed: true })]);
+  eq(shape(bars), ["Closed@4+3 lane0"]);
+});
+
+test("a bar that began last week or runs into the next is open at that end", () => {
+  eq(
+    shape(layout([entry({ title: "Trip", starts_on: "2026-12-18", ends_on: "2026-12-21" })]).bars),
+    ["Trip@0+2 lane0 <"],
+  );
+  eq(
+    shape(layout([entry({ title: "Trip", starts_on: "2026-12-25", ends_on: "2026-12-29" })]).bars),
+    ["Trip@5+2 lane0 >"],
+  );
+  eq(
+    shape(layout([entry({ title: "Trip", starts_on: "2026-12-01", ends_on: "2027-01-05" })]).bars),
+    ["Trip@0+7 lane0 < >"],
+  );
+});
+
+test("bars take the top lanes and keep one lane the whole way; chips fill in under", () => {
+  const { bars } = layout(
+    [
+      entry({ id: "a", title: "Closed", starts_on: "2026-12-24", ends_on: "2026-12-25", shop_closed: true }),
+      entry({ id: "b", title: "Note", starts_on: "2026-12-21", ends_on: "2026-12-21" }),
+    ],
+    [
+      item({ key: "o1", title: "Order A", date: "2026-12-24" }),
+      item({ key: "o2", title: "Order B", date: "2026-12-25" }),
+      item({ key: "o3", title: "Order C", date: "2026-12-21" }),
+    ],
+  );
+  eq(shape(bars).sort(), [
+    "Closed@4+2 lane0",
+    "Note@1+1 lane0",
+    "Order A@4+1 lane1",
+    "Order B@5+1 lane1",
+    "Order C@1+1 lane1",
+  ]);
+});
+
+test("two overlapping bars get a lane each, the longer one on top", () => {
+  const { bars } = layout([
+    entry({ id: "short", title: "Short", starts_on: "2026-12-22", ends_on: "2026-12-23" }),
+    entry({ id: "long", title: "Long", starts_on: "2026-12-21", ends_on: "2026-12-25" }),
+  ]);
+  eq(shape(bars).sort(), ["Long@1+5 lane0", "Short@2+2 lane1"]);
+});
+
+test("too many for the week: the last lane becomes +N more, counted on every day", () => {
+  const busy = [1, 2, 3, 4].map((n) => item({ key: `o${n}`, title: `Order ${n}`, date: "2026-12-24" }));
+  const closed = entry({ title: "Closed", starts_on: "2026-12-24", ends_on: "2026-12-25", shop_closed: true });
+  // Five lanes wanted on the 24th, three available: two shown, one line of "+3".
+  const { bars, more } = layout([closed], busy, 3);
+  eq(shape(bars).sort(), ["Closed@4+2 lane0", "Order 1@4+1 lane1"]);
+  eq(more, [0, 0, 0, 0, 3, 0, 0]);
+  // With room for all five, nothing is hidden.
+  eq(layout([closed], busy, 5).more, [0, 0, 0, 0, 0, 0, 0]);
+  eq(layout([closed], busy, 5).bars.length, 5);
+});
+
+test("a hidden bar is counted on each day it covers", () => {
+  const spans = ["a", "b", "c"].map((id) =>
+    entry({ id, title: id, starts_on: "2026-12-21", ends_on: "2026-12-22" }),
+  );
+  const { bars, more } = layout(spans, [], 2);
+  eq(bars.length, 1);
+  eq(more, [0, 2, 2, 0, 0, 0, 0]);
 });
