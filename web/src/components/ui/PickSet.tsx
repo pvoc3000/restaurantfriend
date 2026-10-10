@@ -69,6 +69,7 @@ export function PickSet({
   boxed = false,
   minWidth = 220,
   className = "",
+  triggerText,
 }: {
   options: PickSetOption[];
   /** The chosen values. EMPTY MEANS ALL — see above. */
@@ -90,6 +91,14 @@ export function PickSet({
   align?: "left" | "right";
   minWidth?: number;
   className?: string;
+  /**
+   * What the trigger ALWAYS says, in place of the summary of what is ticked.
+   * For a set whose state is already drawn right beside it — the calendar's
+   * layers, whose key of chips is the summary (Mark, 2026-10-10) — where a
+   * trigger reading "8 layers" says the same thing twice and worse. Leave it
+   * out everywhere else: a filter with no other witness must say its state.
+   */
+  triggerText?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
@@ -120,8 +129,9 @@ export function PickSet({
   // NAMES UP TO TWO, COUNTS PAST THAT. "DF01 + DF02" is worth the width because
   // it answers the question outright; "DF01 + DF02 + DF03 + EVENT" is a wall
   // that pushes the rest of the filter row around every time you tick one more.
-  const summary =
-    chosen.length === 0
+  const summary = triggerText
+    ? triggerText
+    : chosen.length === 0
       ? allLabel
       : chosen.length <= 2
         ? chosen.map((o) => o.summary ?? o.label).join(" + ")

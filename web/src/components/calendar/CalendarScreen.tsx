@@ -218,6 +218,8 @@ export function CalendarScreen({
                     setOptedIn(OPT_IN_LAYERS.filter((l) => shown.includes(l)));
                   }}
                   allLabel="Everything"
+                  // The key of chips under the month's name IS the summary.
+                  triggerText="Layers"
                   label="What the calendar shows"
                   noun="layers"
                   align="right"
