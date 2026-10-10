@@ -78,7 +78,9 @@ export default async function CalendarPage({
   let stale: string[] = [];
   if (view === "month") {
     const [fetched, subs, feedEvents] = await Promise.all([
-      fetchLayerItems(supabase, layers, range),
+      // `session.locations`, the FULL list: a lookup, not an enumeration
+      // (design rule 3), so a delivery to a since-closed shop still has a code.
+      fetchLayerItems(supabase, layers, range, session.locations),
       supabase
         .from("calendar_subscriptions")
         .select("id, name, location_ids, is_active, has_url, last_fetched_at, last_error")

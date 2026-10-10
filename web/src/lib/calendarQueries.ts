@@ -76,6 +76,8 @@ export async function fetchLayerItems(
   supabase: SupabaseClient,
   layers: readonly CalendarLayer[],
   range: DateRange,
+  /** Every shop, closed ones included, to say a code beside a delivery. */
+  locations: readonly { id: string; code: string }[] = [],
 ): Promise<{ items: CalendarItem[]; failed: { layer: CalendarLayer; message: string }[] }> {
   const want = (layer: CalendarLayer) => layers.includes(layer);
   const failed: { layer: CalendarLayer; message: string }[] = [];
@@ -199,6 +201,7 @@ export async function fetchLayerItems(
         location_id: (po.location_id ?? null) as string | null,
         status: po.status as string,
         vendor: (one<{ name?: string }>(po.vendors)?.name ?? null) as string | null,
+        location_code: locations.find((l) => l.id === po.location_id)?.code ?? null,
       })),
     ),
     ...taskItems(

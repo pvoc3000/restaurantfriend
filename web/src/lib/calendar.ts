@@ -237,15 +237,21 @@ export type CalendarDeliveryRow = {
   location_id: string | null;
   status: string;
   vendor: string | null;
+  /** The receiving shop's code — "DF01". */
+  location_code: string | null;
 };
 
-/** A purchase order on the day it is due in: "Bakemark delivery". */
+/**
+ * A purchase order on the day it is due in: "Chefs Warehouse (DF01)" (Mark,
+ * 2026-10-10). The vendor and the shop it is coming to; the chip's colour is
+ * what says it is a delivery.
+ */
 export function deliveryItems(rows: readonly CalendarDeliveryRow[]): CalendarItem[] {
   return rows.map((po) => ({
     key: `po:${po.id}`,
     layer: "deliveries",
     date: po.delivery_date,
-    title: `${po.vendor ?? "Vendor"} delivery`,
+    title: `${po.vendor ?? "Vendor"}${po.location_code ? ` (${po.location_code})` : ""}`,
     detail: [po.po_number ? `PO ${po.po_number}` : null, po.status].filter(Boolean).join(" · "),
     href: `/purchase-orders/${po.id}`,
     locationIds: shops(po.location_id),

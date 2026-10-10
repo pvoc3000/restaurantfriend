@@ -178,13 +178,13 @@ test("special order with no customer falls back to its title, said once", () => 
 test("delivery, task, pay period, expiry and event each say what they are", () => {
   eq(
     deliveryItems([
-      { id: "p", po_number: "DF01-0042", delivery_date: "2026-12-14", location_id: "df01", status: "sent", vendor: "Bakemark" },
+      { id: "p", po_number: "DF01-0042", delivery_date: "2026-12-14", location_id: "df01", status: "sent", vendor: "Chefs Warehouse", location_code: "DF01" },
     ])[0],
     {
       key: "po:p",
       layer: "deliveries",
       date: "2026-12-14",
-      title: "Bakemark delivery",
+      title: "Chefs Warehouse (DF01)",
       detail: "PO DF01-0042 · sent",
       href: "/purchase-orders/p",
       locationIds: ["df01"],
