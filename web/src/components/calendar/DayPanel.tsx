@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { CALENDAR_LAYERS, type CalendarItem } from "@/lib/calendar";
-import { itemText, LAYER_MARK } from "@/components/calendar/MonthView";
+import { chipClass, itemText } from "@/components/calendar/MonthView";
 
 const WEEKDAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTH = [
@@ -83,14 +83,11 @@ export function DayPanel({
               .join(", ");
             const line = (
               <span className="flex items-baseline gap-3 py-2 text-sm">
-                <span aria-hidden className="w-4 shrink-0 text-center text-[11px]">
-                  {LAYER_MARK[item.layer]}
-                </span>
                 <span className="min-w-0 flex-1">
-                  <span className={item.blackout ? "bg-ink px-1 font-semibold text-white" : "font-semibold"}>
+                  <span className={`rounded-[4px] px-1.5 py-0.5 font-medium ${chipClass(item)}`}>
                     {itemText(item)}
                   </span>
-                  {item.detail && <span className="block text-muted">{item.detail}</span>}
+                  {item.detail && <span className="mt-1 block text-muted">{item.detail}</span>}
                 </span>
                 <span className="shrink-0 text-[11px] uppercase tracking-[0.08em] text-subtle">
                   {[shops, LAYER_LABEL[item.layer]].filter(Boolean).join(" · ")}

@@ -43,7 +43,7 @@ function entry(patch: Partial<CalendarEntry>): CalendarEntry {
 }
 
 function item(patch: Partial<CalendarItem>): CalendarItem {
-  return { key: "k", layer: "special_orders", date: "2026-12-25", title: "x", locationIds: [], ...patch };
+  return { key: "k", layer: "orders_paid", date: "2026-12-25", title: "x", locationIds: [], ...patch };
 }
 
 /* -- the month ----------------------------------------------------------- */
@@ -130,6 +130,7 @@ test("special order: number and customer, its time, both its shops", () => {
     {
       id: "o1",
       number: "SO-10110",
+      status: "order",
       title: "Office party",
       event_date: "2026-12-18",
       event_time: "14:30:00",
@@ -140,6 +141,7 @@ test("special order: number and customer, its time, both its shops", () => {
     },
   ]);
   eq(o.title, "SO-10110 Acme (Pat Lee)");
+  eq(o.layer, "orders_paid", "status order is paid");
   eq(o.detail, "Office party · Delivery");
   eq(o.time, "14:30");
   eq(o.href, "/special-orders/o1");
@@ -151,6 +153,7 @@ test("special order with no customer falls back to its title, said once", () => 
     {
       id: "o2",
       number: "SO-2",
+      status: "quote",
       title: "Walk-in dozen",
       event_date: "2026-12-18",
       event_time: null,
@@ -161,9 +164,10 @@ test("special order with no customer falls back to its title, said once", () => 
     },
   ]);
   eq(o.title, "SO-2 Walk-in dozen");
+  eq(o.layer, "orders_unpaid", "a quote is not paid");
   eq(o.time, null);
   eq(
-    specialOrderItems([{ ...({ id: "o3", number: "SO-3", title: null, event_date: "2026-12-18", fulfillment: "pickup", location_id: null, kitchen_location_id: null, customer: null }), event_time: "00:00:00" }])[0].time,
+    specialOrderItems([{ ...({ id: "o3", number: "SO-3", status: "lead", title: null, event_date: "2026-12-18", fulfillment: "pickup", location_id: null, kitchen_location_id: null, customer: null }), event_time: "00:00:00" }])[0].time,
     null,
     "midnight is no time",
   );
@@ -218,4 +222,11 @@ test("clockTime: 12-hour, minutes only when there are some", () => {
   eq(clockTime("14:30:00"), "2:30 PM");
   eq(clockTime("00:15"), "12:15 AM");
   eq(clockTime("12:00"), "12 PM");
+});
+
+test("paid is status 'order' and nothing else", () => {
+  const base = { id: "x", number: "SO-9", title: null, event_date: "2026-12-18", event_time: null, fulfillment: "pickup", location_id: null, kitchen_location_id: null, customer: null };
+  const layerOf = (status: string | null) => specialOrderItems([{ ...base, status }])[0].layer;
+  eq(layerOf("order"), "orders_paid");
+  for (const status of ["lead", "quote", "invoice", null]) eq(layerOf(status), "orders_unpaid", String(status));
 });

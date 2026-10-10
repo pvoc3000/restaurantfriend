@@ -81,13 +81,14 @@ export async function fetchLayerItems(
   const failed: { layer: CalendarLayer; message: string }[] = [];
   const items: CalendarItem[] = [];
   const hr = want("hr") || want("hr_events");
+  const orderLayers = want("orders_paid") || want("orders_unpaid");
 
   const [orders, pos, tasks, periods, employees, documents, events] = await Promise.all([
-    want("special_orders")
+    orderLayers
       ? supabase
           .from("special_orders")
           .select(
-            "id, number, title, event_date, event_time, fulfillment, location_id, kitchen_location_id, customers ( first_name, last_name, company )",
+            "id, number, status, title, event_date, event_time, fulfillment, location_id, kitchen_location_id, customers ( first_name, last_name, company )",
           )
           // A real order only: a template has no date, and a standing order's
           // DAYS are their own rows — the parent would draw its start date as
@@ -177,9 +178,10 @@ export async function fetchLayerItems(
 
   items.push(
     ...specialOrderItems(
-      rows<Row>("special_orders", orders).map((o) => ({
+      rows<Row>("orders_unpaid", orders).map((o) => ({
         id: o.id as string,
         number: o.number as string,
+        status: (o.status ?? null) as string | null,
         title: (o.title ?? null) as string | null,
         event_date: o.event_date as string,
         event_time: (o.event_time ?? null) as string | null,

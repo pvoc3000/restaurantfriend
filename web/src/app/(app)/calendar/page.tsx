@@ -65,7 +65,7 @@ export default async function CalendarPage({
   // not shown deliveries here. RLS refuses the rows regardless; this is what
   // keeps a layer that would always be empty out of the menu.
   const layers: CalendarLayer[] = ["entries"];
-  if (canReachPage(role, "/special-orders")) layers.push("special_orders");
+  if (canReachPage(role, "/special-orders")) layers.push("orders_paid", "orders_unpaid");
   if (canReachPage(role, "/purchase-orders")) layers.push("deliveries");
   if (canReachPage(role, "/tasks")) layers.push("tasks");
   if (canReachPage(role, "/pay-periods")) layers.push("pay_periods");

@@ -21,7 +21,7 @@ import {
 } from "@/lib/calendar";
 import type { CalendarEntry } from "@/lib/blackoutDates";
 import { useStoredSet } from "@/lib/storedSet";
-import { MonthView, LAYER_MARK } from "@/components/calendar/MonthView";
+import { BLACKOUT_CHIP, LAYER_CHIP, MonthView } from "@/components/calendar/MonthView";
 import { DayPanel } from "@/components/calendar/DayPanel";
 import { EntryDialog, type EntryLocation } from "@/components/calendar/EntryDialog";
 import { EntriesList } from "@/components/calendar/EntriesList";
@@ -205,10 +205,7 @@ export function CalendarScreen({
           {view === "month" && offered.length > 1 && (
               <ControlField label="Show">
                 <PickSet
-                  options={offered.map((l) => ({
-                    value: l.key,
-                    label: `${LAYER_MARK[l.key]} ${l.label}`.trim(),
-                  }))}
+                  options={offered.map((l) => ({ value: l.key, label: l.label }))}
                   value={shownLayers}
                   onChange={(next) => {
                     // An empty set from `PickSet` means ALL, opt-in layers too.
@@ -232,6 +229,23 @@ export function CalendarScreen({
 
       {layerFailures.length > 0 && (
         <p className="text-sm text-accent">Could not load: {layerFailures.join("; ")}</p>
+      )}
+
+      {/* THE KEY to the colours: one chip per layer that is showing, in the
+          menu's order, so the calendar never has to be decoded from memory. */}
+      {view === "month" && (
+        <ul aria-label="Colours" className="flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-medium">
+          {!hiddenSet.has("entries") && (
+            <li className={`rounded-[4px] px-1.5 leading-[18px] ${BLACKOUT_CHIP}`}>Blackouts</li>
+          )}
+          {offered
+            .filter((l) => !hiddenSet.has(l.key))
+            .map((l) => (
+              <li key={l.key} className={`rounded-[4px] px-1.5 leading-[18px] ${LAYER_CHIP[l.key]}`}>
+                {l.key === "entries" ? "Notes and events" : l.label}
+              </li>
+            ))}
+        </ul>
       )}
 
       {view === "month" ? (

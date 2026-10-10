@@ -10,20 +10,38 @@ import { clockTime, type CalendarItem, type CalendarLayer } from "@/lib/calendar
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 /**
- * A mark per layer, so a cell's lines are told apart by SHAPE. Colour means
- * record state in this app and a layer is not a state; U+FE0E keeps Apple from
- * drawing any of them as a colour emoji.
+ * A COLOUR PER LAYER, as a chip (Mark, 2026-10-10: "apple style chips, with
+ * different colors for each event type instead of the glyphs").
+ *
+ * This is the one screen where colour is not record state. Everywhere else in
+ * the app it is, and the classic Mac look keeps to ink, white and the yellow
+ * fill; a calendar is read by colour before it is read by word, which is the
+ * reason Mark asked for it and the reason it stays HERE and nowhere else.
+ *
+ * A pale fill under dark type of the same hue — Apple Calendar's all-day chip
+ * — so every one is legible (each pair is 7:1 or better) and a busy day reads
+ * as bands rather than as a paragraph. Whole class strings, never assembled:
+ * Tailwind only ships a class it can see written out.
  */
-export const LAYER_MARK: Record<CalendarLayer, string> = {
-  entries: "",
-  special_orders: "◆\uFE0E",
-  deliveries: "▲\uFE0E",
-  tasks: "■\uFE0E",
-  pay_periods: "$",
-  hr: "✚\uFE0E",
-  hr_events: "✦\uFE0E",
-  feeds: "○\uFE0E",
+export const LAYER_CHIP: Record<CalendarLayer, string> = {
+  entries: "bg-yellow-200 text-yellow-950",
+  orders_paid: "bg-green-100 text-green-900",
+  orders_unpaid: "bg-orange-100 text-orange-900",
+  deliveries: "bg-sky-100 text-sky-900",
+  tasks: "bg-purple-100 text-purple-900",
+  pay_periods: "bg-slate-200 text-slate-800",
+  hr: "bg-pink-100 text-pink-900",
+  hr_events: "bg-red-100 text-red-900",
+  feeds: "bg-indigo-100 text-indigo-900",
 };
+
+/** A blackout: the one chip that is solid, so it leads its day by weight too. */
+export const BLACKOUT_CHIP = "bg-neutral-800 text-white";
+
+/** The chip's dress for an item — a blackout's, or its layer's. */
+export function chipClass(item: Pick<CalendarItem, "layer" | "blackout">): string {
+  return item.blackout ? BLACKOUT_CHIP : LAYER_CHIP[item.layer];
+}
 
 /** How many lines a day shows before "+N more", until the grid is measured. */
 const SHOWN = 4;
@@ -152,19 +170,10 @@ export function itemText(item: CalendarItem): string {
 
 function ItemLine({ item, onEntry }: { item: CalendarItem; onEntry: (entryId: string) => void }) {
   // One line, truncated: the cell is a summary and the panel has the rest.
-  const dress = item.blackout
-    ? "bg-ink text-white"
-    : item.layer === "entries"
-      ? "bg-mark-fill text-ink"
-      : "text-ink hover:bg-neutral-100";
-  const className = `pointer-events-auto block w-full truncate px-1 text-left text-[11px] leading-[1.35] ${dress}`;
-  const mark = LAYER_MARK[item.layer];
-  const body = (
-    <>
-      {mark && <span aria-hidden className="mr-1 text-[9px]">{mark}</span>}
-      {itemText(item)}
-    </>
-  );
+  // Rounded and inset from the cell's edge, with a hairline of the cell showing
+  // between one chip and the next.
+  const className = `pointer-events-auto block w-full truncate rounded-[4px] px-1.5 text-left text-[11px] font-medium leading-[15px] hover:brightness-95 ${chipClass(item)}`;
+  const body = itemText(item);
 
   if (item.entryId) {
     return (

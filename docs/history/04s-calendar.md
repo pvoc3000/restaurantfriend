@@ -91,6 +91,22 @@ kind. They record what happened rather than what is coming, and shift ratings
 are 44,000 of the 46,000 rows. The other HR layer is expiring documents and
 food handler cards, for current employees only.
 
+**SPECIAL ORDERS ARE TWO LAYERS** (Mark, 2026-10-10): "Paid special orders"
+is `status = 'order'`, "Unpaid special orders" is every other live status.
+Neither shows a cancelled order, a template or a standing order's parent. The
+status is read, not a balance re-derived. The published feed (185) still has
+the one `special_orders` layer.
+
+**EACH LAYER IS A COLOURED CHIP** (Mark, 2026-10-10: "apple style chips, with
+different colors for each event type instead of the glyphs") — a pale fill
+under dark type of the same hue, a blackout solid, and a key above the grid.
+THIS IS THE ONE SCREEN WHERE COLOUR IS NOT RECORD STATE; it stays in
+`MonthView.LAYER_CHIP` and is not a precedent for any other screen.
+
+**THE MONTH FILLS THE WINDOW** (Mark, 2026-10-10), measured with
+`lib/fillHeight.useFillToBottom`; how many lines a day shows follows the row
+height it was given.
+
 **AN ORDER AT MIDNIGHT IS DRAWN ALL-DAY.** `event_time = 00:00` is how an order
 with no real time was stored; the calendar and the feed both treat it as none.
 

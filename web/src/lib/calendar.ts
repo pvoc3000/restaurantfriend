@@ -16,7 +16,8 @@ import { formatRange } from "./dateRange";
 
 export type CalendarLayer =
   | "entries"
-  | "special_orders"
+  | "orders_paid"
+  | "orders_unpaid"
   | "deliveries"
   | "tasks"
   | "pay_periods"
@@ -35,7 +36,12 @@ export const OPT_IN_LAYERS: readonly CalendarLayer[] = ["hr_events"];
 /** In the order the layer menu lists them. */
 export const CALENDAR_LAYERS: readonly { key: CalendarLayer; label: string }[] = [
   { key: "entries", label: "Notes and blackouts" },
-  { key: "special_orders", label: "Special orders" },
+  // TWO LAYERS, split on the one status that means the money is in (Mark,
+  // 2026-10-10): `status = 'order'` is paid, and a lead, a quote or an invoice
+  // is not yet. Neither shows a cancelled order, a template or a standing
+  // order's parent.
+  { key: "orders_paid", label: "Paid special orders" },
+  { key: "orders_unpaid", label: "Unpaid special orders" },
   { key: "deliveries", label: "Deliveries" },
   { key: "tasks", label: "Tasks and maintenance" },
   { key: "pay_periods", label: "Pay periods" },
@@ -133,7 +139,8 @@ export function visibleItems(
 
 const LAYER_ORDER: Record<CalendarLayer, number> = {
   entries: 0,
-  special_orders: 1,
+  orders_paid: 1,
+  orders_unpaid: 1,
   deliveries: 2,
   tasks: 3,
   pay_periods: 4,
@@ -185,6 +192,8 @@ function shops(...ids: (string | null | undefined)[]): string[] {
 export type CalendarOrderRow = {
   id: string;
   number: string;
+  /** `lead | quote | invoice | order` — cancelled ones are never fetched. */
+  status: string | null;
   title: string | null;
   event_date: string;
   event_time: string | null;
@@ -195,11 +204,17 @@ export type CalendarOrderRow = {
   customer: string | null;
 };
 
-/** A special order on its event date: "SO-10110 Cafe Knotted", at its time. */
+/**
+ * A special order on its event date: "SO-10110 Cafe Knotted", at its time.
+ *
+ * PAID IS `status = 'order'` and nothing else. The status is what a person set
+ * when the money arrived and is what gates production, so the calendar reads it
+ * rather than re-deriving a balance; an invoice half paid is still unpaid here.
+ */
 export function specialOrderItems(rows: readonly CalendarOrderRow[]): CalendarItem[] {
   return rows.map((o) => ({
     key: `order:${o.id}`,
-    layer: "special_orders",
+    layer: o.status === "order" ? "orders_paid" : "orders_unpaid",
     date: o.event_date,
     // Midnight is how an order with no real time was stored (the FileMaker
     // history is full of them): all-day, not a 12 AM appointment. The feed
