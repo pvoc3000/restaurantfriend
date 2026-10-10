@@ -221,7 +221,13 @@ export function CalendarScreen({
             <button type="button" aria-label="Previous month" onClick={() => goToMonth(addMonths(month, -1))} className={NAV}>
               ‹
             </button>
-            <span className="w-44 text-center text-sm font-semibold">{monthLabel(month)}</span>
+            {/* The month IS this screen's subject, so it is set at the size of a
+                page title (Mark, 2026-10-10: "substantially increase the size")
+                — 26px against the heading's 28. A fixed width, so ‹ and › do
+                not move under the pointer between "May" and "September". */}
+            <span className="w-[17rem] text-center text-[26px] font-bold leading-9 tracking-[-0.02em]">
+              {monthLabel(month)}
+            </span>
             <button type="button" aria-label="Next month" onClick={() => goToMonth(addMonths(month, 1))} className={NAV}>
               ›
             </button>
