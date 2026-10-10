@@ -156,6 +156,11 @@ test("special order: kitchen, READY time, title; the rest on the second line", (
   eq(o.locationIds, ["df01"]);
 });
 
+test("special order: with no ready time, the event's time places it", () => {
+  eq(specialOrderItems([{ ...ORDER, ready_by_time: null }])[0].time, "14:30");
+  eq(specialOrderItems([{ ...ORDER, ready_by_time: null, event_time: null }])[0].time, null);
+});
+
 test("special order: no title falls back to the customer, then the number", () => {
   eq(specialOrderItems([{ ...ORDER, title: " " }])[0].title, "Acme (Pat Lee)");
   eq(specialOrderItems([{ ...ORDER, title: null, customer: null }])[0].title, "SO-10110");

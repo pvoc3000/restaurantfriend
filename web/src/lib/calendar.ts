@@ -483,7 +483,11 @@ export function specialOrderItems(rows: readonly CalendarOrderRow[]): CalendarIt
     // Midnight is how an order with no real time was stored (the FileMaker
     // history is full of them): no time, not a 12 AM appointment. The feed
     // function (185) makes the same call.
-    time: realTime(o.ready_by_time),
+    // The ready time — or, where an order has none, the event's own. Seven of
+    // 75 live orders had an event time and a blank ready time (SO-10094), and
+    // drew as all-day for it; a time the kitchen was never given is still a
+    // time the order is wanted by.
+    time: realTime(o.ready_by_time) ?? realTime(o.event_time),
     title: o.title?.trim() || o.customer || o.number,
     detail:
       [
