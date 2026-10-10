@@ -63,7 +63,12 @@ export function MonthJump({
         // The month IS this screen's subject, so it is set at the size of a
         // page title — 26px against the heading's 28. A fixed width, so ‹ and
         // › do not move under the pointer between "May" and "September".
-        className="w-[17rem] text-center text-[26px] font-bold leading-9 tracking-[-0.02em] hover:bg-neutral-100"
+        //
+        // BOXED (Mark, 2026-10-10: a border "around the month and year area"):
+        // a raised `mac-control` box like the ‹ › beside it, which is also what
+        // says it can be pressed. 34px of line inside a 1px border is the
+        // arrows' 36, so the three sit level.
+        className="mac-control w-[17rem] border border-ink bg-white text-center text-[26px] font-bold leading-[34px] tracking-[-0.02em] hover:bg-neutral-100"
       >
         {monthLabel(month)}
       </button>
