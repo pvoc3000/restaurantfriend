@@ -64,7 +64,8 @@ export type CalendarItem = {
   detail?: string | null;
   /** `HH:MM` when the thing has a time of day; sorts the day. */
   time?: string | null;
-  /** Said BEFORE the time, with a colon — an order's kitchen: "DF01: 9 AM …". */
+  /** Said BEFORE the time, with a colon — an order's kitchen ("DF01: 9 AM …"),
+   *  or "Menu" on a plan's banner. */
   lead?: string | null;
   /** Where a tap goes. An entry has none — it opens its own dialog. */
   href?: string | null;
@@ -409,6 +410,9 @@ export function planItems(plans: readonly CalendarPlanRow[], range: DateRange): 
         key: `plan:${plan.id}:${day}`,
         layer: "menu_plan",
         date: day,
+        // "Menu: Holiday 2026" (Mark, 2026-10-10) — `lead` is said before the
+        // title with a colon, as an order's kitchen is.
+        lead: "Menu",
         title: plan.title,
         detail: plan.ends_on
           ? `Menu plan · ${formatRange({ from: plan.starts_on, to: plan.ends_on })}`

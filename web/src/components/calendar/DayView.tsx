@@ -101,7 +101,10 @@ export function DayView({
                 item,
                 `flex w-full items-baseline justify-between gap-4 rounded-[4px] px-3 py-1.5 text-sm font-medium hover:brightness-95 ${chipClass(item, colors)}`,
                 <>
-                  <span className="min-w-0 truncate">{item.title}</span>
+                  <span className="min-w-0 truncate">
+                    {item.lead ? `${item.lead}: ` : ""}
+                    {item.title}
+                  </span>
                   <span className="shrink-0 text-[11px] font-normal uppercase tracking-[0.08em] opacity-80">
                     {item.blackout ? item.detail || "Blackout" : LAYER_LABEL[item.layer]}
                   </span>

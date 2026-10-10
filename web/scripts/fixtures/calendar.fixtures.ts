@@ -322,6 +322,7 @@ test("a plan is a banner per week, cut square where it carries on", () => {
   const plans = planItems([{ id: "p", title: "Holiday 2026", starts_on: "2026-12-22", ends_on: "2026-12-31" }], range);
   eq(plans.length, 10);
   eq(plans[0].href, "/plans/p");
+  eq(plans[0].lead, "Menu", "drawn as \"Menu: Holiday 2026\"");
   eq(shape(weekLayout(WEEK, itemsByDay(plans), 6).bars), ["Holiday 2026@2+5 lane0 >"]);
 });
 
