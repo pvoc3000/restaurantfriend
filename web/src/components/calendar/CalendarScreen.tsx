@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeading } from "@/components/ui/PageHeading";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { Radio } from "@/components/ui/Radio";
 import { PickSet } from "@/components/ui/PickSet";
 import { ControlField } from "@/components/ui/ControlField";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
@@ -156,15 +156,6 @@ export function CalendarScreen({
       />
 
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-        <TabPicker<CalendarView>
-          ariaLabel="View"
-          value={view}
-          options={[
-            { key: "month", label: "Month", href: href({ view: "month" }) },
-            { key: "list", label: "List", href: href({ view: "list" }) },
-          ]}
-          className="!flex-none"
-        />
         {view === "month" && (
           <div className="flex items-center gap-2">
             <button type="button" aria-label="Previous month" onClick={() => goToMonth(addMonths(month, -1))} className={NAV}>
@@ -184,8 +175,22 @@ export function CalendarScreen({
             </button>
           </div>
         )}
-        {view === "month" && (
-          <div className="ml-auto flex flex-wrap items-end gap-x-6 gap-y-3">
+        <div className="ml-auto flex flex-wrap items-end gap-x-6 gap-y-3">
+          {/* RADIOS, to the left of Shops (Mark, 2026-10-10). The row a button
+              tall, so the pair sits on the pickers' baseline. */}
+          <ControlField label="View">
+            <Radio<CalendarView>
+              ariaLabel="View"
+              value={view}
+              onChange={(next) => router.push(href({ view: next }))}
+              options={[
+                { value: "month", label: "Month" },
+                { value: "list", label: "List" },
+              ]}
+              className="h-9"
+            />
+          </ControlField>
+          {view === "month" && (
             <ControlField label="Shops">
               <PickSet
                 options={locations.map((l) => ({ value: l.id, label: l.code, hint: l.name }))}
@@ -196,7 +201,8 @@ export function CalendarScreen({
                 noun="shops"
               />
             </ControlField>
-            {offered.length > 1 && (
+          )}
+          {view === "month" && offered.length > 1 && (
               <ControlField label="Show">
                 <PickSet
                   options={offered.map((l) => ({
@@ -220,9 +226,8 @@ export function CalendarScreen({
                   align="right"
                 />
               </ControlField>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {layerFailures.length > 0 && (

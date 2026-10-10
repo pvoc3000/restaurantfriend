@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useFillToBottom } from "@/lib/fillHeight";
 import { monthGrid } from "@/lib/dateRange";
 import { clockTime, type CalendarItem, type CalendarLayer } from "@/lib/calendar";
 
@@ -23,8 +25,11 @@ export const LAYER_MARK: Record<CalendarLayer, string> = {
   feeds: "○\uFE0E",
 };
 
-/** How many lines a day shows before "+N more". */
+/** How many lines a day shows before "+N more", until the grid is measured. */
 const SHOWN = 4;
+/** A cell's padding plus its day number, and one line of an item, in px. */
+const CELL_CHROME = 32;
+const LINE = 16;
 
 /**
  * The month, six weeks of seven days, with what is on each.
@@ -56,6 +61,27 @@ export function MonthView({
 }) {
   const weeks = monthGrid(month);
 
+  // THE GRID ENDS WHERE THE WINDOW DOES (Mark, 2026-10-10: "make the calendar
+  // extend to the bottom of the screen"). Measured, never `100vh - a guess` —
+  // `lib/fillHeight`'s rule — and the six rows share what there is. Below the
+  // floor it stops shrinking and the page scrolls: six rows shorter than this
+  // hold a number and nothing else.
+  const gridRef = useRef<HTMLDivElement>(null);
+  useFillToBottom(gridRef, true, 6 * 84);
+  // How many lines fit follows the height the rows were given, so a tall
+  // window shows more of a busy day instead of more white under four lines.
+  const [capacity, setCapacity] = useState(SHOWN);
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      const row = el.getBoundingClientRect().height / 6;
+      setCapacity(Math.max(1, Math.floor((row - CELL_CHROME) / LINE)));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="select-none">
       <div aria-hidden className="grid grid-cols-7">
@@ -68,10 +94,13 @@ export function MonthView({
           </span>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-px border border-ink bg-ink">
+      <div
+        ref={gridRef}
+        className="grid grid-cols-7 grid-rows-6 gap-px border border-ink bg-ink"
+      >
         {weeks.flat().map((day) => {
           const items = days.get(day.iso) ?? [];
-          const shown = items.length > SHOWN ? items.slice(0, SHOWN - 1) : items;
+          const shown = items.length > capacity ? items.slice(0, capacity - 1) : items;
           const more = items.length - shown.length;
           const closed = items.some((i) => i.blackout);
           return (
@@ -80,7 +109,7 @@ export function MonthView({
               // A blacked-out day is GREY to its edges, so it reads across the
               // month before any line of it is read. A day outside the month
               // keeps a white cell and a faint number.
-              className={`relative min-h-[7.25rem] min-w-0 ${closed ? "bg-neutral-200" : "bg-white"}`}
+              className={`relative min-h-0 min-w-0 overflow-hidden ${closed ? "bg-neutral-200" : "bg-white"}`}
             >
               <button
                 type="button"
