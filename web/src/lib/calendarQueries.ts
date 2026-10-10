@@ -9,6 +9,7 @@ import {
   employeeEventItems,
   expiryItems,
   payPeriodItems,
+  planItems,
   specialOrderItems,
   taskItems,
   type CalendarItem,
@@ -79,6 +80,8 @@ export async function fetchLayerItems(
   /** Every shop, closed ones included, to say a code beside a delivery and a
    *  kitchen before an order. */
   locations: readonly { id: string; code: string }[] = [],
+  /** The shop being worked at — whose menu plan the `menu_plan` layer shows. */
+  workingLocationId: string | null = null,
 ): Promise<{ items: CalendarItem[]; failed: { layer: CalendarLayer; message: string }[] }> {
   const want = (layer: CalendarLayer) => layers.includes(layer);
   const failed: { layer: CalendarLayer; message: string }[] = [];
@@ -86,7 +89,20 @@ export async function fetchLayerItems(
   const hr = want("hr") || want("hr_events");
   const orderLayers = want("orders_paid") || want("orders_unpaid");
 
-  const [orders, pos, tasks, periods, employees, documents, events] = await Promise.all([
+  const [plans, orders, pos, tasks, periods, employees, documents, events] = await Promise.all([
+    want("menu_plan") && workingLocationId
+      ? supabase
+          .from("production_plans")
+          .select("id, title, starts_on, ends_on")
+          .eq("location_id", workingLocationId)
+          // In force means ACTIVE: an inactive plan is a draft or a retired
+          // one, and neither is what the shop is making.
+          .eq("is_active", true)
+          .lte("starts_on", range.to)
+          .or(`ends_on.is.null,ends_on.gte.${range.from}`)
+          .order("starts_on")
+          .order("id")
+      : null,
     orderLayers
       ? supabase
           .from("special_orders")
@@ -180,6 +196,15 @@ export async function fetchLayerItems(
   };
 
   items.push(
+    ...planItems(
+      rows<Row>("menu_plan", plans).map((p) => ({
+        id: p.id as string,
+        title: (p.title ?? "Menu plan") as string,
+        starts_on: p.starts_on as string,
+        ends_on: (p.ends_on ?? null) as string | null,
+      })),
+      range,
+    ),
     ...specialOrderItems(
       rows<Row>("orders_unpaid", orders).map((o) => ({
         id: o.id as string,

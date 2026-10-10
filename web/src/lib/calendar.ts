@@ -15,6 +15,7 @@ import { isBlackout, type CalendarEntry } from "./blackoutDates";
 import { formatRange } from "./dateRange";
 
 export type CalendarLayer =
+  | "menu_plan"
   | "entries"
   | "orders_paid"
   | "orders_unpaid"
@@ -35,6 +36,9 @@ export const OPT_IN_LAYERS: readonly CalendarLayer[] = ["hr_events"];
 
 /** In the order the layer menu lists them. */
 export const CALENDAR_LAYERS: readonly { key: CalendarLayer; label: string }[] = [
+  // The WORKING shop's production plan, as a banner across the top of each
+  // week it is in force (Mark, 2026-10-10).
+  { key: "menu_plan", label: "Menu plan" },
   { key: "entries", label: "Notes and blackouts" },
   // TWO LAYERS, split on the one status that means the money is in (Mark,
   // 2026-10-10): `status = 'order'` is paid, and a lead, a quote or an invoice
@@ -150,6 +154,7 @@ export function visibleItems(
 }
 
 const LAYER_ORDER: Record<CalendarLayer, number> = {
+  menu_plan: -1,
   entries: 0,
   orders_paid: 1,
   orders_unpaid: 1,
@@ -161,8 +166,10 @@ const LAYER_ORDER: Record<CalendarLayer, number> = {
   feeds: 7,
 };
 
-/** Blackouts lead, then by layer, then by time of day, then by title. */
+/** The menu plan first, then blackouts, then by layer, time of day, title. */
 export function compareItems(a: CalendarItem, b: CalendarItem): number {
+  const plan = Number(b.layer === "menu_plan") - Number(a.layer === "menu_plan");
+  if (plan !== 0) return plan;
   const lead = Number(b.blackout ?? false) - Number(a.blackout ?? false);
   if (lead !== 0) return lead;
   const layer = LAYER_ORDER[a.layer] - LAYER_ORDER[b.layer];
@@ -257,8 +264,12 @@ export function weekLayout(
   });
 
   const isBar = (p: Pending) => Boolean(p.item.span);
+  // The menu plan is the week's HEADING: its banner takes the top lane whatever
+  // else is on, even a closure that runs the whole week.
+  const isPlan = (p: Pending) => p.item.layer === "menu_plan";
   pending.sort(
     (a, b) =>
+      Number(isPlan(b)) - Number(isPlan(a)) ||
       Number(isBar(b)) - Number(isBar(a)) ||
       (isBar(a) ? b.days - a.days || a.col - b.col : 0) ||
       (isBar(a) ? Number(b.item.blackout ?? false) - Number(a.item.blackout ?? false) : 0) ||
@@ -301,6 +312,53 @@ export function clockTime(time: string): string {
   const minute = time.slice(3, 5);
   const h12 = hour % 12 === 0 ? 12 : hour % 12;
   return `${h12}${minute === "00" ? "" : `:${minute}`} ${hour < 12 ? "AM" : "PM"}`;
+}
+
+/* -- the menu plan ------------------------------------------------------- */
+
+export type CalendarPlanRow = {
+  id: string;
+  title: string;
+  starts_on: string;
+  /** Null is open-ended: in force until another plan replaces it. */
+  ends_on: string | null;
+};
+
+/**
+ * A production plan as a banner over the days it is in force.
+ *
+ * One item per day, joined by `span`, so `weekLayout` draws one bar per week
+ * and cuts it square where the plan carries on — exactly a multi-day entry's
+ * shape. An open-ended plan runs to the end of whatever is on screen and is
+ * marked as continuing past it.
+ *
+ * NOT ABOUT A SHOP as far as the shop filter goes (`locationIds` is empty): it
+ * is the WORKING shop's plan by definition, and narrowing the calendar to
+ * another shop's orders should not take the week's heading away.
+ */
+export function planItems(plans: readonly CalendarPlanRow[], range: DateRange): CalendarItem[] {
+  const items: CalendarItem[] = [];
+  for (const plan of plans) {
+    const end = plan.ends_on ?? "9999-12-31";
+    const from = plan.starts_on > range.from ? plan.starts_on : range.from;
+    const to = end < range.to ? end : range.to;
+    for (let day = from; day <= to; day = daysAfter(day, 1)) {
+      items.push({
+        key: `plan:${plan.id}:${day}`,
+        layer: "menu_plan",
+        date: day,
+        title: plan.title,
+        detail: plan.ends_on
+          ? `Menu plan · ${formatRange({ from: plan.starts_on, to: plan.ends_on })}`
+          : `Menu plan · from ${formatRange({ from: plan.starts_on, to: plan.starts_on })}`,
+        href: `/plans/${plan.id}`,
+        locationIds: [],
+        // Always a span, even a one-day plan: it is a banner, not a chip.
+        span: { key: `plan:${plan.id}`, from: plan.starts_on, to: end },
+      });
+    }
+  }
+  return items;
 }
 
 /* -- layers from what the app already knows ------------------------------ */

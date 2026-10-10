@@ -121,6 +121,13 @@ everything a LANE shared by that week; `MonthView` draws six week rows with a
 layer of bars over each. An end that carries into another week is cut square.
 When a week needs more lanes than fit, the last lane becomes "+N more".
 
+**"MENU PLAN" IS A LAYER** (Mark, 2026-10-10): the WORKING shop's active
+production plans, each a banner over the days from its `starts_on` to its
+`ends_on`, in the top lane of every week (`weekLayout` places it before any
+other bar). An open-ended plan runs off the screen. It ignores the shop
+filter, because it is the working shop's by definition, and is offered to
+anyone who may open `/plans`. Not in the published feed.
+
 **AN ORDER AT MIDNIGHT IS DRAWN ALL-DAY.** `event_time = 00:00` is how an order
 with no real time was stored; the calendar and the feed both treat it as none.
 

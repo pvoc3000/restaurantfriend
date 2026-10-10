@@ -65,6 +65,9 @@ export default async function CalendarPage({
   // not shown deliveries here. RLS refuses the rows regardless; this is what
   // keeps a layer that would always be empty out of the menu.
   const layers: CalendarLayer[] = ["entries"];
+  // The working shop's menu plan — for anyone who may open Plans, and only
+  // when there IS a working shop.
+  if (canReachPage(role, "/plans") && session.activeLocation) layers.unshift("menu_plan");
   if (canReachPage(role, "/special-orders")) layers.push("orders_paid", "orders_unpaid");
   if (canReachPage(role, "/purchase-orders")) layers.push("deliveries");
   if (canReachPage(role, "/tasks")) layers.push("tasks");
@@ -80,7 +83,13 @@ export default async function CalendarPage({
     const [fetched, subs, feedEvents] = await Promise.all([
       // `session.locations`, the FULL list: a lookup, not an enumeration
       // (design rule 3), so a delivery to a since-closed shop still has a code.
-      fetchLayerItems(supabase, layers, range, session.locations),
+      fetchLayerItems(
+        supabase,
+        layers,
+        range,
+        session.locations,
+        session.activeLocation?.id ?? null,
+      ),
       supabase
         .from("calendar_subscriptions")
         .select("id, name, location_ids, is_active, has_url, last_fetched_at, last_error")

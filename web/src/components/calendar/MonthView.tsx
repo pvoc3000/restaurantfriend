@@ -30,6 +30,7 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
  * Tailwind only ships a class it can see written out.
  */
 export const LAYER_CHIP: Record<CalendarLayer, string> = {
+  menu_plan: "bg-teal-100 text-teal-900",
   entries: "bg-yellow-200 text-yellow-950",
   orders_paid: "bg-green-100 text-green-900",
   orders_unpaid: "bg-orange-100 text-orange-900",

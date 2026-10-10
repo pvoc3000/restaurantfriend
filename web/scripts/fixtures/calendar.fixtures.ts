@@ -19,6 +19,7 @@ import {
   monthParam,
   parseMonthParam,
   payPeriodItems,
+  planItems,
   specialOrderItems,
   taskItems,
   visibleItems,
@@ -306,4 +307,38 @@ test("a hidden bar is counted on each day it covers", () => {
   const { bars, more } = layout(spans, [], 2);
   eq(bars.length, 1);
   eq(more, [0, 2, 2, 0, 0, 0, 0]);
+});
+
+/* -- the menu plan ------------------------------------------------------- */
+// Checked by BREAKING: without the plan-first sort a week-long closure takes
+// the top lane and the plan's banner drops under it; and treating a null
+// `ends_on` as the plan's start draws an open-ended plan on one day.
+
+test("a plan is a banner per week, cut square where it carries on", () => {
+  const range = { from: "2026-11-29", to: "2027-01-09" };
+  const plans = planItems([{ id: "p", title: "Holiday 2026", starts_on: "2026-12-22", ends_on: "2026-12-31" }], range);
+  eq(plans.length, 10);
+  eq(plans[0].href, "/plans/p");
+  eq(shape(weekLayout(WEEK, itemsByDay(plans), 6).bars), ["Holiday 2026@2+5 lane0 >"]);
+});
+
+test("an open-ended plan runs to the end of the screen and on past it", () => {
+  const range = { from: "2026-11-29", to: "2027-01-09" };
+  const plans = planItems([{ id: "p", title: "Winter", starts_on: "2026-12-01", ends_on: null }], range);
+  eq(plans[plans.length - 1].date, "2027-01-09");
+  eq(shape(weekLayout(WEEK, itemsByDay(plans), 6).bars), ["Winter@0+7 lane0 < >"]);
+});
+
+test("the plan's banner is the top of the week, over a closure and over chips", () => {
+  const range = { from: "2026-11-29", to: "2027-01-09" };
+  const all = [
+    ...entryItems([entry({ title: "Closed", starts_on: "2026-12-01", ends_on: "2027-01-05", shop_closed: true })], range),
+    ...planItems([{ id: "p", title: "Holiday 2026", starts_on: "2026-12-22", ends_on: "2026-12-31" }], range),
+    item({ key: "o", title: "Order", date: "2026-12-20" }),
+  ];
+  eq(shape(weekLayout(WEEK, itemsByDay(all), 6).bars).sort(), [
+    "Closed@0+7 lane1 < >",
+    "Holiday 2026@2+5 lane0 >",
+    "Order@0+1 lane0",
+  ]);
 });
