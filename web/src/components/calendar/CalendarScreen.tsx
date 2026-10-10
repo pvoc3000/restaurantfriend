@@ -22,6 +22,7 @@ import {
 import type { CalendarEntry } from "@/lib/blackoutDates";
 import { useStoredSet } from "@/lib/storedSet";
 import { MonthView } from "@/components/calendar/MonthView";
+import { MonthJump } from "@/components/calendar/MonthJump";
 import { ColorSwatches } from "@/components/calendar/ColorSwatches";
 import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
 import { createClient } from "@/lib/supabase/client";
@@ -221,13 +222,7 @@ export function CalendarScreen({
             <button type="button" aria-label="Previous month" onClick={() => goToMonth(addMonths(month, -1))} className={NAV}>
               ‹
             </button>
-            {/* The month IS this screen's subject, so it is set at the size of a
-                page title (Mark, 2026-10-10: "substantially increase the size")
-                — 26px against the heading's 28. A fixed width, so ‹ and › do
-                not move under the pointer between "May" and "September". */}
-            <span className="w-[17rem] text-center text-[26px] font-bold leading-9 tracking-[-0.02em]">
-              {monthLabel(month)}
-            </span>
+            <MonthJump month={month} today={today} onPick={goToMonth} />
             <button type="button" aria-label="Next month" onClick={() => goToMonth(addMonths(month, 1))} className={NAV}>
               ›
             </button>
