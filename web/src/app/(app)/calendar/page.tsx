@@ -4,7 +4,14 @@ import { canEditPage, canReachPage } from "@/lib/pageAccess";
 import { canManageMembers, canReadHr, canSetBlackouts } from "@/lib/roles";
 import { readLayerColors } from "@/lib/calendarColors";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
-import { gridRange, parseMonthParam, type CalendarItem, type CalendarLayer } from "@/lib/calendar";
+import {
+  gridRange,
+  parseDateParam,
+  parseMonthParam,
+  type CalendarItem,
+  type CalendarLayer,
+} from "@/lib/calendar";
+import { monthStart } from "@/lib/dateRange";
 import { fetchEntries, fetchLayerItems, staleSubscriptionIds } from "@/lib/calendarQueries";
 import { CalendarScreen, type CalendarView } from "@/components/calendar/CalendarScreen";
 import { FeedRefresher } from "@/components/calendar/FeedRefresher";
@@ -24,13 +31,15 @@ import {
  * the question "what is on the 25th" is usually asked about all of them.
  *
  * `?month=2026-12` picks the month and is why changing it is a navigation —
- * every layer is fetched for exactly the 42 days the grid draws. `?view=list`
- * is the entries as a table, which loads all of them and no layers.
+ * every layer is fetched for exactly the 42 days the grid draws.
+ * `?view=day&date=2026-12-25` is one day in full, fetched for that day alone.
+ * `?view=list` is the entries as a table, which loads all of them and no
+ * layers.
  */
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; view?: string; shops?: string }>;
+  searchParams: Promise<{ month?: string; date?: string; view?: string; shops?: string }>;
 }) {
   const params = await searchParams;
   const session = await getAppSession();
@@ -38,9 +47,14 @@ export default async function CalendarPage({
   const role = session.membership.role;
 
   const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
-  const view: CalendarView = params.view === "list" ? "list" : "month";
-  const month = parseMonthParam(params.month, today);
-  const range = gridRange(month);
+  const view: CalendarView =
+    params.view === "list" ? "list" : params.view === "day" ? "day" : "month";
+  // The DAY view is one date (`?view=day&date=…`), and the month it sits in is
+  // what Month goes back to.
+  const date = parseDateParam(params.date, today);
+  const month = view === "day" ? monthStart(date) : parseMonthParam(params.month, today);
+  // What every layer is fetched for: the 42 days of the grid, or the one day.
+  const range = view === "day" ? { from: date, to: date } : gridRange(month);
 
   // ENUMERATED, so the active list (design rule 3): a closed shop is not one
   // anybody writes a blackout for.
@@ -80,7 +94,7 @@ export default async function CalendarPage({
   // Subscribed calendars whose stored copy is over an hour old (migration
   // 186). Non-empty, the page mounts `FeedRefresher`, which asks for a read.
   let stale: string[] = [];
-  if (view === "month") {
+  if (view !== "list") {
     const [fetched, subs, feedEvents] = await Promise.all([
       // `session.locations`, the FULL list: a lookup, not an enumeration
       // (design rule 3), so a delivery to a since-closed shop still has a code.
@@ -133,10 +147,11 @@ export default async function CalendarPage({
       <CalendarScreen
       // Keyed by what the server chose, so the screen's own state (the shop
       // filter it seeds from the URL) follows a navigation.
-      key={`${view}:${month}`}
+      key={`${view}:${view === "day" ? date : month}`}
       orgId={session.membership.org_id}
       view={view}
       month={month}
+      date={date}
       today={today}
       entries={entries}
       layerItems={layerItems}

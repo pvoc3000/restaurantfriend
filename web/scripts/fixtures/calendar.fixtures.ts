@@ -10,6 +10,9 @@ import { test, eq, ok } from "./harness";
 import {
   clockTime,
   compareItems,
+  dayAgenda,
+  longDate,
+  parseDateParam,
   deliveryItems,
   employeeEventItems,
   entryItems,
@@ -341,4 +344,33 @@ test("the plan's banner is the top of the week, over a closure and over chips", 
     "Holiday 2026@2+5 lane0 >",
     "Order@0+1 lane0",
   ]);
+});
+
+/* -- one day, in full ---------------------------------------------------- */
+// Checked by BREAKING: leaving a blackout in `allDay` says it twice; sorting
+// `timed` by layer first puts a 2 PM paid order above a 9 AM unpaid one; and a
+// `parseDateParam` without the round trip accepts February 31st.
+
+test("a day is banners, then what has no time, then what has one — by time", () => {
+  const { banners, allDay, timed } = dayAgenda([
+    item({ key: "late-paid", layer: "orders_paid", time: "14:00", title: "Paid at 2" }),
+    item({ key: "early-unpaid", layer: "orders_unpaid", time: "09:00", title: "Unpaid at 9" }),
+    item({ key: "feed", layer: "feeds", time: "11:30", title: "Dentist" }),
+    item({ key: "po", layer: "deliveries", title: "Bakemark (DF01)" }),
+    item({ key: "note", layer: "entries", title: "Inspector" }),
+    item({ key: "closed", layer: "entries", title: "Christmas", blackout: true }),
+    item({ key: "plan", layer: "menu_plan", title: "Holiday 2026" }),
+  ]);
+  eq(banners.map((i) => i.key), ["plan", "closed"]);
+  eq(allDay.map((i) => i.key), ["note", "po"]);
+  eq(timed.map((i) => i.key), ["early-unpaid", "feed", "late-paid"]);
+});
+
+test("longDate and parseDateParam", () => {
+  eq(longDate("2026-12-25"), "Friday, December 25, 2026");
+  eq(longDate("2026-09-30"), "Wednesday, September 30, 2026");
+  eq(parseDateParam("2026-12-25", "2026-10-10"), "2026-12-25");
+  eq(parseDateParam("2026-02-31", "2026-10-10"), "2026-10-10", "not a day");
+  eq(parseDateParam("2026-13-01", "2026-10-10"), "2026-10-10");
+  eq(parseDateParam(undefined, "2026-10-10"), "2026-10-10");
 });

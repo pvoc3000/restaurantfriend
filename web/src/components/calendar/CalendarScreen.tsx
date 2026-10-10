@@ -8,6 +8,7 @@ import { PickSet } from "@/components/ui/PickSet";
 import { ControlField } from "@/components/ui/ControlField";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { addMonths, monthLabel, monthStart } from "@/lib/dateRange";
+import { daysAfter, daysBefore } from "@/lib/today";
 import {
   CALENDAR_LAYERS,
   OPT_IN_LAYERS,
@@ -34,11 +35,12 @@ import {
   type CalendarColor,
   type LayerColors,
 } from "@/lib/calendarColors";
-import { DayPanel } from "@/components/calendar/DayPanel";
+import { DayView } from "@/components/calendar/DayView";
+import { DayJump } from "@/components/calendar/DayJump";
 import { EntryDialog, type EntryLocation } from "@/components/calendar/EntryDialog";
 import { EntriesList } from "@/components/calendar/EntriesList";
 
-export type CalendarView = "month" | "list";
+export type CalendarView = "month" | "day" | "list";
 
 /** What the key calls a layer. Blackouts have their own, fixed, chip beside
  *  the entries', so that one is "Notes and events" here. */
@@ -46,9 +48,8 @@ function keyLabel(layer: { key: CalendarLayer; label: string }): string {
   return layer.key === "entries" ? "Notes and events" : layer.label;
 }
 
-/** Which dialog is open: a day's panel, an entry, or a new entry on a day. */
+/** Which dialog is open: an entry, or a new entry on a day. */
 type Open =
-  | { kind: "day"; date: string }
   | { kind: "entry"; id: string }
   | { kind: "new"; date: string | null };
 
@@ -69,6 +70,7 @@ export function CalendarScreen({
   orgId,
   view,
   month,
+  date,
   today,
   entries,
   layerItems,
@@ -85,8 +87,11 @@ export function CalendarScreen({
   view: CalendarView;
   /** The first day of the month on screen. */
   month: string;
+  /** The day the DAY view shows. Today when another view is on. */
+  date: string;
   today: string;
-  /** Month view: the entries touching the grid. List view: every entry. */
+  /** Month and day view: the entries touching what is on screen. List view:
+   *  every entry. */
   entries: CalendarEntry[];
   /** Every other layer's items for the grid, already built on the server. */
   layerItems: CalendarItem[];
@@ -165,7 +170,10 @@ export function CalendarScreen({
   // `PickSet` reads an empty value as ALL, which is exactly "nothing hidden".
   const shownLayers = hiddenSet.size === 0 ? [] : offered.filter((l) => !hiddenSet.has(l.key)).map((l) => l.key);
 
-  const range = useMemo(() => gridRange(month), [month]);
+  const range = useMemo(
+    () => (view === "day" ? { from: date, to: date } : gridRange(month)),
+    [view, date, month],
+  );
   const days = useMemo(() => {
     const all = [...entryItems(entries, range), ...layerItems];
     return itemsByDay(visibleItems(all, { hiddenLayers: hiddenSet, shops: shopFilter }));
@@ -174,11 +182,19 @@ export function CalendarScreen({
   const shopCodes = useMemo(() => new Map(locations.map((l) => [l.id, l.code])), [locations]);
   const entryById = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
 
-  function href(next: { month?: string; view?: CalendarView; shops?: string[] }): string {
+  function href(next: {
+    month?: string;
+    date?: string;
+    view?: CalendarView;
+    shops?: string[];
+  }): string {
     const params = new URLSearchParams();
     const v = next.view ?? view;
     if (v === "list") params.set("view", "list");
-    else params.set("month", monthParam(next.month ?? month));
+    else if (v === "day") {
+      params.set("view", "day");
+      params.set("date", next.date ?? date);
+    } else params.set("month", monthParam(next.month ?? month));
     const s = next.shops ?? shopFilter;
     if (s.length > 0) params.set("shops", s.join(","));
     return `/calendar?${params.toString()}`;
@@ -186,6 +202,22 @@ export function CalendarScreen({
 
   function goToMonth(next: string) {
     router.push(href({ month: next }));
+  }
+
+  function goToDay(next: string) {
+    router.push(href({ view: "day", date: next }));
+  }
+
+  /** The radios. Day opens on today when today is in the month on screen, and
+   *  on that month's first day otherwise; Month opens on the day's month. */
+  function changeView(next: CalendarView) {
+    if (next === "day") {
+      goToDay(view === "day" ? date : monthStart(today) === month ? today : month);
+    } else if (next === "month") {
+      router.push(href({ view: "month", month: view === "day" ? monthStart(date) : month }));
+    } else {
+      router.push(href({ view: "list" }));
+    }
   }
 
   function changeShops(next: string[]) {
@@ -202,12 +234,28 @@ export function CalendarScreen({
       <PageHeading
         title="Calendar"
         total={count}
-        noun={view === "list" ? "entries" : `on screen · ${monthLabel(month)}`}
+        noun={
+          view === "list"
+            ? "entries"
+            : view === "day"
+              ? "on this day"
+              : `on screen · ${monthLabel(month)}`
+        }
         action={
           canWrite ? (
             <button
               type="button"
-              onClick={() => setOpen({ kind: "new", date: view === "month" && monthStart(today) === month ? today : null })}
+              onClick={() =>
+                setOpen({
+                  kind: "new",
+                  date:
+                    view === "day"
+                      ? date
+                      : view === "month" && monthStart(today) === month
+                        ? today
+                        : null,
+                })
+              }
               className={`${BUTTON_CLASS} ml-auto shrink-0`}
             >
               New entry
@@ -236,6 +284,20 @@ export function CalendarScreen({
             </button>
           </div>
         )}
+        {view === "day" && (
+          <div className="flex items-center gap-2">
+            <button type="button" aria-label="Previous day" onClick={() => goToDay(daysBefore(date, 1))} className={NAV}>
+              ‹
+            </button>
+            <DayJump date={date} today={today} onPick={goToDay} />
+            <button type="button" aria-label="Next day" onClick={() => goToDay(daysAfter(date, 1))} className={NAV}>
+              ›
+            </button>
+            <button type="button" onClick={() => goToDay(today)} disabled={date === today} className={BUTTON_CLASS}>
+              Today
+            </button>
+          </div>
+        )}
         <div className="ml-auto flex flex-wrap items-end gap-x-6 gap-y-3">
           {/* RADIOS, to the left of Shops (Mark, 2026-10-10). The row a button
               tall, so the pair sits on the pickers' baseline. */}
@@ -243,15 +305,16 @@ export function CalendarScreen({
             <Radio<CalendarView>
               ariaLabel="View"
               value={view}
-              onChange={(next) => router.push(href({ view: next }))}
+              onChange={changeView}
               options={[
                 { value: "month", label: "Month" },
+                { value: "day", label: "Day" },
                 { value: "list", label: "List" },
               ]}
               className="h-9"
             />
           </ControlField>
-          {view === "month" && (
+          {view !== "list" && (
             <ControlField label="Shops">
               <PickSet
                 options={locations.map((l) => ({ value: l.id, label: l.code, hint: l.name }))}
@@ -263,7 +326,7 @@ export function CalendarScreen({
               />
             </ControlField>
           )}
-          {view === "month" && offered.length > 1 && (
+          {view !== "list" && offered.length > 1 && (
               <ControlField label="Show">
                 <PickSet
                   options={offered.map((l) => ({ value: l.key, label: l.label }))}
@@ -296,7 +359,7 @@ export function CalendarScreen({
 
       {/* THE KEY to the colours: one chip per layer that is showing, in the
           menu's order, so the calendar never has to be decoded from memory. */}
-      {view === "month" && (
+      {view !== "list" && (
         <ul aria-label="Colours" className="flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-medium">
           {!hiddenSet.has("entries") && (
             <li className={`rounded-[4px] px-1.5 leading-[18px] ${BLACKOUT_CHIP}`}>Blackouts</li>
@@ -332,7 +395,16 @@ export function CalendarScreen({
           today={today}
           days={days}
           colors={colors}
-          onDay={(date) => setOpen({ kind: "day", date })}
+          // A day opens in DAY view (Mark, 2026-10-10), which replaced the
+          // pop-up panel: the same list, with room.
+          onDay={goToDay}
+          onEntry={(id) => setOpen({ kind: "entry", id })}
+        />
+      ) : view === "day" ? (
+        <DayView
+          items={days.get(date) ?? []}
+          shopCodes={shopCodes}
+          colors={colors}
           onEntry={(id) => setOpen({ kind: "entry", id })}
         />
       ) : (
@@ -346,18 +418,6 @@ export function CalendarScreen({
         />
       )}
 
-      {open?.kind === "day" && (
-        <DayPanel
-          date={open.date}
-          items={days.get(open.date) ?? []}
-          shopCodes={shopCodes}
-          colors={colors}
-          canWrite={canWrite}
-          onEntry={(id) => setOpen({ kind: "entry", id })}
-          onNew={() => setOpen({ kind: "new", date: open.date })}
-          onClose={() => setOpen(null)}
-        />
-      )}
       {colourError && <p className="text-sm text-accent">{colourError}</p>}
       {recolouring && (
         <Dialog

@@ -141,6 +141,14 @@ other bar). An open-ended plan runs off the screen. It ignores the shop
 filter, because it is the working shop's by definition, and is offered to
 anyone who may open `/plans`. Not in the published feed.
 
+**THERE IS A DAY VIEW** (Mark, 2026-10-10: "timeline list, combined list, go
+to day view instead of popup panel") — `?view=day&date=…`, fetched for that one
+day. `lib/calendar.dayAgenda` splits it into banners (the menu plan, blackouts),
+All day, and By time across every shop and layer. A TIMELINE LIST, NOT AN HOUR
+GRID: a day has a handful of timed things and a grid would be mostly white.
+Pressing a day in the month goes there; the pop-up day panel it replaced
+(`DayPanel`) is deleted. The date label is `DayJump`, `MonthJump`'s twin.
+
 **AN ORDER AT MIDNIGHT IS DRAWN ALL-DAY.** `event_time = 00:00` is how an order
 with no real time was stored; the calendar and the feed both treat it as none.
 

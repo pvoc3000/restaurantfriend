@@ -310,6 +310,64 @@ export function weekLayout(
   return { bars: visible, more };
 }
 
+/* -- one day, in full ----------------------------------------------------- */
+
+/**
+ * A day's items in the three bands the day view draws.
+ *
+ *   banners  the menu plan and every blackout — facts about the whole day
+ *   allDay   what has no time, in `compareItems`' order
+ *   timed    what has one, by TIME across every layer and shop, so the day
+ *            reads top to bottom as it will happen
+ */
+export function dayAgenda(items: readonly CalendarItem[]): {
+  banners: CalendarItem[];
+  allDay: CalendarItem[];
+  timed: CalendarItem[];
+} {
+  const sorted = [...items].sort(compareItems);
+  const isBanner = (i: CalendarItem) => i.layer === "menu_plan" || Boolean(i.blackout);
+  return {
+    banners: sorted.filter(isBanner),
+    allDay: sorted.filter((i) => !isBanner(i) && !i.time),
+    timed: sorted
+      .filter((i) => !isBanner(i) && i.time)
+      .sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "") || compareItems(a, b)),
+  };
+}
+
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTH_NAMES_LONG = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** "Friday, December 25, 2026". UTC arithmetic, so it cannot slip a day. */
+export function longDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return `${WEEKDAY_NAMES[d.getUTCDay()]}, ${MONTH_NAMES_LONG[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+}
+
+/** `?date=2026-12-25` → that day if it is a real one; else today. */
+export function parseDateParam(raw: string | null | undefined, today: string): string {
+  if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const d = new Date(`${raw}T00:00:00Z`);
+    // A round trip: `2026-02-31` parses and rolls over to March.
+    if (!Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === raw) return raw;
+  }
+  return today;
+}
+
 /** "2:30 PM" from `14:30` or `14:30:00`. */
 export function clockTime(time: string): string {
   const hour = Number(time.slice(0, 2));
