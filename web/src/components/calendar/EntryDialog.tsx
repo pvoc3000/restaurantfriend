@@ -247,6 +247,7 @@ export function EntryDialog({
             aria-label="Title"
             autoFocus={!entry}
             disabled={!editable}
+            fullWidth
             className="w-full"
           />
         </Field>
@@ -299,6 +300,7 @@ export function EntryDialog({
             onValueChange={setNote}
             aria-label="Note"
             disabled={!editable}
+            fullWidth
             className="w-full"
           />
         </Field>

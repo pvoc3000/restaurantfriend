@@ -523,7 +523,8 @@ function SubscriptionDialog({
       <div className="space-y-5">
         {!existing && (
           <Field label="Name" required>
-            <TextInput value={name} onValueChange={setName} aria-label="Calendar name" autoFocus className="w-full" />
+            <TextInput value={name} onValueChange={setName} aria-label="Calendar name" autoFocus fullWidth
+            className="w-full" />
           </Field>
         )}
         <Field label="iCal address" required>
@@ -535,6 +536,7 @@ function SubscriptionDialog({
             autoFocus={Boolean(existing)}
             autoComplete="off"
             spellCheck={false}
+            fullWidth
             className="w-full"
           />
         </Field>
@@ -664,7 +666,8 @@ function LinkDialog({ orgId, shops, onClose }: { orgId: string; shops: Shop[]; o
       ) : (
         <div className="space-y-5">
           <Field label="Who or what it is for" required>
-            <TextInput value={label} onValueChange={setLabel} aria-label="Link label" autoFocus className="w-full" />
+            <TextInput value={label} onValueChange={setLabel} aria-label="Link label" autoFocus fullWidth
+            className="w-full" />
           </Field>
           <fieldset>
             <legend className="mb-2 block text-[11px] uppercase tracking-[0.12em] text-subtle">
