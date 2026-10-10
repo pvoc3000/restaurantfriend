@@ -45,9 +45,10 @@ export function chipClass(item: Pick<CalendarItem, "layer" | "blackout">): strin
 
 /** How many lines a day shows before "+N more", until the grid is measured. */
 const SHOWN = 4;
-/** A cell's padding plus its day number, and one line of an item, in px. */
+/** A cell's padding plus its day number, and one line of an item WITH the
+ *  4px gap under it (`gap-1` below — keep the two in step), in px. */
 const CELL_CHROME = 32;
-const LINE = 16;
+const LINE = 19;
 
 /**
  * The month, six weeks of seven days, with what is on each.
@@ -135,7 +136,7 @@ export function MonthView({
                 onClick={() => onDay(day.iso)}
                 className="absolute inset-0 hover:bg-neutral-100/60"
               />
-              <div className="pointer-events-none relative flex flex-col gap-px p-1">
+              <div className="pointer-events-none relative flex flex-col gap-1 p-1">
                 <span
                   className={`mb-0.5 flex h-5 w-fit min-w-5 items-center justify-center px-1 text-[12px] tabular-nums ${
                     day.iso === today
