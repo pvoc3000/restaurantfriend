@@ -14,7 +14,7 @@ import { PickSet } from "@/components/ui/PickSet";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { confirmDialog } from "@/lib/confirm";
-import { mintTokenValue } from "@/lib/specialOrderSend";
+import { mintTokenValue, resolveAppBase } from "@/lib/specialOrderSend";
 import { entryShops } from "@/lib/blackoutDates";
 import { ColorSwatches } from "@/components/calendar/ColorSwatches";
 import { colorChip, isCalendarColor, type CalendarColor } from "@/lib/calendarColors";
@@ -28,6 +28,29 @@ import {
 } from "@/lib/calendarFeeds";
 
 type Shop = { id: string; code: string; name: string };
+
+/**
+ * A published link's address — ON THE DEPLOYMENT, never on whatever machine
+ * the link was made from (Mark, 2026-10-10: "the calendar links need to
+ * originate from our deployed installation, not localhost").
+ *
+ * The quote link made this same mistake on 2026-08-17 and `resolveAppBase` is
+ * what fixed it: `NEXT_PUBLIC_APP_URL` first, the browser's origin only when it
+ * is not a developer's own machine, and otherwise a refusal — a calendar app
+ * subscribed to `localhost` reads nothing, silently, forever.
+ */
+function linkAddress(token: string): { url: string } | { error: string } {
+  const resolved = resolveAppBase(window.location.origin);
+  if ("error" in resolved) {
+    return {
+      error:
+        "This app is running on your own machine and does not know the deployment's address, " +
+        "so the link would not work anywhere else. Set NEXT_PUBLIC_APP_URL in web/.env.local " +
+        "and restart, or copy the link from the deployed app.",
+    };
+  }
+  return { url: feedUrl(resolved.base, token) };
+}
 
 /** A subscription with its last-read time already said in the org's clock —
  *  formatted on the server, so the browser's timezone cannot disagree. */
@@ -135,8 +158,10 @@ export function CalendarSettings({
 
   async function copyLink(link: FeedLink) {
     setFailed(null);
+    const address = linkAddress(link.token);
+    if ("error" in address) return setFailed(address.error);
     try {
-      await navigator.clipboard.writeText(feedUrl(window.location.origin, link.token));
+      await navigator.clipboard.writeText(address.url);
       setNotice(`Copied the address for “${link.label}”.`);
     } catch {
       setFailed("The browser would not copy it. Open the link's row and copy the address by hand.");
@@ -607,8 +632,12 @@ function LinkDialog({ orgId, shops, onClose }: { orgId: string; shops: Shop[]; o
         setFailed(error.message);
         return;
       }
-      setMade(feedUrl(window.location.origin, token));
+      const address = linkAddress(token);
       router.refresh();
+      // Made either way — it is in the list, and can be copied from the
+      // deployed app. Said rather than handing out an address that is dead.
+      if ("error" in address) return setFailed(`The link was made. ${address.error}`);
+      setMade(address.url);
     });
   }
 

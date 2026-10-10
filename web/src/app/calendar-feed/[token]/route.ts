@@ -31,7 +31,10 @@ export async function GET(request: Request, context: { params: Promise<{ token: 
     timeZone: feed.timeZone,
     items: feed.items,
     now: Date.now(),
-    origin: new URL(request.url).origin,
+    // Each event links back to its record ON THE DEPLOYMENT. The request's own
+    // origin is right there and wrong on a developer's machine, where a feed
+    // fetched for testing would carry `localhost` links.
+    origin: (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || new URL(request.url).origin,
   });
 
   return new Response(body, {
