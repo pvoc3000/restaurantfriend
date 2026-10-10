@@ -485,6 +485,10 @@ message WE authored** (its Message-ID becomes the thread root decision 12
 replies to). The form shows decision 22's cutoff notice ("orders need two
 business days; closer dates incur a rush fee") but never blocks a date.
 
+> **Since 2026-10-09 the form DOES refuse one kind of date**: a day a calendar
+> entry marks "No special orders" (migrations 181, 182). The rush cutoff is
+> still a notice. See `docs/history/04s-calendar.md`.
+
 **Decision 10's paste-and-parse survives as the fallback** — organic emails
 to specialorders@ will never stop, and the parser is how they become leads.
 The Square form is retired once this is live.

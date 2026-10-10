@@ -161,6 +161,12 @@ test("special order with no customer falls back to its title, said once", () => 
     },
   ]);
   eq(o.title, "SO-2 Walk-in dozen");
+  eq(o.time, null);
+  eq(
+    specialOrderItems([{ ...({ id: "o3", number: "SO-3", title: null, event_date: "2026-12-18", fulfillment: "pickup", location_id: null, kitchen_location_id: null, customer: null }), event_time: "00:00:00" }])[0].time,
+    null,
+    "midnight is no time",
+  );
   eq(o.detail, "Pickup");
   eq(o.locationIds, ["df02"], "one shop, not the same one twice");
 });

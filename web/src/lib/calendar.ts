@@ -201,7 +201,10 @@ export function specialOrderItems(rows: readonly CalendarOrderRow[]): CalendarIt
     key: `order:${o.id}`,
     layer: "special_orders",
     date: o.event_date,
-    time: o.event_time ? o.event_time.slice(0, 5) : null,
+    // Midnight is how an order with no real time was stored (the FileMaker
+    // history is full of them): all-day, not a 12 AM appointment. The feed
+    // function (185) makes the same call.
+    time: o.event_time && !o.event_time.startsWith("00:00") ? o.event_time.slice(0, 5) : null,
     title: [o.number, o.customer || o.title].filter(Boolean).join(" "),
     detail:
       [o.customer ? o.title : null, o.fulfillment === "delivery" ? "Delivery" : "Pickup"]

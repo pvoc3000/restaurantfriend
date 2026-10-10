@@ -1,3 +1,7 @@
+import { CalendarSettings, type SubscriptionRow } from "@/components/settings/CalendarSettings";
+import type { CalendarSubscription, FeedLink } from "@/lib/calendarFeeds";
+import { localDateISO, localTime } from "@/lib/timeZone";
+import { serverTimeZone } from "@/lib/today";
 import { getAppSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { canManageMembers } from "@/lib/roles";
@@ -108,6 +112,41 @@ export default async function SettingsPage({
     deviceHere = await thisDeviceId();
   }
 
+  // Migrations 185 and 186: outside calendars in, published links out. The
+  // links are owner/admin-readable by policy, so below that the query returns
+  // nothing — and the section is not drawn for them either.
+  let calendarSubscriptions: SubscriptionRow[] = [];
+  let calendarLinks: FeedLink[] = [];
+  let calendarError: string | null = null;
+  if (tab === "accounting" && integrationsTab === "calendars") {
+    const supabase = await createClient();
+    const zone = session.orgSettings.timezone ?? serverTimeZone();
+    const [subs, links] = await Promise.all([
+      supabase
+        .from("calendar_subscriptions")
+        .select("id, name, location_ids, is_active, has_url, last_fetched_at, last_error")
+        .order("created_at"),
+      supabase
+        .from("calendar_feed_links")
+        .select("id, token, label, layers, location_ids, include_customer_names, created_at, revoked_at")
+        .order("created_at", { ascending: false }),
+    ]);
+    calendarError = subs.error?.message ?? links.error?.message ?? null;
+    calendarSubscriptions = ((subs.data ?? []) as CalendarSubscription[]).map((s) => {
+      const at = s.last_fetched_at ? Date.parse(s.last_fetched_at) : NaN;
+      return {
+        ...s,
+        location_ids: s.location_ids ?? [],
+        last_read: Number.isNaN(at) ? null : `${localDateISO(zone, at)} ${localTime(zone, at)}`,
+      };
+    });
+    calendarLinks = ((links.data ?? []) as FeedLink[]).map((l) => ({
+      ...l,
+      layers: l.layers ?? [],
+      location_ids: l.location_ids ?? [],
+    }));
+  }
+
   const tabOptions = SETTINGS_TABS.map((t) => ({
     key: t,
     label: SETTINGS_TAB_LABEL[t],
@@ -214,6 +253,15 @@ export default async function SettingsPage({
               />
               {integrationsTab === "quickbooks" ? (
                 <AccountingSettings orgId={orgId} editable={editable} initialStatus={accounting} />
+              ) : integrationsTab === "calendars" ? (
+                <CalendarSettings
+                  orgId={orgId}
+                  editable={editable}
+                  shops={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
+                  subscriptions={calendarSubscriptions}
+                  links={calendarLinks}
+                  loadError={calendarError}
+                />
               ) : (
                 <div className="space-y-16">
                   <SpecialOrderSettings

@@ -19,6 +19,7 @@ import { OPEN_TASK_STATUSES } from "./facilityTasks";
 import { DOCUMENT_KIND_LABEL, type DocumentKind } from "./employeeDocuments";
 import { EVENT_KIND_LABEL, eventSummaryLine, type EventKind } from "./employeeEvents";
 import { employeeName } from "./employees";
+import { subscriptionIsStale, type CalendarSubscription } from "./calendarFeeds";
 
 type Row = Record<string, unknown>;
 
@@ -278,4 +279,14 @@ export async function fetchLayerItems(
 function one<T = Record<string, unknown>>(value: unknown): T | null {
   if (Array.isArray(value)) return (value[0] ?? null) as T | null;
   return (value ?? null) as T | null;
+}
+
+/**
+ * The subscriptions due a read, as of NOW. Here rather than in the page so the
+ * clock is read in one named place, the way `todayInTimeZone` reads it — a
+ * server component calling `Date.now()` inline is what the purity lint is for.
+ */
+export function staleSubscriptionIds(subscriptions: readonly CalendarSubscription[]): string[] {
+  const now = Date.now();
+  return subscriptions.filter((sub) => subscriptionIsStale(sub, now)).map((sub) => sub.id);
 }

@@ -9,9 +9,11 @@ import { InquiryForm } from "./InquiryForm";
  * arrives here has no account and does not need one.
  *
  * What makes a public route in an auth-gated app sound is not this file, it is
- * what the page can REACH: two definer RPCs from migration 057 — one that lists
- * the shops and one that creates a lead — and nothing else in the schema. See
- * that migration's header for the full argument.
+ * what the page can REACH: definer functions granted to `anon` by name and
+ * nothing else in the schema — `inquiry_shops` and `create_inquiry` (057),
+ * `inquiry_menu` (132), `inquiry_blackouts` (181), and the
+ * `inquiry-delivery-quote` and `submit-inquiry` edge functions. See 057's
+ * header for the full argument.
  *
  * The org comes from `NEXT_PUBLIC_ORG_ID`, a per-deployment constant exactly as
  * `NEXT_PUBLIC_APP_URL` already is: a public page has no session to resolve it

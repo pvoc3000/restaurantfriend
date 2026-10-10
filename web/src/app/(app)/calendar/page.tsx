@@ -4,8 +4,14 @@ import { canEditPage, canReachPage } from "@/lib/pageAccess";
 import { canReadHr, canSetBlackouts } from "@/lib/roles";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { gridRange, parseMonthParam, type CalendarItem, type CalendarLayer } from "@/lib/calendar";
-import { fetchEntries, fetchLayerItems } from "@/lib/calendarQueries";
+import { fetchEntries, fetchLayerItems, staleSubscriptionIds } from "@/lib/calendarQueries";
 import { CalendarScreen, type CalendarView } from "@/components/calendar/CalendarScreen";
+import { FeedRefresher } from "@/components/calendar/FeedRefresher";
+import {
+  subscriptionItems,
+  type CalendarSubscription,
+  type SubscriptionEventRow,
+} from "@/lib/calendarFeeds";
 
 /**
  * The calendar — build step 4s.
@@ -67,14 +73,52 @@ export default async function CalendarPage({
 
   let layerItems: CalendarItem[] = [];
   let layerFailures: string[] = [];
+  // Subscribed calendars whose stored copy is over an hour old (migration
+  // 186). Non-empty, the page mounts `FeedRefresher`, which asks for a read.
+  let stale: string[] = [];
   if (view === "month") {
-    const fetched = await fetchLayerItems(supabase, layers, range);
+    const [fetched, subs, feedEvents] = await Promise.all([
+      fetchLayerItems(supabase, layers, range),
+      supabase
+        .from("calendar_subscriptions")
+        .select("id, name, location_ids, is_active, has_url, last_fetched_at, last_error")
+        .eq("is_active", true)
+        .order("created_at"),
+      supabase
+        .from("calendar_subscription_events")
+        .select("id, subscription_id, starts_on, ends_on, start_time, title, place")
+        .gte("ends_on", range.from)
+        .lte("starts_on", range.to)
+        .order("starts_on")
+        .order("id")
+        .limit(1000),
+    ]);
     layerItems = fetched.items;
     layerFailures = fetched.failed.map((f) => `${f.layer}: ${f.message}`);
+
+    // A missing table (186 not applied) is no subscriptions, not a broken page.
+    const subscriptions = ((subs.data ?? []) as CalendarSubscription[]).map((sub) => ({
+      ...sub,
+      location_ids: sub.location_ids ?? [],
+    }));
+    if (subscriptions.length > 0) {
+      layers.push("feeds");
+      layerItems.push(
+        ...subscriptionItems((feedEvents.data ?? []) as SubscriptionEventRow[], subscriptions, range),
+      );
+      // Said by name, where the calendar is looked at: a subscription that
+      // stopped working otherwise just looks like an empty week.
+      layerFailures.push(
+        ...subscriptions.filter((sub) => sub.last_error).map((sub) => `${sub.name}: ${sub.last_error}`),
+      );
+      stale = staleSubscriptionIds(subscriptions);
+    }
   }
 
   return (
-    <CalendarScreen
+    <>
+      {stale.length > 0 && <FeedRefresher staleKey={stale.join(",")} />}
+      <CalendarScreen
       // Keyed by what the server chose, so the screen's own state (the shop
       // filter it seeds from the URL) follows a navigation.
       key={`${view}:${month}`}
@@ -90,6 +134,7 @@ export default async function CalendarPage({
       shops={shops}
       canWrite={canEditPage(role, "/calendar")}
       canSetBlackouts={canSetBlackouts(role)}
-    />
+      />
+    </>
   );
 }

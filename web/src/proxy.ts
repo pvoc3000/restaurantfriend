@@ -73,6 +73,11 @@ export default async function proxy(request: NextRequest) {
   // Staff how-to guides: static text, readable before you have a login — the
   // first one explains how to get one. `/legal`'s reasoning.
   const isGuidePage = request.nextUrl.pathname.startsWith("/guides");
+  // The published calendar feed (migration 185): a calendar app fetches it
+  // signed out, holding a token. `/q/`'s argument — it reaches one definer
+  // function that reads one link row. Trailing slash, so `/calendar` itself
+  // stays behind the login.
+  const isCalendarFeed = request.nextUrl.pathname.startsWith("/calendar-feed/");
   const isRegisteredDevice = request.cookies.has(DEVICE_COOKIE);
 
   if (
@@ -84,7 +89,8 @@ export default async function proxy(request: NextRequest) {
     !isInquiryPage &&
     !isLegalPage &&
     !isLockPage &&
-    !isGuidePage
+    !isGuidePage &&
+    !isCalendarFeed
   ) {
     const redirectUrl = request.nextUrl.clone();
     // A registered iPad wakes up on its picker, not the password screen —

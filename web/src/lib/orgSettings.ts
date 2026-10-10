@@ -61,17 +61,20 @@ export function messagesTabHref(tab: MessagesTab): string {
  * The Integrations tab's own tabs (Mark, 2026-10-01): one per service.
  *   · QuickBooks — the connection and its defaults (accounts, items, tax code).
  *   · Square     — how each shop-day's Square sales post to QuickBooks.
+ *   · Calendars  — outside calendars drawn on /calendar, and the feeds the
+ *                  app publishes of its own (migrations 185, 186).
  * In the URL as `?tab=accounting&integration=…`, the first writing no
  * parameter — so `qbo-oauth`'s return to `?tab=accounting` still lands on the
  * QuickBooks tab, where its message is drawn.
  */
-export type IntegrationsTab = "quickbooks" | "square";
+export type IntegrationsTab = "quickbooks" | "square" | "calendars";
 
-export const INTEGRATIONS_TABS: IntegrationsTab[] = ["quickbooks", "square"];
+export const INTEGRATIONS_TABS: IntegrationsTab[] = ["quickbooks", "square", "calendars"];
 
 export const INTEGRATIONS_TAB_LABEL: Record<IntegrationsTab, string> = {
   quickbooks: "QuickBooks",
   square: "Square",
+  calendars: "Calendars",
 };
 
 export function parseIntegrationsTab(raw: string | string[] | undefined): IntegrationsTab {

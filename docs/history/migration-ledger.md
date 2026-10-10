@@ -349,3 +349,12 @@ which drops a column the Inventory list and item detail used to select.
 put per-weekday par on plan rows only because that table happened to carry the
 weekday column, and 003 then silently made it per-vendor-item.
 
+**181–186 are APPLIED** (Claude, 2026-10-09, at Mark's instruction: "go ahead
+and apply the migrations and edge functions yourself when appropriate") — the
+calendar. 181 `calendar_entries` + `blackout_name` + `inquiry_blackouts`; 182
+`create_inquiry` refuses a blacked-out date; 183 the standing-order top-up skips
+one; 184 `generate_production_schedules` skips one; 185 `calendar_feed_links` +
+`calendar_feed_by_token`; 186 the three subscription tables +
+`set_calendar_subscription_url`. 182–184 restate the live bodies from
+`pg_get_functiondef` with marked lines added. Each was dry-run on the live
+database in a rolled-back transaction first. See `docs/history/04s-calendar.md`.
