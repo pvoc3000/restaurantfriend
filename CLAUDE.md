@@ -74,7 +74,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 4p. ✅ Tablet shell (bar, `/start` tiles, batch log on tablet) — `docs/history/04p-tablet-shell.md`
 4q. ✅ Desk start page (`/start`) — `docs/history/04q-desk-start.md`
 4r. 🚧 Square sales posted to QuickBooks (journal entries, deposits) — `docs/history/04r-square-sales-to-qbo.md`
-4s. 🚧 Calendar (blackout dates, notes, layers, iCal feeds in and out; 181–189 applied and `calendar-sync` deployed 2026-10-10; signed-in screens not yet checked in a browser) — `docs/history/04s-calendar.md`
+4s. 🚧 Calendar (blackout dates, notes, layers, iCal feeds in and out; 181–190 applied and `calendar-sync` deployed 2026-10-10; signed-in screens not yet checked in a browser) — `docs/history/04s-calendar.md`
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 **Each module's full history — decisions, measurements, traps, probes and what was verified — lives in `docs/history/`**, moved out of this file verbatim on 2026-09-18 because it had grown to ~1M characters loaded into every session. **Read the module's history file before designing or changing anything in that module**, the same way the briefs in `docs/` are read. The catalog-cleanup notes and the per-migration ledger (001–019 and which are applied) are in `docs/history/migration-ledger.md`. **Record new module history in its `docs/history/` file, not here**; this file keeps only a one-line status per module.

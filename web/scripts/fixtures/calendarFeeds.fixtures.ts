@@ -41,11 +41,12 @@ test("feedLayersLabel is in the menu's order and ignores what a feed cannot carr
   eq(feedLayersLabel(["orders_paid", "entries"]), "Notes and blackouts · Paid special orders");
   eq(
     feedLayersLabel(["special_orders"]),
-    "Paid special orders · Unpaid special orders",
-    "185's one key means both",
+    "Paid special orders · Unpaid special orders · Standing orders",
+    "185's one key means all three",
   );
   ok(feedCarriesOrders(["orders_unpaid"]));
   ok(feedCarriesOrders(["special_orders"]));
+  ok(feedCarriesOrders(["standing_orders"]));
   no(feedCarriesOrders(["entries", "deliveries"]));
   eq(feedLayersLabel(["hr", "pay_periods"]), "Nothing");
 });

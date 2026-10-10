@@ -369,3 +369,6 @@ the column, so 188 goes on before any deploy that includes it.
 
 **189 is APPLIED** (Claude, 2026-10-10) — in `calendar_feed_by_token`, midnight
 is a time and a blank ready time falls back to the event time.
+
+**190 is APPLIED** (Claude, 2026-10-10) — `calendar_feed_by_token` gives days
+made from a standing order their own `standing_orders` layer.

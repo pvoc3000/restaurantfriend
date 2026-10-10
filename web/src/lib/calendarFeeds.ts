@@ -9,6 +9,9 @@ export const FEED_LAYERS: readonly { key: string; label: string }[] = [
   { key: "entries", label: "Notes and blackouts" },
   { key: "orders_paid", label: "Paid special orders" },
   { key: "orders_unpaid", label: "Unpaid special orders" },
+  // Days made from a standing order, whatever their status (migration 190) —
+  // out of the two above, where the wholesale days drowned the one-offs.
+  { key: "standing_orders", label: "Standing orders" },
   { key: "deliveries", label: "Deliveries" },
   { key: "tasks", label: "Tasks and maintenance" },
 ];
@@ -32,13 +35,17 @@ export function feedUrl(origin: string, token: string): string {
 
 /** Does the link carry special orders at all — either layer, or 185's one key? */
 export function feedCarriesOrders(layers: readonly string[]): boolean {
-  return ["orders_paid", "orders_unpaid", "special_orders"].some((k) => layers.includes(k));
+  return ["orders_paid", "orders_unpaid", "standing_orders", "special_orders"].some((k) =>
+    layers.includes(k),
+  );
 }
 
 /** "Notes and blackouts · Paid special orders", in the menu's order. */
 export function feedLayersLabel(layers: readonly string[]): string {
-  // 185's single `special_orders` key means both order layers (187).
-  const held = layers.includes("special_orders") ? [...layers, "orders_paid", "orders_unpaid"] : layers;
+  // 185's single `special_orders` key means every order layer (187, 190).
+  const held = layers.includes("special_orders")
+    ? [...layers, "orders_paid", "orders_unpaid", "standing_orders"]
+    : layers;
   const labels = FEED_LAYERS.filter((l) => held.includes(l.key)).map((l) => l.label);
   return labels.length > 0 ? labels.join(" · ") : "Nothing";
 }

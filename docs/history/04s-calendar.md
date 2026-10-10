@@ -1,6 +1,6 @@
 # 04s — Calendar (blackout dates, layers, feeds in and out)
 
-Built 2026-10-09. Migrations 181–189, all APPLIED (187–189 on 2026-10-10); edge function
+Built 2026-10-09. Migrations 181–190, all APPLIED (187–190 on 2026-10-10); edge function
 `calendar-sync` deployed (v1, `verify_jwt: true`).
 
 Mark, 2026-10-09: "blackout dates. The idea is to create a space where the user
@@ -156,6 +156,12 @@ two Cafe Knotted standing orders, due at midnight on purpose. The lesson is the
 one in memory already — count the column before believing a "blank" story.
 And an order with an event time but no ready time is placed by its EVENT time
 (SO-10094; 7 of 75 live orders). Page and feed (189) agree.
+
+**IN THE FEED, STANDING ORDERS ARE THEIR OWN LAYER** (Mark, 2026-10-10;
+migration 190). A day with `standing_order_id` set is in `standing_orders`
+whatever its status and in neither `orders_paid` nor `orders_unpaid` — the
+Cafe Knotted days were 41 of the 83 "paid" events. THE PAGE STILL HAS TWO
+ORDER LAYERS and counts a standing day as paid; only the link was asked for.
 
 **A FEED LINK IS A CAPABILITY** (185), like the quote and pay links. Managers
 and owners only, even to read the table. It can carry entries, special orders,
