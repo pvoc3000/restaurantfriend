@@ -166,13 +166,13 @@ test("special order: no title falls back to the customer, then the number", () =
   eq(specialOrderItems([{ ...ORDER, title: null, customer: null }])[0].title, "SO-10110");
 });
 
-test("special order: a quote is unpaid, midnight is no time, one shop is said once", () => {
+test("special order: a quote is unpaid, MIDNIGHT IS A TIME, one shop is said once", () => {
   const [o] = specialOrderItems([
-    { ...ORDER, status: "quote", ready_by_time: "00:00:00", event_time: null, fulfillment: "pickup", location_id: "df01", customer: null },
+    { ...ORDER, status: "quote", ready_by_time: "00:00:00", event_time: "00:00:00", fulfillment: "pickup", location_id: "df01", customer: null },
   ]);
   eq(o.layer, "orders_unpaid");
-  eq(o.time, null);
-  eq(o.detail, "SO-10110 · Pickup");
+  eq(o.time, "00:00", "a standing order due at midnight is due at midnight");
+  eq(o.detail, "SO-10110 · Pickup · event at 12 AM");
   eq(o.locationIds, ["df01"]);
 });
 

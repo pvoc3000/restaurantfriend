@@ -366,3 +366,6 @@ the ready time, "<vendor> (<shop>)". Dry-run first, as 181–186 were.
 **188 is APPLIED** (Claude, 2026-10-10) — `color` on `calendar_entries` and
 `calendar_subscriptions`, a palette key or null. Additive. The web app selects
 the column, so 188 goes on before any deploy that includes it.
+
+**189 is APPLIED** (Claude, 2026-10-10) — in `calendar_feed_by_token`, midnight
+is a time and a blank ready time falls back to the event time.

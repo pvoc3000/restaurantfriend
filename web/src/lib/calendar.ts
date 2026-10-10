@@ -432,9 +432,17 @@ export function planItems(plans: readonly CalendarPlanRow[], range: DateRange): 
 // says them as items. Kept apart from the fetching so the wording — which is
 // all a calendar cell is — can be pinned by a fixture.
 
-/** `HH:MM`, or null for no time — and midnight is no time. */
+/**
+ * `HH:MM`, or null for no time.
+ *
+ * MIDNIGHT IS A TIME (Mark, 2026-10-10: "midnight is real"). This used to read
+ * `00:00` as "nobody entered one", on the guess that it was a FileMaker blank.
+ * It is not: all 45 live orders at midnight were days of the two Cafe Knotted
+ * standing orders, which are due at midnight on purpose, and the rule put the
+ * kitchen's first job of the night under "All day".
+ */
 function realTime(time: string | null | undefined): string | null {
-  return time && !time.startsWith("00:00") ? time.slice(0, 5) : null;
+  return time ? time.slice(0, 5) : null;
 }
 
 function shops(...ids: (string | null | undefined)[]): string[] {
@@ -480,9 +488,6 @@ export function specialOrderItems(rows: readonly CalendarOrderRow[]): CalendarIt
     layer: o.status === "order" ? "orders_paid" : "orders_unpaid",
     date: o.event_date,
     lead: o.kitchen_code,
-    // Midnight is how an order with no real time was stored (the FileMaker
-    // history is full of them): no time, not a 12 AM appointment. The feed
-    // function (185) makes the same call.
     // The ready time — or, where an order has none, the event's own. Seven of
     // 75 live orders had an event time and a blank ready time (SO-10094), and
     // drew as all-day for it; a time the kitchen was never given is still a

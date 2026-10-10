@@ -1,6 +1,6 @@
 # 04s — Calendar (blackout dates, layers, feeds in and out)
 
-Built 2026-10-09. Migrations 181–188, all APPLIED (187 and 188 on 2026-10-10); edge function
+Built 2026-10-09. Migrations 181–189, all APPLIED (187–189 on 2026-10-10); edge function
 `calendar-sync` deployed (v1, `verify_jwt: true`).
 
 Mark, 2026-10-09: "blackout dates. The idea is to create a space where the user
@@ -149,8 +149,13 @@ GRID: a day has a handful of timed things and a grid would be mostly white.
 Pressing a day in the month goes there; the pop-up day panel it replaced
 (`DayPanel`) is deleted. The date label is `DayJump`, `MonthJump`'s twin.
 
-**AN ORDER AT MIDNIGHT IS DRAWN ALL-DAY.** `event_time = 00:00` is how an order
-with no real time was stored; the calendar and the feed both treat it as none.
+**MIDNIGHT IS A TIME** (Mark, 2026-10-10: "midnight is real, remove the
+rule"). The first build drew an order at `00:00` as all-day, guessing it was a
+FileMaker blank. It was not: all 45 live orders at midnight were days of the
+two Cafe Knotted standing orders, due at midnight on purpose. The lesson is the
+one in memory already — count the column before believing a "blank" story.
+And an order with an event time but no ready time is placed by its EVENT time
+(SO-10094; 7 of 75 live orders). Page and feed (189) agree.
 
 **A FEED LINK IS A CAPABILITY** (185), like the quote and pay links. Managers
 and owners only, even to read the table. It can carry entries, special orders,
