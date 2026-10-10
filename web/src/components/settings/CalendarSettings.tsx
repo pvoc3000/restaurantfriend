@@ -666,21 +666,27 @@ function LinkDialog({ orgId, shops, onClose }: { orgId: string; shops: Shop[]; o
           <Field label="Who or what it is for" required>
             <TextInput value={label} onValueChange={setLabel} aria-label="Link label" autoFocus className="w-full" />
           </Field>
-          <fieldset className="space-y-2">
+          <fieldset>
             <legend className="mb-2 block text-[11px] uppercase tracking-[0.12em] text-subtle">
               It carries <span className="text-accent">*</span>
             </legend>
-            {FEED_LAYERS.map((l) => (
-              <Checkbox
-                key={l.key}
-                checked={layers.includes(l.key)}
-                onChange={(next) =>
-                  setLayers((prev) => (next ? [...prev, l.key] : prev.filter((k) => k !== l.key)))
-                }
-              >
-                {l.label}
-              </Checkbox>
-            ))}
+            {/* ONE PER LINE. A `ui/Checkbox` is an inline box, so a `space-y`
+                on the fieldset did nothing and the labels ran together in a
+                row (Mark, 2026-10-10). A column, in a `div` — a fieldset is
+                not a reliable flex container. */}
+            <div className="flex flex-col items-start gap-2">
+              {FEED_LAYERS.map((l) => (
+                <Checkbox
+                  key={l.key}
+                  checked={layers.includes(l.key)}
+                  onChange={(next) =>
+                    setLayers((prev) => (next ? [...prev, l.key] : prev.filter((k) => k !== l.key)))
+                  }
+                >
+                  {l.label}
+                </Checkbox>
+              ))}
+            </div>
           </fieldset>
           <Field label="Shops">
             <PickSet

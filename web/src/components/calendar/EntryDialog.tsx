@@ -320,20 +320,26 @@ export function EntryDialog({
         )}
 
         {(canSetBlackouts || blackout) && (
-          <fieldset className="space-y-2">
+          <fieldset>
             <legend className="mb-2 block text-[11px] uppercase tracking-[0.12em] text-subtle">
               On these dates
             </legend>
-            {BLACKOUT_SWITCHES.map((s) => (
-              <Checkbox
-                key={s.column}
-                checked={switches[s.column]}
-                disabled={!editable || !canSetBlackouts}
-                onChange={(next) => setSwitches((prev) => ({ ...prev, [s.column]: next }))}
-              >
-                {s.label}
-              </Checkbox>
-            ))}
+            {/* ONE PER LINE. A `ui/Checkbox` is an inline box, so a `space-y`
+                on the fieldset did nothing and the labels ran together in a
+                row (Mark, 2026-10-10). A column, in a `div` — a fieldset is
+                not a reliable flex container. */}
+            <div className="flex flex-col items-start gap-2">
+              {BLACKOUT_SWITCHES.map((s) => (
+                <Checkbox
+                  key={s.column}
+                  checked={switches[s.column]}
+                  disabled={!editable || !canSetBlackouts}
+                  onChange={(next) => setSwitches((prev) => ({ ...prev, [s.column]: next }))}
+                >
+                  {s.label}
+                </Checkbox>
+              ))}
+            </div>
           </fieldset>
         )}
 
