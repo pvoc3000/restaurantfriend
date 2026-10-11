@@ -99,6 +99,7 @@ export default async function CalendarPage({
   // Subscribed calendars whose stored copy is over an hour old (migration
   // 186). Non-empty, the page mounts `FeedRefresher`, which asks for a read.
   let stale: string[] = [];
+  let calendars: { id: string; name: string }[] = [];
   if (view !== "list") {
     const [fetched, subs, feedEvents] = await Promise.all([
       // `session.locations`, the FULL list: a lookup, not an enumeration
@@ -134,6 +135,9 @@ export default async function CalendarPage({
     }));
     if (subscriptions.length > 0) {
       layers.push("feeds");
+      calendars = subscriptions
+        .map((sub) => ({ id: sub.id, name: sub.name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
       layerItems.push(
         ...subscriptionItems((feedEvents.data ?? []) as SubscriptionEventRow[], subscriptions, range),
       );
@@ -161,6 +165,7 @@ export default async function CalendarPage({
       entries={entries}
       layerItems={layerItems}
       layerFailures={layerFailures}
+      calendars={calendars}
       layers={layers}
       locations={locations}
       shops={shops}

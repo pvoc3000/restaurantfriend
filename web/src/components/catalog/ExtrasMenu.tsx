@@ -128,16 +128,21 @@ export function ExtrasMenu({ extras }: { extras: ChooserExtras }) {
 
 /**
  * A calendar with one day marked — "things on particular days" (Mark chose it
- * from eight, 2026-10-10). The marked square is what tells it from the plain
- * calendar on every date field, which means "pick a date"; this one never
- * does. Material's `event`, filled, at the eye's 24px.
+ * from eight, 2026-10-10). The mark is what tells it from the plain calendar
+ * on every date field, which means "pick a date"; this one never does.
+ *
+ * Material Symbols' `event` at `wght300` — THE EYE'S OWN WEIGHT. It shipped as
+ * the classic filled `event`, whose 2px strokes sat visibly heavier beside the
+ * eye's 1.5 (Mark, the same day). A Material weight is a different PATH, not a
+ * stroke width, so matching a neighbour means fetching the same weight's
+ * artwork — `ColumnsIcon` says the same.
  */
 export function CalendarEventIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+    <svg width="24" height="24" viewBox="0 -960 960 960" aria-hidden="true">
       <path
         fill="currentColor"
-        d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"
+        d="M522.27-266.88q-26.88-26.89-26.88-65.43 0-38.54 26.88-65.42 26.88-26.88 65.42-26.88 38.54 0 65.43 26.88Q680-370.85 680-332.31q0 38.54-26.88 65.43Q626.23-240 587.69-240q-38.54 0-65.42-26.88ZM212.31-100Q182-100 161-121q-21-21-21-51.31v-535.38Q140-738 161-759q21-21 51.31-21h55.38v-84.61h61.54V-780h303.08v-84.61h60V-780h55.38Q778-780 799-759q21 21 21 51.31v535.38Q820-142 799-121q-21 21-51.31 21H212.31Zm0-60h535.38q4.62 0 8.46-3.85 3.85-3.84 3.85-8.46v-375.38H200v375.38q0 4.62 3.85 8.46 3.84 3.85 8.46 3.85ZM200-607.69h560v-100q0-4.62-3.85-8.46-3.84-3.85-8.46-3.85H212.31q-4.62 0-8.46 3.85-3.85 3.84-3.85 8.46v100Zm0 0V-720v112.31Z"
       />
     </svg>
   );

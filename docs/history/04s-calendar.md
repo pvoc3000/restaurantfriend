@@ -183,7 +183,11 @@ calendar-with-a-marked-day glyph Mark chose from eight) hides each kind, and
 each subscribed calendar, per person. Those options were in the eye itself for
 a day, under a heading, and moved out when the list grew a line per calendar;
 the glyph is NOT the plain calendar, which on every date field means "pick a
-date".
+date". It is Material Symbols `event` at `wght300`, the eye's own weight
+— the classic filled `event` shipped first and sat heavier beside it. The
+calendar PAGE's eye is the same `ExtrasMenu`, with the same nested
+per-calendar options (`rf.calendar.hiddenFeeds`); `PickSet`'s short-lived
+`icon` trigger is gone.
 
 **A FEED LINK IS A CAPABILITY** (185), like the quote and pay links. Managers
 and owners only, even to read the table. It can carry entries, special orders,

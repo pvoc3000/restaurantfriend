@@ -426,3 +426,15 @@ test("resolveShops turns the word into the shop you are at", () => {
   eq(resolveShops([WORKING_SHOP], null), [], "nowhere to work: every shop");
   eq(resolveShops([], "df01"), []);
 });
+
+test("one subscribed calendar can be hidden while its layer stays on", () => {
+  const items = [
+    item({ key: "a", layer: "feeds", source: "cal-a" }),
+    item({ key: "b", layer: "feeds", source: "cal-b" }),
+    item({ key: "o", layer: "orders_paid" }),
+  ];
+  eq(
+    visibleItems(items, { hiddenLayers: new Set<never>(), shops: [], hiddenSources: ["cal-b"] }).map((i) => i.key),
+    ["a", "o"],
+  );
+});

@@ -117,6 +117,7 @@ export function subscriptionItems(
         detail: [sub.name, row.place].filter(Boolean).join(" · "),
         locationIds: sub.location_ids,
         color: sub.color,
+        source: sub.id,
         span:
           row.starts_on === row.ends_on
             ? undefined

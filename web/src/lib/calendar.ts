@@ -83,6 +83,9 @@ export type CalendarItem = {
   color?: string | null;
   /** The `calendar_entries` row behind an `entries` item. */
   entryId?: string;
+  /** For a `feeds` item, the subscribed calendar it came from — so one
+   *  calendar can be hidden without the layer. */
+  source?: string;
   /**
    * Set on each day's item of something that covers MORE THAN ONE DAY: what
    * joins the days (`key`) and the thing's own first and last day, which may
@@ -199,10 +202,16 @@ export function entryItems(entries: readonly CalendarEntry[], range: DateRange):
  */
 export function visibleItems(
   items: readonly CalendarItem[],
-  show: { hiddenLayers: ReadonlySet<CalendarLayer>; shops: readonly string[] },
+  show: {
+    hiddenLayers: ReadonlySet<CalendarLayer>;
+    shops: readonly string[];
+    /** Subscribed calendars hidden one by one, by id. */
+    hiddenSources?: readonly string[];
+  },
 ): CalendarItem[] {
   return items.filter((item) => {
     if (show.hiddenLayers.has(item.layer)) return false;
+    if (item.source && show.hiddenSources?.includes(item.source)) return false;
     if (show.shops.length === 0 || item.locationIds.length === 0) return true;
     return item.locationIds.some((id) => show.shops.includes(id));
   });

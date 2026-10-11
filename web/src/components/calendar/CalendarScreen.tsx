@@ -28,6 +28,7 @@ import { useStoredSet } from "@/lib/storedSet";
 import { MonthView } from "@/components/calendar/MonthView";
 import { MonthJump } from "@/components/calendar/MonthJump";
 import { ColumnsIcon } from "@/components/catalog/ColumnsMenu";
+import { ExtrasMenu } from "@/components/catalog/ExtrasMenu";
 import { ColorSwatches } from "@/components/calendar/ColorSwatches";
 import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
 import { createClient } from "@/lib/supabase/client";
@@ -79,6 +80,7 @@ export function CalendarScreen({
   entries,
   layerItems,
   layerFailures,
+  calendars,
   layers,
   locations,
   shops,
@@ -102,6 +104,8 @@ export function CalendarScreen({
   layerItems: CalendarItem[];
   /** A layer that could not be loaded, named — the rest still draw. */
   layerFailures: string[];
+  /** The subscribed calendars, by name, so the eye can hide them one by one. */
+  calendars: { id: string; name: string }[];
   /** The layers this person may see — the menu offers these and no others. */
   layers: CalendarLayer[];
   locations: EntryLocation[];
@@ -163,6 +167,8 @@ export function CalendarScreen({
   // The OPT-IN layers (`OPT_IN_LAYERS`) are the other way round: hidden until
   // somebody turns one on, so what is stored is the ones that were.
   const [optedIn, setOptedIn] = useStoredSet("rf.calendar.shownLayers");
+  // Subscribed calendars hidden ONE BY ONE, by id (Mark, 2026-10-10).
+  const [hiddenFeeds, setHiddenFeeds] = useStoredSet("rf.calendar.hiddenFeeds");
 
   const offered = useMemo(
     () => CALENDAR_LAYERS.filter((l) => layers.includes(l.key)),
@@ -175,8 +181,6 @@ export function CalendarScreen({
     }
     return set;
   }, [hidden, optedIn, layers]);
-  // `PickSet` reads an empty value as ALL, which is exactly "nothing hidden".
-  const shownLayers = hiddenSet.size === 0 ? [] : offered.filter((l) => !hiddenSet.has(l.key)).map((l) => l.key);
 
   const range = useMemo(
     () => (view === "day" ? { from: date, to: date } : gridRange(month)),
@@ -188,9 +192,10 @@ export function CalendarScreen({
       visibleItems(all, {
         hiddenLayers: hiddenSet,
         shops: resolveShops(shopFilter, workingLocation?.id ?? null),
+        hiddenSources: hiddenFeeds,
       }),
     );
-  }, [entries, layerItems, range, hiddenSet, shopFilter, workingLocation]);
+  }, [entries, layerItems, range, hiddenSet, shopFilter, workingLocation, hiddenFeeds]);
 
   const shopCodes = useMemo(() => new Map(locations.map((l) => [l.id, l.code])), [locations]);
   const entryById = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
@@ -357,29 +362,50 @@ export function CalendarScreen({
           />
         </ControlField>
         {view !== "list" && offered.length > 1 && (
-          <PickSet
-            // THE EYE — `ColumnsMenu`'s, for the same verb: which of these to
-            // show. The key of chips under this row is what says the answer,
-            // so the trigger does not have to.
-            icon={<ColumnsIcon />}
-            options={offered.map((l) => ({ value: l.key, label: l.label }))}
-            value={shownLayers}
-            onChange={(next) => {
-              // An empty set from `PickSet` means ALL, opt-in layers too.
-              const shown = next.length === 0 ? offered.map((l) => l.key) : next;
-              setHidden(
-                offered
-                  .filter((l) => !OPT_IN_LAYERS.includes(l.key) && !shown.includes(l.key))
-                  .map((l) => l.key),
-              );
-              setOptedIn(OPT_IN_LAYERS.filter((l) => shown.includes(l)));
-            }}
-            allLabel="Everything"
-            label="What the calendar shows"
-            noun="layers"
-            align="right"
-            className="ml-auto"
-          />
+          // THE EYE — the tables' own (`ColumnsIcon`), for the same verb: which
+          // of these to show. `catalog/ExtrasMenu`, the menu the orders list's
+          // calendar button uses, so a layer and the calendars nested under
+          // "Subscribed calendars" read the same on both screens. The key of
+          // chips under this row is what says the answer.
+          <div className="ml-auto">
+            <ExtrasMenu
+              extras={{
+                label: "What the calendar shows",
+                icon: <ColumnsIcon />,
+                items: offered.flatMap((l) => {
+                  const on = !hiddenSet.has(l.key);
+                  const layer = {
+                    key: l.key,
+                    label: l.label,
+                    on,
+                    // An OPT-IN layer is stored as shown; the rest as hidden.
+                    onToggle: (next: boolean) =>
+                      OPT_IN_LAYERS.includes(l.key)
+                        ? setOptedIn(next ? [...optedIn, l.key] : optedIn.filter((k) => k !== l.key))
+                        : setHidden(next ? hidden.filter((k) => k !== l.key) : [...hidden, l.key]),
+                  };
+                  // Each subscribed calendar, nested — with two or more. With
+                  // the layer off they are shown unticked and fixed: it is the
+                  // layer that is hiding them.
+                  if (l.key !== "feeds" || calendars.length < 2) return [layer];
+                  return [
+                    layer,
+                    ...calendars.map((c) => ({
+                      key: `feed:${c.id}`,
+                      label: c.name,
+                      nested: true,
+                      disabled: !on,
+                      on: on && !hiddenFeeds.includes(c.id),
+                      onToggle: (next: boolean) =>
+                        setHiddenFeeds(
+                          next ? hiddenFeeds.filter((id) => id !== c.id) : [...hiddenFeeds, c.id],
+                        ),
+                    })),
+                  ];
+                }),
+              }}
+            />
+          </div>
         )}
       </div>
 
