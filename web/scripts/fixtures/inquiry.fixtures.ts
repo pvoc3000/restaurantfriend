@@ -11,8 +11,10 @@ import {
   EMPTY_INQUIRY,
   INQUIRY_INTEREST_OPTIONS,
   INQUIRY_REQUIRED,
+  inquiryBlackoutNotices,
   inquiryBlackoutOn,
   inquiryIsSubmittable,
+  inquiryShopFor,
   inquiryPayload,
   inquiryStateMessage,
   isRealDate,
@@ -281,9 +283,13 @@ test("the interest vocabulary is the Square form's own", () => {
 
 const BLACKOUTS: InquiryBlackouts = {
   default_location_id: "df01",
+  shop_ids: ["df01", "df02"],
   entries: [
     { starts_on: "2026-10-30", ends_on: "2026-10-31", location_ids: [] },
     { starts_on: "2026-11-03", ends_on: "2026-11-03", location_ids: ["df01"] },
+    { starts_on: "2026-11-05", ends_on: "2026-11-05", location_ids: ["df02"] },
+    { starts_on: "2026-11-07", ends_on: "2026-11-07", location_ids: ["df01"] },
+    { starts_on: "2026-11-07", ends_on: "2026-11-07", location_ids: ["df02"] },
   ],
 };
 
@@ -293,10 +299,28 @@ test("blackouts: an every-shop entry refuses the date whatever the shop", () => 
   eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-01", null), null);
 });
 
-test("blackouts: a one-shop entry refuses that shop, and no preference falls to the default shop", () => {
+test("blackouts: a NAMED shop is judged by itself", () => {
   eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-03", "df01")?.starts_on, "2026-11-03");
   eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-03", "df02"), null, "another shop is open");
-  eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-03", null)?.starts_on, "2026-11-03", "no preference");
+});
+
+test("blackouts: NO PREFERENCE goes to the shop that is open, and is refused only when none is", () => {
+  // DF01 off: not refused — the inquiry goes to DF02.
+  eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-03", null), null);
+  eq(inquiryShopFor(BLACKOUTS, "2026-11-03"), "df02");
+  // DF02 off: stays at the default.
+  eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-05", null), null);
+  eq(inquiryShopFor(BLACKOUTS, "2026-11-05"), "df01");
+  // An ordinary day: the default.
+  eq(inquiryShopFor(BLACKOUTS, "2026-11-04"), "df01");
+  // Both off, by two separate entries: refused.
+  eq(inquiryShopFor(BLACKOUTS, "2026-11-07"), null);
+  ok(inquiryBlackoutOn(BLACKOUTS, "2026-11-07", null), "every shop is off");
+});
+
+test("blackouts: the up-front notice lists what applies — for no shop, only what closes them all", () => {
+  eq(inquiryBlackoutNotices(BLACKOUTS, null).map((e) => e.starts_on), ["2026-10-30"]);
+  eq(inquiryBlackoutNotices(BLACKOUTS, "df02").map((e) => e.starts_on), ["2026-10-30", "2026-11-05", "2026-11-07"]);
 });
 
 test("blackouts: a typed date is refused under the field — the date, never the reason", () => {
@@ -316,7 +340,7 @@ test("blackouts: the gate's refusal has its own words", () => {
 });
 
 test("blackouts: a malformed answer is no blackouts, never a crash", () => {
-  eq(readInquiryBlackouts(null), { default_location_id: null, entries: [] });
+  eq(readInquiryBlackouts(null), { default_location_id: null, shop_ids: [], entries: [] });
   eq(readInquiryBlackouts([]).entries, []);
   eq(
     readInquiryBlackouts({
@@ -329,6 +353,7 @@ test("blackouts: a malformed answer is no blackouts, never a crash", () => {
     }),
     {
       default_location_id: "df01",
+      shop_ids: [],
       // A title in the answer (a function older than 191) is DROPPED on the way in.
       entries: [{ starts_on: "2026-01-01", ends_on: "2026-01-01", location_ids: [] }],
     },

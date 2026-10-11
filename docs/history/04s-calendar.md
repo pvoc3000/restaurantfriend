@@ -1,6 +1,6 @@
 # 04s — Calendar (blackout dates, layers, feeds in and out)
 
-Built 2026-10-09. Migrations 181–191, all APPLIED (187–191 on 2026-10-10); edge function
+Built 2026-10-09. Migrations 181–192, all APPLIED (187–192 on 2026-10-10); edge function
 `calendar-sync` deployed (v1, `verify_jwt: true`).
 
 Mark, 2026-10-09: "blackout dates. The idea is to create a space where the user
@@ -79,8 +79,14 @@ title is "for internal use only"). The first build sent each entry's title to
 first real entry was "Large Knotted Order". 191 removes the title from
 `inquiry_blackouts`, the message is "We're sorry, but we are not taking special
 orders for <date>.", and it shows the moment a refused date is in the box
-rather than after Submit. A blackout for ONE shop does not apply to a
-"No preference" inquiry, which falls to the default shop.
+rather than after Submit. 
+**A "NO PREFERENCE" INQUIRY GOES TO THE SHOP THAT IS TAKING ORDERS** (Mark,
+2026-10-10; migration 192). With no shop named, `create_inquiry` sends the lead
+to the first open shop NOT blacked out that day — priced and taxed there, with
+that shop as pickup shop and kitchen — and refuses only when every shop is. A
+NAMED shop (a pickup's choice, a delivery's nearest) is still judged by itself.
+`inquiry_blackouts` returns `shop_ids` so the form makes the same call
+(`lib/inquiry.inquiryShopFor`) and prices the basket at the shop it will go to.
 
 **183 TESTS `exists` BEFORE THE BLACKOUT**, the reverse of the plan: a day made
 before the entry was written is an order that exists, and reporting it as
@@ -262,8 +268,10 @@ feed asks for.
   and the address being unreadable by an owner. Then applied.
 - **One order number was consumed by the dry run.** A control inquiry returned
   `created`; the rows rolled back but `special_order_number_seq` did not, so
-  SO-10122 will never be issued. Do not call `create_inquiry` or the
-  materializer's creating path in a dry run again.
+  SO-10122 will never be issued. 192's dry run shows how to do it safely:
+  `create or replace` `special_order_number_for` INSIDE the transaction to
+  return a fixed string — DDL rolls back with everything else — and assert
+  the sequence's `last_value` did not move.
 - `/inquiry`, signed out, in the browser: the notice, the greyed days per shop,
   and a typed date refused under the field.
 - The feed, with curl: 200 `text/calendar`, 272 events, no line over 75 octets,

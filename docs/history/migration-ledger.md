@@ -375,3 +375,6 @@ made from a standing order their own `standing_orders` layer.
 
 **191 is APPLIED** (Claude, 2026-10-10) — `inquiry_blackouts` no longer returns
 an entry's title; it is internal.
+
+**192 is APPLIED** (Claude, 2026-10-10) — a no-preference inquiry goes to the
+first shop not blacked out that day; `inquiry_blackouts` returns `shop_ids`.

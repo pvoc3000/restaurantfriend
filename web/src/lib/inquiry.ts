@@ -61,6 +61,9 @@ export type InquiryState =
  */
 export type InquiryBlackouts = {
   default_location_id: string | null;
+  /** Every shop an inquiry can go to, in the order `create_inquiry` tries them
+   *  (migration 192). Empty from a function older than that. */
+  shop_ids: string[];
   entries: InquiryBlackout[];
 };
 
@@ -71,15 +74,22 @@ export type InquiryBlackout = {
   location_ids: string[];
 };
 
-export const NO_INQUIRY_BLACKOUTS: InquiryBlackouts = { default_location_id: null, entries: [] };
+export const NO_INQUIRY_BLACKOUTS: InquiryBlackouts = {
+  default_location_id: null,
+  shop_ids: [],
+  entries: [],
+};
 
 /** Read the RPC's jsonb defensively — a malformed answer is no blackouts. */
 export function readInquiryBlackouts(data: unknown): InquiryBlackouts {
   if (!data || typeof data !== "object") return NO_INQUIRY_BLACKOUTS;
-  const raw = data as { default_location_id?: unknown; entries?: unknown };
+  const raw = data as { default_location_id?: unknown; shop_ids?: unknown; entries?: unknown };
   const entries = Array.isArray(raw.entries) ? raw.entries : [];
   return {
     default_location_id: typeof raw.default_location_id === "string" ? raw.default_location_id : null,
+    shop_ids: Array.isArray(raw.shop_ids)
+      ? raw.shop_ids.filter((id): id is string => typeof id === "string")
+      : [],
     entries: entries.flatMap((e): InquiryBlackout[] => {
       const r = (e ?? {}) as Record<string, unknown>;
       if (typeof r.starts_on !== "string" || typeof r.ends_on !== "string") return [];
@@ -96,19 +106,61 @@ export function readInquiryBlackouts(data: unknown): InquiryBlackouts {
   };
 }
 
+/** The shops a no-preference inquiry can go to, default first. */
+function candidateShops(blackouts: InquiryBlackouts): string[] {
+  if (blackouts.shop_ids.length > 0) return blackouts.shop_ids;
+  return blackouts.default_location_id ? [blackouts.default_location_id] : [];
+}
+
 /**
- * The entry that refuses `date` for an inquiry made at `locationId`, or null.
+ * The shop a "No preference" inquiry for `date` goes to: the first that is NOT
+ * blacked out that day, or null when every one is (Mark, 2026-10-10: "a
+ * blackout at either shop should set the location of the inquiry to the other
+ * shop automatically"). `create_inquiry` makes the same choice (migration 192).
+ */
+export function inquiryShopFor(blackouts: InquiryBlackouts, date: string): string | null {
+  const shops = candidateShops(blackouts);
+  // No shop list at all: nothing to route between, so only an every-shop
+  // entry can refuse the date.
+  if (shops.length === 0) return coveringEntry(blackouts.entries, date, []) ? null : "";
+  return shops.find((id) => coveringEntry(blackouts.entries, date, [id]) === null) ?? null;
+}
+
+/**
+ * The entry that refuses `date` for this inquiry, or null.
  *
- * `locationId` is the shop the customer chose (a pickup) or the one their
- * delivery was measured from; with neither, the inquiry falls to
- * `default_location_id`, exactly as `create_inquiry` resolves it (182).
+ * A NAMED shop (`locationId` — the pickup shop chosen, or the shop a delivery
+ * was measured from) is judged by itself: the customer asked for it. With no
+ * shop named the date is refused only when EVERY shop is blacked out, because
+ * the inquiry would simply go to one that is not.
  */
 export function inquiryBlackoutOn(
   blackouts: InquiryBlackouts,
   date: string,
   locationId: string | null,
 ): InquiryBlackout | null {
-  return coveringEntry(blackouts.entries, date, [locationId ?? blackouts.default_location_id]);
+  if (locationId) return coveringEntry(blackouts.entries, date, [locationId]);
+  if (inquiryShopFor(blackouts, date) !== null) return null;
+  const first = candidateShops(blackouts)[0];
+  return coveringEntry(blackouts.entries, date, first ? [first] : []);
+}
+
+/**
+ * The stretches of days to WARN about up front, for this shop or for none.
+ * With no shop named, only what blacks out every shop — an entry for all of
+ * them. (Two one-shop entries that happen to overlap still grey the calendar,
+ * through `inquiryBlackoutOn`; they are just not worth a sentence.)
+ */
+export function inquiryBlackoutNotices(
+  blackouts: InquiryBlackouts,
+  locationId: string | null,
+): InquiryBlackout[] {
+  const shops = candidateShops(blackouts);
+  return blackouts.entries.filter((e) =>
+    locationId
+      ? e.location_ids.length === 0 || e.location_ids.includes(locationId)
+      : e.location_ids.length === 0 || (shops.length > 0 && shops.every((id) => e.location_ids.includes(id))),
+  );
 }
 
 export type InquiryFulfillment = "pickup" | "delivery";

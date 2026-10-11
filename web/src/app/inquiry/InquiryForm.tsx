@@ -5,10 +5,12 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { DateField } from "@/components/ui/DateField";
 import { TimePicker } from "@/components/ui/TimePicker";
 import { createClient } from "@/lib/supabase/client";
-import { entryAppliesTo, entryDates } from "@/lib/blackoutDates";
+import { entryDates } from "@/lib/blackoutDates";
 import {
   EMPTY_INQUIRY,
+  inquiryBlackoutNotices,
   inquiryBlackoutOn,
+  inquiryShopFor,
   inquiryPayload,
   inquiryStateMessage,
   NO_INQUIRY_BLACKOUTS,
@@ -115,10 +117,15 @@ export function InquiryForm({ orgId }: { orgId: string }) {
   // measured from, or — with neither yet — the org's default, which is what
   // `create_inquiry` falls to. So the calendar greys out exactly the days the
   // gate would refuse, and changing the shop can change them.
+  //
+  // WITH NO SHOP NAMED the inquiry goes to whichever shop IS taking orders that
+  // day (migration 192), so a date is refused only when every shop is off —
+  // and the basket is priced at the shop it will actually go to.
   const unavailable = (date: string) => inquiryBlackoutOn(blackouts, date, priceLocation);
-  const upcomingBlackouts = blackouts.entries
-    .filter((e) => entryAppliesTo(e, [priceLocation ?? blackouts.default_location_id]))
-    .slice(0, 6);
+  const upcomingBlackouts = inquiryBlackoutNotices(blackouts, priceLocation).slice(0, 6);
+  const routedShop =
+    !priceLocation && draft.eventDate ? inquiryShopFor(blackouts, draft.eventDate) || null : null;
+  const menuLocation = priceLocation ?? routedShop;
 
   const errors: InquiryErrors = validateInquiry(draft, unavailable);
   // A blacked-out date is refused THE MOMENT IT IS IN THE BOX, not after
@@ -217,7 +224,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
       const supabase = createClient();
       const { data, error } = await supabase.rpc("inquiry_menu", {
         p_org_id: orgId,
-        p_location_id: priceLocation,
+        p_location_id: menuLocation,
       });
       if (cancelled) return;
       if (error) {
@@ -234,7 +241,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [orgId, priceLocation]);
+  }, [orgId, menuLocation]);
 
   /** Ask `inquiry-delivery-quote` what delivery to this address comes to. On
    *  BLUR, not per keystroke: every call is a paid maps lookup. */
