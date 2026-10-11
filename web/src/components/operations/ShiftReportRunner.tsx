@@ -503,7 +503,11 @@ export function ShiftReportRunner({
           If this surface ever wants a genuinely fixed banner the answer is a
           DEFINITE height on the shell (`h-dvh`, not `h-screen`), and the
           `overflow-y-auto` comes back at the same time. */}
-      <main className="flex-1 px-6 py-8 text-[16px]">
+      {/* The Report page's text fills what is left of the window, so on that
+          page alone this is a flex column for it to grow in. */}
+      <main
+        className={`flex-1 px-6 py-8 text-[16px] ${page.key === "report" ? "flex flex-col" : ""}`}
+      >
         {busy ? <ProgressBand label={busy} /> : null}
         {failed ? (
           <p className="mb-6 border border-accent px-4 py-3 text-sm text-accent">{failed}</p>

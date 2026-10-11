@@ -149,6 +149,7 @@ export function ProseField({
   rows = 14,
   disabled = false,
   ink = false,
+  fill = false,
 }: {
   value: string | null;
   onCommit: (next: string | null) => void;
@@ -158,6 +159,8 @@ export function ProseField({
   disabled?: boolean;
   /** A black edge at rest — see `boxBorder`. */
   ink?: boolean;
+  /** Grow to the height of a flex-column parent; `rows` is then the least. */
+  fill?: boolean;
 }) {
   const [draft, setDraft] = useState(value ?? "");
   const [seen, setSeen] = useState(value);
@@ -195,9 +198,9 @@ export function ProseField({
   }, [next, saved, onCommit]);
 
   return (
-    <div className="space-y-1">
+    <div className={fill ? "flex flex-1 flex-col gap-1" : "space-y-1"}>
       <textarea
-        className={`${BOX} ${boxBorder(ink)} py-3 leading-relaxed`}
+        className={`${BOX} ${boxBorder(ink)} py-3 leading-relaxed ${fill ? "flex-1" : ""}`}
         rows={rows}
         value={draft}
         aria-label={ariaLabel}

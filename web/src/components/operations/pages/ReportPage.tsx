@@ -42,7 +42,7 @@ export function ReportPage({
   );
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="flex flex-1 flex-col gap-4">
       <div className="text-center">
         <p className="text-[16px] font-bold uppercase tracking-[0.08em]">How was the shift?</p>
         <p className="text-sm font-semibold italic">
@@ -54,6 +54,7 @@ export function ReportPage({
         onCommit={save}
         disabled={!editable}
         ink
+        fill
         ariaLabel="How was the shift"
       />
     </div>
