@@ -20,9 +20,8 @@ type Settings = Record<string, unknown>;
  * supervisor's and the numbers are the shop's — and a template box over HTML
  * tables would be a way to break the layout rather than a way to set the tone.
  *
- * So the one thing genuinely configurable is WHERE REPLIES GO. The mailbox in
- * force is stated at the top of the Internal tab, with the other senders
- * (`SpecialOrderSettings`, "Where these are sent from"). If a covering sentence is ever wanted at the top of
+ * So the one thing genuinely configurable is WHERE REPLIES GO, plus a statement
+ * of the mailbox in force. If a covering sentence is ever wanted at the top of
  * the report, that is the moment to add a template — one key, and this block
  * already has the shape for it.
  *
@@ -51,6 +50,11 @@ export function ShiftReportSettings({
   editable: boolean;
 }) {
   const shift = (settings.shift_report ?? {}) as Settings;
+  const provider = (shift.email_provider ?? settings.email_provider ?? null) as {
+    kind?: string;
+    from?: string;
+    secret_ref?: string;
+  } | null;
   const billing = (settings.billing ?? {}) as Settings;
 
   return (
@@ -58,6 +62,18 @@ export function ShiftReportSettings({
       <SectionHeading>Shift reports</SectionHeading>
 
       <dl className="max-w-[min(42rem,max(24rem,50%))] space-y-3">
+        <div className="grid grid-cols-[10rem_1fr] items-baseline gap-x-6">
+          <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+            Sent from
+          </dt>
+          <dd className="text-sm">
+            {provider?.from ?? "the app's own default sender"}
+            {provider?.kind ? (
+              <span className="text-muted"> · {provider.kind}</span>
+            ) : null}
+          </dd>
+        </div>
+
         <div className="grid grid-cols-[10rem_1fr] items-baseline gap-x-6">
           <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
             Replies go to

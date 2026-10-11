@@ -242,10 +242,6 @@ export function SpecialOrderSettings({
 }) {
   const so = (settings.special_orders ?? {}) as Record<string, unknown>;
   const provider = (so.email_provider ?? {}) as Record<string, unknown>;
-  const shiftProvider = ((settings.shift_report as Record<string, unknown> | undefined)
-    ?.email_provider ??
-    settings.email_provider ??
-    {}) as Record<string, unknown>;
   const emails = (so.email ?? {}) as Record<string, { subject?: string; body?: string }>;
   const fulfillmentNotes = (so.fulfillment_note ?? {}) as Record<string, unknown>;
   const squarePay = (settings.square_payments ?? {}) as Record<string, unknown>;
@@ -291,17 +287,6 @@ export function SpecialOrderSettings({
             {provider.kind ? String(provider.kind) : "the app's default"}
             {provider.secret_ref ? ` · ${String(provider.secret_ref)}` : ""}
           </dd>
-          {/* The shift report's own mailbox, up here with the others rather
-              than down in its section (Mark, 2026-10-10). */}
-          {messagesTab === "internal" ? (
-            <>
-              <dt className="py-0.5 text-subtle">Shift reports from</dt>
-              <dd className="py-0.5">
-                {String(shiftProvider.from ?? "the app's own default sender")}
-                {shiftProvider.kind ? ` · ${String(shiftProvider.kind)}` : ""}
-              </dd>
-            </>
-          ) : null}
         </dl>
         <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
           Not editable here, on purpose. The credential behind this lives in the
