@@ -968,7 +968,16 @@ export function SpecialOrdersList({
     return (
       <ul>
         {marks.map((m) => (
-          <li key={m.key} className={`truncate px-3 py-1 text-xs font-medium ${m.className}`}>
+          <li
+            key={m.key}
+            // A BLACKOUT'S BAND IS DARK AND SO IS THE DAY HEADER ABOVE IT, so
+            // it wears a white border (Mark, 2026-10-10) — inset, or the two
+            // read as one tall black bar. `border-transparent` on the rest
+            // keeps every band's text on the same line.
+            className={`truncate border px-3 py-1 text-xs font-medium ${
+              m.blackout ? "border-white" : "border-transparent"
+            } ${m.className}`}
+          >
             {m.text}
           </li>
         ))}
