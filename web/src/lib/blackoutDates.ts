@@ -176,6 +176,26 @@ export function monthDay(iso: string): string {
   return `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}`;
 }
 
+const MONTHS_LONG = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** "December 25, 2026" — a date said in full, for a sentence a customer reads. */
+export function spokenDate(iso: string): string {
+  return `${MONTHS_LONG[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}, ${iso.slice(0, 4)}`;
+}
+
 /** "Dec 25", "Nov 26–27", or "Dec 31 – Jan 1" across a month end. */
 export function entryDates(entry: Dated): string {
   if (entry.starts_on === entry.ends_on) return monthDay(entry.starts_on);

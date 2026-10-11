@@ -121,7 +121,17 @@ export function InquiryForm({ orgId }: { orgId: string }) {
     .slice(0, 6);
 
   const errors: InquiryErrors = validateInquiry(draft, unavailable);
-  const shown: InquiryErrors = touched ? errors : {};
+  // A blacked-out date is refused THE MOMENT IT IS IN THE BOX, not after
+  // Submit like the other fields: the calendar will not let it be picked, so
+  // the only way it gets there is by typing, and somebody who typed it should
+  // be told before they fill in the rest of the form.
+  const dateRefused =
+    draft.eventDate && unavailable(draft.eventDate) !== null ? errors.eventDate : undefined;
+  const shown: InquiryErrors = touched
+    ? errors
+    : dateRefused
+      ? { eventDate: dateRefused }
+      : {};
 
   const empty = basketIsEmpty(basket);
   const lines = useMemo(() => basketLines(basket, menu), [basket, menu]);
@@ -474,9 +484,9 @@ export function InquiryForm({ orgId }: { orgId: string }) {
           <p className="border-l-2 border-mark pl-3 text-[14px] leading-relaxed text-muted">
             We’re not taking special orders for{" "}
             {upcomingBlackouts.map((e, i) => (
-              <span key={`${e.starts_on}:${e.title}`}>
+              <span key={`${e.starts_on}:${e.ends_on}:${i}`}>
                 {i > 0 && (i === upcomingBlackouts.length - 1 ? " or " : ", ")}
-                <span className="whitespace-nowrap">{entryDates(e)}</span> ({e.title})
+                <span className="whitespace-nowrap">{entryDates(e)}</span>
               </span>
             ))}
             .

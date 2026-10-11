@@ -345,11 +345,6 @@ export function EntryDialog({
           </fieldset>
         )}
 
-        {switches.no_special_orders && (
-          <p className="max-w-[60ch] text-sm text-muted">
-            The inquiry form shows the title to customers.
-          </p>
-        )}
         {shown && shown.orders + shown.schedules > 0 && (
           <p className="border border-ink bg-mark-fill px-3 py-2 text-sm text-ink">
             {existingSentence(shown)}

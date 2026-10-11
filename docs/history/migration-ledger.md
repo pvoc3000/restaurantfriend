@@ -372,3 +372,6 @@ is a time and a blank ready time falls back to the event time.
 
 **190 is APPLIED** (Claude, 2026-10-10) — `calendar_feed_by_token` gives days
 made from a standing order their own `standing_orders` layer.
+
+**191 is APPLIED** (Claude, 2026-10-10) — `inquiry_blackouts` no longer returns
+an entry's title; it is internal.

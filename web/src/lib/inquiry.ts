@@ -17,7 +17,7 @@
  * pins that one.
  */
 
-import { coveringEntry } from "./blackoutDates";
+import { coveringEntry, spokenDate } from "./blackoutDates";
 
 /** Every state `create_inquiry` can answer with, and the two the transport can
  *  add. The page never composes a sentence from a code — see
@@ -54,8 +54,10 @@ export type InquiryState =
   | "date_unavailable";
 
 /**
- * What `inquiry_blackouts` (181) hands the public form: the dates no special
- * order is taken, and the shop an inquiry falls to when none is named.
+ * What `inquiry_blackouts` hands the public form: the dates no special order
+ * is taken, and the shop an inquiry falls to when none is named. DATES AND
+ * SHOPS ONLY — the entry's title is internal and has not left the database
+ * since migration 191.
  */
 export type InquiryBlackouts = {
   default_location_id: string | null;
@@ -63,7 +65,6 @@ export type InquiryBlackouts = {
 };
 
 export type InquiryBlackout = {
-  title: string;
   starts_on: string;
   ends_on: string;
   /** Empty means every shop. */
@@ -81,12 +82,9 @@ export function readInquiryBlackouts(data: unknown): InquiryBlackouts {
     default_location_id: typeof raw.default_location_id === "string" ? raw.default_location_id : null,
     entries: entries.flatMap((e): InquiryBlackout[] => {
       const r = (e ?? {}) as Record<string, unknown>;
-      if (typeof r.title !== "string" || typeof r.starts_on !== "string" || typeof r.ends_on !== "string") {
-        return [];
-      }
+      if (typeof r.starts_on !== "string" || typeof r.ends_on !== "string") return [];
       return [
         {
-          title: r.title,
           starts_on: r.starts_on,
           ends_on: r.ends_on,
           location_ids: Array.isArray(r.location_ids)
@@ -292,8 +290,11 @@ export function validateInquiry(
     errors.eventDate = "That date doesn’t exist.";
   } else if (unavailable?.(draft.eventDate)) {
     // The calendar greys these days out, but a date can be typed.
-    const entry = unavailable(draft.eventDate)!;
-    errors.eventDate = `We’re not taking special orders for that date (${entry.title}).`;
+    //
+    // THE DATE, NEVER THE REASON (Mark, 2026-10-10: the blackout's title is
+    // "for internal use only"). "Staff retreat" or "Short-handed" is ours to
+    // know; the customer is owed the fact and nothing else.
+    errors.eventDate = `We’re sorry, but we are not taking special orders for ${spokenDate(draft.eventDate)}.`;
   }
   if (!draft.eventTime.trim()) {
     errors.eventTime = "Choose a time.";
@@ -376,8 +377,8 @@ export function inquiryStateMessage(state: InquiryState | string): {
     case "date_unavailable":
       return {
         ok: false,
-        title: "We’re not taking special orders for that date",
-        body: "Go back and choose another day, or email us if that date is the only one that works.",
+        title: "We’re sorry, but we are not taking special orders for that date",
+        body: "Go back and choose another day.",
       };
     case "time_required":
       return { ok: false, title: "What time do you need it?", body: "Choose a time." };

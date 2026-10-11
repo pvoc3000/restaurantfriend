@@ -1,6 +1,6 @@
 # 04s — Calendar (blackout dates, layers, feeds in and out)
 
-Built 2026-10-09. Migrations 181–190, all APPLIED (187–190 on 2026-10-10); edge function
+Built 2026-10-09. Migrations 181–191, all APPLIED (187–191 on 2026-10-10); edge function
 `calendar-sync` deployed (v1, `verify_jwt: true`).
 
 Mark, 2026-10-09: "blackout dates. The idea is to create a space where the user
@@ -72,6 +72,15 @@ about is the one the inquiry would be MADE at — the pickup shop, the shop a
 delivery was measured from, or `inquiry_price_location(org, null)` when neither
 is known — and `inquiry_blackouts` returns that default shop so the form greys
 out exactly the days `create_inquiry` refuses.
+
+**THE CUSTOMER IS TOLD THE DATE, NEVER THE REASON** (Mark, 2026-10-10: the
+title is "for internal use only"). The first build sent each entry's title to
+`/inquiry` and printed it, reading "Closed for Christmas" as customer copy; the
+first real entry was "Large Knotted Order". 191 removes the title from
+`inquiry_blackouts`, the message is "We're sorry, but we are not taking special
+orders for <date>.", and it shows the moment a refused date is in the box
+rather than after Submit. A blackout for ONE shop does not apply to a
+"No preference" inquiry, which falls to the default shop.
 
 **183 TESTS `exists` BEFORE THE BLACKOUT**, the reverse of the plan: a day made
 before the entry was written is an order that exists, and reporting it as

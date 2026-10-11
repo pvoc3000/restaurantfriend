@@ -282,28 +282,28 @@ test("the interest vocabulary is the Square form's own", () => {
 const BLACKOUTS: InquiryBlackouts = {
   default_location_id: "df01",
   entries: [
-    { title: "Closed for Halloween", starts_on: "2026-10-30", ends_on: "2026-10-31", location_ids: [] },
-    { title: "Floor refinishing", starts_on: "2026-11-03", ends_on: "2026-11-03", location_ids: ["df01"] },
+    { starts_on: "2026-10-30", ends_on: "2026-10-31", location_ids: [] },
+    { starts_on: "2026-11-03", ends_on: "2026-11-03", location_ids: ["df01"] },
   ],
 };
 
 test("blackouts: an every-shop entry refuses the date whatever the shop", () => {
-  eq(inquiryBlackoutOn(BLACKOUTS, "2026-10-31", "df02")?.title, "Closed for Halloween");
-  eq(inquiryBlackoutOn(BLACKOUTS, "2026-10-31", null)?.title, "Closed for Halloween");
+  eq(inquiryBlackoutOn(BLACKOUTS, "2026-10-31", "df02")?.starts_on, "2026-10-30");
+  eq(inquiryBlackoutOn(BLACKOUTS, "2026-10-31", null)?.starts_on, "2026-10-30");
   eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-01", null), null);
 });
 
 test("blackouts: a one-shop entry refuses that shop, and no preference falls to the default shop", () => {
-  eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-03", "df01")?.title, "Floor refinishing");
+  eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-03", "df01")?.starts_on, "2026-11-03");
   eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-03", "df02"), null, "another shop is open");
-  eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-03", null)?.title, "Floor refinishing", "no preference");
+  eq(inquiryBlackoutOn(BLACKOUTS, "2026-11-03", null)?.starts_on, "2026-11-03", "no preference");
 });
 
-test("blackouts: a typed date is refused under the field, by name", () => {
+test("blackouts: a typed date is refused under the field — the date, never the reason", () => {
   const unavailable = (date: string) => inquiryBlackoutOn(BLACKOUTS, date, null);
   eq(
     validateInquiry(full({ eventDate: "2026-10-30" }), unavailable).eventDate,
-    "We’re not taking special orders for that date (Closed for Halloween).",
+    "We’re sorry, but we are not taking special orders for October 30, 2026.",
   );
   eq(validateInquiry(full({ eventDate: "2026-10-29" }), unavailable), {});
   eq(validateInquiry(full({ eventDate: "2026-10-30" })), {}, "no list, no refusal here");
@@ -312,7 +312,7 @@ test("blackouts: a typed date is refused under the field, by name", () => {
 test("blackouts: the gate's refusal has its own words", () => {
   const m = inquiryStateMessage("date_unavailable");
   no(m.ok);
-  eq(m.title, "We’re not taking special orders for that date");
+  eq(m.title, "We’re sorry, but we are not taking special orders for that date");
 });
 
 test("blackouts: a malformed answer is no blackouts, never a crash", () => {
@@ -321,11 +321,16 @@ test("blackouts: a malformed answer is no blackouts, never a crash", () => {
   eq(
     readInquiryBlackouts({
       default_location_id: "df01",
-      entries: [{ title: "X", starts_on: "2026-01-01", ends_on: "2026-01-01" }, { title: 3 }, null],
+      entries: [
+        { title: "Internal reason", starts_on: "2026-01-01", ends_on: "2026-01-01" },
+        { starts_on: 3 },
+        null,
+      ],
     }),
     {
       default_location_id: "df01",
-      entries: [{ title: "X", starts_on: "2026-01-01", ends_on: "2026-01-01", location_ids: [] }],
+      // A title in the answer (a function older than 191) is DROPPED on the way in.
+      entries: [{ starts_on: "2026-01-01", ends_on: "2026-01-01", location_ids: [] }],
     },
   );
 });
