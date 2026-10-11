@@ -223,6 +223,13 @@ export default async function SettingsPage({
                     href: messagesTabHref(t),
                   }))}
                 />
+                {/* Shift reports lead the Internal tab (Mark, 2026-10-10). The
+                    padding makes this gap the 64px the sections below keep. */}
+                {messagesTab === "internal" && (
+                  <div className="pb-10">
+                    <ShiftReportSettings settings={settings} editable={editable} />
+                  </div>
+                )}
                 <SpecialOrderSettings
                   orgId={orgId}
                   settings={settings}
@@ -231,11 +238,6 @@ export default async function SettingsPage({
                   messagesTab={messagesTab}
                 />
               </div>
-              {messagesTab === "internal" && (
-                <div className="border-t border-hairline pt-8">
-                  <ShiftReportSettings settings={settings} editable={editable} />
-                </div>
-              )}
             </>
           )}
           {tab === "accounting" && (
