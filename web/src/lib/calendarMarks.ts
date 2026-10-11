@@ -21,8 +21,36 @@ import { daysAfter } from "./today";
 import { chipClass, type LayerColors } from "./calendarColors";
 import type { CalendarSubscription, SubscriptionEventRow } from "./calendarFeeds";
 
+/** What a mark IS — the three things the orders list's eye can hide. */
+export type DayMarkKind = "blackout" | "note" | "feed";
+
+/** In the order the eye lists them. */
+export const DAY_MARK_KINDS: readonly { key: DayMarkKind; label: string }[] = [
+  { key: "blackout", label: "Blackout dates" },
+  { key: "note", label: "Notes" },
+  { key: "feed", label: "Subscribed calendars" },
+];
+
+/**
+ * The marks left after some kinds are hidden — days with none left are
+ * dropped, so a day shown only for a hidden note stops being a day at all.
+ */
+export function visibleMarks(
+  marks: Readonly<Record<string, DayMark[]>>,
+  hidden: readonly string[],
+): Record<string, DayMark[]> {
+  if (hidden.length === 0) return { ...marks };
+  const out: Record<string, DayMark[]> = {};
+  for (const [date, list] of Object.entries(marks)) {
+    const kept = list.filter((m) => !hidden.includes(m.kind));
+    if (kept.length > 0) out[date] = kept;
+  }
+  return out;
+}
+
 export type DayMark = {
   key: string;
+  kind: DayMarkKind;
   /** "Closed for Christmas — No special orders · Shop closed (DF01)". */
   text: string;
   /** The calendar's chip for it: fill and type together. */
@@ -98,6 +126,7 @@ export function dayMarks(input: {
         text: `${entry.title}${what ? ` — ${what}` : ""}${where}`,
         className: chipClass({ layer: "entries", blackout, color: entry.color }, input.colors),
         blackout,
+        kind: blackout ? "blackout" : "note",
         order: `${blackout ? "0" : "1"}:${entry.title}`,
       });
     }
@@ -113,13 +142,20 @@ export function dayMarks(input: {
         text: `${time ? `${clockTime(time)} ` : ""}${event.title} · ${sub.name}`,
         className: chipClass({ layer: "feeds", color: sub.color }, input.colors),
         blackout: false,
+        kind: "feed",
         order: `2:${time ?? "99:99"}:${event.title}`,
       });
     }
 
     if (marks.length > 0) {
       marks.sort((a, b) => a.order.localeCompare(b.order, undefined, { numeric: true }));
-      out[date] = marks.map(({ key, text, className, blackout }) => ({ key, text, className, blackout }));
+      out[date] = marks.map(({ key, kind, text, className, blackout }) => ({
+        key,
+        kind,
+        text,
+        className,
+        blackout,
+      }));
     }
   }
   return out;

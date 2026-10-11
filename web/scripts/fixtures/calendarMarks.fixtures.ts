@@ -5,7 +5,7 @@
 // two; and sorting by title alone puts a note above the closure it sits under.
 
 import { test, eq, ok } from "./harness";
-import { dayMarks, gapDates, markedDates } from "../../src/lib/calendarMarks";
+import { dayMarks, gapDates, markedDates, visibleMarks } from "../../src/lib/calendarMarks";
 import { BLACKOUT_CHIP, colorChip } from "../../src/lib/calendarColors";
 import type { CalendarEntry } from "../../src/lib/blackoutDates";
 
@@ -108,4 +108,23 @@ test("gapDates: strictly between the neighbours, in the list's direction", () =>
   eq(gapDates(marked, "2026-12-26", "2026-12-20", "desc"), ["2026-12-25", "2026-12-24"], "descending");
   eq(gapDates(marked, null, "2026-12-26", "desc"), ["2026-12-31"]);
   eq(gapDates(marked, "2026-12-24", "2026-12-25", "asc"), []);
+});
+
+/* -- hiding a kind ------------------------------------------------------- */
+
+test("hiding a kind drops its marks, and a day left with none stops being a day", () => {
+  const marks = dayMarks({
+    ...BASE,
+    dates: ["2026-12-24", "2026-12-25"],
+    entries: [
+      entry({ id: "b", title: "Closed", shop_closed: true }),
+      entry({ id: "n", title: "Note", starts_on: "2026-12-24", ends_on: "2026-12-25" }),
+    ],
+  });
+  eq(marks["2026-12-25"].map((m) => m.kind), ["blackout", "note"]);
+  eq(Object.keys(visibleMarks(marks, [])).sort(), ["2026-12-24", "2026-12-25"]);
+  const noNotes = visibleMarks(marks, ["note"]);
+  eq(Object.keys(noNotes), ["2026-12-25"], "the 24th had only the note");
+  eq(noNotes["2026-12-25"].map((m) => m.kind), ["blackout"]);
+  eq(visibleMarks(marks, ["note", "blackout", "feed"]), {});
 });

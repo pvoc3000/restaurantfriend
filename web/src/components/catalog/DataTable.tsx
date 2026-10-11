@@ -38,7 +38,7 @@ import {
   STICKY_TOTALS_ROW,
 } from "@/lib/tableHead";
 import { ColumnHeader } from "./ColumnHeader";
-import { ColumnsMenu } from "./ColumnsMenu";
+import { ColumnsMenu, type ChooserExtras } from "./ColumnsMenu";
 
 /** What a row knows about the table it is in. See `rowStyle`. */
 export type RowLayout = { boundaries: number[] };
@@ -219,6 +219,7 @@ export function DataTable<T>({
   sort: controlledSort,
   onSortChange,
   columnChooser = false,
+  chooserExtras,
   leading,
   dense = false,
   resetFooter = true,
@@ -424,6 +425,11 @@ export function DataTable<T>({
    * control for four columns.
    */
   columnChooser?: boolean;
+  /**
+   * More tick boxes for the columns eye, under their own heading — things this
+   * table shows that are not columns. See `ChooserExtras` in `ColumnsMenu`.
+   */
+  chooserExtras?: ChooserExtras;
   /**
    * Content for the strip that runs above the table, to the LEFT of the columns
    * eye — this table's own filters, or its heading.
@@ -688,6 +694,7 @@ export function DataTable<T>({
             // drag on a tablet, where the footer line is often off and a
             // double-click is no gesture (Mark, 2026-09-10).
             onResetWidths={customized ? reset : undefined}
+            extras={chooserExtras}
           />
         </div>
       )}

@@ -1,6 +1,7 @@
 "use client";
 
-import { gapDates, type DayMark } from "@/lib/calendarMarks";
+import { DAY_MARK_KINDS, gapDates, visibleMarks, type DayMark } from "@/lib/calendarMarks";
+import { useStoredSet } from "@/lib/storedSet";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -482,6 +483,7 @@ export function SpecialOrdersList({
   const [filters, setFilters] = useState<FilterValues>(() =>
     parseFilterValues(dimensions, seed())
   );
+  const [hiddenMarkKinds, setHiddenMarkKinds] = useStoredSet("rf.specialOrders.hiddenMarks");
   const [sort, setSort] = useState<ListSort | null>(() => parseListSort(seed(), SORT_KEYS));
 
   /**
@@ -961,9 +963,12 @@ export function SpecialOrdersList({
    * else here does: a number is unique per row and a customer is usually one
    * order.
    */
-  const markedDays = Object.keys(dayMarks).sort();
+  // Which kinds of calendar band this person has hidden, from the columns eye
+  // — a display preference, so localStorage, like the columns beside them.
+  const shownMarks = visibleMarks(dayMarks, hiddenMarkKinds);
+  const markedDays = Object.keys(shownMarks).sort();
   const marksUnder = (date: string | null) => {
-    const marks = date ? dayMarks[date] : undefined;
+    const marks = date ? shownMarks[date] : undefined;
     if (!marks?.length) return null;
     return (
       <ul>
@@ -1213,6 +1218,26 @@ export function SpecialOrdersList({
       storageKey="special-orders.v2"
       compactBelow={1280}
       columnChooser
+      // Offered only when the calendar has something to say on this screen at
+      // all — an eye section that does nothing is a control to wonder about.
+      chooserExtras={
+        Object.keys(dayMarks).length > 0 || hiddenMarkKinds.length > 0
+          ? {
+              heading: "Calendar",
+              items: DAY_MARK_KINDS.map((k) => ({
+                key: k.key,
+                label: k.label,
+                on: !hiddenMarkKinds.includes(k.key),
+                onToggle: (next) =>
+                  setHiddenMarkKinds(
+                    next
+                      ? hiddenMarkKinds.filter((h) => h !== k.key)
+                      : [...hiddenMarkKinds, k.key],
+                  ),
+              })),
+            }
+          : undefined
+      }
       group={groups}
       // Grey and struck, so a cancelled order is legible as history rather than
       // as work. It is not hidden: FileMaker kept 705 of them and they are
