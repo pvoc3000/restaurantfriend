@@ -171,6 +171,16 @@ This walks back "it shows every shop" from the first build: the calendar is
 now scoped like an operational screen unless asked otherwise. An item not
 about a shop in particular still shows under any filter.
 
+**THE ORDERS LIST SHOWS WHAT THE CALENDAR SAYS ABOUT EACH DAY** (Mark,
+2026-10-10). Under each day's band on `/special-orders`: blackouts (dark, with
+a white border so they part from the black band above), notes, and subscribed
+calendars' events, as solid bands in the calendar's colours
+(`lib/calendarMarks`). A marked day with NO order still gets a band
+(`DataGroup.gaps`), from the first order or today to the last order or sixty
+days out, inside the list's own date window. Only in the date sort. The
+columns eye hides each kind, per person, under a "Calendar" heading
+(`ChooserExtras`) — the eye still goes black for a missing COLUMN only.
+
 **A FEED LINK IS A CAPABILITY** (185), like the quote and pay links. Managers
 and owners only, even to read the table. It can carry entries, special orders,
 deliveries and tasks and NOTHING else — `calendar_feed_by_token` has no branch
