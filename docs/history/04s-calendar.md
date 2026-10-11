@@ -177,9 +177,13 @@ a white border so they part from the black band above), notes, and subscribed
 calendars' events, as solid bands in the calendar's colours
 (`lib/calendarMarks`). A marked day with NO order still gets a band
 (`DataGroup.gaps`), from the first order or today to the last order or sixty
-days out, inside the list's own date window. Only in the date sort. The
-columns eye hides each kind, per person, under a "Calendar" heading
-(`ChooserExtras`) — the eye still goes black for a missing COLUMN only.
+days out, inside the list's own date window. Only in the date sort. A
+CALENDAR BUTTON right of the columns eye (`catalog/ExtrasMenu`, the
+calendar-with-a-marked-day glyph Mark chose from eight) hides each kind, and
+each subscribed calendar, per person. Those options were in the eye itself for
+a day, under a heading, and moved out when the list grew a line per calendar;
+the glyph is NOT the plain calendar, which on every date field means "pick a
+date".
 
 **A FEED LINK IS A CAPABILITY** (185), like the quote and pay links. Managers
 and owners only, even to read the table. It can carry entries, special orders,

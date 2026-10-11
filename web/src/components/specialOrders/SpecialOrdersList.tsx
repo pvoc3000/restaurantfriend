@@ -1,5 +1,6 @@
 "use client";
 
+import { CalendarEventIcon } from "@/components/catalog/ExtrasMenu";
 import {
   DAY_MARK_KINDS,
   feedMarkKey,
@@ -1227,12 +1228,17 @@ export function SpecialOrdersList({
       storageKey="special-orders.v2"
       compactBelow={1280}
       columnChooser
-      // Offered only when the calendar has something to say on this screen at
-      // all — an eye section that does nothing is a control to wonder about.
-      chooserExtras={
-        Object.keys(dayMarks).length > 0 || hiddenMarkKinds.length > 0
-          ? {
-              heading: "Calendar",
+      // THE CALENDAR BUTTON, right of the eye (Mark, 2026-10-10) — always
+      // there, and saying so in its menu when the calendar has nothing on the
+      // dates this list is showing.
+      chooserExtras={{
+              label: "Calendar",
+              icon: <CalendarEventIcon />,
+              note:
+                Object.keys(dayMarks).length === 0
+                  ? "Nothing from the calendar in these dates."
+                  : null,
+              link: { label: "Open calendar", href: "/calendar" },
               items: DAY_MARK_KINDS.flatMap((k) => {
                 const toggle = (key: string) => (next: boolean) =>
                   setHiddenMarkKinds(
@@ -1258,9 +1264,7 @@ export function SpecialOrdersList({
                   })),
                 ];
               }),
-            }
-          : undefined
-      }
+      }}
       group={groups}
       // Grey and struck, so a cancelled order is legible as history rather than
       // as work. It is not hidden: FileMaker kept 705 of them and they are

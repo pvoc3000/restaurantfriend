@@ -2,12 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  MENU_HEADER_CLASS,
-  MENU_ITEM_CLASS,
-  MENU_PANEL_CLASS,
-  useAnchoredPanel,
-} from "@/lib/anchoredPanel";
+import { MENU_ITEM_CLASS, MENU_PANEL_CLASS, useAnchoredPanel } from "@/lib/anchoredPanel";
 import { isColumnVisible, useColumnVisibility } from "@/lib/columnVisibility";
 import { Checkbox } from "@/components/ui/Checkbox";
 import type { DataColumn } from "./DataTable";
@@ -47,7 +42,6 @@ export function ColumnsMenu<T>({
   columns,
   compact,
   onResetWidths,
-  extras,
 }: {
   /** The table's own key — the same one it stores column widths under. */
   storageKey: string;
@@ -56,8 +50,6 @@ export function ColumnsMenu<T>({
   compact: boolean;
   /** Put every column back to its declared width. Omit when none has moved. */
   onResetWidths?: () => void;
-  /** Other things this table shows that are not columns — see `ChooserExtras`. */
-  extras?: ChooserExtras;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -163,30 +155,6 @@ export function ColumnsMenu<T>({
                 Reset column widths
               </button>
             )}
-            {extras && extras.items.length > 0 && (
-              <>
-                <div className={`${MENU_HEADER_CLASS} border-t`}>{extras.heading}</div>
-                {extras.items.map((item) => (
-                  <label
-                    key={item.key}
-                    // A nested item is indented under its parent by exactly a
-                    // checkbox and its gap, so its box sits under the parent's
-                    // label and the pair reads as one thing with parts.
-                    className={`${MENU_ITEM_CLASS} flex items-center gap-3 ${
-                      item.nested ? "pl-10" : ""
-                    } ${item.disabled ? "text-faint" : "cursor-pointer hover:bg-neutral-100"}`}
-                  >
-                    <Checkbox
-                      checked={item.on}
-                      disabled={item.disabled}
-                      onChange={() => item.onToggle(!item.on)}
-                      label={`Show ${item.label}`}
-                    />
-                    <span className="min-w-0 truncate">{item.label}</span>
-                  </label>
-                ))}
-              </>
-            )}
           </div>,
           document.body
         )}
@@ -223,37 +191,3 @@ export function ColumnsIcon() {
     </svg>
   );
 }
-
-/**
- * OTHER THINGS A TABLE SHOWS THAT ARE NOT COLUMNS, offered in the same eye
- * (Mark, 2026-10-10, on the special orders list's calendar bands: blackout
- * dates, notes, subscribed calendars).
- *
- * The eye means "choose what this table shows", and a band under a day's
- * heading is something the table shows — not a filter on which rows appear, so
- * it does not belong in the filter row. But the eye means COLUMNS on every
- * other list, so the difference is drawn rather than assumed:
- *
- *   · they sit under their own HEADING, below everything about columns, so
- *     nobody reads "Notes" as a column;
- *   · "Show all" and "Reset column widths" stay above that heading and do not
- *     touch them;
- *   · the eye going black still means a COLUMN is missing, and only that —
- *     otherwise anyone who hides one of these has a permanently black eye and
- *     the signal stops meaning anything.
- *
- * The caller owns the state (and where it is stored); this only draws it.
- */
-export type ChooserExtras = {
-  heading: string;
-  items: {
-    key: string;
-    label: string;
-    on: boolean;
-    onToggle: (next: boolean) => void;
-    /** A CHILD of the item above it — drawn indented beneath it. */
-    nested?: boolean;
-    /** Shown but not changeable — a child whose parent is switched off. */
-    disabled?: boolean;
-  }[];
-};

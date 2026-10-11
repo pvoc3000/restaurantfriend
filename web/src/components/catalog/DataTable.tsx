@@ -38,7 +38,8 @@ import {
   STICKY_TOTALS_ROW,
 } from "@/lib/tableHead";
 import { ColumnHeader } from "./ColumnHeader";
-import { ColumnsMenu, type ChooserExtras } from "./ColumnsMenu";
+import { ColumnsMenu } from "./ColumnsMenu";
+import { ExtrasMenu, type ChooserExtras } from "./ExtrasMenu";
 
 /** What a row knows about the table it is in. See `rowStyle`. */
 export type RowLayout = { boundaries: number[] };
@@ -426,8 +427,8 @@ export function DataTable<T>({
    */
   columnChooser?: boolean;
   /**
-   * More tick boxes for the columns eye, under their own heading — things this
-   * table shows that are not columns. See `ChooserExtras` in `ColumnsMenu`.
+   * A second button to the RIGHT of the columns eye, for things this table
+   * shows that are not columns. See `ExtrasMenu`. Needs `columnChooser`.
    */
   chooserExtras?: ChooserExtras;
   /**
@@ -685,7 +686,7 @@ export function DataTable<T>({
         // 2026-08-02). Nudging the button rather than shifting the glyph
         // inside it keeps the hover wash centred on the artwork, which is
         // the thing the button's size exists to do.
-        <div className="-mb-1 shrink-0">
+        <div className="-mb-1 flex shrink-0 items-center">
           <ColumnsMenu
             storageKey={storageKey}
             columns={orderedColumns}
@@ -694,8 +695,8 @@ export function DataTable<T>({
             // drag on a tablet, where the footer line is often off and a
             // double-click is no gesture (Mark, 2026-09-10).
             onResetWidths={customized ? reset : undefined}
-            extras={chooserExtras}
           />
+          {chooserExtras && <ExtrasMenu extras={chooserExtras} />}
         </div>
       )}
     </div>
