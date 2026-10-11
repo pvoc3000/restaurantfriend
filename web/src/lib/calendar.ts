@@ -19,6 +19,7 @@ export type CalendarLayer =
   | "entries"
   | "orders_paid"
   | "orders_unpaid"
+  | "standing_orders"
   | "deliveries"
   | "tasks"
   | "pay_periods"
@@ -46,6 +47,10 @@ export const CALENDAR_LAYERS: readonly { key: CalendarLayer; label: string }[] =
   // order's parent.
   { key: "orders_paid", label: "Paid special orders" },
   { key: "orders_unpaid", label: "Unpaid special orders" },
+  // Days made from a standing order, WHATEVER their status, and in neither of
+  // the two above (Mark, 2026-10-10) — the feed's split, migration 190. The
+  // wholesale days are paid by status and were half of "paid".
+  { key: "standing_orders", label: "Standing orders" },
   { key: "deliveries", label: "Deliveries" },
   { key: "tasks", label: "Tasks and maintenance" },
   { key: "pay_periods", label: "Pay periods" },
@@ -163,6 +168,7 @@ const LAYER_ORDER: Record<CalendarLayer, number> = {
   entries: 0,
   orders_paid: 1,
   orders_unpaid: 1,
+  standing_orders: 1,
   deliveries: 2,
   tasks: 3,
   pay_periods: 4,
@@ -454,6 +460,8 @@ export type CalendarOrderRow = {
   number: string;
   /** `lead | quote | invoice | order` — cancelled ones are never fetched. */
   status: string | null;
+  /** Was this day made from a standing order (`standing_order_id` is set)? */
+  from_standing: boolean;
   title: string | null;
   event_date: string;
   event_time: string | null;
@@ -478,14 +486,19 @@ export type CalendarOrderRow = {
  * time, which is in the day panel's second line with the number and customer.
  * An order with no title falls back to its customer, then its number.
  *
- * PAID IS `status = 'order'` and nothing else. The status is what a person set
+ * A DAY MADE FROM A STANDING ORDER is its own layer whatever its status, as in
+ * the feed (190). Of the rest, PAID IS `status = 'order'` and nothing else. The status is what a person set
  * when the money arrived and is what gates production, so the calendar reads it
  * rather than re-deriving a balance; an invoice half paid is still unpaid here.
  */
 export function specialOrderItems(rows: readonly CalendarOrderRow[]): CalendarItem[] {
   return rows.map((o) => ({
     key: `order:${o.id}`,
-    layer: o.status === "order" ? "orders_paid" : "orders_unpaid",
+    layer: o.from_standing
+      ? "standing_orders"
+      : o.status === "order"
+        ? "orders_paid"
+        : "orders_unpaid",
     date: o.event_date,
     lead: o.kitchen_code,
     // The ready time — or, where an order has none, the event's own. Seven of

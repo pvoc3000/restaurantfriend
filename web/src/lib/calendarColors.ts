@@ -65,6 +65,7 @@ export const DEFAULT_LAYER_COLOR: Record<CalendarLayer, CalendarColor> = {
   entries: "yellow",
   orders_paid: "green",
   orders_unpaid: "orange",
+  standing_orders: "brown",
   deliveries: "sky",
   tasks: "purple",
   pay_periods: "slate",

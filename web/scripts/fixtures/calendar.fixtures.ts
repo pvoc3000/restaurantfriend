@@ -134,6 +134,7 @@ const ORDER = {
   id: "o1",
   number: "SO-10110",
   status: "order",
+  from_standing: false,
   title: "Office party",
   event_date: "2026-12-18",
   event_time: "14:30:00",
@@ -379,4 +380,12 @@ test("longDate and parseDateParam", () => {
   eq(parseDateParam("2026-02-31", "2026-10-10"), "2026-10-10", "not a day");
   eq(parseDateParam("2026-13-01", "2026-10-10"), "2026-10-10");
   eq(parseDateParam(undefined, "2026-10-10"), "2026-10-10");
+});
+
+test("a day made from a standing order is its own layer, whatever its status", () => {
+  const layerOf = (status: string | null) =>
+    specialOrderItems([{ ...ORDER, status, from_standing: true }])[0].layer;
+  eq(layerOf("order"), "standing_orders", "not paid special orders");
+  eq(layerOf("invoice"), "standing_orders", "nor unpaid");
+  eq(specialOrderItems([{ ...ORDER, from_standing: false }])[0].layer, "orders_paid");
 });

@@ -83,7 +83,7 @@ export default async function CalendarPage({
   // The working shop's menu plan — for anyone who may open Plans, and only
   // when there IS a working shop.
   if (canReachPage(role, "/plans") && session.activeLocation) layers.unshift("menu_plan");
-  if (canReachPage(role, "/special-orders")) layers.push("orders_paid", "orders_unpaid");
+  if (canReachPage(role, "/special-orders")) layers.push("orders_paid", "orders_unpaid", "standing_orders");
   if (canReachPage(role, "/purchase-orders")) layers.push("deliveries");
   if (canReachPage(role, "/tasks")) layers.push("tasks");
   if (canReachPage(role, "/pay-periods")) layers.push("pay_periods");
