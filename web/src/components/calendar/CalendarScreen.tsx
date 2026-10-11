@@ -12,10 +12,13 @@ import { daysAfter, daysBefore } from "@/lib/today";
 import {
   CALENDAR_LAYERS,
   OPT_IN_LAYERS,
+  WORKING_SHOP,
   entryItems,
   gridRange,
   itemsByDay,
   monthParam,
+  resolveShops,
+  shopsParam,
   visibleItems,
   type CalendarItem,
   type CalendarLayer,
@@ -79,6 +82,7 @@ export function CalendarScreen({
   layers,
   locations,
   shops,
+  workingLocation,
   canWrite,
   canSetBlackouts,
   layerColors,
@@ -101,8 +105,11 @@ export function CalendarScreen({
   /** The layers this person may see — the menu offers these and no others. */
   layers: CalendarLayer[];
   locations: EntryLocation[];
-  /** The shop filter from `?shops=`. Empty means every shop. */
+  /** The Shops picker's value, from `?shops=` (`parseShopsParam`): shop ids,
+   *  and `WORKING_SHOP` for "whichever shop I am working at". Empty is all. */
   shops: string[];
+  /** The shop being worked at, which `WORKING_SHOP` resolves to. */
+  workingLocation: { id: string; code: string } | null;
   canWrite: boolean;
   canSetBlackouts: boolean;
   /** The organisation's colour per layer, from `orgs.settings`. */
@@ -177,8 +184,13 @@ export function CalendarScreen({
   );
   const days = useMemo(() => {
     const all = [...entryItems(entries, range), ...layerItems];
-    return itemsByDay(visibleItems(all, { hiddenLayers: hiddenSet, shops: shopFilter }));
-  }, [entries, layerItems, range, hiddenSet, shopFilter]);
+    return itemsByDay(
+      visibleItems(all, {
+        hiddenLayers: hiddenSet,
+        shops: resolveShops(shopFilter, workingLocation?.id ?? null),
+      }),
+    );
+  }, [entries, layerItems, range, hiddenSet, shopFilter, workingLocation]);
 
   const shopCodes = useMemo(() => new Map(locations.map((l) => [l.id, l.code])), [locations]);
   const entryById = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
@@ -196,8 +208,8 @@ export function CalendarScreen({
       params.set("view", "day");
       params.set("date", next.date ?? date);
     } else params.set("month", monthParam(next.month ?? month));
-    const s = next.shops ?? shopFilter;
-    if (s.length > 0) params.set("shops", s.join(","));
+    const s = shopsParam(next.shops ?? shopFilter, workingLocation !== null);
+    if (s !== null) params.set("shops", s);
     return `/calendar?${params.toString()}`;
   }
 
@@ -306,7 +318,22 @@ export function CalendarScreen({
         {view !== "list" && (
           <ControlField label="Shops">
             <PickSet
-              options={locations.map((l) => ({ value: l.id, label: l.code, hint: l.name }))}
+              // "Working location" FIRST, and the default (Mark, 2026-10-10):
+              // the calendar follows the shop you are standing in until you
+              // ask it for something else.
+              options={[
+                ...(workingLocation
+                  ? [
+                      {
+                        value: WORKING_SHOP,
+                        label: "Working location",
+                        hint: workingLocation.code,
+                        summary: `Working location (${workingLocation.code})`,
+                      },
+                    ]
+                  : []),
+                ...locations.map((l) => ({ value: l.id, label: l.code, hint: l.name })),
+              ]}
               value={shopFilter}
               onChange={changeShops}
               allLabel="All shops"

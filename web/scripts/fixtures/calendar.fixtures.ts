@@ -21,6 +21,10 @@ import {
   itemsByDay,
   monthParam,
   parseMonthParam,
+  parseShopsParam,
+  resolveShops,
+  shopsParam,
+  WORKING_SHOP,
   payPeriodItems,
   planItems,
   specialOrderItems,
@@ -388,4 +392,37 @@ test("a day made from a standing order is its own layer, whatever its status", (
   eq(layerOf("order"), "standing_orders", "not paid special orders");
   eq(layerOf("invoice"), "standing_orders", "nor unpaid");
   eq(specialOrderItems([{ ...ORDER, from_standing: false }])[0].layer, "orders_paid");
+});
+
+/* -- the shop filter ----------------------------------------------------- */
+// Checked by BREAKING: reading an absent `?shops=` as "all" loses the default;
+// writing the default into the URL makes a shared link pin the SENDER's choice
+// of word but still follow the reader's shop (harmless) while writing "all" as
+// nothing makes All shops impossible to link to at all.
+
+test("the Shops picker opens on the working location", () => {
+  const known = new Set(["df01", "df02"]);
+  eq(parseShopsParam(undefined, known, true), [WORKING_SHOP]);
+  eq(parseShopsParam("", known, true), [WORKING_SHOP]);
+  eq(parseShopsParam(undefined, known, false), [], "no working shop: every shop");
+  eq(parseShopsParam("all", known, true), []);
+  eq(parseShopsParam("working,df02,nope", known, true), [WORKING_SHOP, "df02"]);
+  eq(parseShopsParam("working,df02", known, false), ["df02"]);
+});
+
+test("shopsParam is parseShopsParam's inverse, and the default writes nothing", () => {
+  const known = new Set(["df01", "df02"]);
+  for (const filter of [[WORKING_SHOP], [], ["df02"], [WORKING_SHOP, "df02"]]) {
+    eq(parseShopsParam(shopsParam(filter, true), known, true), filter, JSON.stringify(filter));
+  }
+  eq(shopsParam([WORKING_SHOP], true), null, "the default");
+  eq(shopsParam([], true), "all");
+  eq(shopsParam([], false), null, "with no working shop, all IS the default");
+});
+
+test("resolveShops turns the word into the shop you are at", () => {
+  eq(resolveShops([WORKING_SHOP], "df01"), ["df01"]);
+  eq(resolveShops([WORKING_SHOP, "df01", "df02"], "df01"), ["df01", "df02"], "said once");
+  eq(resolveShops([WORKING_SHOP], null), [], "nowhere to work: every shop");
+  eq(resolveShops([], "df01"), []);
 });

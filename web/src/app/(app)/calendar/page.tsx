@@ -8,6 +8,7 @@ import {
   gridRange,
   parseDateParam,
   parseMonthParam,
+  parseShopsParam,
   type CalendarItem,
   type CalendarLayer,
 } from "@/lib/calendar";
@@ -60,7 +61,11 @@ export default async function CalendarPage({
   // anybody writes a blackout for.
   const locations = session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }));
   const known = new Set(locations.map((l) => l.id));
-  const shops = (params.shops ?? "").split(",").filter((id) => known.has(id));
+  // The Shops picker opens on the WORKING LOCATION (`parseShopsParam`).
+  const working = session.activeLocation
+    ? { id: session.activeLocation.id, code: session.activeLocation.code }
+    : null;
+  const shops = parseShopsParam(params.shops, known, working !== null);
 
   const { entries, error } = await fetchEntries(supabase, view === "list" ? {} : range);
 
@@ -159,6 +164,7 @@ export default async function CalendarPage({
       layers={layers}
       locations={locations}
       shops={shops}
+      workingLocation={working}
       canWrite={canEditPage(role, "/calendar")}
       canSetBlackouts={canSetBlackouts(role)}
       layerColors={readLayerColors(session.orgSettings)}

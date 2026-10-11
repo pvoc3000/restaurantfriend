@@ -163,6 +163,14 @@ whatever its status and in neither `orders_paid` nor `orders_unpaid` — the
 Cafe Knotted days were 41 of the 83 "paid" events. The page has the same three layers
 (`lib/calendar.specialOrderItems`), standing orders in brown by default.
 
+**THE SHOPS PICKER OPENS ON "WORKING LOCATION"** (Mark, 2026-10-10), its first
+option and the default. It is stored as the word `working`, never the shop's
+id, so changing working location changes the calendar and a shared link opens
+on the reader's shop. `?shops=` absent is the default; `all` is every shop.
+This walks back "it shows every shop" from the first build: the calendar is
+now scoped like an operational screen unless asked otherwise. An item not
+about a shop in particular still shows under any filter.
+
 **A FEED LINK IS A CAPABILITY** (185), like the quote and pay links. Managers
 and owners only, even to read the table. It can carry entries, special orders,
 deliveries and tasks and NOTHING else — `calendar_feed_by_token` has no branch

@@ -113,6 +113,51 @@ export function gridRange(monthIso: string): DateRange {
   return { from: weeks[0][0].iso, to: weeks[5][6].iso };
 }
 
+/* -- the shop filter ----------------------------------------------------- */
+
+/**
+ * "WORKING LOCATION" — a choice in the Shops picker that means whichever shop
+ * you are working at (Mark, 2026-10-10: "make it the default option. make it
+ * the first option"). Stored as this word, never as the shop's id, so
+ * switching working location changes what the calendar shows without touching
+ * the filter, and a link somebody shares opens on THEIR shop.
+ */
+export const WORKING_SHOP = "working";
+
+/**
+ * `?shops=` → the picker's value.
+ *
+ *   absent        the DEFAULT: the working location, when there is one
+ *   `all`         every shop (the picker's empty set)
+ *   `working,id`  those — unknown ids are dropped, not obeyed
+ *
+ * With no working location there is nothing for the default to mean, so it is
+ * every shop.
+ */
+export function parseShopsParam(
+  raw: string | null | undefined,
+  known: ReadonlySet<string>,
+  hasWorking: boolean,
+): string[] {
+  if (raw === undefined || raw === null || raw === "") return hasWorking ? [WORKING_SHOP] : [];
+  if (raw === "all") return [];
+  return raw.split(",").filter((v) => (v === WORKING_SHOP ? hasWorking : known.has(v)));
+}
+
+/** The picker's value → `?shops=`, or null when it is the default and the URL
+ *  need not say. The inverse of `parseShopsParam`. */
+export function shopsParam(filter: readonly string[], hasWorking: boolean): string | null {
+  if (filter.length === 0) return hasWorking ? "all" : null;
+  if (hasWorking && filter.length === 1 && filter[0] === WORKING_SHOP) return null;
+  return filter.join(",");
+}
+
+/** The picker's value as shop ids, for `visibleItems`. Empty is every shop. */
+export function resolveShops(filter: readonly string[], workingId: string | null): string[] {
+  const ids = filter.flatMap((v) => (v === WORKING_SHOP ? (workingId ? [workingId] : []) : [v]));
+  return [...new Set(ids)];
+}
+
 /* -- typed entries ------------------------------------------------------- */
 
 /** One item per day an entry covers, clamped to `range`. */
