@@ -169,14 +169,20 @@ export function ColumnsMenu<T>({
                 {extras.items.map((item) => (
                   <label
                     key={item.key}
-                    className={`${MENU_ITEM_CLASS} flex cursor-pointer items-center gap-3 hover:bg-neutral-100`}
+                    // A nested item is indented under its parent by exactly a
+                    // checkbox and its gap, so its box sits under the parent's
+                    // label and the pair reads as one thing with parts.
+                    className={`${MENU_ITEM_CLASS} flex items-center gap-3 ${
+                      item.nested ? "pl-10" : ""
+                    } ${item.disabled ? "text-faint" : "cursor-pointer hover:bg-neutral-100"}`}
                   >
                     <Checkbox
                       checked={item.on}
+                      disabled={item.disabled}
                       onChange={() => item.onToggle(!item.on)}
                       label={`Show ${item.label}`}
                     />
-                    <span>{item.label}</span>
+                    <span className="min-w-0 truncate">{item.label}</span>
                   </label>
                 ))}
               </>
@@ -240,5 +246,14 @@ export function ColumnsIcon() {
  */
 export type ChooserExtras = {
   heading: string;
-  items: { key: string; label: string; on: boolean; onToggle: (next: boolean) => void }[];
+  items: {
+    key: string;
+    label: string;
+    on: boolean;
+    onToggle: (next: boolean) => void;
+    /** A CHILD of the item above it — drawn indented beneath it. */
+    nested?: boolean;
+    /** Shown but not changeable — a child whose parent is switched off. */
+    disabled?: boolean;
+  }[];
 };

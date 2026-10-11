@@ -245,6 +245,7 @@ export default async function SpecialOrdersPage({
     ...new Set((orders ?? []).map((o) => o.event_date as string | null).filter((d): d is string => Boolean(d))),
   ].sort();
   let marks: Record<string, DayMark[]> = {};
+  let markCalendars: { id: string; name: string }[] = [];
   if (eventDates.length > 0) {
     // FROM the first order (or today, if that is earlier) TO the last order or
     // sixty days out, whichever is later — so an upcoming closure shows even
@@ -262,7 +263,11 @@ export default async function SpecialOrdersPage({
     }
     const [{ entries }, subs, feedEvents] = await Promise.all([
       fetchEntries(supabase, span),
-      supabase.from("calendar_subscriptions").select("id, name, color").eq("is_active", true),
+      supabase
+        .from("calendar_subscriptions")
+        .select("id, name, color")
+        .eq("is_active", true)
+        .order("name"),
       supabase
         .from("calendar_subscription_events")
         .select("id, subscription_id, starts_on, ends_on, start_time, title, place")
@@ -273,6 +278,10 @@ export default async function SpecialOrdersPage({
         .limit(1000),
     ]);
     const events = (feedEvents.data ?? []) as SubscriptionEventRow[];
+    markCalendars = ((subs.data ?? []) as { id: string; name: string }[]).map((c) => ({
+      id: c.id,
+      name: c.name,
+    }));
     marks = dayMarks({
       // The order days AND every day the calendar marks, orders or not.
       dates: [...eventDates, ...markedDates(entries, events, span)],
@@ -331,6 +340,7 @@ export default async function SpecialOrdersPage({
       capped={rows.length === 500}
       topUpError={topUpError?.message ?? null}
       dayMarks={marks}
+      markCalendars={markCalendars}
     />
   );
 }

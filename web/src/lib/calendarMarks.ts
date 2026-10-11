@@ -34,6 +34,10 @@ export const DAY_MARK_KINDS: readonly { key: DayMarkKind; label: string }[] = [
 /**
  * The marks left after some kinds are hidden — days with none left are
  * dropped, so a day shown only for a hidden note stops being a day at all.
+ *
+ * `hidden` holds kinds ("feed" hides every subscribed calendar) and single
+ * calendars (`feedMarkKey`), which is how one busy calendar is taken off the
+ * list without losing the others.
  */
 export function visibleMarks(
   marks: Readonly<Record<string, DayMark[]>>,
@@ -42,15 +46,24 @@ export function visibleMarks(
   if (hidden.length === 0) return { ...marks };
   const out: Record<string, DayMark[]> = {};
   for (const [date, list] of Object.entries(marks)) {
-    const kept = list.filter((m) => !hidden.includes(m.kind));
+    const kept = list.filter(
+      (m) => !hidden.includes(m.kind) && !(m.source && hidden.includes(feedMarkKey(m.source))),
+    );
     if (kept.length > 0) out[date] = kept;
   }
   return out;
 }
 
+/** The hidden-set key for ONE subscribed calendar, beside the kinds' own. */
+export function feedMarkKey(subscriptionId: string): string {
+  return `feed:${subscriptionId}`;
+}
+
 export type DayMark = {
   key: string;
   kind: DayMarkKind;
+  /** For a `feed` mark, the subscribed calendar it came from. */
+  source?: string;
   /** "Closed for Christmas — No special orders · Shop closed (DF01)". */
   text: string;
   /** The calendar's chip for it: fill and type together. */
@@ -143,15 +156,17 @@ export function dayMarks(input: {
         className: chipClass({ layer: "feeds", color: sub.color }, input.colors),
         blackout: false,
         kind: "feed",
+        source: sub.id,
         order: `2:${time ?? "99:99"}:${event.title}`,
       });
     }
 
     if (marks.length > 0) {
       marks.sort((a, b) => a.order.localeCompare(b.order, undefined, { numeric: true }));
-      out[date] = marks.map(({ key, kind, text, className, blackout }) => ({
+      out[date] = marks.map(({ key, kind, source, text, className, blackout }) => ({
         key,
         kind,
+        ...(source ? { source } : {}),
         text,
         className,
         blackout,

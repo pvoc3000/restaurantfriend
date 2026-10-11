@@ -1,6 +1,12 @@
 "use client";
 
-import { DAY_MARK_KINDS, gapDates, visibleMarks, type DayMark } from "@/lib/calendarMarks";
+import {
+  DAY_MARK_KINDS,
+  feedMarkKey,
+  gapDates,
+  visibleMarks,
+  type DayMark,
+} from "@/lib/calendarMarks";
 import { useStoredSet } from "@/lib/storedSet";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -257,10 +263,13 @@ export function SpecialOrdersList({
   capped = false,
   topUpError = null,
   dayMarks = {},
+  markCalendars = [],
 }: {
   /** What the calendar says about each day on screen, by date — entries and
    *  subscribed events (`lib/calendarMarks`). Drawn under the day's band. */
   dayMarks?: Record<string, DayMark[]>;
+  /** The subscribed calendars, so the eye can hide them one by one. */
+  markCalendars?: { id: string; name: string }[];
   rows: SpecialOrderRow[];
   today: string;
   thresholds: AttentionThresholds;
@@ -1224,17 +1233,31 @@ export function SpecialOrdersList({
         Object.keys(dayMarks).length > 0 || hiddenMarkKinds.length > 0
           ? {
               heading: "Calendar",
-              items: DAY_MARK_KINDS.map((k) => ({
-                key: k.key,
-                label: k.label,
-                on: !hiddenMarkKinds.includes(k.key),
-                onToggle: (next) =>
+              items: DAY_MARK_KINDS.flatMap((k) => {
+                const toggle = (key: string) => (next: boolean) =>
                   setHiddenMarkKinds(
-                    next
-                      ? hiddenMarkKinds.filter((h) => h !== k.key)
-                      : [...hiddenMarkKinds, k.key],
-                  ),
-              })),
+                    next ? hiddenMarkKinds.filter((h) => h !== key) : [...hiddenMarkKinds, key],
+                  );
+                const on = !hiddenMarkKinds.includes(k.key);
+                const kind = { key: k.key, label: k.label, on, onToggle: toggle(k.key) };
+                // EACH SUBSCRIBED CALENDAR, nested under "Subscribed calendars"
+                // (Mark, 2026-10-10) — with two or more, so one busy calendar
+                // can go without the others. With the parent off they are
+                // shown unticked and fixed: it is the parent that is hiding
+                // them, and a box you can tick to no effect is a puzzle.
+                if (k.key !== "feed" || markCalendars.length < 2) return [kind];
+                return [
+                  kind,
+                  ...markCalendars.map((c) => ({
+                    key: feedMarkKey(c.id),
+                    label: c.name,
+                    nested: true,
+                    disabled: !on,
+                    on: on && !hiddenMarkKinds.includes(feedMarkKey(c.id)),
+                    onToggle: toggle(feedMarkKey(c.id)),
+                  })),
+                ];
+              }),
             }
           : undefined
       }

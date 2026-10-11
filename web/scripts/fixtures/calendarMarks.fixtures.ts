@@ -5,7 +5,7 @@
 // two; and sorting by title alone puts a note above the closure it sits under.
 
 import { test, eq, ok } from "./harness";
-import { dayMarks, gapDates, markedDates, visibleMarks } from "../../src/lib/calendarMarks";
+import { dayMarks, feedMarkKey, gapDates, markedDates, visibleMarks } from "../../src/lib/calendarMarks";
 import { BLACKOUT_CHIP, colorChip } from "../../src/lib/calendarColors";
 import type { CalendarEntry } from "../../src/lib/blackoutDates";
 
@@ -127,4 +127,27 @@ test("hiding a kind drops its marks, and a day left with none stops being a day"
   eq(Object.keys(noNotes), ["2026-12-25"], "the 24th had only the note");
   eq(noNotes["2026-12-25"].map((m) => m.kind), ["blackout"]);
   eq(visibleMarks(marks, ["note", "blackout", "feed"]), {});
+});
+
+test("one subscribed calendar can be hidden without the others", () => {
+  const marks = dayMarks({
+    ...BASE,
+    dates: ["2026-12-10"],
+    entries: [],
+    subscriptions: [
+      { id: "a", name: "Mark", color: null },
+      { id: "b", name: "Holidays", color: null },
+    ],
+    feedEvents: [
+      { id: "1", subscription_id: "a", starts_on: "2026-12-10", ends_on: "2026-12-10", start_time: null, title: "Dentist", place: null },
+      { id: "2", subscription_id: "b", starts_on: "2026-12-10", ends_on: "2026-12-10", start_time: null, title: "Human Rights Day", place: null },
+    ],
+  });
+  eq(marks["2026-12-10"].map((m) => m.source), ["a", "b"]);
+  eq(
+    visibleMarks(marks, [feedMarkKey("b")])["2026-12-10"].map((m) => m.text),
+    ["Dentist · Mark"],
+  );
+  eq(visibleMarks(marks, [feedMarkKey("a"), feedMarkKey("b")]), {}, "both gone, so the day goes");
+  eq(visibleMarks(marks, ["feed"]), {}, "the kind hides them all");
 });
