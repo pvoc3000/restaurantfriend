@@ -110,9 +110,14 @@ export function TextField({
 }) {
   const [draft, setDraft] = useState(value ?? "");
   const [seen, setSeen] = useState(value);
+  // The same guard as `ProseField`, which explains it: a refresh that follows
+  // a save must not put the box back while somebody is typing in it again.
+  const [focused, setFocused] = useState(false);
+  const [pending, setPending] = useState<{ sent: string | null } | null>(null);
+  if (pending && pending.sent === value) setPending(null);
   if (seen !== value) {
     setSeen(value);
-    setDraft(value ?? "");
+    if (!pending && !focused) setDraft(value ?? "");
   }
   return (
     <input
@@ -123,9 +128,13 @@ export function TextField({
       placeholder={placeholder}
       disabled={disabled}
       onChange={(e) => setDraft(e.target.value)}
+      onFocus={() => setFocused(true)}
       onBlur={() => {
+        setFocused(false);
         const next = draft.trim() === "" ? null : draft;
-        if (next !== value) onCommit(next);
+        if (next === (pending ? pending.sent : value)) return;
+        setPending({ sent: next });
+        onCommit(next);
       }}
     />
   );
@@ -152,18 +161,38 @@ export function ProseField({
 }) {
   const [draft, setDraft] = useState(value ?? "");
   const [seen, setSeen] = useState(value);
+  const [focused, setFocused] = useState(false);
+  // What this field last sent and has not yet seen come back. A save is
+  // followed by a server refresh, and that refresh hands down the text AS IT
+  // WAS SAVED — by which time the person has typed more. Adopting it put the
+  // box back a second or two: the last word gone, the caret thrown to the end,
+  // iOS's autocorrect and double-space full stop undone (2026-10-10). So the
+  // box only follows the server when nobody is in it and nothing is in flight.
+  const [pending, setPending] = useState<{ sent: string | null } | null>(null);
+  if (pending && pending.sent === value) setPending(null);
   if (seen !== value) {
     setSeen(value);
-    setDraft(value ?? "");
+    if (!pending && !focused) setDraft(value ?? "");
   }
+
+  const next = draft.trim() === "" ? null : draft;
+  const saved = pending ? pending.sent : value;
+  const commit = () => {
+    if (next === saved) return;
+    setPending({ sent: next });
+    onCommit(next);
+  };
 
   // Saves on blur AND on a pause, because a supervisor writing four paragraphs
   // may never blur before the iPad sleeps.
   useEffect(() => {
-    if (draft === (value ?? "")) return;
-    const t = setTimeout(() => onCommit(draft.trim() === "" ? null : draft), 1500);
+    if (next === saved) return;
+    const t = setTimeout(() => {
+      setPending({ sent: next });
+      onCommit(next);
+    }, 1500);
     return () => clearTimeout(t);
-  }, [draft, value, onCommit]);
+  }, [next, saved, onCommit]);
 
   return (
     <div className="space-y-1">
@@ -175,7 +204,11 @@ export function ProseField({
         placeholder={placeholder}
         disabled={disabled}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => onCommit(draft.trim() === "" ? null : draft)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false);
+          commit();
+        }}
       />
       <p className="text-xs text-muted">length: {draft.length}</p>
     </div>
