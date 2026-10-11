@@ -173,6 +173,17 @@ export type DataGroup<T> = {
    * closure, a note). Return null for nothing, and no row is drawn.
    */
   under?: (firstRow: T) => ReactNode;
+  /**
+   * EMPTY groups to draw between two runs — a band with no rows under it.
+   *
+   * A band normally exists because a row does. This is for a list banded by
+   * something that has values NO row carries and that still wants saying: the
+   * special orders list, banded by day, shows a closed day that has no orders
+   * on it. Called at every boundary with the rows either side — `prev` null
+   * before the first run, `next` null after the last — and returns the bands
+   * to put there, in order. Only ever the filled band, never the `heading`.
+   */
+  gaps?: (prev: T | null, next: T | null) => { key: string; label: string; under?: ReactNode }[];
 };
 
 /**
@@ -865,8 +876,40 @@ export function DataTable<T>({
                   index === 0 ||
                   banding!.subLabel!(sorted[index - 1]) !== subLabel);
 
+              // Empty groups that belong BEFORE this run, and — on the last row
+              // — after it. See `DataGroup.gaps`.
+              const emptyBand = (g: { key: string; label: string; under?: ReactNode }) => (
+                <Fragment key={`gap:${g.key}`}>
+                  <tr className="bg-ink text-white">
+                    <td
+                      colSpan={visibleColumns.length}
+                      className="px-3 py-2 text-xs font-semibold tracking-[0.12em] uppercase"
+                    >
+                      {g.label}
+                      <span className="ml-2 font-normal tracking-normal text-white/55 normal-case">0</span>
+                    </td>
+                  </tr>
+                  {g.under ? (
+                    <tr>
+                      <td colSpan={visibleColumns.length} className="p-0">
+                        {g.under}
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+              const gapsBefore =
+                startsGroup && banding!.gaps && !banding!.heading
+                  ? banding!.gaps(index === 0 ? null : sorted[index - 1], row)
+                  : [];
+              const gapsAfter =
+                index === sorted.length - 1 && banding?.gaps && !banding.heading
+                  ? banding.gaps(row, null)
+                  : [];
+
               return (
                 <Fragment key={key}>
+                  {gapsBefore.map(emptyBand)}
                   {/* BLACK, white text (Mark, 2026-08-02, with a screenshot of
                       the FileMaker employee list beside it). It was a grey
                       wash, which at 56px row height read as one more row rather
@@ -1054,6 +1097,7 @@ export function DataTable<T>({
                       })()}
                     </tr>
                   )}
+                  {gapsAfter.map(emptyBand)}
                 </Fragment>
               );
             })}

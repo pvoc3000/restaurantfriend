@@ -17,6 +17,7 @@ import {
   type CalendarEntry,
 } from "./blackoutDates";
 import { clockTime } from "./calendar";
+import { daysAfter } from "./today";
 import { chipClass, type LayerColors } from "./calendarColors";
 import type { CalendarSubscription, SubscriptionEventRow } from "./calendarFeeds";
 
@@ -28,6 +29,43 @@ export type DayMark = {
   className: string;
   blackout: boolean;
 };
+
+/**
+ * Every date in `span` that an entry or a subscribed event touches — the days
+ * that HAVE something to say, whether or not anything else is on them. This is
+ * what lets a closed day with no orders still appear in an orders list.
+ */
+export function markedDates(
+  entries: readonly Pick<CalendarEntry, "starts_on" | "ends_on">[],
+  feedEvents: readonly Pick<SubscriptionEventRow, "starts_on" | "ends_on">[],
+  span: { from: string; to: string },
+): string[] {
+  const dates = new Set<string>();
+  for (const thing of [...entries, ...feedEvents]) {
+    const from = thing.starts_on > span.from ? thing.starts_on : span.from;
+    const to = thing.ends_on < span.to ? thing.ends_on : span.to;
+    for (let day = from; day <= to; day = daysAfter(day, 1)) dates.add(day);
+  }
+  return [...dates].sort();
+}
+
+/**
+ * The marked days that fall strictly BETWEEN two neighbouring rows of a list
+ * sorted by date, in the list's own direction — the empty days to draw a band
+ * for. `prev`/`next` are the dates either side; null is the list's edge (or a
+ * row with no date), which is unbounded on that side.
+ */
+export function gapDates(
+  marked: readonly string[],
+  prev: string | null,
+  next: string | null,
+  dir: "asc" | "desc",
+): string[] {
+  const lo = dir === "asc" ? prev : next;
+  const hi = dir === "asc" ? next : prev;
+  const between = marked.filter((d) => (lo === null || d > lo) && (hi === null || d < hi));
+  return dir === "asc" ? between : between.reverse();
+}
 
 /**
  * The marks for each of `dates`, keyed by date. A day with none has no key.

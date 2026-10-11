@@ -1,4 +1,4 @@
-import { dayMarks, type DayMark } from "@/lib/calendarMarks";
+import { dayMarks, markedDates, type DayMark } from "@/lib/calendarMarks";
 import { fetchEntries } from "@/lib/calendarQueries";
 import { readLayerColors } from "@/lib/calendarColors";
 import type { SubscriptionEventRow } from "@/lib/calendarFeeds";
@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { serverTimeZone, todayInTimeZone } from "@/lib/today";
+import { daysAfter, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { RawSearchParams } from "@/lib/filterMenus";
 import { parseFilterSearch } from "@/lib/filterMenus";
 import {
@@ -246,7 +246,20 @@ export default async function SpecialOrdersPage({
   ].sort();
   let marks: Record<string, DayMark[]> = {};
   if (eventDates.length > 0) {
-    const span = { from: eventDates[0], to: eventDates[eventDates.length - 1] };
+    // FROM the first order (or today, if that is earlier) TO the last order or
+    // sixty days out, whichever is later — so an upcoming closure shows even
+    // past the last booking — and never outside the window the list itself is
+    // showing. Bounded on purpose: "Future" runs to the end of time.
+    const first = eventDates[0];
+    const last = eventDates[eventDates.length - 1];
+    const ahead = daysAfter(today, 60);
+    let span = { from: first < today ? first : today, to: last > ahead ? last : ahead };
+    if (bounds) {
+      span = {
+        from: bounds.from > span.from ? bounds.from : span.from,
+        to: bounds.to < span.to ? bounds.to : span.to,
+      };
+    }
     const [{ entries }, subs, feedEvents] = await Promise.all([
       fetchEntries(supabase, span),
       supabase.from("calendar_subscriptions").select("id, name, color").eq("is_active", true),
@@ -259,10 +272,12 @@ export default async function SpecialOrdersPage({
         .order("id")
         .limit(1000),
     ]);
+    const events = (feedEvents.data ?? []) as SubscriptionEventRow[];
     marks = dayMarks({
-      dates: eventDates,
+      // The order days AND every day the calendar marks, orders or not.
+      dates: [...eventDates, ...markedDates(entries, events, span)],
       entries,
-      feedEvents: (feedEvents.data ?? []) as SubscriptionEventRow[],
+      feedEvents: events,
       subscriptions: (subs.data ?? []) as { id: string; name: string; color: string | null }[],
       colors: readLayerColors(session.orgSettings),
       locations: session.locations,

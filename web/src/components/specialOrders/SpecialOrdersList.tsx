@@ -1,6 +1,6 @@
 "use client";
 
-import type { DayMark } from "@/lib/calendarMarks";
+import { gapDates, type DayMark } from "@/lib/calendarMarks";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -961,6 +961,21 @@ export function SpecialOrdersList({
    * else here does: a number is unique per row and a customer is usually one
    * order.
    */
+  const markedDays = Object.keys(dayMarks).sort();
+  const marksUnder = (date: string | null) => {
+    const marks = date ? dayMarks[date] : undefined;
+    if (!marks?.length) return null;
+    return (
+      <ul>
+        {marks.map((m) => (
+          <li key={m.key} className={`truncate px-3 py-1 text-xs font-medium ${m.className}`}>
+            {m.text}
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
   const groups: DataGroup<SpecialOrderRow>[] = [
     {
       sortKey: "date",
@@ -969,18 +984,23 @@ export function SpecialOrdersList({
       // 2026-10-10): a blackout, a note, a subscribed calendar's event — each a
       // solid band in the calendar's own colour, so a day that is closed or
       // full is read before any order on it is.
-      under: (r) => {
-        const marks = r.event_date ? dayMarks[r.event_date] : undefined;
-        if (!marks?.length) return null;
-        return (
-          <ul>
-            {marks.map((m) => (
-              <li key={m.key} className={`truncate px-3 py-1 text-xs font-medium ${m.className}`}>
-                {m.text}
-              </li>
-            ))}
-          </ul>
-        );
+      under: (r) => marksUnder(r.event_date),
+      // A DAY THE CALENDAR MARKS BUT NO ORDER IS ON still gets its band (Mark,
+      // 2026-10-10) — a closed day with nothing booked is exactly the day
+      // somebody is about to take an order for.
+      gaps: (prev, next) => {
+        // A row with NO date (a template, a standing order) is not a place in
+        // the calendar: nothing is drawn before its "No date" band, and it is
+        // an open edge for whatever follows. A list of only such rows has no
+        // days at all.
+        if (next && !next.event_date) return [];
+        if (!prev?.event_date && !next?.event_date) return [];
+        return gapDates(
+          markedDays,
+          prev?.event_date ?? null,
+          next?.event_date ?? null,
+          (sort ?? NATURAL_SORT).dir,
+        ).map((date) => ({ key: date, label: dayBand(date), under: marksUnder(date) }));
       },
     },
     /* And the band over those rows, for the same reason: a standing order is

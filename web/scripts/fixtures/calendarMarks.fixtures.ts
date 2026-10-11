@@ -5,7 +5,7 @@
 // two; and sorting by title alone puts a note above the closure it sits under.
 
 import { test, eq, ok } from "./harness";
-import { dayMarks } from "../../src/lib/calendarMarks";
+import { dayMarks, gapDates, markedDates } from "../../src/lib/calendarMarks";
 import { BLACKOUT_CHIP, colorChip } from "../../src/lib/calendarColors";
 import type { CalendarEntry } from "../../src/lib/blackoutDates";
 
@@ -81,4 +81,31 @@ test("a subscribed event: its calendar's name and colour, the time on day one on
   eq(marks["2026-12-10"].map((m) => m.text), ["9 AM Trade show · Mark"]);
   eq(marks["2026-12-11"].map((m) => m.text), ["Trade show · Mark"]);
   eq(marks["2026-12-10"][0].className, colorChip("lime"));
+});
+
+/* -- days with no order on them ------------------------------------------ */
+// Checked by BREAKING: an inclusive bound draws a second band for a day that
+// already has orders; ignoring `dir` lists a descending list's empty days
+// backwards; and an unclamped walk of a year-long entry returns 365 days.
+
+test("markedDates: every day something touches, inside the span", () => {
+  eq(
+    markedDates(
+      [{ starts_on: "2026-12-24", ends_on: "2026-12-26" }, { starts_on: "2026-01-01", ends_on: "2026-12-31" }],
+      [{ starts_on: "2026-12-30", ends_on: "2026-12-30" }],
+      { from: "2026-12-25", to: "2026-12-27" },
+    ),
+    ["2026-12-25", "2026-12-26", "2026-12-27"],
+  );
+  eq(markedDates([], [], { from: "2026-12-01", to: "2026-12-31" }), []);
+});
+
+test("gapDates: strictly between the neighbours, in the list's direction", () => {
+  const marked = ["2026-12-20", "2026-12-24", "2026-12-25", "2026-12-26", "2026-12-31"];
+  eq(gapDates(marked, "2026-12-24", "2026-12-26", "asc"), ["2026-12-25"], "the neighbours have their own bands");
+  eq(gapDates(marked, null, "2026-12-24", "asc"), ["2026-12-20"], "before the first row");
+  eq(gapDates(marked, "2026-12-26", null, "asc"), ["2026-12-31"], "after the last");
+  eq(gapDates(marked, "2026-12-26", "2026-12-20", "desc"), ["2026-12-25", "2026-12-24"], "descending");
+  eq(gapDates(marked, null, "2026-12-26", "desc"), ["2026-12-31"]);
+  eq(gapDates(marked, "2026-12-24", "2026-12-25", "asc"), []);
 });
