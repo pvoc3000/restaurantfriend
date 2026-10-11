@@ -627,6 +627,10 @@ export function SpecialOrderSettings({
       <section className="space-y-4">
         <SectionHeading>What the documents say</SectionHeading>
         <dl className="max-w-2xl space-y-4">
+          {/* Each paper's wording sits on the tab of the message that carries
+              it (Mark, 2026-10-10): the terms with the quote, the footer with
+              the invoice. The phone number is on all of them. */}
+          {messagesTab === "orders" && (
           <div className="space-y-1">
             <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
               Terms, printed on every quote
@@ -643,6 +647,8 @@ export function SpecialOrderSettings({
               online, so the rush-fee figures below should match what it says.
             </p>
           </div>
+          )}
+          {messagesTab === "invoices" && (
           <div className="space-y-1">
             <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
               Invoice footer
@@ -650,11 +656,12 @@ export function SpecialOrderSettings({
             <dd>
               {editable
                 ? cell(["special_orders", "invoice_footer"], text(so.invoice_footer), {
-                    ariaLabel: "Invoice footer",
+                    boxed: true, ariaLabel: "Invoice footer",
                   })
                 : <span>{text(so.invoice_footer) ?? "—"}</span>}
             </dd>
           </div>
+          )}
           <div className="space-y-1">
             <dt className="text-[11px] uppercase tracking-[0.12em] text-subtle">
               Phone number on documents
