@@ -177,8 +177,11 @@ export function ColumnsMenu<T>({
  *
  * A Material weight is a DIFFERENT PATH, not a `stroke-width` — changing it
  * means fetching the `wght300` artwork, so don't expect a CSS knob here.
+ *
+ * Exported for `ui/PickSet`'s `icon` trigger — the calendar's layers, which is
+ * the same verb over a different noun, and should be the same eye.
  */
-function ColumnsIcon() {
+export function ColumnsIcon() {
   return (
     <svg width="24" height="24" viewBox="0 -960 960 960" aria-hidden="true">
       <path

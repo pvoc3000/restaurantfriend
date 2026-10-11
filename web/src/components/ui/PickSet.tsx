@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { createPortal, flushSync } from "react-dom";
 import {
   MENU_CARET,
@@ -69,7 +69,7 @@ export function PickSet({
   boxed = false,
   minWidth = 220,
   className = "",
-  triggerText,
+  icon,
 }: {
   options: PickSetOption[];
   /** The chosen values. EMPTY MEANS ALL — see above. */
@@ -92,13 +92,18 @@ export function PickSet({
   minWidth?: number;
   className?: string;
   /**
-   * What the trigger ALWAYS says, in place of the summary of what is ticked.
-   * For a set whose state is already drawn right beside it — the calendar's
-   * layers, whose key of chips is the summary (Mark, 2026-10-10) — where a
-   * trigger reading "8 layers" says the same thing twice and worse. Leave it
-   * out everywhere else: a filter with no other witness must say its state.
+   * Draw the trigger as a bare ICON BUTTON — `catalog/ColumnsMenu`'s eye, at
+   * its 32px square — in place of the labelled field (Mark, 2026-10-10, on the
+   * calendar's layers: "a similar eye button that we use to show/hide columns
+   * in datatables").
+   *
+   * For a show/hide set whose state is already drawn beside it (the calendar's
+   * key of chips), where a field reading "8 layers" says it twice. Like the
+   * columns eye it is INK when something is hidden and muted when nothing is,
+   * so the button itself says "this is why a thing is missing". Leave it out
+   * for a FILTER: one with no other witness must say its state in words.
    */
-  triggerText?: string;
+  icon?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
@@ -129,9 +134,8 @@ export function PickSet({
   // NAMES UP TO TWO, COUNTS PAST THAT. "DF01 + DF02" is worth the width because
   // it answers the question outright; "DF01 + DF02 + DF03 + EVENT" is a wall
   // that pushes the rest of the filter row around every time you tick one more.
-  const summary = triggerText
-    ? triggerText
-    : chosen.length === 0
+  const summary =
+    chosen.length === 0
       ? allLabel
       : chosen.length <= 2
         ? chosen.map((o) => o.summary ?? o.label).join(" + ")
@@ -184,16 +188,30 @@ export function PickSet({
         // what `BOXED_FIELD` says and what every `InlineValue` beside this one
         // does. Unboxed it stays content-sized, because a filter row packs its
         // controls rather than stretching them.
-        className={`flex h-9 items-center gap-2 bg-white px-3 text-[13px] hover:bg-neutral-100 disabled:opacity-40 ${
-          // Both dresses are raised fields (`rf-press`, `styles/mac-look.css`):
-          // a 2px edge on hover, never a grey fill.
-          boxed ? `rf-press ${BOXED_FIELD_BORDER} w-full` : "rf-press border border-ink"
-        } ${className}`}
+        title={icon ? `${label} — ${summary}` : undefined}
+        className={
+          icon
+            ? // `ColumnsMenu`'s trigger, class for class: a 32px square round
+              // the 24px glyph, a grey wash on hover, ink when the set is
+              // narrowed.
+              `grid h-8 w-8 shrink-0 place-items-center transition-colors hover:bg-neutral-100 hover:text-ink disabled:opacity-40 ${
+                chosen.length > 0 ? "text-ink" : "text-muted"
+              } ${className}`
+            : `flex h-9 items-center gap-2 bg-white px-3 text-[13px] hover:bg-neutral-100 disabled:opacity-40 ${
+                // Both dresses are raised fields (`rf-press`, `styles/mac-look.css`):
+                // a 2px edge on hover, never a grey fill.
+                boxed ? `rf-press ${BOXED_FIELD_BORDER} w-full` : "rf-press border border-ink"
+              } ${className}`
+        }
       >
-        <span className="truncate">{summary}</span>
-        <span aria-hidden className="ml-auto shrink-0 text-[9px] text-muted">
-          {MENU_CARET}
-        </span>
+        {icon ?? (
+          <>
+            <span className="truncate">{summary}</span>
+            <span aria-hidden className="ml-auto shrink-0 text-[9px] text-muted">
+              {MENU_CARET}
+            </span>
+          </>
+        )}
       </button>
 
       {open &&

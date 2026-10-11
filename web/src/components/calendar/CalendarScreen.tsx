@@ -24,6 +24,7 @@ import type { CalendarEntry } from "@/lib/blackoutDates";
 import { useStoredSet } from "@/lib/storedSet";
 import { MonthView } from "@/components/calendar/MonthView";
 import { MonthJump } from "@/components/calendar/MonthJump";
+import { ColumnsIcon } from "@/components/catalog/ColumnsMenu";
 import { ColorSwatches } from "@/components/calendar/ColorSwatches";
 import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
 import { createClient } from "@/lib/supabase/client";
@@ -298,59 +299,61 @@ export function CalendarScreen({
             </button>
           </div>
         )}
-        <div className="ml-auto flex flex-wrap items-end gap-x-6 gap-y-3">
-          {/* RADIOS, to the left of Shops (Mark, 2026-10-10). The row a button
-              tall, so the pair sits on the pickers' baseline. */}
-          <ControlField label="View">
-            <Radio<CalendarView>
-              ariaLabel="View"
-              value={view}
-              onChange={changeView}
-              options={[
-                { value: "month", label: "Month" },
-                { value: "day", label: "Day" },
-                { value: "list", label: "List" },
-              ]}
-              className="h-9"
+        {/* LEFT TO RIGHT (Mark, 2026-10-10): the date and Today, then Shops,
+            then View — the row's `gap-x-6` is the air between Today and Shops —
+            and the layers' eye alone at the far right, where a table's columns
+            eye sits. */}
+        {view !== "list" && (
+          <ControlField label="Shops">
+            <PickSet
+              options={locations.map((l) => ({ value: l.id, label: l.code, hint: l.name }))}
+              value={shopFilter}
+              onChange={changeShops}
+              allLabel="All shops"
+              label="Which shops to show"
+              noun="shops"
             />
           </ControlField>
-          {view !== "list" && (
-            <ControlField label="Shops">
-              <PickSet
-                options={locations.map((l) => ({ value: l.id, label: l.code, hint: l.name }))}
-                value={shopFilter}
-                onChange={changeShops}
-                allLabel="All shops"
-                label="Which shops to show"
-                noun="shops"
-              />
-            </ControlField>
-          )}
-          {view !== "list" && offered.length > 1 && (
-              <ControlField label="Show">
-                <PickSet
-                  options={offered.map((l) => ({ value: l.key, label: l.label }))}
-                  value={shownLayers}
-                  onChange={(next) => {
-                    // An empty set from `PickSet` means ALL, opt-in layers too.
-                    const shown = next.length === 0 ? offered.map((l) => l.key) : next;
-                    setHidden(
-                      offered
-                        .filter((l) => !OPT_IN_LAYERS.includes(l.key) && !shown.includes(l.key))
-                        .map((l) => l.key),
-                    );
-                    setOptedIn(OPT_IN_LAYERS.filter((l) => shown.includes(l)));
-                  }}
-                  allLabel="Everything"
-                  // The key of chips under the month's name IS the summary.
-                  triggerText="Layers"
-                  label="What the calendar shows"
-                  noun="layers"
-                  align="right"
-                />
-              </ControlField>
-          )}
-        </div>
+        )}
+        <ControlField label="View">
+          <Radio<CalendarView>
+            ariaLabel="View"
+            value={view}
+            onChange={changeView}
+            options={[
+              { value: "month", label: "Month" },
+              { value: "day", label: "Day" },
+              { value: "list", label: "List" },
+            ]}
+            // A button tall, so the radios sit on the pickers' baseline.
+            className="h-9"
+          />
+        </ControlField>
+        {view !== "list" && offered.length > 1 && (
+          <PickSet
+            // THE EYE — `ColumnsMenu`'s, for the same verb: which of these to
+            // show. The key of chips under this row is what says the answer,
+            // so the trigger does not have to.
+            icon={<ColumnsIcon />}
+            options={offered.map((l) => ({ value: l.key, label: l.label }))}
+            value={shownLayers}
+            onChange={(next) => {
+              // An empty set from `PickSet` means ALL, opt-in layers too.
+              const shown = next.length === 0 ? offered.map((l) => l.key) : next;
+              setHidden(
+                offered
+                  .filter((l) => !OPT_IN_LAYERS.includes(l.key) && !shown.includes(l.key))
+                  .map((l) => l.key),
+              );
+              setOptedIn(OPT_IN_LAYERS.filter((l) => shown.includes(l)));
+            }}
+            allLabel="Everything"
+            label="What the calendar shows"
+            noun="layers"
+            align="right"
+            className="ml-auto"
+          />
+        )}
       </div>
 
       {layerFailures.length > 0 && (
