@@ -1,3 +1,7 @@
+import { dayMarks, type DayMark } from "@/lib/calendarMarks";
+import { fetchEntries } from "@/lib/calendarQueries";
+import { readLayerColors } from "@/lib/calendarColors";
+import type { SubscriptionEventRow } from "@/lib/calendarFeeds";
 import { cookies } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
@@ -232,6 +236,39 @@ export default async function SpecialOrdersPage({
     }
   }
 
+  // WHAT THE CALENDAR SAYS ABOUT THE DAYS ON SCREEN (Mark, 2026-10-10): typed
+  // entries and subscribed events between the first and last event date in the
+  // list, drawn under each day's band. Two small reads, bounded by those dates;
+  // a failure (the tables predate nothing here, but RLS can say no) is no
+  // marks, never a broken list.
+  const eventDates = [
+    ...new Set((orders ?? []).map((o) => o.event_date as string | null).filter((d): d is string => Boolean(d))),
+  ].sort();
+  let marks: Record<string, DayMark[]> = {};
+  if (eventDates.length > 0) {
+    const span = { from: eventDates[0], to: eventDates[eventDates.length - 1] };
+    const [{ entries }, subs, feedEvents] = await Promise.all([
+      fetchEntries(supabase, span),
+      supabase.from("calendar_subscriptions").select("id, name, color").eq("is_active", true),
+      supabase
+        .from("calendar_subscription_events")
+        .select("id, subscription_id, starts_on, ends_on, start_time, title, place")
+        .gte("ends_on", span.from)
+        .lte("starts_on", span.to)
+        .order("starts_on")
+        .order("id")
+        .limit(1000),
+    ]);
+    marks = dayMarks({
+      dates: eventDates,
+      entries,
+      feedEvents: (feedEvents.data ?? []) as SubscriptionEventRow[],
+      subscriptions: (subs.data ?? []) as { id: string; name: string; color: string | null }[],
+      colors: readLayerColors(session.orgSettings),
+      locations: session.locations,
+    });
+  }
+
   // Codes rather than ids on the row: the list groups, filters and prints by
   // code, and `session.locations` is the FULL list so an order at a closed
   // shop still shows which one instead of an em dash.
@@ -278,6 +315,7 @@ export default async function SpecialOrdersPage({
       initialSearch={parseFilterSearch(viewParams)}
       capped={rows.length === 500}
       topUpError={topUpError?.message ?? null}
+      dayMarks={marks}
     />
   );
 }

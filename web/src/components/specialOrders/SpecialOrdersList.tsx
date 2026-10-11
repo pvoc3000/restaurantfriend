@@ -1,5 +1,6 @@
 "use client";
 
+import type { DayMark } from "@/lib/calendarMarks";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -254,7 +255,11 @@ export function SpecialOrdersList({
   initialSearch = "",
   capped = false,
   topUpError = null,
+  dayMarks = {},
 }: {
+  /** What the calendar says about each day on screen, by date — entries and
+   *  subscribed events (`lib/calendarMarks`). Drawn under the day's band. */
+  dayMarks?: Record<string, DayMark[]>;
   rows: SpecialOrderRow[];
   today: string;
   thresholds: AttentionThresholds;
@@ -957,7 +962,27 @@ export function SpecialOrdersList({
    * order.
    */
   const groups: DataGroup<SpecialOrderRow>[] = [
-    { sortKey: "date", label: (r) => dayBand(r.event_date) },
+    {
+      sortKey: "date",
+      label: (r) => dayBand(r.event_date),
+      // WHAT THE CALENDAR SAYS ABOUT THE DAY, under its band (Mark,
+      // 2026-10-10): a blackout, a note, a subscribed calendar's event — each a
+      // solid band in the calendar's own colour, so a day that is closed or
+      // full is read before any order on it is.
+      under: (r) => {
+        const marks = r.event_date ? dayMarks[r.event_date] : undefined;
+        if (!marks?.length) return null;
+        return (
+          <ul>
+            {marks.map((m) => (
+              <li key={m.key} className={`truncate px-3 py-1 text-xs font-medium ${m.className}`}>
+                {m.text}
+              </li>
+            ))}
+          </ul>
+        );
+      },
+    },
     /* And the band over those rows, for the same reason: a standing order is
        banded as a standing order, not under the status its days will start
        with. */

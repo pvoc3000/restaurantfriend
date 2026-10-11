@@ -163,6 +163,16 @@ export type DataGroup<T> = {
    * Everything else keeps the band — one style per weight, not per caller.
    */
   heading?: boolean;
+  /**
+   * Something to draw DIRECTLY UNDER each band, across the table's full width,
+   * before the run's first row — given that first row, which is how the caller
+   * knows which run it is.
+   *
+   * For a fact about the GROUP that is not one of its rows: the special orders
+   * list, banded by day, puts what the calendar says about that day here (a
+   * closure, a note). Return null for nothing, and no row is drawn.
+   */
+  under?: (firstRow: T) => ReactNode;
 };
 
 /**
@@ -902,6 +912,18 @@ export function DataTable<T>({
                         </td>
                       </tr>
                     ))}
+                  {startsGroup && banding!.under
+                    ? (() => {
+                        const under = banding!.under!(row);
+                        return under ? (
+                          <tr>
+                            <td colSpan={visibleColumns.length} className="p-0">
+                              {under}
+                            </td>
+                          </tr>
+                        ) : null;
+                      })()
+                    : null}
                   {startsSubGroup && (
                     <tr>
                       <td
