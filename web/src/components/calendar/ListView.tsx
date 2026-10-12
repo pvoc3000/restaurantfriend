@@ -57,7 +57,7 @@ export function ListView({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {days.map((day) => {
         const { banners, timed } = dayAgenda(day.items);
         return (
