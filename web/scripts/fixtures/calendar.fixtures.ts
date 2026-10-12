@@ -363,7 +363,7 @@ test("the plan's banner is the top of the week, over a closure and over chips", 
 // `parseDateParam` without the round trip accepts February 31st.
 
 test("a day is banners, then what has no time, then what has one — by time", () => {
-  const { banners, allDay, timed } = dayAgenda([
+  const { banners, timed } = dayAgenda([
     item({ key: "late-paid", layer: "orders_paid", time: "14:00", title: "Paid at 2" }),
     item({ key: "early-unpaid", layer: "orders_unpaid", time: "09:00", title: "Unpaid at 9" }),
     item({ key: "feed", layer: "feeds", time: "11:30", title: "Dentist" }),
@@ -372,8 +372,7 @@ test("a day is banners, then what has no time, then what has one — by time", (
     item({ key: "closed", layer: "entries", title: "Christmas", blackout: true }),
     item({ key: "plan", layer: "menu_plan", title: "Holiday 2026" }),
   ]);
-  eq(banners.map((i) => i.key), ["plan", "closed"]);
-  eq(allDay.map((i) => i.key), ["note", "po"]);
+  eq(banners.map((i) => i.key), ["plan", "closed", "note", "po"], "untimed, after the plan and blackouts");
   eq(timed.map((i) => i.key), ["early-unpaid", "feed", "late-paid"]);
 });
 

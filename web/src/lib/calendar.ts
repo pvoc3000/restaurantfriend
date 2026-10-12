@@ -375,23 +375,24 @@ export function weekLayout(
 /* -- one day, in full ----------------------------------------------------- */
 
 /**
- * A day's items in the three bands the day view draws.
+ * A day's items in the two bands the day view draws.
  *
- *   banners  the menu plan and every blackout — facts about the whole day
- *   allDay   what has no time, in `compareItems`' order
- *   timed    what has one, by TIME across every layer and shop, so the day
+ *   banners  everything with NO TIME: the menu plan and every blackout first,
+ *            then notes, deliveries, tasks and the rest in `compareItems`'
+ *            order. There was a separate "All day" list until Mark,
+ *            2026-10-11: "Anything there can go with the menu plan and
+ *            blackout dates above it".
+ *   timed    what has a time, by TIME across every layer and shop, so the day
  *            reads top to bottom as it will happen
  */
 export function dayAgenda(items: readonly CalendarItem[]): {
   banners: CalendarItem[];
-  allDay: CalendarItem[];
   timed: CalendarItem[];
 } {
   const sorted = [...items].sort(compareItems);
   const isBanner = (i: CalendarItem) => i.layer === "menu_plan" || Boolean(i.blackout);
   return {
-    banners: sorted.filter(isBanner),
-    allDay: sorted.filter((i) => !isBanner(i) && !i.time),
+    banners: [...sorted.filter(isBanner), ...sorted.filter((i) => !isBanner(i) && !i.time)],
     timed: sorted
       .filter((i) => !isBanner(i) && i.time)
       .sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "") || compareItems(a, b)),

@@ -310,3 +310,10 @@ brackets. Read by `entryItems` (month and day views) and `dayMarks` (the
 orders list, where the shops moved from the end of the line to after the
 title). Migration 193 does the same in the published feed. The List view is
 unchanged: it has a Shops column. Never on `/inquiry` — titles do not go there.
+
+**THE DAY VIEW HAS NO "ALL DAY" LIST** (Mark, 2026-10-11: "Anything there can
+go with the menu plan and blackout dates above it"). `dayAgenda` returns two
+bands: `banners` is everything with no time — menu plan and blackouts first,
+then notes, deliveries, tasks and the rest — and `timed` is the list by time,
+now with no heading because it is the only list. A banner that is not a
+blackout shows its detail after the title and its shops and layer on the right.

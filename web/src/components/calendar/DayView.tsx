@@ -12,11 +12,11 @@ const LAYER_LABEL = Object.fromEntries(CALENDAR_LAYERS.map((l) => [l.key, l.labe
  * view instead of popup panel") — everything a month cell squeezes into a chip,
  * with room to read it.
  *
- * Three bands, top to bottom, from `lib/calendar.dayAgenda`:
+ * Two bands, top to bottom, from `lib/calendar.dayAgenda`:
  *
- *   · BANNERS — the menu plan and any blackout, full width. They are facts
- *     about the whole day and are read before anything on it.
- *   · ALL DAY — what has no time: notes, deliveries, tasks, a pay period, HR.
+ *   · BANNERS — everything with no time, full width: the menu plan and any
+ *     blackout first, then notes, deliveries, tasks, a pay period, HR. One
+ *     band, not a separate "All day" list (Mark, 2026-10-11).
  *   · BY TIME — what has one, in time order, every shop together.
  *
  * A TIMELINE LIST, NOT AN HOUR GRID. A day here has a handful of timed things,
@@ -40,7 +40,7 @@ export function DayView({
   colors: LayerColors;
   onEntry: (entryId: string) => void;
 }) {
-  const { banners, allDay, timed } = dayAgenda(items);
+  const { banners, timed } = dayAgenda(items);
 
   if (items.length === 0) {
     return <p className="border border-hairline px-4 py-8 text-center text-sm text-muted">Nothing on this day.</p>;
@@ -59,22 +59,23 @@ export function DayView({
       <div className={className}>{children}</div>
     );
 
-  const line = (item: CalendarItem, withTime: boolean) => {
-    const shops = item.locationIds
+  const shopsOf = (item: CalendarItem) =>
+    item.locationIds
       .map((id) => shopCodes.get(id))
       .filter((code): code is string => Boolean(code))
       .join(", ");
+
+  const line = (item: CalendarItem) => {
+    const shops = shopsOf(item);
     return (
       <li key={item.key}>
         {open(
           item,
           "flex w-full items-baseline gap-4 px-3 py-2.5 hover:bg-neutral-100",
           <>
-            {withTime && (
-              <span className="w-20 shrink-0 text-right text-sm font-semibold tabular-nums">
-                {item.time ? clockTime(item.time) : ""}
-              </span>
-            )}
+            <span className="w-20 shrink-0 text-right text-sm font-semibold tabular-nums">
+              {item.time ? clockTime(item.time) : ""}
+            </span>
             <span className="min-w-0 flex-1">
               <span className={`rounded-[4px] px-1.5 py-0.5 text-sm font-medium ${chipClass(item, colors)}`}>
                 {item.lead ? `${item.lead}: ` : ""}
@@ -104,9 +105,14 @@ export function DayView({
                   <span className="min-w-0 truncate">
                     {item.lead ? `${item.lead}: ` : ""}
                     {item.title}
+                    {!item.blackout && item.detail && (
+                      <span className="font-normal opacity-80"> — {item.detail}</span>
+                    )}
                   </span>
                   <span className="shrink-0 text-[11px] font-normal uppercase tracking-[0.08em] opacity-80">
-                    {item.blackout ? item.detail || "Blackout" : LAYER_LABEL[item.layer]}
+                    {item.blackout
+                      ? item.detail || "Blackout"
+                      : [shopsOf(item), LAYER_LABEL[item.layer]].filter(Boolean).join(" · ")}
                   </span>
                 </>,
               )}
@@ -115,18 +121,8 @@ export function DayView({
         </ul>
       )}
 
-      {allDay.length > 0 && (
-        <section className="space-y-1">
-          <h2 className="text-[11px] uppercase tracking-[0.12em] text-subtle">All day</h2>
-          <ul className="divide-y divide-neutral-200 border border-ink bg-white">{allDay.map((i) => line(i, false))}</ul>
-        </section>
-      )}
-
       {timed.length > 0 && (
-        <section className="space-y-1">
-          <h2 className="text-[11px] uppercase tracking-[0.12em] text-subtle">By time</h2>
-          <ul className="divide-y divide-neutral-200 border border-ink bg-white">{timed.map((i) => line(i, true))}</ul>
-        </section>
+        <ul className="divide-y divide-neutral-200 border border-ink bg-white">{timed.map(line)}</ul>
       )}
     </div>
   );
