@@ -11,7 +11,7 @@
 
 import { monthGrid, monthStart, type DateRange } from "./dateRange";
 import { daysAfter } from "./today";
-import { isBlackout, type CalendarEntry } from "./blackoutDates";
+import { entryTitle, isBlackout, type CalendarEntry } from "./blackoutDates";
 import { formatRange } from "./dateRange";
 
 export type CalendarLayer =
@@ -159,8 +159,13 @@ export function resolveShops(filter: readonly string[], workingId: string | null
 
 /* -- typed entries ------------------------------------------------------- */
 
-/** One item per day an entry covers, clamped to `range`. */
-export function entryItems(entries: readonly CalendarEntry[], range: DateRange): CalendarItem[] {
+/** One item per day an entry covers, clamped to `range`. `locations` is every
+ *  shop, for the codes after a one-shop blackout's title (`entryTitle`). */
+export function entryItems(
+  entries: readonly CalendarEntry[],
+  range: DateRange,
+  locations: readonly { id: string; code: string }[] = [],
+): CalendarItem[] {
   const items: CalendarItem[] = [];
   for (const entry of entries) {
     const from = entry.starts_on > range.from ? entry.starts_on : range.from;
@@ -170,7 +175,7 @@ export function entryItems(entries: readonly CalendarEntry[], range: DateRange):
         key: `entry:${entry.id}:${day}`,
         layer: "entries",
         date: day,
-        title: entry.title,
+        title: entryTitle(entry, locations),
         detail: entry.note,
         locationIds: entry.location_ids,
         blackout: isBlackout(entry),

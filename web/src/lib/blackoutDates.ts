@@ -220,6 +220,25 @@ export function entryShops(
   return `${codes.slice(0, -1).join(", ")} and ${codes[codes.length - 1]}`;
 }
 
+/**
+ * An entry's title as the calendar draws it: a blackout that is not for every
+ * shop says which — "Large Knotted Order (DF02)", "Repairs (DF01, DF02)"
+ * (Mark, 2026-10-11). A note's title is left alone, and so is an every-shop
+ * blackout's. The codes are alphabetical, as migration 193 writes them in the
+ * published feed.
+ */
+export function entryTitle(
+  entry: Pick<CalendarEntry, "title" | "location_ids" | BlackoutColumn>,
+  locations: readonly { id: string; code: string }[],
+): string {
+  if (!isBlackout(entry) || entry.location_ids.length === 0) return entry.title;
+  const codes = locations
+    .filter((l) => entry.location_ids.includes(l.id))
+    .map((l) => l.code)
+    .sort();
+  return codes.length === 0 ? entry.title : `${entry.title} (${codes.join(", ")})`;
+}
+
 const SENTENCE: Record<BlackoutEffect, string> = {
   special_orders: "No special orders",
   standing_orders: "No standing orders",

@@ -13,6 +13,7 @@ import {
   blackoutLabels,
   entryCoversDate,
   entryShops,
+  entryTitle,
   isBlackout,
   type CalendarEntry,
 } from "./blackoutDates";
@@ -132,11 +133,14 @@ export function dayMarks(input: {
     for (const entry of input.entries) {
       if (!entryCoversDate(entry, date)) continue;
       const blackout = isBlackout(entry);
-      const where = entry.location_ids.length === 0 ? "" : ` (${entryShops(entry, input.locations)})`;
+      // A blackout's shops follow its TITLE, as on the calendar (`entryTitle`);
+      // a note's still close the line.
+      const where =
+        blackout || entry.location_ids.length === 0 ? "" : ` (${entryShops(entry, input.locations)})`;
       const what = blackout ? blackoutLabels(entry).join(" · ") : entry.note?.trim() || "";
       marks.push({
         key: `entry:${entry.id}`,
-        text: `${entry.title}${what ? ` — ${what}` : ""}${where}`,
+        text: `${entryTitle(entry, input.locations)}${what ? ` — ${what}` : ""}${where}`,
         className: chipClass({ layer: "entries", blackout, color: entry.color }, input.colors),
         blackout,
         kind: blackout ? "blackout" : "note",

@@ -378,3 +378,8 @@ an entry's title; it is internal.
 
 **192 is APPLIED** (Claude, 2026-10-10) — a no-preference inquiry goes to the
 first shop not blacked out that day; `inquiry_blackouts` returns `shop_ids`.
+
+**193 is APPLIED** (Claude, 2026-10-11) — in the published feed, a blackout
+that is not for every shop names its shops after its title ("Large Knotted
+Order (DF02)"). `calendar_feed_by_token` restated from 190 with one expression
+changed; dry-run on the live DB showed every non-entry item byte-identical.

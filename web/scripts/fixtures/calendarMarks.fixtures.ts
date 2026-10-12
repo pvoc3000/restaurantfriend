@@ -52,7 +52,7 @@ test("a blackout says what it stops and where, in the dark chip, and leads", () 
     ],
   })["2026-12-25"];
   eq(marks.map((m) => m.text), [
-    "Closed — No special orders · Shop closed (DF01)",
+    "Closed (DF01) — No special orders · Shop closed",
     "A note — bring cones",
   ]);
   eq(marks[0].className, BLACKOUT_CHIP, "its own colour does not recolour a blackout");

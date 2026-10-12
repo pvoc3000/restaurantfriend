@@ -187,7 +187,7 @@ export function CalendarScreen({
     [view, date, month],
   );
   const days = useMemo(() => {
-    const all = [...entryItems(entries, range), ...layerItems];
+    const all = [...entryItems(entries, range, locations), ...layerItems];
     return itemsByDay(
       visibleItems(all, {
         hiddenLayers: hiddenSet,

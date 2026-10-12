@@ -299,3 +299,14 @@ Week and day views, timed entries of our own, drag to move, delivery-only
 blackouts, minimum notice, capacity caps, holidays in the rush business-day
 count (`lib/specialOrders` stays Mon–Fri), writing back to Google, a tablet
 tile, emailing a standing-order customer about a skipped day.
+
+**A ONE-SHOP BLACKOUT NAMES ITS SHOPS AFTER ITS TITLE** (Mark, 2026-10-11:
+"if a blackout is anything other than all shops, then add the shops in
+parenthesis after the title. i.e. 'Large Knotted Order (DF02)'").
+`blackoutDates.entryTitle` is the rule: a BLACKOUT with a non-empty
+`location_ids` gets " (DF01, DF02)", codes alphabetical; a note and an
+every-shop blackout are untouched; a shop the lookup does not know adds no
+brackets. Read by `entryItems` (month and day views) and `dayMarks` (the
+orders list, where the shops moved from the end of the line to after the
+title). Migration 193 does the same in the published feed. The List view is
+unchanged: it has a Shops column. Never on `/inquiry` — titles do not go there.

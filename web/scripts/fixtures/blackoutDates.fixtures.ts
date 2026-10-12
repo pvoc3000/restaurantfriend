@@ -18,6 +18,7 @@ import {
   entryCoversDate,
   entryDates,
   entryShops,
+  entryTitle,
   isBlackout,
   type CalendarEntry,
 } from "../../src/lib/blackoutDates";
@@ -168,6 +169,16 @@ test("entryShops reads as codes, and every shop when none is named", () => {
   eq(entryShops({ location_ids: [DF01] }, LOCATIONS), "DF01");
   eq(entryShops({ location_ids: [DF02, DF01] }, LOCATIONS), "DF01 and DF02");
   eq(entryShops({ location_ids: [DF01, DF02, "loc-3"] }, LOCATIONS), "DF01, DF02 and EVENT");
+});
+
+test("entryTitle: a blackout that is not for every shop names its shops", () => {
+  const off = { no_special_orders: true };
+  eq(entryTitle(entry({ ...off, title: "Large Knotted Order", location_ids: [DF02] }), LOCATIONS),
+    "Large Knotted Order (DF02)");
+  eq(entryTitle(entry({ ...off, location_ids: [DF02, DF01] }), LOCATIONS), "Christmas (DF01, DF02)");
+  eq(entryTitle(entry({ ...off }), LOCATIONS), "Christmas", "every shop");
+  eq(entryTitle(entry({ location_ids: [DF02] }), LOCATIONS), "Christmas", "a note is left alone");
+  eq(entryTitle(entry({ ...off, location_ids: ["gone"] }), LOCATIONS), "Christmas", "no empty brackets");
 });
 
 test("blackoutSentence names the shops only when the entry is not for all", () => {
