@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { dayAgenda, longDate, type CalendarItem } from "@/lib/calendar";
 import type { LayerColors } from "@/lib/calendarColors";
-import { ItemLine } from "@/components/calendar/ItemLine";
+import { ITEM_LINES_CLASS, ItemLine } from "@/components/calendar/ItemLine";
 import { BackToTop } from "@/components/ui/BackToTop";
 
 /**
@@ -85,10 +85,7 @@ export function ListView({
                 )}
               </button>
             </h2>
-            {/* The dividing lines start at the SECOND column — past the line's
-                12px pad, the 80px time column and the 16px gap (`ItemLine`) —
-                so the times read as one clear column down the day. */}
-            <ul className="[&>li+li]:relative [&>li+li]:before:absolute [&>li+li]:before:top-0 [&>li+li]:before:right-0 [&>li+li]:before:left-[6.75rem] [&>li+li]:before:border-t [&>li+li]:before:border-neutral-200 [&>li+li]:before:content-['']">
+            <ul className={ITEM_LINES_CLASS}>
               {[...banners, ...timed].map((item) => (
                 <ItemLine key={item.key} item={item} shopCodes={shopCodes} colors={colors} onEntry={onEntry} />
               ))}

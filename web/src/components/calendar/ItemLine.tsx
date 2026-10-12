@@ -36,6 +36,14 @@ export function itemShops(item: CalendarItem, shopCodes: ReadonlyMap<string, str
 }
 
 /**
+ * The `ul` around a run of `ItemLine`s: the dividing lines start at the
+ * SECOND column (Mark, 2026-10-11) — past the line's 12px pad, the 80px time
+ * column and the 16px gap — so the times read as one clear column.
+ */
+export const ITEM_LINES_CLASS =
+  "[&>li+li]:relative [&>li+li]:before:absolute [&>li+li]:before:top-0 [&>li+li]:before:right-0 [&>li+li]:before:left-[6.75rem] [&>li+li]:before:border-t [&>li+li]:before:border-neutral-200 [&>li+li]:before:content-['']";
+
+/**
  * ONE ITEM ON ONE LINE, as the day view's timed list and the list view both
  * draw it: the time in a column (empty for an item that has none), the item's
  * chip with its second phrase under it, and on the right its shops and layer.

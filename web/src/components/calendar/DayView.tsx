@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { dayAgenda, type CalendarItem } from "@/lib/calendar";
 import { chipClass, type LayerColors } from "@/lib/calendarColors";
-import { ItemLine, LAYER_LABEL, itemShops, openItem } from "@/components/calendar/ItemLine";
+import { ITEM_LINES_CLASS, ItemLine, LAYER_LABEL, itemShops, openItem } from "@/components/calendar/ItemLine";
 
 /**
  * ONE DAY IN FULL (Mark, 2026-10-10: "timeline list, combined list, go to day
@@ -53,9 +53,9 @@ export function DayView({
       {banners.length > 0 && (
         <section className="space-y-1">
           <h2 className="text-[11px] uppercase tracking-[0.12em] text-subtle">All day</h2>
-          {/* The banners sit in the same box the timed list wears (Mark,
-              2026-10-11: "I miss the box around the all day items"). */}
-          <ul className="space-y-2 border border-ink bg-white p-2">
+          {/* No box round either list (Mark, 2026-10-11) — the headings are
+              what separate them. */}
+          <ul className="space-y-2">
             {banners.map((item) => (
               <li key={item.key}>
                 {open(
@@ -85,7 +85,7 @@ export function DayView({
       {timed.length > 0 && (
         <section className="space-y-1">
           <h2 className="text-[11px] uppercase tracking-[0.12em] text-subtle">By time</h2>
-          <ul className="divide-y divide-neutral-200 border border-ink bg-white">
+          <ul className={ITEM_LINES_CLASS}>
             {timed.map((item) => (
               <ItemLine key={item.key} item={item} shopCodes={shopCodes} colors={colors} onEntry={onEntry} />
             ))}
