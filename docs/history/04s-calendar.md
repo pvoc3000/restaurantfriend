@@ -336,3 +336,11 @@ eye and the colour key now show in all three views; `?view=list&month=…`.
 This is the "agenda" idea parked on 2026-10-10, scoped to the month on screen
 instead of rolling forward from today, which removed the need for a window and
 a "load more".
+
+**THE FILTER ROW STICKS, AND LIST'S TODAY SCROLLS** (Mark, 2026-10-11). The
+row (stepper, Shops, View, eye) is `sticky top-[var(--rf-header-h)]` and
+publishes its measured height as `--rf-calendar-controls-h` on the screen's
+root, which a list band's `scrollMarginTop` reads. In List, in the current
+month, Today is enabled and scrolls to the band marked
+`data-calendar-landing` (today's, else the next with anything, else the last);
+in another month it goes to this month, which lands there on mount.

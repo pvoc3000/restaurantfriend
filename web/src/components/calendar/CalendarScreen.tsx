@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { Radio } from "@/components/ui/Radio";
@@ -159,6 +159,30 @@ export function CalendarScreen({
       });
   }
 
+  // THE FILTER ROW STICKS under the masthead (Mark, 2026-10-11), and publishes
+  // its measured height so the list can scroll a day's band to just below it —
+  // measured, because the row wraps to two lines on a narrow window.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const controlsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const controls = controlsRef.current;
+    const root = rootRef.current;
+    if (!controls || !root) return;
+    const publish = () =>
+      root.style.setProperty("--rf-calendar-controls-h", `${controls.offsetHeight}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(controls);
+    return () => observer.disconnect();
+  }, []);
+
+  /** List view's Today: scroll to today's band (`ListView` marks it). */
+  function scrollToToday() {
+    document
+      .querySelector("[data-calendar-landing]")
+      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
   const [open, setOpen] = useState<Open | null>(null);
   const [shopFilter, setShopFilter] = useState<string[]>(shops);
   // Stored as the layers that are HIDDEN, so a layer added later shows by
@@ -271,7 +295,7 @@ export function CalendarScreen({
   const openEntry = open?.kind === "entry" ? entryById.get(open.id) ?? null : null;
 
   return (
-    <div className="space-y-5">
+    <div ref={rootRef} className="space-y-5">
       <PageHeading
         title="Calendar"
         total={count}
@@ -305,7 +329,10 @@ export function CalendarScreen({
         }
       />
 
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+      <div
+        ref={controlsRef}
+        className="sticky top-[var(--rf-header-h)] z-30 flex flex-wrap items-end gap-x-6 gap-y-3 bg-white py-3"
+      >
         {view !== "day" && (
           <div className="flex items-center gap-2">
             <button type="button" aria-label="Previous month" onClick={() => goToMonth(addMonths(month, -1))} className={NAV}>
@@ -317,8 +344,14 @@ export function CalendarScreen({
             </button>
             <button
               type="button"
-              onClick={() => goToMonth(monthStart(today))}
-              disabled={monthStart(today) === month}
+              // In the list, in this month, Today is a scroll to today's band;
+              // anywhere else it is the way back to this month.
+              onClick={() =>
+                view === "list" && monthStart(today) === month
+                  ? scrollToToday()
+                  : goToMonth(monthStart(today))
+              }
+              disabled={view === "month" && monthStart(today) === month}
               className={BUTTON_CLASS}
             >
               Today

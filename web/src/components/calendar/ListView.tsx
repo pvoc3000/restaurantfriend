@@ -35,16 +35,20 @@ export function ListView({
   onDay: (iso: string) => void;
   onEntry: (entryId: string) => void;
 }) {
+  // TODAY'S BAND, or the first one after it, or the last when the month's
+  // remaining days are empty — only in the month today is in. It is where the
+  // list opens and where the Today button scrolls to (`data-calendar-landing`).
   const first = days[0]?.date;
-  const last = days[days.length - 1]?.date;
-  // Where to open: today's band, or the first one after it — only when today
-  // is inside what is listed, and not when that is the top band already.
   const landing =
-    first && last && today > first && today <= last ? days.find((d) => d.date >= today)?.date : undefined;
+    first && today.slice(0, 7) === first.slice(0, 7)
+      ? (days.find((d) => d.date >= today) ?? days[days.length - 1]).date
+      : undefined;
   const landingRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    landingRef.current?.scrollIntoView({ block: "start" });
+    // Not when it is the top band already: there is nothing to skip past.
+    if (landing !== first) landingRef.current?.scrollIntoView({ block: "start" });
     // Once, when the list is first drawn — never again as filters change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (days.length === 0) {
@@ -59,8 +63,12 @@ export function ListView({
           <section
             key={day.date}
             ref={day.date === landing ? landingRef : undefined}
-            // Clear of the sticky masthead when scrolled to.
-            style={{ scrollMarginTop: "calc(var(--rf-header-h) + 0.75rem)" }}
+            data-calendar-landing={day.date === landing ? "" : undefined}
+            // Clear of the sticky masthead and the sticky filter row.
+            style={{
+              scrollMarginTop:
+                "calc(var(--rf-header-h) + var(--rf-calendar-controls-h, 4.5rem) + 0.5rem)",
+            }}
             className="border border-ink bg-white"
           >
             {/* A group band: black, white text — and the way into the day. */}
