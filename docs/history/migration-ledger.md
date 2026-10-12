@@ -398,3 +398,11 @@ it. After: `to_regclass` is null and the same anon request is a 404. Found from
 Supabase's "Security Definer View" lint; `v_item_last_ordered` and
 `v_item_last_purchase` trip the same lint on purpose (014) and hold no anon
 grant.
+
+**196 is APPLIED** (Claude, 2026-10-12) — `v_item_last_ordered` and
+`v_item_last_purchase` are granted SELECT to `authenticated` and nothing else
+(Supabase's defaults had added the six write privileges; neither view is
+updatable, so they were unusable). Both still run as owner on purpose (014) and
+will keep tripping the "Security Definer View" lint, which is dismissed in the
+dashboard rather than fixed. After: a signed-in owner reads 1,096 rows from
+each.
