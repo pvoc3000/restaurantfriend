@@ -213,7 +213,7 @@ export function CalendarScreen({
       params.set("view", "day");
       params.set("date", next.date ?? date);
     } else params.set("month", monthParam(next.month ?? month));
-    const s = shopsParam(next.shops ?? shopFilter, workingLocation !== null);
+    const s = shopsParam(next.shops ?? shopFilter);
     if (s !== null) params.set("shops", s);
     return `/calendar?${params.toString()}`;
   }
@@ -323,9 +323,9 @@ export function CalendarScreen({
         {view !== "list" && (
           <ControlField label="Shops">
             <PickSet
-              // "Working location" FIRST, and the default (Mark, 2026-10-10):
-              // the calendar follows the shop you are standing in until you
-              // ask it for something else.
+              // "Working location" FIRST (Mark, 2026-10-10): the calendar
+              // follows the shop you are standing in. The default is All
+              // shops (Mark, 2026-10-11).
               options={[
                 ...(workingLocation
                   ? [

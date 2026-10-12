@@ -402,10 +402,11 @@ test("a day made from a standing order is its own layer, whatever its status", (
 
 test("the Shops picker opens on the working location", () => {
   const known = new Set(["df01", "df02"]);
-  eq(parseShopsParam(undefined, known, true), [WORKING_SHOP]);
-  eq(parseShopsParam("", known, true), [WORKING_SHOP]);
-  eq(parseShopsParam(undefined, known, false), [], "no working shop: every shop");
-  eq(parseShopsParam("all", known, true), []);
+  eq(parseShopsParam(undefined, known, true), [], "the default is every shop");
+  eq(parseShopsParam("", known, true), []);
+  eq(parseShopsParam(undefined, known, false), []);
+  eq(parseShopsParam("all", known, true), [], "an older link");
+  eq(parseShopsParam("working", known, true), [WORKING_SHOP]);
   eq(parseShopsParam("working,df02,nope", known, true), [WORKING_SHOP, "df02"]);
   eq(parseShopsParam("working,df02", known, false), ["df02"]);
 });
@@ -413,11 +414,10 @@ test("the Shops picker opens on the working location", () => {
 test("shopsParam is parseShopsParam's inverse, and the default writes nothing", () => {
   const known = new Set(["df01", "df02"]);
   for (const filter of [[WORKING_SHOP], [], ["df02"], [WORKING_SHOP, "df02"]]) {
-    eq(parseShopsParam(shopsParam(filter, true), known, true), filter, JSON.stringify(filter));
+    eq(parseShopsParam(shopsParam(filter), known, true), filter, JSON.stringify(filter));
   }
-  eq(shopsParam([WORKING_SHOP], true), null, "the default");
-  eq(shopsParam([], true), "all");
-  eq(shopsParam([], false), null, "with no working shop, all IS the default");
+  eq(shopsParam([]), null, "the default");
+  eq(shopsParam([WORKING_SHOP]), "working");
 });
 
 test("resolveShops turns the word into the shop you are at", () => {

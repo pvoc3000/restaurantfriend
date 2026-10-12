@@ -186,6 +186,12 @@ This walks back "it shows every shop" from the first build: the calendar is
 now scoped like an operational screen unless asked otherwise. An item not
 about a shop in particular still shows under any filter.
 
+**REVERSED A DAY LATER: THE PICKER OPENS ON ALL SHOPS** (Mark, 2026-10-11: "i
+changed my mind - make 'all shops' the default setting"). "Working location"
+stays the first option and is still stored as the word. `?shops=` absent is
+every shop; `working` is written out; `all` is still read, for a link saved on
+the 10th. `shopsParam` lost its `hasWorking` argument.
+
 **THE ORDERS LIST SHOWS WHAT THE CALENDAR SAYS ABOUT EACH DAY** (Mark,
 2026-10-10). Under each day's band on `/special-orders`: blackouts (dark, with
 a white border so they part from the black band above), notes, and subscribed

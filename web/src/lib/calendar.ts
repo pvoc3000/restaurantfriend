@@ -120,8 +120,9 @@ export function gridRange(monthIso: string): DateRange {
 
 /**
  * "WORKING LOCATION" — a choice in the Shops picker that means whichever shop
- * you are working at (Mark, 2026-10-10: "make it the default option. make it
- * the first option"). Stored as this word, never as the shop's id, so
+ * you are working at, and the picker's first option. It was the default for a
+ * day; ALL SHOPS is (Mark, 2026-10-11: "i changed my mind - make 'all shops'
+ * the default setting"). Stored as this word, never as the shop's id, so
  * switching working location changes what the calendar shows without touching
  * the filter, and a link somebody shares opens on THEIR shop.
  */
@@ -130,29 +131,24 @@ export const WORKING_SHOP = "working";
 /**
  * `?shops=` → the picker's value.
  *
- *   absent        the DEFAULT: the working location, when there is one
- *   `all`         every shop (the picker's empty set)
- *   `working,id`  those — unknown ids are dropped, not obeyed
- *
- * With no working location there is nothing for the default to mean, so it is
- * every shop.
+ *   absent        the DEFAULT: every shop (the picker's empty set)
+ *   `all`         every shop too — what a link saved on 2026-10-10 says
+ *   `working,id`  those — unknown ids are dropped, not obeyed, and `working`
+ *                 is dropped when there is no working location
  */
 export function parseShopsParam(
   raw: string | null | undefined,
   known: ReadonlySet<string>,
   hasWorking: boolean,
 ): string[] {
-  if (raw === undefined || raw === null || raw === "") return hasWorking ? [WORKING_SHOP] : [];
-  if (raw === "all") return [];
+  if (raw === undefined || raw === null || raw === "" || raw === "all") return [];
   return raw.split(",").filter((v) => (v === WORKING_SHOP ? hasWorking : known.has(v)));
 }
 
 /** The picker's value → `?shops=`, or null when it is the default and the URL
  *  need not say. The inverse of `parseShopsParam`. */
-export function shopsParam(filter: readonly string[], hasWorking: boolean): string | null {
-  if (filter.length === 0) return hasWorking ? "all" : null;
-  if (hasWorking && filter.length === 1 && filter[0] === WORKING_SHOP) return null;
-  return filter.join(",");
+export function shopsParam(filter: readonly string[]): string | null {
+  return filter.length === 0 ? null : filter.join(",");
 }
 
 /** The picker's value as shop ids, for `visibleItems`. Empty is every shop. */

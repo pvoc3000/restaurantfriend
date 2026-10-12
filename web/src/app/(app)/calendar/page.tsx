@@ -61,7 +61,8 @@ export default async function CalendarPage({
   // anybody writes a blackout for.
   const locations = session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }));
   const known = new Set(locations.map((l) => l.id));
-  // The Shops picker opens on the WORKING LOCATION (`parseShopsParam`).
+  // The Shops picker opens on ALL SHOPS; "Working location" is a choice in it
+  // (`parseShopsParam`).
   const working = session.activeLocation
     ? { id: session.activeLocation.id, code: session.activeLocation.code }
     : null;
