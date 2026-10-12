@@ -70,7 +70,7 @@ export function ListView({
               scrollMarginTop:
                 "calc(var(--rf-header-h) + var(--rf-calendar-controls-h, 4.5rem) + 0.5rem)",
             }}
-            className="border border-ink bg-white"
+            className="bg-white"
           >
             {/* A group band: black, white text — and the way into the day. */}
             <h2>
