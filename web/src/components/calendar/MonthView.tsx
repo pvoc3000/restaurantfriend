@@ -112,16 +112,12 @@ export function MonthView({
                     // A blacked-out day is GREY to its edges, so it reads across
                     // the month before any line of it is read. A day outside the
                     // month keeps a white cell and a faint number.
-                    // TODAY is the one cell with a heavy ink frame and the
-                    // yellow fill (Mark, 2026-10-11: "make the current day…
-                    // pop a little more") — findable from across the room,
-                    // where the black number alone was not.
+                    // TODAY is the one cell with a heavy ink frame (Mark,
+                    // 2026-10-11: "make the current day… pop a little more").
+                    // It had a yellow fill too, for an hour: "drop the yellow
+                    // fill, keep the frame".
                     className={`relative min-h-0 min-w-0 ${
-                      items.some((i) => i.blackout)
-                        ? "bg-neutral-200"
-                        : day.iso === today
-                          ? "bg-mark-fill"
-                          : "bg-white"
+                      items.some((i) => i.blackout) ? "bg-neutral-200" : "bg-white"
                     } ${day.iso === today ? "shadow-[inset_0_0_0_3px_var(--rf-neutral-900)]" : ""}`}
                   >
                     <button
