@@ -1440,5 +1440,6 @@ silently, and the function refuses the whole call if handed one.
 **Verified:** 199 against a condensed Postgres 15 fixture, 18 cases — every
 refusal, staff and anon refused, a moved line's fields unchanged, a new order
 taking the source's vendor, shop and order date, and a refused call leaving no
-new order behind. `tsc` and eslint clean. NOT checked in a browser: the pane
-was signed out, and 199 was not yet applied to the hosted DB.
+new order behind. `tsc` and eslint clean. 199 APPLIED 2026-10-12 (function present,
+invoker, executable by authenticated and not anon). NOT checked in a browser:
+the pane was signed out, so the first real split is the first end-to-end run.
