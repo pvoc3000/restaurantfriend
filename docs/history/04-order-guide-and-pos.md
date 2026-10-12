@@ -1409,3 +1409,36 @@ behind the screen. A failed save restores the last value known to be saved.
 `GuideLine` is now `memo`'d with a stable `onCommit`, so a tap redraws its own
 row rather than every line on the guide. Same idea as the checklist walk's fix
 (`9f52b4db`): nothing the user sees waits on the server.
+
+**LINES MOVE BETWEEN DRAFT ORDERS (2026-10-12, migration 199).** Mark: an order
+that will arrive on two days had two ways to be split, both with a hole —
+duplicate it and delete from each copy (an item left on both is ordered
+twice), or make a second order and re-add lines by hand (an item left off both
+is not ordered). **Move Selected…** in the PO's Actions menu and **Move Item…**
+on a row's ⋯ open one dialog (`purchasing/MovePoLines`): a `ui/Radio` of the
+other DRAFT orders for the same vendor at the same shop — number, delivery
+date, line count — plus "New purchase order" with its delivery date beside it,
+defaulting to the vendor's next delivery day after this order's own.
+**It is a MOVE, not a copy:** `move_purchase_order_lines` changes the line's
+`po_id`, so the line keeps its id, price, note and snapshot fields and is on
+exactly one order throughout. One function so the new order and the move
+commit together; SECURITY INVOKER like 013.
+**Decisions (Mark, same day):** drafts only, source and target — a split after
+sending changes what the vendor was told, and is addressed if it ever comes up.
+Moving every line leaves the empty order in place (you may move other lines
+into it); Delete PO… removes it. Mine, not asked about: a matching item on the
+target stays a second line rather than merging quantities (prices and notes can
+differ); the screen stays on the source order afterwards with a link to the
+target.
+**Lines that cannot move:** one with a received quantity, and one on a bill.
+The second replaces an invariant — 025's `vendor_bill_lines` stores the order
+beside the order line and its comment says the pair cannot drift because a PO
+item never changes orders. Now it can, but never a billed one. Anything new
+that stores a line's order beside the line's id needs the same refusal in 199.
+The dialog says how many of the selection stay rather than skipping them
+silently, and the function refuses the whole call if handed one.
+**Verified:** 199 against a condensed Postgres 15 fixture, 18 cases — every
+refusal, staff and anon refused, a moved line's fields unchanged, a new order
+taking the source's vendor, shop and order date, and a refused call leaving no
+new order behind. `tsc` and eslint clean. NOT checked in a browser: the pane
+was signed out, and 199 was not yet applied to the hosted DB.

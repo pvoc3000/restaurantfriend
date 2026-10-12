@@ -38,6 +38,7 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { AddPoLines } from "./AddPoLines";
+import { MovePoLines } from "./MovePoLines";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { RowMenu } from "@/components/ui/RowMenu";
@@ -115,10 +116,21 @@ export function PurchaseOrderDetail({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkedLines, setCheckedLines] = useState<Set<string>>(new Set());
+  // The lines Move… was asked for (null: the dialog is shut), and where the
+  // last move went — said under the fields with a link, since the screen
+  // stays on THIS order to show what is left.
+  const [movingIds, setMovingIds] = useState<string[] | null>(null);
+  const [moved, setMoved] = useState<{ id: string; po_number: string; count: number } | null>(
+    null
+  );
 
   // Line selection (and deletion) is purchaser+ work — `processing` is
   // already null for anyone below that role.
   const canEditLines = processing !== null;
+  // Moving lines to another order is a DRAFT's command (Mark, 2026-10-12):
+  // once sent, the vendor has the lines, and moving them would change what
+  // they were told. Migration 199 refuses it as well.
+  const canMoveLines = canEditLines && order.status === "draft";
 
   function toggleLine(id: string) {
     setCheckedLines((prev) => {
@@ -781,6 +793,16 @@ export function PurchaseOrderDetail({
                   l.vendor_items?.inventory_items?.name ?? l.description ?? "this line"
                 }`}
                 items={[
+                  // The same dialog the Actions menu's Move Selected… opens.
+                  ...(canMoveLines
+                    ? [
+                        {
+                          label: "Move Item…",
+                          disabled: busy,
+                          onSelect: () => setMovingIds([l.id]),
+                        },
+                      ]
+                    : []),
                   {
                     label: "Delete Item",
                     danger: true,
@@ -863,11 +885,21 @@ export function PurchaseOrderDetail({
             ? group([{ label: "Mark PO", items: markItems, disabled: busy }])
             : []),
           ...group(receivingItems),
-          // The line selection's one command (Mark, 2026-09-11) — it replaced a
+          // The line selection's commands (Mark, 2026-09-11) — they replaced a
           // band that held nothing but Delete. Offered only while a line is
           // ticked; `deleteLines` still confirms and names received quantities.
+          // Move Selected… (2026-10-12) leads, on a draft only.
           ...(canEditLines && checkedLines.size > 0
             ? group([
+                ...(canMoveLines
+                  ? [
+                      {
+                        label: "Move Selected…",
+                        onSelect: () => setMovingIds([...checkedLines]),
+                        disabled: busy,
+                      },
+                    ]
+                  : []),
                 {
                   label: "Delete Selected…",
                   onSelect: () => void deleteLines([...checkedLines]),
@@ -1128,6 +1160,21 @@ export function PurchaseOrderDetail({
           </dl>
 
           {error && <p className="text-sm text-accent">{error}</p>}
+          {moved && (
+            <p className="text-sm">
+              Moved {moved.count} {moved.count === 1 ? "line" : "lines"} to{" "}
+              <Link
+                href={withFrom(`/purchase-orders/${moved.id}`, {
+                  href: `/purchase-orders/${order.id}`,
+                  label: order.po_number,
+                })}
+                className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+              >
+                {moved.po_number}
+              </Link>
+              .
+            </p>
+          )}
         </div>
 
         <div className="min-w-0 flex-[999_1_24rem] space-y-[18px]">
@@ -1206,6 +1253,25 @@ export function PurchaseOrderDetail({
         }
         empty={<p className="text-sm text-muted">This order has no lines.</p>}
       />
+
+      {movingIds && (
+        <MovePoLines
+          order={order}
+          lines={lines.filter((l) => movingIds.includes(l.id))}
+          deliveryDays={processing?.delivery_days ?? null}
+          onClose={() => setMovingIds(null)}
+          onMoved={({ id, po_number, lineIds }) => {
+            setMovingIds(null);
+            setMoved({ id, po_number, count: lineIds.length });
+            setCheckedLines((prev) => {
+              const next = new Set(prev);
+              for (const lineId of lineIds) next.delete(lineId);
+              return next;
+            });
+            router.refresh();
+          }}
+        />
+      )}
 
     </div>
   );
