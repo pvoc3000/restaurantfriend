@@ -329,173 +329,173 @@ export function CalendarScreen({
         }
       />
 
-      <div
-        ref={controlsRef}
-        className="sticky top-[var(--rf-header-h)] z-30 flex flex-wrap items-end gap-x-6 gap-y-3 bg-white py-3"
-      >
-        {view !== "day" && (
-          <div className="flex items-center gap-2">
-            <button type="button" aria-label="Previous month" onClick={() => goToMonth(addMonths(month, -1))} className={NAV}>
-              ‹
-            </button>
-            <MonthJump month={month} today={today} onPick={goToMonth} />
-            <button type="button" aria-label="Next month" onClick={() => goToMonth(addMonths(month, 1))} className={NAV}>
-              ›
-            </button>
-            <button
-              type="button"
-              // In the list, in this month, Today is a scroll to today's band;
-              // anywhere else it is the way back to this month.
-              onClick={() =>
-                view === "list" && monthStart(today) === month
-                  ? scrollToToday()
-                  : goToMonth(monthStart(today))
-              }
-              disabled={view === "month" && monthStart(today) === month}
-              className={BUTTON_CLASS}
-            >
-              Today
-            </button>
-          </div>
-        )}
-        {view === "day" && (
-          <div className="flex items-center gap-2">
-            <button type="button" aria-label="Previous day" onClick={() => goToDay(daysBefore(date, 1))} className={NAV}>
-              ‹
-            </button>
-            <DayJump date={date} today={today} onPick={goToDay} />
-            <button type="button" aria-label="Next day" onClick={() => goToDay(daysAfter(date, 1))} className={NAV}>
-              ›
-            </button>
-            <button type="button" onClick={() => goToDay(today)} disabled={date === today} className={BUTTON_CLASS}>
-              Today
-            </button>
-          </div>
-        )}
-        {/* LEFT TO RIGHT (Mark, 2026-10-10): the date and Today, then Shops,
-            then View — the row's `gap-x-6` is the air between Today and Shops —
-            and the layers' eye alone at the far right, where a table's columns
-            eye sits. */}
-        <ControlField label="Shops">
-          <PickSet
-            // "Working location" FIRST (Mark, 2026-10-10): the calendar
-            // follows the shop you are standing in. The default is All
-            // shops (Mark, 2026-10-11).
-            options={[
-              ...(workingLocation
-                ? [
-                    {
-                      value: WORKING_SHOP,
-                      label: "Working location",
-                      hint: workingLocation.code,
-                      summary: `Working location (${workingLocation.code})`,
-                    },
-                  ]
-                : []),
-              ...locations.map((l) => ({ value: l.id, label: l.code, hint: l.name })),
-            ]}
-            value={shopFilter}
-            onChange={changeShops}
-            allLabel="All shops"
-            label="Which shops to show"
-            noun="shops"
-          />
-        </ControlField>
-        <ControlField label="View">
-          <Radio<CalendarView>
-            ariaLabel="View"
-            value={view}
-            onChange={changeView}
-            options={[
-              { value: "month", label: "Month" },
-              { value: "day", label: "Day" },
-              { value: "list", label: "List" },
-            ]}
-            // A button tall, so the radios sit on the pickers' baseline.
-            className="h-9"
-          />
-        </ControlField>
-        {offered.length > 1 && (
-          // THE EYE — the tables' own (`ColumnsIcon`), for the same verb: which
-          // of these to show. `catalog/ExtrasMenu`, the menu the orders list's
-          // calendar button uses, so a layer and the calendars nested under
-          // "Subscribed calendars" read the same on both screens. The key of
-          // chips under this row is what says the answer.
-          <div className="ml-auto">
-            <ExtrasMenu
-              extras={{
-                label: "What the calendar shows",
-                icon: <ColumnsIcon />,
-                items: offered.flatMap((l) => {
-                  const on = !hiddenSet.has(l.key);
-                  const layer = {
-                    key: l.key,
-                    label: l.label,
-                    on,
-                    // An OPT-IN layer is stored as shown; the rest as hidden.
-                    onToggle: (next: boolean) =>
-                      OPT_IN_LAYERS.includes(l.key)
-                        ? setOptedIn(next ? [...optedIn, l.key] : optedIn.filter((k) => k !== l.key))
-                        : setHidden(next ? hidden.filter((k) => k !== l.key) : [...hidden, l.key]),
-                  };
-                  // Each subscribed calendar, nested — with two or more. With
-                  // the layer off they are shown unticked and fixed: it is the
-                  // layer that is hiding them.
-                  if (l.key !== "feeds" || calendars.length < 2) return [layer];
-                  return [
-                    layer,
-                    ...calendars.map((c) => ({
-                      key: `feed:${c.id}`,
-                      label: c.name,
-                      nested: true,
-                      disabled: !on,
-                      on: on && !hiddenFeeds.includes(c.id),
-                      onToggle: (next: boolean) =>
-                        setHiddenFeeds(
-                          next ? hiddenFeeds.filter((id) => id !== c.id) : [...hiddenFeeds, c.id],
-                        ),
-                    })),
-                  ];
-                }),
-              }}
+      {/* PINNED: the filter row and the colour key under it (Mark, 2026-10-11). */}
+      <div ref={controlsRef} className="sticky top-[var(--rf-header-h)] z-30 space-y-3 bg-white py-3">
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+          {view !== "day" && (
+            <div className="flex items-center gap-2">
+              <button type="button" aria-label="Previous month" onClick={() => goToMonth(addMonths(month, -1))} className={NAV}>
+                ‹
+              </button>
+              <MonthJump month={month} today={today} onPick={goToMonth} />
+              <button type="button" aria-label="Next month" onClick={() => goToMonth(addMonths(month, 1))} className={NAV}>
+                ›
+              </button>
+              <button
+                type="button"
+                // In the list, in this month, Today is a scroll to today's band;
+                // anywhere else it is the way back to this month.
+                onClick={() =>
+                  view === "list" && monthStart(today) === month
+                    ? scrollToToday()
+                    : goToMonth(monthStart(today))
+                }
+                disabled={view === "month" && monthStart(today) === month}
+                className={BUTTON_CLASS}
+              >
+                Today
+              </button>
+            </div>
+          )}
+          {view === "day" && (
+            <div className="flex items-center gap-2">
+              <button type="button" aria-label="Previous day" onClick={() => goToDay(daysBefore(date, 1))} className={NAV}>
+                ‹
+              </button>
+              <DayJump date={date} today={today} onPick={goToDay} />
+              <button type="button" aria-label="Next day" onClick={() => goToDay(daysAfter(date, 1))} className={NAV}>
+                ›
+              </button>
+              <button type="button" onClick={() => goToDay(today)} disabled={date === today} className={BUTTON_CLASS}>
+                Today
+              </button>
+            </div>
+          )}
+          {/* LEFT TO RIGHT (Mark, 2026-10-10): the date and Today, then Shops,
+              then View — the row's `gap-x-6` is the air between Today and Shops —
+              and the layers' eye alone at the far right, where a table's columns
+              eye sits. */}
+          <ControlField label="Shops">
+            <PickSet
+              // "Working location" FIRST (Mark, 2026-10-10): the calendar
+              // follows the shop you are standing in. The default is All
+              // shops (Mark, 2026-10-11).
+              options={[
+                ...(workingLocation
+                  ? [
+                      {
+                        value: WORKING_SHOP,
+                        label: "Working location",
+                        hint: workingLocation.code,
+                        summary: `Working location (${workingLocation.code})`,
+                      },
+                    ]
+                  : []),
+                ...locations.map((l) => ({ value: l.id, label: l.code, hint: l.name })),
+              ]}
+              value={shopFilter}
+              onChange={changeShops}
+              allLabel="All shops"
+              label="Which shops to show"
+              noun="shops"
             />
-          </div>
-        )}
+          </ControlField>
+          <ControlField label="View">
+            <Radio<CalendarView>
+              ariaLabel="View"
+              value={view}
+              onChange={changeView}
+              options={[
+                { value: "month", label: "Month" },
+                { value: "day", label: "Day" },
+                { value: "list", label: "List" },
+              ]}
+              // A button tall, so the radios sit on the pickers' baseline.
+              className="h-9"
+            />
+          </ControlField>
+          {offered.length > 1 && (
+            // THE EYE — the tables' own (`ColumnsIcon`), for the same verb: which
+            // of these to show. `catalog/ExtrasMenu`, the menu the orders list's
+            // calendar button uses, so a layer and the calendars nested under
+            // "Subscribed calendars" read the same on both screens. The key of
+            // chips under this row is what says the answer.
+            <div className="ml-auto">
+              <ExtrasMenu
+                extras={{
+                  label: "What the calendar shows",
+                  icon: <ColumnsIcon />,
+                  items: offered.flatMap((l) => {
+                    const on = !hiddenSet.has(l.key);
+                    const layer = {
+                      key: l.key,
+                      label: l.label,
+                      on,
+                      // An OPT-IN layer is stored as shown; the rest as hidden.
+                      onToggle: (next: boolean) =>
+                        OPT_IN_LAYERS.includes(l.key)
+                          ? setOptedIn(next ? [...optedIn, l.key] : optedIn.filter((k) => k !== l.key))
+                          : setHidden(next ? hidden.filter((k) => k !== l.key) : [...hidden, l.key]),
+                    };
+                    // Each subscribed calendar, nested — with two or more. With
+                    // the layer off they are shown unticked and fixed: it is the
+                    // layer that is hiding them.
+                    if (l.key !== "feeds" || calendars.length < 2) return [layer];
+                    return [
+                      layer,
+                      ...calendars.map((c) => ({
+                        key: `feed:${c.id}`,
+                        label: c.name,
+                        nested: true,
+                        disabled: !on,
+                        on: on && !hiddenFeeds.includes(c.id),
+                        onToggle: (next: boolean) =>
+                          setHiddenFeeds(
+                            next ? hiddenFeeds.filter((id) => id !== c.id) : [...hiddenFeeds, c.id],
+                          ),
+                      })),
+                    ];
+                  }),
+                }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* THE KEY to the colours: one chip per layer that is showing, in the
+            menu's order, so the calendar never has to be decoded from memory. */}
+        <ul aria-label="Colours" className="flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-medium">
+          {!hiddenSet.has("entries") && (
+            <li className={`rounded-[4px] px-1.5 leading-[18px] ${BLACKOUT_CHIP}`}>Blackouts</li>
+          )}
+          {offered
+            .filter((l) => !hiddenSet.has(l.key))
+            .map((l) => (
+              <li key={l.key}>
+                {/* A manager presses a chip to change that layer's colour, for
+                    everybody. For anyone else it is a label. */}
+                {orgSettings ? (
+                  <button
+                    type="button"
+                    onClick={() => setRecolouring(l.key)}
+                    aria-label={`Change the colour of ${keyLabel(l)}`}
+                    className={`rounded-[4px] px-1.5 leading-[18px] hover:brightness-95 ${colorChip(layerColor(l.key, colors))}`}
+                  >
+                    {keyLabel(l)}
+                  </button>
+                ) : (
+                  <span className={`block rounded-[4px] px-1.5 leading-[18px] ${colorChip(layerColor(l.key, colors))}`}>
+                    {keyLabel(l)}
+                  </span>
+                )}
+              </li>
+            ))}
+        </ul>
       </div>
 
       {layerFailures.length > 0 && (
         <p className="text-sm text-accent">Could not load: {layerFailures.join("; ")}</p>
       )}
-
-      {/* THE KEY to the colours: one chip per layer that is showing, in the
-          menu's order, so the calendar never has to be decoded from memory. */}
-      <ul aria-label="Colours" className="flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-medium">
-        {!hiddenSet.has("entries") && (
-          <li className={`rounded-[4px] px-1.5 leading-[18px] ${BLACKOUT_CHIP}`}>Blackouts</li>
-        )}
-        {offered
-          .filter((l) => !hiddenSet.has(l.key))
-          .map((l) => (
-            <li key={l.key}>
-              {/* A manager presses a chip to change that layer's colour, for
-                  everybody. For anyone else it is a label. */}
-              {orgSettings ? (
-                <button
-                  type="button"
-                  onClick={() => setRecolouring(l.key)}
-                  aria-label={`Change the colour of ${keyLabel(l)}`}
-                  className={`rounded-[4px] px-1.5 leading-[18px] hover:brightness-95 ${colorChip(layerColor(l.key, colors))}`}
-                >
-                  {keyLabel(l)}
-                </button>
-              ) : (
-                <span className={`block rounded-[4px] px-1.5 leading-[18px] ${colorChip(layerColor(l.key, colors))}`}>
-                  {keyLabel(l)}
-                </span>
-              )}
-            </li>
-          ))}
-      </ul>
 
       {view === "month" ? (
         <MonthView
