@@ -406,3 +406,15 @@ updatable, so they were unusable). Both still run as owner on purpose (014) and
 will keep tripping the "Security Definer View" lint, which is dismissed in the
 dashboard rather than fixed. After: a signed-in owner reads 1,096 rows from
 each.
+
+**197 is APPLIED** (Claude, 2026-10-12) — `item_last_ordered(p_location)` and
+`item_last_purchase(p_location)`, definer functions with 014's org guard (plus
+`vi.org_id` and `v.org_id`), replace the two owner-run views that Supabase's
+"Security Definer View" lint flagged. `/items`, the vendor record and the order
+guide call them. Dry-run on the live DB as an owner: both return the views'
+1,096 rows; per shop the calls take 160–400 ms, as the views did. ONE
+DIFFERENCE: `poi.id` is a new last tiebreak in `item_last_purchase`, because 18
+item-locations were last bought as two vendor items on ONE order and the view's
+★ could land on either. The lint moves from an ERROR to two more rows of the
+WARN "authenticated security definer function executable", which already
+lists 77 functions. The views stay until this code is deployed; 198 drops them.

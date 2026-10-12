@@ -24,7 +24,7 @@ export type VendorItemWithItem = CatalogVendorItem & {
     category?: string | null;
   } | null;
   // Attached by the vendor screen: when the linked inventory item was last
-  // ordered AT THE ACTIVE LOCATION (v_item_last_ordered), same semantics as the
+  // ordered AT THE ACTIVE LOCATION (`item_last_ordered`), same semantics as the
   // Inventory list. Not vendor-item specific — see the note in the page.
   last_order_date?: string | null;
   stale?: StaleBucket;

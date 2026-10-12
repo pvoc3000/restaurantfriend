@@ -245,12 +245,13 @@ export async function VendorDetail({
 
     if (itemByLocationRow.size > 0) {
       const { data: lastOrdered, error: loError } = await supabase
-        .from("v_item_last_ordered")
-        .select("item_location_id, last_order_date")
-        .in("item_location_id", [...itemByLocationRow.keys()]);
+        // The whole shop's rows, a few hundred; the map below keeps this
+        // vendor's. The location is an argument because a filter on a
+        // function's result is applied after it has worked everything out.
+        .rpc("item_last_ordered", { p_location: session.activeLocation.id });
 
       if (loError) {
-        console.warn("v_item_last_ordered unavailable:", loError.message);
+        console.warn("item_last_ordered unavailable:", loError.message);
       } else {
         for (const row of lastOrdered ?? []) {
           const itemId = itemByLocationRow.get(row.item_location_id);

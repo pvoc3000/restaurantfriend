@@ -103,7 +103,7 @@ export default async function OrderGuidePage({
 
   /**
    * WHEN THIS ITEM WAS LAST BOUGHT, AND AS WHAT (Mark, 2026-08-10) — migration
-   * 048's view, one row per item-location at this location.
+   * 048, a function since 197: one row per item-location at this location.
    *
    * On the wire with the entries and reminders for the same reason: it doesn't
    * depend on the guide rows and the guide query is ~850ms, so overlapped it
@@ -113,9 +113,8 @@ export default async function OrderGuidePage({
    * thenable and assigning it sends nothing.
    */
   const lastPurchasePromise = supabase
-    .from("v_item_last_purchase")
+    .rpc("item_last_purchase", { p_location: locationId })
     .select(LAST_PURCHASE_SELECT)
-    .eq("location_id", locationId)
     .then((r) => r);
 
   // Membership is the view's job now: one line per orderable vendor item ×

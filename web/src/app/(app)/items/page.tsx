@@ -60,18 +60,18 @@ export default async function ItemsPage({
     from += 1000;
   }
 
-  // Last-ordered dates for this location, one query over the view (not N+1),
-  // keyed by item_location_id. Degrades to "never" if migration 004 is missing.
+  // Last-ordered dates for this location, one call to `item_last_ordered`
+  // (197; not N+1), keyed by item_location_id. Degrades to "never" on error.
   const lastOrderedByIl = new Map<string, string | null>();
   if (locationId) {
     const { data, error } = await supabase
-      .from("v_item_last_ordered")
-      .select("item_location_id, last_order_date")
-      .eq("location_id", locationId);
+      .rpc("item_last_ordered", { p_location: locationId });
     if (error) {
-      console.warn("v_item_last_ordered unavailable (apply migration 004):", error.message);
+      console.warn("item_last_ordered unavailable (apply migration 197):", error.message);
     } else {
-      for (const r of data ?? []) lastOrderedByIl.set(r.item_location_id, r.last_order_date);
+      for (const r of (data ?? []) as { item_location_id: string; last_order_date: string | null }[]) {
+        lastOrderedByIl.set(r.item_location_id, r.last_order_date);
+      }
     }
   }
 
