@@ -7,7 +7,7 @@ import { Radio } from "@/components/ui/Radio";
 import { PickSet } from "@/components/ui/PickSet";
 import { ControlField } from "@/components/ui/ControlField";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
-import { addMonths, monthLabel, monthStart } from "@/lib/dateRange";
+import { addMonths, monthEnd, monthLabel, monthStart } from "@/lib/dateRange";
 import { daysAfter, daysBefore } from "@/lib/today";
 import {
   CALENDAR_LAYERS,
@@ -43,7 +43,7 @@ import {
 import { DayView } from "@/components/calendar/DayView";
 import { DayJump } from "@/components/calendar/DayJump";
 import { EntryDialog, type EntryLocation } from "@/components/calendar/EntryDialog";
-import { EntriesList } from "@/components/calendar/EntriesList";
+import { ListView } from "@/components/calendar/ListView";
 
 export type CalendarView = "month" | "day" | "list";
 
@@ -65,7 +65,8 @@ const NAV =
  * `/calendar` — the month, what is on it, and the entries typed here.
  *
  * The MONTH is in the URL and is the server's business: changing it is a
- * navigation, because every layer is fetched for the 42 days on screen. The
+ * navigation, because every layer is fetched for the 42 days on screen (the
+ * LIST view is the same month, its own days only, as one band per day). The
  * SHOP filter is in the URL too and is applied here, over what was fetched.
  * WHICH LAYERS SHOW is a display preference and lives in localStorage
  * (`docs/conventions.md`, "View state in the URL, display preferences in
@@ -97,8 +98,7 @@ export function CalendarScreen({
   /** The day the DAY view shows. Today when another view is on. */
   date: string;
   today: string;
-  /** Month and day view: the entries touching what is on screen. List view:
-   *  every entry. */
+  /** The entries touching what is on screen. */
   entries: CalendarEntry[];
   /** Every other layer's items for the grid, already built on the server. */
   layerItems: CalendarItem[];
@@ -183,7 +183,12 @@ export function CalendarScreen({
   }, [hidden, optedIn, layers]);
 
   const range = useMemo(
-    () => (view === "day" ? { from: date, to: date } : gridRange(month)),
+    () =>
+      view === "day"
+        ? { from: date, to: date }
+        : view === "list"
+          ? { from: month, to: monthEnd(month) }
+          : gridRange(month),
     [view, date, month],
   );
   const days = useMemo(() => {
@@ -195,7 +200,21 @@ export function CalendarScreen({
         hiddenSources: hiddenFeeds,
       }),
     );
-  }, [entries, layerItems, range, hiddenSet, shopFilter, workingLocation, hiddenFeeds]);
+  }, [entries, layerItems, range, locations, hiddenSet, shopFilter, workingLocation, hiddenFeeds]);
+
+  // THE LIST: the month's own days that have something on them, in order. The
+  // menu plan is left out — it is on every day, so it would put a line under
+  // each one and say nothing.
+  const listDays = useMemo(
+    () =>
+      view !== "list"
+        ? []
+        : [...days.entries()]
+            .map(([day, items]) => ({ date: day, items: items.filter((i) => i.layer !== "menu_plan") }))
+            .filter((d) => d.date >= range.from && d.date <= range.to && d.items.length > 0)
+            .sort((a, b) => a.date.localeCompare(b.date)),
+    [view, days, range],
+  );
 
   const shopCodes = useMemo(() => new Map(locations.map((l) => [l.id, l.code])), [locations]);
   const entryById = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
@@ -208,8 +227,10 @@ export function CalendarScreen({
   }): string {
     const params = new URLSearchParams();
     const v = next.view ?? view;
-    if (v === "list") params.set("view", "list");
-    else if (v === "day") {
+    if (v === "list") {
+      params.set("view", "list");
+      params.set("month", monthParam(next.month ?? month));
+    } else if (v === "day") {
       params.set("view", "day");
       params.set("date", next.date ?? date);
     } else params.set("month", monthParam(next.month ?? month));
@@ -219,6 +240,7 @@ export function CalendarScreen({
   }
 
   function goToMonth(next: string) {
+    // Month and List both walk by month, and keep the view they are in.
     router.push(href({ month: next }));
   }
 
@@ -231,10 +253,8 @@ export function CalendarScreen({
   function changeView(next: CalendarView) {
     if (next === "day") {
       goToDay(view === "day" ? date : monthStart(today) === month ? today : month);
-    } else if (next === "month") {
-      router.push(href({ view: "month", month: view === "day" ? monthStart(date) : month }));
     } else {
-      router.push(href({ view: "list" }));
+      router.push(href({ view: next, month: view === "day" ? monthStart(date) : month }));
     }
   }
 
@@ -244,7 +264,10 @@ export function CalendarScreen({
     window.history.replaceState(null, "", href({ shops: next }));
   }
 
-  const count = view === "list" ? entries.length : [...days.values()].reduce((n, d) => n + d.length, 0);
+  const count =
+    view === "list"
+      ? listDays.reduce((n, d) => n + d.items.length, 0)
+      : [...days.values()].reduce((n, d) => n + d.length, 0);
   const openEntry = open?.kind === "entry" ? entryById.get(open.id) ?? null : null;
 
   return (
@@ -254,7 +277,7 @@ export function CalendarScreen({
         total={count}
         noun={
           view === "list"
-            ? "entries"
+            ? `in ${monthLabel(month)}`
             : view === "day"
               ? "on this day"
               : `on screen · ${monthLabel(month)}`
@@ -269,7 +292,7 @@ export function CalendarScreen({
                   date:
                     view === "day"
                       ? date
-                      : view === "month" && monthStart(today) === month
+                      : monthStart(today) === month
                         ? today
                         : null,
                 })
@@ -283,7 +306,7 @@ export function CalendarScreen({
       />
 
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-        {view === "month" && (
+        {view !== "day" && (
           <div className="flex items-center gap-2">
             <button type="button" aria-label="Previous month" onClick={() => goToMonth(addMonths(month, -1))} className={NAV}>
               ‹
@@ -320,33 +343,31 @@ export function CalendarScreen({
             then View — the row's `gap-x-6` is the air between Today and Shops —
             and the layers' eye alone at the far right, where a table's columns
             eye sits. */}
-        {view !== "list" && (
-          <ControlField label="Shops">
-            <PickSet
-              // "Working location" FIRST (Mark, 2026-10-10): the calendar
-              // follows the shop you are standing in. The default is All
-              // shops (Mark, 2026-10-11).
-              options={[
-                ...(workingLocation
-                  ? [
-                      {
-                        value: WORKING_SHOP,
-                        label: "Working location",
-                        hint: workingLocation.code,
-                        summary: `Working location (${workingLocation.code})`,
-                      },
-                    ]
-                  : []),
-                ...locations.map((l) => ({ value: l.id, label: l.code, hint: l.name })),
-              ]}
-              value={shopFilter}
-              onChange={changeShops}
-              allLabel="All shops"
-              label="Which shops to show"
-              noun="shops"
-            />
-          </ControlField>
-        )}
+        <ControlField label="Shops">
+          <PickSet
+            // "Working location" FIRST (Mark, 2026-10-10): the calendar
+            // follows the shop you are standing in. The default is All
+            // shops (Mark, 2026-10-11).
+            options={[
+              ...(workingLocation
+                ? [
+                    {
+                      value: WORKING_SHOP,
+                      label: "Working location",
+                      hint: workingLocation.code,
+                      summary: `Working location (${workingLocation.code})`,
+                    },
+                  ]
+                : []),
+              ...locations.map((l) => ({ value: l.id, label: l.code, hint: l.name })),
+            ]}
+            value={shopFilter}
+            onChange={changeShops}
+            allLabel="All shops"
+            label="Which shops to show"
+            noun="shops"
+          />
+        </ControlField>
         <ControlField label="View">
           <Radio<CalendarView>
             ariaLabel="View"
@@ -361,7 +382,7 @@ export function CalendarScreen({
             className="h-9"
           />
         </ControlField>
-        {view !== "list" && offered.length > 1 && (
+        {offered.length > 1 && (
           // THE EYE — the tables' own (`ColumnsIcon`), for the same verb: which
           // of these to show. `catalog/ExtrasMenu`, the menu the orders list's
           // calendar button uses, so a layer and the calendars nested under
@@ -415,35 +436,33 @@ export function CalendarScreen({
 
       {/* THE KEY to the colours: one chip per layer that is showing, in the
           menu's order, so the calendar never has to be decoded from memory. */}
-      {view !== "list" && (
-        <ul aria-label="Colours" className="flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-medium">
-          {!hiddenSet.has("entries") && (
-            <li className={`rounded-[4px] px-1.5 leading-[18px] ${BLACKOUT_CHIP}`}>Blackouts</li>
-          )}
-          {offered
-            .filter((l) => !hiddenSet.has(l.key))
-            .map((l) => (
-              <li key={l.key}>
-                {/* A manager presses a chip to change that layer's colour, for
-                    everybody. For anyone else it is a label. */}
-                {orgSettings ? (
-                  <button
-                    type="button"
-                    onClick={() => setRecolouring(l.key)}
-                    aria-label={`Change the colour of ${keyLabel(l)}`}
-                    className={`rounded-[4px] px-1.5 leading-[18px] hover:brightness-95 ${colorChip(layerColor(l.key, colors))}`}
-                  >
-                    {keyLabel(l)}
-                  </button>
-                ) : (
-                  <span className={`block rounded-[4px] px-1.5 leading-[18px] ${colorChip(layerColor(l.key, colors))}`}>
-                    {keyLabel(l)}
-                  </span>
-                )}
-              </li>
-            ))}
-        </ul>
-      )}
+      <ul aria-label="Colours" className="flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-medium">
+        {!hiddenSet.has("entries") && (
+          <li className={`rounded-[4px] px-1.5 leading-[18px] ${BLACKOUT_CHIP}`}>Blackouts</li>
+        )}
+        {offered
+          .filter((l) => !hiddenSet.has(l.key))
+          .map((l) => (
+            <li key={l.key}>
+              {/* A manager presses a chip to change that layer's colour, for
+                  everybody. For anyone else it is a label. */}
+              {orgSettings ? (
+                <button
+                  type="button"
+                  onClick={() => setRecolouring(l.key)}
+                  aria-label={`Change the colour of ${keyLabel(l)}`}
+                  className={`rounded-[4px] px-1.5 leading-[18px] hover:brightness-95 ${colorChip(layerColor(l.key, colors))}`}
+                >
+                  {keyLabel(l)}
+                </button>
+              ) : (
+                <span className={`block rounded-[4px] px-1.5 leading-[18px] ${colorChip(layerColor(l.key, colors))}`}>
+                  {keyLabel(l)}
+                </span>
+              )}
+            </li>
+          ))}
+      </ul>
 
       {view === "month" ? (
         <MonthView
@@ -464,13 +483,13 @@ export function CalendarScreen({
           onEntry={(id) => setOpen({ kind: "entry", id })}
         />
       ) : (
-        <EntriesList
-          entries={entries}
+        <ListView
+          days={listDays}
           today={today}
-          locations={locations}
-          canWrite={canWrite}
-          canSetBlackouts={canSetBlackouts}
-          onOpen={(id) => setOpen({ kind: "entry", id })}
+          shopCodes={shopCodes}
+          colors={colors}
+          onDay={goToDay}
+          onEntry={(id) => setOpen({ kind: "entry", id })}
         />
       )}
 

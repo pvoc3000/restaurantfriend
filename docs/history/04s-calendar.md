@@ -320,3 +320,19 @@ blackout shows its detail after the title and its shops and layer on the right.
 Later the same day: the banners went INSIDE a box headed "All day" ("I miss
 the box around the all day items") and the timed list is headed "By time"
 again. Still banners, not the old plain lines.
+
+**THE LIST VIEW IS THE MONTH AS A LIST** (Mark, 2026-10-11: "The calendar but
+in a list form. And we could keep the label 'list'"). It replaced the table of
+typed entries (`EntriesList`, deleted — its inline editing and Upcoming | Past
+tabs went with it; an entry is edited in its dialog, and the past is reached
+by stepping back a month). `calendar/ListView`: one black band per day,
+`longDate`, pressing it opens the Day view; under it every item on
+`calendar/ItemLine`, the line the Day view's By time list also uses.
+Decisions: only the month's own days (not the grid's spill-over), only days
+with something on them, a multi-day entry under each of its days, and NO menu
+plan lines (it is on every day). In the current month it scrolls to today's
+band or the next one after it, once, on mount. The month stepper, Shops, the
+eye and the colour key now show in all three views; `?view=list&month=…`.
+This is the "agenda" idea parked on 2026-10-10, scoped to the month on screen
+instead of rolling forward from today, which removed the need for a window and
+a "load more".

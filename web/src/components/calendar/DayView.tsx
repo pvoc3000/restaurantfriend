@@ -1,11 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { CALENDAR_LAYERS, clockTime, dayAgenda, type CalendarItem } from "@/lib/calendar";
+import { dayAgenda, type CalendarItem } from "@/lib/calendar";
 import { chipClass, type LayerColors } from "@/lib/calendarColors";
-
-const LAYER_LABEL = Object.fromEntries(CALENDAR_LAYERS.map((l) => [l.key, l.label]));
+import { ItemLine, LAYER_LABEL, itemShops, openItem } from "@/components/calendar/ItemLine";
 
 /**
  * ONE DAY IN FULL (Mark, 2026-10-10: "timeline list, combined list, go to day
@@ -47,50 +45,8 @@ export function DayView({
   }
 
   const open = (item: CalendarItem, className: string, children: ReactNode) =>
-    item.entryId ? (
-      <button type="button" onClick={() => onEntry(item.entryId!)} className={`${className} text-left`}>
-        {children}
-      </button>
-    ) : item.href ? (
-      <Link href={item.href} className={className}>
-        {children}
-      </Link>
-    ) : (
-      <div className={className}>{children}</div>
-    );
-
-  const shopsOf = (item: CalendarItem) =>
-    item.locationIds
-      .map((id) => shopCodes.get(id))
-      .filter((code): code is string => Boolean(code))
-      .join(", ");
-
-  const line = (item: CalendarItem) => {
-    const shops = shopsOf(item);
-    return (
-      <li key={item.key}>
-        {open(
-          item,
-          "flex w-full items-baseline gap-4 px-3 py-2.5 hover:bg-neutral-100",
-          <>
-            <span className="w-20 shrink-0 text-right text-sm font-semibold tabular-nums">
-              {item.time ? clockTime(item.time) : ""}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className={`rounded-[4px] px-1.5 py-0.5 text-sm font-medium ${chipClass(item, colors)}`}>
-                {item.lead ? `${item.lead}: ` : ""}
-                {item.title}
-              </span>
-              {item.detail && <span className="mt-1 block text-sm text-muted">{item.detail}</span>}
-            </span>
-            <span className="shrink-0 text-[11px] uppercase tracking-[0.08em] text-subtle">
-              {[shops, LAYER_LABEL[item.layer]].filter(Boolean).join(" · ")}
-            </span>
-          </>,
-        )}
-      </li>
-    );
-  };
+    openItem(item, className, children, onEntry);
+  const shopsOf = (item: CalendarItem) => itemShops(item, shopCodes);
 
   return (
     <div className="space-y-6">
@@ -129,7 +85,11 @@ export function DayView({
       {timed.length > 0 && (
         <section className="space-y-1">
           <h2 className="text-[11px] uppercase tracking-[0.12em] text-subtle">By time</h2>
-          <ul className="divide-y divide-neutral-200 border border-ink bg-white">{timed.map(line)}</ul>
+          <ul className="divide-y divide-neutral-200 border border-ink bg-white">
+            {timed.map((item) => (
+              <ItemLine key={item.key} item={item} shopCodes={shopCodes} colors={colors} onEntry={onEntry} />
+            ))}
+          </ul>
         </section>
       )}
     </div>

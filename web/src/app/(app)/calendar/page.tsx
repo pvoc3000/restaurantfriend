@@ -34,8 +34,8 @@ import {
  * `?month=2026-12` picks the month and is why changing it is a navigation —
  * every layer is fetched for exactly the 42 days the grid draws.
  * `?view=day&date=2026-12-25` is one day in full, fetched for that day alone.
- * `?view=list` is the entries as a table, which loads all of them and no
- * layers.
+ * `?view=list&month=2026-12` is that month as a list, one band per day
+ * (`calendar/ListView`), fetched like the month.
  */
 export default async function CalendarPage({
   searchParams,
@@ -68,7 +68,7 @@ export default async function CalendarPage({
     : null;
   const shops = parseShopsParam(params.shops, known, working !== null);
 
-  const { entries, error } = await fetchEntries(supabase, view === "list" ? {} : range);
+  const { entries, error } = await fetchEntries(supabase, range);
 
   if (error) {
     // Before 181 is applied this names the missing table rather than drawing
@@ -101,7 +101,7 @@ export default async function CalendarPage({
   // 186). Non-empty, the page mounts `FeedRefresher`, which asks for a read.
   let stale: string[] = [];
   let calendars: { id: string; name: string }[] = [];
-  if (view !== "list") {
+  {
     const [fetched, subs, feedEvents] = await Promise.all([
       // `session.locations`, the FULL list: a lookup, not an enumeration
       // (design rule 3), so a delivery to a since-closed shop still has a code.
