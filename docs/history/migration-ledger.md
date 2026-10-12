@@ -418,3 +418,7 @@ item-locations were last bought as two vendor items on ONE order and the view's
 ★ could land on either. The lint moves from an ERROR to two more rows of the
 WARN "authenticated security definer function executable", which already
 lists 77 functions. The views stay until this code is deployed; 198 drops them.
+
+**198 is APPLIED** (Claude, 2026-10-12) — drops `v_item_last_ordered` and
+`v_item_last_purchase`, after the deployment of 197's callers (`901459d0`) was
+READY on Vercel. No owner-run view is left in `public`.
