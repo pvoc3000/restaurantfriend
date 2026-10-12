@@ -99,7 +99,7 @@ export function DayView({
           <h2 className="text-[11px] uppercase tracking-[0.12em] text-subtle">All day</h2>
           {/* The banners sit in the same box the timed list wears (Mark,
               2026-10-11: "I miss the box around the all day items"). */}
-          <ul className="space-y-1 border border-ink bg-white p-2">
+          <ul className="space-y-2 border border-ink bg-white p-2">
             {banners.map((item) => (
               <li key={item.key}>
                 {open(
