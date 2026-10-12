@@ -85,7 +85,10 @@ export function ListView({
                 )}
               </button>
             </h2>
-            <ul className="divide-y divide-neutral-200">
+            {/* The dividing lines start at the SECOND column — past the line's
+                12px pad, the 80px time column and the 16px gap (`ItemLine`) —
+                so the times read as one clear column down the day. */}
+            <ul className="[&>li+li]:relative [&>li+li]:before:absolute [&>li+li]:before:top-0 [&>li+li]:before:right-0 [&>li+li]:before:left-[6.75rem] [&>li+li]:before:border-t [&>li+li]:before:border-neutral-200 [&>li+li]:before:content-['']">
               {[...banners, ...timed].map((item) => (
                 <ItemLine key={item.key} item={item} shopCodes={shopCodes} colors={colors} onEntry={onEntry} />
               ))}
