@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { dayAgenda, type CalendarItem } from "@/lib/calendar";
 import { chipClass, type LayerColors } from "@/lib/calendarColors";
-import { ITEM_LINES_CLASS, ItemLine, LAYER_LABEL, itemShops, openItem } from "@/components/calendar/ItemLine";
+import { ITEM_LINES_CLASS, ItemLine, LAYER_LABEL, PrivateMark, itemShops, openItem } from "@/components/calendar/ItemLine";
 
 /**
  * ONE DAY IN FULL (Mark, 2026-10-10: "timeline list, combined list, go to day
@@ -63,6 +63,7 @@ export function DayView({
                   `flex w-full items-baseline justify-between gap-4 rounded-[4px] px-3 py-1.5 text-sm font-medium hover:brightness-95 ${chipClass(item, colors)}`,
                   <>
                     <span className="min-w-0 truncate">
+                      <PrivateMark item={item} />
                       {item.lead ? `${item.lead}: ` : ""}
                       {item.title}
                       {!item.blackout && item.detail && (
@@ -72,7 +73,7 @@ export function DayView({
                     <span className="shrink-0 text-[11px] font-normal uppercase tracking-[0.08em] opacity-80">
                       {item.blackout
                         ? item.detail || "Blackout"
-                        : [shopsOf(item), LAYER_LABEL[item.layer]].filter(Boolean).join(" · ")}
+                        : [shopsOf(item), item.private ? "Private" : LAYER_LABEL[item.layer]].filter(Boolean).join(" · ")}
                     </span>
                   </>,
                 )}

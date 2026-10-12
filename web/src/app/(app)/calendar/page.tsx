@@ -159,6 +159,7 @@ export default async function CalendarPage({
       // filter it seeds from the URL) follows a navigation.
       key={`${view}:${view === "day" ? date : month}`}
       orgId={session.membership.org_id}
+      userId={session.userId}
       view={view}
       month={month}
       date={date}

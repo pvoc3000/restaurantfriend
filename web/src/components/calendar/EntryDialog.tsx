@@ -54,6 +54,7 @@ type Existing = { orders: number; schedules: number };
  */
 export function EntryDialog({
   orgId,
+  userId,
   locations,
   entry,
   initialDate,
@@ -62,6 +63,8 @@ export function EntryDialog({
   onClose,
 }: {
   orgId: string;
+  /** The person signed in — a private note names its writer (migration 194). */
+  userId: string;
   locations: EntryLocation[];
   /** The entry being edited; omit for a new one. */
   entry?: CalendarEntry | null;
@@ -92,6 +95,7 @@ export function EntryDialog({
         }
       : NO_SWITCHES,
   );
+  const [isPrivate, setIsPrivate] = useState(entry?.is_private === true);
   const [pending, startTransition] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
   const [existing, setExisting] = useState<Existing | null>(null);
@@ -163,6 +167,13 @@ export function EntryDialog({
       // A blackout is always drawn dark, so it keeps no colour of its own.
       color: isBlackout(switches) ? null : color,
       ...switches,
+      // PRIVATE (194): only its writer reads it, and the database compares
+      // `created_by` with the caller — so it is said here, which is also what
+      // lets a note written before 194 (no writer on record) be made private.
+      // Never with a switch on; the box is disabled then, and a check
+      // constraint would refuse it.
+      is_private: isPrivate && !isBlackout(switches),
+      ...(isPrivate && !isBlackout(switches) ? { created_by: userId } : {}),
     };
     startTransition(async () => {
       // `org_id` EXPLICITLY on the insert — design rule 1: a WITH CHECK runs
@@ -321,6 +332,18 @@ export function EntryDialog({
           </div>
         )}
 
+        {/* PRIVATE (Mark, 2026-10-12): text only, for the person who wrote it.
+            It cannot be a blackout, so the two disable each other. */}
+        <div>
+          <Checkbox
+            checked={isPrivate && !blackout}
+            disabled={!editable || blackout}
+            onChange={setIsPrivate}
+          >
+            Private
+          </Checkbox>
+        </div>
+
         {(canSetBlackouts || blackout) && (
           <fieldset>
             <legend className="mb-2 block text-[11px] uppercase tracking-[0.12em] text-subtle">
@@ -335,7 +358,7 @@ export function EntryDialog({
                 <Checkbox
                   key={s.column}
                   checked={switches[s.column]}
-                  disabled={!editable || !canSetBlackouts}
+                  disabled={!editable || !canSetBlackouts || isPrivate}
                   onChange={(next) => setSwitches((prev) => ({ ...prev, [s.column]: next }))}
                 >
                   {s.label}

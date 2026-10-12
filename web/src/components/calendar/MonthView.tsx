@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { PrivateMark } from "@/components/calendar/ItemLine";
 import { useFillToBottom } from "@/lib/fillHeight";
 import { chipClass, type LayerColors } from "@/lib/calendarColors";
 import { monthGrid } from "@/lib/dateRange";
@@ -198,7 +199,12 @@ function Bar({
   }`;
   const className = `pointer-events-auto block min-w-0 truncate rounded-[4px] px-1.5 text-left text-[11px] font-medium leading-[15px] hover:brightness-95 ${ends} ${chipClass(item, colors)}`;
   const style = { gridColumn: `${bar.col + 1} / span ${bar.days}`, gridRow: bar.lane + 1 };
-  const body = itemText(item);
+  const body = (
+    <>
+      <PrivateMark item={item} />
+      {itemText(item)}
+    </>
+  );
 
   if (item.entryId) {
     return (

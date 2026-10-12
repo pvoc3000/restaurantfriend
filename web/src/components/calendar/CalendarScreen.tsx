@@ -74,6 +74,7 @@ const NAV =
  */
 export function CalendarScreen({
   orgId,
+  userId,
   view,
   month,
   date,
@@ -92,6 +93,7 @@ export function CalendarScreen({
   orgSettings,
 }: {
   orgId: string;
+  userId: string;
   view: CalendarView;
   /** The first day of the month on screen. */
   month: string;
@@ -553,6 +555,7 @@ export function CalendarScreen({
       {open?.kind === "new" && (
         <EntryDialog
           orgId={orgId}
+          userId={userId}
           locations={locations}
           initialDate={open.date}
           canWrite={canWrite}
@@ -564,6 +567,7 @@ export function CalendarScreen({
         <EntryDialog
           key={openEntry.id}
           orgId={orgId}
+          userId={userId}
           locations={locations}
           entry={openEntry}
           canWrite={canWrite}

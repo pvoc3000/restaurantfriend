@@ -38,11 +38,15 @@ export type CalendarEntry = {
   /** A palette key (`lib/calendarColors`, migration 188), or null/absent for
    *  the layer's colour. Ignored on a blackout. */
   color?: string | null;
+  /** ONLY ITS WRITER SEES IT (migration 194) — the database's rule, so a row
+   *  that reaches the screen is either shared or the reader's own. Never true
+   *  on a blackout. */
+  is_private?: boolean;
 };
 
 /** The columns every reader selects. */
 export const CALENDAR_ENTRY_SELECT =
-  "id, title, starts_on, ends_on, location_ids, no_special_orders, no_standing_orders, no_production, shop_closed, note, color";
+  "id, title, starts_on, ends_on, location_ids, no_special_orders, no_standing_orders, no_production, shop_closed, note, color, is_private";
 
 /**
  * The four switches, in the order the screens show them. `label` reads as what

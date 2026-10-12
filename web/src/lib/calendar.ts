@@ -83,6 +83,8 @@ export type CalendarItem = {
   color?: string | null;
   /** The `calendar_entries` row behind an `entries` item. */
   entryId?: string;
+  /** A private note (migration 194) — drawn with a lock. */
+  private?: boolean;
   /** For a `feeds` item, the subscribed calendar it came from — so one
    *  calendar can be hidden without the layer. */
   source?: string;
@@ -181,6 +183,7 @@ export function entryItems(
         blackout: isBlackout(entry),
         color: entry.color,
         entryId: entry.id,
+        private: entry.is_private === true,
         span:
           entry.starts_on === entry.ends_on
             ? undefined

@@ -437,3 +437,27 @@ test("one subscribed calendar can be hidden while its layer stays on", () => {
     ["a", "o"],
   );
 });
+
+test("a private note's items say so, and a shared one's do not", () => {
+  const base = {
+    title: "Call the landlord",
+    starts_on: "2026-12-10",
+    ends_on: "2026-12-10",
+    location_ids: [],
+    no_special_orders: false,
+    no_standing_orders: false,
+    no_production: false,
+    shop_closed: false,
+    note: null,
+  };
+  const range = { from: "2026-12-01", to: "2026-12-31" };
+  const [mine, shared] = entryItems(
+    [
+      { ...base, id: "mine", is_private: true },
+      { ...base, id: "shared" },
+    ],
+    range,
+  );
+  eq(mine.private, true);
+  eq(shared.private, false);
+});

@@ -383,3 +383,9 @@ first shop not blacked out that day; `inquiry_blackouts` returns `shop_ids`.
 that is not for every shop names its shops after its title ("Large Knotted
 Order (DF02)"). `calendar_feed_by_token` restated from 190 with one expression
 changed; dry-run on the live DB showed every non-entry item byte-identical.
+
+**194 is APPLIED** (Claude, 2026-10-12) — `calendar_entries.is_private`: a
+private note is read and written by `created_by` alone (all four policies),
+never a blackout (check constraint), never in a published feed
+(`calendar_feed_by_token` restated from 193 with one line). `created_by` now
+defaults to `auth.uid()`. Dry-run on the live DB as a supervisor and an owner.

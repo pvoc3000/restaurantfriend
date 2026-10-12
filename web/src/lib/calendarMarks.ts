@@ -140,7 +140,7 @@ export function dayMarks(input: {
       const what = blackout ? blackoutLabels(entry).join(" · ") : entry.note?.trim() || "";
       marks.push({
         key: `entry:${entry.id}`,
-        text: `${entryTitle(entry, input.locations)}${what ? ` — ${what}` : ""}${where}`,
+        text: `${entryTitle(entry, input.locations)}${what ? ` — ${what}` : ""}${where}${entry.is_private ? " · Private" : ""}`,
         className: chipClass({ layer: "entries", blackout, color: entry.color }, input.colors),
         blackout,
         kind: blackout ? "blackout" : "note",

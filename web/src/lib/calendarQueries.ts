@@ -37,6 +37,7 @@ function toEntry(r: Row): CalendarEntry {
     shop_closed: Boolean(r.shop_closed),
     note: (r.note ?? null) as string | null,
     color: (r.color ?? null) as string | null,
+    is_private: Boolean(r.is_private),
   };
 }
 

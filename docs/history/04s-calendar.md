@@ -344,3 +344,24 @@ root, which a list band's `scrollMarginTop` reads. In List, in the current
 month, Today is enabled and scrolls to the band marked
 `data-calendar-landing` (today's, else the next with anything, else the last);
 in another month it goes to this month, which lands there on mount.
+
+**PRIVATE NOTES** (Mark, 2026-10-12: "supervisor and up… 'Private'… disable
+the other checkboxes for private notes. It's text only, doesn't affect the
+shop in any way"). Migration 194. A tick box "Private" in `EntryDialog`; it
+and the four switches disable each other, and a check constraint refuses the
+pair. THE PRIVACY IS THE SELECT POLICY, not a filter in the app: nobody but
+`created_by` is sent the row — not a manager, not an owner — so every reader
+(`fetchEntries`, and through it the orders list's bands) is correct without
+knowing the feature exists. The dialog writes `created_by: userId` whenever it
+saves a private note, because the policy compares it with the caller and rows
+from before 194 have none; that also means anyone who may edit a shared note
+may take it private, which is no more than the delete they already had.
+Published links leave private notes out (the feed function is a definer, so
+it says so itself). Drawn with a padlock (`ItemLine.PrivateMark`) before the
+title in all three views and "Private" where the layer name would be; "·
+Private" ends its band on the orders list. Dry run, rolled back: the writer
+saw, changed and deleted it; an owner saw 0 rows and changed 0; a forged
+`created_by`, a private blackout and hiding someone else's note were each
+refused; the feed carried the shared note only. NOT tested: a staff login
+(no staff member has one) — staff are refused by 181's unchanged role clause.
+The signed-in screens were not looked at.

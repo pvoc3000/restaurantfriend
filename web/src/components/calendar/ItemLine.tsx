@@ -7,6 +7,22 @@ import { chipClass, type LayerColors } from "@/lib/calendarColors";
 
 export const LAYER_LABEL = Object.fromEntries(CALENDAR_LAYERS.map((l) => [l.key, l.label]));
 
+/** The mark on a PRIVATE note (migration 194): a small padlock before its
+ *  title, in the chip's own ink. */
+export function PrivateMark({ item }: { item: CalendarItem }) {
+  if (!item.private) return null;
+  return (
+    <svg
+      viewBox="0 0 12 12"
+      aria-label="Private"
+      role="img"
+      className="mr-1 inline-block h-[0.85em] w-[0.85em] -translate-y-px fill-current align-middle"
+    >
+      <path d="M3.5 5V3.5a2.5 2.5 0 0 1 5 0V5H9a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h.5Zm1.25 0h2.5V3.5a1.25 1.25 0 0 0-2.5 0V5Z" />
+    </svg>
+  );
+}
+
 /** An item as the thing it opens: the entry's dialog, its record, or nothing. */
 export function openItem(
   item: CalendarItem,
@@ -70,6 +86,7 @@ export function ItemLine({
           </span>
           <span className="min-w-0 flex-1">
             <span className={`rounded-[4px] px-1.5 py-0.5 text-sm font-medium ${chipClass(item, colors)}`}>
+              <PrivateMark item={item} />
               {item.lead ? `${item.lead}: ` : ""}
               {item.title}
             </span>
@@ -78,7 +95,7 @@ export function ItemLine({
           <span className="shrink-0 text-[11px] uppercase tracking-[0.08em] text-subtle">
             {[
               itemShops(item, shopCodes),
-              item.blackout ? "Blackout" : LAYER_LABEL[item.layer],
+              item.blackout ? "Blackout" : item.private ? "Private" : LAYER_LABEL[item.layer],
             ]
               .filter(Boolean)
               .join(" · ")}
