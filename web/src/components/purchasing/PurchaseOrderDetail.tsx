@@ -943,6 +943,7 @@ export function PurchaseOrderDetail({
   // the row already says which — ordered on top, received below, and each row
   // ends in its own total — and the repeated words were what made this card
   // ~530px wide and the two columns stack early.
+  const selectedLines = lines.filter((l) => checkedLines.has(l.id));
   const stats: { label: string; value: string; short?: boolean }[] = [
     { label: "Products", value: String(lines.length) },
     { label: "Packages", value: qty(orderedPackages) },
@@ -958,9 +959,20 @@ export function PurchaseOrderDetail({
       short: receivedPackages < orderedPackages - 0.005,
     },
     { label: "Received total", value: money(received), short: received < ordered - 0.005 },
+    // A THIRD ROW WHILE LINES ARE TICKED (Mark, 2026-10-12): what the selection
+    // comes to, as ordered — the size of the order Move Selected… would make.
+    // Read off `lines`, so an id ticked and since deleted counts for nothing.
+    ...(selectedLines.length > 0
+      ? [
+          { label: "Products", value: String(selectedLines.length) },
+          { label: "Packages", value: qty(orderedQty(selectedLines)) },
+          { label: "Selected total", value: money(orderedTotal(selectedLines)) },
+        ]
+      : []),
   ];
 
-  // TWO ROWS OF THREE (Mark, 2026-09-11): ordered above, received below. A grid
+  // ROWS OF THREE (Mark, 2026-09-11): ordered above, received below, and the
+  // selection under them while there is one. A grid
   // of `auto` tracks sizes each column to its widest figure across BOTH rows,
   // so Products ordered sits over Products received and so on down; `w-fit
   // ml-auto` keeps the block on the right margin.
@@ -971,7 +983,7 @@ export function PurchaseOrderDetail({
     <div className="border border-ink bg-white px-4 py-3">
       <div className="ml-auto grid w-fit grid-cols-[repeat(3,auto)] gap-x-8 gap-y-3">
         {/* Keyed by POSITION: the labels repeat since the ordered and received
-            rows dropped their prefixes (2026-09-12), and this is a fixed six. */}
+            rows dropped their prefixes (2026-09-12), and the order is fixed. */}
         {stats.map((s, i) => (
           <div key={i} className="text-right">
             <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">{s.label}</div>
