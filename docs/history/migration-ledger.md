@@ -389,3 +389,12 @@ private note is read and written by `created_by` alone (all four policies),
 never a blackout (check constraint), never in a published feed
 (`calendar_feed_by_token` restated from 193 with one line). `created_by` now
 defaults to `auth.uid()`. Dry-run on the live DB as a supervisor and an owner.
+
+**195 is APPLIED** (Claude, 2026-10-12) — drops `v_last_orders`. 001 made it
+without `security_invoker`, and Supabase's default privileges granted it to
+`anon`, so a signed-out request with the anon key read all 3,158 rows (last
+order date, quantities, unit price). Nothing read it and nothing depended on
+it. After: `to_regclass` is null and the same anon request is a 404. Found from
+Supabase's "Security Definer View" lint; `v_item_last_ordered` and
+`v_item_last_purchase` trip the same lint on purpose (014) and hold no anon
+grant.

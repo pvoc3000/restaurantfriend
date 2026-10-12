@@ -100,9 +100,9 @@ export async function VendorItemDetail({
     .select("item_location_id, weekday")
     .eq("vendor_item_id", id);
 
-  // Last ordered per location, straight off the PO tables — v_last_orders
-  // exists (migration 001) but was never granted to `authenticated`, so the
-  // app can't read it. Void orders don't count as having been ordered.
+  // Last ordered per location, straight off the PO tables, where RLS applies.
+  // (001's v_last_orders view answered this but bypassed RLS; 195 dropped it.)
+  // Void orders don't count as having been ordered.
   const { data: poLines } = await supabase
     .from("purchase_order_items")
     .select("purchase_orders!inner ( order_date, location_id, status )")
