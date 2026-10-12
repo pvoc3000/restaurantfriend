@@ -16,7 +16,7 @@ const LAYER_LABEL = Object.fromEntries(CALENDAR_LAYERS.map((l) => [l.key, l.labe
  *
  *   · BANNERS — everything with no time, full width: the menu plan and any
  *     blackout first, then notes, deliveries, tasks, a pay period, HR. One
- *     band, not a separate "All day" list (Mark, 2026-10-11).
+ *     band of banners in a box headed "All day" (Mark, 2026-10-11).
  *   · BY TIME — what has one, in time order, every shop together.
  *
  * A TIMELINE LIST, NOT AN HOUR GRID. A day here has a handful of timed things,
@@ -95,34 +95,42 @@ export function DayView({
   return (
     <div className="space-y-6">
       {banners.length > 0 && (
-        <ul className="space-y-1">
-          {banners.map((item) => (
-            <li key={item.key}>
-              {open(
-                item,
-                `flex w-full items-baseline justify-between gap-4 rounded-[4px] px-3 py-1.5 text-sm font-medium hover:brightness-95 ${chipClass(item, colors)}`,
-                <>
-                  <span className="min-w-0 truncate">
-                    {item.lead ? `${item.lead}: ` : ""}
-                    {item.title}
-                    {!item.blackout && item.detail && (
-                      <span className="font-normal opacity-80"> — {item.detail}</span>
-                    )}
-                  </span>
-                  <span className="shrink-0 text-[11px] font-normal uppercase tracking-[0.08em] opacity-80">
-                    {item.blackout
-                      ? item.detail || "Blackout"
-                      : [shopsOf(item), LAYER_LABEL[item.layer]].filter(Boolean).join(" · ")}
-                  </span>
-                </>,
-              )}
-            </li>
-          ))}
-        </ul>
+        <section className="space-y-1">
+          <h2 className="text-[11px] uppercase tracking-[0.12em] text-subtle">All day</h2>
+          {/* The banners sit in the same box the timed list wears (Mark,
+              2026-10-11: "I miss the box around the all day items"). */}
+          <ul className="space-y-1 border border-ink bg-white p-2">
+            {banners.map((item) => (
+              <li key={item.key}>
+                {open(
+                  item,
+                  `flex w-full items-baseline justify-between gap-4 rounded-[4px] px-3 py-1.5 text-sm font-medium hover:brightness-95 ${chipClass(item, colors)}`,
+                  <>
+                    <span className="min-w-0 truncate">
+                      {item.lead ? `${item.lead}: ` : ""}
+                      {item.title}
+                      {!item.blackout && item.detail && (
+                        <span className="font-normal opacity-80"> — {item.detail}</span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-[11px] font-normal uppercase tracking-[0.08em] opacity-80">
+                      {item.blackout
+                        ? item.detail || "Blackout"
+                        : [shopsOf(item), LAYER_LABEL[item.layer]].filter(Boolean).join(" · ")}
+                    </span>
+                  </>,
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {timed.length > 0 && (
-        <ul className="divide-y divide-neutral-200 border border-ink bg-white">{timed.map(line)}</ul>
+        <section className="space-y-1">
+          <h2 className="text-[11px] uppercase tracking-[0.12em] text-subtle">By time</h2>
+          <ul className="divide-y divide-neutral-200 border border-ink bg-white">{timed.map(line)}</ul>
+        </section>
       )}
     </div>
   );

@@ -317,3 +317,6 @@ bands: `banners` is everything with no time — menu plan and blackouts first,
 then notes, deliveries, tasks and the rest — and `timed` is the list by time,
 now with no heading because it is the only list. A banner that is not a
 blackout shows its detail after the title and its shops and layer on the right.
+Later the same day: the banners went INSIDE a box headed "All day" ("I miss
+the box around the all day items") and the timed list is headed "By time"
+again. Still banners, not the old plain lines.
