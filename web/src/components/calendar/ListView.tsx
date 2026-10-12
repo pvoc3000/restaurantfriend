@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { dayAgenda, longDate, type CalendarItem } from "@/lib/calendar";
 import type { LayerColors } from "@/lib/calendarColors";
 import { ItemLine } from "@/components/calendar/ItemLine";
+import { BackToTop } from "@/components/ui/BackToTop";
 
 /**
  * THE MONTH AS A LIST (Mark, 2026-10-11: "The calendar but in a list form") —
@@ -92,6 +93,8 @@ export function ListView({
           </section>
         );
       })}
+      {/* A month can run long — the order guide's own button. */}
+      <BackToTop />
     </div>
   );
 }
