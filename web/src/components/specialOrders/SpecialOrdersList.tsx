@@ -126,6 +126,9 @@ export type SpecialOrderRow = {
 };
 
 const PATH = "/special-orders";
+/** The calendar menu's "Active Days Only" switch, as stored in `rf.specialOrders.markOptions`. */
+const ACTIVE_DAYS_ONLY = "activeDaysOnly";
+
 /** The Status menu's two "everything" values — real tokens, because it rests on one of them. */
 const STATUS_ALL = "all";
 const NOT_CANCELLED = "not-cancelled";
@@ -494,6 +497,10 @@ export function SpecialOrdersList({
     parseFilterValues(dimensions, seed())
   );
   const [hiddenMarkKinds, setHiddenMarkKinds] = useStoredSet("rf.specialOrders.hiddenMarks");
+  // The calendar menu's switches — its own key, because `hiddenMarks` holds
+  // kinds of band and this is not one.
+  const [markOptions, setMarkOptions] = useStoredSet("rf.specialOrders.markOptions");
+  const activeDaysOnly = markOptions.includes(ACTIVE_DAYS_ONLY);
   const [sort, setSort] = useState<ListSort | null>(() => parseListSort(seed(), SORT_KEYS));
 
   /**
@@ -1013,6 +1020,10 @@ export function SpecialOrdersList({
       // 2026-10-10) — a closed day with nothing booked is exactly the day
       // somebody is about to take an order for.
       gaps: (prev, next) => {
+        // ACTIVE DAYS ONLY (Mark, 2026-10-13): the calendar speaks only on a
+        // day an order is already on, so no day is drawn for the calendar's
+        // sake.
+        if (activeDaysOnly) return [];
         // A row with NO date (a template, a standing order) is not a place in
         // the calendar: nothing is drawn before its "No date" band, and it is
         // an open edge for whatever follows. A list of only such rows has no
@@ -1239,6 +1250,19 @@ export function SpecialOrdersList({
                   ? "Nothing from the calendar in these dates."
                   : null,
               link: { label: "Open calendar", href: "/calendar" },
+              options: [
+                {
+                  key: ACTIVE_DAYS_ONLY,
+                  label: "Active Days Only",
+                  on: activeDaysOnly,
+                  onToggle: (next) =>
+                    setMarkOptions(
+                      next
+                        ? [...markOptions, ACTIVE_DAYS_ONLY]
+                        : markOptions.filter((o) => o !== ACTIVE_DAYS_ONLY),
+                    ),
+                },
+              ],
               items: DAY_MARK_KINDS.flatMap((k) => {
                 const toggle = (key: string) => (next: boolean) =>
                   setHiddenMarkKinds(

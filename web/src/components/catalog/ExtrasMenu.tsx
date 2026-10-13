@@ -44,6 +44,13 @@ export type ChooserExtras = {
     /** Shown but not changeable — a child whose parent is switched off. */
     disabled?: boolean;
   }[];
+  /**
+   * SWITCHES THAT ARE NOT THINGS TO SHOW, under a rule of their own (Mark,
+   * 2026-10-13, "Active Days Only") — off at rest, where an item is on, so one
+   * left off is not counted as something hidden. One switched ON does turn the
+   * button ink: it is narrowing what the list shows.
+   */
+  options?: { key: string; label: string; on: boolean; onToggle: (next: boolean) => void }[];
   /** A line under the checklist — "Nothing from the calendar in these dates". */
   note?: string | null;
   /** Where the thing itself lives — "Open calendar". */
@@ -59,6 +66,7 @@ export function ExtrasMenu({ extras }: { extras: ChooserExtras }) {
 
   // A disabled child is off because its PARENT is, which is already counted.
   const hidden = extras.items.filter((i) => !i.on && !i.disabled).length;
+  const narrowed = hidden > 0 || (extras.options ?? []).some((o) => o.on);
 
   return (
     <>
@@ -72,7 +80,7 @@ export function ExtrasMenu({ extras }: { extras: ChooserExtras }) {
         title={hidden > 0 ? `${extras.label} — ${hidden} hidden` : `${extras.label} — choose what this list shows`}
         // `ColumnsMenu`'s trigger, class for class.
         className={`grid h-8 w-8 shrink-0 place-items-center transition-colors hover:bg-neutral-100 hover:text-ink ${
-          hidden > 0 ? "text-ink" : "text-muted"
+          narrowed ? "text-ink" : "text-muted"
         }`}
       >
         {extras.icon}
@@ -105,6 +113,21 @@ export function ExtrasMenu({ extras }: { extras: ChooserExtras }) {
                   label={`Show ${item.label}`}
                 />
                 <span className="min-w-0 truncate">{item.label}</span>
+              </label>
+            ))}
+            {extras.options?.map((option, i) => (
+              <label
+                key={option.key}
+                className={`${MENU_ITEM_CLASS} flex cursor-pointer items-center gap-3 hover:bg-neutral-100 ${
+                  i === 0 ? "border-t border-hairline" : ""
+                }`}
+              >
+                <Checkbox
+                  checked={option.on}
+                  onChange={() => option.onToggle(!option.on)}
+                  label={option.label}
+                />
+                <span className="min-w-0 truncate">{option.label}</span>
               </label>
             ))}
             {extras.note && (
