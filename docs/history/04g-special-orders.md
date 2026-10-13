@@ -5894,5 +5894,4 @@ limit event times to between two hours after opening up until close."
 - **Verified:** dry run of 200 on the hosted database in a transaction that
   never committed (windows for both shops, four refusals, four accepted at
   the edges, anon cannot call the internal function); fixtures broken and
-  restored; `tsc`, eslint, 2,364 fixtures. **Not verified:** the form in a
-  browser, which needs 200 applied.
+  restored; `tsc`, eslint, 2,364 fixtures. **200 APPLIED 2026-10-13**, and the form checked in a browser: both sentences appear for 8 AM on a Friday. No inquiry was submitted.
