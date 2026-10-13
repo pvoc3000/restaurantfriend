@@ -27,8 +27,7 @@ import type { CalendarEntry } from "@/lib/blackoutDates";
 import { useStoredSet } from "@/lib/storedSet";
 import { MonthView } from "@/components/calendar/MonthView";
 import { MonthJump } from "@/components/calendar/MonthJump";
-import { EyeIcon } from "@/components/catalog/ColumnsMenu";
-import { ExtrasMenu } from "@/components/catalog/ExtrasMenu";
+import { CalendarEventIcon, ExtrasMenu } from "@/components/catalog/ExtrasMenu";
 import { ColorSwatches } from "@/components/calendar/ColorSwatches";
 import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
 import { createClient } from "@/lib/supabase/client";
@@ -375,8 +374,8 @@ export function CalendarScreen({
           )}
           {/* LEFT TO RIGHT (Mark, 2026-10-10): the date and Today, then Shops,
               then View — the row's `gap-x-6` is the air between Today and Shops —
-              and the layers' eye alone at the far right, where a table's columns
-              eye sits. */}
+              and the layers' button alone at the far right, where a table's
+              columns button sits. */}
           <ControlField label="Shops">
             <PickSet
               // "Working location" FIRST (Mark, 2026-10-10): the calendar
@@ -417,8 +416,8 @@ export function CalendarScreen({
             />
           </ControlField>
           {offered.length > 1 && (
-            // THE EYE (`EyeIcon`, the tables' own until 2026-10-13) — which
-            // of these to show. `catalog/ExtrasMenu`, the menu the orders list's
+            // THE ORDERS LIST'S CALENDAR GLYPH (Mark, 2026-10-13; an eye before
+            // that) — which of these to show. `catalog/ExtrasMenu`, the menu the orders list's
             // calendar button uses, so a layer and the calendars nested under
             // "Subscribed calendars" read the same on both screens. The key of
             // chips under this row is what says the answer.
@@ -426,7 +425,7 @@ export function CalendarScreen({
               <ExtrasMenu
                 extras={{
                   label: "What the calendar shows",
-                  icon: <EyeIcon />,
+                  icon: <CalendarEventIcon />,
                   items: offered.flatMap((l) => {
                     const on = !hiddenSet.has(l.key);
                     const layer = {
