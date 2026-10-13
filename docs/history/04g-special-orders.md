@@ -5895,3 +5895,18 @@ limit event times to between two hours after opening up until close."
   never committed (windows for both shops, four refusals, four accepted at
   the edges, anon cannot call the internal function); fixtures broken and
   restored; `tsc`, eslint, 2,364 fixtures. **200 APPLIED 2026-10-13**, and the form checked in a browser: both sentences appear for 8 AM on a Friday. No inquiry was submitted.
+
+### 2026-10-13 — an inquiry is for tomorrow at the earliest (201)
+
+Mark: "the inquiry form should not allow the user to select dates in the past
+or the current day."
+
+- **The form:** the calendar disables today and every day before it, and a
+  typed one reads "Choose a date after today." at once (`validateInquiry`'s
+  fourth argument). Today is the org's (`todayIn(rules.timezone)`), which is
+  UTC until the menu has loaded.
+- **Migration 201:** `create_inquiry` refuses `v_date <= v_today` with a new
+  state, `date_past`.
+- **Verified:** dry run of 201 on the hosted database, never committed
+  (yesterday and today refused, tomorrow created); the form in a browser;
+  a fixture broken and restored; `tsc`, eslint, 2,366 fixtures.

@@ -14,6 +14,7 @@ import {
   inquiryPayload,
   inquiryStateMessage,
   inquiryTimeWindow,
+  isRealDate,
   isRealTime,
   NO_INQUIRY_BLACKOUTS,
   NO_INQUIRY_HOURS,
@@ -144,13 +145,19 @@ export function InquiryForm({ orgId }: { orgId: string }) {
     draft.fulfillment,
   );
 
-  const errors: InquiryErrors = validateInquiry(draft, unavailable, timeWindow);
+  // TOMORROW AT THE EARLIEST (migration 201). Today is the org's, not the
+  // browser's, because that is the day the gate compares against.
+  const today = todayIn(rules.timezone);
+
+  const errors: InquiryErrors = validateInquiry(draft, unavailable, timeWindow, today);
   // A blacked-out date is refused THE MOMENT IT IS IN THE BOX, not after
   // Submit like the other fields: the calendar will not let it be picked, so
   // the only way it gets there is by typing, and somebody who typed it should
   // be told before they fill in the rest of the form.
   const dateRefused =
-    draft.eventDate && unavailable(draft.eventDate) !== null ? errors.eventDate : undefined;
+    isRealDate(draft.eventDate) && (draft.eventDate <= today || unavailable(draft.eventDate) !== null)
+      ? errors.eventDate
+      : undefined;
   // A time outside the shop's hours is said at once too: the picker offers
   // every hour, so this sentence is how a customer learns the range.
   const timeRefused =
@@ -184,7 +191,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
     lines,
     rules,
     eventDate: draft.eventDate || null,
-    today: todayIn(rules.timezone),
+    today,
     deliveryFee: delivery.status === "ok" ? delivery.fee : null,
   });
 
@@ -513,7 +520,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
               value={draft.eventDate || null}
               onChange={(next) => set("eventDate", next ?? "")}
               ariaLabel="Date you need it"
-              isDisabled={(iso) => unavailable(iso) !== null}
+              isDisabled={(iso) => iso <= today || unavailable(iso) !== null}
             />
           </Field>
           {/* `ui/TimePicker` beside `ui/DateField`, both in the form box, so

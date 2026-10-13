@@ -475,3 +475,24 @@ test("hours: a malformed answer is no hours, never a crash", () => {
     },
   );
 });
+
+/* -------------------------------------------------------------------------
+ * Tomorrow at the earliest (migration 201)
+ *
+ * Checked by BREAKING: `<` in place of `<=` lets today through.
+ * ---------------------------------------------------------------------- */
+
+test("dates: today and earlier are refused, tomorrow is not", () => {
+  const on = (eventDate: string) => validateInquiry(full({ eventDate }), undefined, null, "2026-10-13");
+  eq(on("2026-10-13").eventDate, "Choose a date after today.", "today");
+  eq(on("2026-10-12").eventDate, "Choose a date after today.", "yesterday");
+  eq(on("2025-12-31").eventDate, "Choose a date after today.", "last year");
+  eq(on("2026-10-14"), {}, "tomorrow");
+  eq(validateInquiry(full({ eventDate: "2020-01-01" })), {}, "no today given, no refusal here");
+});
+
+test("dates: the gate's refusal has its own words", () => {
+  const m = inquiryStateMessage("date_past");
+  no(m.ok);
+  eq(m.title, "That date is too soon");
+});

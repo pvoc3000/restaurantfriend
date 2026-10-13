@@ -53,6 +53,9 @@ export type InquiryState =
   // disables those days and `validateInquiry` refuses a typed one, so a
   // customer only meets this when an entry was added while the form was open.
   | "date_unavailable"
+  // Migration 201 — today or earlier. The calendar disables those days and
+  // `validateInquiry` refuses a typed one.
+  | "date_past"
   // Migration 200 — the time is outside the shop's hours for a pickup or a
   // delivery. `validateInquiry` refuses it first, from `inquiry_hours`.
   | "time_unavailable";
@@ -417,6 +420,9 @@ export function validateInquiry(
   /** `inquiryTimeWindow` for the shop, date and fulfillment the caller has
    *  already decided. Null or omitted, no time is refused here. */
   timeWindow?: InquiryTimeWindow | null,
+  /** Today in the org's zone, `YYYY-MM-DD`. A date on or before it is refused
+   *  (Mark, 2026-10-13; migration 201). Omitted, none is refused for that. */
+  today?: string,
 ): InquiryErrors {
   const errors: InquiryErrors = {};
 
@@ -451,6 +457,9 @@ export function validateInquiry(
     errors.eventDate = "Choose the date you need it.";
   } else if (!isRealDate(draft.eventDate)) {
     errors.eventDate = "That date doesn’t exist.";
+  } else if (today && draft.eventDate.trim() <= today) {
+    // ISO dates, so comparing the strings compares the days.
+    errors.eventDate = "Choose a date after today.";
   } else if (unavailable?.(draft.eventDate)) {
     // The calendar greys these days out, but a date can be typed.
     //
@@ -547,6 +556,12 @@ export function inquiryStateMessage(state: InquiryState | string): {
       return { ok: false, title: "Where are we delivering to?", body: "Add the delivery address, or choose pickup." };
     case "date_required":
       return { ok: false, title: "When do you need it?", body: "Choose a date." };
+    case "date_past":
+      return {
+        ok: false,
+        title: "That date is too soon",
+        body: "Go back and choose a date after today.",
+      };
     case "date_unavailable":
       return {
         ok: false,
