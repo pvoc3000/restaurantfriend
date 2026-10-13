@@ -818,7 +818,17 @@ export function TimesheetsList({
       label: "Break",
       width: 124,
       sortValue: (r) => r.unpaid_break_minutes ?? -1,
-      render: (r) => <BreakCell row={r} editable={editable} finding={breakFindings.get(r.id) ?? null} />,
+      // The chip is work still to do, so a decided day drops it — the same
+      // rule, and the same key, as the Issues filter's `mealDecided`.
+      render: (r) => (
+        <BreakCell
+          row={r}
+          editable={editable}
+          finding={
+            premiums[`${r.employee_id}|${r.workday}|meal`] ? null : breakFindings.get(r.id) ?? null
+          }
+        />
+      ),
     },
     {
       key: "sick",
