@@ -5861,3 +5861,38 @@ Mark: "group the order items on an invoice pdf as well."
   well") — on the order documents and the customer invoice. `detail.groups`
   still carries each band's `amount`; nothing prints it. The Items tab keeps
   its quantities and totals.
+
+### 2026-10-13 — an inquiry's time is inside the shop's opening hours (200)
+
+Mark: "limit pickup times to between 30 minutes after opening and 30 minutes
+before close only, using store hours set Locations. For delivery, we need to
+limit event times to between two hours after opening up until close."
+
+- **The hours are the location record's** (017): `open_days` and the two
+  per-weekday time arrays. Pickup is opening + 30 min to close − 30 min;
+  a delivery's event time is opening + 2 h to close. DF01 on a Friday
+  (10–10): pickup 10:30 AM–9:30 PM, delivery 12:00 PM–10:00 PM.
+- **The margins are org settings with those defaults**
+  (`special_orders.inquiry_pickup_after_open_minutes`,
+  `inquiry_pickup_before_close_minutes`,
+  `inquiry_delivery_after_open_minutes`). Nothing writes them yet.
+- **Migration 200:** `inquiry_time_window` (internal) works out the window;
+  `inquiry_hours` (anon) hands the form the hours and margins;
+  `create_inquiry` refuses with a new state, `time_unavailable`, after 192's
+  reroute so the shop judged is the one the lead is made at.
+- **The form** (`lib/inquiry`: `inquiryTimeWindow`, `validateInquiry`'s third
+  argument) says "Pickup is between 10:30 AM and 8:30 PM that day." under the
+  Time field as soon as an outside time is in the box. The picker still
+  offers every hour.
+- **Nothing is refused** when the shop has no hours typed for that weekday,
+  the weekday is not an open day, or the margins leave no window.
+- **NO PREFERENCE IS JUDGED BY THE SHOP THE LEAD GOES TO**, which is DF01
+  unless it is blacked out. So a no-preference pickup at 8 AM is refused
+  though DF02 opens at 7. Not rerouted by time; ask before building that.
+- **A delivery before its address is quoted** is judged by the default shop
+  in the form and by the nearest shop once quoted, as the gate does.
+- **Verified:** dry run of 200 on the hosted database in a transaction that
+  never committed (windows for both shops, four refusals, four accepted at
+  the edges, anon cannot call the internal function); fixtures broken and
+  restored; `tsc`, eslint, 2,364 fixtures. **Not verified:** the form in a
+  browser, which needs 200 applied.

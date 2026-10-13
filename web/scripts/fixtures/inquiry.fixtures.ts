@@ -17,6 +17,8 @@ import {
   inquiryShopFor,
   inquiryPayload,
   inquiryStateMessage,
+  inquiryTimeWindow,
+  readInquiryHours,
   isRealDate,
   isRealTime,
   looksLikeEmail,
@@ -26,6 +28,7 @@ import {
   validateInquiry,
   type InquiryBlackouts,
   type InquiryDraft,
+  type InquiryHours,
 } from "../../src/lib/inquiry";
 
 function draft(over: Partial<InquiryDraft> = {}): InquiryDraft {
@@ -356,6 +359,119 @@ test("blackouts: a malformed answer is no blackouts, never a crash", () => {
       shop_ids: [],
       // A title in the answer (a function older than 191) is DROPPED on the way in.
       entries: [{ starts_on: "2026-01-01", ends_on: "2026-01-01", location_ids: [] }],
+    },
+  );
+});
+
+/* -------------------------------------------------------------------------
+ * Opening hours (migration 200)
+ *
+ * Mark, 2026-10-13: pickup from 30 minutes after opening to 30 minutes before
+ * close; a delivery's event time from two hours after opening to close.
+ *
+ * The hours are the two shops' real ones. Checked by BREAKING: reading the
+ * weekday in local time or off by one loses Friday's 10 PM close; dropping the
+ * delivery branch gives a delivery the pickup window; and removing the
+ * `timeWindow` branch from `validateInquiry` turns the refusals red.
+ * ---------------------------------------------------------------------- */
+
+const HOURS: InquiryHours = {
+  pickup_after_open_minutes: 30,
+  pickup_before_close_minutes: 30,
+  delivery_after_open_minutes: 120,
+  shops: [
+    {
+      id: "df01",
+      open_days: [1, 2, 3, 4, 5, 6, 7],
+      open: ["10:00", "10:00", "10:00", "10:00", "10:00", "10:00", "10:00"],
+      close: ["21:00", "21:00", "21:00", "21:00", "22:00", "22:00", "21:00"],
+    },
+    {
+      id: "df02",
+      open_days: [1, 2, 3, 4, 5, 6],
+      open: ["07:00", "07:00", "07:00", "07:00", "07:00", null, "07:00"],
+      close: ["21:00", "21:00", "21:00", "21:00", "21:00", "21:00", "21:00"],
+    },
+  ],
+};
+
+// 2026-11-19 is a Thursday, the 20th a Friday, the 21st a Saturday, the 22nd a Sunday.
+test("hours: a pickup is 30 minutes inside opening and close", () => {
+  eq(inquiryTimeWindow(HOURS, "df01", "2026-11-19", "pickup"), { earliest: "10:30", latest: "20:30" });
+  eq(inquiryTimeWindow(HOURS, "df02", "2026-11-19", "pickup"), { earliest: "07:30", latest: "20:30" });
+});
+
+test("hours: a delivery is two hours after opening, up to close", () => {
+  eq(inquiryTimeWindow(HOURS, "df01", "2026-11-19", "delivery"), { earliest: "12:00", latest: "21:00" });
+  eq(inquiryTimeWindow(HOURS, "df02", "2026-11-19", "delivery"), { earliest: "09:00", latest: "21:00" });
+});
+
+test("hours: the weekday is the date's own", () => {
+  eq(inquiryTimeWindow(HOURS, "df01", "2026-11-20", "pickup")?.latest, "21:30", "Friday closes at 10");
+  eq(inquiryTimeWindow(HOURS, "df01", "2026-11-21", "delivery")?.latest, "22:00", "Saturday too");
+  eq(inquiryTimeWindow(HOURS, "df01", "2026-11-22", "pickup")?.latest, "20:30", "Sunday is slot 7");
+});
+
+test("hours: the margins are the org's", () => {
+  const h = { ...HOURS, pickup_after_open_minutes: 60, pickup_before_close_minutes: 0, delivery_after_open_minutes: 90 };
+  eq(inquiryTimeWindow(h, "df01", "2026-11-19", "pickup"), { earliest: "11:00", latest: "21:00" });
+  eq(inquiryTimeWindow(h, "df01", "2026-11-19", "delivery"), { earliest: "11:30", latest: "21:00" });
+});
+
+test("hours: nothing known is nothing refused", () => {
+  eq(inquiryTimeWindow(HOURS, null, "2026-11-19", "pickup"), null, "no shop");
+  eq(inquiryTimeWindow(HOURS, "df09", "2026-11-19", "pickup"), null, "a shop with no hours");
+  eq(inquiryTimeWindow(HOURS, "df01", "", "pickup"), null, "no date yet");
+  eq(inquiryTimeWindow(HOURS, "df01", "2026-02-31", "pickup"), null, "not a date");
+  eq(inquiryTimeWindow(HOURS, "df02", "2026-11-21", "pickup"), null, "Saturday has no opening time typed");
+  eq(inquiryTimeWindow(HOURS, "df02", "2026-11-22", "pickup"), null, "Sunday is not an open day");
+  const short = { ...HOURS, shops: [{ ...HOURS.shops[0], close: Array(7).fill("10:30") }] };
+  eq(inquiryTimeWindow(short, "df01", "2026-11-19", "pickup"), null, "margins that leave no window");
+});
+
+test("hours: validateInquiry refuses a time outside the window, and says the window", () => {
+  const pickup = inquiryTimeWindow(HOURS, "df01", "2026-11-19", "pickup");
+  const at = (eventTime: string, over: Partial<InquiryDraft> = {}) =>
+    validateInquiry(full({ eventDate: "2026-11-19", eventTime, ...over }), undefined, pickup);
+  eq(at("10:29").eventTime, "Pickup is between 10:30 AM and 8:30 PM that day.");
+  eq(at("20:31").eventTime, "Pickup is between 10:30 AM and 8:30 PM that day.");
+  eq(at("10:30"), {}, "the earliest minute is allowed");
+  eq(at("20:30"), {}, "and the latest");
+
+  const delivery = inquiryTimeWindow(HOURS, "df01", "2026-11-19", "delivery");
+  const d = (eventTime: string) =>
+    validateInquiry(
+      full({ eventDate: "2026-11-19", eventTime, fulfillment: "delivery", address: "5107 York Blvd" }),
+      undefined,
+      delivery,
+    );
+  eq(d("11:59").eventTime, "We deliver between 12:00 PM and 9:00 PM that day.");
+  eq(d("21:00"), {}, "a delivery may arrive at close");
+  eq(d("20:45"), {}, "inside the last half hour a pickup may not have");
+
+  eq(validateInquiry(full({ eventTime: "03:00" })), {}, "no window, no refusal here");
+  eq(validateInquiry(full({ eventTime: "03:00" }), undefined, null), {});
+});
+
+test("hours: the gate's refusal has its own words", () => {
+  const m = inquiryStateMessage("time_unavailable");
+  no(m.ok);
+  eq(m.title, "We can’t do that time");
+});
+
+test("hours: a malformed answer is no hours, never a crash", () => {
+  eq(readInquiryHours(null).shops, []);
+  eq(readInquiryHours({ shops: "x" }).pickup_after_open_minutes, 30);
+  eq(
+    readInquiryHours({
+      delivery_after_open_minutes: 90,
+      shops: [{ id: "df01", open_days: [1, "2"], open: ["10:00", null, "nope"], close: null }, { open: [] }, null],
+    }),
+    {
+      pickup_after_open_minutes: 30,
+      pickup_before_close_minutes: 30,
+      delivery_after_open_minutes: 90,
+      shops: [{ id: "df01", open_days: [1], open: ["10:00", null, null], close: [] }],
     },
   );
 });

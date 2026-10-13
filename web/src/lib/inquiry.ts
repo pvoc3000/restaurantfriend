@@ -18,6 +18,7 @@
  */
 
 import { coveringEntry, spokenDate } from "./blackoutDates";
+import { formatTypedTime } from "./timeInput";
 
 /** Every state `create_inquiry` can answer with, and the two the transport can
  *  add. The page never composes a sentence from a code — see
@@ -51,7 +52,10 @@ export type InquiryState =
   // Migration 182 — a calendar entry says no special orders that day. The page
   // disables those days and `validateInquiry` refuses a typed one, so a
   // customer only meets this when an entry was added while the form was open.
-  | "date_unavailable";
+  | "date_unavailable"
+  // Migration 200 — the time is outside the shop's hours for a pickup or a
+  // delivery. `validateInquiry` refuses it first, from `inquiry_hours`.
+  | "time_unavailable";
 
 /**
  * What `inquiry_blackouts` hands the public form: the dates no special order
@@ -164,6 +168,110 @@ export function inquiryBlackoutNotices(
 }
 
 export type InquiryFulfillment = "pickup" | "delivery";
+
+/**
+ * What `inquiry_hours` hands the public form (migration 200): each shop's
+ * opening hours off its location record, and the three margins.
+ *
+ * Mark, 2026-10-13: a PICKUP is between 30 minutes after opening and 30
+ * minutes before close; a DELIVERY's event time is between two hours after
+ * opening and close. `inquiry_time_window` in SQL is the gate's copy of
+ * `inquiryTimeWindow` below; keep the two in step by hand.
+ */
+export type InquiryHours = {
+  pickup_after_open_minutes: number;
+  pickup_before_close_minutes: number;
+  delivery_after_open_minutes: number;
+  shops: InquiryShopHours[];
+};
+
+export type InquiryShopHours = {
+  id: string;
+  /** ISO weekdays, 1 = Monday. */
+  open_days: number[];
+  /** `HH:MM`, seven slots, slot n − 1 = weekday n. Null = no time recorded. */
+  open: (string | null)[];
+  close: (string | null)[];
+};
+
+export const NO_INQUIRY_HOURS: InquiryHours = {
+  pickup_after_open_minutes: 30,
+  pickup_before_close_minutes: 30,
+  delivery_after_open_minutes: 120,
+  shops: [],
+};
+
+/** Read the RPC's jsonb defensively — a malformed answer is no hours, and no
+ *  hours refuses no time. */
+export function readInquiryHours(data: unknown): InquiryHours {
+  if (!data || typeof data !== "object") return NO_INQUIRY_HOURS;
+  const raw = data as Record<string, unknown>;
+  const minutes = (v: unknown, fallback: number) =>
+    typeof v === "number" && Number.isFinite(v) ? v : fallback;
+  const times = (v: unknown): (string | null)[] =>
+    Array.isArray(v) ? v.map((t) => (typeof t === "string" && isRealTime(t) ? t : null)) : [];
+  return {
+    pickup_after_open_minutes: minutes(raw.pickup_after_open_minutes, NO_INQUIRY_HOURS.pickup_after_open_minutes),
+    pickup_before_close_minutes: minutes(raw.pickup_before_close_minutes, NO_INQUIRY_HOURS.pickup_before_close_minutes),
+    delivery_after_open_minutes: minutes(raw.delivery_after_open_minutes, NO_INQUIRY_HOURS.delivery_after_open_minutes),
+    shops: (Array.isArray(raw.shops) ? raw.shops : []).flatMap((s): InquiryShopHours[] => {
+      const r = (s ?? {}) as Record<string, unknown>;
+      if (typeof r.id !== "string") return [];
+      return [
+        {
+          id: r.id,
+          open_days: Array.isArray(r.open_days)
+            ? r.open_days.filter((d): d is number => typeof d === "number")
+            : [],
+          open: times(r.open),
+          close: times(r.close),
+        },
+      ];
+    }),
+  };
+}
+
+/** The earliest and latest time an inquiry may ask for, both `HH:MM` and both
+ *  allowed. */
+export type InquiryTimeWindow = { earliest: string; latest: string };
+
+const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+const hhmmOf = (minutes: number) =>
+  `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+/**
+ * The times `locationId` takes a pickup or a delivery on `date`, or null when
+ * nothing is refused: no shop, a date that is not one, a weekday the shop has
+ * no hours typed for or is not open on, or margins that leave no window at
+ * all. An inquiry is a lead, and a gap in a location record must not turn one
+ * away.
+ *
+ * The weekday is read in UTC off the string, for `isRealDate`'s reason.
+ */
+export function inquiryTimeWindow(
+  hours: InquiryHours,
+  locationId: string | null,
+  date: string,
+  fulfillment: InquiryFulfillment,
+): InquiryTimeWindow | null {
+  if (!locationId || !isRealDate(date)) return null;
+  const shop = hours.shops.find((s) => s.id === locationId);
+  if (!shop) return null;
+
+  const [y, m, d] = date.trim().split("-").map(Number);
+  const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay() || 7;
+  if (!shop.open_days.includes(weekday)) return null;
+  const open = shop.open[weekday - 1];
+  const close = shop.close[weekday - 1];
+  if (!open || !close) return null;
+
+  const from =
+    minutesOf(open) +
+    (fulfillment === "delivery" ? hours.delivery_after_open_minutes : hours.pickup_after_open_minutes);
+  const to = minutesOf(close) - (fulfillment === "delivery" ? 0 : hours.pickup_before_close_minutes);
+  if (from < 0 || to > 1439 || from > to) return null;
+  return { earliest: hhmmOf(from), latest: hhmmOf(to) };
+}
 
 export type InquiryDraft = {
   name: string;
@@ -306,6 +414,9 @@ export function validateInquiry(
   /** The blackout covering a date, if any — `inquiryBlackoutOn`, with the shop
    *  already decided by the caller. Omitted, no date is refused here. */
   unavailable?: (date: string) => InquiryBlackout | null,
+  /** `inquiryTimeWindow` for the shop, date and fulfillment the caller has
+   *  already decided. Null or omitted, no time is refused here. */
+  timeWindow?: InquiryTimeWindow | null,
 ): InquiryErrors {
   const errors: InquiryErrors = {};
 
@@ -352,6 +463,16 @@ export function validateInquiry(
     errors.eventTime = "Choose a time.";
   } else if (!isRealTime(draft.eventTime)) {
     errors.eventTime = "That time doesn’t look right.";
+  } else if (
+    timeWindow &&
+    (draft.eventTime.trim() < timeWindow.earliest || draft.eventTime.trim() > timeWindow.latest)
+  ) {
+    // Both are zero-padded `HH:MM`, so comparing the strings compares the times.
+    const between = `between ${formatTypedTime(timeWindow.earliest)} and ${formatTypedTime(timeWindow.latest)}`;
+    errors.eventTime =
+      draft.fulfillment === "delivery"
+        ? `We deliver ${between} that day.`
+        : `Pickup is ${between} that day.`;
   }
 
   return errors;
@@ -434,6 +555,12 @@ export function inquiryStateMessage(state: InquiryState | string): {
       };
     case "time_required":
       return { ok: false, title: "What time do you need it?", body: "Choose a time." };
+    case "time_unavailable":
+      return {
+        ok: false,
+        title: "We can’t do that time",
+        body: "It’s outside the hours we take pickups and deliveries that day. Go back and choose another time.",
+      };
     case "fulfillment_invalid":
       return {
         ok: false,

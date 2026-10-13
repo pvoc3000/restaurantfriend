@@ -13,12 +13,17 @@ import {
   inquiryShopFor,
   inquiryPayload,
   inquiryStateMessage,
+  inquiryTimeWindow,
+  isRealTime,
   NO_INQUIRY_BLACKOUTS,
+  NO_INQUIRY_HOURS,
   readInquiryBlackouts,
+  readInquiryHours,
   validateInquiry,
   type InquiryBlackouts,
   type InquiryDraft,
   type InquiryErrors,
+  type InquiryHours,
   type InquiryShop,
 } from "@/lib/inquiry";
 import {
@@ -100,6 +105,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
   const [rules, setRules] = useState<InquiryRules>(EMPTY_RULES);
   const [basket, setBasket] = useState<Basket>(EMPTY_BASKET);
   const [blackouts, setBlackouts] = useState<InquiryBlackouts>(NO_INQUIRY_BLACKOUTS);
+  const [hours, setHours] = useState<InquiryHours>(NO_INQUIRY_HOURS);
   // The delivery estimate, KEYED BY THE ADDRESS it was worked out for: an
   // edited address makes it stale without an effect to clear it.
   // `from` is the NEAREST shop the estimate measured from (Mark, 2026-10-01):
@@ -127,18 +133,38 @@ export function InquiryForm({ orgId }: { orgId: string }) {
     !priceLocation && draft.eventDate ? inquiryShopFor(blackouts, draft.eventDate) || null : null;
   const menuLocation = priceLocation ?? routedShop;
 
-  const errors: InquiryErrors = validateInquiry(draft, unavailable);
+  // OPENING HOURS (migration 200). Judged at the shop the inquiry would be
+  // made at — the same one the blackouts and the menu are read for, falling to
+  // the org's default when no date has routed it yet. `create_inquiry` checks
+  // the same window.
+  const timeWindow = inquiryTimeWindow(
+    hours,
+    menuLocation ?? blackouts.default_location_id,
+    draft.eventDate,
+    draft.fulfillment,
+  );
+
+  const errors: InquiryErrors = validateInquiry(draft, unavailable, timeWindow);
   // A blacked-out date is refused THE MOMENT IT IS IN THE BOX, not after
   // Submit like the other fields: the calendar will not let it be picked, so
   // the only way it gets there is by typing, and somebody who typed it should
   // be told before they fill in the rest of the form.
   const dateRefused =
     draft.eventDate && unavailable(draft.eventDate) !== null ? errors.eventDate : undefined;
+  // A time outside the shop's hours is said at once too: the picker offers
+  // every hour, so this sentence is how a customer learns the range.
+  const timeRefused =
+    timeWindow &&
+    isRealTime(draft.eventTime) &&
+    (draft.eventTime < timeWindow.earliest || draft.eventTime > timeWindow.latest)
+      ? errors.eventTime
+      : undefined;
   const shown: InquiryErrors = touched
     ? errors
-    : dateRefused
-      ? { eventDate: dateRefused }
-      : {};
+    : {
+        ...(dateRefused ? { eventDate: dateRefused } : {}),
+        ...(timeRefused ? { eventTime: timeRefused } : {}),
+      };
 
   const empty = basketIsEmpty(basket);
   const lines = useMemo(() => basketLines(basket, menu), [basket, menu]);
@@ -212,6 +238,26 @@ export function InquiryForm({ orgId }: { orgId: string }) {
         return;
       }
       setBlackouts(readInquiryBlackouts(data));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("inquiry_hours", { p_org_id: orgId });
+      if (cancelled) return;
+      if (error) {
+        // No hours means no time is refused here, and the gate still refuses
+        // one (200). The commonest cause is migration 200 not having been
+        // applied.
+        console.error("inquiry_hours failed", error.message);
+        return;
+      }
+      setHours(readInquiryHours(data));
     })();
     return () => {
       cancelled = true;
