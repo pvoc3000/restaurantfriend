@@ -23,7 +23,7 @@ import {
   workweekStart,
   type PayPeriodStatus,
 } from "@/lib/payPeriods";
-import { proposeOvertime } from "@/lib/overtime";
+import { proposeOvertime, type ShiftHours } from "@/lib/overtime";
 import { workedHours, type OtDecision } from "@/lib/timesheets";
 import { isEarningColumn, shiftJobTitle } from "@/lib/gustoExport";
 import {
@@ -172,6 +172,7 @@ export default async function TimesheetsPage({
     { data: poolRows, error: poolError },
     { data: benefitRows, error: benefitError },
     { data: entitlementRows, error: entitlementError },
+    { data: weekRows, error: weekError },
   ] = await Promise.all([
     // ONE select for both halves of the screen. It is all-or-nothing on the
     // payroll migrations — the `timesheet_benefits` embed already made it so
@@ -237,6 +238,22 @@ export default async function TimesheetsPage({
     supabase
       .from("employee_benefits")
       .select("id, employee_id, benefit_id, location_id, amount, starts_on, ends_on"),
+    // THE REST OF EACH WORKWEEK THIS PERIOD TOUCHES (2026-10-13). Weekly
+    // overtime and the seventh day are counted over a workweek, and since 062 a
+    // shift is filed into a period by `business_date` while its week comes from
+    // `workday` — so a Sunday-evening shift with a workday boundary is paid in
+    // one period and counted in the next one's first week. Loading by
+    // `pay_period_id` alone left that week short by the shift: Eddy Salazar's
+    // 10.13h on 2026-10-11 would have been missing from the week of 10-12.
+    // These rows are never shown and never written; they are only counted.
+    // One day past the end for the reason `tip_pools` starts one day early:
+    // the workday moves forward by at most one.
+    supabase
+      .from("timesheets")
+      .select("id, employee_id, workday, workweek_start, clock_in, clock_out, unpaid_break_minutes")
+      .gte("workweek_start", workweekStart(periodStart, settings))
+      .lte("workweek_start", workweekStart(addDays(periodEnd, 1), settings))
+      .or(`pay_period_id.is.null,pay_period_id.neq.${periodId}`),
   ]);
 
   if (error) {
@@ -493,12 +510,38 @@ export default async function TimesheetsPage({
 
   const rawById = new Map((sheets ?? []).map((t) => [t.id as string, t]));
 
+  // A week counted without them is the fault this query exists to remove, so a
+  // failure says so rather than quietly proposing less overtime.
+  if (weekError) {
+    return <p className="text-sm text-accent">Could not load the rest of the workweek: {weekError.message}</p>;
+  }
+  const weekContext: ShiftHours[] = (weekRows ?? [])
+    .map((t) => {
+      const hours = workedHours({
+        clock_in: (t.clock_in ?? null) as string | null,
+        clock_out: (t.clock_out ?? null) as string | null,
+        unpaid_break_minutes: numOrNull(t.unpaid_break_minutes),
+      });
+      return hours === null
+        ? null
+        : {
+            id: t.id as string,
+            employee_id: t.employee_id as string,
+            workday: t.workday as string,
+            workweek_start: t.workweek_start as string,
+            hours,
+            starts_at: (t.clock_in ?? null) as string | null,
+          };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
   // Overtime still disagreeing with our recompute, for the readiness list. Same
   // one-cent tolerance and the same comparison against the DECISION that the
   // list's own needs-review queue uses — see lib/overtime's EPSILON. It is
   // computed TWICE, here and in the browser, and the two must not drift.
-  const proposals = proposeOvertime(
-    shifts
+  const proposals = proposeOvertime([
+    ...weekContext,
+    ...shifts
       .map((s) => {
         const hours = workedHours(s);
         const wk = rawById.get(s.id)?.workweek_start as string | undefined;
@@ -515,8 +558,8 @@ export default async function TimesheetsPage({
               starts_at: s.clock_in,
             };
       })
-      .filter((x): x is NonNullable<typeof x> => x !== null)
-  );
+      .filter((x): x is NonNullable<typeof x> => x !== null),
+  ]);
   let overtimeNeedingReview = 0;
   for (const s of shifts) {
     const p = proposals.get(s.id);
@@ -691,6 +734,7 @@ export default async function TimesheetsPage({
 
       <TimesheetsList
         rows={rows}
+        weekContext={weekContext}
         period={chosen}
         canWrite={canWrite}
         // The org's zone, not the server's: a punch is an instant, and reading

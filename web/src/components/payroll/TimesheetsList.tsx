@@ -21,6 +21,7 @@ import {
   REASON_LABEL,
   proposeOvertime,
   type OvertimeReason,
+  type ShiftHours,
   type ShiftProposal,
   type Split,
 } from "@/lib/overtime";
@@ -166,6 +167,7 @@ const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: TimesheetRow) => string
  */
 export function TimesheetsList({
   rows,
+  weekContext,
   period,
   canWrite,
   timeZone,
@@ -177,6 +179,9 @@ export function TimesheetsList({
   sheet,
 }: {
   rows: TimesheetRow[];
+  /** Shifts filed in ANOTHER pay period that share a workweek with these rows.
+   *  Counted by the overtime recompute and never shown — see the page's query. */
+  weekContext: ShiftHours[];
   /** The pay period these rows are from, chosen on the bar above. */
   period: PeriodOption | null;
   canWrite: boolean;
@@ -234,8 +239,9 @@ export function TimesheetsList({
    */
   const proposals = useMemo(
     () =>
-      proposeOvertime(
-        rows
+      proposeOvertime([
+        ...weekContext,
+        ...rows
           .map((r) => {
             const hours = workedHours(r);
             return hours === null
@@ -253,10 +259,28 @@ export function TimesheetsList({
           })
           // An unfinished shift has no hours to classify. Feeding it 0 would
           // quietly tell the seventh-day rule that a day was worked.
-          .filter((x): x is NonNullable<typeof x> => x !== null)
-      ),
-    [rows]
+          .filter((x): x is NonNullable<typeof x> => x !== null),
+      ]),
+    [rows, weekContext]
   );
+
+  /**
+   * How many shifts behind a row's overtime are NOT on this screen: the rest of
+   * its week for the weekly and seventh-day rules, the rest of its day
+   * otherwise. Said in the tooltip, or "over 40 hours in the week" would sit on
+   * a week whose visible rows add up to less.
+   */
+  const elsewhereFor = (r: TimesheetRow): number => {
+    const weekly = (proposals.get(r.id)?.reasons ?? []).some(
+      (x) => x === "weekly_over_40" || x === "seventh_day"
+    );
+    return weekContext.filter(
+      (c) =>
+        c.employee_id === r.employee_id &&
+        c.workweek_start === r.workweek_start &&
+        (weekly || c.workday === r.workday)
+    ).length;
+  };
 
   /** Where the recompute differs from what the row currently SAYS. */
   const needsReview = useMemo(() => {
@@ -786,6 +810,7 @@ export function TimesheetsList({
           editable={editable}
           proposed={proposedFor(r, "overtime")}
           day={proposals.get(r.id) ?? null}
+          elsewhere={elsewhereFor(r)}
           // Why there is overtime at all. `proposeOvertime` already names its
           // reasons — they were only ever shown after you opened a row AND the
           // recompute disagreed, which is the rarest case rather than the
@@ -809,6 +834,7 @@ export function TimesheetsList({
           editable={editable}
           proposed={proposedFor(r, "double_ot")}
           day={proposals.get(r.id) ?? null}
+          elsewhere={elsewhereFor(r)}
           reasons={proposals.get(r.id)?.reasons ?? []}
         />
       ),
@@ -1161,6 +1187,7 @@ function HoursCell({
   reasons = [],
   proposed = null,
   day = null,
+  elsewhere = 0,
 }: {
   row: TimesheetRow;
   column: "hours_regular" | "hours_overtime" | "hours_double_ot" | "sick_hours";
@@ -1171,6 +1198,8 @@ function HoursCell({
   proposed?: number | null;
   /** The workday this shift sits in — what every daily reason is about. */
   day?: { day_hours: number; day_shifts: number } | null;
+  /** Shifts counted toward this overtime that are filed in another pay period. */
+  elsewhere?: number;
 }) {
   const differs =
     column !== "sick_hours" &&
@@ -1216,7 +1245,12 @@ function HoursCell({
           ? ` That day totals ${day.day_hours.toFixed(2)}h across ${day.day_shifts} shifts.`
           : day
             ? ` That day totals ${day.day_hours.toFixed(2)}h.`
-            : "")
+            : "") +
+        (elsewhere > 0
+          ? ` ${elsewhere === 1 ? "1 shift" : `${elsewhere} shifts`} counted here ${
+              elsewhere === 1 ? "is" : "are"
+            } in another pay period.`
+          : "")
       : null;
 
   return (

@@ -1076,3 +1076,21 @@
    - Footer: Export and Close side by side. The primary is Export until
      Exported, then Close. `PayPeriodActions` no longer offers Close, leaving
      Start review / Back to open / Reopen.
+   **2026-10-13 — THE OVERTIME RECOMPUTE COUNTS WHOLE WORKWEEKS.** `/timesheets`
+   loaded shifts by `pay_period_id` only. Since 062 a shift is filed into a
+   period by `business_date` while `workweek_start` comes from `workday`, so a
+   Sunday-evening shift with a workday boundary is paid in one period and
+   belongs to the next period's first week — and that week was being counted
+   without it. Found on Erick Mejia's sheet: his and Eddy Salazar's 10-11
+   evening shifts (6.42h, 10.13h) sit in 09-28→10-11 and count toward the week
+   of 10-12. The page now also fetches every shift whose `workweek_start` is
+   one of the period's weeks (through the week of period end + 1 day) and is
+   NOT in the period, as `weekContext`: counted by `proposeOvertime` in both
+   places it runs (page readiness and `TimesheetsList`), never shown, never
+   written. Weekly overtime comes off the LATEST days, so an earlier period's
+   shift only ever pushes a current row over; a closed row is not re-decided.
+   The overtime tooltip says when shifts it counted are in another pay period.
+   Measured on 09-28→10-11: two context rows (both 09-27), no proposal moves.
+   Not checked in a browser. **The same change also fixed the Break chip
+   staying up after its premium was decided** — it now reads the decision the
+   way the Issues filter's `mealDecided` does.
