@@ -14,7 +14,12 @@ import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { PAY_PERIOD_STATUS_LABEL, isPayPeriodEditable, type PayPeriodStatus } from "@/lib/payPeriods";
+import {
+  PAY_PERIOD_STATUS_LABEL,
+  isoWeekday,
+  isPayPeriodEditable,
+  type PayPeriodStatus,
+} from "@/lib/payPeriods";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { NewTimesheet, type EditableTimesheet } from "./NewTimesheet";
 import {
@@ -95,6 +100,9 @@ export type TimesheetRow = {
   source: string;
   source_payload: Record<string, unknown> | null;
 };
+
+/** ISO order, Monday first — `isoWeekday` is 1-based. */
+const WEEKDAY_NAME = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export type PeriodOption = {
   id: string;
@@ -709,7 +717,14 @@ export function TimesheetsList({
       label: "Workday",
       width: 126,
       sortValue: (r) => r.workday,
-      render: (r) => <span className="tabular-nums">{r.workday}</span>,
+      // The day of the week under the date (Mark, 2026-10-13): overtime and
+      // the schedule are both read by weekday, and a bare date does not say it.
+      render: (r) => (
+        <span className="block leading-tight">
+          <span className="block tabular-nums">{r.workday}</span>
+          <span className="block text-[11px] text-muted">{WEEKDAY_NAME[isoWeekday(r.workday) - 1]}</span>
+        </span>
+      ),
     },
     {
       key: "location",
