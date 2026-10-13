@@ -49,6 +49,7 @@ export function NewShiftReport({
   locationCode,
   today,
   myEmployeeId,
+  myName,
   existing,
 }: {
   orgId: string;
@@ -60,6 +61,14 @@ export function NewShiftReport({
    * `my_employee_id`, or null when their login has no HR record.
    */
   myEmployeeId: string | null;
+  /**
+   * Who the report will be filed as: the employee record's name, or the
+   * login's when there is no record. STATED in the dialog (2026-10-13) because
+   * the dialog fills the supervisor in silently and lands on page 2, so on a
+   * shared iPad still open under somebody else's PIN nothing said whose report
+   * this was until the email arrived — DF02's opening report that day.
+   */
+  myName: string;
   existing: {
     id: string;
     /** Started by the signed-in member — the one who may reopen it once sent (106). */
@@ -223,6 +232,15 @@ export function NewShiftReport({
                 Location
               </span>
               <p className="text-[16px] font-semibold">{locationCode}</p>
+            </div>
+
+            {/* Stated, not asked, like the location — and the one place the
+                person sees whose login this is before the report carries it. */}
+            <div className="space-y-1.5">
+              <span className="block text-xs font-semibold uppercase tracking-[0.08em]">
+                {myEmployeeId === null ? "Signed in as" : "Supervisor"}
+              </span>
+              <p className="text-[16px] font-semibold">{myName}</p>
             </div>
 
             <label className="block space-y-1.5">

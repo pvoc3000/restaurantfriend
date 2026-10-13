@@ -172,6 +172,10 @@ export default async function ShiftReportsPage({
         ...closedDates(calendarEntries, active.id, { from: daysBefore(today, GAP_DAYS), to: today }),
       ]}
       myEmployeeId={(myEmployeeId as string | null) ?? null}
+      myName={
+        (myEmployeeId ? nameById.get(myEmployeeId as string) : null) ??
+        ((session.membership.display_name ?? "").trim() || session.email)
+      }
     />
   );
 }

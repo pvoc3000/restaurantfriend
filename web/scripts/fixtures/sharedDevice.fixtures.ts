@@ -11,6 +11,7 @@ import {
   IDLE_WARN_MS,
   extendedFor,
   idleLimitMs,
+  idleOnLoad,
   idleExpired,
   idleWarningSeconds,
   isValidPin,
@@ -238,4 +239,19 @@ test("stay unlocked: the lock and its warning follow the longer limit", () => {
   eq(idleWarningSeconds(t, t + IDLE_MS - 1000, EXTEND_MS), null, "and not the warning");
   eq(idleWarningSeconds(t, t + EXTEND_MS - 10_000, EXTEND_MS), 10, "the warning before twenty");
   ok(idleExpired(t, t + EXTEND_MS, EXTEND_MS), "twenty minutes is");
+});
+
+test("idleOnLoad: a page load on a session left idle locks instead of starting a clock", () => {
+  const OTHER = "7ec6508c-1111-4222-8333-444444444444";
+  const t = 1_800_000_000_000;
+  ok(idleOnLoad(ID, ID, String(t), t + IDLE_MS), "same person, idle the full limit");
+  ok(idleOnLoad(ID, ID, String(t), t + 18 * 3_600_000), "the closer's session, next morning");
+  no(idleOnLoad(ID, ID, String(t), t + IDLE_MS - 1), "a reload inside the limit");
+  no(idleOnLoad("", ID, String(t), t + 18 * 3_600_000), "first page after a lock or Switch user");
+  no(idleOnLoad(OTHER, ID, String(t), t + 18 * 3_600_000), "somebody else just unlocked");
+  no(idleOnLoad(null, ID, String(t), t + 18 * 3_600_000), "nothing known about who");
+  no(idleOnLoad(ID, ID, null, t + 18 * 3_600_000), "no touch recorded, or storage blocked");
+  no(idleOnLoad(ID, ID, "soon", t + 18 * 3_600_000), "not a number");
+  no(idleOnLoad(ID, ID, String(t), t + IDLE_MS, EXTEND_MS), "Stay unlocked: twenty minutes, not five");
+  ok(idleOnLoad(ID, ID, String(t), t + EXTEND_MS, EXTEND_MS), "and twenty are up");
 });

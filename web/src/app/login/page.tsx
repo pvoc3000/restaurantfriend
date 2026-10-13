@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { recordActivity } from "@/lib/sharedDevice";
 
 // Email/password sign-in. The browser client writes the auth cookies; the
 // middleware then sees the session and lets us into the app.
@@ -32,6 +33,9 @@ export default function LoginPage() {
       return;
     }
 
+    // On a shared iPad the first page would otherwise read the last touch
+    // before this sign-in and lock at once — see `idleOnLoad`.
+    recordActivity(Date.now());
     router.replace("/");
     router.refresh();
   }

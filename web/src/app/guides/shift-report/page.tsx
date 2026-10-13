@@ -183,6 +183,10 @@ export default function ShiftReportGuide() {
             Check the <strong>Date</strong>, <strong>Shift</strong> and{" "}
             <strong>Next production day</strong>, then tap <Ui go>Start the report</Ui>.
             <p>
+              <strong>Supervisor</strong> should be your name. If it is somebody else’s, the
+              iPad is still signed in as them: tap <Ui>Cancel</Ui>, then <Ui>Switch user</Ui>.
+            </p>
+            <p>
               The date is{" "}
               <span className={s.hl}>the day your shift started, not the day it ended.</span> A
               closing shift that runs past midnight still uses the earlier date.

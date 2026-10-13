@@ -172,3 +172,24 @@ another one. Every touch is now also written to `ACTIVE_KEY`
 only when `deviceLastActivity` (the later of its own touch and the recorded
 one, fixtures) is five minutes old. Unreadable storage falls back to the tab's
 own clock, which was the old behaviour.
+
+**A PAGE LOAD IS NOT A TOUCH (Mark, 2026-10-13),** after DF02's opening report
+was created (13:27) and sent (13:42) under Karina's login by the opener.
+`pin_attempts` shows Karina's last unlock on the DF02 Supervisor iPad at 19:22
+the night before, her next at 14:52, and nobody's in between. The lock is
+client-side only, and `IdleLock` counted its own mount as activity: it set its
+clock to now and overwrote `ACTIVE_KEY`. The wake check needs a page that
+survived the sleep; when Safari loads a fresh one (a discarded tab, a new tab)
+the last person's cookies are still good and the five minutes start again.
+`idleOnLoad` (`lib/sharedDevice`, fixtures) is read on mount BEFORE anything is
+recorded: same user already in `SIGNED_IN_KEY` and the recorded touch past the
+limit → lock. A lock and Switch user write "" there, so the first page after an
+unlock starts a clock as before; `/login` records a touch on success so a
+password sign-in on a registered device is not locked at once. Since 10-01 six
+supervisor reports were started 13–23 hours after the author's last PIN, or
+with none (DF01 10-04, 10-05, 10-06, 10-10, 10-13; DF02 10-13); some may be a
+personal phone.
+NOT DONE, offered: the SERVER still trusts the cookie for ever
+(`rf.pin_session` carries no time, `getAppSession` only reads cookies), so the
+page renders for a moment before the lock, and nothing locks with JavaScript
+off. Not walked live: needs the registered iPad.

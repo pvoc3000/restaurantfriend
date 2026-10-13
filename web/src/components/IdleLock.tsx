@@ -14,6 +14,7 @@ import {
   extendedFor,
   idleExpired,
   idleLimitMs,
+  idleOnLoad,
   idleWarningSeconds,
   readExtendedUser,
   recordExtendedUser,
@@ -77,6 +78,11 @@ import {
  * or key press, and on the lock itself. A tap is `pointerup`, which a touch
  * scroll never fires (the browser sends `pointercancel`), and which iOS does
  * deliver on plain text where it withholds `click`.
+ *
+ * A PAGE LOAD IS NOT A TOUCH (2026-10-13). The wake check needs a page that
+ * survived the sleep, and Safari often loads a fresh one instead. So the mount
+ * reads the device's last touch BEFORE recording its own and locks if that is
+ * already past the limit — `idleOnLoad` in `lib/sharedDevice`.
  */
 export function IdleLock({ userId }: { userId: string }) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
@@ -84,6 +90,47 @@ export function IdleLock({ userId }: { userId: string }) {
   useEffect(() => {
     let last = Date.now();
     let locking = false;
+
+    const lock = () => {
+      locking = true;
+      recordSignedInUser("");
+      recordExtendedUser("");
+      try {
+        const path = window.location.pathname + window.location.search;
+        localStorage.setItem(
+          RESUME_KEY,
+          serializeResume({
+            userId,
+            path,
+            view: snapshotViewMemory(),
+            scroll: snapshotScrollMemory(),
+          })
+        );
+      } catch {
+        // Private mode or blocked storage: the unlock lands on the home page.
+      }
+      // A HARD navigation, once the session is gone — see `lockDevice` for
+      // why the action does not redirect itself.
+      void lockDevice().then(() => window.location.assign("/lock"));
+    };
+
+    // A PAGE LOAD IS NOT A TOUCH (2026-10-13). Before anything is recorded:
+    // if the device already had this person signed in and has been idle past
+    // the limit, this load is somebody picking the iPad up, so it locks. See
+    // `idleOnLoad`.
+    if (
+      idleOnLoad(
+        readSignedInUser(),
+        userId,
+        readActivity(),
+        last,
+        idleLimitMs(readExtendedUser(), userId)
+      )
+    ) {
+      lock();
+      return;
+    }
+
     recordSignedInUser(userId);
     recordActivity(last);
 
@@ -112,28 +159,7 @@ export function IdleLock({ userId }: { userId: string }) {
       const limit = idleLimitMs(readExtendedUser(), userId);
       // Another tab's touch counts here too, so the band goes when it does.
       setSecondsLeft(idleWarningSeconds(active, Date.now(), limit));
-      if (idleExpired(active, Date.now(), limit)) {
-        locking = true;
-        recordSignedInUser("");
-        recordExtendedUser("");
-        try {
-          const path = window.location.pathname + window.location.search;
-          localStorage.setItem(
-            RESUME_KEY,
-            serializeResume({
-              userId,
-              path,
-              view: snapshotViewMemory(),
-              scroll: snapshotScrollMemory(),
-            })
-          );
-        } catch {
-          // Private mode or blocked storage: the unlock lands on the home page.
-        }
-        // A HARD navigation, once the session is gone — see `lockDevice` for
-        // why the action does not redirect itself.
-        void lockDevice().then(() => window.location.assign("/lock"));
-      }
+      if (idleExpired(active, Date.now(), limit)) lock();
     };
 
     /** Stay unlocked ends at the first tap or key — except the switch's own. */

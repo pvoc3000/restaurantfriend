@@ -86,6 +86,7 @@ export function ShiftReportsList({
   openDays,
   closedDates,
   myEmployeeId,
+  myName,
 }: {
   rows: ShiftReportRow[];
   today: string;
@@ -101,6 +102,7 @@ export function ShiftReportsList({
   closedDates: string[];
   /** The signed-in member's own employee id — migration 080. */
   myEmployeeId: string | null;
+  myName: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -341,6 +343,7 @@ export function ShiftReportsList({
             locationCode={locationCode}
             today={today}
             myEmployeeId={myEmployeeId}
+            myName={myName}
             existing={rows.map((r) => ({
               id: r.id,
               mine: r.mine,

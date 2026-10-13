@@ -355,6 +355,33 @@ export function deviceLastActivity(ownMs: number, stored: string | null): number
   return Number.isFinite(shared) && shared > ownMs ? shared : ownMs;
 }
 
+/**
+ * WHETHER A PAGE THAT HAS JUST LOADED SHOULD LOCK INSTEAD OF STARTING A CLOCK
+ * (2026-10-13). `IdleLock` used to count its own mount as a touch, so a fresh
+ * page load gave whoever held the iPad a new five minutes on the last person's
+ * session. Safari throws a sleeping tab away and loads it again on wake, and
+ * then no page is left to run the wake check: DF02's opening report on
+ * 2026-10-13 was written and sent under the PIN the closer had typed eighteen
+ * hours earlier.
+ *
+ * True only when the device already had THIS person signed in (`signedIn`,
+ * from `SIGNED_IN_KEY`) and its recorded last touch is past the limit. A lock
+ * and Switch user both write "" there, so the first page after any unlock
+ * starts a clock as before; and nothing recorded, or nothing readable, never
+ * locks.
+ */
+export function idleOnLoad(
+  signedIn: string | null,
+  userId: string,
+  storedActivity: string | null,
+  nowMs: number,
+  limitMs = IDLE_MS
+): boolean {
+  if (signedIn !== userId) return false;
+  const at = storedActivity === null || storedActivity.trim() === "" ? NaN : Number(storedActivity);
+  return Number.isFinite(at) && idleExpired(at, nowMs, limitMs);
+}
+
 /** Record a touch for every tab. Never throws. */
 export function recordActivity(atMs: number): void {
   try {

@@ -796,3 +796,14 @@ prelude holding 159's function: applies twice, one function left, a named list
 makes only those and tops up, a WEEKLY element named on a DONUT log is not
 made, three named arguments make every donut, `anon` refused. Not walked in a
 browser.
+
+**THE NEW-REPORT DIALOG NAMES THE SUPERVISOR (Mark, 2026-10-13).** DF02's
+opening report went out under Karina's name, written by the opener on an iPad
+still signed in as Karina (how: 04o, "A page load is not a touch"). The dialog
+never asks who you are, fills `supervisor_employee_id` from the login and lands
+on page 2, so nothing showed the name before the email. It now states it under
+Location: "Supervisor" and the employee record's name (`myName`, from the
+list page's `special_order_takers` roster), or "Signed in as" and the login's
+name when there is no record. Stated, not asked; page 1's picker is unchanged.
+The guide's step 2 says what to do when the name is not yours. Not seen in a
+browser.
