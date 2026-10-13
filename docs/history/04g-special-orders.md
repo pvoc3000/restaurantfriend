@@ -5909,4 +5909,4 @@ or the current day."
   state, `date_past`.
 - **Verified:** dry run of 201 on the hosted database, never committed
   (yesterday and today refused, tomorrow created); the form in a browser;
-  a fixture broken and restored; `tsc`, eslint, 2,366 fixtures.
+  a fixture broken and restored; `tsc`, eslint, 2,366 fixtures. **201 APPLIED 2026-10-13**; the live gate answers `date_past` for today.
