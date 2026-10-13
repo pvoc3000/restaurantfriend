@@ -54,6 +54,7 @@ way so the timing matches.
 | --- | --- | --- | --- |
 | `rf.device` | `registerThisDevice` | a year, httpOnly | `${id}.${secret}`; the secret's sha256 is what the database holds |
 | `rf.pin_session` | `unlockWithPin` | session, httpOnly | this session came from a PIN |
+| `rf.device.until` | `unlockWithPin`, `POST /device-touch` | a year, httpOnly | `${user_id}.${ms}`; when the server locks this session |
 
 `clearSessionCookies` (`lib/sessionCookies.ts`) is the one sweep — the guide,
 PO and invoice views, the menu memory, the PIN mark — used by `signOut`,
@@ -77,6 +78,35 @@ choice for a session that expires between the proxy and the page.
 cookie; it keeps a last-activity timestamp and checks it on `visibilitychange`
 and `focus` as well as on a timer, because an iPad suspends JavaScript when the
 screen sleeps and the wake is what should lock.
+
+## The idle lock has two halves (2026-10-13)
+
+**The page's** (`IdleLock`): five minutes without a touch, by the device's
+last touch in localStorage. A page LOAD is not a touch — on mount it reads the
+recorded touch before writing its own and locks if that is already past the
+limit (`idleOnLoad`). Before this, a fresh load of the closer's session gave
+the opener a new five minutes.
+
+**The server's** (`proxy.ts`, `serverLocked`): the device carries when it
+locks in `rf.device.until`, which the page cannot write. A PIN unlock sets it;
+a touch moves it forward through `POST /device-touch`, at most once a minute
+(and at once when Stay unlocked goes on or off); a page load never does. Once
+it has passed, the proxy signs the session out (`local`), clears the session
+cookies and redirects to `/lock`. `/device-touch` is not exempt, so it cannot
+revive a session that is already past its time.
+
+- The time is the SERVER's clock at both ends. The iPad's clock is not used.
+- It is the limit plus 90 seconds, so the page's own lock comes first whenever
+  a page is alive to run it.
+- No time recorded: a PIN session is locked (every PIN unlock records one); a
+  password sign-in on a registered iPad is let through until its first touch.
+- The value names its user. Somebody else's time counts as none.
+
+Probed against the dev server with one-off owner sessions (2026-10-13): a desk
+browser and a password session pass; a touch gives 6.5 minutes, 21.5 with Stay
+unlocked; a PIN session inside its time passes; past it, or with none, is a
+307 to `/lock` with every session cookie cleared and the session gone at
+Supabase; a touch does not revive it.
 
 ## Deploy
 

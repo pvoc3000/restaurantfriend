@@ -39,8 +39,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   to get a login. Its labels are copied from the screens, so a relabelled button
   is also an edit to `app/guides/shift-report/page.tsx`; add a row to
   `app/guides/page.tsx` when a guide ships.
-  **`/calendar-feed/[token]` is a ROUTE HANDLER, the app's only one**
+  **`/calendar-feed/[token]` is a ROUTE HANDLER, one of the app's two**
   (2026-10-09) — a published iCal feed, exempted in `proxy.ts` like `/q/`.
+  The other is `POST /device-touch` (2026-10-13), the shared iPad's heartbeat,
+  signed in and NOT exempted — see `docs/shared-device-brief.md`.
   **`/forms` shows every printed document** (Mark, 2026-09-25) — the real
   PDF components over `components/forms/formSamples.ts`, for layout work; URL
   only, like `/interface`. A new PDF gets a row in `forms/formCatalog.ts`.

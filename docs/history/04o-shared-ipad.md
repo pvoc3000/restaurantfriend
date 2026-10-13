@@ -189,7 +189,23 @@ password sign-in on a registered device is not locked at once. Since 10-01 six
 supervisor reports were started 13–23 hours after the author's last PIN, or
 with none (DF01 10-04, 10-05, 10-06, 10-10, 10-13; DF02 10-13); some may be a
 personal phone.
-NOT DONE, offered: the SERVER still trusts the cookie for ever
-(`rf.pin_session` carries no time, `getAppSession` only reads cookies), so the
-page renders for a moment before the lock, and nothing locks with JavaScript
-off. Not walked live: needs the registered iPad.
+Not walked live: needs the registered iPad.
+
+**AND THE SERVER LOCKS TOO (Mark, the same day).** The server had trusted the
+cookie for ever, so the stale page still rendered for a moment before the
+page's lock, and nothing locked if no JavaScript ran. `rf.device.until`
+(httpOnly, `${user_id}.${ms}`, server clock) is when the session locks:
+`unlockWithPin` sets it, `POST /device-touch` (the app's second route handler;
+a server action that sets a cookie re-renders the calling page) moves it on a
+touch at most once a minute, and `proxy.ts` (`serverLocked`, fixtures) signs
+out and redirects to /lock once it has passed. Limit + 90s, so the page's lock
+still comes first. A PIN session with no time is locked, so EVERY iPAD ASKS FOR
+A PIN ONCE WHEN THIS DEPLOYS. The proxy also deletes the `sb-…-auth-token`
+cookies by name: a failed sign-out call leaves them, and /lock → / → /lock
+would loop. `LockScreen` records a touch on unlock, or the same person coming
+back from a server lock would be locked again by `idleOnLoad`; `IdleLock` and
+`SwitchUser` go to /lock whether or not `lockDevice` resolves, since a session
+the server already locked refuses the action. `clearSessionCookies` takes
+anything with `delete`. Probed on the dev server with one-off owner sessions,
+results in `docs/shared-device-brief.md`. NOT walked on an iPad: the heartbeat
+from a real page, and Stay unlocked across a long read.
