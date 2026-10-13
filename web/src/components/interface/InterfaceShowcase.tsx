@@ -1185,7 +1185,7 @@ function TablesBlock() {
         </div>
       )}
 
-      <Specimen name="DataTable · sort, resize, reorder, columns eye, group, totals, expand" wide>
+      <Specimen name="DataTable · sort, resize, reorder, columns menu, group, totals, expand" wide>
         <DataTable
           rows={shown}
           columns={columns}

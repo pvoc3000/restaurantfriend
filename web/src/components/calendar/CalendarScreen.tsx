@@ -27,7 +27,7 @@ import type { CalendarEntry } from "@/lib/blackoutDates";
 import { useStoredSet } from "@/lib/storedSet";
 import { MonthView } from "@/components/calendar/MonthView";
 import { MonthJump } from "@/components/calendar/MonthJump";
-import { ColumnsIcon } from "@/components/catalog/ColumnsMenu";
+import { EyeIcon } from "@/components/catalog/ColumnsMenu";
 import { ExtrasMenu } from "@/components/catalog/ExtrasMenu";
 import { ColorSwatches } from "@/components/calendar/ColorSwatches";
 import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
@@ -417,7 +417,7 @@ export function CalendarScreen({
             />
           </ControlField>
           {offered.length > 1 && (
-            // THE EYE — the tables' own (`ColumnsIcon`), for the same verb: which
+            // THE EYE (`EyeIcon`, the tables' own until 2026-10-13) — which
             // of these to show. `catalog/ExtrasMenu`, the menu the orders list's
             // calendar button uses, so a layer and the calendars nested under
             // "Subscribed calendars" read the same on both screens. The key of
@@ -426,7 +426,7 @@ export function CalendarScreen({
               <ExtrasMenu
                 extras={{
                   label: "What the calendar shows",
-                  icon: <ColumnsIcon />,
+                  icon: <EyeIcon />,
                   items: offered.flatMap((l) => {
                     const on = !hiddenSet.has(l.key);
                     const layer = {

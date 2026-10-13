@@ -163,25 +163,37 @@ export function ColumnsMenu<T>({
 }
 
 /**
- * An eye — Material Symbols Outlined `visibility` (Apache 2.0), 24px at
+ * Three columns — Material Symbols Outlined `view_column` (Apache 2.0), 24px at
  * wght 300. Inlined as a path rather than pulled from a font or a package: one
  * icon doesn't justify a dependency, and the artifact is a `currentColor` shape
  * that inherits the button's hover the way `RowMenu`'s ⋯ does.
  *
- * JUST the eye (Mark, 2026-07-31). It arrived as three columns, then as
- * `table_eye` — a table with an eye in the corner — and both were trying to say
- * "columns" as well as "show". They don't need to: the control sits ON the
- * table, directly above its last column header, so the table is already said by
- * where it is. What's left for the glyph is the verb, and at 24px the eye alone
- * is legible where a grid-plus-eye is a smudge.
+ * COLUMNS AGAIN (Mark, 2026-10-13: "use view_column in place of the eye"). It
+ * was an eye from 2026-07-31 — the verb alone, the table being said by where
+ * the button sits. Since then the menu also REORDERS, and a second button (the
+ * calendar's) sits beside it, so the glyph has to say which of the two this is.
  *
  * A Material weight is a DIFFERENT PATH, not a `stroke-width` — changing it
  * means fetching the `wght300` artwork, so don't expect a CSS knob here.
- *
- * Exported for `ui/PickSet`'s `icon` trigger — the calendar's layers, which is
- * the same verb over a different noun, and should be the same eye.
  */
 export function ColumnsIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 -960 960 960" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M140.62-292.31v-375.38q0-29.83 21.24-51.07Q183.1-740 212.92-740h534.77q29.83 0 51.07 21.24Q820-697.52 820-667.69v375.38q0 29.83-21.24 51.07Q777.52-220 747.69-220H212.92q-29.82 0-51.06-21.24-21.24-21.24-21.24-51.07ZM212.31-280h134.15v-400H212.31q-4.62 0-8.46 3.85-3.85 3.84-3.85 8.46v375.38q0 4.62 3.85 8.46 3.84 3.85 8.46 3.85Zm194.15 0h146.46v-400H406.46v400Zm206.46 0h134.16q4.61 0 8.46-3.85 3.84-3.84 3.84-8.46v-375.38q0-4.62-3.84-8.46-3.85-3.85-8.46-3.85H612.92v400Z"
+      />
+    </svg>
+  );
+}
+
+/**
+ * An eye — Material Symbols Outlined `visibility`, wght 300. The columns
+ * button wore it until 2026-10-13; it stays for the calendar's layers, which
+ * are the same verb ("which of these to show") over things that are not
+ * columns.
+ */
+export function EyeIcon() {
   return (
     <svg width="24" height="24" viewBox="0 -960 960 960" aria-hidden="true">
       <path
