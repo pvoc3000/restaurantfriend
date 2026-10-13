@@ -1133,3 +1133,7 @@
    and made them read-only; admin reopen, blank reason and a FileMaker period
    each refused; owner reopen cleared 151 and, on 09-14, all 36 accruals and
    every frozen pool. Not checked in a browser.
+   **202 APPLIED 2026-10-13** (by CLI, one transaction). Verified after: 182
+   closed, 1 in review, none exported; `freeze_pay_period` gone,
+   `close_pay_period` / `reopen_pay_period` / the guard trigger present; all
+   801 snapshotted rows on 07-20 → 09-27 still frozen.
