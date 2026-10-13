@@ -427,7 +427,7 @@ export function DataTable<T>({
    */
   columnChooser?: boolean;
   /**
-   * A second button to the RIGHT of the columns eye, for things this table
+   * A second button to the LEFT of the columns button, for things this table
    * shows that are not columns. See `ExtrasMenu`. Needs `columnChooser`.
    */
   chooserExtras?: ChooserExtras;
@@ -687,6 +687,9 @@ export function DataTable<T>({
         // inside it keeps the hover wash centred on the artwork, which is
         // the thing the button's size exists to do.
         <div className="-mb-1 flex shrink-0 items-center">
+          {/* The extras LEAD and the columns button keeps the far right, over
+              the last column header (Mark, 2026-10-13: "swap the order"). */}
+          {chooserExtras && <ExtrasMenu extras={chooserExtras} />}
           <ColumnsMenu
             storageKey={storageKey}
             columns={orderedColumns}
@@ -696,7 +699,6 @@ export function DataTable<T>({
             // double-click is no gesture (Mark, 2026-09-10).
             onResetWidths={customized ? reset : undefined}
           />
-          {chooserExtras && <ExtrasMenu extras={chooserExtras} />}
         </div>
       )}
     </div>

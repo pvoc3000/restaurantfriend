@@ -1239,7 +1239,8 @@ export function SpecialOrdersList({
       storageKey="special-orders.v2"
       compactBelow={1280}
       columnChooser
-      // THE CALENDAR BUTTON, right of the eye (Mark, 2026-10-10) — always
+      // THE CALENDAR BUTTON, left of the columns button (Mark, 2026-10-10;
+      // right of it until 2026-10-13) — always
       // there, and saying so in its menu when the calendar has nothing on the
       // dates this list is showing.
       chooserExtras={{
