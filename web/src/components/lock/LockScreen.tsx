@@ -6,6 +6,7 @@ import { unlockWithPin, type LockMember } from "@/app/deviceActions";
 import {
   PIN_LENGTH,
   RESUME_KEY,
+  recordActivity,
   recordExtendedUser,
   resumePathFor,
   resumeScrollFor,
@@ -62,6 +63,9 @@ export function LockScreen({
       let destination = "/";
       // Nobody arrives with Stay unlocked already on.
       recordExtendedUser("");
+      // The unlock is a touch. Without this, the same person coming back after
+      // the SERVER locked them out would be locked again by `idleOnLoad`.
+      recordActivity(Date.now());
       try {
         const raw = localStorage.getItem(RESUME_KEY);
         destination = resumePathFor(raw, who.user_id);

@@ -21,9 +21,10 @@ export function SwitchUser({ size = "md" }: { size?: "md" | "lg" }) {
     setBusy(true);
     // Nobody, as far as the other tabs know — they leave their pages too.
     recordSignedInUser("");
-    void lockDevice()
-      .then(() => window.location.assign("/lock"))
-      .catch(() => setBusy(false));
+    // Either way: a session the server has already locked refuses the action,
+    // and /lock is still the destination.
+    const leave = () => window.location.assign("/lock");
+    void lockDevice().then(leave, leave);
   };
 
   if (size === "lg") {

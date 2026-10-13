@@ -1,7 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { supabaseEnv } from "@/lib/supabase/env";
-import { DEVICE_COOKIE } from "@/lib/sharedDevice";
+import {
+  DEADLINE_COOKIE,
+  DEVICE_COOKIE,
+  PIN_SESSION_COOKIE,
+  serverLocked,
+} from "@/lib/sharedDevice";
+import { clearSessionCookies } from "@/lib/sessionCookies";
 
 // Next 16's replacement for middleware.ts (same thing, new file convention).
 // Runs on every request: refreshes the Supabase auth token (writing the updated
@@ -80,24 +86,61 @@ export default async function proxy(request: NextRequest) {
   const isCalendarFeed = request.nextUrl.pathname.startsWith("/calendar-feed/");
   const isRegisteredDevice = request.cookies.has(DEVICE_COOKIE);
 
-  if (
-    !user &&
-    !isLoginPage &&
-    !isWelcomePage &&
-    !isQuotePage &&
-    !isPayPage &&
-    !isInquiryPage &&
-    !isLegalPage &&
-    !isLockPage &&
-    !isGuidePage &&
-    !isCalendarFeed
-  ) {
+  const isPublicPage =
+    isLoginPage ||
+    isWelcomePage ||
+    isQuotePage ||
+    isPayPage ||
+    isInquiryPage ||
+    isLegalPage ||
+    isLockPage ||
+    isGuidePage ||
+    isCalendarFeed;
+
+  if (!user && !isPublicPage) {
     const redirectUrl = request.nextUrl.clone();
     // A registered iPad wakes up on its picker, not the password screen —
     // /login stays reachable from the picker as the escape hatch.
     redirectUrl.pathname = isRegisteredDevice ? "/lock" : "/login";
     redirectUrl.search = "";
-    return NextResponse.redirect(redirectUrl);
+    const redirect = NextResponse.redirect(redirectUrl);
+    // Nobody is signed in, so the last session's lock time means nothing —
+    // and left behind it would lock the same person's next password sign-in.
+    redirect.cookies.delete(DEADLINE_COOKIE);
+    return redirect;
+  }
+
+  // THE SHARED iPAD'S IDLE LOCK, SERVER SIDE (2026-10-13). `IdleLock` locks
+  // from the page, which needs a page that is alive; this refuses the request
+  // itself once the device's lock time has passed. See `serverLocked` in
+  // `lib/sharedDevice` for the rule and `/device-touch` for what moves it.
+  if (
+    user &&
+    isRegisteredDevice &&
+    !isPublicPage &&
+    serverLocked(
+      request.cookies.get(DEADLINE_COOKIE)?.value,
+      user.id,
+      request.cookies.get(PIN_SESSION_COOKIE)?.value === "1",
+      Date.now()
+    )
+  ) {
+    // `local`, as everywhere: locking the iPad must not sign anybody out of
+    // their own phone. The sign-out writes its cleared cookies onto `response`.
+    await supabase.auth.signOut({ scope: "local" });
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/lock";
+    redirectUrl.search = "";
+    const redirect = NextResponse.redirect(redirectUrl);
+    for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
+    // And by name, in case the sign-out call itself failed (it leaves the
+    // cookies alone then): /lock sends a signed-in request home, home would
+    // send it back here, and the iPad would loop until the network returned.
+    for (const { name } of request.cookies.getAll()) {
+      if (name.startsWith("sb-") && name.includes("-auth-token")) redirect.cookies.delete(name);
+    }
+    clearSessionCookies(redirect.cookies);
+    return redirect;
   }
 
   if (user && (isLoginPage || isLockPage)) {

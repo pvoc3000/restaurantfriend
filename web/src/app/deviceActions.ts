@@ -5,10 +5,13 @@ import { cookies } from "next/headers";
 
 import { clearSessionCookies, type CookieJar } from "@/lib/sessionCookies";
 import {
+  DEADLINE_COOKIE,
   DEVICE_COOKIE,
   PIN_SESSION_COOKIE,
+  deadlineFor,
   isValidPin,
   parseDeviceCookie,
+  serializeDeadline,
   serializeDeviceCookie,
 } from "@/lib/sharedDevice";
 import { createClient } from "@/lib/supabase/server";
@@ -225,6 +228,15 @@ export async function unlockWithPin(userId: string, pin: string): Promise<Unlock
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
+  });
+  // When this session locks if nobody touches the iPad — the server's half
+  // of the idle lock. See `serverLocked`.
+  jar.set(DEADLINE_COOKIE, serializeDeadline(userId, deadlineFor(Date.now(), false)), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 365 * 24 * 60 * 60,
   });
 
   return { ok: true };

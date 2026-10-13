@@ -11,6 +11,11 @@ import {
   IDLE_WARN_MS,
   extendedFor,
   idleLimitMs,
+  DEADLINE_GRACE_MS,
+  TOUCH_EVERY_MS,
+  deadlineFor,
+  serializeDeadline,
+  serverLocked,
   idleOnLoad,
   idleExpired,
   idleWarningSeconds,
@@ -254,4 +259,31 @@ test("idleOnLoad: a page load on a session left idle locks instead of starting a
   no(idleOnLoad(ID, ID, "soon", t + 18 * 3_600_000), "not a number");
   no(idleOnLoad(ID, ID, String(t), t + IDLE_MS, EXTEND_MS), "Stay unlocked: twenty minutes, not five");
   ok(idleOnLoad(ID, ID, String(t), t + EXTEND_MS, EXTEND_MS), "and twenty are up");
+});
+
+test("serverLocked: the server refuses a request once the device's time has passed", () => {
+  const OTHER = "7ec6508c-1111-4222-8333-444444444444";
+  const t = 1_800_000_000_000;
+  const until = deadlineFor(t, false);
+  const mine = serializeDeadline(ID, until);
+  no(serverLocked(mine, ID, true, until - 1), "a millisecond to go");
+  ok(serverLocked(mine, ID, true, until), "time up");
+  ok(serverLocked(mine, ID, false, until), "a password session with a time is held to it too");
+  ok(serverLocked(mine, ID, true, t + 18 * 3_600_000), "the closer's session, next morning");
+  ok(serverLocked(undefined, ID, true, t), "a PIN session with no time recorded");
+  no(serverLocked(undefined, ID, false, t), "a password sign-in before its first touch");
+  ok(serverLocked(serializeDeadline(OTHER, until), ID, true, t), "somebody else's time is not this PIN session's");
+  no(serverLocked(serializeDeadline(OTHER, t - 1), ID, false, t), "nor does it lock a password session");
+  ok(serverLocked(`${ID}.soon`, ID, true, t), "unreadable counts as none");
+  ok(serverLocked(`${ID}.`, ID, true, t), "empty counts as none, not as zero");
+});
+
+test("deadlineFor: the page's own lock always comes before the server's", () => {
+  const t = 1_800_000_000_000;
+  // The worst case: the last touch came just inside the heartbeat's throttle,
+  // so the server last heard TOUCH_EVERY_MS before it.
+  ok(deadlineFor(t - TOUCH_EVERY_MS, false) > t + IDLE_MS, "five minutes");
+  ok(deadlineFor(t - TOUCH_EVERY_MS, true) > t + EXTEND_MS, "Stay unlocked");
+  eq(deadlineFor(t, false), t + IDLE_MS + DEADLINE_GRACE_MS);
+  eq(deadlineFor(t, true), t + EXTEND_MS + DEADLINE_GRACE_MS);
 });

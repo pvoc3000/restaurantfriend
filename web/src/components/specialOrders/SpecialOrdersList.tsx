@@ -336,7 +336,7 @@ export function SpecialOrdersList({
          * one answer.
          */
         key: "view",
-        label: "Show",
+        label: "Dates",
         /**
          * IT IS STILL A DIMENSION, and that is what buys the conversion for
          * almost nothing: `parseFilterValues`, `filterHref` and the view cookie
@@ -1164,12 +1164,12 @@ export function SpecialOrdersList({
               </div>
               {/* THE WINDOW SITS FIRST AMONG THE FILTERS, straight after the
                   search, which is where the PO list and the bill list both put
-                  theirs. It keeps the word "Show", because that is what the
-                  menu it replaces was called and it is still the same question
-                  — only now asked with a calendar. */}
+                  theirs. LABELLED "DATES" (Mark, 2026-10-13) — it was "Show",
+                  the name of the menu it replaced, and comments here still
+                  call it that. */}
               <div className="w-44 space-y-1.5">
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                  Show
+                  Dates
                 </span>
                 <RangePicker
                   /* "All Time" WHILE IT IS OFF, not the window it would apply.

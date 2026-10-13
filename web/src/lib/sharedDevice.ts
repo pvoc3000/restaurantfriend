@@ -382,6 +382,61 @@ export function idleOnLoad(
   return Number.isFinite(at) && idleExpired(at, nowMs, limitMs);
 }
 
+/**
+ * THE SERVER'S HALF OF THE IDLE LOCK (2026-10-13). Everything above runs in
+ * the page, so it locks only when a page is alive to do it, and the server
+ * went on trusting the session cookie for as long as it lasted. Now the device
+ * also carries WHEN IT LOCKS, in an httpOnly cookie the page cannot write:
+ *   · a PIN unlock sets it (`unlockWithPin`);
+ *   · a touch moves it forward, through `POST /device-touch`, at most once
+ *     every `TOUCH_EVERY_MS`;
+ *   · `proxy.ts` reads it on every request and, once it has passed, signs the
+ *     session out and sends the request to /lock.
+ * A page load never moves it. The value names its user, so one person's time
+ * is never applied to the next.
+ *
+ * `DEADLINE_GRACE_MS` is why the page's own lock still comes first: the cookie
+ * may be up to a minute behind the last touch, so it allows that minute and
+ * thirty seconds more. Server clock on both ends — the iPad's own clock is
+ * never compared.
+ */
+export const DEADLINE_COOKIE = "rf.device.until";
+export const TOUCH_EVERY_MS = 60_000;
+export const DEADLINE_GRACE_MS = 90_000;
+
+/** When a device touched at `nowMs` locks, by the server's reckoning. */
+export function deadlineFor(nowMs: number, extended: boolean): number {
+  return nowMs + (extended ? EXTEND_MS : IDLE_MS) + DEADLINE_GRACE_MS;
+}
+
+export function serializeDeadline(userId: string, untilMs: number): string {
+  return `${userId}.${untilMs}`;
+}
+
+/**
+ * Whether the server should refuse this request and lock the device.
+ *
+ * With a time recorded for THIS user: once it has passed. With none (or
+ * somebody else's, or anything unreadable): only a PIN session is locked,
+ * because every PIN unlock records one, so a PIN session without it predates
+ * this rule or has lost it. A password sign-in on a registered iPad has none
+ * until its first touch, and is let through.
+ */
+export function serverLocked(
+  raw: string | undefined | null,
+  userId: string,
+  pinSession: boolean,
+  nowMs: number
+): boolean {
+  const dot = raw ? raw.lastIndexOf(".") : -1;
+  if (raw && dot > 0 && raw.slice(0, dot) === userId) {
+    const tail = raw.slice(dot + 1);
+    const until = /^[0-9]+$/.test(tail) ? Number(tail) : NaN;
+    if (Number.isFinite(until)) return nowMs >= until;
+  }
+  return pinSession;
+}
+
 /** Record a touch for every tab. Never throws. */
 export function recordActivity(atMs: number): void {
   try {

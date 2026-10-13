@@ -7,7 +7,9 @@ import { snapshotViewMemory } from "@/lib/viewMemory";
 import { lockDevice } from "@/app/deviceActions";
 import {
   EXTEND_ACTION_KEY,
+  EXTEND_EVENT,
   EXTEND_KEY,
+  TOUCH_EVERY_MS,
   RESUME_KEY,
   SIGNED_IN_KEY,
   deviceLastActivity,
@@ -83,6 +85,11 @@ import {
  * survived the sleep, and Safari often loads a fresh one instead. So the mount
  * reads the device's last touch BEFORE recording its own and locks if that is
  * already past the limit — `idleOnLoad` in `lib/sharedDevice`.
+ *
+ * AND THE SERVER KEEPS ITS OWN COPY (same day): `beat` below tells it about
+ * touches, and `proxy.ts` refuses a request once its copy has run out — see
+ * `DEADLINE_COOKIE`. The page's lock still comes first whenever a page is
+ * alive; the server's is for when none is.
  */
 export function IdleLock({ userId }: { userId: string }) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
@@ -111,7 +118,10 @@ export function IdleLock({ userId }: { userId: string }) {
       }
       // A HARD navigation, once the session is gone — see `lockDevice` for
       // why the action does not redirect itself.
-      void lockDevice().then(() => window.location.assign("/lock"));
+      // Either way: if the server has already locked this session, the action
+      // is refused, and /lock is still where this page is going.
+      const leave = () => window.location.assign("/lock");
+      void lockDevice().then(leave, leave);
     };
 
     // A PAGE LOAD IS NOT A TOUCH (2026-10-13). Before anything is recorded:
@@ -134,6 +144,27 @@ export function IdleLock({ userId }: { userId: string }) {
     recordSignedInUser(userId);
     recordActivity(last);
 
+    // THE SERVER'S COPY OF THE CLOCK (`/device-touch`): told about a touch at
+    // most once a minute, and at once when Stay unlocked goes on or off, since
+    // that changes how long it should wait. A failed call is retried on the
+    // next touch.
+    let lastBeat = 0;
+    const beat = (force = false) => {
+      const now = Date.now();
+      if (locking || (!force && now - lastBeat < TOUCH_EVERY_MS)) return;
+      lastBeat = now;
+      fetch("/device-touch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ extended: extendedFor(readExtendedUser(), userId) }),
+      }).catch(() => {
+        lastBeat = 0;
+      });
+    };
+    beat(true);
+    const onExtend = () => beat(true);
+    window.addEventListener(EXTEND_EVENT, onExtend);
+
     // The same one-a-second throttle now covers the storage write, too.
     const touch = () => {
       const now = Date.now();
@@ -142,6 +173,7 @@ export function IdleLock({ userId }: { userId: string }) {
         recordActivity(now);
         setSecondsLeft(null);
       }
+      beat();
     };
 
     /** Another tab changed who is signed in — this page is not theirs. */
@@ -185,7 +217,10 @@ export function IdleLock({ userId }: { userId: string }) {
     const onStorage = (e: StorageEvent) => {
       if (e.key === SIGNED_IN_KEY || e.key === null) leaveIfStale();
       // Switched off in another tab with the band up: recount at once.
-      if (e.key === EXTEND_KEY) check();
+      if (e.key === EXTEND_KEY) {
+        check();
+        beat(true);
+      }
     };
     window.addEventListener("storage", onStorage);
     // Every second, since the band counts in seconds. It was every thirty.
@@ -198,6 +233,7 @@ export function IdleLock({ userId }: { userId: string }) {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", check);
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener(EXTEND_EVENT, onExtend);
       window.clearInterval(timer);
     };
   }, [userId]);
