@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { PageHeading } from "@/components/ui/PageHeading";
-import { canRunPayroll } from "@/lib/roles";
+import { canReopenPayPeriod, canRunPayroll } from "@/lib/roles";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import {
   TimesheetsList,
@@ -214,7 +214,7 @@ export default async function TimesheetsPage({
       .select("id, employee_id, workday, kind, decision, hours, reason")
       .gte("workday", periodStart)
       .lte("workday", periodEnd),
-    // `id` is here for the FREEZE: `freeze_pay_period`'s pool payload names each
+    // `id` is here for the CLOSE: `close_pay_period`'s pool payload names each
     // tip_pool row, so the panel cannot snapshot a rate without it.
     //
     // ONE DAY EARLIER than the period starts, since 061. A shift whose employee
@@ -676,6 +676,7 @@ export default async function TimesheetsPage({
                 ? {
                     period: record,
                     canWrite,
+                    canReopen: canReopenPayPeriod(session.membership.role),
                     timeZone,
                     today,
                     weeks,

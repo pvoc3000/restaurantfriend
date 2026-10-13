@@ -29,22 +29,24 @@ const DF = DEFAULT_PAYROLL_SETTINGS;
 
 /* -- the ladder ----------------------------------------------------------- */
 
-test("editable in open and review, never once a file exists", () => {
+test("editable until closed — an exported file can still be corrected", () => {
   ok(isPayPeriodEditable("open"), "open");
-  // Review is where corrections are MADE — a review that couldn't write would
-  // force you to step backwards to fix anything you found.
   ok(isPayPeriodEditable("review"), "review");
-  no(isPayPeriodEditable("exported"), "exported");
+  // 202: the file is checked against Gusto AFTER it is exported, which is when
+  // a correction is found.
+  ok(isPayPeriodEditable("exported"), "exported");
   no(isPayPeriodEditable("closed"), "closed");
 });
 
-test("closed is terminal and never reopens", () => {
+test("only a closed period reopens, and never one from FileMaker", () => {
   eq(nextStatuses("closed"), [] as PayPeriodStatus[]);
-  no(canReopen("closed"), "closed cannot reopen");
-  // Only the state that produced a file can discard it.
-  ok(canReopen("exported"), "exported can reopen");
+  ok(canReopen("closed"), "closed can reopen");
+  // Nothing before closed is locked, so there is nothing to reopen.
+  no(canReopen("exported"), "exported has nothing to reopen");
   no(canReopen("open"), "open has nothing to reopen");
   no(canReopen("review"), "review has nothing to reopen");
+  // Its tips cannot be derived again.
+  no(canReopen("closed", "283"), "a FileMaker period never reopens");
 });
 
 test("review steps back to open without a reason; that is not a reopen", () => {

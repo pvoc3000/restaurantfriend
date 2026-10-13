@@ -203,6 +203,16 @@ export const canApprovePayment = canManageMembers;
 export const canRunPayroll = canManageMembers;
 
 /**
+ * Reopen a CLOSED pay period. The owner alone (Mark, 2026-10-13: "under very,
+ * very rare circumstances") — a manager closes payroll, and undoing that
+ * discards the locked tips and benefits of a period Gusto has paid.
+ * Migration 202's `reopen_pay_period` names the same one role.
+ */
+export function canReopenPayPeriod(role: Role): boolean {
+  return role === "owner";
+}
+
+/**
  * Resolve a purchase request — mark it ordered, dismiss it, reopen it.
  * Migration 092's `preq_resolve`, whose role array is this set verbatim.
  *

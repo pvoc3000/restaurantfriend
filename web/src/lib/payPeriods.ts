@@ -35,8 +35,8 @@ export const PAY_PERIOD_STATUS_LABEL: Record<PayPeriodStatus, string> = {
 export const PAY_PERIOD_STATUS_HINT: Record<PayPeriodStatus, string> = {
   open: "Punches are still arriving. Timesheets can be edited.",
   review: "The pay period has ended and is being adjudicated. Timesheets can still be edited.",
-  exported: "The payroll file has been produced. Reopening discards it.",
-  closed: "Payroll ran. This period is final.",
+  exported: "The payroll file has been produced. Timesheets can still be edited, and the file exported again.",
+  closed: "Payroll ran. Tips and benefits are locked, and this period is final.",
 };
 
 /**
@@ -61,18 +61,18 @@ export const PAY_PERIOD_STATUS_CLASS: Record<PayPeriodStatus, string> = {
  * historical" flag — one rule, the way `closed` came to mean something on
  * purchase orders.
  *
- * Note this covers `review` as well as `open`, and that reading is deliberate.
- * Review is the step where a human adjudicates break violations and overtime
- * disagreements — correcting things is what the status is FOR, and a review
- * that couldn't write would force you to step backwards to `open` to fix
- * anything you found. What must not be editable is a period whose FILE already
- * exists, which is `exported` and `closed`.
+ * EVERYTHING BUT `closed` (Mark, 2026-10-13, migration 202: "Payroll should be
+ * editable until it is final/closed/complete"). Until then `exported` was
+ * read-only too, because exporting took the snapshot — but the file is checked
+ * against Gusto AFTER it is exported, which is exactly when a correction is
+ * found. What must not be editable is a period whose payroll RAN.
  *
- * Migration 028's insert/update/delete policies enforce exactly this same pair,
- * so the screen and the database agree. They must be changed together.
+ * 202's `timesheet_period_editable` and `period_editable_on` enforce exactly
+ * this same set, so the screen and the database agree. They must be changed
+ * together.
  */
 export function isPayPeriodEditable(status: PayPeriodStatus): boolean {
-  return status === "open" || status === "review";
+  return status !== "closed";
 }
 
 /** The allowed forward moves, plus the one backward move that isn't a reopen. */
@@ -92,17 +92,17 @@ export function nextStatuses(status: PayPeriodStatus): PayPeriodStatus[] {
 }
 
 /**
- * Reopening (decision 11) is only ever from `exported`, and it always costs a
- * reason: the file that period produced is being discarded, and a year later
- * the only question anyone asks is why.
- *
- * `closed` is never reopened. A correction to a fortnight Gusto has already
- * paid becomes an adjustment row in the current open period — 028's `kind`
- * column — which exports as its own line. That is what makes the two end states
- * mean different things: exported = the file exists, closed = payroll ran.
+ * Reopening is only ever from `closed` (migration 202) — nothing before it is
+ * locked, so there is nothing else to reopen. It is meant to be very rare
+ * (Mark, 2026-10-13): the ordinary correction to a pay period Gusto has already
+ * paid is still an adjustment row in the current one — 028's `kind` column —
+ * which exports as its own line. So it costs a reason, only the OWNER may do it
+ * (`canReopenPayPeriod` in lib/roles), and a period loaded from FileMaker never
+ * can: there is nothing behind it to derive its tips from again.
+ * `reopen_pay_period` enforces all three.
  */
-export function canReopen(status: PayPeriodStatus): boolean {
-  return status === "exported";
+export function canReopen(status: PayPeriodStatus, legacyId: string | null = null): boolean {
+  return status === "closed" && legacyId === null;
 }
 
 /** A reason that is only whitespace is not a reason. Mirrors 027's check. */

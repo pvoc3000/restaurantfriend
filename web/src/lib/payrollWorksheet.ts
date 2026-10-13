@@ -11,7 +11,7 @@
  *
  * Nothing here writes, and nothing here decides. `assessWorkday` proposes a
  * finding; a human records a `break_premiums` row. `allocateTips` proposes a
- * division; `freeze_pay_period` commits it.
+ * division; `close_pay_period` commits it.
  */
 
 import { assessWorkday, type BreakFinding, type BreakShift } from "./breakRules";

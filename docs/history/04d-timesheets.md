@@ -1094,3 +1094,42 @@
    Not checked in a browser. **The same change also fixed the Break chip
    staying up after its premium was decided** — it now reads the decision the
    way the Issues filter's `mealDecided` does.
+   **2026-10-13 — A PAY PERIOD LOCKS AT CLOSE, NOT AT EXPORT (migration 202).**
+   Mark: "Payroll should be editable until it is final/closed/complete. Locking
+   some items mid way through the process doesn't make sense to me … After
+   exporting and importing into Gusto, I may catch something I didn't see
+   before." This SUPERSEDES decisions 10 and 11's timing in
+   `docs/timesheets-brief.md` and the 2026-09-29 entry above. Decision 10's
+   argument is unchanged — a later entitlement change must not re-derive money
+   already paid — but money is paid when payroll runs, which is `closed`.
+   - **Export Timesheets** downloads and writes `status = 'exported'` +
+     `exported_at` with a plain update, every time. No confirm, no snapshot.
+     `exported` is now EDITABLE: `isPayPeriodEditable` is "not closed", and 202
+     changes `timesheet_period_editable`, `period_editable_on`,
+     `day_in_open_pay_period` and `fill_tip_pools_for_period` to match.
+   - **Close Pay Period** calls `close_pay_period` — `freeze_pay_period`'s body,
+     renamed, setting `closed` + `closed_at` + `closed_by`. Its confirm lists
+     what is unresolved, since the export no longer has one.
+   - **Reopen** is from `closed` only, through `reopen_pay_period(period,
+     reason)`: OWNER only (`canReopenPayPeriod`), a reason required, and never a
+     FileMaker period (`legacy_id`) — those have no tip pools, so nothing could
+     be derived again. It deletes the snapshot (benefits, tip allocations, pool
+     rates) and sets In Review. Mark asked for "very, very rare", which is why
+     it is the owner's and not a manager's.
+   - **A trigger refuses any plain write that moves a period into or out of
+     `closed`** (`guard_pay_period_closed`, gated on the transaction-local
+     `rf.pay_period_gate` the two functions set — 113's idiom). Without it
+     `pay_periods_update` would let a manager close with no snapshot or reopen
+     without the owner. A script that must do either sets the same setting.
+   - The four periods exported under the old rule (07-20 → 09-13, all paid and
+     fully snapshotted) are CLOSED by the migration, before the trigger exists.
+   **The bug this removes:** the old Reopen cleared `exported_at` and nothing
+   else, and `mergeFrozen` makes a snapshot WIN — so a benefit correction made
+   after a reopen never reached the second export. A snapshot now exists only
+   on a closed period, where winning is right.
+   Dry-run on the hosted DB in a rolled-back transaction, as a real admin and
+   the real owner: plain close and plain reopen refused; an exported period's
+   151 timesheets editable; a partial close refused by name; close froze 151
+   and made them read-only; admin reopen, blank reason and a FileMaker period
+   each refused; owner reopen cleared 151 and, on 09-14, all 36 accruals and
+   every frozen pool. Not checked in a browser.

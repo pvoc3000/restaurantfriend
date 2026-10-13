@@ -14,7 +14,7 @@ import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { PAY_PERIOD_STATUS_LABEL, type PayPeriodStatus } from "@/lib/payPeriods";
+import { PAY_PERIOD_STATUS_LABEL, isPayPeriodEditable, type PayPeriodStatus } from "@/lib/payPeriods";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { NewTimesheet, type EditableTimesheet } from "./NewTimesheet";
 import {
@@ -229,7 +229,7 @@ export function TimesheetsList({
    * so an offered-but-dead edit would look like it worked.
    */
   const editable =
-    canWrite && period !== null && (period.status === "open" || period.status === "review");
+    canWrite && period !== null && isPayPeriodEditable(period.status);
 
   /**
    * The recompute, over the WHOLE pay period — never over the filtered set.

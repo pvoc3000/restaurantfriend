@@ -26,25 +26,31 @@ const BUTTON =
  * exception — the black commit inside the reopen dialog IS that exception,
  * because a panel exists to produce one outcome.
  *
- * `exported` IS NOT OFFERED HERE (Mark, 2026-08-06). Phase 6 shipped, so the
- * export exists, and Finalize in the panel around these buttons is the only
- * thing that should reach that status — because it is the only thing that also
- * FREEZES. When the ladder and the export lived on separate parts of a long
- * screen, a bare "Mark exported" beside them was merely redundant; side by side
- * in one panel it is a trap, since pressing it leaves a period reading as
- * exported with no tip allocation, premium or accrual snapshotted and no file
- * anywhere. `nextStatuses` still returns it — the ladder in `lib/payPeriods` is
- * unchanged, and a reopen still has to clear `exported_at` — this only declines
- * to offer it a button.
+ * NEITHER END STEP IS OFFERED HERE. Export Timesheets marks a period exported
+ * and Close Pay Period closes it, both in the footer of the panel around these
+ * buttons (2026-09-29) — and Close is the only thing that may reach `closed`,
+ * because it is the only thing that also takes the snapshot (migration 202
+ * refuses a plain status write into or out of `closed`).
+ *
+ * REOPEN IS FROM `closed`, THE OWNER'S ALONE, AND MEANT TO BE VERY RARE (Mark,
+ * 2026-10-13). Nothing before closed is locked any more, so there is nothing
+ * else to reopen. It goes through `reopen_pay_period`, which clears the
+ * snapshot so a correction made afterwards reaches the next export.
  */
 export function PayPeriodActions({
   id,
   status,
+  legacyId,
   canWrite,
+  canReopen: mayReopen,
 }: {
   id: string;
   status: PayPeriodStatus;
+  /** A period loaded from FileMaker never reopens — see `canReopen`. */
+  legacyId: string | null;
   canWrite: boolean;
+  /** `canReopenPayPeriod` — the owner. */
+  canReopen: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -93,6 +99,25 @@ export function PayPeriodActions({
     });
   }
 
+  /** Through the function, never a status write: it is what checks the owner,
+   *  clears the snapshot and stamps who and why, in one transaction. */
+  function reopen() {
+    setFailed(null);
+    startTransition(async () => {
+      const { error } = await supabase.rpc("reopen_pay_period", {
+        p_period_id: id,
+        p_reason: reason.trim(),
+      });
+      if (error) {
+        setFailed(error.message);
+        return;
+      }
+      setReopening(false);
+      setReason("");
+      router.refresh();
+    });
+  }
+
   // Everything the ladder allows EXCEPT `exported`, which only Finalize may
   // reach — see the note at the top of this file.
   // Neither end step is offered here: Export Timesheets marks a period
@@ -132,14 +157,14 @@ export function PayPeriodActions({
           </button>
         ))}
 
-        {canReopen(status) && (
+        {mayReopen && canReopen(status, legacyId) && (
           <button
             type="button"
             disabled={pending}
             onClick={() => setReopening(true)}
             className={BUTTON}
           >
-            Reopen
+            Reopen…
           </button>
         )}
 
@@ -174,17 +199,7 @@ export function PayPeriodActions({
               <button
                 type="button"
                 disabled={pending || !isValidReopenReason(reason)}
-                onClick={() =>
-                  move("open", {
-                    reopened_at: new Date().toISOString(),
-                    reopen_reason: reason.trim(),
-                    // The file this period produced is being discarded, so the
-                    // claim that one exists goes with it. Leaving the stamp
-                    // would have the record assert an export that no longer
-                    // describes these hours.
-                    exported_at: null,
-                  })
-                }
+                onClick={reopen}
                 className={DIALOG_COMMIT_CLASS}
               >
                 {pending ? "Reopening…" : "Reopen"}
@@ -194,15 +209,15 @@ export function PayPeriodActions({
         >
           <div className="space-y-5">
             <p className="max-w-[60ch] text-sm">
-              This discards the payroll file this period produced. The hours
-              become editable again, and anything already frozen onto them —
-              tip allocations especially — no longer matches the file someone
-              may have sent to Gusto.
+              Payroll ran on this pay period. Reopening unlocks its tip
+              allocations and benefit accruals and puts it back In Review, so
+              its timesheets can be edited and its figures are worked out again
+              from today&rsquo;s tips and entitlements — they may no longer match
+              what Gusto paid.
             </p>
             <p className="max-w-[60ch] text-sm text-muted">
-              If payroll has already RUN, don&rsquo;t reopen. Close the period
-              instead and make the correction as an adjustment in the current
-              open one, so the period Gusto paid keeps saying what was paid.
+              The usual correction is an adjustment in the current pay period,
+              which leaves this one saying what was paid.
             </p>
             <label className="block space-y-1.5">
               <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">

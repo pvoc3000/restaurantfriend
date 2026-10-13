@@ -22,7 +22,7 @@
  *
  * What derivation costs is stability — an entitlement corrected in September
  * would restate July's dollars. That is paid for by the freeze: at export
- * `freeze_pay_period` snapshots every accrual into `timesheet_benefits`, and
+ * `close_pay_period` snapshots every accrual into `timesheet_benefits`, and
  * `mergeFrozen` makes the snapshot win. Decision 10's argument for freezing the
  * tip allocations, reaching a second table.
  *

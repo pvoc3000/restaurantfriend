@@ -15,7 +15,7 @@ import type { DayPool, WorkdayFinding, WorksheetEmployee } from "@/lib/payrollWo
  *
  * Everything here is a PROPOSAL until somebody records a decision. The break
  * findings are derived on every render and never stored (decision 3); the tip
- * allocations are derived until `freeze_pay_period` snapshots them (decision
+ * allocations are derived until `close_pay_period` snapshots them (decision
  * 10). Nothing on this screen pays anybody.
  */
 export function PayrollWorksheet({

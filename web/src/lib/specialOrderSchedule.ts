@@ -6,7 +6,7 @@
  * twelve-year-old data, it already exists and is fixture-tested in
  * `specialOrderLines`, and writing a second copy of it in PL/pgSQL would be
  * 016's `nextDeliveryDate` trap on a document a kitchen bakes from. So this is
- * 029's `freeze_pay_period` shape — the client computes the payload and
+ * 029's `close_pay_period` shape — the client computes the payload and
  * `schedule_special_order` VALIDATES and commits it. That function does not
  * trust what it is handed; see migration 068's header for what it re-checks.
  *

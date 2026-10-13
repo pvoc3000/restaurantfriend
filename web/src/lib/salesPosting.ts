@@ -8,7 +8,7 @@
  * stops a post: it lands on its kind's default and is NAMED on the receipt.
  *
  * Pure and fixture-tested, so `qbo-sync`'s `post_daily_sales` VALIDATES what
- * this built rather than rebuilding it (`freeze_pay_period`'s shape, and
+ * this built rather than rebuilding it (`close_pay_period`'s shape, and
  * `buildBillPayload`'s). No Supabase import, or the fixture build breaks.
  *
  * MONEY IS INTEGER CENTS UNTIL THE PAYLOAD EDGE, and the entry must balance to

@@ -44,7 +44,7 @@ function checkedAtLabel(iso: string): string {
  *
  * THE PAYLOAD IS BUILT HERE, by the pure `lib/quickbooks`, and `qbo-sync`
  * validates it against the invoice it names before posting. That split is
- * `freeze_pay_period`'s: the rule — a credit is a VendorCredit with a positive
+ * `close_pay_period`'s: the rule — a credit is a VendorCredit with a positive
  * amount, an update carries Id and SyncToken — lives once, in a module the
  * fixtures can reach, rather than in a Deno twin drifting from it.
  *

@@ -18,6 +18,7 @@ import { resolveLocal } from "@/lib/timeZone";
 import { parseWorkdayStart, workdayFor } from "@/lib/workday";
 import {
   formatPeriodRange,
+  isPayPeriodEditable,
   nextPeriodAfter,
   overlapsAny,
   payrollSettings as readPayrollSettings,
@@ -202,9 +203,7 @@ export function ImportTimesheets({
     return periods.filter((p) => [...days].some((d) => d >= p.start_date && d <= p.end_date));
   }, [plan, matched, periods]);
 
-  const blockedPeriods = targetPeriods.filter(
-    (p) => p.status !== "open" && p.status !== "review"
-  );
+  const blockedPeriods = targetPeriods.filter((p) => !isPayPeriodEditable(p.status));
 
   /**
    * The period this file needs, when none exists yet.
@@ -611,7 +610,7 @@ export function ImportTimesheets({
                 {targetPeriods.map((p) => (
                   <li key={p.id}>
                     {formatPeriodRange(p)} —{" "}
-                    {p.status === "open" || p.status === "review" ? (
+                    {isPayPeriodEditable(p.status) ? (
                       <span className="text-muted">{p.status}</span>
                     ) : (
                       <span className="bg-mark-fill px-1">
