@@ -152,15 +152,15 @@ const KEYS: ReadonlyArray<Key> = [
  * after `text-[24px]` is a coin flip that a token reorder would silently flip
  * back. Exactly one text-size utility is ever emitted per key.
  */
-const KEY_SIZE_BASE = "text-[19px]";
+const KEY_SIZE_BASE = "text-[21.5px]";
 const KEY_SIZE: Record<string, string> = {
-  "÷": "text-[23px]",
-  "×": "text-[23px]",
-  "−": "text-[23px]",
-  "+": "text-[23px]",
-  "=": "text-[25px]",
+  "÷": "text-[26px]",
+  "×": "text-[26px]",
+  "−": "text-[26px]",
+  "+": "text-[26px]",
+  "=": "text-[28.5px]",
 };
-const KEY_NUDGE: Record<string, string> = { "⌫": "-translate-x-[2px]" };
+const KEY_NUDGE: Record<string, string> = { "⌫": "-translate-x-[2.5px]" };
 
 /**
  * EVERY KEY IS THE APP'S OWN MAC BUTTON (Mark, 2026-09-10: "give our calculator
@@ -245,7 +245,7 @@ function labelFor(el: HTMLInputElement): string {
 type Side = "left" | "right" | "top" | "bottom";
 
 /** The window's width plus the guard ring, both sides. Keep in step with the classes below. */
-const PAD_OUTER_WIDTH = 240 + 2 * 16;
+const PAD_OUTER_WIDTH = 288 + 2 * 16;
 
 /** Would the pad, parked at `side`, sit on top of the field? */
 function covers(side: Side, r: DOMRect, padHeight: number): boolean {
@@ -619,31 +619,33 @@ export function CalcPad() {
         // The rounded corners are what tells a floating window from a box on
         // the page.
         //
-        // 15rem WIDE, down from 21 (Mark, 2026-09-23: "it doesn't need to be so
-        // big"). A key still comes out about 50px square, over the 44px a
-        // finger needs.
-        className="w-[15rem] overflow-hidden rounded-[8px] border-2 border-ink bg-white shadow-[4px_4px_0_0_#000]"
+        // 18rem WIDE: 21 until 2026-09-23 (Mark: "it doesn't need to be so
+        // big"), 15 from then, and HALFWAY between from 2026-10-14 (Mark:
+        // "split the difference"). Every other measurement on the pad went to
+        // the midpoint of the same two commits too. A key comes out 60px square
+        // (288 − 4 frame − 20 padding − 3 × 8 gaps, over 4).
+        className="w-[18rem] overflow-hidden rounded-[8px] border-2 border-ink bg-white shadow-[4px_4px_0_0_#000]"
       >
         {/* THE TITLE BAR names the field being edited — `aria-label` on the
             input — since › can reach one you never touched and the pad is
             across the page from it. Its close box does what a tap outside does
-            (`done` — blur, which is the commit). Every target is 40px. */}
-        <div className="flex h-10 items-center bg-ink text-white">
+            (`done` — blur, which is the commit). Every target is 42px. */}
+        <div className="flex h-[42px] items-center bg-ink text-white">
           <button
             type="button"
             tabIndex={-1}
             aria-label="Close the calculator"
-            className="flex h-10 w-10 shrink-0 items-center justify-center"
+            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center"
             {...act("done")}
           >
-            <span className="block h-[16px] w-[16px] border-2 border-white" />
+            <span className="block h-[17px] w-[17px] border-2 border-white" />
           </button>
-          <span className="min-w-0 flex-1 truncate text-[14px] font-bold">{label}</span>
+          <span className="min-w-0 flex-1 truncate text-[15.5px] font-bold">{label}</span>
           <button
             type="button"
             tabIndex={-1}
             aria-label="Previous field"
-            className="flex h-10 w-10 shrink-0 items-center justify-center text-[26px] leading-none active:bg-neutral-700"
+            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center text-[26px] leading-none active:bg-neutral-700"
             {...act("prev")}
           >
             ‹
@@ -652,25 +654,25 @@ export function CalcPad() {
             type="button"
             tabIndex={-1}
             aria-label="Next field"
-            className="flex h-10 w-10 shrink-0 items-center justify-center text-[26px] leading-none active:bg-neutral-700"
+            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center text-[26px] leading-none active:bg-neutral-700"
             {...act("next")}
           >
             ›
           </button>
         </div>
 
-        <div className="mac-stipple p-2">
+        <div className="mac-stipple p-2.5">
           {/* THE READOUT, Apple's way round: the expression small and grey
               above, what it comes to large below, both right-aligned so the
               digits line up as they grow. A sunken white well — `mac-field`,
               the search box's own inset. A refusal is red, the app's colour
               for something wrong. */}
-          <div className="mac-field mb-2 border border-ink bg-white px-2 pb-1 pt-1 text-right">
-            <div className="h-4 truncate font-mono text-[12px] leading-4 text-muted">
+          <div className="mac-field mb-2.5 border border-ink bg-white px-2.5 pb-[5px] pt-1.5 text-right">
+            <div className="h-[18px] truncate font-mono text-[13.5px] leading-[18px] text-muted">
               {showsResult ? draft : showsRefusal ? "can’t read that" : " "}
             </div>
             <div
-              className={`truncate font-mono text-[28px] leading-tight ${
+              className={`truncate font-mono text-[34px] leading-tight ${
                 showsRefusal ? "text-accent" : "text-ink"
               }`}
             >
@@ -678,7 +680,7 @@ export function CalcPad() {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-4 gap-2">
             {KEYS.map(([label, action]) => (
               <button
                 key={label}

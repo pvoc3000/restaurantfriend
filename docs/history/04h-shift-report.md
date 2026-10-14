@@ -858,3 +858,12 @@ the size-joins-only-when-two rule and the order in both emails. Seen as a
 Quick Look render of the fixture report (Quick Look drops the sans stack; mail
 clients don't). Page widths: Made / Rescued / Left 10→9% each, Sold out 15→16%,
 Note 20→22%. NOT re-seen in the browser — the pane was on `/lock`.
+
+**THE CALCULATOR SPLITS THE DIFFERENCE (Mark, 2026-10-14: "can we split the
+difference so it's halfway between its original size and its current size?").**
+Every measurement `113108b7` (2026-09-23) shrank went to the midpoint of its
+before and after: width 21 → 15 → **18rem** (`PAD_OUTER_WIDTH` 288 + 32), title
+bar and its buttons 44 → 40 → 42px, close box 17px, title 15.5px, body padding
+10px, display 13.5px over 34px, key gaps 8px, key type 21.5px (operators 26,
+`=` 28.5). Keys come out 60px square. The ‹ › arrows (26px) were new in that
+commit and kept. Not seen in a browser — the pane was on `/lock`.
