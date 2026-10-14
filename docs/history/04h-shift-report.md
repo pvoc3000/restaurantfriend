@@ -818,4 +818,4 @@ nobody can say how many there were — perishable, by `submitBlockers`' own test
 Its ergonomics are a **Nothing rescued** button beside Nothing left over (the
 same fill-empty-only rule, now one `fillEmpty`). The email's premade table
 gains the column. `countsQuery`'s one-shot retry now drops `rescued` rather
-than 081's long-applied `note`. Not walked in a browser before 203 is applied.
+than 081’s long-applied `note`. 203 APPLIED 2026-10-14.
