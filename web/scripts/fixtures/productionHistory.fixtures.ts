@@ -25,6 +25,7 @@ function line(over: Partial<HistoryLine> & { schedule_date: string }): HistoryLi
     par: 18,
     made: null,
     leftover: null,
+    rescued: null,
     sold: null,
     ...over,
   };

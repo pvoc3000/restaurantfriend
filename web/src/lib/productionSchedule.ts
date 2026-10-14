@@ -66,6 +66,8 @@ export type ScheduleLine = {
   par: number;
   made: number | null;
   leftover: number | null;
+  /** Packed for Too Good To Go before close — not sold. Migration 203. */
+  rescued: number | null;
 };
 
 /** What a schedule is FOR, which the packet's header states. */
@@ -761,19 +763,21 @@ export const SCHEDULE_WINDOW_DAYS = 28;
  *
  * A count nobody has entered is left OUT of its sum rather than read as zero,
  * and a count no line in the run has is NULL — a "0 made" before the night is
- * counted would read as a result. SOLD is made − leftover per line, a missing
- * leftover counting as none: `v_production_schedule_lines`' own definition,
- * repeated because the packet's lines come from the table, not the view.
+ * counted would read as a result. SOLD is made − leftover − rescued per line,
+ * a missing leftover or rescued counting as none: `v_production_schedule_lines`'
+ * own definition (203), repeated because the packet's lines come from the
+ * table, not the view.
  */
 export type CountTotals = {
   par: number;
   made: number | null;
+  rescued: number | null;
   leftover: number | null;
   sold: number | null;
 };
 
 export function countTotals(
-  lines: { par: number; made: number | null; leftover: number | null }[]
+  lines: { par: number; made: number | null; leftover: number | null; rescued: number | null }[]
 ): CountTotals {
   const add = (values: (number | null)[]) => {
     const counted = values.filter((n): n is number => n !== null);
@@ -782,7 +786,10 @@ export function countTotals(
   return {
     par: lines.reduce((n, l) => n + (Number(l.par) || 0), 0),
     made: add(lines.map((l) => l.made)),
+    rescued: add(lines.map((l) => l.rescued)),
     leftover: add(lines.map((l) => l.leftover)),
-    sold: add(lines.map((l) => (l.made === null ? null : l.made - (l.leftover ?? 0)))),
+    sold: add(
+      lines.map((l) => (l.made === null ? null : l.made - (l.leftover ?? 0) - (l.rescued ?? 0)))
+    ),
   };
 }

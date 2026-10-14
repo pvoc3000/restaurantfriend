@@ -109,7 +109,7 @@ export default async function SchedulesPage() {
     const s = stats.get(id) ?? { lines: 0, par: 0, counted: 0 };
     s.lines += 1;
     s.par += Number(l.par) || 0;
-    if (l.made !== null || l.leftover !== null) s.counted += 1;
+    if (l.made !== null || l.leftover !== null || l.rescued !== null) s.counted += 1;
     stats.set(id, s);
   }
 
@@ -219,11 +219,17 @@ export default async function SchedulesPage() {
  */
 async function windowLines(supabase: SupabaseClient, from: string, to: string) {
   const PAGE = 1000;
-  const out: { schedule_id: string; par: number | null; made: number | null; leftover: number | null }[] = [];
+  const out: {
+    schedule_id: string;
+    par: number | null;
+    made: number | null;
+    leftover: number | null;
+    rescued: number | null;
+  }[] = [];
   for (let start = 0; ; start += PAGE) {
     const { data, error } = await supabase
       .from("production_schedule_items")
-      .select("schedule_id, par, made, leftover, production_schedules!inner(schedule_date)")
+      .select("schedule_id, par, made, leftover, rescued, production_schedules!inner(schedule_date)")
       .gte("production_schedules.schedule_date", from)
       .lte("production_schedules.schedule_date", to)
       .order("id")
@@ -235,6 +241,7 @@ async function windowLines(supabase: SupabaseClient, from: string, to: string) {
         par: l.par as number | null,
         made: l.made as number | null,
         leftover: l.leftover as number | null,
+        rescued: l.rescued as number | null,
       });
     }
     if (!data || data.length < PAGE) break;

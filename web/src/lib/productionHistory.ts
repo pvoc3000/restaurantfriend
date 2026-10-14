@@ -18,6 +18,8 @@ export type HistoryLine = {
   par: number;
   made: number | null;
   leftover: number | null;
+  /** Packed for Too Good To Go — migration 203. */
+  rescued: number | null;
   sold: number | null;
 };
 
@@ -32,6 +34,7 @@ export type HistoryDay = {
   shops: number;
   par: number;
   made: number | null;
+  rescued: number | null;
   leftover: number | null;
   sold: number | null;
 };
@@ -41,6 +44,7 @@ export type HistorySummary = {
   /** The divisor every average below is over. Reported, never assumed. */
   daysCounted: number;
   made: number;
+  rescued: number;
   leftover: number;
   sold: number;
   /** Mean sold per COUNTED night, or null when nothing has been counted. */
@@ -96,7 +100,9 @@ export function bucketByDay(lines: HistoryLine[], dates: string[]): HistoryDay[]
 
   return dates.map((date) => {
     const run = byDate.get(date) ?? [];
-    const counted = run.filter((l) => l.made !== null || l.leftover !== null);
+    const counted = run.filter(
+      (l) => l.made !== null || l.leftover !== null || l.rescued !== null
+    );
     const sum = (pick: (l: HistoryLine) => number | null) =>
       counted.length === 0
         ? null
@@ -111,6 +117,7 @@ export function bucketByDay(lines: HistoryLine[], dates: string[]): HistoryDay[]
       shops: new Set(run.map((l) => l.location_id)).size,
       par: run.reduce((n, l) => n + (Number(l.par) || 0), 0),
       made: sum((l) => l.made),
+      rescued: sum((l) => l.rescued),
       leftover: sum((l) => l.leftover),
       sold: sum((l) => l.sold),
     };
@@ -136,6 +143,7 @@ export function summarise(days: HistoryDay[]): HistorySummary {
     daysScheduled: days.filter((d) => d.scheduled).length,
     daysCounted: counted.length,
     made: total((d) => d.made),
+    rescued: total((d) => d.rescued),
     leftover: total((d) => d.leftover),
     sold,
     soldPerNight: counted.length === 0 ? null : sold / counted.length,

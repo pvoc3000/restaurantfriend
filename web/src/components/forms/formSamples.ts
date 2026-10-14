@@ -438,6 +438,7 @@ function schedLine(
     par,
     made: null,
     leftover: null,
+    rescued: null,
   };
 }
 

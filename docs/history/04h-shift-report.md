@@ -807,3 +807,15 @@ list page's `special_order_takers` roster), or "Signed in as" and the login's
 name when there is no record. Stated, not asked; page 1's picker is unchanged.
 The guide's step 2 says what to do when the name is not yours. Not seen in a
 browser.
+
+**RESCUED ON THE PREMADES PAGE, AND IT GATES THE SEND (migration 203,
+2026-10-14).** A Rescued column between Made and Left — what went into Too Good
+To Go boxes, so it isn't counted as sold (the reasoning is in 04f). Widths:
+Name 24→20%, the three count columns 12% each, Note 19→16%. **It blocks the
+send like Left does** ("N of M premade lines have nothing under Rescued"),
+because a blank Rescued silently puts the boxes back into `sold` and by morning
+nobody can say how many there were — perishable, by `submitBlockers`' own test.
+Its ergonomics are a **Nothing rescued** button beside Nothing left over (the
+same fill-empty-only rule, now one `fillEmpty`). The email's premade table
+gains the column. `countsQuery`'s one-shot retry now drops `rescued` rather
+than 081's long-applied `note`. Not walked in a browser before 203 is applied.

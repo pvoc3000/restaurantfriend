@@ -77,9 +77,10 @@ async function ratingsQuery(supabase: SupabaseClient, reportId: string) {
 }
 
 /**
- * The draft counts, with a ONE-SHOT RETRY without `note`.
+ * The draft counts, with a ONE-SHOT RETRY without `rescued`.
  *
- * 081 adds that column and migrations are applied by hand, so between a deploy
+ * 203 adds that column (081's `note` was the first to need this, and is long
+ * applied) and migrations are applied by hand, so between a deploy
  * and the SQL editor this select would 400 — and because the whole draft map
  * would come back null, EVERY count already typed would render as empty. A
  * supervisor mid-shift would reasonably conclude the report had lost their
@@ -87,20 +88,20 @@ async function ratingsQuery(supabase: SupabaseClient, reportId: string) {
  *
  * `ratingsQuery`'s pattern, thirty lines up and there for exactly this reason
  * (071's `break_started_at`): ask for everything, and if the message names the
- * new column, ask again without it. The note then reads as unrecorded, which is
+ * new column, ask again without it. Rescued then reads as unrecorded, which is
  * precisely what it is until the migration runs.
  */
 async function countsQuery(supabase: SupabaseClient, reportId: string) {
   const full = await supabase
     .from("shift_report_counts")
-    .select("schedule_item_id, made, leftover, note")
+    .select("schedule_item_id, made, leftover, rescued, note")
     .eq("report_id", reportId);
 
-  if (!full.error || !/note/.test(full.error.message)) return full;
+  if (!full.error || !/rescued/.test(full.error.message)) return full;
 
   return supabase
     .from("shift_report_counts")
-    .select("schedule_item_id, made, leftover")
+    .select("schedule_item_id, made, leftover, note")
     .eq("report_id", reportId);
 }
 
@@ -538,6 +539,7 @@ export default async function RunShiftReportPage({
         par: l.par === null ? null : Number(l.par),
         made: d?.made == null ? null : Number(d.made),
         leftover: d?.leftover == null ? null : Number(d.leftover),
+        rescued: d?.rescued == null ? null : Number(d.rescued),
         // TWO NOTES, kept apart: the schedule's instruction and the
         // supervisor's own. See `PremadeRow`.
         note: (l.note as string | null) ?? null,
@@ -777,6 +779,7 @@ export default async function RunShiftReportPage({
     taskSchedulesDone: report.task_schedules_done as boolean,
     netSalesCents,
     countedLines: premadeRows.filter((r) => r.made !== null || r.leftover !== null).length,
+    rescuedLines: premadeRows.filter((r) => r.rescued !== null).length,
     scheduledLines: premadeRows.length,
     countedBatches: elementRows.filter((r) => r.yieldCount !== null || r.yieldSize !== null)
       .length,
@@ -1053,6 +1056,7 @@ export default async function RunShiftReportPage({
         par: r.par,
         made: r.made,
         leftover: r.leftover,
+        rescued: r.rescued,
         // The SUPERVISOR's note, not the schedule's instruction: the email
         // reports the night, and what the kitchen was asked to do is already on
         // the packet they were handed.

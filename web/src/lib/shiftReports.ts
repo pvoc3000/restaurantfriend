@@ -215,6 +215,8 @@ export type ReadinessInput = {
   /** Null when Square has not reported the day yet, which is the normal case. */
   netSalesCents: number | null;
   countedLines: number;
+  /** Lines with Rescued filled in, 0 included — 203. */
+  rescuedLines: number;
   scheduledLines: number;
   countedBatches: number;
   scheduledBatches: number;
@@ -325,6 +327,17 @@ export function submitBlockers(input: ReadinessInput): string[] {
     const left = input.scheduledLines - input.countedLines;
     out.push(
       `${left} of ${input.scheduledLines} premade ${left === 1 ? "line has" : "lines have"} no count.`
+    );
+  }
+
+  // RESCUED IS PERISHABLE TOO (203): by morning nobody can say how many went
+  // into the Too Good To Go boxes, and a blank one quietly counts every boxed
+  // donut as sold — the whole reason the column exists. Its ergonomics are
+  // "Nothing rescued", one tap on a night with no boxes.
+  if (pages.includes("premades") && input.rescuedLines < input.scheduledLines) {
+    const left = input.scheduledLines - input.rescuedLines;
+    out.push(
+      `${left} of ${input.scheduledLines} premade ${left === 1 ? "line has" : "lines have"} nothing under Rescued.`
     );
   }
 
@@ -489,6 +502,8 @@ export type EmailReport = {
       par: number | null;
       made: number | null;
       leftover: number | null;
+      /** Packed for Too Good To Go — migration 203. */
+      rescued: number | null;
       /** The supervisor's note about this count — migration 081. */
       note: string | null;
     }[];
@@ -785,13 +800,15 @@ export function supervisorBody(report: EmailReport): string {
     parts.push(
       `<h3 style="${S.h3}">${esc(section.title)}</h3><table style="${S.table}"><tr>` +
         `<th style="${S.th}">Item</th><th style="${S.thr}">Par</th>` +
-        `<th style="${S.thr}">Made</th><th style="${S.thr}">Left</th>` +
+        `<th style="${S.thr}">Made</th><th style="${S.thr}">Rescued</th>` +
+        `<th style="${S.thr}">Left</th>` +
         `<th style="${S.th}">Note</th></tr>`
     );
     for (const p of section.lines) {
       parts.push(
         `<tr><td style="${S.td}">${esc(p.name)}</td><td style="${S.tdr}">${p.par ?? "—"}</td>` +
-          `<td style="${S.tdr}">${p.made ?? "—"}</td><td style="${S.tdr}">${p.leftover ?? "—"}</td>` +
+          `<td style="${S.tdr}">${p.made ?? "—"}</td><td style="${S.tdr}">${p.rescued ?? "—"}</td>` +
+          `<td style="${S.tdr}">${p.leftover ?? "—"}</td>` +
           // The column that makes the three numbers mean something: "18 made, 0
           // left" and the same with "dropped a tray, re-fried" are different
           // nights. Empty is a thin space rather than an em dash — a dash in

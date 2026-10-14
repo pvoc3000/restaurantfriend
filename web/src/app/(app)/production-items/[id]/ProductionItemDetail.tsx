@@ -97,7 +97,7 @@ export async function ProductionItemDetail({
     wantsHistory
       ? supabase
           .from("v_production_schedule_lines")
-          .select("schedule_date, location_id, par, made, leftover, sold")
+          .select("schedule_date, location_id, par, made, leftover, rescued, sold")
           .eq("item_id", id)
           .gte("schedule_date", fortnight.from)
           .lte("schedule_date", fortnight.to)

@@ -247,10 +247,22 @@ export default function ShiftReportGuide() {
           <Page name="Premades" closingOnly>
             <p>
               For each item on today’s production schedule, enter how many were{" "}
-              <strong>Made</strong> and how many were <strong>Left</strong>. The rows are in the
-              same order as the printed sheet.
+              <strong>Made</strong>, how many were <strong>Rescued</strong>, and how many were{" "}
+              <strong>Left</strong>. The rows are in the same order as the printed sheet.
             </p>
             <ul>
+              <li>
+                <strong>Rescued</strong> is how many went into Too Good To Go boxes. Write it on the
+                printed sheet when you pack the boxes, because they’re gone by the time you count.
+              </li>
+              <li>
+                Count <strong>Left</strong> after the boxes are packed. If a box isn’t picked up,
+                leave its donuts as Rescued and don’t count them again under Left.
+              </li>
+              <li>
+                On a night with no boxes, tap <Ui>Nothing rescued</Ui>. The report won’t send with
+                Rescued left blank. <Ui>Nothing left over</Ui> does the same for Left.
+              </li>
               <li>
                 Every schedule for the day gets its own page, special orders included. A special
                 order’s page is titled with the order’s name.

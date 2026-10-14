@@ -1997,3 +1997,38 @@ in `production_element_locations.stock_unit` (21 rows, which seed a generated
 batch's par unit). LEFT ALONE: `QT Pan` 281, `Pan?` 32, `x Pan` 6, `pan?` 1.
 Backups: `FMP Export/pre-pan-fold-batches-2026-10-08.json` and
 `pre-pan-fold-element-locations-2026-10-08.json`.
+
+## 2026-10-14 — Rescued: Too Good To Go boxes are not sold (migration 203)
+
+Mark: "the more successful the program is, the less donuts we're throwing away
+making it look in Restaurant Friend that we're selling out, so we aren't
+lowering production on some donuts that we probably need to." `sold` was
+`made − leftover`, and the boxes are packed and handed out in the last hour,
+before the closer counts, so every boxed donut was a sale.
+
+**A third count, `rescued`, and `sold = made − leftover − rescued`** — still
+defined once in `v_production_schedule_lines` (appended last, since `create or
+replace` can only append) and repeated only in `countTotals` for the packet,
+which reads the table. Options weighed and set aside: counting leftovers BEFORE
+the boxes are packed (cannot happen — they're gone by close); Square item sales
+(mixed dozens lose the flavor, and not every sale is in Square); a sold-out
+time per line (would answer "could we have sold more", a different question).
+
+**"Rescued", not "Donated"** — Mark left the word to me. A box is SOLD at a
+discount, so "donated" is untrue on the thing it is for and is the word for a
+tax-deductible gift; Rescued also covers a food-bank pickup.
+
+**Written on the printed premade sheet when the boxes are packed** (Mark: the
+sheet the supervisor already counts from), as a third write-in box between
+TOTAL and L/O. Measured on the sample render: the tally strip gives up 38pt and
+a 12 still fits its box; "RESCUED" fits its 34pt label. The rule a closer has to
+know: a box nobody collects stays Rescued and is not counted again under Left.
+
+Where it shows: the shift report's Premades page (draft rows, carried by
+`submit_shift_report`, taken back by `reopen_shift_report`), the schedule
+record (`set_schedule_actual` takes `rescued`), the item's two-week history,
+the packet totals and the shift report email. History is NOT corrected and
+cannot be — nothing recorded how many boxes there were. Dry-run on the hosted
+DB in a rolled-back transaction: 20 made / 4 left / 6 rescued reads sold 10,
+the author stamps clear only when all three counts are emptied, `par` is still
+refused, and no counted line's sold changed.

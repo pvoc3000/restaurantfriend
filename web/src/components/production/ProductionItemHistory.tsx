@@ -48,6 +48,7 @@ export function ProductionItemHistory({
                   <Th className="w-[132px]">Day</Th>
                   <Th align="right">To make</Th>
                   <Th align="right">Made</Th>
+                  <Th align="right">Rescued</Th>
                   <Th align="right">Left over</Th>
                   <Th align="right">Sold</Th>
                   <Th className="w-[92px]">Shops</Th>
@@ -63,7 +64,7 @@ export function ProductionItemHistory({
                       // in words rather than by leaving four cells blank: "we
                       // didn't make it" and "nobody wrote down what came back"
                       // are different facts about a day.
-                      <td colSpan={5} className="py-1.5 text-faint">
+                      <td colSpan={6} className="py-1.5 text-faint">
                         no schedule
                       </td>
                     ) : (
@@ -72,6 +73,7 @@ export function ProductionItemHistory({
                         {d.counted ? (
                           <>
                             <Td align="right">{d.made?.toLocaleString()}</Td>
+                            <Td align="right">{d.rescued?.toLocaleString() ?? "—"}</Td>
                             <Td align="right">{d.leftover?.toLocaleString() ?? "—"}</Td>
                             <Td
                               align="right"
@@ -81,7 +83,7 @@ export function ProductionItemHistory({
                             </Td>
                           </>
                         ) : (
-                          <td colSpan={3} className="py-1.5">
+                          <td colSpan={4} className="py-1.5">
                             <span className="bg-mark-fill px-1">not counted</span>
                           </td>
                         )}
@@ -106,7 +108,9 @@ export function ProductionItemHistory({
                 : `Scheduled on ${summary.daysScheduled} of the last 14 days, and none of them counted yet.`
               : `${summary.sold.toLocaleString()} sold over ${summary.daysCounted} counted ${
                   summary.daysCounted === 1 ? "night" : "nights"
-                } — averaging ${summary.soldPerNight!.toFixed(1)} a night, with ${summary.leftover.toLocaleString()} left over.`}
+                } — averaging ${summary.soldPerNight!.toFixed(1)} a night, with ${summary.leftover.toLocaleString()} left over${
+                  summary.rescued > 0 ? ` and ${summary.rescued.toLocaleString()} rescued` : ""
+                }.`}
           </p>
         </>
       )}

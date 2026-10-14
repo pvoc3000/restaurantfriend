@@ -31,7 +31,8 @@ export type ScheduleLineRow = ScheduleLine & {
 };
 
 /**
- * `made` or `leftover`, written through migration 044's definer function.
+ * `made`, `leftover` or `rescued` (203), written through migration 044's
+ * definer function.
  *
  * NOT `.from("production_schedule_items").update(…)`, and the difference is
  * invisible until it bites: RLS filters ROWS, and "a supervisor may set these
@@ -45,13 +46,15 @@ export type ScheduleLineRow = ScheduleLine & {
  * everything else on this table is purchaser+, and these two cells are the only
  * ones a supervisor may touch.
  */
+const ACTUAL_LABEL = { made: "Made", rescued: "Rescued", leftover: "Left over" } as const;
+
 function ActualCell({
   row,
   column,
   countable,
 }: {
   row: ScheduleLineRow;
-  column: "made" | "leftover";
+  column: "made" | "leftover" | "rescued";
   countable: boolean;
 }) {
   const supabase = createClient();
@@ -78,7 +81,7 @@ function ActualCell({
       kind="number"
       align="right"
       value={value}
-      ariaLabel={`${column === "made" ? "Made" : "Left over"}, ${row.item_name}`}
+      ariaLabel={`${ACTUAL_LABEL[column]}, ${row.item_name}`}
       onWrite={async (next) => {
         const { error } = await supabase.rpc("set_schedule_actual", {
           p_line_id: row.id,
@@ -249,7 +252,9 @@ export function ScheduleLines({
    */
   async function removeLines(ids: string[]) {
     const victims = sorted.filter((r) => ids.includes(r.id));
-    const counted = victims.filter((r) => r.made !== null || r.leftover !== null);
+    const counted = victims.filter(
+      (r) => r.made !== null || r.leftover !== null || r.rescued !== null
+    );
     const names = victims.slice(0, 6).map((r) => r.item_name).join(", ");
     // NAME the one line when there is one: from a row menu "1 item" is a worse
     // answer to "which one?" than the name on the row you just pressed.
@@ -533,6 +538,17 @@ export function ScheduleLines({
       render: (r) => <ActualCell row={r} column="made" countable={countable} />,
     },
     {
+      // Between Made and Left over, as on the shift report's Premades page:
+      // made it, boxed some for Too Good To Go, counted the rest. Migration 203.
+      key: "rescued",
+      label: "Rescued",
+      width: 100,
+      align: "right",
+      sortValue: (r) => r.rescued ?? -1,
+      hideWhenCompact: true,
+      render: (r) => <ActualCell row={r} column="rescued" countable={countable} />,
+    },
+    {
       key: "leftover",
       label: "Left over",
       width: 100,
@@ -548,7 +564,7 @@ export function ScheduleLines({
       align: "right",
       sortValue: (r) => r.sold ?? -1,
       // DERIVED, and read-only for the reason it has no column: made − leftover
-      // is computed by `v_production_schedule_lines` and nowhere else, so there
+      // − rescued is computed by `v_production_schedule_lines` and nowhere else, so there
       // is one definition of it and one place for a POS feed to land later.
       //
       // It can go NEGATIVE, and it is shown that way rather than clamped:
@@ -560,7 +576,7 @@ export function ScheduleLines({
         ) : (
           <span
             className={`${READ_ONLY_VALUE} tabular-nums ${r.sold < 0 ? "bg-mark-fill px-1" : ""}`}
-            title={r.sold < 0 ? "More left over than made — carried over from another day?" : undefined}
+            title={r.sold < 0 ? "More left over and rescued than made — carried over from another day?" : undefined}
           >
             {r.sold}
           </span>
@@ -624,7 +640,7 @@ export function ScheduleLines({
                     {
                       label: "Delete line",
                       hint:
-                        r.made !== null || r.leftover !== null
+                        r.made !== null || r.leftover !== null || r.rescued !== null
                           ? "It carries a counted quantity"
                           : "Takes it off tonight's sheet",
                       danger: true,

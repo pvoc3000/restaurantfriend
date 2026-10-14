@@ -112,7 +112,7 @@ export async function ScheduleDetail({
         .select(
           `id, item_id, item_name, item_type, subtype, finish, size, tally_box_size,
            tray_capacity, tray_number, tray_band, par, planned_par, par_source, made, leftover,
-           sold, counted_at, note, unit_cost, unit_price, cost_unresolved, costed_at, sort`
+           rescued, sold, counted_at, note, unit_cost, unit_price, cost_unresolved, costed_at, sort`
         )
         .eq("schedule_id", id)
         .order("sort"),
@@ -141,9 +141,11 @@ export async function ScheduleDetail({
     return (
       <p className="text-sm text-accent">
         Could not load this schedule&rsquo;s items: {lineErr.message}
-        {/counted_at|sold|v_production_schedule_lines/.test(lineErr.message)
-          ? " — migration 044 has not been applied yet."
-          : ""}
+        {/rescued/.test(lineErr.message)
+          ? " — migration 203 has not been applied yet."
+          : /counted_at|sold|v_production_schedule_lines/.test(lineErr.message)
+            ? " — migration 044 has not been applied yet."
+            : ""}
       </p>
     );
   }
@@ -174,6 +176,7 @@ export async function ScheduleDetail({
     par_source: (l.par_source ?? "plan") as string,
     made: (l.made ?? null) as number | null,
     leftover: (l.leftover ?? null) as number | null,
+    rescued: (l.rescued ?? null) as number | null,
     sold: (l.sold ?? null) as number | null,
     counted_at: (l.counted_at ?? null) as string | null,
     note: (l.note ?? null) as string | null,
@@ -188,7 +191,9 @@ export async function ScheduleDetail({
   // marks in the table are one claim rather than two that can drift.
   const manualCount = rows.filter((r) => planDeviation(r) !== null).length;
   const uncosted = rows.filter((r) => r.costed_at === null).length;
-  const countedLines = rows.filter((r) => r.made !== null || r.leftover !== null).length;
+  const countedLines = rows.filter(
+    (r) => r.made !== null || r.leftover !== null || r.rescued !== null
+  ).length;
   const soldTotal = rows.reduce((n, r) => n + (r.sold ?? 0), 0);
 
   /**
@@ -347,7 +352,7 @@ export async function ScheduleDetail({
           sellsCode={sellsCode}
           kitchenCode={kitchenCode}
           source={(schedule.source ?? "plan") as string}
-          hasActuals={rows.some((r) => r.made !== null || r.leftover !== null)}
+          hasActuals={rows.some((r) => r.made !== null || r.leftover !== null || r.rescued !== null)}
           lineCount={rows.length}
           editable={editable}
           stampable={countable}

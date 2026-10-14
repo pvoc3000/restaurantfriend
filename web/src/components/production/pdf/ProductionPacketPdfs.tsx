@@ -107,7 +107,7 @@ const styles = {
       alignItems: "center",
       backgroundColor: INK,
       paddingVertical: 4,
-      // No right padding: the premade band's TOTAL and L/O labels must sit
+      // No right padding: the premade band's TOTAL, RESC and L/O labels must sit
       // exactly over the write-in boxes, which run to the margin.
       paddingLeft: 6,
       paddingRight: 0,
@@ -430,6 +430,9 @@ function PremadeType({ type }: { type: RollType }) {
         <Text style={styles.typeBandTotal}>{fmt(type.total)}</Text>
         <View style={styles.typeBandRight}>
           <Text style={styles.bandLabel}>Total</Text>
+          {/* 203: between Total and L/O, in the order the night happens —
+              made it, boxed some for Too Good To Go, counted the rest. */}
+          <Text style={styles.bandLabel}>Rescued</Text>
           <Text style={styles.bandLabel}>L/O</Text>
         </View>
       </View>
@@ -483,7 +486,8 @@ const sizeLines = (size: RollSize) => size.subtypes.flatMap(subtypeLines);
 
 /**
  * A premade total line: the par in words as it always printed, and — once the
- * night is counted — MADE and L/O under the two write-in boxes they sum, with
+ * night is counted — MADE, RESCUED and L/O under the three write-in boxes they
+ * sum, with
  * SOLD after the par since the sheet has no column for it. The same sums as the
  * schedule record's (`countTotals`); a count no line has prints nothing, so a
  * packet printed before the night looks exactly as it did.
@@ -505,6 +509,7 @@ function CountTotalRow({
         {t.sold !== null ? `    SOLD: ${fmt(t.sold)}` : ""}
       </Text>
       <Text style={[textStyle, styles.countCell]}>{t.made !== null ? fmt(t.made) : ""}</Text>
+      <Text style={[textStyle, styles.countCell]}>{t.rescued !== null ? fmt(t.rescued) : ""}</Text>
       <Text style={[textStyle, styles.countCell]}>{t.leftover !== null ? fmt(t.leftover) : ""}</Text>
     </>
   );
@@ -530,6 +535,7 @@ function PremadeRow({ line }: { line: ScheduleLine }) {
           </View>
         ))}
       </View>
+      <View style={styles.writeIn} />
       <View style={styles.writeIn} />
       <View style={styles.writeIn} />
     </View>

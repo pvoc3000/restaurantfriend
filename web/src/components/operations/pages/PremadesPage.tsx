@@ -20,6 +20,13 @@ export type PremadeRow = {
   made: number | null;
   leftover: number | null;
   /**
+   * Packed into Too Good To Go boxes before close — migration 203. Not sold:
+   * the view's `sold` is made − left − rescued. The boxes go out in the last
+   * hour, before anybody counts, so without this every boxed donut read as a
+   * sale and production never came down.
+   */
+  rescued: number | null;
+  /**
    * The SCHEDULE's own note — an instruction, snapshotted at generation and
    * printed on the packet as what the kitchen was told to make.
    */
@@ -78,6 +85,8 @@ export function PremadesPage({
 
   /** Rows with nothing in the Left column yet — what the button below fills. */
   const uncounted = rows.filter((r) => r.leftover === null);
+  /** And in the Rescued column — its own button, by the same rule. */
+  const unrescued = rows.filter((r) => r.rescued === null);
 
   /**
    * "Nothing left over" — every EMPTY Left box becomes 0, in one write.
@@ -99,20 +108,33 @@ export function PremadesPage({
    * from saying nothing came back.
    */
   function nothingLeftOver() {
-    if (uncounted.length === 0) return;
-    const ids = uncounted.map((r) => r.scheduleItemId);
-    void optimistic(ids, { leftover: 0 }, async () => {
+    fillEmpty(uncounted, "leftover");
+  }
+
+  /**
+   * "Nothing rescued" — the same button for the Rescued column (203). Rescued
+   * is required like Left, because a blank one is the mistake that puts boxed
+   * donuts back into `sold`; this is what keeps a night with no boxes one tap.
+   */
+  function nothingRescued() {
+    fillEmpty(unrescued, "rescued");
+  }
+
+  function fillEmpty(empty: PremadeRow[], column: "leftover" | "rescued") {
+    if (empty.length === 0) return;
+    const ids = empty.map((r) => r.scheduleItemId);
+    void optimistic(ids, column === "leftover" ? { leftover: 0 } : { rescued: 0 }, async () => {
       // ONE upsert for every row. Uniform keys, which PostgREST's bulk upsert
       // requires — and because `made` is not among them it is left alone on
       // rows that already have one rather than being reset.
       const { error } = await supabase
         .from("shift_report_counts")
         .upsert(
-          uncounted.map((r) => ({
+          empty.map((r) => ({
             org_id: orgId,
             report_id: reportId,
             schedule_item_id: r.scheduleItemId,
-            leftover: 0,
+            [column]: 0,
           })),
           { onConflict: "report_id,schedule_item_id" }
         )
@@ -133,6 +155,7 @@ export function PremadesPage({
     const shown: Partial<PremadeRow> = {};
     if ("made" in patch) shown.made = patch.made as number | null;
     if ("leftover" in patch) shown.leftover = patch.leftover as number | null;
+    if ("rescued" in patch) shown.rescued = patch.rescued as number | null;
     if ("note" in patch) shown.countNote = patch.note as string | null;
     void optimistic(scheduleItemId, shown, async () => {
       // UPSERT on the pair, because most lines have no draft row until somebody
@@ -149,9 +172,11 @@ export function PremadesPage({
         // courtesy every other screen in this app extends, and here the fix is
         // one `alter table` rather than anything the reader did wrong.
         setFailed(
-          /note/.test(error.message)
-            ? `${error.message} — if this names a missing column, migration 081 has not been applied yet.`
-            : error.message
+          /rescued/.test(error.message)
+            ? `${error.message} — if this names a missing column, migration 203 has not been applied yet.`
+            : /note/.test(error.message)
+              ? `${error.message} — if this names a missing column, migration 081 has not been applied yet.`
+              : error.message
         );
         return false;
       }
@@ -249,33 +274,46 @@ export function PremadesPage({
           <span />
         )}
         {editable ? (
-          <button
-            type="button"
-            className={BUTTON_CLASS}
-            // Disabled rather than hidden once every row has a count, so the
-            // control does not appear and vanish as the sheet fills in.
-            disabled={uncounted.length === 0}
-            onClick={nothingLeftOver}
-          >
-            Nothing left over
-            {uncounted.length > 0 ? ` (${uncounted.length})` : ""}
-          </button>
+          // In the columns' order: Rescued, then Left.
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={BUTTON_CLASS}
+              disabled={unrescued.length === 0}
+              onClick={nothingRescued}
+            >
+              Nothing rescued
+              {unrescued.length > 0 ? ` (${unrescued.length})` : ""}
+            </button>
+            <button
+              type="button"
+              className={BUTTON_CLASS}
+              // Disabled rather than hidden once every row has a count, so the
+              // control does not appear and vanish as the sheet fills in.
+              disabled={uncounted.length === 0}
+              onClick={nothingLeftOver}
+            >
+              Nothing left over
+              {uncounted.length > 0 ? ` (${uncounted.length})` : ""}
+            </button>
+          </div>
         ) : null}
       </div>
 
-      {/* `table-fixed` with a colgroup, or the two 112px input columns push the
+      {/* `table-fixed` with a colgroup, or the three count columns push the
           Note header into Left's and it renders as "LEFTNOTE". A `w-28` on a
           `th` is a suggestion an auto-layout table is free to ignore. */}
       <table className="w-full table-fixed">
         <colgroup>
           <col className="w-[9%]" />
           <col className="w-[11%]" />
-          <col className="w-[24%]" />
+          <col className="w-[20%]" />
           <col className="w-[7%]" />
           <col className="w-[5%]" />
-          <col className="w-[13%]" />
-          <col className="w-[13%]" />
-          <col className="w-[19%]" />
+          <col className="w-[12%]" />
+          <col className="w-[12%]" />
+          <col className="w-[12%]" />
+          <col className="w-[12%]" />
         </colgroup>
         {/* THE LABELS STAY ON SCREEN (Mark, 2026-09-09: "so the user knows what
             they're entering"). Made and Left are two identical boxes eight
@@ -303,6 +341,9 @@ export function PremadesPage({
             <th className="py-2 pr-1 text-right">Par</th>
             <th className="py-2" />
             <th className="py-2 pr-2 text-right">Made</th>
+            {/* BETWEEN Made and Left, in the order the night happens: made
+                it, boxed some for Too Good To Go, counted the rest. */}
+            <th className="py-2 pr-2 text-right">Rescued</th>
             <th className="py-2 pr-2 text-right">Left</th>
             <th className="py-2 pl-4 text-left">Note</th>
           </tr>
@@ -341,6 +382,14 @@ export function PremadesPage({
                   onCommit={(next) => save(r.scheduleItemId, { made: next })}
                   disabled={!editable}
                   ariaLabel={`Made, ${r.name}`}
+                />
+              </td>
+              <td className="py-2 pr-2">
+                <CountField
+                  value={r.rescued}
+                  onCommit={(next) => save(r.scheduleItemId, { rescued: next })}
+                  disabled={!editable}
+                  ariaLabel={`Rescued, ${r.name}`}
                 />
               </td>
               <td className="py-2 pr-2">

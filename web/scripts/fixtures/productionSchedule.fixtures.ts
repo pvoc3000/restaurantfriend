@@ -15,7 +15,8 @@ import {
   TRAY_CELLS,
   type ScheduleLine,
   type ItemDemandSource,
-  planDeviation,} from "../../src/lib/productionSchedule";
+  planDeviation,
+  countTotals,} from "../../src/lib/productionSchedule";
 import type { CostElement } from "../../src/lib/productionCost";
 import { test, eq } from "./harness";
 
@@ -36,6 +37,7 @@ function line(over: Partial<ScheduleLine> = {}): ScheduleLine {
     par: 15,
     made: null,
     leftover: null,
+    rescued: null,
     ...over,
   };
 }
@@ -379,4 +381,23 @@ test("a line the plan never carried reads as ADDED, not as changed", () => {
   eq(planDeviation(devLine({ par_source: "manual", par: 12, planned_par: null })), {
     kind: "added",
   });
+});
+
+/* -- countTotals: sold is made − left − rescued (203) ----------------------- */
+
+test("countTotals takes RESCUED off sold, as the view does (203)", () => {
+  const t = countTotals([
+    line({ par: 24, made: 24, rescued: 6, leftover: 2 }),
+    line({ par: 12, made: 12, rescued: null, leftover: 0 }),
+  ]);
+  eq(t.made, 36);
+  eq(t.rescued, 6);
+  eq(t.leftover, 2);
+  eq(t.sold, 28);
+});
+
+test("countTotals: a night before Rescued existed reads exactly as it did", () => {
+  const t = countTotals([line({ par: 24, made: 24, leftover: 3 })]);
+  eq(t.rescued, null);
+  eq(t.sold, 21);
 });

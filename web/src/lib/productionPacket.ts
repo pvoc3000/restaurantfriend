@@ -279,7 +279,7 @@ export async function fetchPacketData(
       supabase,
       "production_schedule_items",
       `id, schedule_id, item_id, item_name, item_type, subtype, finish, size,
-       tally_box_size, tray_capacity, tray_number, par, made, leftover, sort`,
+       tally_box_size, tray_capacity, tray_number, par, made, leftover, rescued, sort`,
       "id",
       (q) => (q as never as { in: (c: string, v: string[]) => unknown }).in("schedule_id", allIds)
     ),
@@ -405,6 +405,7 @@ export async function fetchPacketData(
       par: Number(l.par) || 0,
       made: (l.made ?? null) as number | null,
       leftover: (l.leftover ?? null) as number | null,
+      rescued: (l.rescued ?? null) as number | null,
     });
   }
 

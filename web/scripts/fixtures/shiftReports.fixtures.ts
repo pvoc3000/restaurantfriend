@@ -135,6 +135,7 @@ const READY: ReadinessInput = {
   taskSchedulesDone: true,
   netSalesCents: 133307,
   countedLines: 12,
+  rescuedLines: 12,
   scheduledLines: 12,
   countedBatches: 0,
   scheduledBatches: 0,
@@ -158,6 +159,7 @@ test("THE PERISHABLE THINGS BLOCK; only the recoverable ones are advisory", () =
     [{ narrative: "  " }, "The shift report itself is empty."],
     [{ ratingCount: 0 }, "No employees have been added."],
     [{ countedLines: 5, scheduledLines: 32 }, "27 of 32 premade lines have no count."],
+    [{ rescuedLines: 2 }, "10 of 12 premade lines have nothing under Rescued."],
     [{ checklistNotStarted: true, checklist: null }, "The checklist for this shift has not been started."],
     [
       { checklist: { outstanding: 64, total: 67, finished: false } },
@@ -204,6 +206,20 @@ test("uncounted premade lines are named, with the count", () => {
   const out = submitBlockers({ ...READY, countedLines: 9 });
   eq(out.length, 1);
   ok(out[0].includes("3 of 12"), out[0]);
+});
+
+test("RESCUED IS ITS OWN GATE — counted lines with a blank Rescued still block (203)", () => {
+  // A blank Rescued puts every boxed donut back into `sold`, which is the bug
+  // the column exists to fix. Counting Left does not answer it.
+  const out = submitBlockers({ ...READY, rescuedLines: 11 });
+  eq(out, ["1 of 12 premade line has nothing under Rescued."]);
+  // And an opening report, with no premades page, is not asked.
+  no(
+    submitBlockers({ ...READY, shift: "opening" as const, rescuedLines: 0 }).some((b) =>
+      b.includes("Rescued")
+    ),
+    "Rescued on an opening report"
+  );
 });
 
 test("one uncounted line reads singular", () => {
@@ -449,12 +465,12 @@ const REPORT: EmailReport = {
     {
       title: "Premades",
       lines: [
-        { name: "Angry Samoa", par: 12, made: 12, leftover: 3, note: "Dropped a tray, re-fried" },
+        { name: "Angry Samoa", par: 12, made: 12, rescued: 7, leftover: 3, note: "Dropped a tray, re-fried" },
       ],
     },
     {
       title: "Special order — #9761 · Cafe Knotted",
-      lines: [{ name: "Glazed", par: 24, made: 24, leftover: 0, note: null }],
+      lines: [{ name: "Glazed", par: 24, made: 24, rescued: 0, leftover: 0, note: null }],
     },
     // The empty Premades page a day with no plan schedule still gets.
     { title: "Premades — made at DF01", lines: [] },
@@ -586,6 +602,16 @@ test("the supervisor's note on a count reaches the email", () => {
   // where the distinction is written down.
   for (const body of [supervisorBody(REPORT), managementBody(REPORT)]) {
     ok(body.includes("Dropped a tray, re-fried"), "the note reached the email");
+  }
+});
+
+test("Rescued reaches the email, between Made and Left (203)", () => {
+  for (const body of [supervisorBody(REPORT), managementBody(REPORT)]) {
+    const made = body.indexOf(">Made<");
+    const rescued = body.indexOf(">Rescued<");
+    const left = body.indexOf(">Left<");
+    ok(made >= 0 && made < rescued && rescued < left, "Made · Rescued · Left headings");
+    ok(body.includes(">7<"), "Angry Samoa's 7 rescued");
   }
 });
 
