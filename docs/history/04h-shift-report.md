@@ -845,6 +845,6 @@ DataTable): a black band per type with its line count, and a caps heading on a
 black rule per cut. The rows were already in the printed sheet's order (type,
 size, cut, name), so each group is one run. The SIZE joins the cut heading only
 when a type comes in more than one ("Mini · Glazed") — nearly every line is
-Regular. The freed 18% went to Name (17→30%) and the boxes. Seen at 1180×820
+Regular. The freed 18% went to Name and the boxes, then (Mark, same day) Name 30→24% and the three counts 11→10% each so Sold out (15%) and Note (20%) got room; at 1180×820 one name of 37 wraps. Seen at 1180×820
 on DF01's sent 2026-10-13 report: five bands summing to its 37 lines, Name on
 one line, no console errors.

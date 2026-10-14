@@ -339,16 +339,17 @@ export function PremadesPage({
       <table className="w-full table-fixed">
         <colgroup>
           {/* Sums to 100 — 203's set came to 104, which a fixed table scales
-              down without saying so. Type and Sub type are bands now, so their
-              18% went to Name and the boxes. */}
-          <col className="w-[30%]" />
-          <col className="w-[7%]" />
+              down without saying so. Type and Sub type are bands now; their 18%
+              went to Name, and then some of Name's and the three count boxes'
+              to Sold out and Note (Mark, 2026-10-14), so a long name wraps. */}
+          <col className="w-[24%]" />
+          <col className="w-[6%]" />
           <col className="w-[5%]" />
-          <col className="w-[11%]" />
-          <col className="w-[11%]" />
-          <col className="w-[11%]" />
-          <col className="w-[12%]" />
-          <col className="w-[13%]" />
+          <col className="w-[10%]" />
+          <col className="w-[10%]" />
+          <col className="w-[10%]" />
+          <col className="w-[15%]" />
+          <col className="w-[20%]" />
         </colgroup>
         {/* THE LABELS STAY ON SCREEN (Mark, 2026-09-09: "so the user knows what
             they're entering"). Made and Left are two identical boxes eight
