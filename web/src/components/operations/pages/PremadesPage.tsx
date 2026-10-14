@@ -398,6 +398,7 @@ export function PremadesPage({
                   onCommit={(next) => save(r.scheduleItemId, { made: next })}
                   disabled={!editable}
                   ariaLabel={`Made, ${r.name}`}
+                  ink
                 />
               </td>
               <td className="py-2 pr-2">
@@ -406,6 +407,7 @@ export function PremadesPage({
                   onCommit={(next) => save(r.scheduleItemId, { rescued: next })}
                   disabled={!editable}
                   ariaLabel={`Rescued, ${r.name}`}
+                  ink
                 />
               </td>
               <td className="py-2 pr-2">
@@ -414,8 +416,12 @@ export function PremadesPage({
                   onCommit={(next) => save(r.scheduleItemId, { leftover: next })}
                   disabled={!editable}
                   ariaLabel={`Left over, ${r.name}`}
+                  ink
                 />
               </td>
+              {/* BLACK EDGES ON EVERY BOX IN THE ROW (204): the time picker's
+                  field is black-edged, and the Donut batches page settled what
+                  a page mixing the two does — `ink` on the rest. */}
               <td className="py-2 pr-2">
                 <TimePicker
                   value={r.soldOutAt}
@@ -440,6 +446,7 @@ export function PremadesPage({
                   onCommit={(next) => save(r.scheduleItemId, { note: next })}
                   disabled={!editable}
                   ariaLabel={`Note, ${r.name}`}
+                  ink
                 />
               </td>
             </tr>

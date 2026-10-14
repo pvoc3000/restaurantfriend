@@ -831,3 +831,8 @@ the printed sheet. Optional: blank is "did not sell out", so it is in no gate.
 Carried to the schedule on Send, taken back on Reopen; the email's premade
 table gains a Sold out column, blank rather than dashed when it did not. The
 reasoning is in 04f.
+Seen the same day on DF01's sent 2026-10-13 report at 1180×820: Sold out after
+Left, all ten columns fit, no console errors. The page's boxes then took `ink`
+(black edges): the time picker's field is black-edged and the Donut batches page
+had already settled that a page mixing the two blackens the rest. Not
+exercised: entering a time on a draft — the only draft was a live one.
