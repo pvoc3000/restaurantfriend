@@ -8,6 +8,7 @@ import { STICKY_HEAD_ROW_UNDER_RUNNER } from "@/lib/tableHead";
 import { CountField, TextField } from "./fields";
 import { useOptimisticRows } from "@/lib/useOptimisticRows";
 import { TimePicker } from "@/components/ui/TimePicker";
+import { premadeGroups } from "@/lib/shiftReports";
 
 export type PremadeRow = {
   scheduleItemId: string;
@@ -98,25 +99,6 @@ export function PremadesPage({
   /** And in the Rescued column — its own button, by the same rule. */
   const unrescued = rows.filter((r) => r.rescued === null);
 
-  /** Lines per type, for the band's count — DataTable's band carries one. */
-  const typeCounts = new Map<string | null, number>();
-  for (const r of rows) typeCounts.set(r.itemType, (typeCounts.get(r.itemType) ?? 0) + 1);
-
-  /**
-   * The cut heading. The SIZE joins it only when the type comes in more than
-   * one ("Mini · Glazed"): nearly every line is Regular, and printing it on
-   * every heading would be a word that never tells two groups apart.
-   */
-  const sizesByType = new Map<string | null, Set<string | null>>();
-  for (const r of rows) {
-    const set = sizesByType.get(r.itemType) ?? new Set();
-    set.add(r.size);
-    sizesByType.set(r.itemType, set);
-  }
-  const cutLabel = (r: PremadeRow) => {
-    const cut = r.subtype ?? "No cut";
-    return (sizesByType.get(r.itemType)?.size ?? 0) > 1 && r.size ? `${r.size} · ${cut}` : cut;
-  };
 
   /**
    * "Nothing left over" — every EMPTY Left box becomes 0, in one write.
@@ -345,11 +327,11 @@ export function PremadesPage({
           <col className="w-[24%]" />
           <col className="w-[6%]" />
           <col className="w-[5%]" />
-          <col className="w-[10%]" />
-          <col className="w-[10%]" />
-          <col className="w-[10%]" />
-          <col className="w-[15%]" />
-          <col className="w-[20%]" />
+          <col className="w-[9%]" />
+          <col className="w-[9%]" />
+          <col className="w-[9%]" />
+          <col className="w-[16%]" />
+          <col className="w-[22%]" />
         </colgroup>
         {/* THE LABELS STAY ON SCREEN (Mark, 2026-09-09: "so the user knows what
             they're entering"). Made and Left are two identical boxes eight
@@ -386,39 +368,35 @@ export function PremadesPage({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => {
-            const prev = i === 0 ? null : rows[i - 1];
-            const startsType = prev === null || prev.itemType !== r.itemType;
-            const startsCut = startsType || prev.size !== r.size || prev.subtype !== r.subtype;
+          {premadeGroups(rows).map(({ row: r, typeHead, cutHead }) => {
             return (
               <Fragment key={r.scheduleItemId}>
                 {/* GROUPED, NOT COLUMNS (Mark, 2026-10-14: "we could save some
                     horizontal space … if we removed type and subtype fields from
                     each row and, instead, grouped the donuts by type and subtype
                     with headers"). DataTable's two marks: the black band for the
-                    type, the caps heading on a black rule for the cut. The rows are
-                    already in the printed sheet's order (type, size, cut, name), so
-                    a group is a run and never repeats. */}
-                {startsType ? (
+                    type, the caps heading on a black rule for the cut. The groups
+                    are `premadeGroups`, which the email uses too. */}
+                {typeHead ? (
                   <tr className="bg-ink text-white">
                     <td
                       colSpan={COLUMN_COUNT}
                       className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em]"
                     >
-                      {r.itemType ?? "No type"}
+                      {typeHead.label}
                       <span className="ml-2 font-normal normal-case tracking-normal text-white/55">
-                        {typeCounts.get(r.itemType) ?? 0}
+                        {typeHead.count}
                       </span>
                     </td>
                   </tr>
                 ) : null}
-                {startsCut ? (
+                {cutHead ? (
                   <tr>
                     <td
                       colSpan={COLUMN_COUNT}
                       className="border-b border-ink pb-1 pt-3 text-xs font-semibold uppercase tracking-[0.08em]"
                     >
-                      {cutLabel(r)}
+                      {cutHead}
                     </td>
                   </tr>
                 ) : null}

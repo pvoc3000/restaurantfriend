@@ -1054,6 +1054,9 @@ export default async function RunShiftReportPage({
       title: s.title,
       lines: s.rows.map((r) => ({
         name: r.name,
+        itemType: r.itemType,
+        size: r.size,
+        subtype: r.subtype,
         par: r.par,
         made: r.made,
         leftover: r.leftover,

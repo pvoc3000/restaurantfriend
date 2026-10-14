@@ -500,6 +500,10 @@ export type EmailReport = {
     title: string;
     lines: {
       name: string;
+      /** For the type band and cut heading — `premadeGroups`. */
+      itemType: string | null;
+      size: string | null;
+      subtype: string | null;
       par: number | null;
       made: number | null;
       leftover: number | null;
@@ -582,6 +586,47 @@ export type EmailReport = {
  * Kept to the properties that survive everywhere: no flexbox, no grid, no
  * shorthand borders on `table` itself.
  */
+/**
+ * The Premades groups — a TYPE band with its line count, and a CUT heading
+ * under it (Mark, 2026-10-14) — for the runner's page AND the email, so the two
+ * cannot group differently.
+ *
+ * The rows must already be in the printed sheet's order (type, size, cut,
+ * name — `compareForPremadeSheet`), which makes every group one run. The SIZE
+ * joins the cut heading only when the type comes in more than one ("Mini ·
+ * Glazed"): nearly every line is Regular, and naming it on every heading would
+ * be a word that never tells two groups apart.
+ */
+export function premadeGroups<
+  T extends { itemType: string | null; size: string | null; subtype: string | null },
+>(rows: T[]): { row: T; typeHead: { label: string; count: number } | null; cutHead: string | null }[] {
+  const counts = new Map<string | null, number>();
+  const sizes = new Map<string | null, Set<string | null>>();
+  for (const r of rows) {
+    counts.set(r.itemType, (counts.get(r.itemType) ?? 0) + 1);
+    const set = sizes.get(r.itemType) ?? new Set();
+    set.add(r.size);
+    sizes.set(r.itemType, set);
+  }
+  return rows.map((row, i) => {
+    const prev = i === 0 ? null : rows[i - 1];
+    const startsType = prev === null || prev.itemType !== row.itemType;
+    const startsCut = startsType || prev.size !== row.size || prev.subtype !== row.subtype;
+    const cut = row.subtype ?? "No cut";
+    return {
+      row,
+      typeHead: startsType
+        ? { label: row.itemType ?? "No type", count: counts.get(row.itemType) ?? 0 }
+        : null,
+      cutHead: startsCut
+        ? (sizes.get(row.itemType)?.size ?? 0) > 1 && row.size
+          ? `${row.size} · ${cut}`
+          : cut
+        : null,
+    };
+  });
+}
+
 const S = {
   // SINGLE quotes around the multi-word family, not double. These strings go
   // into `style="..."` attributes, so a double quote here TERMINATES THE
@@ -597,6 +642,10 @@ const S = {
   td: "padding:6px 10px 6px 0;border-bottom:1px solid #e5e5e5",
   tdr: "padding:6px 10px 6px 0;border-bottom:1px solid #e5e5e5;text-align:right",
   muted: "color:#666;font-size:13px",
+  // The Premades groups (2026-10-14) — the app's black band and caps heading.
+  band: "background:#111;color:#fff;padding:6px 8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em",
+  bandCount: "margin-left:8px;font-weight:400;letter-spacing:0;color:#aaa",
+  cut: "padding:10px 10px 3px 0;border-bottom:1px solid #111;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em",
   // Yellow as a FILL, never as ink — the app's own rule, and `text-mark` on
   // white measures 1.43:1.
   mark: "background:#fef08a;padding:0 3px",
@@ -807,7 +856,18 @@ export function supervisorBody(report: EmailReport): string {
         `<th style="${S.thr}">Left</th><th style="${S.th}">Sold out</th>` +
         `<th style="${S.th}">Note</th></tr>`
     );
-    for (const p of section.lines) {
+    for (const { row: p, typeHead, cutHead } of premadeGroups(section.lines)) {
+      // The Premades page's two marks in email form: a black band for the type
+      // with its count, and a caps heading on a black rule for the cut.
+      if (typeHead) {
+        parts.push(
+          `<tr><td colspan="7" style="${S.band}">${esc(typeHead.label)}` +
+            `<span style="${S.bandCount}">${typeHead.count}</span></td></tr>`
+        );
+      }
+      if (cutHead) {
+        parts.push(`<tr><td colspan="7" style="${S.cut}">${esc(cutHead)}</td></tr>`);
+      }
       parts.push(
         `<tr><td style="${S.td}">${esc(p.name)}</td><td style="${S.tdr}">${p.par ?? "—"}</td>` +
           `<td style="${S.tdr}">${p.made ?? "—"}</td><td style="${S.tdr}">${p.rescued ?? "—"}</td>` +

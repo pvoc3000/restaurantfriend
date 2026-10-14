@@ -7,6 +7,7 @@ import {
   pageBanner,
   submitReadiness,
   submitBlockers,
+  premadeGroups,
   attentionReason,
   missingNights,
   supervisorBody,
@@ -465,12 +466,12 @@ const REPORT: EmailReport = {
     {
       title: "Premades",
       lines: [
-        { name: "Angry Samoa", par: 12, made: 12, rescued: 7, leftover: 3, soldOutAt: null, note: "Dropped a tray, re-fried" },
+        { name: "Angry Samoa", itemType: "Cake", size: "Regular", subtype: "Vanilla", par: 12, made: 12, rescued: 7, leftover: 3, soldOutAt: null, note: "Dropped a tray, re-fried" },
       ],
     },
     {
       title: "Special order — #9761 · Cafe Knotted",
-      lines: [{ name: "Glazed", par: 24, made: 24, rescued: 0, leftover: 0, soldOutAt: "14:15:00", note: null }],
+      lines: [{ name: "Glazed", itemType: "Raised", size: "Regular", subtype: "Promise Ring", par: 24, made: 24, rescued: 0, leftover: 0, soldOutAt: "14:15:00", note: null }],
     },
     // The empty Premades page a day with no plan schedule still gets.
     { title: "Premades — made at DF01", lines: [] },
@@ -620,6 +621,37 @@ test("the sold-out time reaches the email, after Left (204)", () => {
     ok(body.indexOf(">Left<") < body.indexOf(">Sold out<"), "Left · Sold out headings");
     ok(body.includes("2:15 PM"), "Glazed sold out at 2:15 PM");
   }
+});
+
+test("the email groups premades by type and cut, as the page does (2026-10-14)", () => {
+  for (const body of [supervisorBody(REPORT), managementBody(REPORT)]) {
+    const band = body.indexOf(">Cake<");
+    const cut = body.indexOf(">Vanilla<");
+    const row = body.indexOf("Angry Samoa");
+    ok(band >= 0 && band < cut && cut < row, "Cake band · Vanilla heading · Angry Samoa");
+  }
+});
+
+test("premadeGroups: one band per type with its count, one heading per cut", () => {
+  const rows = [
+    { itemType: "Cake", size: "Regular", subtype: "Vanilla" },
+    { itemType: "Cake", size: "Regular", subtype: "Vanilla" },
+    { itemType: "Cake", size: "Regular", subtype: "Coffee" },
+    { itemType: "Raised", size: "Regular", subtype: null },
+  ];
+  const g = premadeGroups(rows);
+  eq(g.map((x) => x.typeHead?.label ?? null), ["Cake", null, null, "Raised"]);
+  eq(g.map((x) => x.typeHead?.count ?? null), [3, null, null, 1]);
+  eq(g.map((x) => x.cutHead), ["Vanilla", null, "Coffee", "No cut"]);
+});
+
+test("premadeGroups: the size joins a cut heading only when its type has two", () => {
+  const g = premadeGroups([
+    { itemType: "Raised", size: "Mini", subtype: "Glazed" },
+    { itemType: "Raised", size: "Regular", subtype: "Glazed" },
+    { itemType: "Cake", size: "Regular", subtype: "Vanilla" },
+  ]);
+  eq(g.map((x) => x.cutHead), ["Mini · Glazed", "Regular · Glazed", "Vanilla"]);
 });
 
 test("WHAT WAS OUTSTANDING TRAVELS — both emails carry it", () => {

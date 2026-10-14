@@ -848,3 +848,13 @@ when a type comes in more than one ("Mini · Glazed") — nearly every line is
 Regular. The freed 18% went to Name and the boxes, then (Mark, same day) Name 30→24% and the three counts 11→10% each so Sold out (15%) and Note (20%) got room; at 1180×820 one name of 37 wraps. Seen at 1180×820
 on DF01's sent 2026-10-13 report: five bands summing to its 37 lines, Name on
 one line, no console errors.
+
+**THE EMAIL GROUPS THE SAME WAY, AND THE COUNTS NARROWED AGAIN (Mark,
+2026-10-14).** `premadeGroups` in `lib/shiftReports` is now the one definition
+of the type band and cut heading, read by the Premades page AND the email's
+premade tables (a #111 band with the count in grey, a caps heading on a 1px
+black rule), so the two cannot group differently. Fixtures cover the counts,
+the size-joins-only-when-two rule and the order in both emails. Seen as a
+Quick Look render of the fixture report (Quick Look drops the sans stack; mail
+clients don't). Page widths: Made / Rescued / Left 10→9% each, Sold out 15→16%,
+Note 20→22%. NOT re-seen in the browser — the pane was on `/lock`.
