@@ -836,3 +836,15 @@ Left, all ten columns fit, no console errors. The page's boxes then took `ink`
 (black edges): the time picker's field is black-edged and the Donut batches page
 had already settled that a page mixing the two blackens the rest. Not
 exercised: entering a time on a draft — the only draft was a live one.
+
+**TYPE AND SUB TYPE ARE BANDS, NOT COLUMNS (Mark, 2026-10-14: "we could save
+some horizontal space … if we removed type and subtype fields from each row
+and, instead, grouped the donuts by type and subtype with headers").** The
+Premades page uses DataTable's two marks by hand (it is a form, not a
+DataTable): a black band per type with its line count, and a caps heading on a
+black rule per cut. The rows were already in the printed sheet's order (type,
+size, cut, name), so each group is one run. The SIZE joins the cut heading only
+when a type comes in more than one ("Mini · Glazed") — nearly every line is
+Regular. The freed 18% went to Name (17→30%) and the boxes. Seen at 1180×820
+on DF01's sent 2026-10-13 report: five bands summing to its 37 lines, Name on
+one line, no console errors.

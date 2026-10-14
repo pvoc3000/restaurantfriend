@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
@@ -61,6 +61,9 @@ export type PremadeRow = {
  * the schedule the night before produced. Tomorrow's is page 7, and confusing
  * the two would have the closer counting donuts nobody has made yet.
  */
+/** The table's columns, for a band's `colSpan`. Name through Note. */
+const COLUMN_COUNT = 8;
+
 export function PremadesPage({
   reportId,
   orgId,
@@ -94,6 +97,26 @@ export function PremadesPage({
   const uncounted = rows.filter((r) => r.leftover === null);
   /** And in the Rescued column — its own button, by the same rule. */
   const unrescued = rows.filter((r) => r.rescued === null);
+
+  /** Lines per type, for the band's count — DataTable's band carries one. */
+  const typeCounts = new Map<string | null, number>();
+  for (const r of rows) typeCounts.set(r.itemType, (typeCounts.get(r.itemType) ?? 0) + 1);
+
+  /**
+   * The cut heading. The SIZE joins it only when the type comes in more than
+   * one ("Mini · Glazed"): nearly every line is Regular, and printing it on
+   * every heading would be a word that never tells two groups apart.
+   */
+  const sizesByType = new Map<string | null, Set<string | null>>();
+  for (const r of rows) {
+    const set = sizesByType.get(r.itemType) ?? new Set();
+    set.add(r.size);
+    sizesByType.set(r.itemType, set);
+  }
+  const cutLabel = (r: PremadeRow) => {
+    const cut = r.subtype ?? "No cut";
+    return (sizesByType.get(r.itemType)?.size ?? 0) > 1 && r.size ? `${r.size} · ${cut}` : cut;
+  };
 
   /**
    * "Nothing left over" — every EMPTY Left box becomes 0, in one write.
@@ -316,15 +339,14 @@ export function PremadesPage({
       <table className="w-full table-fixed">
         <colgroup>
           {/* Sums to 100 — 203's set came to 104, which a fixed table scales
-              down without saying so. */}
-          <col className="w-[8%]" />
-          <col className="w-[10%]" />
-          <col className="w-[17%]" />
-          <col className="w-[6%]" />
-          <col className="w-[4%]" />
-          <col className="w-[10%]" />
-          <col className="w-[10%]" />
-          <col className="w-[10%]" />
+              down without saying so. Type and Sub type are bands now, so their
+              18% went to Name and the boxes. */}
+          <col className="w-[30%]" />
+          <col className="w-[7%]" />
+          <col className="w-[5%]" />
+          <col className="w-[11%]" />
+          <col className="w-[11%]" />
+          <col className="w-[11%]" />
           <col className="w-[12%]" />
           <col className="w-[13%]" />
         </colgroup>
@@ -348,8 +370,6 @@ export function PremadesPage({
           <tr
             className={`text-xs font-semibold uppercase tracking-[0.08em] ${STICKY_HEAD_ROW_UNDER_RUNNER}`}
           >
-            <th className="py-2 pr-3 text-left">Type</th>
-            <th className="py-2 pr-3 text-left">Sub type</th>
             <th className="py-2 pr-3 text-left">Name</th>
             <th className="py-2 pr-1 text-right">Par</th>
             <th className="py-2" />
@@ -360,97 +380,132 @@ export function PremadesPage({
             <th className="py-2 pr-2 text-right">Left</th>
             {/* AFTER the counts rather than among them: a time, not a number
                 that adds up. Blank is "did not sell out". */}
-            <th className="py-2 pr-2 text-left">Sold out</th>
+            <th className="py-2 pl-3 pr-2 text-left">Sold out</th>
             <th className="py-2 pl-4 text-left">Note</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.scheduleItemId} className="border-b border-hairline/60">
-              <td className="py-2 pr-3 text-[16px]">{r.itemType ?? "—"}</td>
-              <td className="py-2 pr-3 text-[16px]">{r.subtype ?? "—"}</td>
-              <td className="py-2 pr-3 text-[16px]">{r.name}</td>
-              <td className="py-2 pr-1 text-right text-[16px]">{r.par ?? "—"}</td>
-              {/* TAKE THE PAR (Mark, 2026-08-28). The receiving screen's `→`
-                  idiom, and for its reason: the usual answer is "we made what
-                  we were asked to", and typing it out forty times is the work.
-                  An ARROW rather than a prefilled box — a box that filled
-                  itself would make merely OPENING the page look like somebody
-                  had counted, which is the one thing the report must not
-                  claim. Hidden when there is no par to take, and when the made
-                  figure already equals it. */}
-              <td className="py-2 pr-1 text-center align-middle">
-                {editable && r.par !== null && r.made !== r.par ? (
-                  <button
-                    type="button"
-                    className="px-2 py-2 text-lg leading-none text-muted hover:text-ink"
-                    onClick={() => save(r.scheduleItemId, { made: r.par })}
-                    title={`Made ${r.par}`}
-                    aria-label={`Made ${r.par}, ${r.name}`}
-                  >
-                    &rarr;
-                  </button>
+          {rows.map((r, i) => {
+            const prev = i === 0 ? null : rows[i - 1];
+            const startsType = prev === null || prev.itemType !== r.itemType;
+            const startsCut = startsType || prev.size !== r.size || prev.subtype !== r.subtype;
+            return (
+              <Fragment key={r.scheduleItemId}>
+                {/* GROUPED, NOT COLUMNS (Mark, 2026-10-14: "we could save some
+                    horizontal space … if we removed type and subtype fields from
+                    each row and, instead, grouped the donuts by type and subtype
+                    with headers"). DataTable's two marks: the black band for the
+                    type, the caps heading on a black rule for the cut. The rows are
+                    already in the printed sheet's order (type, size, cut, name), so
+                    a group is a run and never repeats. */}
+                {startsType ? (
+                  <tr className="bg-ink text-white">
+                    <td
+                      colSpan={COLUMN_COUNT}
+                      className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em]"
+                    >
+                      {r.itemType ?? "No type"}
+                      <span className="ml-2 font-normal normal-case tracking-normal text-white/55">
+                        {typeCounts.get(r.itemType) ?? 0}
+                      </span>
+                    </td>
+                  </tr>
                 ) : null}
-              </td>
-              <td className="py-2 pr-2">
-                <CountField
-                  value={r.made}
-                  onCommit={(next) => save(r.scheduleItemId, { made: next })}
-                  disabled={!editable}
-                  ariaLabel={`Made, ${r.name}`}
-                  ink
-                />
-              </td>
-              <td className="py-2 pr-2">
-                <CountField
-                  value={r.rescued}
-                  onCommit={(next) => save(r.scheduleItemId, { rescued: next })}
-                  disabled={!editable}
-                  ariaLabel={`Rescued, ${r.name}`}
-                  ink
-                />
-              </td>
-              <td className="py-2 pr-2">
-                <CountField
-                  value={r.leftover}
-                  onCommit={(next) => save(r.scheduleItemId, { leftover: next })}
-                  disabled={!editable}
-                  ariaLabel={`Left over, ${r.name}`}
-                  ink
-                />
-              </td>
-              {/* BLACK EDGES ON EVERY BOX IN THE ROW (204): the time picker's
-                  field is black-edged, and the Donut batches page settled what
-                  a page mixing the two does — `ink` on the rest. */}
-              <td className="py-2 pr-2">
-                <TimePicker
-                  value={r.soldOutAt}
-                  onChange={(next) => save(r.scheduleItemId, { sold_out_at: next })}
-                  variant="field"
-                  disabled={!editable}
-                  ariaLabel={`Sold out at, ${r.name}`}
-                />
-              </td>
-              {/* TWO NOTES IN ONE COLUMN'S WIDTH — PO detail's Item cell in
-                  another costume. The schedule's own note sits above as muted
-                  context (it is what the kitchen was ASKED to do, and it is
-                  worth having in front of you while you count), and the field
-                  below is the supervisor's own. Most lines have neither, so the
-                  cell is usually just the box. */}
-              <td className="py-2 pl-4 align-top">
-                {r.note ? (
-                  <p className="pb-1 text-sm leading-snug text-muted">{r.note}</p>
+                {startsCut ? (
+                  <tr>
+                    <td
+                      colSpan={COLUMN_COUNT}
+                      className="border-b border-ink pb-1 pt-3 text-xs font-semibold uppercase tracking-[0.08em]"
+                    >
+                      {cutLabel(r)}
+                    </td>
+                  </tr>
                 ) : null}
-                <TextField
-                  value={r.countNote}
-                  onCommit={(next) => save(r.scheduleItemId, { note: next })}
-                  disabled={!editable}
-                  ariaLabel={`Note, ${r.name}`}
-                  ink
-                />
-              </td>
-            </tr>
-          ))}
+                <tr className="border-b border-hairline/60">
+                  <td className="py-2 pr-3 text-[16px]">{r.name}</td>
+                  <td className="py-2 pr-1 text-right text-[16px]">{r.par ?? "—"}</td>
+                  {/* TAKE THE PAR (Mark, 2026-08-28). The receiving screen's `→`
+                      idiom, and for its reason: the usual answer is "we made what
+                      we were asked to", and typing it out forty times is the work.
+                      An ARROW rather than a prefilled box — a box that filled
+                      itself would make merely OPENING the page look like somebody
+                      had counted, which is the one thing the report must not
+                      claim. Hidden when there is no par to take, and when the made
+                      figure already equals it. */}
+                  <td className="py-2 pr-1 text-center align-middle">
+                    {editable && r.par !== null && r.made !== r.par ? (
+                      <button
+                        type="button"
+                        className="px-2 py-2 text-lg leading-none text-muted hover:text-ink"
+                        onClick={() => save(r.scheduleItemId, { made: r.par })}
+                        title={`Made ${r.par}`}
+                        aria-label={`Made ${r.par}, ${r.name}`}
+                      >
+                        &rarr;
+                      </button>
+                    ) : null}
+                  </td>
+                  <td className="py-2 pr-2">
+                    <CountField
+                      value={r.made}
+                      onCommit={(next) => save(r.scheduleItemId, { made: next })}
+                      disabled={!editable}
+                      ariaLabel={`Made, ${r.name}`}
+                      ink
+                    />
+                  </td>
+                  <td className="py-2 pr-2">
+                    <CountField
+                      value={r.rescued}
+                      onCommit={(next) => save(r.scheduleItemId, { rescued: next })}
+                      disabled={!editable}
+                      ariaLabel={`Rescued, ${r.name}`}
+                      ink
+                    />
+                  </td>
+                  <td className="py-2 pr-2">
+                    <CountField
+                      value={r.leftover}
+                      onCommit={(next) => save(r.scheduleItemId, { leftover: next })}
+                      disabled={!editable}
+                      ariaLabel={`Left over, ${r.name}`}
+                      ink
+                    />
+                  </td>
+                  {/* BLACK EDGES ON EVERY BOX IN THE ROW (204): the time picker's
+                      field is black-edged, and the Donut batches page settled what
+                      a page mixing the two does — `ink` on the rest. */}
+                  <td className="py-2 pl-3 pr-2">
+                    <TimePicker
+                      value={r.soldOutAt}
+                      onChange={(next) => save(r.scheduleItemId, { sold_out_at: next })}
+                      variant="field"
+                      disabled={!editable}
+                      ariaLabel={`Sold out at, ${r.name}`}
+                    />
+                  </td>
+                  {/* TWO NOTES IN ONE COLUMN'S WIDTH — PO detail's Item cell in
+                      another costume. The schedule's own note sits above as muted
+                      context (it is what the kitchen was ASKED to do, and it is
+                      worth having in front of you while you count), and the field
+                      below is the supervisor's own. Most lines have neither, so the
+                      cell is usually just the box. */}
+                  <td className="py-2 pl-4 align-top">
+                    {r.note ? (
+                      <p className="pb-1 text-sm leading-snug text-muted">{r.note}</p>
+                    ) : null}
+                    <TextField
+                      value={r.countNote}
+                      onCommit={(next) => save(r.scheduleItemId, { note: next })}
+                      disabled={!editable}
+                      ariaLabel={`Note, ${r.name}`}
+                      ink
+                    />
+                  </td>
+                </tr>
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
