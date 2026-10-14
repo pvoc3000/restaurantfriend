@@ -148,7 +148,7 @@ export default async function TagsPage({
       day={day}
       orgId={orgId}
       editable={editable}
-      action={editable && <NewTag orgId={orgId} items={itemOptions} />}
+      action={editable && <NewTag key="new-tag" orgId={orgId} items={itemOptions} />}
     />
   );
 }
