@@ -542,7 +542,9 @@ export function ScheduleLines({
       // made it, boxed some for Too Good To Go, counted the rest. Migration 203.
       key: "rescued",
       label: "Rescued",
-      width: 100,
+      // Wider than Left over's 100: one word cannot wrap the way "Left over"
+      // does, so at a laptop width it truncated to "RESC…".
+      width: 120,
       align: "right",
       sortValue: (r) => r.rescued ?? -1,
       hideWhenCompact: true,

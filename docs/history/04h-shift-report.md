@@ -819,3 +819,8 @@ Its ergonomics are a **Nothing rescued** button beside Nothing left over (the
 same fill-empty-only rule, now one `fillEmpty`). The email's premade table
 gains the column. `countsQuery`'s one-shot retry now drops `rescued` rather
 than 081’s long-applied `note`. 203 APPLIED 2026-10-14.
+Seen in the browser the same day, on DF01's sent 2026-10-13 closing report at
+1180×820: Rescued sits between Made and Left, the same box size, empty on a
+report sent before it existed; no console errors. The Nothing rescued button
+and the send gate were NOT exercised: a sent report is read-only and no draft
+existed to try them on.
