@@ -1,4 +1,5 @@
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { formatTypedTime } from "@/lib/timeInput";
 import {
   bucketByDay,
   summarise,
@@ -51,6 +52,7 @@ export function ProductionItemHistory({
                   <Th align="right">Rescued</Th>
                   <Th align="right">Left over</Th>
                   <Th align="right">Sold</Th>
+                  <Th>Sold out</Th>
                   <Th className="w-[92px]">Shops</Th>
                 </tr>
               </thead>
@@ -64,7 +66,7 @@ export function ProductionItemHistory({
                       // in words rather than by leaving four cells blank: "we
                       // didn't make it" and "nobody wrote down what came back"
                       // are different facts about a day.
-                      <td colSpan={6} className="py-1.5 text-faint">
+                      <td colSpan={7} className="py-1.5 text-faint">
                         no schedule
                       </td>
                     ) : (
@@ -81,9 +83,10 @@ export function ProductionItemHistory({
                             >
                               {d.sold?.toLocaleString()}
                             </Td>
+                            <Td>{formatTypedTime(d.soldOutAt)}</Td>
                           </>
                         ) : (
-                          <td colSpan={4} className="py-1.5">
+                          <td colSpan={5} className="py-1.5">
                             <span className="bg-mark-fill px-1">not counted</span>
                           </td>
                         )}
@@ -110,7 +113,13 @@ export function ProductionItemHistory({
                   summary.daysCounted === 1 ? "night" : "nights"
                 } — averaging ${summary.soldPerNight!.toFixed(1)} a night, with ${summary.leftover.toLocaleString()} left over${
                   summary.rescued > 0 ? ` and ${summary.rescued.toLocaleString()} rescued` : ""
-                }.`}
+                }.${
+                  summary.daysSoldOut > 0
+                    ? ` Sold out on ${summary.daysSoldOut} of those ${
+                        summary.daysCounted === 1 ? "night" : "nights"
+                      }.`
+                    : ""
+                }`}
           </p>
         </>
       )}

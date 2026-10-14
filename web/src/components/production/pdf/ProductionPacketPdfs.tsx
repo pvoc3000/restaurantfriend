@@ -107,8 +107,8 @@ const styles = {
       alignItems: "center",
       backgroundColor: INK,
       paddingVertical: 4,
-      // No right padding: the premade band's TOTAL, RESC and L/O labels must sit
-      // exactly over the write-in boxes, which run to the margin.
+      // No right padding: the premade band's TOTAL, RESCUED, L/O and SOLD OUT
+      // labels must sit exactly over the write-in boxes, which run to the margin.
       paddingLeft: 6,
       paddingRight: 0,
       marginTop: 12,
@@ -117,6 +117,8 @@ const styles = {
     typeBandTotal: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "#fff", marginLeft: 10 },
     typeBandRight: { marginLeft: "auto", flexDirection: "row" },
     bandLabel: { ...caps(6, 0.12), color: "#fff", width: 34, textAlign: "center", marginLeft: 4 },
+    // 204: over the sold-out box, which is wider — a time in a hand, "2:15p".
+    timeBandLabel: { ...caps(6, 0.12), color: "#fff", width: 42, textAlign: "center", marginLeft: 8 },
 
     // The app's group STRIP, one step below the band.
     sizeBand: {
@@ -150,6 +152,10 @@ const styles = {
 
     // A box somebody writes in — the app's 1px box, as on every document.
     writeIn: { width: 34, height: 14, borderWidth: 1, borderColor: INK, marginLeft: 4 },
+    // The time the last one sold (204). Set apart by a wider gap: it is a clock
+    // reading, not a fourth number that adds up with the three before it.
+    timeWriteIn: { width: 42, height: 14, borderWidth: 1, borderColor: INK, marginLeft: 8 },
+    timeCell: { width: 42, marginLeft: 8 },
     // Room for "7.5" in a baker's hand.
     batchWriteIn: { width: 60, height: 18, borderWidth: 1, borderColor: INK },
     // A name in a baker's hand.
@@ -434,6 +440,7 @@ function PremadeType({ type }: { type: RollType }) {
               made it, boxed some for Too Good To Go, counted the rest. */}
           <Text style={styles.bandLabel}>Rescued</Text>
           <Text style={styles.bandLabel}>L/O</Text>
+          <Text style={styles.timeBandLabel}>Sold out</Text>
         </View>
       </View>
 
@@ -511,6 +518,9 @@ function CountTotalRow({
       <Text style={[textStyle, styles.countCell]}>{t.made !== null ? fmt(t.made) : ""}</Text>
       <Text style={[textStyle, styles.countCell]}>{t.rescued !== null ? fmt(t.rescued) : ""}</Text>
       <Text style={[textStyle, styles.countCell]}>{t.leftover !== null ? fmt(t.leftover) : ""}</Text>
+      {/* Nothing sums under the sold-out box; this only keeps the three
+          figures under their own columns. */}
+      <View style={styles.timeCell} />
     </>
   );
 }
@@ -538,6 +548,7 @@ function PremadeRow({ line }: { line: ScheduleLine }) {
       <View style={styles.writeIn} />
       <View style={styles.writeIn} />
       <View style={styles.writeIn} />
+      <View style={styles.timeWriteIn} />
     </View>
   );
 }

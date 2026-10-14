@@ -112,7 +112,7 @@ export async function ScheduleDetail({
         .select(
           `id, item_id, item_name, item_type, subtype, finish, size, tally_box_size,
            tray_capacity, tray_number, tray_band, par, planned_par, par_source, made, leftover,
-           rescued, sold, counted_at, note, unit_cost, unit_price, cost_unresolved, costed_at, sort`
+           rescued, sold, sold_out_at, counted_at, note, unit_cost, unit_price, cost_unresolved, costed_at, sort`
         )
         .eq("schedule_id", id)
         .order("sort"),
@@ -141,7 +141,9 @@ export async function ScheduleDetail({
     return (
       <p className="text-sm text-accent">
         Could not load this schedule&rsquo;s items: {lineErr.message}
-        {/rescued/.test(lineErr.message)
+        {/sold_out_at/.test(lineErr.message)
+          ? " — migration 204 has not been applied yet."
+          : /rescued/.test(lineErr.message)
           ? " — migration 203 has not been applied yet."
           : /counted_at|sold|v_production_schedule_lines/.test(lineErr.message)
             ? " — migration 044 has not been applied yet."
@@ -177,6 +179,7 @@ export async function ScheduleDetail({
     made: (l.made ?? null) as number | null,
     leftover: (l.leftover ?? null) as number | null,
     rescued: (l.rescued ?? null) as number | null,
+    sold_out_at: (l.sold_out_at ?? null) as string | null,
     sold: (l.sold ?? null) as number | null,
     counted_at: (l.counted_at ?? null) as string | null,
     note: (l.note ?? null) as string | null,

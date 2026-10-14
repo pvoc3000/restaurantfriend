@@ -7,6 +7,7 @@ import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { STICKY_HEAD_ROW_UNDER_RUNNER } from "@/lib/tableHead";
 import { CountField, TextField } from "./fields";
 import { useOptimisticRows } from "@/lib/useOptimisticRows";
+import { TimePicker } from "@/components/ui/TimePicker";
 
 export type PremadeRow = {
   scheduleItemId: string;
@@ -26,6 +27,12 @@ export type PremadeRow = {
    * sale and production never came down.
    */
   rescued: number | null;
+  /**
+   * The time of day the last one sold — migration 204. `HH:MM`, or null when
+   * it did not sell out, which is most lines and so never required. It tells
+   * "made the right amount" from "could have sold more", which `sold` cannot.
+   */
+  soldOutAt: string | null;
   /**
    * The SCHEDULE's own note — an instruction, snapshotted at generation and
    * printed on the packet as what the kitchen was told to make.
@@ -156,6 +163,7 @@ export function PremadesPage({
     if ("made" in patch) shown.made = patch.made as number | null;
     if ("leftover" in patch) shown.leftover = patch.leftover as number | null;
     if ("rescued" in patch) shown.rescued = patch.rescued as number | null;
+    if ("sold_out_at" in patch) shown.soldOutAt = patch.sold_out_at as string | null;
     if ("note" in patch) shown.countNote = patch.note as string | null;
     void optimistic(scheduleItemId, shown, async () => {
       // UPSERT on the pair, because most lines have no draft row until somebody
@@ -172,7 +180,9 @@ export function PremadesPage({
         // courtesy every other screen in this app extends, and here the fix is
         // one `alter table` rather than anything the reader did wrong.
         setFailed(
-          /rescued/.test(error.message)
+          /sold_out_at/.test(error.message)
+            ? `${error.message} — if this names a missing column, migration 204 has not been applied yet.`
+            : /rescued/.test(error.message)
             ? `${error.message} — if this names a missing column, migration 203 has not been applied yet.`
             : /note/.test(error.message)
               ? `${error.message} — if this names a missing column, migration 081 has not been applied yet.`
@@ -305,15 +315,18 @@ export function PremadesPage({
           `th` is a suggestion an auto-layout table is free to ignore. */}
       <table className="w-full table-fixed">
         <colgroup>
-          <col className="w-[9%]" />
-          <col className="w-[11%]" />
-          <col className="w-[20%]" />
-          <col className="w-[7%]" />
-          <col className="w-[5%]" />
+          {/* Sums to 100 — 203's set came to 104, which a fixed table scales
+              down without saying so. */}
+          <col className="w-[8%]" />
+          <col className="w-[10%]" />
+          <col className="w-[17%]" />
+          <col className="w-[6%]" />
+          <col className="w-[4%]" />
+          <col className="w-[10%]" />
+          <col className="w-[10%]" />
+          <col className="w-[10%]" />
           <col className="w-[12%]" />
-          <col className="w-[12%]" />
-          <col className="w-[12%]" />
-          <col className="w-[12%]" />
+          <col className="w-[13%]" />
         </colgroup>
         {/* THE LABELS STAY ON SCREEN (Mark, 2026-09-09: "so the user knows what
             they're entering"). Made and Left are two identical boxes eight
@@ -345,6 +358,9 @@ export function PremadesPage({
                 it, boxed some for Too Good To Go, counted the rest. */}
             <th className="py-2 pr-2 text-right">Rescued</th>
             <th className="py-2 pr-2 text-right">Left</th>
+            {/* AFTER the counts rather than among them: a time, not a number
+                that adds up. Blank is "did not sell out". */}
+            <th className="py-2 pr-2 text-left">Sold out</th>
             <th className="py-2 pl-4 text-left">Note</th>
           </tr>
         </thead>
@@ -398,6 +414,15 @@ export function PremadesPage({
                   onCommit={(next) => save(r.scheduleItemId, { leftover: next })}
                   disabled={!editable}
                   ariaLabel={`Left over, ${r.name}`}
+                />
+              </td>
+              <td className="py-2 pr-2">
+                <TimePicker
+                  value={r.soldOutAt}
+                  onChange={(next) => save(r.scheduleItemId, { sold_out_at: next })}
+                  variant="field"
+                  disabled={!editable}
+                  ariaLabel={`Sold out at, ${r.name}`}
                 />
               </td>
               {/* TWO NOTES IN ONE COLUMN'S WIDTH — PO detail's Item cell in

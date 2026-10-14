@@ -465,12 +465,12 @@ const REPORT: EmailReport = {
     {
       title: "Premades",
       lines: [
-        { name: "Angry Samoa", par: 12, made: 12, rescued: 7, leftover: 3, note: "Dropped a tray, re-fried" },
+        { name: "Angry Samoa", par: 12, made: 12, rescued: 7, leftover: 3, soldOutAt: null, note: "Dropped a tray, re-fried" },
       ],
     },
     {
       title: "Special order — #9761 · Cafe Knotted",
-      lines: [{ name: "Glazed", par: 24, made: 24, rescued: 0, leftover: 0, note: null }],
+      lines: [{ name: "Glazed", par: 24, made: 24, rescued: 0, leftover: 0, soldOutAt: "14:15:00", note: null }],
     },
     // The empty Premades page a day with no plan schedule still gets.
     { title: "Premades — made at DF01", lines: [] },
@@ -612,6 +612,13 @@ test("Rescued reaches the email, between Made and Left (203)", () => {
     const left = body.indexOf(">Left<");
     ok(made >= 0 && made < rescued && rescued < left, "Made · Rescued · Left headings");
     ok(body.includes(">7<"), "Angry Samoa's 7 rescued");
+  }
+});
+
+test("the sold-out time reaches the email, after Left (204)", () => {
+  for (const body of [supervisorBody(REPORT), managementBody(REPORT)]) {
+    ok(body.indexOf(">Left<") < body.indexOf(">Sold out<"), "Left · Sold out headings");
+    ok(body.includes("2:15 PM"), "Glazed sold out at 2:15 PM");
   }
 });
 

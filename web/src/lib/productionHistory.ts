@@ -21,6 +21,8 @@ export type HistoryLine = {
   /** Packed for Too Good To Go — migration 203. */
   rescued: number | null;
   sold: number | null;
+  /** When the last one sold, `HH:MM:SS`; null = it did not — migration 204. */
+  sold_out_at: string | null;
 };
 
 /** One calendar day in the window, whether or not anything happened on it. */
@@ -37,6 +39,12 @@ export type HistoryDay = {
   rescued: number | null;
   leftover: number | null;
   sold: number | null;
+  /**
+   * The EARLIEST sold-out time across the shops that day, or null when none
+   * ran out. Earliest because the question is whether there was more demand,
+   * and one shop running dry at 11am answers it even if the other didn't.
+   */
+  soldOutAt: string | null;
 };
 
 export type HistorySummary = {
@@ -49,6 +57,8 @@ export type HistorySummary = {
   sold: number;
   /** Mean sold per COUNTED night, or null when nothing has been counted. */
   soldPerNight: number | null;
+  /** Counted nights on which it sold out somewhere — 204. */
+  daysSoldOut: number;
 };
 
 /**
@@ -120,6 +130,12 @@ export function bucketByDay(lines: HistoryLine[], dates: string[]): HistoryDay[]
       rescued: sum((l) => l.rescued),
       leftover: sum((l) => l.leftover),
       sold: sum((l) => l.sold),
+      // `HH:MM:SS` sorts as text, so the smallest string is the earliest time.
+      soldOutAt:
+        run
+          .map((l) => l.sold_out_at)
+          .filter((t): t is string => t !== null)
+          .sort()[0] ?? null,
     };
   });
 }
@@ -147,6 +163,7 @@ export function summarise(days: HistoryDay[]): HistorySummary {
     leftover: total((d) => d.leftover),
     sold,
     soldPerNight: counted.length === 0 ? null : sold / counted.length,
+    daysSoldOut: counted.filter((d) => d.soldOutAt !== null).length,
   };
 }
 

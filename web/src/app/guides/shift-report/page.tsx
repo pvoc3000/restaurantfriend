@@ -260,6 +260,11 @@ export default function ShiftReportGuide() {
                 leave its donuts as Rescued and don’t count them again under Left.
               </li>
               <li>
+                When a donut sells out, write the time on the printed sheet under{" "}
+                <strong>Sold out</strong>, and enter it in the <strong>Sold out</strong> box at
+                close. Leave it blank if it didn’t sell out.
+              </li>
+              <li>
                 On a night with no boxes, tap <Ui>Nothing rescued</Ui>. The report won’t send with
                 Rescued left blank. <Ui>Nothing left over</Ui> does the same for Left.
               </li>

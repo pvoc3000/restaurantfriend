@@ -824,3 +824,10 @@ Seen in the browser the same day, on DF01's sent 2026-10-13 closing report at
 report sent before it existed; no console errors. The Nothing rescued button
 and the send gate were NOT exercised: a sent report is read-only and no draft
 existed to try them on.
+
+**SOLD OUT, A TIME, ON THE PREMADES PAGE (migration 204, 2026-10-14).** After
+Left, a `ui/TimePicker variant="field"` per line — when the last one sold, from
+the printed sheet. Optional: blank is "did not sell out", so it is in no gate.
+Carried to the schedule on Send, taken back on Reopen; the email's premade
+table gains a Sold out column, blank rather than dashed when it did not. The
+reasoning is in 04f.

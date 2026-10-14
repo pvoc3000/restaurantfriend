@@ -27,6 +27,7 @@ function line(over: Partial<HistoryLine> & { schedule_date: string }): HistoryLi
     leftover: null,
     rescued: null,
     sold: null,
+    sold_out_at: null,
     ...over,
   };
 }
@@ -212,4 +213,34 @@ test("a cleared count stops being counted", () => {
 test("historyDate names the weekday", () => {
   eq(historyDate("2026-08-10"), "Mon 8/10");
   eq(historyDate("2026-08-09"), "Sun 8/9");
+});
+
+/* -- sold-out time (204) ------------------------------------------------- */
+
+test("a day's sold-out time is the EARLIEST across its shops (204)", () => {
+  const { dates } = historyWindow("2026-10-14", 1);
+  const [day] = bucketByDay(
+    [
+      line({ schedule_date: "2026-10-14", made: 18, leftover: 0, sold: 18, sold_out_at: "15:40:00" }),
+      line({ schedule_date: "2026-10-14", location_id: DF02, made: 18, leftover: 0, sold: 18, sold_out_at: "11:05:00" }),
+    ],
+    dates
+  );
+  eq(day.soldOutAt, "11:05:00");
+});
+
+test("nights it sold out are counted over COUNTED nights only (204)", () => {
+  const { dates } = historyWindow("2026-10-14", 3);
+  const s = summarise(
+    bucketByDay(
+      [
+        line({ schedule_date: "2026-10-12", made: 18, leftover: 0, sold: 18, sold_out_at: "14:00:00" }),
+        line({ schedule_date: "2026-10-13", made: 18, leftover: 4, sold: 14 }),
+        line({ schedule_date: "2026-10-14" }),
+      ],
+      dates
+    )
+  );
+  eq(s.daysCounted, 2);
+  eq(s.daysSoldOut, 1);
 });

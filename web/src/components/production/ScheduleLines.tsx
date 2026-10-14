@@ -12,6 +12,7 @@ import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { countTotals, planDeviation, type ScheduleLine } from "@/lib/productionSchedule";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { formatTypedTime } from "@/lib/timeInput";
 
 export type ScheduleLineRow = ScheduleLine & {
   planned_par: number | null;
@@ -28,6 +29,8 @@ export type ScheduleLineRow = ScheduleLine & {
   /** When somebody last counted this line. 044 stores the author beside it;
    *  the date is the half worth showing without a second query for names. */
   counted_at: string | null;
+  /** The time of day the last one sold, or null — migration 204. */
+  sold_out_at: string | null;
 };
 
 /**
@@ -87,6 +90,39 @@ function ActualCell({
           p_line_id: row.id,
           p_column: column,
           p_value: next,
+        });
+        return { error: error ? error.message : null };
+      }}
+    />
+  );
+}
+
+/**
+ * When the last one sold — migration 204, through its own definer function for
+ * 044's reason (a supervisor may write it; the table's UPDATE policy says
+ * purchaser+, and a direct write would match no rows and say nothing).
+ */
+function SoldOutCell({ row, countable }: { row: ScheduleLineRow; countable: boolean }) {
+  const supabase = createClient();
+  if (!countable) {
+    return row.sold_out_at === null ? (
+      <span className="text-faint">—</span>
+    ) : (
+      <span className={`${READ_ONLY_VALUE} tabular-nums`}>{formatTypedTime(row.sold_out_at)}</span>
+    );
+  }
+  return (
+    <InlineValue
+      table="production_schedule_items"
+      id={row.id}
+      column="sold_out_at"
+      kind="time"
+      value={row.sold_out_at}
+      ariaLabel={`Sold out at, ${row.item_name}`}
+      onWrite={async (next) => {
+        const { error } = await supabase.rpc("set_schedule_sold_out", {
+          p_line_id: row.id,
+          p_time: next,
         });
         return { error: error ? error.message : null };
       }}
@@ -583,6 +619,15 @@ export function ScheduleLines({
             {r.sold}
           </span>
         ),
+    },
+    {
+      // After Sold: a clock reading, not a count. Blank is "did not sell out".
+      key: "sold_out_at",
+      label: "Sold out",
+      width: 120,
+      sortValue: (r) => r.sold_out_at ?? "",
+      hideWhenCompact: true,
+      render: (r) => <SoldOutCell row={r} countable={countable} />,
     },
     {
       key: "note",

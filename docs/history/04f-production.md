@@ -2032,3 +2032,29 @@ cannot be — nothing recorded how many boxes there were. Dry-run on the hosted
 DB in a rolled-back transaction: 20 made / 4 left / 6 rescued reads sold 10,
 the author stamps clear only when all three counts are emptied, `par` is still
 refused, and no counted line's sold changed.
+
+## 2026-10-14 — the time a donut sold out (migration 204)
+
+Mark: "let's also record the sold out time like you suggested." The question
+203's honest `sold` cannot answer: 18 made, 18 sold says demand was AT LEAST
+18. Gone at 11am is a donut to make more of; gone at 5:40pm is a par about
+right.
+
+`sold_out_at time` on the line (`schedule_date` is the day), null = did not sell
+out — most lines, most nights — so it is NEVER required to send a report. A
+fourth write-in on the printed premade sheet, after L/O, 42pt wide (a time in
+a hand) and set apart by an 8pt gap because it is a clock reading, not a count
+that sums; the totals row leaves a blank cell under it to keep the three sums
+aligned. The tally strip shrank again: the sample's "12" boxes now touch their
+rules, but every real line since 2026-09-14 (1,873) has a box size of 6, one
+digit. Revisit if a two-digit box size ever comes back.
+
+Its own definer, `set_schedule_sold_out(uuid, time)`, rather than a fourth
+column on `set_schedule_actual` (numeric), and it does NOT stamp
+`counted_by`/`counted_at` — a time is not a count. The shift report's flush
+carries it like the counts. The item history shows the EARLIEST time across
+shops each day (one shop running dry answers "was there more demand") and the
+summary adds "Sold out on N of those nights", over counted nights only.
+
+Premades page widths re-cut to sum to 100 — 203's came to 104, which a fixed
+table scales down without saying so.

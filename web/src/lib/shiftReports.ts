@@ -8,6 +8,7 @@
  */
 
 import type { ShiftSlot } from "./employeeEvents";
+import { formatTypedTime } from "./timeInput";
 import { SHIFT_SLOT_LABEL } from "./employeeEvents";
 import {
   CHECKLIST_KIND_LABEL,
@@ -504,6 +505,8 @@ export type EmailReport = {
       leftover: number | null;
       /** Packed for Too Good To Go — migration 203. */
       rescued: number | null;
+      /** When the last one sold, `HH:MM` — migration 204. Null = did not. */
+      soldOutAt: string | null;
       /** The supervisor's note about this count — migration 081. */
       note: string | null;
     }[];
@@ -801,7 +804,7 @@ export function supervisorBody(report: EmailReport): string {
       `<h3 style="${S.h3}">${esc(section.title)}</h3><table style="${S.table}"><tr>` +
         `<th style="${S.th}">Item</th><th style="${S.thr}">Par</th>` +
         `<th style="${S.thr}">Made</th><th style="${S.thr}">Rescued</th>` +
-        `<th style="${S.thr}">Left</th>` +
+        `<th style="${S.thr}">Left</th><th style="${S.th}">Sold out</th>` +
         `<th style="${S.th}">Note</th></tr>`
     );
     for (const p of section.lines) {
@@ -809,6 +812,9 @@ export function supervisorBody(report: EmailReport): string {
         `<tr><td style="${S.td}">${esc(p.name)}</td><td style="${S.tdr}">${p.par ?? "—"}</td>` +
           `<td style="${S.tdr}">${p.made ?? "—"}</td><td style="${S.tdr}">${p.rescued ?? "—"}</td>` +
           `<td style="${S.tdr}">${p.leftover ?? "—"}</td>` +
+          // Blank, not a dash, when it did not sell out — the usual case, and a
+          // column of dashes would shout over the few times that matter.
+          `<td style="${S.td}">${esc(formatTypedTime(p.soldOutAt))}</td>` +
           // The column that makes the three numbers mean something: "18 made, 0
           // left" and the same with "dropped a tray, re-fried" are different
           // nights. Empty is a thin space rather than an em dash — a dash in
