@@ -155,3 +155,22 @@ the sales, which would have disagreed with Square's Sales Summary and with the
 net sales figure payroll reads.
 **A day synced BEFORE its offline payments upload still does not balance** —
 correctly; sync it again once they have.
+
+**A RE-POST DOUBLED THE DEPOSIT (2026-10-15, Mark).** Posting 10-14 again with
+"Post unchanged days and deposits again" ticked updated both shops' deposits
+(551094, 551095 — same ids, sync token 0 → 1) but each came back with TWO
+lines, the old and the new, so each deposit read double. Mark deleted the
+extra line by hand; the audit log shows an edit, not a second deposit.
+Cause: the update is a full update (`sparse: false`) whose lines carry no
+`Id`, and QuickBooks reads an id-less line as a NEW line and kept the old one
+beside it. Fix (`qbo-sync` v53), at all three posting paths — days, deposits
+and the labor split: `withLiveLineIds` reads the live document before an
+update and gives its line ids, in order, to the lines being sent; and
+`savedLinesMatch` compares what QuickBooks KEPT (line count and sum) with what
+was sent after every save, recording the post as FAILED with the reason when
+they differ, so a doubled document can no longer pass silently. Not yet
+proven against QuickBooks by a real re-post.
+**Twelve journal entries had been updated the old way** (both shops, 10-01
+through 10-05 and 10-14) — whether journal-entry updates doubled their lines
+too was not known when this was written; a doubled journal entry still
+balances, so nothing would have flagged it.

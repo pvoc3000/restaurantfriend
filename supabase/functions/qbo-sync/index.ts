@@ -208,6 +208,66 @@ async function currentSyncToken(
  * be right is worse than one that fails, because it teaches you to trust it.
  */
 /**
+ * AN UPDATE MUST NAME THE LINES IT REPLACES (2026-10-15). A full update
+ * (`sparse: false`) whose lines carry no `Id` is read by QuickBooks as NEW lines
+ * — on a Deposit it kept the old line beside the new one, so a re-posted payout
+ * doubled (Mark, both shops' 10-14 deposits, fixed by hand). So before an
+ * update the live document is read and its line ids are given, in order, to
+ * the lines being sent. A longer new version adds lines, which is right; a
+ * shorter one leaves old lines that may survive, which `savedLinesMatch`
+ * catches after the save. Creates are untouched.
+ */
+async function withLiveLineIds(
+  admin: SupabaseClient,
+  conn: Parameters<typeof qboUpload>[1],
+  entity: string,
+  payload: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const id = payload.Id;
+  if (id === undefined || id === null || String(id).trim() === "") return payload;
+  const sql = `select * from ${entity} where Id = '${String(id).replace(/'/g, "")}'`;
+  const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(sql)}`)) as {
+    QueryResponse?: Record<string, Record<string, unknown>[]>;
+  };
+  const live = res.QueryResponse?.[entity]?.[0];
+  if (!live) {
+    throw new QboError(
+      `${entity} ${String(id)} is no longer in QuickBooks (deleted there?), so it cannot be updated. ` +
+        "Nothing was sent.",
+      409
+    );
+  }
+  const liveIds = ((live.Line as Record<string, unknown>[] | undefined) ?? [])
+    .map((l) => (l.Id === undefined || l.Id === null ? null : String(l.Id)))
+    .filter((x): x is string => Boolean(x));
+  const lines = ((payload.Line as Record<string, unknown>[] | undefined) ?? []).map((l, i) =>
+    i < liveIds.length ? { ...l, Id: liveIds[i] } : { ...l }
+  );
+  return { ...payload, Line: lines, SyncToken: String(live.SyncToken ?? payload.SyncToken ?? "") };
+}
+
+/** What QuickBooks KEPT against what was sent: the same number of lines and
+ *  the same sum, to the cent. Null when they agree, else the sentence. */
+function savedLinesMatch(
+  sent: Record<string, unknown>,
+  saved: Record<string, unknown> | undefined,
+  entity: string
+): string | null {
+  const sum = (lines: Record<string, unknown>[]) =>
+    lines.reduce((s, l) => s + Math.round(Number(l.Amount ?? 0) * 100), 0);
+  const a = (sent.Line as Record<string, unknown>[] | undefined) ?? [];
+  const b = ((saved?.Line as Record<string, unknown>[] | undefined) ?? []).filter(
+    (l) => l.DetailType !== "SubTotalLineDetail"
+  );
+  if (a.length === b.length && sum(a) === sum(b)) return null;
+  return (
+    `QuickBooks saved ${entity} ${String(saved?.Id ?? "")} with ${b.length} line${b.length === 1 ? "" : "s"} ` +
+    `totalling ${(sum(b) / 100).toFixed(2)}, but ${a.length} totalling ${(sum(a) / 100).toFixed(2)} were sent. ` +
+    "Open it in QuickBooks and remove the extra lines."
+  );
+}
+
+/**
  * THE LABOR ACCOUNTS (205) AS QUICKBOOKS IDS: every chosen account and every
  * account under it, by FullyQualifiedName — `lib/laborAllocation`'s
  * `expandLaborAccounts`, done here from QuickBooks' own chart so the server
@@ -1446,8 +1506,10 @@ Deno.serve(async (req) => {
       const conn = await loadConnection(admin, orgId);
       let saved: Record<string, Record<string, unknown>>;
       let retried = false;
+      let sent: Record<string, unknown> = p;
       try {
-        ({ saved, retried } = await postDocument(admin, conn, "JournalEntry", p));
+        sent = await withLiveLineIds(admin, conn, "JournalEntry", p);
+        ({ saved, retried } = await postDocument(admin, conn, "JournalEntry", sent));
       } catch (e) {
         // RECORDED, so the Sales screen can say "failed" with the reason, and
         // the entry that is already there (if any) stays the entry.
@@ -1511,6 +1573,14 @@ Deno.serve(async (req) => {
         .from("accounting_connections")
         .update({ last_used_at: new Date().toISOString() })
         .eq("id", conn.id);
+
+      // Recorded first (the document IS in QuickBooks, and the next update
+      // must target it), then refused loudly if it is not what was sent.
+      const mismatch = savedLinesMatch(sent, doc as Record<string, unknown>, "JournalEntry");
+      if (mismatch) {
+        await supabase.rpc("record_sales_posting", { p_daily_sales: day.id, p_ref: null, p_error: mismatch });
+        return json(502, { error: mismatch, qbo_id: String(doc.Id) });
+      }
 
       return json(200, {
         entity: "JournalEntry",
@@ -1630,8 +1700,10 @@ Deno.serve(async (req) => {
 
       let saved: Record<string, Record<string, unknown>>;
       let retried = false;
+      let sent: Record<string, unknown> = p;
       try {
-        ({ saved, retried } = await postDocument(admin, conn, "JournalEntry", p));
+        sent = await withLiveLineIds(admin, conn, "JournalEntry", p);
+        ({ saved, retried } = await postDocument(admin, conn, "JournalEntry", sent));
       } catch (e) {
         const message = e instanceof QboError ? e.message : (e instanceof Error ? e.message : String(e));
         await supabase.rpc("record_labor_allocation", {
@@ -1697,6 +1769,14 @@ Deno.serve(async (req) => {
         .from("accounting_connections")
         .update({ last_used_at: new Date().toISOString() })
         .eq("id", conn.id);
+
+      // Recorded first (the document IS in QuickBooks, and the next update
+      // must target it), then refused loudly if it is not what was sent.
+      const mismatch = savedLinesMatch(sent, doc as Record<string, unknown>, "JournalEntry");
+      if (mismatch) {
+        await supabase.rpc("record_labor_allocation", { p_org: orgId, p_month: month, p_ref: null, p_shares: null, p_error: mismatch });
+        return json(502, { error: mismatch, qbo_id: String(doc.Id) });
+      }
 
       return json(200, {
         entity: "JournalEntry",
@@ -1843,8 +1923,10 @@ Deno.serve(async (req) => {
       const conn = await loadConnection(admin, orgId);
       let saved: Record<string, Record<string, unknown>>;
       let retried = false;
+      let sent: Record<string, unknown> = p;
       try {
-        ({ saved, retried } = await postDocument(admin, conn, "Deposit", p));
+        sent = await withLiveLineIds(admin, conn, "Deposit", p);
+        ({ saved, retried } = await postDocument(admin, conn, "Deposit", sent));
       } catch (e) {
         const message = e instanceof QboError ? e.message : (e instanceof Error ? e.message : String(e));
         await supabase.rpc("record_payout_posting", { p_payout: payout.id, p_ref: null, p_error: message });
@@ -1900,6 +1982,14 @@ Deno.serve(async (req) => {
         .from("accounting_connections")
         .update({ last_used_at: new Date().toISOString() })
         .eq("id", conn.id);
+
+      // Recorded first (the document IS in QuickBooks, and the next update
+      // must target it), then refused loudly if it is not what was sent.
+      const mismatch = savedLinesMatch(sent, doc as Record<string, unknown>, "Deposit");
+      if (mismatch) {
+        await supabase.rpc("record_payout_posting", { p_payout: payout.id, p_ref: null, p_error: mismatch });
+        return json(502, { error: mismatch, qbo_id: String(doc.Id) });
+      }
 
       return json(200, {
         entity: "Deposit",
