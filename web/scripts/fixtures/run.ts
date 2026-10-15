@@ -122,6 +122,7 @@ import "./specialOrderSchedule.fixtures";
 import "./scheduleSource.fixtures";
 import "./sales.fixtures";
 import "./salesPosting.fixtures";
+import "./laborAllocation.fixtures";
 import "./startPage.fixtures";
 import "./sharedDevice.fixtures";
 import "./shell.fixtures";

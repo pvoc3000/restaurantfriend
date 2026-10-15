@@ -1484,6 +1484,193 @@ Deno.serve(async (req) => {
     }
 
     // -----------------------------------------------------------------------
+    // post_labor_allocation — the month's labor split by hours (205)
+    // -----------------------------------------------------------------------
+    //
+    // `post_daily_sales`' shape. The browser BUILT the entry
+    // (`lib/laborAllocation`, pure and fixture-tested); this checks what it
+    // must never get wrong — the month's DocNumber and date, that every line
+    // is on a labor account, and that EVERY ACCOUNT NETS TO ZERO to the cent.
+    // That last check is stronger than "the entry balances": it is what
+    // guarantees the split can move labor between shops and never change how
+    // much labor there is. Create versus update is decided by the stored id.
+    if (mode === "post_labor_allocation") {
+      if (!["owner", "admin"].includes(role)) {
+        return json(403, { error: "a manager or the owner is required to post the labor split" });
+      }
+      const req = body as unknown as {
+        month?: string;
+        payload?: Record<string, unknown>;
+        journal_hash?: string;
+        shares?: Record<string, unknown>;
+        force?: boolean;
+      };
+      if (!req.month || !/^\d{4}-\d{2}-01$/.test(req.month) || !req.payload || !req.journal_hash) {
+        return json(400, { error: "missing month (YYYY-MM-01), payload or journal_hash" });
+      }
+      const month = req.month;
+      const [y, m] = month.split("-").map(Number);
+      const lastDay = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+      const expectedDoc = `LABOR-${month.slice(0, 7)}`;
+
+      const [{ data: existing, error: exErr }, { data: accts, error: acctErr }] = await Promise.all([
+        supabase
+          .from("labor_allocations")
+          .select("id, external_ref")
+          .eq("org_id", orgId)
+          .eq("month", month)
+          .maybeSingle(),
+        supabase.from("accounting_labor_accounts").select("account_ref").eq("org_id", orgId),
+      ]);
+      if (exErr || acctErr) {
+        const msg = (exErr ?? acctErr)!.message;
+        return json(500, {
+          error: /labor_allocations|accounting_labor_accounts/.test(msg)
+            ? "The labor split needs migration 205, which has not been applied yet."
+            : msg,
+        });
+      }
+      const allowed = new Set((accts ?? []).map((a) => String((a as { account_ref: string }).account_ref)));
+      if (allowed.size === 0) {
+        return json(400, { error: "No labor accounts are chosen yet (Settings → Integrations → QuickBooks)." });
+      }
+
+      const p = req.payload;
+      if (p.DocNumber !== expectedDoc) {
+        return json(400, { error: `The payload's DocNumber (${String(p.DocNumber)}) is not this month's (${expectedDoc}).` });
+      }
+      if (p.TxnDate !== lastDay) {
+        return json(400, { error: `The payload's date (${String(p.TxnDate)}) is not the last day of the month (${lastDay}).` });
+      }
+      const lines = p.Line as Record<string, unknown>[] | undefined;
+      if (!Array.isArray(lines) || lines.length === 0) {
+        return json(400, { error: "The payload has no lines." });
+      }
+      const netByAccount = new Map<string, number>();
+      for (const line of lines) {
+        const detail = line.JournalEntryLineDetail as Record<string, unknown> | undefined;
+        const cents = Math.round(Number(line.Amount) * 100);
+        if (!Number.isFinite(cents) || cents <= 0) {
+          return json(400, { error: `A line carries an amount QuickBooks would refuse (${String(line.Amount)}).` });
+        }
+        const acct = (detail?.AccountRef as { value?: string } | undefined)?.value;
+        if (!acct || !allowed.has(String(acct))) {
+          return json(400, { error: `A line posts to account ${String(acct)}, which is not a labor account.` });
+        }
+        const sign = detail?.PostingType === "Debit" ? 1 : detail?.PostingType === "Credit" ? -1 : 0;
+        if (sign === 0) return json(400, { error: "A line has no posting type." });
+        netByAccount.set(String(acct), (netByAccount.get(String(acct)) ?? 0) + sign * cents);
+      }
+      for (const [acct, net] of netByAccount) {
+        if (net !== 0) {
+          return json(400, {
+            error: `Account ${acct} does not net to zero (${net} cents) — the split may only move labor between shops.`,
+          });
+        }
+      }
+
+      const stored = (existing?.external_ref as { qbo?: { id?: string; journal_hash?: string; doc_number?: string | null } } | null)?.qbo;
+      const storedId = stored?.id ?? null;
+      const sentId = p.Id === undefined || p.Id === null ? null : String(p.Id);
+      if (storedId && sentId !== storedId) {
+        return json(400, {
+          error: `This month is already in QuickBooks as entry ${storedId}; the payload names ${sentId ?? "a new entry"}. Reload and try again.`,
+        });
+      }
+      if (!storedId && sentId) {
+        return json(400, { error: `The payload updates entry ${sentId}, but this month has never been posted. Reload and try again.` });
+      }
+      if (storedId && !req.force && stored?.journal_hash === req.journal_hash) {
+        return json(200, {
+          skipped: true,
+          reason: "unchanged since it was last posted",
+          qbo_id: storedId,
+          doc_number: stored?.doc_number ?? expectedDoc,
+        });
+      }
+
+      const conn = await loadConnection(admin, orgId);
+      let saved: Record<string, Record<string, unknown>>;
+      let retried = false;
+      try {
+        ({ saved, retried } = await postDocument(admin, conn, "JournalEntry", p));
+      } catch (e) {
+        const message = e instanceof QboError ? e.message : (e instanceof Error ? e.message : String(e));
+        await supabase.rpc("record_labor_allocation", {
+          p_org: orgId,
+          p_month: month,
+          p_ref: null,
+          p_shares: null,
+          p_error: message,
+        });
+        const status = e instanceof QboError ? e.status : 502;
+        return json(status, { error: message });
+      }
+
+      const doc = saved?.JournalEntry;
+      if (!doc?.Id || doc?.SyncToken === undefined || doc?.SyncToken === null) {
+        return json(502, { error: "QuickBooks saved the entry but did not return an id and sync token." });
+      }
+
+      const warnings: string[] = [];
+      if (retried) warnings.push(STALE_RETRY_NOTE);
+      const savedLines = (doc.Line as Record<string, Record<string, unknown>>[] | undefined) ?? [];
+      const kept = (which: "ClassRef" | "DepartmentRef") =>
+        savedLines.some((l) => Boolean((l.JournalEntryLineDetail as Record<string, unknown> | undefined)?.[which]));
+      if (!kept("DepartmentRef")) {
+        warnings.push(
+          "QuickBooks did not keep the location. Turn on Track locations in " +
+            "Account and settings → Advanced → Categories, then post again."
+        );
+      }
+      if (!kept("ClassRef")) {
+        warnings.push(
+          "QuickBooks did not keep the class. Turn on Track classes in " +
+            "Account and settings → Advanced → Categories, then post again."
+        );
+      }
+
+      const ref = {
+        qbo: {
+          id: String(doc.Id),
+          sync_token: String(doc.SyncToken),
+          doc_number: doc.DocNumber === undefined || doc.DocNumber === null ? null : String(doc.DocNumber),
+          entity: "JournalEntry",
+          journal_hash: req.journal_hash,
+        },
+      };
+      const { data: recorded, error: recErr } = await supabase.rpc("record_labor_allocation", {
+        p_org: orgId,
+        p_month: month,
+        p_ref: ref,
+        p_shares: req.shares ?? null,
+        p_error: null,
+      });
+      if (recErr) return json(500, { error: recErr.message, qbo_id: String(doc.Id) });
+      if (!Array.isArray(recorded) || recorded.length === 0) {
+        return json(500, {
+          error: "It reached QuickBooks but could not be recorded here, so posting " +
+            `again would duplicate it. Its QuickBooks id is ${doc.Id}.`,
+          qbo_id: String(doc.Id),
+        });
+      }
+
+      await admin
+        .from("accounting_connections")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", conn.id);
+
+      return json(200, {
+        entity: "JournalEntry",
+        qbo_id: String(doc.Id),
+        doc_number: ref.qbo.doc_number,
+        sync_token: ref.qbo.sync_token,
+        updated: Boolean(sentId),
+        warnings,
+      });
+    }
+
+    // -----------------------------------------------------------------------
     // post_square_payout — one payout becomes a Bank Deposit (105)
     // -----------------------------------------------------------------------
     //
@@ -2060,7 +2247,11 @@ Deno.serve(async (req) => {
                 amount: Number(l.Amount ?? 0),
                 account_ref: ref("AccountRef").value ?? null,
                 account_name: ref("AccountRef").name ?? null,
+                // The ids as well as the names (205): the labor split joins
+                // on them, and two classes can share a name.
+                class_ref: ref("ClassRef").value ?? null,
                 class_name: ref("ClassRef").name ?? null,
+                department_ref: ref("DepartmentRef").value ?? null,
                 department_name: ref("DepartmentRef").name ?? null,
                 description: l.Description === undefined || l.Description === null ? null : String(l.Description),
               };

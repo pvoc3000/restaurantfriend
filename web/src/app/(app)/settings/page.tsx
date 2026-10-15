@@ -9,6 +9,7 @@ import { canManageMembers } from "@/lib/roles";
 import { ShiftReportSettings } from "@/components/settings/ShiftReportSettings";
 import { MessagesIntro, SpecialOrderSettings } from "@/components/settings/SpecialOrderSettings";
 import { AccountingSettings, type AccountingStatus } from "@/components/settings/AccountingSettings";
+import { LaborAccountsSettings, type LaborAccountRow } from "@/components/settings/LaborAccountsSettings";
 import { SalesMappingsTable, type SalesMappingRow } from "@/components/settings/SalesMappingsTable";
 import { SharedDevices, type RegisteredDevice } from "@/components/settings/SharedDevices";
 import { thisDeviceId } from "@/app/deviceActions";
@@ -79,9 +80,11 @@ export default async function SettingsPage({
   let accounting: AccountingStatus | null = null;
   let salesMappings: SalesMappingRow[] = [];
   let salesMappingsError: string | null = null;
+  let laborAccounts: LaborAccountRow[] = [];
+  let laborAccountsError: string | null = null;
   if (tab === "accounting") {
     const supabase = await createClient();
-    const [{ data: qbo }, maps] = await Promise.all([
+    const [{ data: qbo }, maps, labor] = await Promise.all([
       supabase.rpc("accounting_connection_status", { p_org: session.membership.org_id }),
       // Migration 104's grid. A missing table is a sentence on the tab, never
       // a broken settings screen.
@@ -91,7 +94,16 @@ export default async function SettingsPage({
             .select("id, kind, square_key, square_name, account_ref, account_name, last_seen_at")
             .eq("org_id", session.membership.org_id)
         : Promise.resolve({ data: [], error: null }),
+      // Migration 205's labor accounts, on the QuickBooks tab.
+      integrationsTab === "quickbooks"
+        ? supabase
+            .from("accounting_labor_accounts")
+            .select("id, account_ref, account_name")
+            .eq("org_id", session.membership.org_id)
+        : Promise.resolve({ data: [], error: null }),
     ]);
+    laborAccounts = (labor.data ?? []) as LaborAccountRow[];
+    laborAccountsError = labor.error?.message ?? null;
     accounting = Array.isArray(qbo) ? ((qbo[0] as AccountingStatus | undefined) ?? null) : null;
     salesMappings = (maps.data ?? []) as SalesMappingRow[];
     salesMappingsError = maps.error?.message ?? null;
@@ -255,7 +267,21 @@ export default async function SettingsPage({
                 }))}
               />
               {integrationsTab === "quickbooks" ? (
-                <AccountingSettings orgId={orgId} editable={editable} initialStatus={accounting} />
+                <div className="space-y-16">
+                  <AccountingSettings orgId={orgId} editable={editable} initialStatus={accounting} />
+                  {laborAccountsError ? (
+                    <p className="max-w-2xl text-[13px] text-accent">
+                      The labor accounts are missing — migration 205 has not been applied yet. ({laborAccountsError})
+                    </p>
+                  ) : (
+                    <LaborAccountsSettings
+                      orgId={orgId}
+                      rows={laborAccounts}
+                      editable={editable}
+                      connected={accounting?.status === "connected"}
+                    />
+                  )}
+                </div>
               ) : integrationsTab === "calendars" ? (
                 <CalendarSettings
                   orgId={orgId}

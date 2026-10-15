@@ -112,6 +112,9 @@ export const PAGE_ACCESS: Record<string, Record<Role, PageAccess>> = {
   // Owner only — the manager cell is BLANK on the sheet. 033's write policy
   // still admits a manager; hidden, per Mark's rule for everything not HR.
   "/payroll-benefits":     row("X", "X", "-", "-", "W"),
+  // Not on the sheet (2026-10-14). 205 is owner/admin on every table it adds,
+  // and the hours it sums are 028's, which are owner/admin too.
+  "/labor-allocation":     row("X", "X", "X", "W", "W"),
 
   // ── Operations ────────────────────────────────────────────────────────────
   // Not on the sheet (2026-10-09). Everyone reads; a supervisor or a purchaser

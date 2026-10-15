@@ -211,6 +211,15 @@ export const SECTIONS: NavSection[] = [
         built: true,
         // Owner only on the sheet — the manager cell is blank. See pageAccess.
       },
+      {
+        // The month's labor split between shops by hours worked, posted to
+        // QuickBooks (migration 205). Under HR beside Timesheets because the
+        // hours are the timesheets'; owner/manager like them.
+        slug: "labor-by-shop",
+        label: "Labor by Shop",
+        href: "/labor-allocation",
+        built: true,
+      },
     ],
   },
   {
