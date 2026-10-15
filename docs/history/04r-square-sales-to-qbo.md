@@ -168,9 +168,13 @@ and the labor split: `withLiveLineIds` reads the live document before an
 update and gives its line ids, in order, to the lines being sent; and
 `savedLinesMatch` compares what QuickBooks KEPT (line count and sum) with what
 was sent after every save, recording the post as FAILED with the reason when
-they differ, so a doubled document can no longer pass silently. Not yet
-proven against QuickBooks by a real re-post.
+they differ, so a doubled document can no longer pass silently. **PROVEN the
+same day**: Mark re-posted 10-14 with "again" ticked — both deposits stayed one
+line, no post_error. (An unchanged update does not move QuickBooks' sync
+token: the deposits stayed at 2, Mark's hand edit, and the entries at 1.)
 **Twelve journal entries had been updated the old way** (both shops, 10-01
-through 10-05 and 10-14) — whether journal-entry updates doubled their lines
-too was not known when this was written; a doubled journal entry still
-balances, so nothing would have flagged it.
+through 10-05 and 10-14). **Journal-entry updates did NOT double**: the
+proving re-post sent `DF01-2026-10-14` (updated the old way at 14:58) with its
+live line ids, and `savedLinesMatch` found the same count kept — a doubled
+entry would have kept twice the lines and failed. QuickBooks replaces a
+JournalEntry's lines on a full update; only the Deposit appended.
