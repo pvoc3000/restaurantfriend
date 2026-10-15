@@ -77,7 +77,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 4q. ✅ Desk start page (`/start`) — `docs/history/04q-desk-start.md`
 4r. 🚧 Square sales posted to QuickBooks (journal entries, deposits) — `docs/history/04r-square-sales-to-qbo.md`
 4s. 🚧 Calendar (blackout dates, notes, layers, iCal feeds in and out; 181–194 applied and `calendar-sync` deployed 2026-10-10; signed-in screens not yet checked in a browser) — `docs/history/04s-calendar.md`
-4t. 🚧 Labor by Shop (monthly labor split between shops by hours, posted to QuickBooks; 205 APPLIED and `qbo-sync` v50 deployed 2026-10-14; nothing posted yet) — `docs/history/04t-labor-allocation.md`
+4t. 🚧 Labor by Shop (monthly labor split between shops by hours, posted to QuickBooks; 205 APPLIED, pool read from the general ledger (`qbo-sync` v52); Dec 2025–Sep 2026 POSTED by Mark 2026-10-15) — `docs/history/04t-labor-allocation.md`
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 **Each module's full history — decisions, measurements, traps, probes and what was verified — lives in `docs/history/`**, moved out of this file verbatim on 2026-09-18 because it had grown to ~1M characters loaded into every session. **Read the module's history file before designing or changing anything in that module**, the same way the briefs in `docs/` are read. The catalog-cleanup notes and the per-migration ledger (001–019 and which are applied) are in `docs/history/migration-ledger.md`. **Record new module history in its `docs/history/` file, not here**; this file keeps only a one-line status per module.

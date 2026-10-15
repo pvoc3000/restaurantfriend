@@ -130,7 +130,21 @@ shift has a null location and none is at EVENT.
   supervisor sees 0 rows everywhere and is refused an insert; `anon` cannot
   execute either function. Nothing committed (checked afterwards).
 
-## Not done yet
+## Posted (2026-10-15)
+
+Mark checked December 2025 against his P&L by Class — Employee Payroll
+$67,615.20 to the penny — then posted December 2025 through September 2026,
+QuickBooks entries 551082–551091. Splits ran 61.4–67.5% DF01. March
+($96,355.06) and August ($102,998.59) run about $30k above the ~$67k norm,
+most likely three Gusto check dates in those months (the check-date
+approximation above); not investigated.
+
+The debit total equals the month's labor exactly, BY DESIGN while Gusto posts a
+Class and no Location: no existing bucket carries a shop's exact refs, so
+nothing nets. A month where they differ means something was posted with a
+location.
+
+## Not done yet (as first written)
 
 - (Done 2026-10-14, at Mark's request: 205 applied via `db query --linked` in one
   transaction, after-checks 3 policies / 2 functions / anon refused; `qbo-sync`
