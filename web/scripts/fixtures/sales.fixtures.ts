@@ -628,11 +628,18 @@ test("incompleteDays: only the unfinished ones, in the order given", () => {
   eq(incompleteDays([], LA), []);
 });
 
-test("salesRangePresets: five presets, no custom, agreeing with resolveSalesRange", () => {
+test("salesRangePresets: seven presets, no custom, agreeing with resolveSalesRange", () => {
   const presets = salesRangePresets("2026-08-23", PERIODS);
-  eq(presets.map((p) => p.key), ["period", "last-period", "mtd", "last-30", "ytd"]);
-  eq(presets[0].range("2026-08-23"), resolveSalesRange("period", "2026-08-23", PERIODS).range);
-  eq(presets[2].label, "Month to Date");
+  eq(presets.map((p) => p.key), ["today", "yesterday", "period", "last-period", "mtd", "last-30", "ytd"]);
+  eq(presets[2].range("2026-08-23"), resolveSalesRange("period", "2026-08-23", PERIODS).range);
+  eq(presets[4].label, "Month to Date");
+});
+
+test("resolveSalesRange: today and yesterday are one day each", () => {
+  eq(resolveSalesRange("today", "2026-08-23", PERIODS).range, { from: "2026-08-23", to: "2026-08-23" });
+  eq(resolveSalesRange("yesterday", "2026-03-01", PERIODS).range, { from: "2026-02-28", to: "2026-02-28" });
+  eq(parseSalesRange(undefined), "period", "the default is still the pay period");
+  eq(parseSalesRange("yesterday"), "yesterday");
 });
 
 /* -- closed days (migration 181) ----------------------------------------- */

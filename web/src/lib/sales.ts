@@ -399,6 +399,11 @@ function rollUp(
  * scoped to, so "how did this period do" is the question the screen opens on.
  */
 export const SALES_RANGES = [
+  // One day each (Mark, 2026-10-15): "how did today go" and "what posts this
+  // morning". First in the menu as the shortest windows; the DEFAULT stays the
+  // pay period, which is `parseSalesRange`'s fallback, not list order.
+  "today",
+  "yesterday",
   "period",
   "last-period",
   "mtd",
@@ -410,6 +415,8 @@ export const SALES_RANGES = [
 export type SalesRangeKey = (typeof SALES_RANGES)[number];
 
 export const SALES_RANGE_LABEL: Record<SalesRangeKey, string> = {
+  today: "Today",
+  yesterday: "Yesterday",
   period: "This Pay Period",
   "last-period": "Last Pay Period",
   mtd: "Month to Date",
@@ -441,6 +448,8 @@ export const SALES_RANGE_LABEL: Record<SalesRangeKey, string> = {
  * Worth a decision; it is not this one.
  */
 export const SALES_PREVIOUS_LABEL: Record<SalesRangeKey, string> = {
+  today: "the day before",
+  yesterday: "the day before",
   period: "last period",
   "last-period": "last period",
   mtd: "last month",
@@ -451,7 +460,7 @@ export const SALES_PREVIOUS_LABEL: Record<SalesRangeKey, string> = {
 
 /**
  * The `ui/RangePicker`'s presets on this screen (Mark, 2026-09-08, replacing
- * the Period tabs): the five named windows, resolved through
+ * the Period tabs): the named windows, resolved through
  * `resolveSalesRange` so the picker and the page cannot disagree about what
  * "this pay period" is. `custom` is not a preset — it is the calendar.
  */
@@ -493,6 +502,12 @@ export function resolveSalesRange(
   const twoWeeks = (): DateRange => ({ from: addDays(today, -13), to: today });
 
   switch (key) {
+    case "today":
+      return { range: { from: today, to: today }, label: today, fellBack: false };
+    case "yesterday": {
+      const day = addDays(today, -1);
+      return { range: { from: day, to: day }, label: day, fellBack: false };
+    }
     case "period": {
       if (containing) {
         return {
