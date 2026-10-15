@@ -867,3 +867,14 @@ bar and its buttons 44 → 40 → 42px, close box 17px, title 15.5px, body paddi
 10px, display 13.5px over 34px, key gaps 8px, key type 21.5px (operators 26,
 `=` 28.5). Keys come out 60px square. The ‹ › arrows (26px) were new in that
 commit and kept. Not seen in a browser — the pane was on `/lock`.
+
+**THE GUIDE'S PREMADES SECTION, REWRITTEN FOR RESCUED (Mark, 2026-10-15: "update
+the shift report guide with the new information on 'rescue' donuts and accurate
+reporting").** It now says why the numbers matter (sold = made − rescued −
+left, and a blank Rescued on a box night counts the boxes as sales), then walks
+the night in order: during the shift on the printed sheet (Sold out time;
+Rescued as the boxes are packed), at close (L/O after packing; an uncollected
+box stays Rescued), and on the page (grouped by type and cut; the → arrow;
+Nothing rescued after entering the boxed donuts; Sold out blank if it didn't).
+A red note: the report won't send with a blank Rescued or Left, and the buttons
+fill only empty boxes. Seen rendered at /guides/shift-report.

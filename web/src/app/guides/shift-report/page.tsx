@@ -247,39 +247,76 @@ export default function ShiftReportGuide() {
           <Page name="Premades" closingOnly>
             <p>
               For each item on today’s production schedule, enter how many were{" "}
-              <strong>Made</strong>, how many were <strong>Rescued</strong>, and how many were{" "}
-              <strong>Left</strong>. The rows are in the same order as the printed sheet.
+              <strong>Made</strong>, <strong>Rescued</strong> and <strong>Left</strong>, and the
+              time it <strong>Sold out</strong> if it did. These numbers decide how many of each
+              donut we make next time, so they need to be right.
+            </p>
+            <p>
+              <strong>Sold = Made − Rescued − Left.</strong> A donut that went into a Too Good To Go
+              box was not sold. If Rescued is left at 0 when boxes went out, those donuts count as
+              sales, and we keep making too many.
+            </p>
+
+            <p>
+              <strong>During the shift, on the printed premade sheet:</strong>
             </p>
             <ul>
               <li>
-                <strong>Rescued</strong> is how many went into Too Good To Go boxes. Write it on the
-                printed sheet when you pack the boxes, because they’re gone by the time you count.
+                When a donut sells out, write the time in its <strong>Sold out</strong> box.
               </li>
               <li>
-                Count <strong>Left</strong> after the boxes are packed. If a box isn’t picked up,
-                leave its donuts as Rescued and don’t count them again under Left.
+                When you pack the Too Good To Go boxes, write how many of each donut went in, in
+                its <strong>Rescued</strong> box. Do it as you pack: by the time you count, the
+                boxes are gone and nobody can say what was in them.
+              </li>
+            </ul>
+
+            <p>
+              <strong>At close:</strong>
+            </p>
+            <ul>
+              <li>
+                Count what’s left in the case and write it under <strong>L/O</strong>. Count after
+                the boxes are packed, so a donut is never in both.
               </li>
               <li>
-                When a donut sells out, write the time on the printed sheet under{" "}
-                <strong>Sold out</strong>, and enter it in the <strong>Sold out</strong> box at
-                close. Leave it blank if it didn’t sell out.
+                If a box isn’t picked up, its donuts stay Rescued. Don’t put them back in the case
+                or count them again under Left.
+              </li>
+            </ul>
+
+            <p>
+              <strong>On this page:</strong>
+            </p>
+            <ul>
+              <li>
+                The donuts are grouped by type and cut, in the same order as the printed sheet. Copy
+                each number from the sheet.
               </li>
               <li>
-                On a night with no boxes, tap <Ui>Nothing rescued</Ui>. The report won’t send with
-                Rescued left blank. <Ui>Nothing left over</Ui> does the same for Left.
+                If you made exactly the par, tap the <strong>→</strong> arrow to copy it in.
+              </li>
+              <li>
+                On a night with no boxes, tap <Ui>Nothing rescued</Ui>. On a night with some boxes,
+                enter those donuts first, then tap it to fill the rest with 0.{" "}
+                <Ui>Nothing left over</Ui> does the same for Left.
+              </li>
+              <li>
+                Leave <strong>Sold out</strong> blank for a donut that didn’t sell out.
               </li>
               <li>
                 Every schedule for the day gets its own page, special orders included. A special
                 order’s page is titled with the order’s name.
               </li>
               <li>
-                If you made exactly the par, tap the <strong>→</strong> arrow to copy it in.
-              </li>
-              <li>
                 If nobody generated today’s schedule, the page is empty. Tap{" "}
                 <Ui>Generate today’s schedule</Ui> and the rows appear.
               </li>
             </ul>
+            <Note head="The report won’t send with a blank Rescued or Left." warn>
+              A 0 is an answer; a blank box isn’t. The buttons only fill boxes that are empty, so
+              they never change a number you typed.
+            </Note>
           </Page>
 
           <Page name="Donut batches" shifts="Opening · Mid">
