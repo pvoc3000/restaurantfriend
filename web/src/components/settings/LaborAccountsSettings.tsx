@@ -52,9 +52,15 @@ export function LaborAccountsSettings({
     };
   }, [connected, supabase]);
 
+  // A PARENT ACCOUNT HOLDS NOTHING when its sub-accounts are where the money
+  // is posted — and the split matches lines by exact account, so a chosen
+  // parent quietly adds nothing (Mark chose "Employee Earnings" while Gusto
+  // posts to "Regular Wages" under it, 2026-10-14). Only accounts with nothing
+  // under them are offered, and a parent already chosen says so.
+  const subAccounts = (name: string) => (accounts ?? []).filter((b) => b.name.startsWith(`${name}:`));
   const chosen = new Set(rows.map((r) => r.account_ref));
   const options = (accounts ?? [])
-    .filter((a) => !chosen.has(a.id))
+    .filter((a) => !chosen.has(a.id) && subAccounts(a.name).length === 0)
     .map((a) => {
       const { parent, leaf } = splitAccountName(a.name);
       return { value: a.id, label: leaf, group: parent ?? a.classification, hint: a.type };
@@ -102,7 +108,18 @@ export function LaborAccountsSettings({
             .sort((a, b) => (a.account_name ?? a.account_ref).localeCompare(b.account_name ?? b.account_ref))
             .map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-3 py-1.5">
-                <span>{r.account_name ?? r.account_ref}</span>
+                <span className="flex flex-col">
+                  <span>{r.account_name ?? r.account_ref}</span>
+                  {(() => {
+                    const subs = r.account_name ? subAccounts(r.account_name) : [];
+                    return subs.length ? (
+                      <span className="text-[12px] text-accent">
+                        Has sub-accounts, so nothing is posted here. Choose the accounts under it instead:{" "}
+                        {subs.map((b) => splitAccountName(b.name).leaf).join(", ")}.
+                      </span>
+                    ) : null;
+                  })()}
+                </span>
                 {editable ? (
                   <button type="button" className={SMALL_BUTTON_CLASS} disabled={busy} onClick={() => void remove(r)}>
                     Remove
