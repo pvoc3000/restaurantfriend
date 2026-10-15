@@ -103,9 +103,9 @@ export function LaborAccountsSettings({
     <section className="space-y-4">
       <SectionHeading>Labor Accounts</SectionHeading>
       <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
-        Labor by Shop splits everything Gusto posts to these accounts between the shops by the hours worked at
-        each. Choose the wage accounts, and the payroll tax and benefit accounts if they should follow the hours
-        too.
+        Labor by Shop splits what Gusto’s payroll journal entries post to these accounts between the shops by the
+        hours worked at each. Choose the wage accounts, and the payroll tax and benefit accounts Gusto posts to. An
+        account paid by bill or check, like an insurance premium, does not belong here: the split cannot see it.
       </p>
       {error ? <p className="max-w-2xl text-[13px] text-accent">{error}</p> : null}
       {rows.length === 0 ? (

@@ -420,6 +420,19 @@ export function buildLaborJournalEntry(input: {
   for (const [accountRef, buckets] of accounts) {
     const accountName = buckets[0].accountName;
     const total = buckets.reduce((s, b) => s + b.cents, 0);
+    // LABOR CANNOT BE NOTHING OR LESS. An account that nets to zero or below in
+    // the month's journal entries is one whose cost arrives some other way — a
+    // bill or a check, which this does not read — and whose journal entries
+    // are somebody's hand reclass of that cost. Splitting it would undo the
+    // reclass and leave the bill on no shop (Mark's January 2026: Workers Comp
+    // netting to $0.00, Medical to −$817.02). Left alone, and said.
+    if (total <= 0) {
+      warnings.push(
+        `${accountName ?? accountRef} is left out: its journal entries net to ${total === 0 ? "zero" : "less than zero"}, ` +
+          "so its cost is paid by bill or check, which this split cannot see. Take it off the labor accounts."
+      );
+      continue;
+    }
     poolCents += total;
     const parts = splitCents(total, shares.shares);
 

@@ -75,6 +75,25 @@ picker would not offer it. The branch is the rule.
   never dropped (dropping it would hand its labor to the other shops). Hours on
   no shop are counted and left out.
 
+## Bill-paid accounts (January 2026, the first real review)
+
+Mark's first review, January 2026, checked against his P&L by Class: five
+accounts (Commuter Benefit, Overtime, PTO and Sick, Regular Wages, Payroll Tax)
+matched to the cent. Two did not. **Workers Comp** and **Medical Dental
+Vision** are paid by BILL or CHECK with no class, and Mark's own month-end
+journal entries move them onto the shops. The pool reads journal entries only,
+so it saw the reclass and not the bill: Workers Comp netted to $0.00 and
+Medical to −$817.02, and the split would have undone his allocation and left
+negative medical at both shops.
+
+Fix: Mark takes those two off the labor accounts, and `buildLaborJournalEntry`
+now LEAVES OUT any account whose journal entries net to zero or less, with a
+warning naming it. That guard catches the January shape; it would NOT catch a
+bill-paid account whose journal entries happen to net positive. The complete
+answer is to read the pool from QuickBooks' General Ledger report (every
+transaction type, with class and location per line) instead of journal entries
+— not built; ask Mark first.
+
 ## Known approximation
 
 Gusto dates its entries by check date; hours count on the day they were

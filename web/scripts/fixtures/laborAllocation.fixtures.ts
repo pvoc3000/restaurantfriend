@@ -306,3 +306,31 @@ test("laborAllocation: a chosen account covers itself and everything under it", 
     ["1", "2", "3", "4", "5"]
   );
 });
+
+test("laborAllocation: an account paid by bill, seen only through a hand reclass, is left out", () => {
+  // January 2026's Workers Comp: the bill (not a journal entry) put $1,467.73
+  // on no class, and Mark's month-end entry moved it onto the shops. The
+  // journal entries alone net to zero — splitting that would undo the reclass.
+  const COMP = { ref: "70", name: "Employee Payroll:Workers Comp" };
+  const entries: LaborEntry[] = [
+    ...GUSTO,
+    {
+      id: "2",
+      doc_number: "JE-Jan",
+      txn_date: "2026-01-31",
+      lines: [line("Credit", 1467.73, COMP, null), line("Debit", 791.63, COMP, DF01), line("Debit", 676.1, COMP, DF02)],
+    },
+  ];
+  const b = buildLaborJournalEntry({
+    month: "2026-09-01",
+    pool: poolFromEntries(entries, [WAGES, TAXES, COMP]),
+    shares: sharesFromHours(SEPT_HOURS, SHOPS),
+    existing: null,
+  });
+  ok(b.ok);
+  if (!b.ok) return;
+  no(b.lines.some((l) => l.accountRef === "70"), "no line on the bill-paid account");
+  no(b.moves.some((m) => m.accountRef === "70"));
+  ok(b.warnings.some((w) => /Workers Comp is left out/.test(w)), b.warnings.join(" | "));
+  eq(b.poolCents, 1296000, "the pool is the wages and taxes only");
+});
