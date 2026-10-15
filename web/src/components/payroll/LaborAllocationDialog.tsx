@@ -8,10 +8,8 @@ import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/u
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { formatCents } from "@/lib/tipPool";
-import { findJournalEntries } from "@/components/sales/salesPostClient";
 import {
   buildLaborJournalEntry,
-  expandLaborAccounts,
   lastDayOfMonth,
   monthLabel,
   percentText,
@@ -21,7 +19,6 @@ import {
   type LaborEntry,
   type LaborPostingRef,
   type LaborShop,
-  type QboAccount,
   type ShopShare,
 } from "@/lib/laborAllocation";
 import type { LaborMonthRow } from "./LaborAllocationList";
@@ -98,25 +95,22 @@ export function LaborAllocationDialog({
       );
 
       // QuickBooks last, and only when there is something to read it for.
-      // One after the other, never at once: two calls together after an idle
-      // hour are two token refreshes racing (2026-09-12).
+      // THE GENERAL LEDGER, not journal entries alone (`labor_ledger`): the
+      // health premium and workers' comp arrive as bills and checks, and a
+      // split that cannot see them undoes whatever moved them (January 2026).
+      // The server expands the chosen accounts to their branches and says
+      // which accounts it read.
       let entries: LaborEntry[] = [];
       let labor = accounts;
       if (connected && accounts.length > 0) {
-        const listed = await invokeQbo(supabase, { mode: "accounts", classification: "Expense" });
+        const ledger = await invokeQbo(supabase, { mode: "labor_ledger", from: month, to });
         if (cancelled) return;
-        if (listed.message) {
-          setLoadError(listed.message);
+        if (ledger.message) {
+          setLoadError(ledger.message);
           return;
         }
-        labor = expandLaborAccounts(accounts, (listed.data?.accounts as QboAccount[] | undefined) ?? []);
-        const found = await findJournalEntries(supabase, { from: month, to });
-        if (cancelled) return;
-        if (found.error) {
-          setLoadError(found.error);
-          return;
-        }
-        entries = found.entries as unknown as LaborEntry[];
+        entries = (ledger.data?.entries as LaborEntry[] | undefined) ?? [];
+        labor = (ledger.data?.accounts as { ref: string; name: string | null }[] | undefined) ?? accounts;
       }
       const stored = ((alloc.data?.external_ref as LaborPostingRef | null) ?? null);
       const build = buildLaborJournalEntry({
@@ -318,8 +312,8 @@ export function LaborAllocationDialog({
                 </section>
 
                 <p className="max-w-[80ch] text-[13px] text-muted">
-                  Labor is every journal-entry line this month on the labor accounts — Gusto’s payrolls are dated by
-                  check date, so a payroll paid early in a month counts in that month, while hours count on the day
+                  Labor is everything posted this month to the labor accounts — Gusto’s payrolls, and any bill or check
+                  coded to them. Payrolls are dated by check date, so a payroll paid early in a month counts in that month, while hours count on the day
                   they were worked. Each account nets to zero: total labor is unchanged, only the shop moves.
                 </p>
               </>

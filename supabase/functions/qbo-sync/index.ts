@@ -207,6 +207,46 @@ async function currentSyncToken(
  * we hold: the document may have moved by several, and a guess that happens to
  * be right is worse than one that fails, because it teaches you to trust it.
  */
+/**
+ * THE LABOR ACCOUNTS (205) AS QUICKBOOKS IDS: every chosen account and every
+ * account under it, by FullyQualifiedName — `lib/laborAllocation`'s
+ * `expandLaborAccounts`, done here from QuickBooks' own chart so the server
+ * never takes the payload's word for which accounts are labor.
+ */
+async function laborAccountIds(
+  supabase: SupabaseClient,
+  admin: SupabaseClient,
+  conn: Parameters<typeof qboUpload>[1],
+  orgId: string
+): Promise<{ ids: Set<string>; names: Map<string, string>; error: string | null }> {
+  const { data, error } = await supabase.from("accounting_labor_accounts").select("account_ref").eq("org_id", orgId);
+  if (error) {
+    return {
+      ids: new Set(),
+      names: new Map(),
+      error: /accounting_labor_accounts/.test(error.message)
+        ? "The labor split needs migration 205, which has not been applied yet."
+        : error.message,
+    };
+  }
+  const ids = new Set((data ?? []).map((a) => String((a as { account_ref: string }).account_ref)));
+  const names = new Map<string, string>();
+  if (ids.size === 0) return { ids, names, error: null };
+  const q = `select Id, FullyQualifiedName from Account where Classification = 'Expense' maxresults 1000`;
+  const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(q)}`)) as {
+    QueryResponse?: { Account?: Row[] };
+  };
+  const chart = (res.QueryResponse?.Account ?? []).map((a) => ({ id: String(a.Id), name: String(a.FullyQualifiedName ?? "") }));
+  const chosen = chart.filter((a) => ids.has(a.id)).map((a) => a.name);
+  for (const a of chart) {
+    if (ids.has(a.id) || chosen.some((n) => a.name.startsWith(`${n}:`))) {
+      ids.add(a.id);
+      names.set(a.id, a.name);
+    }
+  }
+  return { ids, names, error: null };
+}
+
 async function postDocument(
   admin: SupabaseClient,
   conn: Parameters<typeof qboUpload>[1],
@@ -1513,44 +1553,25 @@ Deno.serve(async (req) => {
       const lastDay = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
       const expectedDoc = `LABOR-${month.slice(0, 7)}`;
 
-      const [{ data: existing, error: exErr }, { data: accts, error: acctErr }] = await Promise.all([
-        supabase
-          .from("labor_allocations")
-          .select("id, external_ref")
-          .eq("org_id", orgId)
-          .eq("month", month)
-          .maybeSingle(),
-        supabase.from("accounting_labor_accounts").select("account_ref").eq("org_id", orgId),
-      ]);
-      if (exErr || acctErr) {
-        const msg = (exErr ?? acctErr)!.message;
+      const { data: existing, error: exErr } = await supabase
+        .from("labor_allocations")
+        .select("id, external_ref")
+        .eq("org_id", orgId)
+        .eq("month", month)
+        .maybeSingle();
+      if (exErr) {
         return json(500, {
-          error: /labor_allocations|accounting_labor_accounts/.test(msg)
+          error: /labor_allocations/.test(exErr.message)
             ? "The labor split needs migration 205, which has not been applied yet."
-            : msg,
+            : exErr.message,
         });
       }
-      const allowed = new Set((accts ?? []).map((a) => String((a as { account_ref: string }).account_ref)));
+      const conn = await loadConnection(admin, orgId);
+      const labor = await laborAccountIds(supabase, admin, conn, orgId);
+      if (labor.error) return json(500, { error: labor.error });
+      const allowed = labor.ids;
       if (allowed.size === 0) {
         return json(400, { error: "No labor accounts are chosen yet (Settings → Integrations → QuickBooks)." });
-      }
-      const conn = await loadConnection(admin, orgId);
-      // A CHOSEN ACCOUNT COVERS ITSELF AND EVERY ACCOUNT UNDER IT — the
-      // browser's `expandLaborAccounts`, done again here from QuickBooks' own
-      // chart rather than taken on trust from the payload.
-      {
-        const q = `select Id, FullyQualifiedName from Account where Classification = 'Expense' maxresults 1000`;
-        const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(q)}`)) as {
-          QueryResponse?: { Account?: Row[] };
-        };
-        const chart = (res.QueryResponse?.Account ?? []).map((a) => ({
-          id: String(a.Id),
-          name: String(a.FullyQualifiedName ?? ""),
-        }));
-        const chosenNames = chart.filter((a) => allowed.has(a.id)).map((a) => a.name);
-        for (const a of chart) {
-          if (chosenNames.some((n) => a.name.startsWith(`${n}:`))) allowed.add(a.id);
-        }
       }
 
       const p = req.payload;
@@ -2230,6 +2251,125 @@ Deno.serve(async (req) => {
     // screen can lay them beside what this app would post. Reads, never
     // writes. Capped at a month, because a year of journal entries is a report
     // and not a comparison.
+    // -----------------------------------------------------------------------
+    // labor_ledger — every posting on the labor accounts for a month (205)
+    // -----------------------------------------------------------------------
+    //
+    // Read from the GENERAL LEDGER REPORT, not from journal entries, because
+    // labor arrives by more than one road: Gusto's payrolls are journal
+    // entries, but the health premium and the workers' comp policy are bills
+    // and checks. Reading journal entries alone saw Mark's hand reclass of
+    // those bills without the bills themselves (January 2026), and would have
+    // undone it. Each line comes back with the Class and Location ids it
+    // carries — the report gives NAMES, so they are resolved against
+    // QuickBooks' own lists, and a name that matches nothing is refused rather
+    // than treated as "no class", which would leave that class's balance
+    // where it was. Reads, never writes. `raw: true` returns the report as
+    // QuickBooks sent it, for checking the parse.
+    if (mode === "labor_ledger") {
+      if (!["owner", "admin"].includes(role)) {
+        return json(403, { error: "a manager or the owner is required to read the labor ledger" });
+      }
+      const { from, to, raw } = body as unknown as { from?: string; to?: string; raw?: boolean };
+      const iso = /^\d{4}-\d{2}-\d{2}$/;
+      if (!from || !to || !iso.test(from) || !iso.test(to) || from > to) {
+        return json(400, { error: "from and to must be ISO dates with from <= to" });
+      }
+      const span = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000 + 1;
+      if (span > 31) return json(400, { error: "at most 31 days at a time" });
+
+      const conn = await loadConnection(admin, orgId);
+      const labor = await laborAccountIds(supabase, admin, conn, orgId);
+      if (labor.error) return json(500, { error: labor.error });
+      const accounts = [...labor.names].map(([id, name]) => ({ ref: id, name }));
+      if (labor.ids.size === 0) return json(200, { entries: [], accounts });
+
+      // Name → id for classes and locations. Both the full and the short name,
+      // since a report may print either.
+      const lookup = async (entity: "Class" | "Department") => {
+        const q = `select Id, Name, FullyQualifiedName from ${entity} maxresults 1000`;
+        const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(q)}`)) as {
+          QueryResponse?: Record<string, Row[] | undefined>;
+        };
+        const map = new Map<string, string>();
+        for (const r of res.QueryResponse?.[entity] ?? []) {
+          if (r.FullyQualifiedName) map.set(String(r.FullyQualifiedName), String(r.Id));
+          if (r.Name && !map.has(String(r.Name))) map.set(String(r.Name), String(r.Id));
+        }
+        return map;
+      };
+      const classIds = await lookup("Class");
+      const deptIds = await lookup("Department");
+
+      const columns = "tx_date,txn_type,doc_num,klass_name,dept_name,subt_nat_amount";
+      const path =
+        `reports/GeneralLedger?start_date=${from}&end_date=${to}&accounting_method=Accrual` +
+        `&account=${encodeURIComponent([...labor.ids].join(","))}&columns=${columns}`;
+      const report = (await qboFetch(admin, conn, path)) as Record<string, unknown>;
+      if (raw) return json(200, { report, accounts });
+
+      type Cell = { value?: string; id?: string };
+      type RRow = { type?: string; Header?: { ColData?: Cell[] }; Rows?: { Row?: RRow[] }; ColData?: Cell[] };
+      const cols = (((report.Columns as { Column?: { MetaData?: { Name?: string; Value?: string }[] }[] } | undefined)?.Column) ?? [])
+        .map((c) => c.MetaData?.find((m) => m.Name === "ColKey")?.Value ?? "");
+      const at = (key: string) => cols.indexOf(key);
+      for (const k of ["txn_type", "subt_nat_amount", "klass_name", "dept_name"]) {
+        if (at(k) < 0) return json(502, { error: `The general ledger report came back without its ${k} column.` });
+      }
+      const byName = new Map([...labor.names].map(([id, name]) => [name, id]));
+      const entries: Record<string, unknown>[] = [];
+      const unresolved = new Set<string>();
+      const walk = (rows: RRow[] | undefined, account: { id: string; name: string } | null) => {
+        for (const r of rows ?? []) {
+          let acct = account;
+          const head = r.Header?.ColData?.[0];
+          if (head?.value) {
+            const id = head.id ?? byName.get(head.value) ?? null;
+            acct = id ? { id: String(id), name: labor.names.get(String(id)) ?? head.value } : null;
+          }
+          if (r.Rows?.Row) walk(r.Rows.Row, acct);
+          if (!r.ColData || r.Header) continue;
+          const cell = (k: string) => r.ColData?.[at(k)];
+          const txnType = cell("txn_type")?.value ?? "";
+          if (!txnType) continue; // a beginning-balance or total row
+          if (!acct || !labor.ids.has(acct.id)) continue;
+          const amount = Number(cell("subt_nat_amount")?.value ?? "");
+          if (!Number.isFinite(amount) || amount === 0) continue;
+          const klass = (cell("klass_name")?.value ?? "").trim();
+          const dept = (cell("dept_name")?.value ?? "").trim();
+          const classRef = klass ? classIds.get(klass) ?? null : null;
+          const deptRef = dept ? deptIds.get(dept) ?? null : null;
+          if (klass && !classRef) unresolved.add(`class “${klass}”`);
+          if (dept && !deptRef) unresolved.add(`location “${dept}”`);
+          entries.push({
+            id: cell("txn_type")?.id ?? "",
+            txn_type: txnType,
+            doc_number: cell("doc_num")?.value || null,
+            txn_date: cell("tx_date")?.value ?? "",
+            lines: [{
+              // A debit to an expense account is a positive amount in the
+              // ledger; a credit, a negative one.
+              posting: amount > 0 ? "Debit" : "Credit",
+              amount: Math.abs(amount),
+              account_ref: acct.id,
+              account_name: acct.name,
+              class_ref: classRef,
+              class_name: klass || null,
+              department_ref: deptRef,
+              department_name: dept || null,
+            }],
+          });
+        }
+      };
+      walk((report.Rows as { Row?: RRow[] } | undefined)?.Row, null);
+      if (unresolved.size) {
+        return json(502, {
+          error: `The ledger names ${[...unresolved].join(", ")}, which QuickBooks' lists do not have, so the split cannot reverse it. Nothing was read.`,
+        });
+      }
+      return json(200, { entries, accounts });
+    }
+
     if (mode === "find_journal_entries") {
       if (!["owner", "admin", "purchaser"].includes(role)) {
         return json(403, { error: "a purchaser or above is required to read journal entries" });

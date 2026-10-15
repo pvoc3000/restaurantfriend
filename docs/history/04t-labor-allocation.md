@@ -86,13 +86,25 @@ so it saw the reclass and not the bill: Workers Comp netted to $0.00 and
 Medical to −$817.02, and the split would have undone his allocation and left
 negative medical at both shops.
 
-Fix: Mark takes those two off the labor accounts, and `buildLaborJournalEntry`
-now LEAVES OUT any account whose journal entries net to zero or less, with a
-warning naming it. That guard catches the January shape; it would NOT catch a
-bill-paid account whose journal entries happen to net positive. The complete
-answer is to read the pool from QuickBooks' General Ledger report (every
-transaction type, with class and location per line) instead of journal entries
-— not built; ask Mark first.
+First fix: leave out any account whose postings net to zero or less (kept as
+a guard). Mark then said the hand split must NOT be kept ("it was based on
+earnings as defined by Gusto, which is what we're trying to correct"), so the
+pool now comes from QuickBooks' **General Ledger report** (`qbo-sync`
+`labor_ledger`, read-only, owner/admin): every posting on the labor accounts —
+journal entries, bills, checks — with the Class and Location each carries. The
+report gives NAMES; they are resolved against QuickBooks' Class and Department
+lists, and a name that matches nothing refuses the read rather than becoming
+"no class" (which would leave that class's balance unreversed). Our own
+`LABOR-` entry is still excluded by doc number. With the ledger, Mark's
+month-end reclass entries no longer matter: every bucket is emptied and
+re-split by hours.
+
+**Unverified against the live report as of this writing**: the column keys
+(`klass_name`, `dept_name`, `subt_nat_amount`), the sign convention (a debit to
+an expense account positive), and that each account section's header carries
+the account id. The first Review… of January checks all three: its "now"
+figures must equal the P&L by Class to the cent. `raw: true` returns the
+report untouched for checking the parse.
 
 ## Known approximation
 

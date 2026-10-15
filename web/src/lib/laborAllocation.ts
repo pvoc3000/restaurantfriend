@@ -428,8 +428,8 @@ export function buildLaborJournalEntry(input: {
     // netting to $0.00, Medical to −$817.02). Left alone, and said.
     if (total <= 0) {
       warnings.push(
-        `${accountName ?? accountRef} is left out: its journal entries net to ${total === 0 ? "zero" : "less than zero"}, ` +
-          "so its cost is paid by bill or check, which this split cannot see. Take it off the labor accounts."
+        `${accountName ?? accountRef} is left out: its postings this month net to ${total === 0 ? "zero" : "less than zero"}, ` +
+          "and labor cannot be split from nothing."
       );
       continue;
     }
