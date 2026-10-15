@@ -9,6 +9,7 @@
 import { test, eq, ok, no } from "./harness";
 import {
   buildLaborJournalEntry,
+  expandLaborAccounts,
   isLaborDocNumber,
   laborDocNumber,
   laborHash,
@@ -284,4 +285,24 @@ test("laborAllocation: posting state", () => {
   eq(laborPostingState(null), "unposted");
   eq(laborPostingState({ external_ref: { qbo: { id: "1" } }, post_error: null }), "posted");
   eq(laborPostingState({ external_ref: { qbo: { id: "1" } }, post_error: "closed books" }), "failed");
+});
+
+test("laborAllocation: a chosen account covers itself and everything under it", () => {
+  const all = [
+    { id: "1", name: "Employee Payroll" },
+    { id: "2", name: "Employee Payroll:Payroll Tax" },
+    { id: "3", name: "Employee Payroll:Payroll Tax:SUI" },
+    { id: "4", name: "Employee Payroll:Payroll Taxes Refund" },
+    { id: "5", name: "Employee Payroll:Employee Earnings:Regular Wages" },
+  ];
+  eq(
+    expandLaborAccounts([{ ref: "2", name: "Payroll Tax" }], all).map((a) => a.ref),
+    ["2", "3"],
+    "the parent and its child, never a sibling that merely starts with the same words"
+  );
+  eq(expandLaborAccounts([{ ref: "9", name: "Gone" }], all), [{ ref: "9", name: "Gone" }], "an account QuickBooks no longer lists is kept");
+  eq(
+    expandLaborAccounts([{ ref: "1", name: null }], all).map((a) => a.ref),
+    ["1", "2", "3", "4", "5"]
+  );
 });

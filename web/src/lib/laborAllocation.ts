@@ -182,6 +182,35 @@ export function monthsBetween(from: string, to: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// Which accounts are labor
+// ---------------------------------------------------------------------------
+
+/** A QuickBooks account as the `accounts` action returns it: `name` is the
+ *  FullyQualifiedName, "Employee Payroll:Payroll Tax". */
+export type QboAccount = { id: string; name: string };
+
+/**
+ * A CHOSEN ACCOUNT COVERS ITSELF AND EVERY ACCOUNT UNDER IT. QuickBooks lets a
+ * parent hold postings of its own — Gusto posts payroll tax straight to
+ * "Payroll Tax", which also has a sub-account (Mark, 2026-10-14) — so neither
+ * "leaves only" nor "parents only" is right; the branch is. A chosen account
+ * QuickBooks no longer lists is kept as itself. `qbo-sync` expands the same
+ * way before it trusts a line.
+ */
+export function expandLaborAccounts(chosen: readonly LaborAccount[], all: readonly QboAccount[]): LaborAccount[] {
+  const out = new Map<string, LaborAccount>();
+  for (const c of chosen) {
+    const self = all.find((a) => a.id === c.ref);
+    out.set(c.ref, { ref: c.ref, name: self?.name ?? c.name });
+    if (!self) continue;
+    for (const a of all) {
+      if (a.name.startsWith(`${self.name}:`)) out.set(a.id, { ref: a.id, name: a.name });
+    }
+  }
+  return [...out.values()];
+}
+
+// ---------------------------------------------------------------------------
 // The pool
 // ---------------------------------------------------------------------------
 

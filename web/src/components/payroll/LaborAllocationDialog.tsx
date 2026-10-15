@@ -11,6 +11,7 @@ import { formatCents } from "@/lib/tipPool";
 import { findJournalEntries } from "@/components/sales/salesPostClient";
 import {
   buildLaborJournalEntry,
+  expandLaborAccounts,
   lastDayOfMonth,
   monthLabel,
   percentText,
@@ -20,6 +21,7 @@ import {
   type LaborEntry,
   type LaborPostingRef,
   type LaborShop,
+  type QboAccount,
   type ShopShare,
 } from "@/lib/laborAllocation";
 import type { LaborMonthRow } from "./LaborAllocationList";
@@ -96,8 +98,18 @@ export function LaborAllocationDialog({
       );
 
       // QuickBooks last, and only when there is something to read it for.
+      // One after the other, never at once: two calls together after an idle
+      // hour are two token refreshes racing (2026-09-12).
       let entries: LaborEntry[] = [];
+      let labor = accounts;
       if (connected && accounts.length > 0) {
+        const listed = await invokeQbo(supabase, { mode: "accounts", classification: "Expense" });
+        if (cancelled) return;
+        if (listed.message) {
+          setLoadError(listed.message);
+          return;
+        }
+        labor = expandLaborAccounts(accounts, (listed.data?.accounts as QboAccount[] | undefined) ?? []);
         const found = await findJournalEntries(supabase, { from: month, to });
         if (cancelled) return;
         if (found.error) {
@@ -109,7 +121,7 @@ export function LaborAllocationDialog({
       const stored = ((alloc.data?.external_ref as LaborPostingRef | null) ?? null);
       const build = buildLaborJournalEntry({
         month,
-        pool: poolFromEntries(entries, accounts),
+        pool: poolFromEntries(entries, labor),
         shares,
         existing: stored,
         orgName: (org.data?.name as string | undefined) ?? "",

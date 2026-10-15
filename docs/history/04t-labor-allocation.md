@@ -44,6 +44,17 @@ Options weighed in conversation with Mark, 2026-10-09 to 2026-10-14:
   `LaborAllocationDialog`, which reads QuickBooks and shows the entry before
   anything is sent.
 
+## Which accounts count (2026-10-14, corrected the same day)
+
+A chosen account covers ITSELF AND EVERY ACCOUNT UNDER IT
+(`expandLaborAccounts`; `qbo-sync` expands again from QuickBooks' own chart).
+Mark first chose the parents `Benefit Expenses` and `Employee Earnings`, which
+under an exact-account match would have found nothing — Gusto posts to the
+sub-accounts. A leaf-only picker was tried for an hour and was WRONG the other
+way: QuickBooks lets a parent hold postings, and Gusto posts payroll tax
+straight to `Payroll Tax`, which also has a sub-account, so the leaf-only
+picker would not offer it. The branch is the rule.
+
 ## How the entry works
 
 - **The pool** is every journal-entry line dated in the month on a labor

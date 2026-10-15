@@ -1534,6 +1534,24 @@ Deno.serve(async (req) => {
       if (allowed.size === 0) {
         return json(400, { error: "No labor accounts are chosen yet (Settings → Integrations → QuickBooks)." });
       }
+      const conn = await loadConnection(admin, orgId);
+      // A CHOSEN ACCOUNT COVERS ITSELF AND EVERY ACCOUNT UNDER IT — the
+      // browser's `expandLaborAccounts`, done again here from QuickBooks' own
+      // chart rather than taken on trust from the payload.
+      {
+        const q = `select Id, FullyQualifiedName from Account where Classification = 'Expense' maxresults 1000`;
+        const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(q)}`)) as {
+          QueryResponse?: { Account?: Row[] };
+        };
+        const chart = (res.QueryResponse?.Account ?? []).map((a) => ({
+          id: String(a.Id),
+          name: String(a.FullyQualifiedName ?? ""),
+        }));
+        const chosenNames = chart.filter((a) => allowed.has(a.id)).map((a) => a.name);
+        for (const a of chart) {
+          if (chosenNames.some((n) => a.name.startsWith(`${n}:`))) allowed.add(a.id);
+        }
+      }
 
       const p = req.payload;
       if (p.DocNumber !== expectedDoc) {
@@ -1589,7 +1607,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      const conn = await loadConnection(admin, orgId);
       let saved: Record<string, Record<string, unknown>>;
       let retried = false;
       try {
