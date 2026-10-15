@@ -90,7 +90,9 @@ shift has a null location and none is at EVENT.
 
 ## Not done yet
 
-- Migration 205 is NOT applied and `qbo-sync` is NOT deployed (waiting on Mark).
+- (Done 2026-10-14, at Mark's request: 205 applied via `db query --linked` in one
+  transaction, after-checks 3 policies / 2 functions / anon refused; `qbo-sync`
+  deployed as v50 with `verify_jwt` still true, and it boots.)
 - Nothing has been posted to QuickBooks. First post: September 2026, after Mark
   reviews the preview. Then read it back, check both refs stuck, and check a
   P&L by Class shows the split.
