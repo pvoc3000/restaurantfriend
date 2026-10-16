@@ -177,21 +177,6 @@ export function ChecklistsList({
 
   return (
     <div className="space-y-4">
-      {outstanding.length > 0 && (
-        <section className="border-2 border-hairline p-3">
-          <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-            Asked for today — not started
-          </h2>
-          <ul className="space-y-1 text-sm">
-            {outstanding.map((t) => (
-              <li key={t.id}>
-                <span className="bg-mark-fill px-1">{t.name}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
       {heading ? (
         <PageHeading
           title={heading.title}
@@ -229,6 +214,21 @@ export function ChecklistsList({
           />
         </ControlField>
       </div>
+
+      {outstanding.length > 0 && (
+        <section className="border-2 border-hairline p-3">
+          <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+            Asked for today — not started
+          </h2>
+          <ul className="space-y-1 text-sm">
+            {outstanding.map((t) => (
+              <li key={t.id}>
+                <span className="bg-mark-fill px-1">{t.name}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <DataTable
         rows={shown}
