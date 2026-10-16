@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { PickList } from "@/components/ui/PickList";
 import { ControlField } from "@/components/ui/ControlField";
+import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { SHIFT_SLOT_LABEL } from "@/lib/employeeEvents";
 import { CHECKLIST_KIND_LABEL, type ChecklistKind } from "@/lib/checklists";
 
@@ -45,19 +47,11 @@ export function ChecklistsList({
   rows,
   startable,
   locationCode,
-  viewTabs,
   heading,
 }: {
   rows: RunRow[];
   startable: StartableTemplate[];
   locationCode: string;
-  /**
-   * The screen's view tabs (Checklists | Templates), rendered as the FIRST cell
-   * of this row (Mark, 2026-09-03) — they used to sit on a line of their own
-   * between the heading and the filters, which made three stacked bands of
-   * controls out of two.
-   */
-  viewTabs?: ReactNode;
   /**
    * The page heading, when this list IS the page — `/inspection-logs`. On
    * `/checklists` the heading sits above the view tabs, so the screen owns it
@@ -66,10 +60,27 @@ export function ChecklistsList({
   heading?: { title: string; code: string; noun: string };
 }) {
   const [tier, setTier] = useState<"open" | "all">("open");
+  const [search, setSearch] = useState("");
+
+  // The search reads what each row SHOWS — name, kind, shift and date — so a
+  // supervisor can type "closing" or "10-14" and find it. The Show counts
+  // describe the SEARCHED set, the templates list's rule.
+  const searched = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      [
+        r.title,
+        CHECKLIST_KIND_LABEL[r.kind],
+        r.shift ? (SHIFT_SLOT_LABEL[r.shift as never] ?? r.shift) : "",
+        r.business_date,
+      ].some((v) => v.toLowerCase().includes(q)),
+    );
+  }, [rows, search]);
 
   const shown = useMemo(
-    () => (tier === "open" ? rows.filter((r) => r.status === "open") : rows),
-    [rows, tier],
+    () => (tier === "open" ? searched.filter((r) => r.status === "open") : searched),
+    [searched, tier],
   );
 
   // What today is asked for and has NOT been walked. Stated as a sentence
@@ -192,7 +203,14 @@ export function ChecklistsList({
       ) : null}
 
       <div className="flex flex-wrap items-end gap-4">
-        {viewTabs}
+        <TextInput
+          value={search}
+          onValueChange={setSearch}
+          aria-label="Search checklists"
+          clearLabel="Clear the search"
+          search
+          icon={<SearchGlyph />}
+        />
         <ControlField label="Show">
           <PickList
             ariaLabel="Which ones"
@@ -202,9 +220,9 @@ export function ChecklistsList({
               {
                 value: "open",
                 label: "Unfinished",
-                hint: String(rows.filter((r) => r.status === "open").length),
+                hint: String(searched.filter((r) => r.status === "open").length),
               },
-              { value: "all", label: "All", hint: String(rows.length) },
+              { value: "all", label: "All", hint: String(searched.length) },
             ]}
             onPick={(v) => setTier(v as typeof tier)}
             fit
@@ -226,7 +244,9 @@ export function ChecklistsList({
         group={{ label: (r) => r.business_date, sortKey: "business_date" }}
         empty={
           <p className="max-w-[72ch] text-sm text-muted">
-            {tier === "open"
+            {search.trim()
+              ? "No checklists match the search."
+              : tier === "open"
               ? "Nothing unfinished at " + locationCode + "."
               : `Nothing recorded at ${locationCode} in this window.`}
           </p>

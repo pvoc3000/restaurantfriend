@@ -1,8 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { PickList } from "@/components/ui/PickList";
-import { ControlField } from "@/components/ui/ControlField";
+import { TabPicker } from "@/components/ui/TabPicker";
 import { PageHeading } from "@/components/ui/PageHeading";
 import {
   CHECKLIST_VIEWS,
@@ -21,8 +20,10 @@ import { NewChecklistTemplate } from "./NewChecklistTemplate";
  * ONE SCREEN, TWO VIEWS (Mark, 2026-08-30). They are the same subject at two
  * moments, and two adjacent nav entries made you decide which one you wanted
  * before you could look at either. `/events` is the precedent for the shape: a
- * view switch (a captioned `PickList` since 2026-09-10) over two populations
- * fetched under different rules.
+ * view switch over two populations fetched under different rules. It is a
+ * `TabPicker` on its own line under the heading (Mark, 2026-10-16, after a
+ * month as a captioned `PickList` in the filter row) — tabs over their content,
+ * so each view's own filters and the "asked for today" box sit INSIDE its tab.
  *
  * The view rides in the URL — this app's rule for view state — through a real
  * navigation rather than `history.replaceState`, because the two halves are
@@ -66,25 +67,20 @@ export function ChecklistsScreen({
 }) {
   const router = useRouter();
 
-  // Handed to whichever list is rendered, so it sits IN the filter row rather
-  // than on a band above it (Mark, 2026-09-03).
-  // A captioned PICKLIST rather than tabs (Mark, 2026-09-10). Still a real
-  // navigation — the two views are different queries.
+  // A real navigation — the two views are different queries. Each tab carries
+  // its `href` too, so it can be middle-clicked and bookmarked.
   const viewTabs = (
-    <ControlField label="View">
-      <PickList
-        ariaLabel="Which view"
-        variant="field"
-        value={view}
-        options={CHECKLIST_VIEWS.map((v) => ({
-          value: v,
-          label: CHECKLIST_VIEW_LABEL[v],
-          hint: String(v === "walks" ? runs.length : templates.length),
-        }))}
-        onPick={(v) => router.push(checklistViewHref(v as ChecklistView))}
-        fit
-      />
-    </ControlField>
+    <TabPicker
+      ariaLabel="Which view"
+      value={view}
+      options={CHECKLIST_VIEWS.map((v) => ({
+        key: v,
+        label: CHECKLIST_VIEW_LABEL[v],
+        count: v === "walks" ? runs.length : templates.length,
+        href: checklistViewHref(v),
+      }))}
+      onChange={(v) => router.push(checklistViewHref(v))}
+    />
   );
 
   return (
@@ -117,21 +113,22 @@ export function ChecklistsScreen({
         }
       />
 
-      {view === "walks" ? (
-        <ChecklistsList
-          rows={runs}
-          startable={startable}
-          locationCode={locationCode}
-          viewTabs={viewTabs}
-        />
-      ) : (
-        <ChecklistTemplatesList
-          rows={templates}
-          locationCode={locationCode}
-          editable={canEdit}
-          viewTabs={viewTabs}
-        />
-      )}
+      <div className="space-y-4">
+        {viewTabs}
+        {view === "walks" ? (
+          <ChecklistsList
+            rows={runs}
+            startable={startable}
+            locationCode={locationCode}
+          />
+        ) : (
+          <ChecklistTemplatesList
+            rows={templates}
+            locationCode={locationCode}
+            editable={canEdit}
+          />
+        )}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
@@ -47,18 +47,10 @@ export function ChecklistTemplatesList({
   rows,
   locationCode,
   editable,
-  viewTabs,
 }: {
   rows: TemplateRow[];
   locationCode: string;
   editable: boolean;
-  /**
-   * The screen's view tabs (Checklists | Templates), rendered as the FIRST cell
-   * of this row (Mark, 2026-09-03) — they used to sit on a line of their own
-   * between the heading and the filters, which made three stacked bands of
-   * controls out of two.
-   */
-  viewTabs?: ReactNode;
 }) {
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState<ChecklistKind | "all">("all");
@@ -155,7 +147,6 @@ export function ChecklistTemplatesList({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-4">
-        {viewTabs}
         <TextInput
           value={search}
           onValueChange={setSearch}
