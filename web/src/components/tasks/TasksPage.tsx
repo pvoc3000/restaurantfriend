@@ -177,8 +177,13 @@ export async function TasksPage({
         kind={kind}
         today={today}
         action={
+          // KEYED: this element is made HERE, on the server, and rendered by a
+          // client component (TasksScreen → PageHeading). React 19's dev build
+          // counts an unkeyed server element in that slot as a list child and
+          // logs "Each child in a list should have a unique key".
           canResolveTasks(session.membership.role) && (
             <NewTask
+              key="new-task"
               kind={kind}
               orgId={session.membership.org_id}
               locationId={active.id}
