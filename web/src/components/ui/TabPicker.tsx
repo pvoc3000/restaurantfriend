@@ -108,6 +108,13 @@ export function TabPicker<K extends string>({
       // fills the width. An `ml-auto` sibling still wins the space first.
       className={`flex ${tall} ${stretch ? "w-full" : "min-w-0 flex-1"} items-end ${className}`}
     >
+      {/* THE LEAD-IN (Mark, 2026-10-16): a short stretch of the rule BEFORE
+          the first tab, so the row reads as tabs standing on a line rather
+          than as a bar whose line starts at its own edge. Fixed and short — it
+          says where the line comes from, and anything longer pushes the first
+          tab away from the left edge every filter row shares. Left off a
+          stretched bar for the same reason the trailing rule is. */}
+      {stretch ? null : <span aria-hidden className="w-3 shrink-0 border-b border-ink" />}
       {options.map((o, i) => {
         const on = o.key === value;
         // whitespace-nowrap: a cell label is a name, never a paragraph. It
@@ -166,7 +173,7 @@ export function TabPicker<K extends string>({
           </button>
         );
       })}
-      {/* THE RULE: the grey tabs' own bottom borders carry it under the tabs,
+      {/* THE RULE: the lead-in above starts it, the grey tabs' own bottom borders carry it under the tabs,
           the selected tab leaves the gap, and this runs it on to the edge. A
           stretched bar has no leftover width, so it needs none. */}
       {stretch ? null : <span aria-hidden className="min-w-0 flex-1 border-b border-ink" />}
