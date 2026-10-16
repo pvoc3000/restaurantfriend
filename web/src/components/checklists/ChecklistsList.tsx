@@ -216,7 +216,7 @@ export function ChecklistsList({
       </div>
 
       {outstanding.length > 0 && (
-        <section className="border-2 border-hairline p-3">
+        <section className="mt-8 border-2 border-hairline p-3">
           <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
             Asked for today — not started
           </h2>
