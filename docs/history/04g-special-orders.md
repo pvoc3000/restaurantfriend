@@ -5503,7 +5503,12 @@ user."
   got "See inquiry notes." + its words, a member could record their own read
   and was refused one for another member, sequence unchanged, nothing left.
 - **Order:** 206, then the web change (it selects `inquiry_note`).
-- **NOT YET APPLIED.**
+- **APPLIED 2026-10-17** at Mark's word (`db query --linked`, in a
+  transaction), after saving the 17 old read rows and the 27 inquiry orders'
+  general notes to `FMP Export/pre206-inquiry-notes-2026-10-17.json`: 19
+  moved, 8 empty, 206 read rows with none reader-less, key `(order_id,
+  read_by)`, `create_inquiry` writes the pointer and keeps its grants, both
+  triggers back on, no log lines written.
 
 ## The delivery window is the ready and event times (170, 2026-10-02)
 
