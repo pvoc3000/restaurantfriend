@@ -64,8 +64,8 @@ export type ScheduleRow = {
  * tier; "All" is no range, which here means the whole loaded window rather than
  * all history — the page never fetches more than that. THIS MONTH and LAST
  * MONTH are why the page loads from the first of last month (Mark,
- * 2026-10-17); LAST WEEK is the seven days to yesterday, and PREVIOUS WEEK the
- * Mon–Sun week just closed (`lib/dateRange`).
+ * 2026-10-17). No LAST WEEK (the seven days to yesterday): PREVIOUS WEEK, the
+ * Mon–Sun week just closed, is the one this screen wants (Mark, 2026-10-17).
  */
 const SCHEDULE_PRESETS: readonly RangePresetSpec[] = [
   {
@@ -77,7 +77,6 @@ const SCHEDULE_PRESETS: readonly RangePresetSpec[] = [
   "tomorrow",
   "yesterday",
   "this_week",
-  "last_week",
   "previous_week",
   "this_month",
   "last_month",
