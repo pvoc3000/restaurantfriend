@@ -1130,7 +1130,7 @@ export async function SpecialOrderDetail({
                         one note. Under Pickup / delivery and Allergies (Mark,
                         2026-10-17), with the other facts the kitchen works
                         from. */}
-                    <Row label="General note" wide>
+                    <Row label="General note" wide className="pt-8">
                       <Cell table="special_orders" id={id} column="notes_general" multiline boxed
                             value={row.notes_general as string | null} canWrite={canWrite} ariaLabel="General note" />
                     </Row>
