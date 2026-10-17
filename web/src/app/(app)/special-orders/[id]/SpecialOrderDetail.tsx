@@ -777,10 +777,13 @@ export async function SpecialOrderDetail({
                 balance — and until Convert into an Order Template existed
                 almost nobody had one to notice. "$1,125.00 due" in red on a
                 record that is a PROTOTYPE is the same falsehood as the progress
-                wash it lost this morning. `kind` rather than `countsAsOwed`,
-                which would also silence a lead or a quote — those are orders,
-                and what their balance means is a separate argument. */}
-            {kind === "order" && totals.balance > 0 && !moneyInputs.ignore_balance ? (
+                wash it lost this morning.
+                NOR DOES A LEAD OR A QUOTE (Mark, 2026-10-17): nobody has
+                agreed to pay anything yet, so a red "due" there is the same
+                falsehood. Spelled out rather than `countsAsOwed`, which would
+                also silence a cancelled order. */}
+            {kind === "order" && status !== "lead" && status !== "quote" &&
+             totals.balance > 0 && !moneyInputs.ignore_balance ? (
               <span className="text-accent"> · {money(totals.balance)} due</span>
             ) : null}
           </p>
