@@ -9,6 +9,7 @@ import { SCHEDULE_WINDOW_DAYS, type SchedulePlan } from "@/lib/productionSchedul
 import { canEditPage } from "@/lib/pageAccess";
 import { readSettings } from "@/lib/specialOrders";
 import { dateInTimeZone } from "@/lib/today";
+import { addMonths, monthEnd } from "@/lib/dateRange";
 
 /**
  * The committed days — production brief phase 4.
@@ -44,11 +45,18 @@ export default async function SchedulesPage() {
   const timeZone = session.orgSettings.timezone ?? serverTimeZone();
   const today = guideToday(timeZone).date;
 
-  // A window rather than the whole history: a fortnight either side is the
+  // A window rather than the whole history: four weeks either side is the
   // question this screen answers ("what is tonight, what did we do last week"),
-  // and the table grows by ~4 rows a day forever.
-  const from = addDays(today, -SCHEDULE_WINDOW_DAYS);
-  const to = addDays(today, SCHEDULE_WINDOW_DAYS);
+  // and the table grows by ~4 rows a day forever. Stretched to the start of
+  // LAST month and the end of THIS one, because the Window offers both and a
+  // preset over nights the page never loaded would read as nights that never
+  // happened. ISO dates compare as strings.
+  const lastMonthStart = addMonths(today, -1);
+  const thisMonthEnd = monthEnd(today);
+  const windowFrom = addDays(today, -SCHEDULE_WINDOW_DAYS);
+  const windowTo = addDays(today, SCHEDULE_WINDOW_DAYS);
+  const from = lastMonthStart < windowFrom ? lastMonthStart : windowFrom;
+  const to = thisMonthEnd > windowTo ? thisMonthEnd : windowTo;
 
   // The kitchen the list opens on and Generate writes for. Null only when the
   // member has no active location at all, which `InactiveLocationGate` already
