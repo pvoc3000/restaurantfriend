@@ -1202,7 +1202,7 @@ export async function SpecialOrderDetail({
                         Notes tab, not a copy: an edit in either place is the
                         one note. Under Customer because an inquiry's note is
                         the customer's own words. */}
-                    <Row label="General note" wide>
+                    <Row label="General note" wide className="pt-8">
                       <Cell table="special_orders" id={id} column="notes_general" multiline boxed
                             value={row.notes_general as string | null} canWrite={canWrite} ariaLabel="General note" />
                     </Row>
