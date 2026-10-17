@@ -1,0 +1,726 @@
+-- 206 — THE CUSTOMER'S INQUIRY NOTE GETS ITS OWN FIELD, AND THE "!" IS PER
+-- PERSON (Mark, 2026-10-17).
+--
+-- "I don't like that general notes are shared with inquiry notes. I think we
+-- need to create an 'inquiry note' field that is used only to store notes from
+-- the customer when they submit an inquiry. General notes should be internal
+-- notes from staff about the order. … when a special order is created from an
+-- inquiry, the app should add 'See inquiry notes.' to the general notes. The
+-- flag should track which user views the notes page and only be cleared per
+-- user."
+--
+-- 1. `special_orders.inquiry_note`: what the customer wrote on /inquiry (the
+--    interest, then the description, as `create_inquiry` has always joined
+--    them). Written once, by `create_inquiry`; the app shows it read-only.
+-- 2. BACKFILL. Measured 2026-10-17: on all 27 inquiry orders `notes_general`
+--    is still exactly what `create_inquiry` wrote (rebuilt from
+--    `source_payload`), so nobody has typed into it. Each moves to
+--    `inquiry_note` and the general note becomes "See inquiry notes."; the 8
+--    with no note stay empty in both. The log trigger is off for the backfill
+--    so 19 orders do not gain a "Notes changed" line nobody made, and
+--    `updated_at` is not moved.
+-- 3. `create_inquiry` writes the customer's words to `inquiry_note` and "See
+--    inquiry notes." to `notes_general` (nothing to either when there is no
+--    note). Otherwise the live definition, unchanged.
+-- 4. `special_order_note_reads` becomes ONE ROW PER ORDER PER PERSON. 169
+--    keyed it by order, so the first look cleared the "!" for everybody.
+--    `read_by` is now required and part of the key, and a person may record
+--    only their own read. Rows 169's backfill wrote with no reader are
+--    replaced: an inquiry order past the lead stage is marked read for every
+--    current member (as 169 did for "everybody"); an open lead keeps only the
+--    reads people actually made, so everybody else sees its "!".
+--    Somebody who joins later sees the "!" on older inquiry orders until they
+--    open their Notes tab.
+--
+-- Order: apply this, then deploy the web change. The web change selects
+-- `inquiry_note`, and the old page reading `notes_general` still works after
+-- this (it shows "See inquiry notes.").
+
+begin;
+
+-- 1 -------------------------------------------------------------------------
+alter table special_orders add column if not exists inquiry_note text;
+
+comment on column special_orders.inquiry_note is
+  'What the customer wrote on the /inquiry form (206). Written by '
+  'create_inquiry; staff notes go in notes_general.';
+
+-- 2 -------------------------------------------------------------------------
+alter table special_orders disable trigger trg_special_orders_log;
+alter table special_orders disable trigger trg_special_orders_updated;
+
+update special_orders
+   set inquiry_note  = notes_general,
+       notes_general = 'See inquiry notes.'
+ where source = 'inquiry'
+   and inquiry_note is null
+   and nullif(btrim(coalesce(notes_general, '')), '') is not null;
+
+alter table special_orders enable trigger trg_special_orders_log;
+alter table special_orders enable trigger trg_special_orders_updated;
+
+-- 4 -------------------------------------------------------------------------
+delete from special_order_note_reads where read_by is null;
+
+alter table special_order_note_reads drop constraint special_order_note_reads_pkey;
+alter table special_order_note_reads
+  alter column read_by set not null,
+  alter column read_by set default auth.uid();
+alter table special_order_note_reads
+  drop constraint if exists special_order_note_reads_read_by_fkey;
+alter table special_order_note_reads
+  add constraint special_order_note_reads_read_by_fkey
+    foreign key (read_by) references auth.users(id) on delete cascade;
+alter table special_order_note_reads add primary key (order_id, read_by);
+
+comment on table special_order_note_reads is
+  'Who has read an order''s /inquiry note, so the Notes tab stops showing '
+  'them its "!" (169; one row per order per person since 206).';
+
+drop policy if exists special_order_note_reads_insert on special_order_note_reads;
+create policy special_order_note_reads_insert on special_order_note_reads for insert
+  with check (org_id in (select user_org_ids()) and read_by = auth.uid());
+
+insert into special_order_note_reads (order_id, org_id, read_by)
+select so.id, so.org_id, m.user_id
+  from special_orders so
+  join org_members m on m.org_id = so.org_id
+ where so.source = 'inquiry'
+   and coalesce(so.status, '') <> 'lead'
+on conflict do nothing;
+
+-- 3 -------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.create_inquiry(p_org_id uuid, p_name text, p_email text DEFAULT NULL::text, p_phone text DEFAULT NULL::text, p_occasion text DEFAULT NULL::text, p_fulfillment text DEFAULT 'pickup'::text, p_address text DEFAULT NULL::text, p_location_id uuid DEFAULT NULL::uuid, p_event_date text DEFAULT NULL::text, p_event_time text DEFAULT NULL::text, p_interest text DEFAULT NULL::text, p_description text DEFAULT NULL::text, p_allergies text DEFAULT NULL::text, p_meta jsonb DEFAULT '{}'::jsonb, p_items jsonb DEFAULT '{}'::jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_settings    jsonb;
+  v_tz          text;
+  v_today       date;
+  v_name        text := nullif(btrim(coalesce(p_name, '')), '');
+  v_email       text := lower(nullif(btrim(coalesce(p_email, '')), ''));
+  v_phone       text := nullif(btrim(coalesce(p_phone, '')), '');
+  v_digits      text;
+  v_fulfillment text := lower(coalesce(nullif(btrim(coalesce(p_fulfillment, '')), ''), 'pickup'));
+  v_address     text := nullif(btrim(coalesce(p_address, '')), '');
+  v_date        date;
+  v_time        time;
+  v_cap_email   integer;
+  v_cap_all     integer;
+  v_seen        integer;
+  v_location    uuid;
+  v_tax         numeric(6,5);
+  v_customer    uuid;
+  v_first       text;
+  v_last        text;
+  v_number      text;
+  v_order       uuid;
+  v_notes       text;
+  -- <<< 133: the customer's basket
+  v_mins        jsonb;
+  v_price_loc   uuid;
+  v_reroute     uuid;   -- 192
+  v_earliest    time;   -- 200
+  v_latest      time;   -- 200
+  v_lines       jsonb := '[]'::jsonb;
+  v_r           jsonb;
+  v_c           jsonb;
+  v_id          uuid;
+  v_ids         uuid[];
+  v_assign      uuid[];
+  v_chars       text[];
+  v_char        text;
+  v_pi          production_items%rowtype;
+  v_cat         text;
+  v_price       numeric;
+  v_avg         numeric;
+  v_qty         integer;
+  v_sets        integer;
+  v_line_note   text;
+  v_flavor_names text;
+  v_n_regular   integer := 0;
+  v_n_mini      integer := 0;
+  v_n_giant     integer := 0;
+  v_n_letter    integer := 0;
+  v_mini_by     jsonb := '{}'::jsonb;
+  v_min         integer;
+  v_i           integer;
+  v_sort        integer := 0;
+begin
+  -- --- the org, and everything configured on it -----------------------------
+  if p_org_id is null then
+    return jsonb_build_object('ok', false, 'state', 'unknown_org');
+  end if;
+
+  select o.settings into v_settings from orgs o where o.id = p_org_id;
+  if not found then
+    return jsonb_build_object('ok', false, 'state', 'unknown_org');
+  end if;
+
+  -- A public page has no session, so `lib/today` is unreachable and the org's
+  -- own zone is the only honest source for "today". 007's lesson: from 5pm in
+  -- Los Angeles a UTC host is already tomorrow.
+  v_tz := coalesce(v_settings ->> 'timezone', 'UTC');
+  v_today := (now() at time zone v_tz)::date;
+
+  -- --- THE HONEYPOT ---------------------------------------------------------
+  -- Decided HERE rather than in the edge function so the gate holds the whole
+  -- rule, and answered with the ORDINARY state so a bot cannot tell that its
+  -- submission went nowhere.
+  if nullif(btrim(coalesce(p_meta ->> 'honeypot', '')), '') is not null then
+    return jsonb_build_object('ok', true, 'state', 'received');
+  end if;
+
+  -- --- validation, all of it a returned state -------------------------------
+  if v_name is null then
+    return jsonb_build_object('ok', false, 'state', 'name_required');
+  end if;
+
+  -- (135): BOTH an email and a phone (Mark, 2026-09-24), where 058 took
+  -- either. `contact_required` is no longer returned; the page still words it,
+  -- for an old tab.
+  if v_email is null then
+    return jsonb_build_object('ok', false, 'state', 'email_required');
+  end if;
+  if v_phone is null then
+    return jsonb_build_object('ok', false, 'state', 'phone_required');
+  end if;
+  -- Seven digits, `looksLikePhone`'s floor.
+  if length(regexp_replace(v_phone, '\D', '', 'g')) < 7 then
+    return jsonb_build_object('ok', false, 'state', 'phone_invalid');
+  end if;
+
+  if v_email is not null and v_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' then
+    return jsonb_build_object('ok', false, 'state', 'email_invalid');
+  end if;
+
+  if v_fulfillment not in ('pickup', 'delivery') then
+    return jsonb_build_object('ok', false, 'state', 'fulfillment_invalid');
+  end if;
+
+  -- <<< 136: a DELIVERY needs somewhere to deliver to (Mark, 2026-09-24:
+  -- "require the address for delivery"). A pickup still needs none, and one
+  -- sent anyway is still not written to `delivery_address`.
+  if v_fulfillment = 'delivery' and v_address is null then
+    return jsonb_build_object('ok', false, 'state', 'address_required');
+  end if;
+
+  -- (135): the occasion, the date and the time are required.
+  if nullif(btrim(coalesce(p_occasion, '')), '') is null then
+    return jsonb_build_object('ok', false, 'state', 'occasion_required');
+  end if;
+  if nullif(btrim(coalesce(p_event_date, '')), '') is null then
+    return jsonb_build_object('ok', false, 'state', 'date_required');
+  end if;
+  if nullif(btrim(coalesce(p_event_time, '')), '') is null then
+    return jsonb_build_object('ok', false, 'state', 'time_required');
+  end if;
+
+  if nullif(btrim(coalesce(p_event_date, '')), '') is not null then
+    if btrim(p_event_date) !~ '^\d{4}-\d{2}-\d{2}$' then
+      return jsonb_build_object('ok', false, 'state', 'date_invalid');
+    end if;
+    begin
+      v_date := btrim(p_event_date)::date;
+    exception when others then
+      -- '2026-02-31' has the right shape and is not a day.
+      return jsonb_build_object('ok', false, 'state', 'date_invalid');
+    end;
+  end if;
+
+  -- <<< 201: TOMORROW AT THE EARLIEST (Mark, 2026-10-13: the form "should not
+  -- allow the user to select dates in the past or the current day"). Today is
+  -- the org's, `v_today` above. The form greys the same days.
+  if v_date is not null and v_date <= v_today then
+    return jsonb_build_object('ok', false, 'state', 'date_past');
+  end if;
+
+  if nullif(btrim(coalesce(p_event_time, '')), '') is not null then
+    if btrim(p_event_time) !~ '^\d{2}:\d{2}(:\d{2})?$' then
+      return jsonb_build_object('ok', false, 'state', 'time_invalid');
+    end if;
+    begin
+      v_time := btrim(p_event_time)::time;
+    exception when others then
+      return jsonb_build_object('ok', false, 'state', 'time_invalid');
+    end;
+  end if;
+
+  -- --- THE BASKET (133) -----------------------------------------------------
+  -- <<< 133. Everything the customer picked, VALIDATED AND RE-PRICED here,
+  -- before anything is written, so a refusal leaves no customer and no lead
+  -- behind. The page's prices are never read: each line is priced again with
+  -- `production_item_price` at the same shop `inquiry_menu` priced it at.
+  --
+  -- p_items = {
+  --   "lines":   [{ "item_id": uuid, "qty": int, "notes": text? }],
+  --   "letters": [{ "characters": ["H","I","<3"], "flavors": [uuid, …],
+  --                 "assign": [uuid|null, …] | null, "sets": int }]
+  -- }
+  -- A 14-argument call (the v1 form, tag `inquiry-v1`) sends none of it and
+  -- gets exactly 058's lead.
+  --
+  -- Every refusal is a returned state, like the rest of this function:
+  -- `items_invalid` (malformed), `item_unavailable` (not on the menu),
+  -- `letter_invalid` (a character we cannot cut), `minimum_not_met` (+ which).
+  if p_items is not null and jsonb_typeof(p_items) <> 'object' then
+    return jsonb_build_object('ok', false, 'state', 'items_invalid');
+  end if;
+  if jsonb_typeof(coalesce(p_items -> 'lines', '[]'::jsonb)) <> 'array'
+     or jsonb_typeof(coalesce(p_items -> 'letters', '[]'::jsonb)) <> 'array'
+     or jsonb_array_length(coalesce(p_items -> 'lines', '[]'::jsonb)) > 100
+     or jsonb_array_length(coalesce(p_items -> 'letters', '[]'::jsonb)) > 10 then
+    return jsonb_build_object('ok', false, 'state', 'items_invalid');
+  end if;
+
+  v_mins := coalesce(v_settings -> 'special_orders' -> 'inquiry_minimums', '{}'::jsonb);
+  -- <<< 162: a delivery's shop is the one its estimate measured from — the
+  -- nearest — which the form sends as `p_location_id`. A pickup's is its own.
+  v_price_loc := inquiry_price_location(p_org_id, p_location_id);
+
+  -- <<< 182, 192: A BLACKED-OUT DATE, here, before anything is written.
+  --
+  -- 192 (Mark, 2026-10-10: "a blackout at either shop should set the location
+  -- of the inquiry to the other shop automatically"). Two cases:
+  --
+  --   * THE SHOP WAS NAMED — a pickup's chosen shop, or the shop a delivery's
+  --     estimate was measured from. That shop is not taking orders that day,
+  --     and the customer asked for it: refused, as 182 did.
+  --   * NO SHOP WAS NAMED ("No preference"). The lead would have fallen to the
+  --     first open shop; it goes instead to the first open shop that IS taking
+  --     orders that day, and is priced and taxed there, and that shop becomes
+  --     its pickup shop as well as its kitchen. Refused only when every shop
+  --     is blacked out.
+  --
+  -- The form works out the same answer from `inquiry_blackouts` (its
+  -- `shop_ids`), so it greys out exactly the days this refuses.
+  if v_date is not null
+     and blackout_name(p_org_id, array[v_price_loc], v_date, 'special_orders') is not null then
+    if p_location_id is not null and v_price_loc = p_location_id then
+      return jsonb_build_object('ok', false, 'state', 'date_unavailable');
+    end if;
+    select l.id into v_reroute
+      from locations l
+     where l.org_id = p_org_id and l.is_active and l.kind = 'physical'
+       and blackout_name(p_org_id, array[l.id], v_date, 'special_orders') is null
+     order by l.code
+     limit 1;
+    if v_reroute is null then
+      return jsonb_build_object('ok', false, 'state', 'date_unavailable');
+    end if;
+    v_price_loc := v_reroute;
+  end if;
+
+  -- <<< 200: THE TIME, AGAINST THE SHOP'S OPENING HOURS (Mark, 2026-10-13).
+  -- A pickup is collected between 30 minutes after opening and 30 minutes
+  -- before close; a delivery's event time is between two hours after opening
+  -- and close. The shop is the one the lead is made at — `v_price_loc`, after
+  -- 192's reroute — and the hours are that weekday's on its record.
+  -- `inquiry_time_window` answers nulls when the shop has no hours for the
+  -- day, and then no time is refused. The form works out the same window from
+  -- `inquiry_hours`.
+  if v_date is not null and v_time is not null then
+    select w.earliest, w.latest into v_earliest, v_latest
+      from inquiry_time_window(p_org_id, v_price_loc, v_date, v_fulfillment) w;
+    if v_earliest is not null and (v_time < v_earliest or v_time > v_latest) then
+      return jsonb_build_object('ok', false, 'state', 'time_unavailable',
+                                'earliest', left(v_earliest::text, 5),
+                                'latest', left(v_latest::text, 5));
+    end if;
+  end if;
+
+  -- Donuts, minis and giants: one line each, as picked.
+  for v_r in select value from jsonb_array_elements(coalesce(p_items -> 'lines', '[]'::jsonb)) loop
+    begin
+      v_id := (v_r ->> 'item_id')::uuid;
+    exception when others then
+      return jsonb_build_object('ok', false, 'state', 'items_invalid');
+    end;
+    if coalesce(v_r ->> 'qty', '') !~ '^\d{1,4}$' then
+      return jsonb_build_object('ok', false, 'state', 'items_invalid');
+    end if;
+    v_qty := (v_r ->> 'qty')::int;
+    if v_qty < 1 or v_qty > 2000 then
+      return jsonb_build_object('ok', false, 'state', 'items_invalid');
+    end if;
+
+    select pi.* into v_pi from production_items pi
+     where pi.id = v_id and pi.org_id = p_org_id and pi.is_active and pi.show_on_inquiry_form
+       and not exists (select 1 from production_item_locations pil
+                        where pil.item_id = pi.id and pil.location_id = v_price_loc and not pil.is_active);
+    if not found then
+      return jsonb_build_object('ok', false, 'state', 'item_unavailable');
+    end if;
+    v_cat := inquiry_category(v_pi.subtype, v_pi.size, v_pi.item_type);   -- (134)
+    v_price := production_item_price(v_pi.id, v_price_loc);
+    -- (134): an EXTRA may have no price — it is "priced in your quote".
+    if v_cat is null or v_cat = 'letter' or (v_price is null and v_cat <> 'extra') then
+      return jsonb_build_object('ok', false, 'state', 'item_unavailable');
+    end if;
+
+    if v_cat = 'regular' then v_n_regular := v_n_regular + v_qty;
+    elsif v_cat = 'giant' then v_n_giant := v_n_giant + v_qty;
+    elsif v_cat = 'extra' then null;   -- (134): no minimum on an extra
+    else
+      v_n_mini := v_n_mini + v_qty;
+      v_mini_by := v_mini_by || jsonb_build_object(
+        v_pi.id::text, coalesce((v_mini_by ->> v_pi.id::text)::int, 0) + v_qty);
+    end if;
+
+    -- `AddOrderLine`'s snapshot, field for field (`addedLineName`: a Mini or
+    -- Giant says so in the name; Regular is the unstated default).
+    v_lines := v_lines || jsonb_build_array(jsonb_build_object(
+      'item_id', v_pi.id,
+      'name', v_pi.name || case when v_cat in ('mini', 'giant') then ' - ' || btrim(v_pi.size) else '' end,
+      'item_donut', v_pi.name, 'item_type', v_pi.item_type, 'item_cut', v_pi.subtype,
+      'item_finish', v_pi.finish, 'item_size', v_pi.size,
+      'qty', v_qty, 'unit_price', coalesce(v_price, 0),                  -- (134)
+      'notes', case when v_price is null                                  -- (134)
+                    then concat_ws(' — ', 'Price to be quoted', left(nullif(btrim(coalesce(v_r ->> 'notes', '')), ''), 500))
+                    else left(nullif(btrim(coalesce(v_r ->> 'notes', '')), ''), 500) end
+    ));
+  end loop;
+
+  -- Letters: ONE LINE PER CHARACTER, in the message's order, because on a
+  -- letter order the sequence IS the word and the decorator lays it out from
+  -- the lines (04g, "the lines keep the order's own sequence"). The cut is
+  -- `letterCut`'s canonical `Letter - "A"`, the note is `"A"` as FileMaker's
+  -- always were, and qty is the number of SETS.
+  for v_r in select value from jsonb_array_elements(coalesce(p_items -> 'letters', '[]'::jsonb)) loop
+    if jsonb_typeof(v_r -> 'characters') is distinct from 'array'
+       or jsonb_typeof(v_r -> 'flavors') is distinct from 'array'
+       or jsonb_array_length(v_r -> 'characters') not between 1 and 200
+       or jsonb_array_length(v_r -> 'flavors') not between 1 and 10
+       or coalesce(v_r ->> 'sets', '') !~ '^\d{1,2}$' then
+      return jsonb_build_object('ok', false, 'state', 'items_invalid');
+    end if;
+    v_sets := (v_r ->> 'sets')::int;
+    if v_sets < 1 or v_sets > 50 then
+      return jsonb_build_object('ok', false, 'state', 'items_invalid');
+    end if;
+
+    -- The character set is `LETTER_CHARACTERS` in lib/specialOrderLines.ts —
+    -- the cuts twelve years of orders hold. Keep the two in step by hand.
+    select array_agg(upper(btrim(x)) order by o) into v_chars
+      from jsonb_array_elements_text(v_r -> 'characters') with ordinality as t(x, o);
+    foreach v_char in array v_chars loop
+      if not (v_char ~ '^[A-Z0-9]$' or v_char in ('<3', '!', '?', '&', '+', '-')) then
+        return jsonb_build_object('ok', false, 'state', 'letter_invalid', 'character', v_char);
+      end if;
+    end loop;
+
+    -- The flavours: each must be a LETTER item on the menu.
+    begin
+      select array_agg(x::uuid order by o) into v_ids
+        from jsonb_array_elements_text(v_r -> 'flavors') with ordinality as t(x, o);
+      if jsonb_typeof(v_r -> 'assign') = 'array' then
+        if jsonb_array_length(v_r -> 'assign') <> array_length(v_chars, 1) then
+          return jsonb_build_object('ok', false, 'state', 'items_invalid');
+        end if;
+        select array_agg(case when jsonb_typeof(x) = 'null' then null else (x #>> '{}')::uuid end order by o)
+          into v_assign
+          from jsonb_array_elements(v_r -> 'assign') with ordinality as t(x, o);
+      else
+        v_assign := null;
+      end if;
+    exception when others then
+      return jsonb_build_object('ok', false, 'state', 'items_invalid');
+    end;
+
+    v_avg := 0;
+    v_flavor_names := null;
+    foreach v_id in array v_ids loop
+      select pi.* into v_pi from production_items pi
+       where pi.id = v_id and pi.org_id = p_org_id and pi.is_active and pi.show_on_inquiry_form
+         and not exists (select 1 from production_item_locations pil
+                          where pil.item_id = pi.id and pil.location_id = v_price_loc and not pil.is_active);
+      if not found or inquiry_category(v_pi.subtype, v_pi.size, v_pi.item_type) is distinct from 'letter' then   -- (134)
+        return jsonb_build_object('ok', false, 'state', 'item_unavailable');
+      end if;
+      v_price := production_item_price(v_pi.id, v_price_loc);
+      if v_price is null then
+        return jsonb_build_object('ok', false, 'state', 'item_unavailable');
+      end if;
+      v_avg := v_avg + v_price;
+      v_flavor_names := concat_ws(', ', v_flavor_names, v_pi.name);
+    end loop;
+    v_avg := round(v_avg / array_length(v_ids, 1), 2);
+
+    -- ONE flavour and no assignment is not ambiguous: every letter is that one.
+    if v_assign is null and array_length(v_ids, 1) = 1 then
+      v_assign := array_fill(v_ids[1], array[array_length(v_chars, 1)]);
+    end if;
+
+    for v_i in 1 .. array_length(v_chars, 1) loop
+      v_char := v_chars[v_i];
+      v_id := case when v_assign is null then null else v_assign[v_i] end;
+      if v_id is not null then
+        if not (v_id = any (v_ids)) then
+          return jsonb_build_object('ok', false, 'state', 'items_invalid');
+        end if;
+        select pi.* into v_pi from production_items pi where pi.id = v_id;
+        v_lines := v_lines || jsonb_build_array(jsonb_build_object(
+          'item_id', v_pi.id,
+          'name', v_pi.name || ' - Letter ' || v_char,
+          'item_donut', v_pi.name, 'item_type', v_pi.item_type,
+          'item_cut', 'Letter - "' || v_char || '"',
+          'item_finish', v_pi.finish, 'item_size', v_pi.size,
+          'qty', v_sets, 'unit_price', production_item_price(v_pi.id, v_price_loc),
+          'notes', '"' || v_char || '"'
+        ));
+      else
+        -- "MAKE IT WORK": the customer gave flavours and left the spelling of
+        -- them to us. The line is UNLINKED on purpose — the app already says a
+        -- line with no production item cannot be scheduled, which is exactly
+        -- the prompt somebody needs to pick the flavour. Priced at the average
+        -- of the flavours they chose, which is what "estimate" means here.
+        v_lines := v_lines || jsonb_build_array(jsonb_build_object(
+          'item_id', null,
+          'name', 'Letter ' || v_char || ' (flavor to be chosen)',
+          'item_donut', null, 'item_type', null,
+          'item_cut', 'Letter - "' || v_char || '"',
+          'item_finish', null, 'item_size', 'Regular',
+          'qty', v_sets, 'unit_price', v_avg,
+          'notes', '"' || v_char || '" — flavors: ' || v_flavor_names
+        ));
+      end if;
+    end loop;
+
+    v_n_letter := v_n_letter + array_length(v_chars, 1) * v_sets;
+  end loop;
+
+  -- THE MINIMUMS (Mark, 2026-09-24): EACH CATEGORY THAT IS ORDERED MEETS ITS
+  -- OWN. A category left empty is not short — a giant-only order is fine.
+  v_min := coalesce((v_mins ->> 'regular')::int, 0);
+  if v_n_regular > 0 and v_n_regular < v_min then
+    return jsonb_build_object('ok', false, 'state', 'minimum_not_met', 'category', 'regular', 'minimum', v_min);
+  end if;
+  v_min := coalesce((v_mins ->> 'mini')::int, 0);
+  if v_n_mini > 0 and v_n_mini < v_min then
+    return jsonb_build_object('ok', false, 'state', 'minimum_not_met', 'category', 'mini', 'minimum', v_min);
+  end if;
+  v_min := coalesce((v_mins ->> 'mini_per_flavor')::int, 0);
+  if exists (select 1 from jsonb_each_text(v_mini_by) e where e.value::int < v_min) then
+    return jsonb_build_object('ok', false, 'state', 'minimum_not_met', 'category', 'mini_per_flavor', 'minimum', v_min);
+  end if;
+  v_min := coalesce((v_mins ->> 'letter')::int, 0);
+  if v_n_letter > 0 and v_n_letter < v_min then
+    return jsonb_build_object('ok', false, 'state', 'minimum_not_met', 'category', 'letter', 'minimum', v_min);
+  end if;
+  v_min := coalesce((v_mins ->> 'giant')::int, 0);
+  if v_n_giant > 0 and v_n_giant < v_min then
+    return jsonb_build_object('ok', false, 'state', 'minimum_not_met', 'category', 'giant', 'minimum', v_min);
+  end if;
+
+  -- --- THE CAPS -------------------------------------------------------------
+  -- Both answer with `received`, which is the same thing a successful
+  -- submission is told. That covers a double-tapped button and a nuisance
+  -- identically, and tells a prober nothing about either.
+  v_cap_email := coalesce((v_settings -> 'special_orders' ->> 'inquiry_max_per_email_per_hour')::int, 3);
+  v_cap_all   := coalesce((v_settings -> 'special_orders' ->> 'inquiry_max_per_hour')::int, 30);
+
+  select count(*) into v_seen
+    from special_orders so
+   where so.org_id = p_org_id
+     and so.source = 'inquiry'
+     and so.created_at > now() - interval '1 hour';
+  if v_seen >= v_cap_all then
+    return jsonb_build_object('ok', true, 'state', 'received');
+  end if;
+
+  if v_email is not null then
+    select count(*) into v_seen
+      from special_orders so
+     where so.org_id = p_org_id
+       and so.source = 'inquiry'
+       and so.created_at > now() - interval '1 hour'
+       and lower(so.contact_email) = v_email;
+    if v_seen >= v_cap_email then
+      return jsonb_build_object('ok', true, 'state', 'received');
+    end if;
+  end if;
+
+  -- --- the pickup shop ------------------------------------------------------
+  -- A shop that is not this org's, not active or not physical is DROPPED rather
+  -- than refused: a stale form left open in a tab must not cost somebody their
+  -- inquiry, and a null pickup shop is an ordinary state (187 of 8,330 real
+  -- orders name one at all).
+  -- <<< 162: only a PICKUP has a pickup shop. A delivery's `p_location_id`
+  -- is its kitchen (above), never where the customer collects.
+  -- <<< 192: or the shop a no-preference pickup was sent to, above.
+  if v_fulfillment = 'pickup' and coalesce(v_reroute, p_location_id) is not null then
+    select l.id, l.tax_rate into v_location, v_tax
+      from locations l
+     where l.id = coalesce(v_reroute, p_location_id)
+       and l.org_id = p_org_id
+       and l.is_active
+       and l.kind = 'physical';
+  end if;
+
+  -- <<< 133: a DELIVERY lead has no pickup shop and so no tax rate, which
+  -- would make the lead's total quietly tax-free. Take the rate from the shop
+  -- its prices come from.
+  -- <<< 174: basket or not. 133 did this only when the form sent a basket, so
+  -- a delivery lead with no items arrived with no rate, and the items staff
+  -- added afterwards were never taxed (SO-10110).
+  if v_tax is null then
+    select l.tax_rate into v_tax from locations l where l.id = v_price_loc;
+  end if;
+
+  -- --- MATCH OR CREATE THE CUSTOMER, INTERNALLY -----------------------------
+  -- Email first, then phone — 051 created the two indexes for exactly this and
+  -- says so. The phone comparison strips punctuation, so it does NOT use
+  -- `customers_phone_idx`; over 5,874 rows that is a few milliseconds, and
+  -- matching '(323) 337-7966' against '3233377966' is worth more than the
+  -- index, because the alternative is a duplicate customer every time.
+  --
+  -- WHATEVER HAPPENS HERE, THE ANSWER BELOW IS THE SAME.
+  if v_email is not null then
+    select c.id into v_customer
+      from customers c
+     where c.org_id = p_org_id and lower(c.email) = v_email
+     order by c.created_at
+     limit 1;
+  end if;
+
+  if v_customer is null and v_phone is not null then
+    v_digits := nullif(regexp_replace(v_phone, '\D', '', 'g'), '');
+    if length(coalesce(v_digits, '')) >= 7 then
+      select c.id into v_customer
+        from customers c
+       where c.org_id = p_org_id
+         and regexp_replace(coalesce(c.phone, ''), '\D', '', 'g') = v_digits
+       order by c.created_at
+       limit 1;
+    end if;
+  end if;
+
+  if v_customer is null then
+    -- `lib/customerSearch`'s `splitName`: split on the LAST space, and an
+    -- unsplittable name becomes the LAST name. "Brittany" is a real
+    -- submission, and inventing a first name for her would be worse than
+    -- leaving it null.
+    if position(' ' in v_name) > 0 then
+      v_first := btrim(left(v_name, length(v_name) - position(' ' in reverse(v_name))));
+      v_last  := btrim(right(v_name, position(' ' in reverse(v_name)) - 1));
+    else
+      v_first := null;
+      v_last  := v_name;
+    end if;
+
+    insert into customers (org_id, first_name, last_name, phone, email, source, source_payload)
+    values (p_org_id, nullif(v_first, ''), nullif(v_last, ''), v_phone, v_email, 'inquiry',
+            jsonb_build_object('inquiry', coalesce(p_meta, '{}'::jsonb)))
+    returning id into v_customer;
+  end if;
+
+  -- --- the number -----------------------------------------------------------
+  -- Directly, for the reason in the header. NOT `next_special_order_number`.
+  v_number := special_order_number_for(p_org_id);                          -- <<< 147
+
+  -- --- what they told us ----------------------------------------------------
+  -- The coarse "what are you interested in" leads the description rather than
+  -- taking a column: it is one of a handful of category words, and a column for
+  -- it would be a vocabulary to maintain for a field a supervisor reads once.
+  v_notes := btrim(concat_ws(
+    E'\n\n',
+    nullif(btrim(coalesce(p_interest, '')), ''),
+    nullif(btrim(coalesce(p_description, '')), '')
+  ));
+
+  insert into special_orders (
+    org_id, number, kind, status, todo, flag_reason,
+    customer_id, contact_name, contact_phone, contact_email, allergen_info,
+    title, event_date, event_time,
+    location_id, kitchen_location_id, fulfillment, delivery_address,   -- <<< 152
+    tax_rate, date_initiated,
+    notes_general, inquiry_note, source, source_payload           -- <<< 206
+  )
+  values (
+    p_org_id, v_number, 'order', 'lead', 'Respond to Email/Call', 'New Inquiry',
+    v_customer, v_name, v_phone, v_email,
+    nullif(btrim(coalesce(p_allergies, '')), ''),
+    -- FMP's Event_Description. The occasion IS the title on these — "Child's
+    -- bday", "Anniversary" — and a lead with no title is a blank row in a list.
+    coalesce(nullif(btrim(coalesce(p_occasion, '')), ''), 'Website inquiry'),
+    v_date, v_time,
+    v_location,
+    -- <<< 152: THE KITCHEN DEFAULTS TO THE PICKUP SHOP, and a delivery (which
+    -- has none) to the shop its basket was priced at — the delivery origin.
+    coalesce(v_location, v_price_loc),
+    v_fulfillment,
+    -- THE ADDRESS IS NOT EVIDENCE OF DELIVERY. Measured over the three real
+    -- Square submissions: two are PICKUPS that carry an address anyway (the
+    -- form asked regardless) and one omits the field entirely. Writing it to
+    -- `delivery_address` unconditionally would print a customer's home address
+    -- on a kitchen document for an order they are collecting themselves. It is
+    -- kept in `source_payload` either way.
+    case when v_fulfillment = 'delivery' then v_address else null end,
+    v_tax, v_today,
+    -- <<< 206: THE CUSTOMER'S WORDS GO TO `inquiry_note`, and the general
+    -- note, which is staff's, only points at them. Nothing written means
+    -- nothing to point at.
+    case when nullif(v_notes, '') is not null then 'See inquiry notes.' end,
+    nullif(v_notes, ''), 'inquiry',
+    jsonb_build_object(
+      'inquiry', jsonb_build_object(
+        'name', v_name, 'email', v_email, 'phone', v_phone,
+        'occasion', p_occasion, 'fulfillment', v_fulfillment, 'address', v_address,
+        'location_id', p_location_id, 'event_date', p_event_date, 'event_time', p_event_time,
+        'interest', p_interest, 'description', p_description, 'allergies', p_allergies,
+        'items', p_items                                              -- <<< 133
+      ),
+      'meta', coalesce(p_meta, '{}'::jsonb)
+    )
+  )
+  returning id into v_order;
+
+  -- 055's insert trigger has already written "Order started as a lead", and it
+  -- is AUTHORLESS here — `auth.uid()` is null for an anon caller, so
+  -- `log_special_order_event` finds no `org_members` row. That is honest;
+  -- nobody signed in started this. What it does not say is where it came from.
+  insert into special_order_events (org_id, order_id, message, author, source)
+  values (p_org_id, v_order, 'Inquiry received from the website', 'Website', 'app');
+
+  -- <<< 133: the basket becomes the lead's lines, in the order picked. 054's
+  -- line trigger logs each ("Added …", authorless, which is honest); this
+  -- entry says where they came from.
+  for v_r in select value from jsonb_array_elements(v_lines) loop
+    v_sort := v_sort + 1;
+    insert into special_order_items (
+      org_id, order_id, sort, production_item_id,
+      name, item_donut, item_type, item_cut, item_finish, item_size,
+      notes, qty, unit_price, taxable
+    ) values (
+      p_org_id, v_order, v_sort, (v_r ->> 'item_id')::uuid,
+      v_r ->> 'name', v_r ->> 'item_donut', v_r ->> 'item_type', v_r ->> 'item_cut',
+      v_r ->> 'item_finish', v_r ->> 'item_size',
+      v_r ->> 'notes', (v_r ->> 'qty')::numeric, (v_r ->> 'unit_price')::numeric, true
+    );
+  end loop;
+
+  if v_sort > 0 then
+    insert into special_order_events (org_id, order_id, message, author, source)
+    values (p_org_id, v_order,
+            'Items proposed by the customer on the website (' || v_sort
+              || case when v_sort = 1 then ' line)' else ' lines)' end,
+            'Website', 'app');
+  end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'state', 'created',
+    'order_id', v_order,
+    'org_id', p_org_id,
+    'number', v_number,
+    'contact_name', v_name,
+    'contact_email', v_email,
+    'lines', v_sort                                                   -- <<< 133
+  );
+end;
+$function$;
+
+commit;

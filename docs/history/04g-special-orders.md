@@ -5474,6 +5474,37 @@ removed once the user has viewed the tab."
   not a copy. The "!" stays. Opening Info does not mark the note read; only
   the Notes tab does.
 
+## The inquiry note is its own field, and the "!" is per person (206, 2026-10-17)
+
+Mark: "I don't like that general notes are shared with inquiry notes. I think
+we need to create an 'inquiry note' field that is used only to store notes from
+the customer … General notes should be internal notes from staff about the
+order. Both … displayed on the notes tab. When a special order is created from
+an inquiry, the app should add 'See inquiry notes.' to the general notes. The
+flag should track which user views the notes page and only be cleared per
+user."
+
+- **`special_orders.inquiry_note`**: the customer's words (interest, then
+  description). `create_inquiry` writes them there and puts "See inquiry
+  notes." in `notes_general`, only when the customer wrote something.
+- **Notes tab:** "From the inquiry (prints nowhere)" sits above General,
+  READ-ONLY (what the customer sent; replies go in General), and only when
+  there is one.
+- **Backfill, measured first:** all 27 inquiry orders still held exactly what
+  `create_inquiry` wrote (rebuilt from `source_payload`), so 19 moved whole and
+  8 have no note. The log and `updated_at` triggers were off for it.
+- **`special_order_note_reads` is per person:** key `(order_id, read_by)`, and
+  the insert policy only lets you record your own read. 169's reader-less rows
+  were dropped; inquiry orders past the lead stage are marked read for every
+  member at the time (12), and open leads keep only real reads. Someone who
+  joins later sees the "!" on older inquiry orders until they open Notes.
+- **Dry-run** on the hosted DB in a transaction that raised its results
+  (number function stubbed): 19 moved, 8 empty, 206 read rows, a new inquiry
+  got "See inquiry notes." + its words, a member could record their own read
+  and was refused one for another member, sequence unchanged, nothing left.
+- **Order:** 206, then the web change (it selects `inquiry_note`).
+- **NOT YET APPLIED.**
+
 ## The delivery window is the ready and event times (170, 2026-10-02)
 
 Mark: "window opens = ready time; window closes = event time. Keep Event Time

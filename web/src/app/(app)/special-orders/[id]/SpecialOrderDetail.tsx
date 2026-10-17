@@ -104,7 +104,7 @@ const ORDER_COLUMNS = `
   delivery_boxes, delivery_weight_lbs,
   tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
   ignore_balance, square_item, taken_by, taken_by_employee_id,
-  notes_general, notes_quote, notes_production, notes_invoice, notes_receipt,
+  notes_general, inquiry_note, notes_quote, notes_production, notes_invoice, notes_receipt,
   standing_days, starts_on, ends_on, paused, standing_order_id,
   date_initiated, quote_sent_at, quote_returned_at, invoice_sent_at,
   invoice_paid_at, receipt_sent_at, delivery_scheduled_at,
@@ -251,9 +251,14 @@ export async function SpecialOrderDetail({
           .eq("org_id", session.membership.org_id)
           .eq("is_active", true)
       : SKIP_MENU,
-    // Whether the customer's /inquiry note has been read (169) — the Notes
-    // tab's "!". One row or none.
-    supabase.from("special_order_note_reads").select("order_id").eq("order_id", id).maybeSingle(),
+    // Whether YOU have read the customer's /inquiry note (169; per person
+    // since 206) — the Notes tab's "!". One row or none.
+    supabase
+      .from("special_order_note_reads")
+      .select("order_id")
+      .eq("order_id", id)
+      .eq("read_by", session.userId)
+      .maybeSingle(),
   ]);
 
   if (error) {
@@ -650,13 +655,12 @@ export async function SpecialOrderDetail({
       : null;
   const trail = parseTrail(rawParams, SPECIAL_ORDERS_CRUMB);
   const tabs = tabsFor(kind, (row.fulfillment as string | null) ?? "pickup");
-  // A NOTE FROM AN /INQUIRY THAT NOBODY HAS READ (Mark, 2026-10-02): a yellow
-  // "!" on the Notes tab until somebody opens it, which `MarkNoteRead` records
-  // (169). The customer's words are `notes_general` — `create_inquiry` writes
-  // them there.
+  // A NOTE FROM AN /INQUIRY THAT YOU HAVE NOT READ (Mark, 2026-10-02): a
+  // yellow "!" on the Notes tab until you open it, which `MarkNoteRead`
+  // records (169). PER PERSON since 206 (Mark, 2026-10-17): one person's look
+  // used to clear it for everybody. The customer's words are `inquiry_note`.
   const unreadInquiryNote =
-    row.source === "inquiry" &&
-    String(row.notes_general ?? "").trim() !== "" &&
+    String(row.inquiry_note ?? "").trim() !== "" &&
     !noteRead;
   const tabOptions = tabs.map((t) => ({
     key: t,
@@ -1122,10 +1126,9 @@ export async function SpecialOrderDetail({
                             ariaLabel="Allergen information" />
                     </Row>
                     {/* THE GENERAL NOTE, HERE AS WELL AS ON NOTES (Mark,
-                        2026-10-17). The Notes tab's "!" clears for everybody
-                        the first time anybody opens it, so the next person to
-                        work the order never knew the customer had written
-                        anything. The same column and the same cell as the
+                        2026-10-17): staff's own note about the order, which
+                        since 206 is no longer where the customer's inquiry
+                        words live (those are on Notes). The same column and the same cell as the
                         Notes tab, not a copy: an edit in either place is the
                         one note. Under Pickup / delivery and Allergies (Mark,
                         2026-10-17), with the other facts the kitchen works
@@ -1277,7 +1280,7 @@ export async function SpecialOrderDetail({
               paragraphs — and the log wants HEIGHT, so neither fits under the
               other and both scroll their own rows. */}
           {activeTab === "notes" && unreadInquiryNote && (
-            <MarkNoteRead orderId={id} orgId={session.membership.org_id} />
+            <MarkNoteRead orderId={id} orgId={session.membership.org_id} userId={session.userId} />
           )}
           {activeTab === "notes" && (
             <OrderSplitLayout
@@ -1295,6 +1298,16 @@ export async function SpecialOrderDetail({
                       down a column reads as loose text rather than as a box you
                       can type in. See `INLINE_REST_BOXED`. */}
                   <div className="space-y-6 pr-2">
+                    {/* THE CUSTOMER'S OWN WORDS (206, Mark, 2026-10-17),
+                        apart from the general note, which is staff's.
+                        Read-only: it is what they sent, and a reply or a
+                        correction goes in the general note. */}
+                    {String(row.inquiry_note ?? "").trim() !== "" && (
+                      <Row label="From the inquiry (prints nowhere)">
+                        <Cell table="special_orders" id={id} column="inquiry_note" multiline boxed
+                              value={row.inquiry_note as string | null} canWrite={false} ariaLabel="Inquiry note" />
+                      </Row>
+                    )}
                     <Row label="General (prints nowhere)">
                       <Cell table="special_orders" id={id} column="notes_general" multiline boxed
                             value={row.notes_general as string | null} canWrite={canWrite} ariaLabel="General note" />
