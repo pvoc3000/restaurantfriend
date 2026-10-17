@@ -1194,6 +1194,18 @@ export async function SpecialOrderDetail({
                             value={row.contact_email as string | null} canWrite={canWrite}
                             ariaLabel="Day-of contact email" />
                     </Row>
+                    {/* THE GENERAL NOTE, HERE AS WELL AS ON NOTES (Mark,
+                        2026-10-17). The Notes tab's "!" clears for everybody
+                        the first time anybody opens it, so the next person to
+                        work the order never knew the customer had written
+                        anything. The same column and the same cell as the
+                        Notes tab, not a copy: an edit in either place is the
+                        one note. Under Customer because an inquiry's note is
+                        the customer's own words. */}
+                    <Row label="General note" wide>
+                      <Cell table="special_orders" id={id} column="notes_general" multiline boxed
+                            value={row.notes_general as string | null} canWrite={canWrite} ariaLabel="General note" />
+                    </Row>
                   </div>
                 </section>
               }

@@ -5466,6 +5466,14 @@ removed once the user has viewed the tab."
   transaction): RLS on, 2 policies, anon cannot read, 9 orders marked read by
   the backfill, 3 open leads flagged.
 
+- **The general note on Info too (2026-10-17).** Mark: the "!" clears as
+  soon as anybody looks, "so the next person who looks at it is unaware a note
+  exists." The read is per ORDER, not per person, by design (above). Rather
+  than make it per person, `notes_general` now also sits on the Info tab, a
+  wide boxed row at the foot of Customer: the same column and the same cell,
+  not a copy. The "!" stays. Opening Info does not mark the note read; only
+  the Notes tab does.
+
 ## The delivery window is the ready and event times (170, 2026-10-02)
 
 Mark: "window opens = ready time; window closes = event time. Keep Event Time
