@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
+import { BOXED_FIELDS, BOXED_FIELD_TALL, BOXED_FIELD_TALLER } from "@/components/ui/fieldMetrics";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
@@ -1298,6 +1298,13 @@ export async function SpecialOrderDetail({
                       down a column reads as loose text rather than as a box you
                       can type in. See `INLINE_REST_BOXED`. */}
                   <div className="space-y-6 pr-2">
+                    {/* GENERAL FIRST AND TWICE AS TALL (Mark, 2026-10-17):
+                        staff's own running note about the order, the one
+                        that gets written in most. */}
+                    <Row label="General (prints nowhere)">
+                      <Cell table="special_orders" id={id} column="notes_general" multiline boxed rows={8}
+                            value={row.notes_general as string | null} canWrite={canWrite} ariaLabel="General note" />
+                    </Row>
                     {/* THE CUSTOMER'S OWN WORDS (206, Mark, 2026-10-17),
                         apart from the general note, which is staff's.
                         Read-only: it is what they sent, and a reply or a
@@ -1308,10 +1315,6 @@ export async function SpecialOrderDetail({
                               value={row.inquiry_note as string | null} canWrite={false} ariaLabel="Inquiry note" />
                       </Row>
                     )}
-                    <Row label="General (prints nowhere)">
-                      <Cell table="special_orders" id={id} column="notes_general" multiline boxed
-                            value={row.notes_general as string | null} canWrite={canWrite} ariaLabel="General note" />
-                    </Row>
                     <Row label="On the quote">
                       <Cell table="special_orders" id={id} column="notes_quote" multiline boxed
                             value={row.notes_quote as string | null} canWrite={canWrite} ariaLabel="Quote note" />
@@ -1537,6 +1540,8 @@ function Cell({
   allowNew?: boolean;
   clearable?: boolean;
   multiline?: boolean;
+  /** A note's height in lines; 8 is twice the usual (`InlineValue`'s `rows`). */
+  rows?: number;
   boxed?: boolean;
   placeholder?: string;
   ariaLabel?: string;
@@ -1555,7 +1560,7 @@ function Cell({
       <span
         className={`${READ_ONLY_VALUE} ${
           props.multiline && boxed
-            ? "block min-h-16 w-full whitespace-pre-wrap border border-hairline"
+            ? `block ${(props.rows ?? 4) >= 8 ? BOXED_FIELD_TALLER : BOXED_FIELD_TALL} whitespace-pre-wrap border border-hairline`
             : ""
         }`}
       >
