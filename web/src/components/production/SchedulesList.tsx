@@ -9,7 +9,7 @@ import type { SortDir } from "@/lib/tableSort";
 import { PickList } from "@/components/ui/PickList";
 import { RangePicker } from "@/components/ui/RangePicker";
 import { inRange, type DateRange, type RangePresetSpec } from "@/lib/dateRange";
-import { daysAfter } from "@/lib/today";
+import { daysAfter, daysBefore } from "@/lib/today";
 import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
@@ -78,6 +78,13 @@ const SCHEDULE_PRESETS: readonly RangePresetSpec[] = [
   "yesterday",
   "this_week",
   "previous_week",
+  // Upcoming's mirror: the four weeks up to yesterday, which is also exactly
+  // how far back the page always loads.
+  {
+    key: "last_4_weeks",
+    label: "Last 4 Weeks",
+    range: (t: string) => ({ from: daysBefore(t, SCHEDULE_WINDOW_DAYS), to: daysBefore(t, 1) }),
+  },
   "this_month",
   "last_month",
   { key: "all", label: "All", range: () => null },
