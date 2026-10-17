@@ -78,12 +78,13 @@ const SCHEDULE_PRESETS: readonly RangePresetSpec[] = [
   "yesterday",
   "this_week",
   "previous_week",
-  // Upcoming's mirror: the four weeks up to yesterday, which is also exactly
-  // how far back the page always loads.
+  // Upcoming's mirror: the four weeks ENDING TODAY, 28 nights with tonight
+  // the last (Mark, 2026-10-17: "in practice I would want to include today").
+  // Unlike `lib/dateRange`'s Last N Days, which stop at yesterday.
   {
     key: "last_4_weeks",
     label: "Last 4 Weeks",
-    range: (t: string) => ({ from: daysBefore(t, SCHEDULE_WINDOW_DAYS), to: daysBefore(t, 1) }),
+    range: (t: string) => ({ from: daysBefore(t, SCHEDULE_WINDOW_DAYS - 1), to: t }),
   },
   "this_month",
   "last_month",
