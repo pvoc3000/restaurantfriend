@@ -5470,7 +5470,7 @@ removed once the user has viewed the tab."
   soon as anybody looks, "so the next person who looks at it is unaware a note
   exists." The read is per ORDER, not per person, by design (above). Rather
   than make it per person, `notes_general` now also sits on the Info tab, a
-  wide boxed row at the foot of Customer: the same column and the same cell,
+  wide boxed row under Pickup / delivery and Allergies (moved there from the foot of Customer the same day): the same column and the same cell,
   not a copy. The "!" stays. Opening Info does not mark the note read; only
   the Notes tab does.
 
