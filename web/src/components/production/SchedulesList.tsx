@@ -39,6 +39,9 @@ export type ScheduleRow = {
   sellsCode: string;
   kitchenCode: string;
   source: string;
+  /** `source`, with a special order told apart from a standing order's day —
+   *  what the From filter picks between. */
+  origin: ScheduleFrom;
   title: string | null;
   location_id: string;
   kitchen_location_id: string;
@@ -73,6 +76,15 @@ const SCHEDULE_PRESETS: readonly RangePresetSpec[] = [
   "this_week",
   "previous_week",
   { key: "all", label: "All", range: () => null },
+];
+
+export type ScheduleFrom = "plan" | "special_order" | "standing_order" | "manual";
+
+const ORIGIN_OPTIONS: { value: ScheduleFrom; label: string }[] = [
+  { value: "plan", label: "Plan" },
+  { value: "special_order", label: "Special Order" },
+  { value: "standing_order", label: "Standing Order" },
+  { value: "manual", label: "By Hand" },
 ];
 
 /** Re-exported name for the local reads below; `lib/productionSchedule` owns it. */
@@ -152,6 +164,7 @@ export function SchedulesList({
    * screen showed when that was a scope on the query.
    */
   const [show, setShow] = useState<string[]>(() => (kitchenId ? [`kitchen:${kitchenId}`] : []));
+  const [origin, setOrigin] = useState<ScheduleFrom | "all">("all");
   const [grouping, setGrouping] = useState<Grouping>("date");
   const [term, setTerm] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -196,6 +209,7 @@ export function SchedulesList({
     const q = term.trim().toLowerCase();
     return rows.filter((r) => {
       if (range && !inRange(r.schedule_date, range)) return false;
+      if (origin !== "all" && r.origin !== origin) return false;
       if (filter.unprinted && r.printedAt !== null) return false;
       if (filter.shops.size > 0 && !filter.shops.has(r.location_id)) return false;
       if (filter.kitchens.size > 0 && !filter.kitchens.has(r.kitchen_location_id)) return false;
@@ -221,7 +235,7 @@ export function SchedulesList({
         .toLowerCase()
         .includes(q);
     });
-  }, [rows, plans, range, filter, term]);
+  }, [rows, plans, range, origin, filter, term]);
 
   // The order lives in `lib/productionSchedule` so it can be fixture-tested —
   // a comparator inside a `useMemo` is exactly where the group-leads bug hid.
@@ -597,6 +611,22 @@ export function SchedulesList({
             allLabel="All"
             label="Which schedules to show"
             noun="filters"
+          />
+        </ControlField>
+        <ControlField label="From">
+          <PickList
+            ariaLabel="Which source the schedules came from"
+            variant="field"
+            value={origin}
+            onPick={(v) => setOrigin(v as ScheduleFrom | "all")}
+            options={[
+              { value: "all", label: "All" },
+              ...ORIGIN_OPTIONS.map((o) => ({
+                ...o,
+                hint: String(rows.filter((r) => r.origin === o.value).length),
+              })),
+            ]}
+            fit
           />
         </ControlField>
         <ControlField label="Group by">

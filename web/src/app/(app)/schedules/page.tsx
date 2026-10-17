@@ -68,7 +68,7 @@ export default async function SchedulesPage() {
       // from the select's literal type, and `"a" + "b"` widens to `string`,
       // which turns every field access into a GenericStringError.
       .select(
-        `id, schedule_date, location_id, kitchen_location_id, source, title, plan_ids,
+        `id, schedule_date, location_id, kitchen_location_id, source, source_ref, title, plan_ids,
          generated_at, generated_by, printed_at, printed_by, regeneration_count, note`
       )
       .gte("schedule_date", from)
@@ -99,6 +99,29 @@ export default async function SchedulesPage() {
             : ""}
       </p>
     );
+  }
+
+  // Which special-order nights are a STANDING order's day: the schedule only
+  // says `special_order`, and the order it points at says whether a standing
+  // order made it (`standing_order_id`, 051). A second round trip, because the
+  // ids come from the first. `special_orders` is supervisor+ (051), so for
+  // staff this returns no rows and no error, and those nights read as special
+  // orders — the From filter's Standing order then shows none for them.
+  const orderIds = [
+    ...new Set(
+      (schedules ?? [])
+        .filter((s) => s.source === "special_order" && s.source_ref)
+        .map((s) => s.source_ref as string)
+    ),
+  ];
+  const standingOrderIds = new Set<string>();
+  if (orderIds.length) {
+    const { data: orders } = await supabase
+      .from("special_orders")
+      .select("id")
+      .in("id", orderIds)
+      .not("standing_order_id", "is", null);
+    for (const o of orders ?? []) standingOrderIds.add(o.id as string);
   }
 
   // Rolled up in JS rather than asked for per row: one query either way, and
@@ -138,6 +161,14 @@ export default async function SchedulesPage() {
       sellsCode: codeById.get(s.location_id as string) ?? "—",
       kitchenCode: codeById.get(s.kitchen_location_id as string) ?? "—",
       source: (s.source ?? "plan") as string,
+      origin:
+        s.source === "special_order"
+          ? standingOrderIds.has(s.source_ref as string)
+            ? "standing_order"
+            : "special_order"
+          : s.source === "manual"
+            ? "manual"
+            : "plan",
       title: (s.title ?? null) as string | null,
       // Kept on the row because `scheduleSourceLabel` matches on them, and the
       // list already holds the codes for display.
