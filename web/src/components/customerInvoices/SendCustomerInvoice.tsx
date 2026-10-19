@@ -12,6 +12,7 @@ import { TextInput } from "@/components/ui/TextInput";
 import { customerLabel, money, readSettings } from "@/lib/specialOrders";
 import {
   DEFAULT_TEMPLATES,
+  ccWithContacts,
   fillTemplate,
   docOrgFrom,
   orderEmailSubject,
@@ -260,18 +261,25 @@ export function SendCustomerInvoice({
       // subject, so it threads with the quote and the inquiry. Several orders —
       // the weekly wholesale invoice — keep the invoice's own subject.
       // `send-special-order-email` threads it on the same rule.
-      const invoiceOrders = [...new Set(view.lines.map((l) => l.special_order_id).filter(Boolean))];
+      // EACH ORDER'S CONTACT IS CC'D (Mark, 2026-10-19), the way the order's
+      // own documents cc theirs (`documentCc`) — read in the same query.
+      const invoiceOrders = [...new Set(view.lines.map((l) => l.special_order_id).filter(Boolean))] as string[];
       let conversation: string | null = null;
-      if (invoiceOrders.length === 1) {
-        const { data: one } = await supabase
+      let contacts: (string | null)[] = [];
+      if (invoiceOrders.length > 0) {
+        const { data: orders, error: ordersError } = await supabase
           .from("special_orders")
-          .select("number, title, thread_subject")
-          .eq("id", invoiceOrders[0]!)
-          .maybeSingle();
+          .select("id, number, title, thread_subject, contact_email")
+          .in("id", invoiceOrders);
+        if (ordersError) throw ordersError;
+        // In the invoice's own order, so the Cc reads in the order its lines do.
+        const byId = new Map((orders ?? []).map((o) => [o.id as string, o]));
+        contacts = invoiceOrders.map((id) => (byId.get(id)?.contact_email as string | null) ?? null);
+        const one = invoiceOrders.length === 1 ? byId.get(invoiceOrders[0]) : undefined;
         if (one) conversation = orderEmailSubject(one, doc.name, settings);
       }
       setCompose(
-        invoiceEmail(view, number, settings, pay, viaQbo, (me as string | null) || doc.name, conversation)
+        invoiceEmail(view, number, settings, pay, viaQbo, (me as string | null) || doc.name, conversation, contacts)
       );
       setPending({
         replacesInQbo,
@@ -522,7 +530,9 @@ function invoiceEmail(
   viaQbo = false,
   employeeName = "",
   /** The order's conversation subject, for an invoice covering one order. */
-  conversation: string | null = null
+  conversation: string | null = null,
+  /** The contact email of each order on the invoice. */
+  contacts: (string | null)[] = []
 ): Compose {
   const so = (settings.special_orders ?? {}) as Record<string, unknown>;
   const templates = (so.email ?? {}) as Record<string, { subject?: string; body?: string }>;
@@ -543,7 +553,7 @@ function invoiceEmail(
   };
   return {
     to: (view.customer?.email ?? "").trim(),
-    cc: typeof so.email_cc === "string" ? so.email_cc : "",
+    cc: ccWithContacts(view.customer?.email ?? "", typeof so.email_cc === "string" ? so.email_cc : "", contacts),
     subject: conversation ?? fillTemplate(orDefault(configured.subject, fallback.subject), vars),
     body: fillTemplate(orDefault(configured.body, fallback.body), vars),
   };

@@ -23,6 +23,7 @@ import {
   cutoffClause,
   fillFulfillmentNote,
   fulfillmentNote,
+  ccWithContacts,
   documentCc,
   documentTimeLabel,
   documentFileName,
@@ -929,4 +930,13 @@ test("customerLines: a hidden line leaves the customer's list, and the kitchen k
   const lines = [line({ id: "a" }), line({ id: "b", hide_from_customer: true }), line({ id: "c" })];
   eq(customerLines(lines).map((l) => l.id), ["a", "c"]);
   eq(sizeClassGroups(lines).flatMap((g) => g.lines).length, 3, "the kitchen order still prints it");
+});
+
+test("ccWithContacts: an invoice over several orders cc's each contact once", () => {
+  eq(ccWithContacts("ap@corp.com", "orders@df.com", ["a@corp.com", "b@corp.com"]),
+    "orders@df.com, a@corp.com, b@corp.com");
+  eq(ccWithContacts("ap@corp.com", "", ["a@corp.com", " A@Corp.com ", null, ""]), "a@corp.com", "twice is once");
+  eq(ccWithContacts("ap@corp.com", "", ["AP@corp.com"]), "", "the To is never cc'd");
+  eq(ccWithContacts("ap@corp.com", "orders@df.com", ["orders@df.com"]), "orders@df.com", "nor the standing Cc twice");
+  eq(ccWithContacts("", "", []), "");
 });

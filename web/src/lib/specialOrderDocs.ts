@@ -1108,11 +1108,29 @@ export function documentRecipient(order: OrderDocData): string {
  * the whole of this field before today; the contact is appended.
  */
 export function documentCc(order: OrderDocData, configuredCc: string): string {
+  return ccWithContacts(documentRecipient(order), configuredCc, [order.contact_email]);
+}
+
+/**
+ * `documentCc`'s rule over ANY NUMBER of contacts, for a customer invoice,
+ * which can bill several orders and so carry several contacts (Mark,
+ * 2026-10-19). Each is added once, and never when it is already the To or
+ * already in the configured Cc.
+ */
+export function ccWithContacts(
+  to: string,
+  configuredCc: string,
+  contacts: (string | null | undefined)[]
+): string {
   const split = (v: string) => v.split(",").map((a) => a.trim()).filter(Boolean);
   const out = split(configuredCc);
-  const taken = new Set([documentRecipient(order), ...out].map((a) => a.toLowerCase()));
-  const contact = (order.contact_email ?? "").trim();
-  if (contact && !taken.has(contact.toLowerCase())) out.push(contact);
+  const taken = new Set([to.trim(), ...out].map((a) => a.toLowerCase()));
+  for (const c of contacts) {
+    const contact = (c ?? "").trim();
+    if (!contact || taken.has(contact.toLowerCase())) continue;
+    taken.add(contact.toLowerCase());
+    out.push(contact);
+  }
   return out.join(", ");
 }
 
