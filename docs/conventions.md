@@ -2287,7 +2287,7 @@
   NULL means the built-in default, and saving the default writes NULL, so a
   person who never edits the page follows the default as it changes. Edit mode
   itself is VIEW state (`?edit=1`), per the rule above.
-  **A widget's TINT IS THE APP'S ONE SANCTIONED DECORATIVE COLOUR.** Colour is
+  **A widget's TINT IS THE APP'S ONE SANCTIONED DECORATIVE COLOR.** Color is
   state everywhere else; a tint is a label its owner chose, so `START_TINTS` is
   pale neutrals and cool tints only — no green, red, yellow or orange, which are
   the go / stop / mark / submitted fills. Calendar chips on a tinted widget wear

@@ -18,7 +18,7 @@ export const WIDGET_CHIP_EDGE = "ring-1 ring-inset ring-black/15";
 /**
  * ONE CALENDAR ITEM ON A START-PAGE WIDGET — the Calendar's upcoming list and
  * the Today timeline. The calendar's own chip (`chipClass`, so an entry wears
- * the colour it wears on `/calendar`), its time in a column when it has one,
+ * the color it wears on `/calendar`), its time in a column when it has one,
  * and from two columns its second phrase and its shops.
  *
  * A tap goes where the item goes on the calendar; an ENTRY, which opens a

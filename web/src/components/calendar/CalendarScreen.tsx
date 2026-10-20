@@ -153,7 +153,7 @@ export function CalendarScreen({
       .then(({ data, error }) => {
         if (error || !data?.length) {
           setColors(before);
-          setColourError(error?.message ?? "The colour was not saved — the database refused it.");
+          setColourError(error?.message ?? "The color was not saved — the database refused it.");
           return;
         }
         router.refresh();
@@ -465,7 +465,7 @@ export function CalendarScreen({
 
         {/* THE KEY to the colours: one chip per layer that is showing, in the
             menu's order, so the calendar never has to be decoded from memory. */}
-        <ul aria-label="Colours" className="flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-medium">
+        <ul aria-label="Colors" className="flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-medium">
           {!hiddenSet.has("entries") && (
             <li className={`rounded-[4px] px-1.5 leading-[18px] ${BLACKOUT_CHIP}`}>Blackouts</li>
           )}
@@ -479,7 +479,7 @@ export function CalendarScreen({
                   <button
                     type="button"
                     onClick={() => setRecolouring(l.key)}
-                    aria-label={`Change the colour of ${keyLabel(l)}`}
+                    aria-label={`Change the color of ${keyLabel(l)}`}
                     className={`rounded-[4px] px-1.5 leading-[18px] hover:brightness-95 ${colorChip(layerColor(l.key, colors))}`}
                   >
                     {keyLabel(l)}
@@ -530,7 +530,7 @@ export function CalendarScreen({
       {colourError && <p className="text-sm text-accent">{colourError}</p>}
       {recolouring && (
         <Dialog
-          title={`Colour for ${keyLabel(CALENDAR_LAYERS.find((l) => l.key === recolouring)!)}`}
+          title={`Color for ${keyLabel(CALENDAR_LAYERS.find((l) => l.key === recolouring)!)}`}
           onClose={() => setRecolouring(null)}
           width="max-w-lg"
           footer={
@@ -543,10 +543,10 @@ export function CalendarScreen({
             <ColorSwatches
               value={layerColor(recolouring, colors)}
               onChange={(next) => next && setLayerColour(recolouring, next)}
-              ariaLabel="Colour"
+              ariaLabel="Color"
               name="layer-colour"
             />
-            <p className="text-sm text-muted">Everyone in the organisation sees this colour.</p>
+            <p className="text-sm text-muted">Everyone in the organisation sees this color.</p>
           </div>
         </Dialog>
       )}

@@ -108,7 +108,7 @@ export function CalendarSettings({
         .eq("id", sub.id)
         .select("id");
       if (error) setFailed(error.message);
-      else if (!data?.length) setFailed("The colour was not saved — the database refused it.");
+      else if (!data?.length) setFailed("The color was not saved — the database refused it.");
       router.refresh();
     });
   }
@@ -227,7 +227,7 @@ export function CalendarSettings({
     },
     {
       key: "colour",
-      label: "Colour",
+      label: "Color",
       width: 130,
       sortValue: (s) => s.color ?? "",
       // Drawn as the chip its events wear on the calendar — its own colour, or
@@ -238,7 +238,7 @@ export function CalendarSettings({
             isCalendarColor(s.color) ? s.color : feedsColor,
           )}`}
         >
-          {isCalendarColor(s.color) ? "Its own" : "Layer colour"}
+          {isCalendarColor(s.color) ? "Its own" : "Layer color"}
         </span>
       ),
     },
@@ -283,7 +283,7 @@ export function CalendarSettings({
                 items={[
                   { label: "Refresh now", onSelect: () => refresh(s) },
                   { label: "Change address…", onSelect: () => setAddressFor(s) },
-                  { label: "Change colour…", onSelect: () => setColourFor(s) },
+                  { label: "Change color…", onSelect: () => setColourFor(s) },
                   { label: "Remove", danger: true, onSelect: () => void removeSubscription(s) },
                 ]}
               />
@@ -428,7 +428,7 @@ export function CalendarSettings({
       )}
       {colourFor && (
         <Dialog
-          title={`Colour for ${colourFor.name}`}
+          title={`Color for ${colourFor.name}`}
           onClose={() => setColourFor(null)}
           width="max-w-lg"
           footer={
@@ -444,7 +444,7 @@ export function CalendarSettings({
               return isCalendarColor(now) ? now : null;
             })()}
             onChange={(next) => setColour(colourFor, next)}
-            ariaLabel="Colour"
+            ariaLabel="Color"
             name="subscription-colour"
             allowDefault
           />
@@ -580,11 +580,11 @@ function SubscriptionDialog({
         )}
         {!existing && (
           <div className="space-y-1">
-            <span className="block text-[11px] uppercase tracking-[0.12em] text-subtle">Colour</span>
+            <span className="block text-[11px] uppercase tracking-[0.12em] text-subtle">Color</span>
             <ColorSwatches
               value={color}
               onChange={setColor}
-              ariaLabel="Colour"
+              ariaLabel="Color"
               name="new-subscription-colour"
               allowDefault
             />

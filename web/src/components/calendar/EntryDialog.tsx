@@ -320,11 +320,11 @@ export function EntryDialog({
             blackout has none: a closed day looks the same every time. */}
         {!blackout && (
           <div className="space-y-1">
-            <span className="block text-[11px] uppercase tracking-[0.12em] text-subtle">Colour</span>
+            <span className="block text-[11px] uppercase tracking-[0.12em] text-subtle">Color</span>
             <ColorSwatches
               value={color}
               onChange={setColor}
-              ariaLabel="Colour"
+              ariaLabel="Color"
               name="entry-colour"
               allowDefault
               disabled={!editable}

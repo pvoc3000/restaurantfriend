@@ -120,7 +120,7 @@ export function StartGrid({
   async function reset() {
     const ok = await confirmDialog({
       title: "Reset the start page?",
-      body: "Your widgets go back to the default arrangement, widths and colours.",
+      body: "Your widgets go back to the default arrangement, widths and colors.",
       confirmLabel: "Reset",
     });
     if (ok) change(DEFAULT_LAYOUT);

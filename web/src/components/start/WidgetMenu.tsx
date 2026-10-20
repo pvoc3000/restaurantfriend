@@ -22,7 +22,7 @@ import {
  * nothing ticked, the current width disabled and labelled rather than checked,
  * Remove last.
  *
- * Colour… opens a swatch panel on `useAnchoredPanel`, anchored to the same ⋯,
+ * Color… opens a swatch panel on `useAnchoredPanel`, anchored to the same ⋯,
  * so it portals and closes on scroll, Escape and an outside click like every
  * other panel here.
  */
@@ -76,7 +76,7 @@ export function WidgetMenu({
         label={`Settings for ${title}`}
         items={[
           ...widths,
-          { label: "Colour…", onSelect: () => setPicking(true) },
+          { label: "Color…", onSelect: () => setPicking(true) },
           ...dayItems,
           { label: "Move earlier", disabled: !canStepEarlier, onSelect: () => onStep(-1) },
           { label: "Move later", disabled: !canStepLater, onSelect: () => onStep(1) },
@@ -89,7 +89,7 @@ export function WidgetMenu({
           <div
             ref={panelRef}
             role="dialog"
-            aria-label={`Colour for ${title}`}
+            aria-label={`Color for ${title}`}
             style={{ top: box.top, left: box.left, transform: "translateX(-100%)" }}
             className={`${MENU_PANEL_CLASS} flex gap-2 p-3`}
           >

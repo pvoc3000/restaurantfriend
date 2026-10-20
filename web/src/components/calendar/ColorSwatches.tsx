@@ -20,7 +20,7 @@ export function ColorSwatches({
   ariaLabel,
   name,
   allowDefault = false,
-  defaultLabel = "Layer colour",
+  defaultLabel = "Layer color",
   disabled = false,
 }: {
   value: CalendarColor | null;

@@ -205,7 +205,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 - A VENDOR'S NAME IS EDITABLE, AND SO IS ITS CONFIG AT A SHOP IT HAS NONE AT
 - THE THREE PURCHASING LISTS FILTER BY VENDOR, AND SEVERAL AT ONCE
 - View state in the URL, display preferences in localStorage.
-- THE START PAGE LAYOUT IS SAVED PER PERSON, NOT PER DEVICE — and a widget tint is the one decorative colour
+- THE START PAGE LAYOUT IS SAVED PER PERSON, NOT PER DEVICE — and a widget tint is the one decorative color
 - Scroll restoration is UNIVERSAL and nothing opts in
 - Breadcrumbs follow the route taken
 - Detail views are FULL-SCREEN PAGES

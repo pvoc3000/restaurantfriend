@@ -70,7 +70,7 @@ the upper right hand corner of each one." Scoped first; his answers:
   default, and saving the default writes NULL. See conventions, "THE START PAGE
   LAYOUT IS SAVED PER PERSON".
 - **Tint from a small palette of pale neutrals** (`START_TINTS`: grey, stone,
-  slate, sky, lilac) — never a state colour.
+  slate, sky, lilac) — never a state color.
 - **The corner ⋯ only in edit mode**; the resting page looks as it did.
 - **Desk shell only**; the tablet keeps its tiles. Wall-screen mode dropped.
 - **Ten widgets.** The six cards and Sales, made width-aware; **Reminders**
@@ -133,7 +133,7 @@ page with live data, edit mode draws grips, ⋯, Add widget and Reset, and a
 saved layout of Today/Calendar/tints/widths rendered — the owner's own
 `start_layout` was set for that and put back to NULL. Static snapshots with the
 dev stylesheet were looked at in the pane at 1440 and 1024.
-**NOT VERIFIED:** the INTERACTIVE half — drag, the corner menu, the colour
+**NOT VERIFIED:** the INTERACTIVE half — drag, the corner menu, the color
 panel, Add, Reset and the save queue in a live, hydrated page. The pane is
 behind the shared-device PIN lock. Check them in Safari, where Mark reads the
 app, including drag on an iPad.

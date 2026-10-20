@@ -79,15 +79,15 @@ export const DEFAULT_LAYOUT: StartLayout = {
 // ---------------------------------------------------------------------------
 
 /**
- * THE ONE SANCTIONED DECORATIVE COLOUR IN THE APP. The design system's rule is
- * that colour is a record's STATE, never decoration — which is why the heart
+ * THE ONE SANCTIONED DECORATIVE COLOR IN THE APP. The design system's rule is
+ * that color is a record's STATE, never decoration — which is why the heart
  * and the star are black and the sales chart has no hue. A widget's tint is a
  * label its owner chose, so it must never be mistaken for a state: these are
  * pale NEUTRALS and cool tints only. No green, red, yellow or orange — those
  * are the go / stop / mark / submitted fills — and nothing a count badge's
  * yellow would vanish against.
  *
- * A PALETTE, NOT A COLOUR WELL, as `lib/calendarColors` argues: every class is
+ * A PALETTE, NOT A COLOR WELL, as `lib/calendarColors` argues: every class is
  * a whole literal so Tailwind ships it.
  */
 export type TintKey = "grey" | "stone" | "slate" | "sky" | "lilac";

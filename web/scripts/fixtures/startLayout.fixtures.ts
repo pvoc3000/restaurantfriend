@@ -64,7 +64,7 @@ test("startLayout: an unknown tint or day count is forgotten; days only on Calen
       { kind: "today", span: 1 },
     ],
   });
-  eq(l.widgets[0].tint, null, "red is a state colour, not a tint");
+  eq(l.widgets[0].tint, null, "red is a state color, not a tint");
   eq(l.widgets[1].tint, "sky");
   no("days" in l.widgets[1], "days on Sales");
   eq(l.widgets[2].days, 30);
