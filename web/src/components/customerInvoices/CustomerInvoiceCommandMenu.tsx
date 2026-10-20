@@ -13,6 +13,7 @@ import { TextInput } from "@/components/ui/TextInput";
 import { alertDialog, confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { customerInvoiceRefusals } from "@/lib/quickbooks";
 import { QuickBooksCustomerStep } from "@/components/specialOrders/QuickBooksCustomerStep";
+import { ProgressBand } from "@/components/ui/ProgressBand";
 import {
   DEFAULT_PAYMENT_TYPE,
   PAYMENT_TYPE_OPTIONS,
@@ -93,6 +94,9 @@ export function CustomerInvoiceCommandMenu({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  /** What Send to QuickBooks is doing right now — a render and a push run
+   *  several seconds each, and a label inside a closed menu says nothing. */
+  const [progress, setProgress] = useState<string | null>(null);
 
   const [paying, setPaying] = useState(false);
   const [payAmount, setPayAmount] = useState("");
@@ -116,6 +120,16 @@ export function CustomerInvoiceCommandMenu({
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
+    }
+  }
+
+  /** The band shows only while work runs — never behind a confirm. */
+  async function withProgress<T>(label: string, fn: () => Promise<T>): Promise<T> {
+    setProgress(label);
+    try {
+      return await fn();
+    } finally {
+      setProgress(null);
     }
   }
 
@@ -147,8 +161,10 @@ export function CustomerInvoiceCommandMenu({
    */
   const sendToQuickBooks = async () => {
     await run("qbo", async () => {
-      const { blob, view } = await renderInvoicePdf(supabase, id, today);
-      const inputs = await quickBooksInputs(supabase, orgId, view, numberText);
+      const { blob, view, inputs } = await withProgress("Preparing the invoice…", async () => {
+        const rendered = await renderInvoicePdf(supabase, id, today);
+        return { ...rendered, inputs: await quickBooksInputs(supabase, orgId, rendered.view, numberText) };
+      });
       if (!inputs.customerRef && view.invoice.customer_id) {
         setLinkFor(view.invoice.customer_id);
         return;
@@ -170,12 +186,9 @@ export function CustomerInvoiceCommandMenu({
       ) {
         return;
       }
-      const pushed = await pushToQuickBooks(
-        supabase,
-        inputs,
-        email,
-        blob,
-        invoiceFileName(numberText, view.invoice.issued_on)
+      const pushed = await withProgress(
+        inQuickBooks ? "Updating it in QuickBooks…" : "Sending it to QuickBooks…",
+        () => pushToQuickBooks(supabase, inputs, email, blob, invoiceFileName(numberText, view.invoice.issued_on))
       );
       const doc = pushed.ref.qbo?.doc_number ?? pushed.ref.qbo?.id ?? "";
       setNote(
@@ -394,6 +407,11 @@ export function CustomerInvoiceCommandMenu({
           }}
         />
       )}
+      {progress ? (
+        <div className="w-80">
+          <ProgressBand label={progress} />
+        </div>
+      ) : null}
       {note ? <p className="max-w-sm text-right text-[13px] text-[var(--rf-green-600)]">{note}</p> : null}
       {error ? <p className="max-w-sm text-right text-[13px] text-accent">{error}</p> : null}
 
