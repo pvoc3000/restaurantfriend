@@ -6,9 +6,11 @@ import {
   isOverdueBill,
   missedClosingNights,
   paperworkAlerts,
+  todayTimeline,
   yearOverYearTrend,
   type StartBill,
 } from "../../src/lib/startPage";
+import type { CalendarItem } from "../../src/lib/calendar";
 import type { SalesDay } from "../../src/lib/sales";
 import { eq, no, ok, test } from "./harness";
 
@@ -104,4 +106,32 @@ test("paperwork: the worst lapsing document per person, expired first", () => {
     { employeeId: "e1", kind: "food_handler_card", on: "2023-01-01", state: "expired" },
     { employeeId: "e2", kind: "food_handler_card", on: "2026-10-01", state: "soon" },
   ]);
+});
+
+// --- todayTimeline (2026-10-20) ----------------------------------------------
+
+
+const T = "2026-10-20";
+const codes = new Map([["k1", "DF01"], ["s2", "DF02"]]);
+const plan: CalendarItem = { key: "plan:1", layer: "menu_plan", date: T, title: "Fall menu", lead: "Menu", locationIds: [] };
+const pickup: CalendarItem = { key: "o:1", layer: "orders_paid", date: T, title: "Smith", time: "09:00", locationIds: ["s2"] };
+const delivery: CalendarItem = { key: "po:1", layer: "deliveries", date: T, title: "Bakemark", locationIds: ["s2"] };
+
+test("todayTimeline: a special-order schedule is the order already listed, so it is dropped", () => {
+  const out = todayTimeline([pickup], [
+    { id: "a", title: "Smith wedding", location_id: "s2", kitchen_location_id: "k1", source: "special_order" },
+  ], T, codes);
+  eq(out.banners.map((i) => i.key), []);
+  eq(out.timed.map((i) => i.key), ["o:1"]);
+});
+
+test("todayTimeline: a schedule replaces the plan's banner; with none the plan stays", () => {
+  const out = todayTimeline([plan, pickup, delivery], [
+    { id: "b", title: "DF02 Tuesday", location_id: "s2", kitchen_location_id: "k1", source: "plan" },
+  ], T, codes);
+  eq(out.banners.map((i) => i.key), ["schedule:b", "po:1"]);
+  eq(out.banners[0].lead, "DF01", "the kitchen leads, as it does on an order");
+  eq(out.banners[0].href, "/schedules/b");
+  eq(out.timed.map((i) => i.key), ["o:1"]);
+  eq(todayTimeline([plan, delivery], [], T, codes).banners.map((i) => i.key), ["plan:1", "po:1"]);
 });

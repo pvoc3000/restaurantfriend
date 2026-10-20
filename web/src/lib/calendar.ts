@@ -13,6 +13,8 @@ import { monthGrid, monthStart, type DateRange } from "./dateRange";
 import { daysAfter } from "./today";
 import { entryTitle, isBlackout, type CalendarEntry } from "./blackoutDates";
 import { formatRange } from "./dateRange";
+import { canReachPage } from "./pageAccess";
+import { canReadHr, type Role } from "./roles";
 
 export type CalendarLayer =
   | "menu_plan"
@@ -95,6 +97,27 @@ export type CalendarItem = {
    */
   span?: { key: string; from: string; to: string };
 };
+
+/**
+ * WHICH LAYERS THIS PERSON MAY SEE — the Page Permissions sheet's answer for
+ * the screen each one comes from: if you may not open Purchase Orders you are
+ * not shown deliveries. RLS refuses the rows regardless; this is what keeps a
+ * layer that would always be empty out of the menu. Shared by `/calendar` and
+ * the start page's Today widget (2026-10-20), so the two cannot disagree.
+ * `feeds` is not here: it depends on whether any calendar is subscribed.
+ */
+export function calendarLayersFor(role: Role, hasWorkingShop: boolean): CalendarLayer[] {
+  const layers: CalendarLayer[] = ["entries"];
+  // The working shop's menu plan — for anyone who may open Plans, and only
+  // when there IS a working shop.
+  if (canReachPage(role, "/plans") && hasWorkingShop) layers.unshift("menu_plan");
+  if (canReachPage(role, "/special-orders")) layers.push("orders_paid", "orders_unpaid", "standing_orders");
+  if (canReachPage(role, "/purchase-orders")) layers.push("deliveries");
+  if (canReachPage(role, "/tasks")) layers.push("tasks");
+  if (canReachPage(role, "/pay-periods")) layers.push("pay_periods");
+  if (canReadHr(role)) layers.push("hr", "hr_events");
+  return layers;
+}
 
 /* -- the month on screen ------------------------------------------------- */
 

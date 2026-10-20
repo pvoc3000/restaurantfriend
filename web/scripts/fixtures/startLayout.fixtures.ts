@@ -5,7 +5,6 @@ import {
   addableKinds,
   DEFAULT_LAYOUT,
   readStartLayout,
-  sameKinds,
   tileDropTarget,
   tintFill,
   visibleWidgets,
@@ -90,13 +89,6 @@ test("startLayout: a widget the role can't open is hidden but stays in the layou
   ]);
   ok(kinds(DEFAULT_LAYOUT).includes("paperwork"), "still stored");
   eq(addableKinds(withoutWidget(DEFAULT_LAYOUT, "paperwork"), may), ["calendar", "today"], "nor offered to add");
-});
-
-test("startLayout: sameKinds ignores order, width and tint", () => {
-  const moved = withSpan(withMove(DEFAULT_LAYOUT, "sales", { before: "reminders" }), "bills", 3);
-  ok(sameKinds(DEFAULT_LAYOUT, moved));
-  no(sameKinds(DEFAULT_LAYOUT, withWidget(DEFAULT_LAYOUT, "today")));
-  no(sameKinds(DEFAULT_LAYOUT, withoutWidget(DEFAULT_LAYOUT, "bills")));
 });
 
 // --- edits -------------------------------------------------------------------

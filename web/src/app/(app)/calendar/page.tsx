@@ -1,26 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canEditPage, canReachPage } from "@/lib/pageAccess";
-import { canManageMembers, canReadHr, canSetBlackouts } from "@/lib/roles";
+import { canEditPage } from "@/lib/pageAccess";
+import { canManageMembers, canSetBlackouts } from "@/lib/roles";
 import { readLayerColors } from "@/lib/calendarColors";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import {
+  calendarLayersFor,
   gridRange,
   parseDateParam,
   parseMonthParam,
   parseShopsParam,
   type CalendarItem,
-  type CalendarLayer,
 } from "@/lib/calendar";
 import { monthStart } from "@/lib/dateRange";
-import { fetchEntries, fetchLayerItems, staleSubscriptionIds } from "@/lib/calendarQueries";
+import { fetchEntries, fetchFeeds, fetchLayerItems, staleSubscriptionIds } from "@/lib/calendarQueries";
 import { CalendarScreen, type CalendarView } from "@/components/calendar/CalendarScreen";
 import { FeedRefresher } from "@/components/calendar/FeedRefresher";
-import {
-  subscriptionItems,
-  type CalendarSubscription,
-  type SubscriptionEventRow,
-} from "@/lib/calendarFeeds";
 
 /**
  * The calendar — build step 4s.
@@ -81,19 +76,9 @@ export default async function CalendarPage({
     );
   }
 
-  // WHICH LAYERS THIS PERSON MAY SEE is the Page Permissions sheet's answer for
-  // the screen each one comes from: if you may not open Purchase Orders you are
-  // not shown deliveries here. RLS refuses the rows regardless; this is what
-  // keeps a layer that would always be empty out of the menu.
-  const layers: CalendarLayer[] = ["entries"];
-  // The working shop's menu plan — for anyone who may open Plans, and only
-  // when there IS a working shop.
-  if (canReachPage(role, "/plans") && session.activeLocation) layers.unshift("menu_plan");
-  if (canReachPage(role, "/special-orders")) layers.push("orders_paid", "orders_unpaid", "standing_orders");
-  if (canReachPage(role, "/purchase-orders")) layers.push("deliveries");
-  if (canReachPage(role, "/tasks")) layers.push("tasks");
-  if (canReachPage(role, "/pay-periods")) layers.push("pay_periods");
-  if (canReadHr(role)) layers.push("hr", "hr_events");
+  // WHICH LAYERS THIS PERSON MAY SEE — `calendarLayersFor`, shared with the
+  // start page's Today widget.
+  const layers = calendarLayersFor(role, Boolean(session.activeLocation));
 
   let layerItems: CalendarItem[] = [];
   let layerFailures: string[] = [];
@@ -102,7 +87,7 @@ export default async function CalendarPage({
   let stale: string[] = [];
   let calendars: { id: string; name: string }[] = [];
   {
-    const [fetched, subs, feedEvents] = await Promise.all([
+    const [fetched, feeds] = await Promise.all([
       // `session.locations`, the FULL list: a lookup, not an enumeration
       // (design rule 3), so a delivery to a since-closed shop still has a code.
       fetchLayerItems(
@@ -112,36 +97,18 @@ export default async function CalendarPage({
         session.locations,
         session.activeLocation?.id ?? null,
       ),
-      supabase
-        .from("calendar_subscriptions")
-        .select("id, name, location_ids, is_active, has_url, last_fetched_at, last_error, color")
-        .eq("is_active", true)
-        .order("created_at"),
-      supabase
-        .from("calendar_subscription_events")
-        .select("id, subscription_id, starts_on, ends_on, start_time, title, place")
-        .gte("ends_on", range.from)
-        .lte("starts_on", range.to)
-        .order("starts_on")
-        .order("id")
-        .limit(1000),
+      fetchFeeds(supabase, range),
     ]);
     layerItems = fetched.items;
     layerFailures = fetched.failed.map((f) => `${f.layer}: ${f.message}`);
 
-    // A missing table (186 not applied) is no subscriptions, not a broken page.
-    const subscriptions = ((subs.data ?? []) as CalendarSubscription[]).map((sub) => ({
-      ...sub,
-      location_ids: sub.location_ids ?? [],
-    }));
+    const { subscriptions } = feeds;
     if (subscriptions.length > 0) {
       layers.push("feeds");
       calendars = subscriptions
         .map((sub) => ({ id: sub.id, name: sub.name }))
         .sort((a, b) => a.name.localeCompare(b.name));
-      layerItems.push(
-        ...subscriptionItems((feedEvents.data ?? []) as SubscriptionEventRow[], subscriptions, range),
-      );
+      layerItems.push(...feeds.items);
       // Said by name, where the calendar is looked at: a subscription that
       // stopped working otherwise just looks like an empty week.
       layerFailures.push(

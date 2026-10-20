@@ -34,6 +34,13 @@ export type Membership = {
   role: Role;
   display_name: string | null;
   last_active_location_id: string | null;
+  /**
+   * The desk start page's widgets, as stored (migration 207) — raw jsonb, null
+   * for the built-in default. Read it with `readStartLayout` (`lib/startLayout`),
+   * which drops anything it doesn't recognise; write it only through
+   * `set_my_start_layout`.
+   */
+  start_layout: unknown;
 };
 
 export type OrgSettings = { timezone?: string } & Record<string, unknown>;
@@ -142,7 +149,7 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
   ] = await Promise.all([
     supabase
       .from("org_members")
-      .select("org_id, role, display_name, last_active_location_id, orgs(name, settings)")
+      .select("org_id, role, display_name, last_active_location_id, start_layout, orgs(name, settings)")
       .eq("user_id", user.id)
       .maybeSingle<Membership & { orgs: { name: string; settings: OrgSettings | null } | null }>(),
     // No is_active filter: the Locations list carries every one of them. See

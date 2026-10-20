@@ -34,26 +34,48 @@ export type SalesSummaryData = {
  * rendered from a component that holds it. Nothing here does anything but
  * render figures.
  */
-export function SalesSummary({ summary }: { summary: SalesSummaryData }) {
+export function SalesSummary({
+  summary,
+  fit = "viewport",
+}: {
+  summary: SalesSummaryData;
+  /**
+   * How the three figures decide how many fit. `viewport` — the Sales screen —
+   * goes three across from `sm`. `container` is the start page's widget
+   * (2026-10-20), which can be one column wide on a wide screen: it reads its
+   * own width (`@container` is on the widget), shows Net sales alone when
+   * narrow, adds Tips at two columns and the share at three.
+   */
+  fit?: "viewport" | "container";
+}) {
   const { current, vsPrevious, vsLastYear, gaps, previousLabel } = summary;
   const share = tipFraction(current);
+  const byContainer = fit === "container";
 
   return (
     <section className="space-y-3">
       <SectionHeading>{summary.rangeLabel}</SectionHeading>
 
-      <div className="grid gap-px border border-hairline bg-hairline sm:grid-cols-3">
+      <div
+        className={`grid gap-px border border-hairline bg-hairline ${
+          byContainer ? "@xl:grid-cols-2 @4xl:grid-cols-3" : "sm:grid-cols-3"
+        }`}
+      >
         <Figure label="Net sales" value={formatCents(current.netSalesCents)}>
           <Delta c={vsPrevious} field="net" what={previousLabel} />
           <Delta c={vsLastYear} field="net" what="a year ago" />
         </Figure>
 
-        <Figure label="Tips" value={formatCents(current.tipsCents)}>
+        <Figure label="Tips" value={formatCents(current.tipsCents)} className={byContainer ? "hidden @xl:block" : ""}>
           <Delta c={vsPrevious} field="tips" what={previousLabel} />
           <Delta c={vsLastYear} field="tips" what="a year ago" />
         </Figure>
 
-        <Figure label="Tips as a share of sales" value={formatFraction(share)}>
+        <Figure
+          label="Tips as a share of sales"
+          value={formatFraction(share)}
+          className={byContainer ? "hidden @4xl:block" : ""}
+        >
           <ShareDelta c={vsPrevious} what={previousLabel} />
           <ShareDelta c={vsLastYear} what="a year ago" />
         </Figure>
@@ -165,14 +187,16 @@ function rangeText(r: { from: string; to: string }): string {
 function Figure({
   label,
   value,
+  className = "",
   children,
 }: {
   label: string;
   value: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white p-4">
+    <div className={`bg-white p-4 ${className}`}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
         {label}
       </div>

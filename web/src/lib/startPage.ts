@@ -12,6 +12,7 @@ import { agingBucket, balanceOwed, billStage, type BillStatus } from "./bills";
 import { addDays, isoWeekday } from "./payPeriods";
 import { rollUpByDate, type DateRange, type SalesDay } from "./sales";
 import { missingNights } from "./shiftReports";
+import { dayAgenda, type CalendarItem } from "./calendar";
 
 // ---------------------------------------------------------------------------
 // Sales: this year against last year, day by day
@@ -176,4 +177,52 @@ export function paperworkAlerts(
     out.push({ employeeId: e.id, kind: next.kind, on: next.on, state });
   }
   return out.sort((a, b) => a.on.localeCompare(b.on));
+}
+
+// ---------------------------------------------------------------------------
+// Today (2026-10-20)
+// ---------------------------------------------------------------------------
+
+/** A production schedule for today at this shop — sold here or made here. */
+export type TodaySchedule = {
+  id: string;
+  title: string | null;
+  location_id: string;
+  kitchen_location_id: string;
+  source: "plan" | "special_order" | "manual";
+};
+
+/**
+ * THE TODAY WIDGET'S DAY: the calendar's items for today (deliveries, orders,
+ * standing-order days, tasks, entries, the menu plan) and today's production
+ * schedules, as `dayAgenda` splits a day — banners, then what has a time.
+ *
+ * TWO THINGS WOULD OTHERWISE BE SAID TWICE:
+ *   * A schedule whose source is a special order IS that order, which is
+ *     already on the day as a pickup or delivery — so it is left out.
+ *   * The menu plan says what the shop INTENDS to make; a schedule is what was
+ *     committed for today. When there is a schedule the plan's banner is
+ *     dropped, and when there is none the plan is the best answer there is.
+ *
+ * `codes` names the kitchen before a schedule, as an order's kitchen leads its
+ * line ("DF01: …").
+ */
+export function todayTimeline(
+  items: readonly CalendarItem[],
+  schedules: readonly TodaySchedule[],
+  today: string,
+  codes: ReadonlyMap<string, string>,
+): { banners: CalendarItem[]; timed: CalendarItem[] } {
+  const made = schedules.filter((s) => s.source !== "special_order");
+  const scheduleItems: CalendarItem[] = made.map((s) => ({
+    key: `schedule:${s.id}`,
+    layer: "menu_plan",
+    date: today,
+    title: s.title?.trim() || "Production schedule",
+    lead: codes.get(s.kitchen_location_id) ?? null,
+    href: `/schedules/${s.id}`,
+    locationIds: [...new Set([s.location_id, s.kitchen_location_id])],
+  }));
+  const rest = made.length > 0 ? items.filter((i) => i.layer !== "menu_plan") : items;
+  return dayAgenda([...rest, ...scheduleItems]);
 }

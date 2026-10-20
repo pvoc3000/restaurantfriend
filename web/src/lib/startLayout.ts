@@ -169,13 +169,6 @@ export function addableKinds(layout: StartLayout, may: WidgetAccess): WidgetKind
   return WIDGET_KINDS.filter((k) => may[k] && !placed.has(k));
 }
 
-/** The same widgets, in any order? A move, a width or a tint needs no new data. */
-export function sameKinds(a: StartLayout, b: StartLayout): boolean {
-  if (a.widgets.length !== b.widgets.length) return false;
-  const set = new Set(a.widgets.map((w) => w.kind));
-  return b.widgets.every((w) => set.has(w.kind));
-}
-
 // ---------------------------------------------------------------------------
 // Edits — each returns a new layout and leaves the input alone
 // ---------------------------------------------------------------------------

@@ -20,7 +20,12 @@ import { OPEN_TASK_STATUSES } from "./facilityTasks";
 import { DOCUMENT_KIND_LABEL, type DocumentKind } from "./employeeDocuments";
 import { EVENT_KIND_LABEL, eventSummaryLine, type EventKind } from "./employeeEvents";
 import { employeeName } from "./employees";
-import { subscriptionIsStale, type CalendarSubscription } from "./calendarFeeds";
+import {
+  subscriptionIsStale,
+  subscriptionItems,
+  type CalendarSubscription,
+  type SubscriptionEventRow,
+} from "./calendarFeeds";
 
 type Row = Record<string, unknown>;
 
@@ -325,4 +330,39 @@ function one<T = Record<string, unknown>>(value: unknown): T | null {
 export function staleSubscriptionIds(subscriptions: readonly CalendarSubscription[]): string[] {
   const now = Date.now();
   return subscriptions.filter((sub) => subscriptionIsStale(sub, now)).map((sub) => sub.id);
+}
+
+/**
+ * The subscribed calendars (migration 186) and their events in `range`, as
+ * items. Shared by `/calendar` and the start page's Calendar widget. A missing
+ * table (186 not applied) is no subscriptions, not a broken page.
+ */
+export async function fetchFeeds(
+  supabase: SupabaseClient,
+  range: DateRange,
+): Promise<{ subscriptions: CalendarSubscription[]; items: CalendarItem[] }> {
+  const [subs, feedEvents] = await Promise.all([
+    supabase
+      .from("calendar_subscriptions")
+      .select("id, name, location_ids, is_active, has_url, last_fetched_at, last_error, color")
+      .eq("is_active", true)
+      .order("created_at"),
+    supabase
+      .from("calendar_subscription_events")
+      .select("id, subscription_id, starts_on, ends_on, start_time, title, place")
+      .gte("ends_on", range.from)
+      .lte("starts_on", range.to)
+      .order("starts_on")
+      .order("id")
+      .limit(1000),
+  ]);
+  const subscriptions = ((subs.data ?? []) as CalendarSubscription[]).map((sub) => ({
+    ...sub,
+    location_ids: sub.location_ids ?? [],
+  }));
+  if (subscriptions.length === 0) return { subscriptions, items: [] };
+  return {
+    subscriptions,
+    items: subscriptionItems((feedEvents.data ?? []) as SubscriptionEventRow[], subscriptions, range),
+  };
 }
