@@ -51,7 +51,7 @@ export const CALENDAR_PALETTE: readonly {
   { key: "green", label: "Green", chip: "bg-green-100 text-green-900", swatch: "bg-green-500" },
   { key: "lime", label: "Lime", chip: "bg-lime-200 text-lime-950", swatch: "bg-lime-400" },
   { key: "brown", label: "Brown", chip: "bg-amber-200 text-amber-950", swatch: "bg-amber-700" },
-  { key: "slate", label: "Grey", chip: "bg-slate-200 text-slate-800", swatch: "bg-slate-400" },
+  { key: "slate", label: "Gray", chip: "bg-slate-200 text-slate-800", swatch: "bg-slate-400" },
 ];
 
 const BY_KEY = new Map(CALENDAR_PALETTE.map((c) => [c.key as string, c]));

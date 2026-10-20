@@ -252,7 +252,7 @@ export function normalizeEventKind(raw: string | null | undefined): EventKind {
   const kind = FMP_EVENT_TYPE[key];
   if (!kind) {
     throw new Error(
-      `Unrecognised FileMaker event type ${JSON.stringify(String(raw ?? ""))}. ` +
+      `Unrecognized FileMaker event type ${JSON.stringify(String(raw ?? ""))}. ` +
         `Add it to FMP_EVENT_TYPE in lib/employeeEvents.ts, or skip the row deliberately.`,
     );
   }

@@ -514,6 +514,19 @@
   the label over each field, which costs a 14px line per row and gives the
   value the whole column back. Re-measure before quoting the figure.)
 
+- **WHAT PEOPLE READ IS AMERICAN ENGLISH** (Mark, 2026-10-20: "please use
+  american english spelling throughout"). Every screen, printed document, email,
+  dialog, error and aria-label: color, gray, organization, labor, fulfill,
+  recognize, authorized, canceled / canceling (cancellation keeps its two l's in
+  American spelling too). Applied to the whole app's visible text that day.
+  **A STORED OR WIRED VALUE KEEPS ITS SPELLING**, because changing it is a
+  migration, not an edit: the status value `'cancelled'` (special orders, tasks,
+  and every `status !== "cancelled"` that reads it), the scan mode `"grey"`, the
+  start page tint key `"grey"`, the calendar settings column key `colour` (saved
+  column layouts are stored under it), radio-group `name`s like `entry-colour`,
+  and iCal's `STATUS:CANCELLED`. Only the LABEL shown for them is American.
+  Code comments and the docs were left as written, by choice (Mark, the same
+  day); new ones are written in American English.
 - **USE LITERAL TYPOGRAPHIC CHARACTERS IN JSX TEXT, NEVER HTML ENTITIES**
   (found 2026-08-30). **SWC strips the leading whitespace of a JSXText node that
   contains an entity**, so a `&rsquo;` anywhere in a paragraph silently deletes

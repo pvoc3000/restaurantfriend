@@ -77,8 +77,8 @@ export function PriceGrid({
         {locationId ? (
           <>
             {overrideCount === 0
-              ? "This shop overrides nothing — every cell below is the org price, shown in grey. Type in one to override it here only."
-              : `This shop overrides ${overrideCount} of ${grid.length} cells. The rest are the org price, shown in grey.`}
+              ? "This shop overrides nothing — every cell below is the org price, shown in gray. Type in one to override it here only."
+              : `This shop overrides ${overrideCount} of ${grid.length} cells. The rest are the org price, shown in gray.`}
           </>
         ) : (
           "What every shop charges unless it says otherwise. Changing one cell reprices every item on that class and tier."

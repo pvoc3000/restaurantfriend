@@ -32,7 +32,7 @@ export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   open: "Open",
   in_progress: "In Progress",
   done: "Done",
-  cancelled: "Cancelled",
+  cancelled: "Canceled",
 };
 
 export type TaskPriority = "low" | "normal" | "high";

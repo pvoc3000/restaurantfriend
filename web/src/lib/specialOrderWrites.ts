@@ -158,7 +158,7 @@ export function deleteConfirmMessage(ctx: DeleteContext): string {
   const noun = ctx.kind === "template" ? "template" : "order";
   return (
     `Delete ${noun} ${ctx.number}?\n\n${removes}Deleting is for a typo. ` +
-    `An order that is not happening should be CANCELLED, which keeps the record.`
+    `An order that is not happening should be CANCELED, which keeps the record.`
   );
 }
 
@@ -374,7 +374,7 @@ export async function cancelSpecialOrder(
     return {
       error:
         error.code === "PGRST202" || /schema cache/i.test(error.message)
-          ? "Cancelling needs migration 148, which has not been applied yet."
+          ? "Canceling needs migration 148, which has not been applied yet."
           : error.message,
     };
   }

@@ -354,7 +354,7 @@ export async function LocationDetail({
                 />
                 <p className="max-w-md text-xs text-subtle">
                   Kept per location, but a PO&rsquo;s <strong>bill to</strong>{" "}comes from
-                  the organisation&rsquo;s billing entity, not from here.
+                  the organization&rsquo;s billing entity, not from here.
                 </p>
               </section>
             </div>
@@ -419,7 +419,7 @@ export async function LocationDetail({
               </dl>
               <p className="max-w-[72ch] text-xs text-subtle">
                 Purchase orders emailed from this location go out through whichever of
-                the three tiers answers first — this location, then the organisation,
+                the three tiers answers first — this location, then the organization,
                 then the app&rsquo;s own sender. Credentials live in edge-function
                 secrets and are never stored in the database, so there is nothing here
                 to edit; changing the transport is a settings change.

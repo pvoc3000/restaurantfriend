@@ -118,7 +118,7 @@ export function payStateMessage(
       };
     case "cancelled":
       return {
-        title: "This order was cancelled",
+        title: "This order was canceled",
         body: "There’s nothing to pay. If that’s a surprise, reply to our email and we’ll sort it out.",
       };
     case "paid":

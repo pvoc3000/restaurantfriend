@@ -36,7 +36,7 @@ export async function runCancelOrder(
   const result = await cancelSpecialOrder(supabase, order.id, ctx);
   if ("error" in result) return result;
   if (result.notes.length) {
-    await alertDialog({ title: `Order ${order.number} is cancelled`, body: result.notes.join("\n\n") });
+    await alertDialog({ title: `Order ${order.number} is canceled`, body: result.notes.join("\n\n") });
   }
   return { cancelled: true };
 }

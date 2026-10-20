@@ -71,7 +71,7 @@ export default function PrivacyPage() {
       <h2>Why it holds it</h2>
       <p>
         To run the business: to employ and schedule people, meet employment and
-        food-safety record-keeping obligations, buy from suppliers, fulfil
+        food-safety record-keeping obligations, buy from suppliers, fulfill
         customer orders, and keep the books.
       </p>
 
@@ -126,7 +126,7 @@ export default function PrivacyPage() {
       <p>
         Business and employment records are kept for as long as the business or
         the law requires — employment records are retained after someone leaves,
-        because tax and labour rules require it.
+        because tax and labor rules require it.
       </p>
 
       <h2>Your choices</h2>

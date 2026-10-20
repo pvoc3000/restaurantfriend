@@ -652,7 +652,7 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (!member) return json(403, { error: "not a member of any organisation" });
+    if (!member) return json(403, { error: "not a member of any organization" });
     const orgId = member.org_id as string;
     const role = member.role as string;
     const isManager = role === "owner" || role === "admin";

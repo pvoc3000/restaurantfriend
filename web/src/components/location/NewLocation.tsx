@@ -162,7 +162,7 @@ export function NewLocation({ orgId, existingCodes }: { orgId: string; existingC
             </Field>
 
             <p className="text-[13px] text-muted">
-              It opens ACTIVE. The addresses, hours, tax and labour rates and the
+              It opens ACTIVE. The addresses, hours, tax and labor rates and the
               production mapping are set on the record.
             </p>
 

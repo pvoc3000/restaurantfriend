@@ -546,7 +546,7 @@ export function CalendarScreen({
               ariaLabel="Color"
               name="layer-colour"
             />
-            <p className="text-sm text-muted">Everyone in the organisation sees this color.</p>
+            <p className="text-sm text-muted">Everyone in the organization sees this color.</p>
           </div>
         </Dialog>
       )}

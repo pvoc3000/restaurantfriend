@@ -139,7 +139,7 @@ export type Unresolved = {
     | "no ingredients"         // made, and the master version is an empty document
     | "no yield"               // made, but the version doesn't say how much it makes
     | "no prep time"           // made, but the recipe never says how long it takes
-    | "no labour rate"         // the hours are known and the shop has no rate
+    | "no labor rate"         // the hours are known and the shop has no rate
     | "no quantity"            // a line with no amount
     | "incompatible units"     // the line's unit can't reach the element's
     | "cycle";                 // the BOM refers to itself
@@ -438,7 +438,7 @@ export function versionCostedBatch(
       // The hours are on the recipe and the shop has no rate to price them at.
       // A different gap with a different fix, so it says so rather than
       // blaming the recipe.
-      unresolved.push({ elementId: null, name, reason: "no labour rate" });
+      unresolved.push({ elementId: null, name, reason: "no labor rate" });
     }
   }
 

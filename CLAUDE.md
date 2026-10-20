@@ -155,6 +155,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 - THE CLASSIC MAC LOOK IS APP-WIDE
 - A DETAIL SCREEN'S EDITABLE FIELDS WEAR A BOX — read `docs/detail-field-styling-brief.md` before restyling one.
 - USE LITERAL TYPOGRAPHIC CHARACTERS IN JSX TEXT, NEVER HTML ENTITIES
+- WHAT PEOPLE READ IS AMERICAN ENGLISH — color, organization, canceled, gray; database values keep their spelling
 - A SHARED CLASS STRING STATES LAYOUT; EACH CALLER STATES ITS OWN COLOURS
 - `flex-wrap` ONLY HELPS WHEN A CHILD CAN CLAIM THE NEXT LINE
 - YELLOW IS A FILL, NEVER AN INK — do not use `text-mark` on a light background

@@ -660,7 +660,7 @@ export function createRefusals(rows: InvoiceCandidate[]): string[] {
     out.push(`${plural(notOrders.length, "row is", "rows are")} a template or a standing order, not a day.`);
   }
   const cancelled = rows.filter((r) => r.kind === "order" && r.status === "cancelled");
-  if (cancelled.length) out.push(`${plural(cancelled.length, "order is", "orders are")} cancelled.`);
+  if (cancelled.length) out.push(`${plural(cancelled.length, "order is", "orders are")} canceled.`);
   const customers = new Set(rows.map((r) => r.customer_id ?? ""));
   if (customers.has("")) out.push("An order with no customer cannot be invoiced.");
   else if (customers.size > 1) out.push("An invoice is for one customer — these are for several.");

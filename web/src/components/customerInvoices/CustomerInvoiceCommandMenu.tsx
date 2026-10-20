@@ -212,7 +212,7 @@ export function CustomerInvoiceCommandMenu({
       !(await confirmDialog({
         ...splitConfirmMessage(
           `Void invoice ${numberText}?\n\n` +
-            "It stops asking for money, its pay link says it was cancelled, and its orders can go on another invoice. " +
+            "It stops asking for money, its pay link says it was canceled, and its orders can go on another invoice. " +
             (paid !== 0
               ? `${money(paid)} already paid stays recorded on the orders — refund it from each order's Payments table if it is going back.`
               : "Nothing has been paid on it.")

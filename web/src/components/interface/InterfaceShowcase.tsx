@@ -673,7 +673,7 @@ function TogglesBlock() {
             />
             <Radio
               vertical
-              ariaLabel="Fulfilment"
+              ariaLabel="Fulfillment"
               options={[
                 { value: "pickup", label: "Pickup at the shop" },
                 { value: "delivery", label: "Delivery" },
@@ -1337,7 +1337,7 @@ function PanelsBlock() {
             <button
               type="button"
               className={BUTTON_CLASS}
-              onClick={async () => setLast((await confirmDialog({ title: "Close this order?", body: "1 line's price differs from the catalog." })) ? "confirmed" : "cancelled")}
+              onClick={async () => setLast((await confirmDialog({ title: "Close this order?", body: "1 line's price differs from the catalog." })) ? "confirmed" : "canceled")}
             >
               Confirm
             </button>
@@ -1353,7 +1353,7 @@ function PanelsBlock() {
               className={BUTTON_CLASS}
               onClick={async () => {
                 const outcome = await confirmDialogWithOption({ title: "Complete this order?", option: { label: "Also file invoice 120274 as a bill", defaultChecked: true } });
-                setLast(`${outcome.ok ? "completed" : "cancelled"}, option ${outcome.option ? "on" : "off"}`);
+                setLast(`${outcome.ok ? "completed" : "canceled"}, option ${outcome.option ? "on" : "off"}`);
               }}
             >
               With option

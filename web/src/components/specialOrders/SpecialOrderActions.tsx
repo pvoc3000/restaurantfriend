@@ -89,7 +89,7 @@ export function SpecialOrderActions({
       const result = await runCancelOrder(supabase, { id, number });
       setBusy(null);
       if ("error" in result) {
-        void alertDialog({ title: `Order ${number} was not cancelled`, body: result.error });
+        void alertDialog({ title: `Order ${number} was not canceled`, body: result.error });
         return;
       }
       if (result.cancelled) router.refresh();
@@ -160,7 +160,7 @@ export function SpecialOrderActions({
         ...(kind === "order" && status !== "cancelled"
           ? [
               {
-                label: busy === "cancel" ? "Cancelling…" : "Cancel Order…",
+                label: busy === "cancel" ? "Canceling…" : "Cancel Order…",
                 hint: "Stays on the list, struck through",
                 danger: true,
                 disabled: busy !== null || pending,

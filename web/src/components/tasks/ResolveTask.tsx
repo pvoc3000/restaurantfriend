@@ -76,7 +76,7 @@ export function ResolveTask({
     >
       <div className="space-y-4">
         <p className="max-w-[52ch] text-sm text-muted">
-          Cancelling is how a task is erased — there is no delete, deliberately,
+          Canceling is how a task is erased — there is no delete, deliberately,
           because the only record that somebody once thought this needed doing is
           this row. Say why: “duplicate”, “fixed itself”,
           “not ours”.
@@ -90,7 +90,7 @@ export function ResolveTask({
             onChange={(e) => setReason(e.target.value)}
             rows={3}
             autoFocus
-            aria-label="Why this task is being cancelled"
+            aria-label="Why this task is being canceled"
             className={FORM_TEXTAREA}
           />
         </label>

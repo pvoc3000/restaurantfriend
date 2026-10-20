@@ -549,7 +549,7 @@ test("only an invoiced or committed order is sent", () => {
   }
   ok(
     invoicePushRefusals(ar({ order: order({ status: "cancelled" }) })).some((r) =>
-      r.includes("cancelled")
+      r.includes("canceled")
     ),
     "cancelled refused"
   );

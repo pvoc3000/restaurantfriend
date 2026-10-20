@@ -589,7 +589,7 @@ export function invoicePushRefusals(inputs: InvoicePushInputs): string[] {
         : "A template is not an invoice."
     );
   } else if (order.status === "cancelled") {
-    out.push("This order was cancelled.");
+    out.push("This order was canceled.");
   } else if (order.status !== "invoice" && order.status !== "order") {
     // A lead or a quote is not money anybody has agreed to pay, and putting one
     // on the books is the A/P "approved only" rule from the other direction.

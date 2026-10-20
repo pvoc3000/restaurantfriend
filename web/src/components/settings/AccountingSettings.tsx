@@ -75,7 +75,7 @@ const CALLBACK_REASON: Record<string, string> = {
   exchange_failed: "QuickBooks refused the connection. Check the app's keys and try again.",
   not_saved: "QuickBooks connected but the result could not be saved. Try again.",
   lookup_failed: "The connection could not be looked up. Try again.",
-  access_denied: "The connection was cancelled in QuickBooks.",
+  access_denied: "The connection was canceled in QuickBooks.",
 };
 
 function usDate(iso: string | null): string | null {

@@ -482,11 +482,11 @@ export function SpecialOrderBatchActions({
           `Cancel ${plural(cancellable.length, "order")}?\n\n` +
             (skipped
               ? `${plural(skipped, "of the selected rows is", "of the selected rows are")} ` +
-                `already cancelled or ${skipped === 1 ? "is" : "are"} a template or standing ` +
+                `already canceled or ${skipped === 1 ? "is" : "are"} a template or standing ` +
                 `order, and will be left alone. `
               : "") +
-            "They stay on the list, greyed and struck through, and drop out of every working " +
-            "view. Cancelling is reversible — set the status back on the Info tab. It does NOT " +
+            "They stay on the list, grayed and struck through, and drop out of every working " +
+            "view. Canceling is reversible — set the status back on the Info tab. It does NOT " +
             "unschedule anything: where the kitchen already has an order, unschedule it too or " +
             "those donuts get made."
         ),
@@ -505,11 +505,11 @@ export function SpecialOrderBatchActions({
     setBusy(null);
     if (error) return onReport(error.message, "error");
     if (!data?.length) {
-      return onReport("Nothing was cancelled — the database refused it and said nothing.", "error");
+      return onReport("Nothing was canceled — the database refused it and said nothing.", "error");
     }
     router.refresh();
     onReport(
-      `Cancelled ${plural(data.length, "order")}.` +
+      `Canceled ${plural(data.length, "order")}.` +
         (skipped ? ` ${plural(skipped, "row")} left alone.` : ""),
       "done"
     );
@@ -590,7 +590,7 @@ export function SpecialOrderBatchActions({
           `Delete ${plural(deletable.length, "order")}?\n\n` +
             (skips.length ? `Skipping ${skips.join(", and ")}. ` : "") +
             "This also removes their lines, their payments and everything in their history. " +
-            "Deleting is for a typo — an order that is not happening should be CANCELLED, " +
+            "Deleting is for a typo — an order that is not happening should be CANCELED, " +
             "which keeps the record."
         ),
         confirmLabel: `Delete ${deletable.length}`,

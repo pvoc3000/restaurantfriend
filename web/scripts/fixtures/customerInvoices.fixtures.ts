@@ -70,7 +70,7 @@ test("createRefusals: Knotted's week is one invoice", () => {
 test("createRefusals: each rule, in words", () => {
   eq(createRefusals([]), ["Select the orders to invoice."]);
   ok(createRefusals([...week, day(8, { kind: "standing_order" })])[0].includes("standing order"));
-  ok(createRefusals([...week, day(8, { status: "cancelled" })])[0].includes("cancelled"));
+  ok(createRefusals([...week, day(8, { status: "cancelled" })])[0].includes("canceled"));
   ok(createRefusals([...week, day(8, { customer_id: "someone" })])[0].includes("one customer"));
   ok(createRefusals([...week, day(8, { customer_id: null })])[0].includes("no customer"));
   ok(createRefusals([...week, day(8, { shop: "DF01" })])[0].includes("different shops"));

@@ -132,7 +132,7 @@ export const STATUS_LABEL: Record<SpecialOrderStatus, string> = {
   quote: "Quote",
   invoice: "Invoice",
   order: "Order",
-  cancelled: "Cancelled",
+  cancelled: "Canceled",
 };
 
 /** What each rung MEANS, in the words Mark used. Shown as PickList hints. */

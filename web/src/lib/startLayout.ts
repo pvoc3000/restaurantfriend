@@ -93,7 +93,7 @@ export const DEFAULT_LAYOUT: StartLayout = {
 export type TintKey = "grey" | "stone" | "slate" | "sky" | "lilac";
 
 export const START_TINTS: readonly { key: TintKey; label: string; fill: string }[] = [
-  { key: "grey", label: "Grey", fill: "bg-neutral-100" },
+  { key: "grey", label: "Gray", fill: "bg-neutral-100" },
   { key: "stone", label: "Stone", fill: "bg-stone-200" },
   { key: "slate", label: "Slate", fill: "bg-slate-200" },
   { key: "sky", label: "Sky", fill: "bg-sky-100" },

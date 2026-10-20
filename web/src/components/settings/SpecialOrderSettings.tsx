@@ -210,7 +210,7 @@ export function MessagesIntro() {
         Each box holds the wording that will be sent.{" "}
         <strong>Clear one to go back to our default.</strong> Anything in
         curly braces is filled in when the message is sent; a name we do not
-        recognise is left on the page as you typed it, so a typo is visible
+        recognize is left on the page as you typed it, so a typo is visible
         rather than swallowed.
       </p>
     </div>
@@ -292,7 +292,7 @@ export function SpecialOrderSettings({
           Not editable here, on purpose. The credential behind this lives in the
           server&rsquo;s own secrets and never in the database, and the address has to
           be one that credential is allowed to send as —{" "}
-          <strong>Gmail does not refuse an address it is not authorised for, it
+          <strong>Gmail does not refuse an address it is not authorized for, it
           silently replaces it</strong>, so a typo would not fail, it would
           quietly start signing your quotes as somebody else. Changing it is a
           setup job: see <code>docs/po-email-setup.md</code>.

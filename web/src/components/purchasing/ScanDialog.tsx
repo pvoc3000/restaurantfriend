@@ -711,7 +711,7 @@ function Loupe({
 
 const MODE_OPTIONS = [
   { key: "color", label: "Color" },
-  { key: "grey", label: "Greyscale" },
+  { key: "grey", label: "Grayscale" },
   { key: "bw", label: "Black & White" },
 ] as const satisfies readonly { key: ScanMode; label: string }[];
 
