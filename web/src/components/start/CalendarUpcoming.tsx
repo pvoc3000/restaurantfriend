@@ -6,7 +6,7 @@ import type { CalendarItem } from "@/lib/calendar";
 import { chipClass, type LayerColors } from "@/lib/calendarColors";
 import { daysAfter } from "@/lib/today";
 
-import { AgendaLine, dayLabel } from "./AgendaLine";
+import { AgendaLine, dayLabel, WIDGET_CHIP_EDGE } from "./AgendaLine";
 import { useWidgetSettings } from "./widgetSettings";
 
 /**
@@ -82,7 +82,7 @@ export function CalendarUpcoming({
                     key={item.key}
                     href={item.href ?? `/calendar?view=day&date=${item.date}`}
                     title={item.title}
-                    className={`block truncate rounded-[4px] px-1 text-[12px] no-underline hover:brightness-95 ${chipClass(item, colors)}`}
+                    className={`block truncate rounded-[4px] px-1 text-[12px] no-underline hover:brightness-95 ${WIDGET_CHIP_EDGE} ${chipClass(item, colors)}`}
                   >
                     {item.lead ? `${item.lead}: ` : ""}
                     {item.title}

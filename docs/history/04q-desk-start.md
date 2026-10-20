@@ -58,3 +58,82 @@
    page with the dev stylesheet at 1440 — the pane is behind the shared-device
    PIN lock, so the signed-in page itself has NOT been seen yet.
 
+
+**CUSTOMIZABLE WIDGETS (2026-10-17 → 20, migration 207).** Mark: "It would be
+even cooler if [we could] choose which modules to display and where to display
+them … A page edit mode could allow the user to drag/move the widgets around,
+add, remove them … 1 column, 2 columns, or 3 columns wide, and the widget could
+display more info the bigger it got … a background color … a small button in
+the upper right hand corner of each one." Scoped first; his answers:
+- **Per person, in the database** (`org_members.start_layout`, written only by
+  `set_my_start_layout`), one built-in default, NO per-role defaults. NULL =
+  default, and saving the default writes NULL. See conventions, "THE START PAGE
+  LAYOUT IS SAVED PER PERSON".
+- **Tint from a small palette of pale neutrals** (`START_TINTS`: grey, stone,
+  slate, sky, lilac) — never a state colour.
+- **The corner ⋯ only in edit mode**; the resting page looks as it did.
+- **Desk shell only**; the tablet keeps its tiles. Wall-screen mode dropped.
+- **Ten widgets.** The six cards and Sales, made width-aware; **Reminders**
+  folds in the open purchase requests ("purchase requests can be folded into the
+  reminders widget"); **Calendar** is an upcoming list of the calendar's OWN
+  entries and subscribed feeds — no orders or deliveries, so nothing is said
+  twice; **Today** is the day's deliveries, special-order pickups and
+  deliveries, standing-order days, tasks, entries, feeds and production.
+- Not in v1, offered and declined: per-widget shop, collapse-when-clear, acting
+  inside widgets, number tiles, multiple pages, a pinned note, more modules.
+
+**HOW IT IS BUILT.**
+- `lib/startLayout` (pure, fixture-tested): the kinds, `DEFAULT_LAYOUT` (the
+  page as it was: Reminders 3, Sales 3, six cards at 1; Today and Calendar
+  start in the Add list), a tolerant `readStartLayout` (unknown kinds and
+  duplicates dropped, spans clamped, unknown tints forgotten — the column
+  outlives the code), the edits, and `tileDropTarget`, the 2-D hit test.
+- `DeskStart` is the server half: it reads the layout and fetches ONLY the
+  widgets placed and permitted (`widgets/index.ts`, `widgetAccess` from
+  `lib/pageAccess`), one server file per widget under `components/start/widgets/`
+  (loaders moved verbatim from the 909-line `DeskStart`). A widget a role can no
+  longer open is hidden, not deleted, so it comes back with the role.
+- `StartGrid` (client) places the bodies; Edit layout is a `ui/Switch` kept as
+  `?edit=1`. Every change goes through `useLatestWrite` to the RPC and shows at
+  once; only ADDING a widget whose body was never fetched refreshes.
+- `useTileDrag` (`lib/tileDrag`) is the drag family's fourth member: pointer
+  events, geometry measured once, a vertical drop line. `movedColumnOrder` moved
+  to `lib/moveInOrder` as `rowDrag`'s note asked "the day a third caller
+  appears"; `columnOrder` keeps the old names as aliases. The corner menu also
+  offers Move earlier / Move later.
+- **Width is CSS container queries**, not a prop: the frame is `@container` and
+  bodies show more at `@xl` (≈ 2 columns) and `@4xl` (≈ 3), so a width change
+  needs no server trip and a 3-wide widget on a two-column screen reads its real
+  width. Cards: 3 records at 1 column, counts beside 6 at 2, 10 in two columns
+  at 3. Sales: Net sales alone at 1 (no chart), Tips and the chart at 2, the
+  share at 3 (`SalesSummary fit="container"`; `/sales` unchanged).
+- The Calendar's day count (7/14/30) reaches its client list through
+  `widgetSettings` context; the server always fetches 30 days.
+- Today reuses `/calendar`'s own queries (`fetchLayerItems`, now gated by the
+  shared `calendarLayersFor`) and `todayTimeline` (`lib/startPage`): a
+  special-order production schedule IS an order already listed, so it is
+  dropped; a committed schedule replaces the menu plan's banner. `fetchFeeds`
+  was lifted out of the calendar page so both read subscribed calendars one way.
+- Calendar chips on a widget wear `WIDGET_CHIP_EDGE`: a Sky Deliveries chip
+  vanished on a Sky widget.
+- Fixed in passing: `/start`'s loading line read "Loading Loading……".
+- **Not as planned:** the plan gave Reminders/GuideRequests a borderless "bare"
+  variant; they kept their yellow bands inside the widget instead, which is the
+  guide's own look and needed no change to either component.
+
+**VERIFIED (2026-10-20).** 207 dry-run on the hosted DB by raised exception
+(own row written; staff cannot update any `org_members` row directly; array and
+> 8 KB refused; `anon` cannot execute; NULL resets), then APPLIED by Claude at
+Mark's request, and the column, grants and anon refusal re-probed. Fixtures:
+`startLayout.fixtures.ts` plus two `todayTimeline` cases (2,413 pass; the
+duplicate guard and the hit test's tie-break each broken once to see a case go
+red). `/start` and `/start?edit=1` rendered from the running dev server with a
+one-off owner session (signed out after): the default layout reproduces the old
+page with live data, edit mode draws grips, ⋯, Add widget and Reset, and a
+saved layout of Today/Calendar/tints/widths rendered — the owner's own
+`start_layout` was set for that and put back to NULL. Static snapshots with the
+dev stylesheet were looked at in the pane at 1440 and 1024.
+**NOT VERIFIED:** the INTERACTIVE half — drag, the corner menu, the colour
+panel, Add, Reset and the save queue in a live, hydrated page. The pane is
+behind the shared-device PIN lock. Check them in Safari, where Mark reads the
+app, including drag on an iPad.

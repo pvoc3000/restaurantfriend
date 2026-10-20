@@ -8,6 +8,14 @@ import { chipClass, type LayerColors } from "@/lib/calendarColors";
 const LAYER_LABEL: Record<string, string> = Object.fromEntries(CALENDAR_LAYERS.map((l) => [l.key, l.label]));
 
 /**
+ * A hairline round a calendar chip on a widget. A widget can wear a tint, and
+ * the calendar's palette has a chip of nearly every tint — a Deliveries chip
+ * (sky) on a Sky widget vanished (seen 2026-10-20). The calendar itself has no
+ * tinted ground, so it does without.
+ */
+export const WIDGET_CHIP_EDGE = "ring-1 ring-inset ring-black/15";
+
+/**
  * ONE CALENDAR ITEM ON A START-PAGE WIDGET — the Calendar's upcoming list and
  * the Today timeline. The calendar's own chip (`chipClass`, so an entry wears
  * the colour it wears on `/calendar`), its time in a column when it has one,
@@ -40,7 +48,7 @@ export function AgendaLine({
           </span>
         )}
         <span className="min-w-0 flex-1">
-          <span className={`rounded-[4px] px-1.5 py-0.5 text-[13px] font-medium ${chipClass(item, colors)}`}>
+          <span className={`rounded-[4px] px-1.5 py-0.5 text-[13px] font-medium ${WIDGET_CHIP_EDGE} ${chipClass(item, colors)}`}>
             {item.lead ? `${item.lead}: ` : ""}
             {item.title}
           </span>

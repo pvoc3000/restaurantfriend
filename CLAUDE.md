@@ -74,7 +74,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 4n. ✅ Tags (display signs priced at print time) — `docs/history/04n-tags.md`
 4o. ✅ Shared iPad PIN switching (migration 097) — `docs/history/04o-shared-ipad.md`
 4p. ✅ Tablet shell (bar, `/start` tiles, batch log on tablet) — `docs/history/04p-tablet-shell.md`
-4q. ✅ Desk start page (`/start`) — `docs/history/04q-desk-start.md`
+4q. ✅ Desk start page (`/start`; customizable widgets per person, migration 207 APPLIED 2026-10-20) — `docs/history/04q-desk-start.md`
 4r. 🚧 Square sales posted to QuickBooks (journal entries, deposits) — `docs/history/04r-square-sales-to-qbo.md`
 4s. 🚧 Calendar (blackout dates, notes, layers, iCal feeds in and out; 181–194 applied and `calendar-sync` deployed 2026-10-10; signed-in screens not yet checked in a browser) — `docs/history/04s-calendar.md`
 4t. 🚧 Labor by Shop (monthly labor split between shops by hours, posted to QuickBooks; 205 APPLIED, pool read from the general ledger (`qbo-sync` v52); Dec 2025–Sep 2026 POSTED by Mark 2026-10-15) — `docs/history/04t-labor-allocation.md`
@@ -205,6 +205,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 - A VENDOR'S NAME IS EDITABLE, AND SO IS ITS CONFIG AT A SHOP IT HAS NONE AT
 - THE THREE PURCHASING LISTS FILTER BY VENDOR, AND SEVERAL AT ONCE
 - View state in the URL, display preferences in localStorage.
+- THE START PAGE LAYOUT IS SAVED PER PERSON, NOT PER DEVICE — and a widget tint is the one decorative colour
 - Scroll restoration is UNIVERSAL and nothing opts in
 - Breadcrumbs follow the route taken
 - Detail views are FULL-SCREEN PAGES

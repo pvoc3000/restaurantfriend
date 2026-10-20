@@ -2274,6 +2274,25 @@
   this view, so the columns depend on the state seeded from it). **Keep it in
   step with `columns`**: a key missing from it sorts fine and is silently
   forgotten, which is the original complaint again.
+- **THE START PAGE LAYOUT IS SAVED PER PERSON, NOT PER DEVICE** (migration 207,
+  2026-10-20) — the one display preference that lives in the DATABASE. Mark,
+  asked where a person's widget arrangement should live, chose "per person":
+  `org_members.start_layout`, written only by `set_my_start_layout`, read by
+  `lib/startLayout`'s tolerant `readStartLayout`. It departs from column
+  layouts (localStorage, per device) on purpose, and the reason those are per
+  device — "a desk and an iPad want different columns" — does not reach it: the
+  widget page is DESK-ONLY, the tablet keeps its tiles. If the tablet ever gets
+  widgets, that reason returns, and the answer is a layout per shell rather than
+  moving this one into localStorage.
+  NULL means the built-in default, and saving the default writes NULL, so a
+  person who never edits the page follows the default as it changes. Edit mode
+  itself is VIEW state (`?edit=1`), per the rule above.
+  **A widget's TINT IS THE APP'S ONE SANCTIONED DECORATIVE COLOUR.** Colour is
+  state everywhere else; a tint is a label its owner chose, so `START_TINTS` is
+  pale neutrals and cool tints only — no green, red, yellow or orange, which are
+  the go / stop / mark / submitted fills. Calendar chips on a tinted widget wear
+  a hairline (`WIDGET_CHIP_EDGE`), because the calendar palette has a chip of
+  nearly every tint and a Sky chip vanished on a Sky widget.
 - **Scroll restoration is UNIVERSAL and nothing opts in** (`lib/scrollMemory.ts`
   + `components/ScrollMemory.tsx`, Mark, 2026-07-30: "any list view now and in
   the future"). This is what pays for detail views going back to full screen.
