@@ -1,10 +1,15 @@
 import { billAttention, isOverdueBill, type StartBill } from "@/lib/startPage";
 
-import { CARD_ITEMS, StartCard, type CardItem } from "../StartCard";
+import { CARD_ITEMS, StartCard, urgentCount, type CardItem, type CardSummary } from "../StartCard";
 import { shortDate, type Result, type StartContext, type Supabase } from "./shared";
 
 export async function BillsWidget(ctx: StartContext) {
-  return <BillsCard result={await loadBills(ctx.supabase, ctx.shop.id)} today={ctx.today} />;
+  return <StartCard {...billsSummary({ result: await loadBills(ctx.supabase, ctx.shop.id), today: ctx.today })} />;
+}
+
+/** What Bills adds to the Home button's badge. */
+export async function billsAttention(ctx: StartContext): Promise<number> {
+  return urgentCount(billsSummary({ result: await loadBills(ctx.supabase, ctx.shop.id), today: ctx.today }));
 }
 
 type BillRow = StartBill & {
@@ -54,14 +59,14 @@ async function loadBills(supabase: Supabase, loc: string): Promise<Result<BillRo
   return { data: rows, error: null };
 }
 
-function BillsCard({
+function billsSummary({
   result,
   today,
 }: {
   result: Result<BillRow[]>;
   today: string;
-}) {
-  if (result.data === null) return <StartCard lines={[]} error={result.error} />;
+}): CardSummary {
+  if (result.data === null) return { lines: [], error: result.error };
   const rows = result.data;
   const counts = billAttention(rows, today);
 
@@ -79,18 +84,16 @@ function BillsCard({
     href: `/bills/${r.id}`,
   }));
 
-  return (
-    <StartCard
-      lines={[
-        { count: counts.overdue, label: "overdue", href: "/bills?status=all&aging=overdue&range=all" },
-        { count: counts.awaitingApproval, label: "awaiting approval", href: "/bills?status=open&range=all" },
-        {
-          count: counts.notSent,
-          label: "approved, not sent to QuickBooks",
-          href: "/bills?status=approved&range=all",
-        },
-      ]}
-      items={items}
-    />
-  );
+  return {
+    lines: [
+      { count: counts.overdue, label: "overdue", href: "/bills?status=all&aging=overdue&range=all" },
+      { count: counts.awaitingApproval, label: "awaiting approval", href: "/bills?status=open&range=all" },
+      {
+        count: counts.notSent,
+        label: "approved, not sent to QuickBooks",
+        href: "/bills?status=approved&range=all",
+      },
+    ],
+    items,
+  };
 }

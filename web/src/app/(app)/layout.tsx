@@ -3,11 +3,13 @@ import { CalcPad } from "@/components/ui/CalcPad";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { IdleLock } from "@/components/IdleLock";
 import { InactiveLocationGate } from "@/components/InactiveLocationGate";
+import { NewDayReturn } from "@/components/NewDayReturn";
 import { PageAccessGate } from "@/components/PageAccessGate";
 import { ScrollMemory } from "@/components/ScrollMemory";
 import { ShellProvider } from "@/components/ShellProvider";
 import { TabletBar } from "@/components/tablet/TabletBar";
 import { getAppSession } from "@/lib/session";
+import { serverTimeZone } from "@/lib/today";
 
 // Everything inside the (app) route group is signed-in + location-scoped.
 //
@@ -81,6 +83,10 @@ export default async function AppLayout({
           minutes idle. Nothing on a desk browser — the session only says
           `registeredDevice` when the device cookie is present. */}
       {session.registeredDevice && <IdleLock userId={session.userId} />}
+      {/* Each new day starts on Start (Mark, 2026-10-20): the first touch
+          after three hours idle on a new day, in the ORG's timezone, takes an
+          open tab there. Both shells. Renders nothing. */}
+      <NewDayReturn zone={session.orgSettings.timezone ?? serverTimeZone()} />
       </ShellProvider>
     </ConfirmProvider>
   );

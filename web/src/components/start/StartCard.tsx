@@ -5,7 +5,28 @@ export type CardLine = {
   count: number;
   label: string;
   href?: string;
+  /**
+   * Does a count here mean somebody has to DO something? Default yes. A line
+   * that only informs — "sent, still to arrive", "awaiting payment" — says
+   * false: its count is set in ink rather than on the yellow fill, and it is
+   * left out of the Home button's badge (2026-10-20), so the badge is always
+   * the sum of the yellow numbers on your page.
+   */
+  urgent?: boolean;
+  /** Yellow, but already inside another line's count — "flagged" is a part of
+   *  "need attention" — so the badge must not count it twice. */
+  subset?: boolean;
 };
+
+/** A card's body, as a widget computes it once for the card and the badge. */
+export type CardSummary = { lines: CardLine[]; items?: CardItem[]; error?: string | null; footnote?: string | null };
+
+/** What a card adds to the Home button's badge: its urgent counts, once each.
+ *  A card that failed to load adds nothing. */
+export function urgentCount(summary: CardSummary): number {
+  if (summary.error) return 0;
+  return summary.lines.reduce((n, l) => (l.urgent === false || l.subset ? n : n + l.count), 0);
+}
 
 /** One of the handful of records a card names. */
 export type CardItem = {
@@ -66,7 +87,7 @@ export function StartCard({
               <>
                 <span
                   className={`inline-block min-w-8 px-1 text-center font-bold tabular-nums ${
-                    line.count > 0 ? "bg-mark-fill text-ink" : "text-faint"
+                    line.count === 0 ? "text-faint" : line.urgent === false ? "text-ink" : "bg-mark-fill text-ink"
                   }`}
                 >
                   {line.count}

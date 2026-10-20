@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Crumb } from "@/lib/breadcrumbs";
 
+const START_CRUMB: Crumb = { href: "/start", label: "Start" };
+
 /**
  * The path you took to get here. The last crumb is the current page and isn't a
  * link; everything before it is, so any step is one click away — including the
@@ -14,7 +16,7 @@ import type { Crumb } from "@/lib/breadcrumbs";
  * bodies share a first row.
  */
 export function Breadcrumbs({
-  trail,
+  trail: route,
   current,
   trailing,
 }: {
@@ -22,6 +24,10 @@ export function Breadcrumbs({
   current: string;
   trailing?: React.ReactNode;
 }) {
+  // EVERY TRAIL STARTS AT START (Mark, 2026-10-20), so home is one click from
+  // any record. Added here, once, rather than by 25 callers — and not twice
+  // when the route already came from there.
+  const trail = route[0] && route[0].href.split("?")[0] === "/start" ? route : [START_CRUMB, ...route];
   return (
     <nav
       aria-label="Breadcrumb"

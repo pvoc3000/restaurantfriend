@@ -209,6 +209,9 @@ export type ResumePoint = {
   view?: Record<string, unknown>;
   /** Where each scroller was — `lib/scrollMemory`'s. See `resumeScrollFor`. */
   scroll?: Record<string, number>;
+  /** The page's own heading, so a new day's Start can say "Back to …" by
+   *  name (`lib/newDay`, 2026-10-20). See `resumeTitleFor`. */
+  title?: string;
 };
 
 export function serializeResume(point: ResumePoint): string {
@@ -267,6 +270,17 @@ export function resumeScrollFor(
         typeof entry[1] === "number" && Number.isFinite(entry[1])
     )
   );
+}
+
+/** The page's heading, under `resumeViewFor`'s rule exactly, or null. */
+export function resumeTitleFor(raw: string | null | undefined, userId: string): string | null {
+  if (!raw || resumePathFor(raw, userId) === "/") return null;
+  try {
+    const title = (JSON.parse(raw) as Record<string, unknown>).title;
+    return typeof title === "string" && title.trim() ? title.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 function resumeField(

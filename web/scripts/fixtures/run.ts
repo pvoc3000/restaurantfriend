@@ -125,6 +125,7 @@ import "./salesPosting.fixtures";
 import "./laborAllocation.fixtures";
 import "./startPage.fixtures";
 import "./startLayout.fixtures";
+import "./newDay.fixtures";
 import "./sharedDevice.fixtures";
 import "./shell.fixtures";
 import "./landingState.fixtures";

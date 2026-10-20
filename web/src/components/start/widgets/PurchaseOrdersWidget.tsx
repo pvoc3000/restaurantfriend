@@ -1,10 +1,17 @@
 import { daysBefore } from "@/lib/today";
 
-import { CARD_ITEMS, StartCard, type CardItem } from "../StartCard";
+import { CARD_ITEMS, StartCard, urgentCount, type CardItem, type CardSummary } from "../StartCard";
 import { shortDate, type Result, type StartContext, type Supabase } from "./shared";
 
 export async function PurchaseOrdersWidget(ctx: StartContext) {
-  return <PurchaseOrdersCard result={await loadPurchaseOrders(ctx.supabase, ctx.today, ctx.shop.id)} today={ctx.today} />;
+  const result = await loadPurchaseOrders(ctx.supabase, ctx.today, ctx.shop.id);
+  return <StartCard {...purchaseOrdersSummary({ result, today: ctx.today })} />;
+}
+
+/** What Purchase orders adds to the Home button's badge. */
+export async function purchaseOrdersAttention(ctx: StartContext): Promise<number> {
+  const result = await loadPurchaseOrders(ctx.supabase, ctx.today, ctx.shop.id);
+  return urgentCount(purchaseOrdersSummary({ result, today: ctx.today }));
 }
 
 type PoRow = {
@@ -53,15 +60,15 @@ async function loadPurchaseOrders(
   };
 }
 
-function PurchaseOrdersCard({
+function purchaseOrdersSummary({
   result,
   today,
 }: {
   result: Result<PoRow[]>;
   today: string;
-}) {
+}): CardSummary {
   if (result.data === null) {
-    return <StartCard lines={[]} error={result.error} />;
+    return { lines: [], error: result.error };
   }
   const rows = result.data;
   const drafts = rows.filter((r) => r.status === "draft");
@@ -79,19 +86,17 @@ function PurchaseOrdersCard({
     href: `/purchase-orders/${r.id}`,
   }));
 
-  return (
-    <StartCard
-      lines={[
-        { count: late.length, label: "past their delivery day", href: "/purchase-orders?status=sent&range=all" },
-        { count: drafts.length, label: "drafts not sent", href: "/purchase-orders?status=draft&range=all" },
-        { count: sent.length, label: "sent, still to arrive", href: "/purchase-orders?status=sent&range=all" },
-        {
-          count: unclosed.length,
-          label: `received in the last ${UNCLOSED_DAYS} days, not closed`,
-          href: "/purchase-orders?status=received&range=30",
-        },
-      ]}
-      items={items}
-    />
-  );
+  return {
+    lines: [
+      { count: late.length, label: "past their delivery day", href: "/purchase-orders?status=sent&range=all" },
+      { count: drafts.length, label: "drafts not sent", href: "/purchase-orders?status=draft&range=all" },
+      { count: sent.length, label: "sent, still to arrive", href: "/purchase-orders?status=sent&range=all", urgent: false },
+      {
+        count: unclosed.length,
+        label: `received in the last ${UNCLOSED_DAYS} days, not closed`,
+        href: "/purchase-orders?status=received&range=30",
+      },
+    ],
+    items,
+  };
 }

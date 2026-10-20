@@ -1,5 +1,6 @@
 import { blackoutFor } from "@/lib/blackoutDates";
 import { fetchEntries } from "@/lib/calendarQueries";
+import { NewDayBackLink } from "@/components/start/NewDayBackLink";
 import { DeskStart } from "@/components/start/DeskStart";
 import { Landing, type TileState } from "@/components/tablet/Landing";
 import { templatesForShift, type ScheduledTemplate } from "@/lib/checklists";
@@ -248,6 +249,11 @@ export default async function StartPage() {
   // location picker, so an h1 restating it was the same fact twice.
   const active = session.activeLocation;
   return (
+    <>
+    {/* A new day sent this tablet here from last night's page (lib/newDay). */}
+    <div className="mb-4 empty:hidden">
+      <NewDayBackLink />
+    </div>
     <Landing
       groups={groups}
       state={state}
@@ -263,5 +269,6 @@ export default async function StartPage() {
           : null
       }
     />
+    </>
   );
 }

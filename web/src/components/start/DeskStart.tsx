@@ -2,12 +2,13 @@ import type { ReactNode } from "react";
 
 import type { AppSession } from "@/lib/session";
 import { readStartLayout, visibleWidgets, type WidgetKind } from "@/lib/startLayout";
-import { createClient } from "@/lib/supabase/server";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 
+import { NewDayBackLink } from "./NewDayBackLink";
 import { StartGrid } from "./StartGrid";
 import { WIDGET_BODY, widgetAccess } from "./widgets";
-import { longDate, type StartContext } from "./widgets/shared";
+import { startContext } from "./widgets/context";
+import { longDate } from "./widgets/shared";
 
 /**
  * THE DESK START PAGE (Mark, 2026-09-17: "Let's make one for the desktop
@@ -31,7 +32,6 @@ import { longDate, type StartContext } from "./widgets/shared";
  * may not open is not fetched at all (`widgetAccess`, from `lib/pageAccess`).
  */
 export async function DeskStart({ session }: { session: AppSession }) {
-  const supabase = await createClient();
   const role = session.membership.role;
   const timeZone = session.orgSettings.timezone ?? serverTimeZone();
   const today = todayInTimeZone(timeZone);
@@ -48,6 +48,10 @@ export async function DeskStart({ session }: { session: AppSession }) {
         {shop ? `${shop.code} · ` : ""}
         {longDate(today)}
       </p>
+      {/* A new day sent this tab here from last night's page (lib/newDay). */}
+      <div className="mt-2 empty:hidden">
+        <NewDayBackLink />
+      </div>
     </div>
   );
 
@@ -62,15 +66,8 @@ export async function DeskStart({ session }: { session: AppSession }) {
 
   const layout = readStartLayout(session.membership.start_layout);
   const access = widgetAccess(role);
-  const ctx: StartContext = {
-    supabase,
-    session,
-    role,
-    orgId: session.membership.org_id,
-    today,
-    timeZone,
-    shop: { id: shop.id, code: shop.code },
-  };
+  const ctx = await startContext(session);
+  if (!ctx) return null;
 
   const placed = visibleWidgets(layout, access).map((w) => w.kind);
   const rendered = await Promise.all(

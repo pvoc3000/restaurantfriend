@@ -137,3 +137,45 @@ dev stylesheet were looked at in the pane at 1440 and 1024.
 panel, Add, Reset and the save queue in a live, hydrated page. The pane is
 behind the shared-device PIN lock. Check them in Safari, where Mark reads the
 app, including drag on an iPad.
+
+**GETTING PEOPLE BACK TO START (2026-10-20).** Mark: "I would like for users to
+see the start page more frequently." Of ten ideas he chose three:
+- **Each new day starts on Start** (his refinement: "first new activity after
+  being idle for a while, and it's the next day → go to /start"; three hours
+  AND a new day; "a link should go to the link"; tablet also). `lib/newDay`
+  (pure, fixture-tested) and `components/NewDayReturn`, mounted by the `(app)`
+  layout under both shells. The device's last touch is `rf.day.active`
+  (localStorage, every tab). It asks only when an EXISTING tab comes back —
+  focus, visible again, reload or restore, or the first pointer or key — so a
+  page opened fresh from an email or a bookmark is honored. A desk monitor
+  sleeps without hiding the tab, hence the first mouse move counts. Never with
+  a dialog open; a triggering press or key is swallowed so it cannot fire a
+  button on yesterday's page. The org's timezone. On the SHARED iPad the
+  five-minute idle lock gets there first, so the unlock (`LockScreen`) makes
+  the same test against the iPad's last touch (`rf.device.active`) in the
+  iPad's own timezone (signed out, it cannot read the org's) and goes to "/"
+  instead of resuming; the idle lock now also notes the page's heading.
+  Start then offers **"← Back to …"** (`NewDayBackLink`, from
+  `rf.day.back` in sessionStorage, 12-hour limit, spent by leaving Start).
+- **A count on the Home button** (`HomeButton`, `startAttention` in
+  `app/startActions.ts`): the yellow numbers on YOUR placed widgets at your
+  working shop, from the same summaries the cards draw (`WIDGET_ATTENTION`).
+  So the badge equals the yellow, card lines that only inform —
+  "sent, still to arrive", "committed orders in the next 7 days", "sent,
+  awaiting payment", "expiring in the next 60 days" — now set their count in
+  ink rather than on the fill (`CardLine.urgent: false`), and "flagged" is
+  yellow but not counted twice (`subset`, it is part of "need attention").
+  Reminders count due reminders plus open requests. Asked from the browser
+  after paint — once per load, every five minutes, and on returning or moving
+  between screens when a minute old — never on the way to a page. Desk only.
+- **Start is the first breadcrumb** everywhere, added once in `Breadcrumbs`.
+
+**VERIFIED (2026-10-20):** fixtures for `lib/newDay` (2,420 pass; the gap guard
+broken once to see a case go red); the badge action called on the running dev
+server with a one-off owner session returned 55, equal to the yellow numbers on
+the same session's rendered Start (39 + 13 + 3; no due reminders or open
+requests at DF02); a PO detail rendered with "Start / POs / …"; the lock screen
+renders with no console errors. **NOT VERIFIED:** the new-day move itself and
+the back link in a live browser (the pane is behind the PIN lock), and the
+badge's look in the masthead — check both in Safari, the move by leaving a tab
+open overnight.

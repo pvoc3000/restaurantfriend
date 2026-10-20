@@ -3,13 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 
 import { unlockWithPin, type LockMember } from "@/app/deviceActions";
+import { isNewDay, isReturnablePath, NEW_DAY_BACK_KEY, readMs, serializeBack } from "@/lib/newDay";
 import {
   PIN_LENGTH,
   RESUME_KEY,
+  readActivity,
   recordActivity,
   recordExtendedUser,
   resumePathFor,
   resumeScrollFor,
+  resumeTitleFor,
   resumeViewFor,
   retryLabel,
 } from "@/lib/sharedDevice";
@@ -61,18 +64,36 @@ export function LockScreen({
       // Back to the page an idle lock left, if it was THIS person's; read
       // once and always cleared, so it never outlives the next unlock.
       let destination = "/";
+      // The iPad's last touch BEFORE this one — a new day is judged on it.
+      const previous = readMs(readActivity());
+      const now = Date.now();
       // Nobody arrives with Stay unlocked already on.
       recordExtendedUser("");
       // The unlock is a touch. Without this, the same person coming back after
       // the SERVER locked them out would be locked again by `idleOnLoad`.
-      recordActivity(Date.now());
+      recordActivity(now);
       try {
         const raw = localStorage.getItem(RESUME_KEY);
         destination = resumePathFor(raw, who.user_id);
         localStorage.removeItem(RESUME_KEY);
-        // And how they had it set up, for the page about to load.
-        handOverViewMemory(resumeViewFor(raw, who.user_id));
-        handOverScrollMemory(resumeScrollFor(raw, who.user_id));
+        // EACH NEW DAY STARTS ON START (Mark, 2026-10-20: "tablet also"):
+        // three hours idle and a new day, and the unlock goes home rather than
+        // back to last night's page — which Start then offers as "Back to …".
+        // The iPad's own timezone: signed out, this screen cannot read the
+        // org's, and a shop's iPad is in the shop's.
+        if (isNewDay(previous, now, Intl.DateTimeFormat().resolvedOptions().timeZone)) {
+          if (isReturnablePath(destination)) {
+            sessionStorage.setItem(
+              NEW_DAY_BACK_KEY,
+              serializeBack({ href: destination, label: resumeTitleFor(raw, who.user_id) ?? "", at: now }),
+            );
+          }
+          destination = "/";
+        } else {
+          // And how they had it set up, for the page about to load.
+          handOverViewMemory(resumeViewFor(raw, who.user_id));
+          handOverScrollMemory(resumeScrollFor(raw, who.user_id));
+        }
       } catch {
         // Storage unavailable: the home page, as before.
       }

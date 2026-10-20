@@ -8,19 +8,26 @@ import {
 } from "@/lib/specialOrders";
 import { daysAfter, daysBefore } from "@/lib/today";
 
-import { CARD_ITEMS, StartCard, type CardItem } from "../StartCard";
+import { CARD_ITEMS, StartCard, urgentCount, type CardItem, type CardSummary } from "../StartCard";
 import type { Result, StartContext, Supabase } from "./shared";
 
 export async function SpecialOrdersWidget(ctx: StartContext) {
+  return <StartCard {...(await summarize(ctx))} />;
+}
+
+/** What Special orders adds to the Home button's badge. */
+export async function specialOrdersAttention(ctx: StartContext): Promise<number> {
+  return urgentCount(await summarize(ctx));
+}
+
+async function summarize(ctx: StartContext): Promise<CardSummary> {
   const settings = readSettings(ctx.session.orgSettings);
-  return (
-    <SpecialOrdersCard
-      result={await loadSpecialOrders(ctx.supabase, ctx.orgId, ctx.today, ctx.shop.id)}
-      today={ctx.today}
-      thresholds={settings.attention}
-      rush={settings.rush}
-    />
-  );
+  return specialOrdersSummary({
+    result: await loadSpecialOrders(ctx.supabase, ctx.orgId, ctx.today, ctx.shop.id),
+    today: ctx.today,
+    thresholds: settings.attention,
+    rush: settings.rush,
+  });
 }
 
 type OrderRow = AttentionOrder & {
@@ -119,7 +126,7 @@ async function loadSpecialOrders(
   };
 }
 
-function SpecialOrdersCard({
+function specialOrdersSummary({
   result,
   today,
   thresholds,
@@ -131,9 +138,9 @@ function SpecialOrdersCard({
   /** 118: a rate needs the org's floor to resolve to money. Passed beside the
    *  thresholds because it comes from the same `readSettings` call. */
   rush: ReturnType<typeof readSettings>["rush"];
-}) {
+}): CardSummary {
   if (result.data === null) {
-    return <StartCard lines={[]} error={result.error} />;
+    return { lines: [], error: result.error };
   }
   const judged = result.data
     .map((o) => ({ o, reason: needsAttention(o, today, orderTotals(o, o.lines, o.payments, rush), thresholds) }))
@@ -151,23 +158,21 @@ function SpecialOrdersCard({
     href: `/special-orders/${o.id}`,
   }));
 
-  return (
-    <StartCard
-      lines={[
-        /* `status=attention` SINCE 2026-09-20, when Needs Attention moved out of
-           the Show menu and into Status — Show answers WHEN and this answers
-           what state an order is in.
-           `view=all` rides with it, and that is a fix rather than plumbing: the
-           old link set Show to `attention`, which REPLACED the default Upcoming
-           window, so it showed overdue orders. Split across two menus, Show
-           would have stayed on Upcoming and hidden exactly the orders this line
-           is counting — the ones whose event has gone by unpaid or unprinted.
-           `all` also widens the SERVER window, which `attention` never did. */
-        { count: flagged.length, label: "flagged", href: "/special-orders?status=attention&view=all" },
-        { count: judged.length, label: "need attention", href: "/special-orders?status=attention&view=all" },
-        { count: thisWeek.length, label: "committed orders in the next 7 days", href: "/special-orders?view=upcoming" },
-      ]}
-      items={items}
-    />
-  );
+  return {
+    lines: [
+      /* `status=attention` SINCE 2026-09-20, when Needs Attention moved out of
+         the Show menu and into Status — Show answers WHEN and this answers
+         what state an order is in.
+         `view=all` rides with it, and that is a fix rather than plumbing: the
+         old link set Show to `attention`, which REPLACED the default Upcoming
+         window, so it showed overdue orders. Split across two menus, Show
+         would have stayed on Upcoming and hidden exactly the orders this line
+         is counting — the ones whose event has gone by unpaid or unprinted.
+         `all` also widens the SERVER window, which `attention` never did. */
+      { count: flagged.length, label: "flagged", href: "/special-orders?status=attention&view=all", subset: true },
+      { count: judged.length, label: "need attention", href: "/special-orders?status=attention&view=all" },
+      { count: thisWeek.length, label: "committed orders in the next 7 days", href: "/special-orders?view=upcoming", urgent: false },
+    ],
+    items,
+  };
 }

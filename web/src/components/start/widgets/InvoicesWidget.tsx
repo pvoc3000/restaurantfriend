@@ -1,18 +1,25 @@
 import { invoiceNumberText, invoiceStatus, readInvoiceTerms } from "@/lib/customerInvoices";
 import { customerLabel, money, type CustomerName } from "@/lib/specialOrders";
 
-import { CARD_ITEMS, StartCard, type CardItem } from "../StartCard";
+import { CARD_ITEMS, StartCard, urgentCount, type CardItem, type CardSummary } from "../StartCard";
 import { shortDate, type Result, type StartContext, type Supabase } from "./shared";
 
 export async function InvoicesWidget(ctx: StartContext) {
-  return (
-    <InvoicesCard
-      result={await loadInvoices(ctx.supabase, ctx.shop.id)}
-      today={ctx.today}
-      shopCode={ctx.shop.code}
-      terms={readInvoiceTerms(ctx.session.orgSettings as Record<string, unknown>)}
-    />
-  );
+  return <StartCard {...(await summarize(ctx))} />;
+}
+
+/** What Invoices adds to the Home button's badge. */
+export async function invoicesAttention(ctx: StartContext): Promise<number> {
+  return urgentCount(await summarize(ctx));
+}
+
+async function summarize(ctx: StartContext): Promise<CardSummary> {
+  return invoicesSummary({
+    result: await loadInvoices(ctx.supabase, ctx.shop.id),
+    today: ctx.today,
+    shopCode: ctx.shop.code,
+    terms: readInvoiceTerms(ctx.session.orgSettings as Record<string, unknown>),
+  });
 }
 
 type InvoiceRow = {
@@ -71,7 +78,7 @@ async function loadInvoices(supabase: Supabase, loc: string): Promise<Result<Inv
  * has drafted and not sent. Each count is a status the invoice list filters
  * by (`invoiceStatus`), with this shop set, so the two agree.
  */
-function InvoicesCard({
+function invoicesSummary({
   result,
   today,
   shopCode,
@@ -81,9 +88,9 @@ function InvoicesCard({
   today: string;
   shopCode: string;
   terms: ReturnType<typeof readInvoiceTerms>;
-}) {
+}): CardSummary {
   if (result.data === null) {
-    return <StartCard lines={[]} error={result.error} />;
+    return { lines: [], error: result.error };
   }
   const withStatus = result.data.map((r) => ({ r, status: invoiceStatus(r, today) }));
   const overdue = withStatus
@@ -101,14 +108,12 @@ function InvoicesCard({
     href: `/customer-invoices/${r.id}`,
   }));
 
-  return (
-    <StartCard
-      lines={[
-        { count: overdue.length, label: "overdue", href: list("overdue") },
-        { count: sent.length, label: "sent, awaiting payment", href: list("sent") },
-        { count: drafts.length, label: "drafts not sent", href: list("draft") },
-      ]}
-      items={items}
-    />
-  );
+  return {
+    lines: [
+      { count: overdue.length, label: "overdue", href: list("overdue") },
+      { count: sent.length, label: "sent, awaiting payment", href: list("sent"), urgent: false },
+      { count: drafts.length, label: "drafts not sent", href: list("draft") },
+    ],
+    items,
+  };
 }

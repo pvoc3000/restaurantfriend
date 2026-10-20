@@ -111,6 +111,7 @@ export function IdleLock({ userId }: { userId: string }) {
             path,
             view: snapshotViewMemory(),
             scroll: snapshotScrollMemory(),
+            title: document.querySelector("main h1")?.textContent?.trim() || undefined,
           })
         );
       } catch {

@@ -2,11 +2,16 @@ import { DOCUMENT_KIND_LABEL, type DocumentKind } from "@/lib/employeeDocuments"
 import { employeeName } from "@/lib/employees";
 import { paperworkAlerts } from "@/lib/startPage";
 
-import { CARD_ITEMS, StartCard } from "../StartCard";
+import { CARD_ITEMS, StartCard, urgentCount, type CardSummary } from "../StartCard";
 import { shortDate, type Result, type StartContext, type Supabase } from "./shared";
 
 export async function PaperworkWidget(ctx: StartContext) {
-  return <PaperworkCard result={await loadPaperwork(ctx.supabase, ctx.shop.id)} today={ctx.today} />;
+  return <StartCard {...paperworkSummary({ result: await loadPaperwork(ctx.supabase, ctx.shop.id), today: ctx.today })} />;
+}
+
+/** What Employee paperwork adds to the Home button's badge. */
+export async function paperworkAttention(ctx: StartContext): Promise<number> {
+  return urgentCount(paperworkSummary({ result: await loadPaperwork(ctx.supabase, ctx.shop.id), today: ctx.today }));
 }
 
 type PaperworkData = {
@@ -34,9 +39,9 @@ async function loadPaperwork(supabase: Supabase, loc: string): Promise<Result<Pa
   };
 }
 
-function PaperworkCard({ result, today }: { result: Result<PaperworkData>; today: string }) {
+function paperworkSummary({ result, today }: { result: Result<PaperworkData>; today: string }): CardSummary {
   if (result.data === null) {
-    return <StartCard lines={[]} error={result.error} />;
+    return { lines: [], error: result.error };
   }
   const { employees, docs } = result.data;
   const alerts = paperworkAlerts(employees, docs, today);
@@ -44,17 +49,15 @@ function PaperworkCard({ result, today }: { result: Result<PaperworkData>; today
   const expired = alerts.filter((a) => a.state === "expired");
   const soon = alerts.filter((a) => a.state === "soon");
 
-  return (
-    <StartCard
-      lines={[
-        { count: expired.length, label: "current staff with a lapsed document", href: "/employees" },
-        { count: soon.length, label: "expiring in the next 60 days", href: "/employees" },
-      ]}
-      items={alerts.slice(0, CARD_ITEMS).map((a) => ({
-        primary: nameOf.get(a.employeeId) ?? "Unknown",
-        secondary: `${DOCUMENT_KIND_LABEL[a.kind]} · ${a.state === "expired" ? "lapsed" : "expires"} ${shortDate(a.on)}`,
-        href: `/employees/${a.employeeId}?tab=documents`,
-      }))}
-    />
-  );
+  return {
+    lines: [
+      { count: expired.length, label: "current staff with a lapsed document", href: "/employees" },
+      { count: soon.length, label: "expiring in the next 60 days", href: "/employees", urgent: false },
+    ],
+    items: alerts.slice(0, CARD_ITEMS).map((a) => ({
+      primary: nameOf.get(a.employeeId) ?? "Unknown",
+      secondary: `${DOCUMENT_KIND_LABEL[a.kind]} · ${a.state === "expired" ? "lapsed" : "expires"} ${shortDate(a.on)}`,
+      href: `/employees/${a.employeeId}?tab=documents`,
+    })),
+  };
 }

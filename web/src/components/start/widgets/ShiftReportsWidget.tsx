@@ -3,11 +3,18 @@ import { fetchEntries } from "@/lib/calendarQueries";
 import { missedClosingNights } from "@/lib/startPage";
 import { daysBefore } from "@/lib/today";
 
-import { CARD_ITEMS, StartCard, type CardItem } from "../StartCard";
+import { CARD_ITEMS, StartCard, urgentCount, type CardItem, type CardSummary } from "../StartCard";
 import { longDate, type Result, type StartContext, type Supabase } from "./shared";
 
 export async function ShiftReportsWidget(ctx: StartContext) {
-  return <ShiftReportsCard result={await loadShiftReports(ctx.supabase, ctx.today, ctx.shop.id, ctx.shop.code)} />;
+  const result = await loadShiftReports(ctx.supabase, ctx.today, ctx.shop.id, ctx.shop.code);
+  return <StartCard {...shiftReportsSummary({ result })} />;
+}
+
+/** What Shift reports adds to the Home button's badge. */
+export async function shiftReportsAttention(ctx: StartContext): Promise<number> {
+  const result = await loadShiftReports(ctx.supabase, ctx.today, ctx.shop.id, ctx.shop.code);
+  return urgentCount(shiftReportsSummary({ result }));
 }
 
 /** The Shift Reports list's own look-back for missing nights. */
@@ -71,9 +78,9 @@ async function loadShiftReports(
   };
 }
 
-function ShiftReportsCard({ result }: { result: Result<ReportsData> }) {
+function shiftReportsSummary({ result }: { result: Result<ReportsData> }): CardSummary {
   if (result.data === null) {
-    return <StartCard lines={[]} error={result.error} />;
+    return { lines: [], error: result.error };
   }
   const { missed, staleDrafts, notEmailed } = result.data;
   const items: CardItem[] = [
@@ -85,14 +92,12 @@ function ShiftReportsCard({ result }: { result: Result<ReportsData> }) {
     })),
   ].slice(0, CARD_ITEMS);
 
-  return (
-    <StartCard
-      lines={[
-        { count: missed.length, label: `closing nights with no report (last ${REPORT_LOOKBACK} days)` },
-        { count: staleDrafts.length, label: "drafts from an earlier day", href: "/shift-reports" },
-        { count: notEmailed, label: "sent but not emailed", href: "/shift-reports" },
-      ]}
-      items={items}
-    />
-  );
+  return {
+    lines: [
+      { count: missed.length, label: `closing nights with no report (last ${REPORT_LOOKBACK} days)` },
+      { count: staleDrafts.length, label: "drafts from an earlier day", href: "/shift-reports" },
+      { count: notEmailed, label: "sent but not emailed", href: "/shift-reports" },
+    ],
+    items,
+  };
 }

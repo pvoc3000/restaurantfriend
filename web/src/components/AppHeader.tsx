@@ -4,7 +4,8 @@ import { signOut } from "@/app/actions";
 import { SwitchUser } from "@/components/SwitchUser";
 import { AppNav } from "@/components/AppNav";
 import { HeaderShell } from "@/components/HeaderShell";
-import { GearIcon, HomeIcon, IconButton, OrgIcon } from "@/components/ui/IconButton";
+import { HomeButton } from "@/components/HomeButton";
+import { GearIcon, IconButton, OrgIcon } from "@/components/ui/IconButton";
 import { canReachPage } from "@/lib/pageAccess";
 import { WorkingLocation } from "@/components/WorkingLocation";
 import { NAV_COOKIE, parseNavMemory } from "@/lib/navMemory";
@@ -41,9 +42,9 @@ export async function AppHeader({ session }: { session: AppSession }) {
             {/* HOME, FIRST (Mark, 2026-09-17 — it went in last, after the
                 location picker, and moved here the same day). The house came
                 back with a destination of its own: the Start page. */}
-            <IconButton href="/start" label="Home">
-              <HomeIcon />
-            </IconButton>
+            {/* With a count of what needs somebody on your Start page
+                (2026-10-20) — `HomeButton`. */}
+            <HomeButton />
 
             {/* TWO SETTINGS, TWO ICONS (Mark, 2026-09-04): the storefront is
                 the ORG's — what the business says and is connected to, manager
