@@ -51,8 +51,9 @@ export type NewSpecialOrderInput = {
   /** Decision 8: where the customer COLLECTS. Drives the tax rate, the menu's
    *  prices and the LOCATION line on the quote. */
   locationId?: string | null;
-  /** Decision 8: where it is MADE. Both create doors pass the shop you are
-   *  working at (Mark, 2026-09-23); the record's Info tab changes it. */
+  /** Decision 8: where it is MADE. Both create doors pass the PICKUP shop
+   *  (Mark, 2026-10-19), the working shop only when pickup is not set; the
+   *  record's Info tab changes it. */
   kitchenLocationId?: string | null;
   /** Which Square item its money is sold as (129). Absent → Special Order. */
   squareItem?: "special_order" | "wholesale";

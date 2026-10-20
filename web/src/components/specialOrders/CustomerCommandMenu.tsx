@@ -72,8 +72,8 @@ export function CustomerCommandMenu({
         title: `New order for ${name}`,
         customerId: id,
         locationId: defaultLocationId,
-        // The kitchen is the shop you are working at, as the list's dialog
-        // sets it (2026-09-23).
+        // The kitchen starts as the pickup shop, as the list's dialog sets it
+        // (2026-10-19) — here both are the shop you are working at.
         kitchenLocationId: defaultLocationId,
         takenBy,
         // Their name, phone and email become the order's day-of contact —

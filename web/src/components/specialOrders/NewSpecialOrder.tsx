@@ -103,10 +103,12 @@ export function NewSpecialOrder({
   const [address, setAddress] = useState("");
   const [locationId, setLocationId] = useState(defaultLocationId ?? "");
   const [customer, setCustomer] = useState<CustomerChoice>(null);
+  const kitchenId = locationId || defaultLocationId || null;
 
   // The calendar's blackouts from today on (migration 181), read once when the
   // dialog opens. The pickup shop and the kitchen are both asked about, as the
-  // record asks — here the kitchen is the shop you are standing in.
+  // record asks — here the kitchen is the pickup shop, or the shop you are
+  // standing in while pickup is Not set.
   const [blackouts, setBlackouts] = useState<CalendarEntry[]>([]);
   useEffect(() => {
     if (!open) return;
@@ -122,7 +124,7 @@ export function NewSpecialOrder({
     kind === "order"
       ? blackoutFor(blackouts, {
           date: eventDate,
-          locationIds: [locationId || null, defaultLocationId],
+          locationIds: [locationId || null, kitchenId],
           effect: "special_orders",
         })
       : null;
@@ -196,11 +198,13 @@ export function NewSpecialOrder({
         today,
         takenBy,
         locationId,
-        // THE KITCHEN IS THE SHOP YOU ARE WORKING AT (Mark, 2026-09-23:
-        // "remove the kitchen picklist and automatically set it to whatever
-        // the location is when the order is created"). Changed afterwards on
-        // the record's Info tab when another shop bakes it.
-        kitchenLocationId: defaultLocationId,
+        // THE KITCHEN STARTS AS THE PICKUP SHOP (Mark, 2026-10-19: "The
+        // kitchen should be set to the pickup location initially, not the
+        // working location"). It had been the working shop since 2026-09-23,
+        // so picking DF02 for pickup while working at DF01 put the bake at
+        // DF01 without a word. The working shop is only the fallback when
+        // pickup is left Not set. Changed afterwards on the Info tab.
+        kitchenLocationId: kitchenId,
         squareItem,
         fulfillment,
         // Kept in state through a flip back to Pickup, and dropped on the way
