@@ -51,13 +51,3 @@ export async function RemindersWidget(ctx: StartContext) {
     </div>
   );
 }
-
-/** What Reminders adds to the Home button's badge: reminders due and requests
- *  still open, each under its own gate — both are waiting on somebody. */
-export async function remindersAttention(ctx: StartContext): Promise<number> {
-  const [reminders, requests] = await Promise.all([
-    canReachPage(ctx.role, "/order-guide") ? fetchDueReminders(ctx.supabase, ctx.shop.id, ctx.today) : [],
-    canReachPage(ctx.role, "/purchase-requests") ? fetchOpenRequests(ctx.supabase, ctx.shop.id) : [],
-  ]);
-  return reminders.length + requests.length;
-}

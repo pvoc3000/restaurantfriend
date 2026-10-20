@@ -1,16 +1,11 @@
 import { invoiceNumberText, invoiceStatus, readInvoiceTerms } from "@/lib/customerInvoices";
 import { customerLabel, money, type CustomerName } from "@/lib/specialOrders";
 
-import { CARD_ITEMS, StartCard, urgentCount, type CardItem, type CardSummary } from "../StartCard";
+import { CARD_ITEMS, StartCard, type CardItem, type CardSummary } from "../StartCard";
 import { shortDate, type Result, type StartContext, type Supabase } from "./shared";
 
 export async function InvoicesWidget(ctx: StartContext) {
   return <StartCard {...(await summarize(ctx))} />;
-}
-
-/** What Invoices adds to the Home button's badge. */
-export async function invoicesAttention(ctx: StartContext): Promise<number> {
-  return urgentCount(await summarize(ctx));
 }
 
 async function summarize(ctx: StartContext): Promise<CardSummary> {
@@ -111,7 +106,7 @@ function invoicesSummary({
   return {
     lines: [
       { count: overdue.length, label: "overdue", href: list("overdue") },
-      { count: sent.length, label: "sent, awaiting payment", href: list("sent"), urgent: false },
+      { count: sent.length, label: "sent, awaiting payment", href: list("sent") },
       { count: drafts.length, label: "drafts not sent", href: list("draft") },
     ],
     items,

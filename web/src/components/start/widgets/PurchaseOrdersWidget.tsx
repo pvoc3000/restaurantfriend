@@ -1,17 +1,11 @@
 import { daysBefore } from "@/lib/today";
 
-import { CARD_ITEMS, StartCard, urgentCount, type CardItem, type CardSummary } from "../StartCard";
+import { CARD_ITEMS, StartCard, type CardItem, type CardSummary } from "../StartCard";
 import { shortDate, type Result, type StartContext, type Supabase } from "./shared";
 
 export async function PurchaseOrdersWidget(ctx: StartContext) {
   const result = await loadPurchaseOrders(ctx.supabase, ctx.today, ctx.shop.id);
   return <StartCard {...purchaseOrdersSummary({ result, today: ctx.today })} />;
-}
-
-/** What Purchase orders adds to the Home button's badge. */
-export async function purchaseOrdersAttention(ctx: StartContext): Promise<number> {
-  const result = await loadPurchaseOrders(ctx.supabase, ctx.today, ctx.shop.id);
-  return urgentCount(purchaseOrdersSummary({ result, today: ctx.today }));
 }
 
 type PoRow = {
@@ -90,7 +84,7 @@ function purchaseOrdersSummary({
     lines: [
       { count: late.length, label: "past their delivery day", href: "/purchase-orders?status=sent&range=all" },
       { count: drafts.length, label: "drafts not sent", href: "/purchase-orders?status=draft&range=all" },
-      { count: sent.length, label: "sent, still to arrive", href: "/purchase-orders?status=sent&range=all", urgent: false },
+      { count: sent.length, label: "sent, still to arrive", href: "/purchase-orders?status=sent&range=all" },
       {
         count: unclosed.length,
         label: `received in the last ${UNCLOSED_DAYS} days, not closed`,

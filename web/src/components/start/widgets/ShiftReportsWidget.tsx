@@ -3,18 +3,12 @@ import { fetchEntries } from "@/lib/calendarQueries";
 import { missedClosingNights } from "@/lib/startPage";
 import { daysBefore } from "@/lib/today";
 
-import { CARD_ITEMS, StartCard, urgentCount, type CardItem, type CardSummary } from "../StartCard";
+import { CARD_ITEMS, StartCard, type CardItem, type CardSummary } from "../StartCard";
 import { longDate, type Result, type StartContext, type Supabase } from "./shared";
 
 export async function ShiftReportsWidget(ctx: StartContext) {
   const result = await loadShiftReports(ctx.supabase, ctx.today, ctx.shop.id, ctx.shop.code);
   return <StartCard {...shiftReportsSummary({ result })} />;
-}
-
-/** What Shift reports adds to the Home button's badge. */
-export async function shiftReportsAttention(ctx: StartContext): Promise<number> {
-  const result = await loadShiftReports(ctx.supabase, ctx.today, ctx.shop.id, ctx.shop.code);
-  return urgentCount(shiftReportsSummary({ result }));
 }
 
 /** The Shift Reports list's own look-back for missing nights. */

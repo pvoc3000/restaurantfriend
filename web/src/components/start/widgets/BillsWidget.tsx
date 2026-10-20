@@ -1,15 +1,10 @@
 import { billAttention, isOverdueBill, type StartBill } from "@/lib/startPage";
 
-import { CARD_ITEMS, StartCard, urgentCount, type CardItem, type CardSummary } from "../StartCard";
+import { CARD_ITEMS, StartCard, type CardItem, type CardSummary } from "../StartCard";
 import { shortDate, type Result, type StartContext, type Supabase } from "./shared";
 
 export async function BillsWidget(ctx: StartContext) {
   return <StartCard {...billsSummary({ result: await loadBills(ctx.supabase, ctx.shop.id), today: ctx.today })} />;
-}
-
-/** What Bills adds to the Home button's badge. */
-export async function billsAttention(ctx: StartContext): Promise<number> {
-  return urgentCount(billsSummary({ result: await loadBills(ctx.supabase, ctx.shop.id), today: ctx.today }));
 }
 
 type BillRow = StartBill & {

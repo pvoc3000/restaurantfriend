@@ -4,16 +4,16 @@ import { canReachPage } from "@/lib/pageAccess";
 import { canReadHr, type Role } from "@/lib/roles";
 import type { WidgetAccess, WidgetKind } from "@/lib/startLayout";
 
-import { billsAttention, BillsWidget } from "./BillsWidget";
+import { BillsWidget } from "./BillsWidget";
 import { CalendarWidget } from "./CalendarWidget";
-import { invoicesAttention, InvoicesWidget } from "./InvoicesWidget";
-import { paperworkAttention, PaperworkWidget } from "./PaperworkWidget";
-import { purchaseOrdersAttention, PurchaseOrdersWidget } from "./PurchaseOrdersWidget";
-import { remindersAttention, RemindersWidget } from "./RemindersWidget";
+import { InvoicesWidget } from "./InvoicesWidget";
+import { PaperworkWidget } from "./PaperworkWidget";
+import { PurchaseOrdersWidget } from "./PurchaseOrdersWidget";
+import { RemindersWidget } from "./RemindersWidget";
 import { SalesWidget } from "./SalesWidget";
 import type { StartContext } from "./shared";
-import { shiftReportsAttention, ShiftReportsWidget } from "./ShiftReportsWidget";
-import { specialOrdersAttention, SpecialOrdersWidget } from "./SpecialOrdersWidget";
+import { ShiftReportsWidget } from "./ShiftReportsWidget";
+import { SpecialOrdersWidget } from "./SpecialOrdersWidget";
 import { TodayWidget } from "./TodayWidget";
 
 /** Each widget's server half: its queries, then its body. */
@@ -28,22 +28,6 @@ export const WIDGET_BODY: Record<WidgetKind, (ctx: StartContext) => Promise<Reac
   paperwork: PaperworkWidget,
   calendar: CalendarWidget,
   today: TodayWidget,
-};
-
-/**
- * What each widget adds to the Home button's badge (2026-10-20) — the yellow
- * numbers on its card, from the SAME summary the card draws, so the badge and
- * the page cannot disagree. Sales, Calendar and Today count nothing: they
- * report, they do not ask.
- */
-export const WIDGET_ATTENTION: Partial<Record<WidgetKind, (ctx: StartContext) => Promise<number>>> = {
-  reminders: remindersAttention,
-  bills: billsAttention,
-  purchase_orders: purchaseOrdersAttention,
-  special_orders: specialOrdersAttention,
-  invoices: invoicesAttention,
-  shift_reports: shiftReportsAttention,
-  paperwork: paperworkAttention,
 };
 
 /**

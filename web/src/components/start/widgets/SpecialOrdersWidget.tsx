@@ -8,16 +8,11 @@ import {
 } from "@/lib/specialOrders";
 import { daysAfter, daysBefore } from "@/lib/today";
 
-import { CARD_ITEMS, StartCard, urgentCount, type CardItem, type CardSummary } from "../StartCard";
+import { CARD_ITEMS, StartCard, type CardItem, type CardSummary } from "../StartCard";
 import type { Result, StartContext, Supabase } from "./shared";
 
 export async function SpecialOrdersWidget(ctx: StartContext) {
   return <StartCard {...(await summarize(ctx))} />;
-}
-
-/** What Special orders adds to the Home button's badge. */
-export async function specialOrdersAttention(ctx: StartContext): Promise<number> {
-  return urgentCount(await summarize(ctx));
 }
 
 async function summarize(ctx: StartContext): Promise<CardSummary> {
@@ -169,9 +164,9 @@ function specialOrdersSummary({
          would have stayed on Upcoming and hidden exactly the orders this line
          is counting — the ones whose event has gone by unpaid or unprinted.
          `all` also widens the SERVER window, which `attention` never did. */
-      { count: flagged.length, label: "flagged", href: "/special-orders?status=attention&view=all", subset: true },
+      { count: flagged.length, label: "flagged", href: "/special-orders?status=attention&view=all" },
       { count: judged.length, label: "need attention", href: "/special-orders?status=attention&view=all" },
-      { count: thisWeek.length, label: "committed orders in the next 7 days", href: "/special-orders?view=upcoming", urgent: false },
+      { count: thisWeek.length, label: "committed orders in the next 7 days", href: "/special-orders?view=upcoming" },
     ],
     items,
   };

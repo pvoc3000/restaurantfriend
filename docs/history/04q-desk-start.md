@@ -179,3 +179,10 @@ renders with no console errors. **NOT VERIFIED:** the new-day move itself and
 the back link in a live browser (the pane is behind the PIN lock), and the
 badge's look in the masthead — check both in Safari, the move by leaving a tab
 open overnight.
+
+**THE HOME BADGE CAME OUT THE SAME DAY (2026-10-20).** Mark: "actually the
+badge on the home icon is just noise. Let's remove it." `HomeButton`,
+`app/startActions.ts` and every widget's `…Attention` count are gone, and the
+Home button is the plain house again. With it went the reason for setting
+informational counts in ink, so every count above zero is on the yellow fill
+again, as before. The new-day move and the Start breadcrumb stay.
