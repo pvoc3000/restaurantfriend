@@ -123,17 +123,9 @@ export function CustomerInvoiceCommandMenu({
     }
   }
 
-  /** The band shows only while work runs — never behind a confirm. It waits
-   *  for the band to PAINT before starting: rendering the PDF is one long
-   *  block on the main thread, and Safari, given no frame first, showed the
-   *  band only for the instant after it finished. The timeout covers a hidden
-   *  tab, where requestAnimationFrame never fires. */
+  /** The band shows only while work runs — never behind a confirm. */
   async function withProgress<T>(label: string, fn: () => Promise<T>): Promise<T> {
     setProgress(label);
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => setTimeout(resolve, 0));
-      setTimeout(resolve, 100);
-    });
     try {
       return await fn();
     } finally {

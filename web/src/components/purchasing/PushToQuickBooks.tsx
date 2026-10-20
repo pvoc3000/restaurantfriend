@@ -10,6 +10,7 @@ import {
 } from "./qboBillPush";
 import type { ReactNode } from "react";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { ProgressBand } from "@/components/ui/ProgressBand";
 import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { alertDialog } from "@/lib/confirm";
 import { money } from "@/lib/purchaseOrders";
@@ -124,6 +125,9 @@ export function PushToQuickBooks({
    *  during the lookup and "Sending…" only once it actually knows there's
    *  nothing to link to. */
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+  /** The send itself, in words for the band — `busy` also covers link,
+   *  check and forget, which are quick and say so on their own rows. */
+  const [sending, setSending] = useState<string | null>(null);
   /** What QuickBooks says is still owed. HELD IN STATE AND NEVER STORED — see
    *  `refresh_status`. It disappears on reload, which is honest: a balance kept
    *  in our row would be stale the moment it landed and shown as if current. */
@@ -264,18 +268,23 @@ export function PushToQuickBooks({
     tracking: { location: QboRefValue | null; klass: QboRefValue | null };
   }) {
     setBusy(true);
+    setSending(pushedLabel(input.ctx.billRef) ? "Updating it in QuickBooks…" : "Sending it to QuickBooks…");
     setError(null);
     setWarnings([]);
-    const result = await sendBillToQuickBooks(supabase, { billId, ...input });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.message);
-      return;
+    try {
+      const result = await sendBillToQuickBooks(supabase, { billId, ...input });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setWarnings(result.warnings);
+      setSent(`${result.updated ? "Updated" : "Sent"} as ${result.entity} ${result.label}`);
+      setCtx(await readContext());
+      onDone();
+    } finally {
+      setBusy(false);
+      setSending(null);
     }
-    setWarnings(result.warnings);
-    setSent(`${result.updated ? "Updated" : "Sent"} as ${result.entity} ${result.label}`);
-    setCtx(await readContext());
-    onDone();
   }
 
   // STILL DECIDING — a same-shaped placeholder holds the space rather than
@@ -596,6 +605,13 @@ export function PushToQuickBooks({
   // half of a two-box row.
   const notes = (
     <div className="w-full max-w-sm space-y-1 text-right text-[13px]">
+      {/* BOTH WAITS ARE SECONDS LONG and their only other sign is a row
+          inside a closed menu (Mark, 2026-10-20: "a long pause"). */}
+      {(checkingDuplicate || sending) && (
+        <div className="text-left">
+          <ProgressBand label={sending ?? "Checking QuickBooks for this bill…"} />
+        </div>
+      )}
       {/* THE PASSIVE HALF of Mark's ask — the ACTIVE half is `offerResync`,
           fired once from the effect above at the moment of re-approval.
           This is what covers a reload afterwards, when that moment has
