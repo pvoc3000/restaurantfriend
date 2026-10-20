@@ -64,27 +64,18 @@ export function applyColumnOrder<C extends OrderableColumn>(
   return columns.map((c) => (isMovableColumn(c) ? byKey.get(orderedKeys[next++])! : c));
 }
 
-/** Where a drag would land: before a movable column, or after one (the end). */
-export type ColumnDropTarget = { before: string } | { after: string };
-
 /**
- * The movable key list with `dragKey` moved next to the anchor. Operates on the
- * FULL movable order — hidden and compact-dropped columns included — so a drop
- * "at the end of what I can see" still lands before any trailing hidden
- * columns' stored positions are disturbed. An unknown anchor is a no-op.
+ * Where a drag would land, and the splice that carries it out — the movable key
+ * list with `dragKey` moved next to the anchor. Callers pass the FULL movable
+ * order (hidden and compact-dropped columns included), so a drop "at the end of
+ * what I can see" still lands before any trailing hidden columns' stored
+ * positions are disturbed. An unknown anchor is a no-op.
+ *
+ * The splice now lives in `lib/moveInOrder`, shared with `rowDrag` and the start
+ * page's `tileDrag`; these are its column-shaped names.
  */
-export function movedColumnOrder(
-  orderedMovableKeys: readonly string[],
-  dragKey: string,
-  target: ColumnDropTarget
-): string[] {
-  const without = orderedMovableKeys.filter((k) => k !== dragKey);
-  const anchor = "before" in target ? target.before : target.after;
-  const at = without.indexOf(anchor);
-  if (at === -1) return [...orderedMovableKeys];
-  without.splice("before" in target ? at : at + 1, 0, dragKey);
-  return without;
-}
+export { moveInOrder as movedColumnOrder, type DropTarget as ColumnDropTarget } from "./moveInOrder";
+import { type DropTarget as ColumnDropTarget } from "./moveInOrder";
 
 // ---------------------------------------------------------------------------
 // The store — columnVisibility's shape with an ordered array instead of a Set.

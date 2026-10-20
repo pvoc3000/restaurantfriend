@@ -42,23 +42,14 @@ import { useRef, useState, type PointerEvent as ReactPointerEvent, type RefObjec
  */
 
 /**
- * Where a drag would land, and the splice that carries it out.
- *
- * BOTH ARE `columnOrder`'s, re-exported rather than re-derived.
- * `movedColumnOrder` is a pure list splice over string keys with a
- * `{before}|{after}` target and an unknown-anchor no-op — it is generic in
- * everything but its name, and it is already pinned by 13 fixture cases. Copying
- * six lines to avoid an odd-looking import is exactly the second-implementation
- * drift this app keeps paying for; the alias is what makes it read right at a
- * row's call site. (Renaming them at source is the tidier end state, and is
- * worth doing the day a third caller appears.)
+ * Where a drag would land, and the splice that carries it out — `lib/moveInOrder`,
+ * shared with `columnOrder` and the start page's `tileDrag` (it began as
+ * `columnOrder`'s `movedColumnOrder` and moved to its own module when that third
+ * caller appeared, 2026-10-20). Re-exported so this hook's callers keep one import.
  */
-export {
-  movedColumnOrder as moveInOrder,
-  type ColumnDropTarget as DropTarget,
-} from "./columnOrder";
+export { moveInOrder, type DropTarget } from "./moveInOrder";
 
-import { type ColumnDropTarget as DropTarget } from "./columnOrder";
+import { type DropTarget } from "./moveInOrder";
 
 // ---------------------------------------------------------------------------
 // Pure logic — fixture-tested (scripts/fixtures/rowDrag.fixtures.ts).
