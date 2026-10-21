@@ -6033,3 +6033,17 @@ threaded.
   `approve-quote`, `square-pay`, `send-special-order-email`, `qbo-sync`
   (which also carried 10-20's one respelled error message); verify_jwt
   confirmed unchanged afterwards.
+- **Repaired 2026-10-21, from the mailbox.** The 16 open orders (event today
+  or later, not canceled) were pointed at their real conversation: of the
+  conversations under the order's subject, the one with the latest activity,
+  its first message's real Message-ID as root and its Gmail threadId as
+  conversation (read with the Gmail connector, RAW headers; all 16 subjects
+  equal `thread_subject`). The other 25 generated roots (past, canceled, test
+  leads) were cleared, subject kept, so their next email starts a real
+  conversation. Guarded on `like '<rf-%'` in one transaction; before-values
+  were saved outside the repo. Emails already sent stay split; this only
+  decides where the next ones go.
+- **NOT verified by a real send yet**, and the Mail.app/customer half cannot
+  be until the specialorders@ token is re-minted with `gmail.metadata`. The
+  16 repaired orders need no new token: they already have a root and a
+  conversation, so the next email on any of them is the first real test.
