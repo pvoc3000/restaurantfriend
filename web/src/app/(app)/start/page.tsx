@@ -246,8 +246,8 @@ export default async function StartPage() {
     }
   }
 
-  // No heading (Mark, 2026-09-10): the shop's code already sits in the bar's
-  // location picker, so an h1 restating it was the same fact twice.
+  // The title is the desk's "Welcome to <org>!" since 2026-10-20 (Landing);
+  // still no shop code (Mark, 2026-09-10) — it sits in the bar's picker.
   const active = session.activeLocation;
   return (
     <>
@@ -258,6 +258,7 @@ export default async function StartPage() {
     <Landing
       groups={groups}
       pins={readTileKeys(session.membership.tablet_pins)}
+      orgName={session.orgName}
       state={state}
       today={today}
       request={

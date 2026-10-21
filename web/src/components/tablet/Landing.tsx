@@ -38,6 +38,7 @@ export function Landing({
   request,
   today,
   pins: serverPins,
+  orgName,
 }: {
   groups: TileGroup[];
   state: Partial<Record<TileKey, TileState>>;
@@ -47,6 +48,8 @@ export function Landing({
   today: string;
   /** This person's pins, already read (`readTileKeys`). */
   pins: TileKey[];
+  /** For the title — the desk Start's "Welcome to <org name>!". */
+  orgName: string;
 }) {
   const searchParams = useSearchParams();
   const [editing, setEditing] = useState(() => searchParams.get("edit") === "1");
@@ -105,7 +108,13 @@ export function Landing({
 
   return (
     <div className="mx-auto max-w-5xl space-y-10 text-[16px]">
-      <div className="flex justify-end">
+      {/* THE DESK START'S TITLE, beside the Edit switch (Mark, 2026-10-20).
+          Only the title: the shop's code is already in the bar's picker, which
+          is why this page had no heading at all from 2026-09-10. */}
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          {orgName ? `Welcome to ${orgName}!` : "Welcome!"}
+        </h1>
         <Switch checked={editing} onChange={toggleEditing}>
           Edit
         </Switch>

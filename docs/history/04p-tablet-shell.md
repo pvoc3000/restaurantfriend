@@ -353,3 +353,7 @@ to pin' can you display a pin glyph button in the upper right hand corner").
 In edit mode the tile body is inert; a 44px pin button in its top-right corner
 pins or unpins. The pin is drawn (`PinGlyph`), black, outlined when unpinned
 and filled when pinned — not the 📌 emoji, which Apple paints red.
+**A title again (Mark, 2026-10-20):** "add a 'Welcome to Donut Friend!' title
+to it like the desktop start page (inline with the edit switch)". The desk's
+h1, from `session.orgName`, left of the Edit switch. Title only — the shop code
+stays in the bar's picker, the reason the page had no heading from 2026-09-10.
