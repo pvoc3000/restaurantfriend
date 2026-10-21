@@ -6043,7 +6043,15 @@ threaded.
   conversation. Guarded on `like '<rf-%'` in one transaction; before-values
   were saved outside the repo. Emails already sent stay split; this only
   decides where the next ones go.
-- **NOT verified by a real send yet**, and the Mail.app/customer half cannot
-  be until the specialorders@ token is re-minted with `gmail.metadata`. The
-  16 repaired orders need no new token: they already have a root and a
-  conversation, so the next email on any of them is the first real test.
+- **Token re-minted by Mark 2026-10-21** with `gmail.send` + `gmail.metadata`,
+  in project 967634606189 (renamed "RF specialorders Mail"; the setup doc had
+  named a project neither account has, now corrected).
+- **VERIFIED 2026-10-21 by a real send** (Mark's test lead SO-10155, "Testy
+  testy", to trombino@mac.com): root `<CAP6m4V_gBaJ…@mail.gmail.com>` is the
+  real Message-ID, `thread_conversation_id` `1a15f42a5fdf1ebc`, no warning in
+  the order's log, and the confirmation, the new-inquiry notice and the quote
+  are ONE three-message conversation in specialorders@; Mark saw it thread in
+  Mail.app. **Not yet exercised:** the approval confirmation and
+  quote-approved notice (`approve-quote`) and the paid-online pair
+  (`square-pay`, `qbo-webhook`/`qbo-sync`) — same `orderThread` path, but no
+  real send has gone through them.
