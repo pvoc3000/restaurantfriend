@@ -11,7 +11,6 @@ import { stepPin, togglePin, withPinned } from "@/lib/tablet/pins";
 
 import type { RequestContext } from "./RequestTile";
 import { TileCell, type TileState } from "./TileCell";
-import { TILE_CLASS } from "./tileClass";
 
 export type { TileState };
 
@@ -29,8 +28,8 @@ export type { TileState };
  * moves up out of its group (`withPinned`). Nothing pinned, no row.
  *
  * Pinning is an EDIT switch, kept as `?edit=1` like the desk's Edit layout.
- * While it is on no tile is a door: tapping one pins or unpins it, and a
- * pinned one also gets arrows to move it. Saved as you go (`lib/latestWrite`)
+ * While it is on no tile is a door: the pin in a tile's corner pins or unpins
+ * it, and a pinned one also gets arrows to move it. Saved as you go (`lib/latestWrite`)
  * and held here until the server's copy agrees — a tap never waits.
  */
 export function Landing({
@@ -153,9 +152,11 @@ export function Landing({
 }
 
 /**
- * A tile while pinning: the whole tile pins or unpins it — no tile is a door
- * in edit mode — and a pinned one carries ← → to move it. 44px targets, the
- * tablet's floor.
+ * A tile while pinning (Mark, 2026-10-20: "instead of 'tap to pin' … a pin
+ * glyph button in the upper right hand corner"). The tile itself is inert —
+ * no tile is a door in edit mode — and the pin in its corner pins or unpins
+ * it; a pinned one also carries ← → to move it. 44px targets, the tablet's
+ * floor.
  */
 function EditTile({
   tile,
@@ -168,24 +169,56 @@ function EditTile({
   onToggle: () => void;
   onStep: { earlier: (() => void) | null; later: (() => void) | null } | null;
 }) {
-  const arrow =
+  const square =
     "mac-control grid h-11 w-11 shrink-0 place-items-center border border-ink bg-white text-[18px] hover:bg-neutral-100 disabled:opacity-35";
   return (
     <div className="flex flex-1 gap-2">
-      <button type="button" onClick={onToggle} aria-pressed={pinned} className={`${TILE_CLASS} border-dashed`}>
+      <div className="relative flex min-h-24 flex-1 items-center border border-dashed border-ink bg-white py-4 pl-5 pr-14">
         <span className="font-bold uppercase tracking-[0.04em] text-ink">{tile.label}</span>
-        <span className="text-[14px] text-muted">{pinned ? "Tap to unpin" : "Tap to pin"}</span>
-      </button>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-pressed={pinned}
+          aria-label={pinned ? `Unpin ${tile.label}` : `Pin ${tile.label}`}
+          title={pinned ? "Unpin" : "Pin"}
+          className="absolute right-1 top-1 grid h-11 w-11 place-items-center text-ink hover:bg-neutral-100"
+        >
+          <PinGlyph filled={pinned} />
+        </button>
+      </div>
       {onStep && (
         <div className="flex flex-col justify-center gap-2">
-          <button type="button" aria-label={`Move ${tile.label} earlier`} disabled={!onStep.earlier} onClick={() => onStep.earlier?.()} className={arrow}>
+          <button type="button" aria-label={`Move ${tile.label} earlier`} disabled={!onStep.earlier} onClick={() => onStep.earlier?.()} className={square}>
             ←
           </button>
-          <button type="button" aria-label={`Move ${tile.label} later`} disabled={!onStep.later} onClick={() => onStep.later?.()} className={arrow}>
+          <button type="button" aria-label={`Move ${tile.label} later`} disabled={!onStep.later} onClick={() => onStep.later?.()} className={square}>
             →
           </button>
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * A pushpin, drawn rather than the 📌 emoji, which Apple paints red — color
+ * is a record's state here, and this is not one. Pinned is told from unpinned
+ * by FILL, the way the heart and star are told apart by shape.
+ */
+function PinGlyph({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className="h-6 w-6"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    >
+      <path d="M8.5 3h7l-1.25 6.5L17.5 13v1.5h-11V13l3.25-3.5z" />
+      <path d="M12 14.5V21" />
+    </svg>
   );
 }

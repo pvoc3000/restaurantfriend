@@ -348,3 +348,8 @@ cannot execute; null clears), applied, re-probed. Rendered both shells from the
 dev server with a one-off owner session and test pins (owner's pins and layout
 restored byte-for-byte after), and looked at static snapshots at 1024.
 **Not verified:** tapping through edit mode on a real iPad.
+**A pin in the corner, not "Tap to pin"** (Mark, 2026-10-20: "instead of 'tap
+to pin' can you display a pin glyph button in the upper right hand corner").
+In edit mode the tile body is inert; a 44px pin button in its top-right corner
+pins or unpins. The pin is drawn (`PinGlyph`), black, outlined when unpinned
+and filled when pinned — not the 📌 emoji, which Apple paints red.
