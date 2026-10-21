@@ -5984,3 +5984,52 @@ the app should warn them before continuing."
 - **Verified:** 17 fixtures, broken four ways (no delivery clause, no epsilon,
   balance excused, no canceled early return) and restored; `tsc`, eslint, 2,446
   fixtures. **NOT checked in a browser**: the pane sat on `/lock`.
+
+### 2026-10-21 — one conversation per order, for real (migration 210)
+
+Mark: "figure out why they aren't threading the way I asked for several weeks
+ago … from the inquiry email forward, all emails to this customer regarding
+their order should be together in a single thread, including the notification
+emails when they approve or pay." Read in Mail.app and in Gmail; neither
+threaded.
+
+- **167 had never threaded anything.** Read off the specialorders@ mailbox:
+  SO-10136's inquiry confirmation was stored as root
+  `<rf-f814b734…@donutfriend.com>` but went out as
+  `<CAP6m4V8_…@mail.gmail.com>`. **`users.messages.send` REPLACES a supplied
+  Message-ID** (`email.ts` had said the opposite), so every later email was
+  `In-Reply-To` an id no message anywhere carried; `rfc822msgid:` finds
+  nothing for it. All 41 roots written since 167 were of this kind. Second
+  cause: **in the sending mailbox an API send joins a conversation only when
+  it names its `threadId`** (Gmail's rule: threadId, reply headers, same
+  subject), and nothing passed one, so SO-10136 was six one-message
+  conversations. Third: the shop notices went to specialorders@ under their
+  own subjects with no headers at all, by design.
+- **The send path now reads back what Gmail actually did.** `sendMailWithIds`
+  (`_shared/email.ts`) returns `{ ref, messageId, threadId, note }`: the
+  `threadId` from the send response and the real Message-ID from a
+  `messages.get?format=metadata` right after. `sendMail` still returns the
+  provider ref, so the other senders are untouched. A stored conversation
+  Gmail refuses (404/400: deleted, or another mailbox) is retried as a new
+  one rather than failing a customer's email.
+- **`special_orders.thread_conversation_id` (210, APPLIED 2026-10-21)** holds
+  the Gmail `threadId`. `orderThread` puts it in `headers.threadId`, and
+  `record(sent, subject)` fills root, conversation and subject each only where
+  null, from what the send returned, never from what we generated.
+- **The notices join the conversation.** `sendShopNotice` takes
+  `threadOrderId`; the new-inquiry, quote-approved and (one-order) paid-online
+  notices go under the ORDER's subject, because Gmail splits on a changed
+  one. What happened moves from the subject to the notice's own heading,
+  which is the conversation's preview line. A notice about several orders
+  keeps its own subject. `submit-inquiry` now sends the notice AFTER the
+  confirmation so it has a conversation to join; a phone-only inquiry's notice
+  starts the conversation itself.
+- **The credential needed a second scope.** specialorders@'s refresh token
+  had `gmail.send` only, which cannot read a header back. It needs
+  `gmail.metadata` too (headers and labels, no bodies); `po-email-setup.md`
+  A2 now asks for both. Until it is re-minted every send logs "Gmail would not
+  say which Message-ID it gave the email".
+- **Deployed** `submit-inquiry` and `qbo-webhook` (`--no-verify-jwt`),
+  `approve-quote`, `square-pay`, `send-special-order-email`, `qbo-sync`
+  (which also carried 10-20's one respelled error message); verify_jwt
+  confirmed unchanged afterwards.

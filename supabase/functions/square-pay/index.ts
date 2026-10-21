@@ -32,7 +32,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-import { resolveTransport, sendMail, type ProviderConfig } from "../_shared/email.ts";
+import { resolveTransport, sendMailWithIds, type ProviderConfig } from "../_shared/email.ts";
 import { notifyInvoicePaid } from "../_shared/shopNotify.ts";
 import { orderThread } from "../_shared/orderThread.ts";
 import { buildSquareOrder, type PayBreakdown } from "../_shared/squareOrder.ts";
@@ -464,14 +464,14 @@ Deno.serve(async (req) => {
         const subject =
           thread?.subject ?? fill(orDefault(configured.subject, INVOICE_PAYMENT_TEMPLATE.subject), values);
 
-        await sendMail(transport, {
+        const sent = await sendMailWithIds(transport, {
           to,
           subject,
           text: fill(orDefault(configured.body, INVOICE_PAYMENT_TEMPLATE.body), values),
           ...(thread?.headers ?? {}),
         });
         if (thread) {
-          const threadProblem = await thread.record(subject);
+          const threadProblem = await thread.record(sent, subject);
           if (threadProblem) warnings.push(threadProblem);
         }
       } catch (e) {

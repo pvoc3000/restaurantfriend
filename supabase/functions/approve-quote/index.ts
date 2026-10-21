@@ -32,7 +32,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 import {
   resolveTransport,
-  sendMail,
+  sendMailWithIds,
   TransportError,
   withGapBeforeAttachment,
   type ProviderConfig,
@@ -207,10 +207,11 @@ Deno.serve(async (req) => {
           `Approved by: ${state.approved_name}\n` +
           `When: ${state.approved_at}\n\n` +
           `Your invoice will follow by email. If anything needs changing, just reply to this message.\n`;
-        await sendMail(transport, {
+        const subject = thread?.subject ??
+          `Quote #${order?.number ?? ""} approved${order?.title ? ` — ${order.title}` : ""}`;
+        const sent = await sendMailWithIds(transport, {
           to: customerEmail,
-          subject: thread?.subject ??
-            `Quote #${order?.number ?? ""} approved${order?.title ? ` — ${order.title}` : ""}`,
+          subject,
           text: attachSigned ? withGapBeforeAttachment(confirmation) : confirmation,
           // The signed copy rides along where there IS one; with none the
           // message is an ordinary text email rather than one carrying a
@@ -221,7 +222,7 @@ Deno.serve(async (req) => {
           ...(thread?.headers ?? {}),
         });
         if (thread) {
-          const threadProblem = await thread.record(thread.subject);
+          const threadProblem = await thread.record(sent, subject);
           if (threadProblem) warnings.push(threadProblem);
         }
       }
@@ -276,6 +277,7 @@ Deno.serve(async (req) => {
         notice,
         orderIds: [state.order_id],
         what: "Quote-approved notice",
+        threadOrderId: state.order_id,
         replyTo: order?.contact_email ?? (order?.customers as { email?: string } | null)?.email ?? null,
         attachment:
           pdf_base64 && filed

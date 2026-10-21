@@ -35,16 +35,17 @@
 // real. And — decision 12 — ITS `Message-ID` BECOMES THE THREAD ROOT: the
 // order stores it, so every quote, invoice and receipt the app later sends
 // threads onto this message, and the customer's own replies land in the same
-// conversation. That is what retires FileMaker's subject-pasting kludge, and it
-// is why `newMessageId` exists rather than storing what `sendMail` returns
-// (a provider id, which threads with nothing).
+// conversation. That is what retires FileMaker's subject-pasting kludge. The
+// stored root is the Message-ID Gmail READS BACK as sent (`sendMailWithIds`),
+// never the one we generate — Gmail replaces that (210, 2026-10-21) — and never
+// the provider id `sendMail` returns, which threads with nothing.
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 import {
   newMessageId,
   resolveTransport,
-  sendMail,
+  sendMailWithIds,
   TransportError,
   type ProviderConfig,
 } from "../_shared/email.ts";
@@ -293,6 +294,7 @@ async function notifyShop(orgId: string, orderId: string): Promise<string> {
       orderIds: [orderId],
       what: "New-inquiry notice",
       replyTo: (row.contact_email as string | null) ?? null,
+      threadOrderId: orderId,
     });
   } catch (e) {
     const why = e instanceof Error ? e.message : String(e);
@@ -397,18 +399,20 @@ Deno.serve(async (req) => {
     // Like the email, a failure here is bookkeeping and never an error.
     const deliveryNote = await estimateDelivery(state.org_id, state.order_id, fulfillment, address);
 
-    /* ---- 1c. TELL THE SHOP --------------------------------------------- */
-
-    // Every created lead, phone-only included, and AFTER the delivery estimate
-    // so the notice carries it. Bookkeeping like the confirmation: a failure is
-    // a warning in the order's log, never an error to the customer.
-    const noticeNote = await notifyShop(state.org_id, state.order_id);
-
     /* ---- 2. THE CONFIRMATION, AND THE THREAD ROOT ----------------------- */
+
+    // THE SHOP'S NOTICE COMES AFTER THE CONFIRMATION (2026-10-21), for every
+    // created lead, phone-only included, and after the delivery estimate so
+    // it carries it. After, because the confirmation starts the order's
+    // conversation and the notice goes INTO it; sent first, it started one of
+    // its own. Bookkeeping like the confirmation: a failure is a warning in
+    // the order's log, never an error to the customer.
 
     if (!state.contact_email) {
       // A phone-only inquiry is a real submission and there is nobody to write
-      // to. Not a failure, and not worth a warning in the log either.
+      // to. Not a failure, and not worth a warning in the log either. The
+      // notice then starts the conversation itself.
+      const noticeNote = await notifyShop(state.org_id, state.order_id);
       return json(200, { ...state, delivery: deliveryNote, notice: noticeNote });
     }
 
@@ -463,35 +467,35 @@ Deno.serve(async (req) => {
       const configured = orgSettings.special_orders?.email?.inquiry ?? {};
 
       // THIS EMAIL STARTS THE ORDER'S CONVERSATION (167): its Message-ID is
-      // the root every later email answers, and its subject — "Donut Friend
-      // SO-10101: Smith Wedding", the org's `thread_subject` template — is the
-      // one they all go under. Generated BEFORE the send and stored AFTER it,
-      // the same string both times, which is the entire point: reading a
-      // Message-ID back off a provider is either impossible or a second API
-      // call, and getting it wrong fails silently forever. The inquiry's own
-      // subject template only stands in if the order cannot be read.
+      // the root every later email answers, its Gmail conversation is where
+      // they are all filed, and its subject — "Donut Friend SO-10101: Smith
+      // Wedding", the org's `thread_subject` template — is the one they all go
+      // under. The Message-ID is the one the email ACTUALLY carries, read back
+      // after the send: the one we generate is replaced by Gmail, and storing
+      // that instead is how 167 threaded nothing for three weeks (210). The
+      // inquiry's own subject template only stands in if the order cannot be
+      // read.
       const thread = await orderThread(admin, state.order_id, transport.cfg.from, {
         org: org?.name,
         template: orgSettings.special_orders?.thread_subject,
       });
-      const messageId = thread?.headers.messageId ?? newMessageId(transport.cfg.from);
       const subject = thread?.subject ?? fill(configured.subject ?? DEFAULT_SUBJECT, values);
 
-      await sendMail(transport, {
+      const sent = await sendMailWithIds(transport, {
         to: state.contact_email,
         cc: orgSettings.special_orders?.inquiry_cc || undefined,
         subject,
         text: fill(configured.body ?? DEFAULT_BODY, values),
-        messageId,
+        ...(thread?.headers ?? { messageId: newMessageId(transport.cfg.from) }),
       });
 
       // The inquiry's own record, as before, and the thread beside it.
       const { error: stampError } = await admin
         .from("special_orders")
-        .update({ inbound_message_id: messageId, inbound_subject: subject })
+        .update({ inbound_message_id: sent.messageId, inbound_subject: subject })
         .eq("id", state.order_id)
         .select("id");
-      const threadProblem = thread ? await thread.record(subject) : null;
+      const threadProblem = thread ? await thread.record(sent, subject) : null;
       if (stampError || threadProblem) {
         // The customer has the message; we have lost the ability to thread onto
         // it. Worth saying out loud, because the symptom later is silent.
@@ -510,6 +514,10 @@ Deno.serve(async (req) => {
         `the confirmation email was not sent: ${e instanceof Error ? e.message : String(e)}`
       );
     }
+
+    /* ---- 3. TELL THE SHOP, IN THE CONVERSATION ------------------------ */
+
+    const noticeNote = await notifyShop(state.org_id, state.order_id);
 
     if (warnings.length) {
       await admin.from("special_order_events").insert({

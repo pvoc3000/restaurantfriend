@@ -90,16 +90,43 @@ export type Mail = {
    * produces a thread root that nothing will ever match, and the failure is
    * silent: replies simply start new conversations forever.
    *
-   * So a caller who needs the thread root — decision 18's inquiry
-   * confirmation, whose Message-ID becomes what every later reply answers —
-   * GENERATES it, passes it here, and stores the same string. Gmail preserves
-   * a supplied Message-ID; Resend passes it through as a header.
+   * **GMAIL DOES NOT KEEP IT** (found 2026-10-21, after three weeks of
+   * orders that never threaded): `users.messages.send` throws a supplied
+   * Message-ID away and stamps its own `<CA…@mail.gmail.com>`. 167 stored the
+   * string we generated as every order's thread root, so every later email
+   * answered an id that no message anywhere carries. So the Gmail path now
+   * READS BACK the id it actually sent (`Sent.messageId`, via
+   * `sendMailWithIds`), and that is what a thread root must be. Resend passes
+   * a supplied one through as a header, so for Resend the generated string is
+   * still the answer.
    *
    * Omitted by everything else, in which case no header is emitted and the
-   * provider generates its own exactly as before. Adding this moved no
-   * existing caller.
+   * provider generates its own exactly as before.
    */
   messageId?: string;
+  /**
+   * GMAIL ONLY: the sending mailbox's conversation to put this message in.
+   * Headers decide threading for the RECIPIENT; in the sending mailbox an
+   * API-sent message joins a conversation only when it names it — Gmail's
+   * rule is the `threadId`, `References`/`In-Reply-To`, AND the same subject.
+   * Without it every send from specialorders@ started a conversation of its
+   * own. Resend has no such thing and ignores it.
+   */
+  threadId?: string;
+};
+
+/**
+ * What a send produced. `ref` is the provider's own handle ("gmail 19f9…"),
+ * for logs. `messageId` is the RFC 822 Message-ID the message ACTUALLY carries
+ * — read back from Gmail, or the one we supplied to Resend — and null when it
+ * could not be learned, with `note` saying why. `threadId` is Gmail's
+ * conversation id in the sending mailbox.
+ */
+export type Sent = {
+  ref: string;
+  messageId: string | null;
+  threadId: string | null;
+  note?: string;
 };
 
 export type ProviderConfig = {
@@ -131,7 +158,7 @@ function ccList(cc?: string): string[] | undefined {
 async function sendViaResend(
   creds: { api_key?: string },
   mail: Mail & { from: string }
-): Promise<string> {
+): Promise<Sent> {
   if (!creds.api_key) throw new Error("resend credentials are missing api_key");
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -157,7 +184,7 @@ async function sendViaResend(
   if (!res.ok) {
     throw new Error(`Resend refused the send: ${result?.message ?? res.statusText}`);
   }
-  return `resend ${result.id}`;
+  return { ref: `resend ${result.id}`, messageId: mail.messageId ?? null, threadId: null };
 }
 
 // --- Gmail ---
@@ -302,7 +329,7 @@ function buildMime(mail: Mail & { from: string }): string {
 async function sendViaGmail(
   creds: { client_id?: string; client_secret?: string; refresh_token?: string },
   mail: Mail & { from: string }
-): Promise<string> {
+): Promise<Sent> {
   if (!creds.client_id || !creds.client_secret || !creds.refresh_token) {
     throw new Error(
       "gmail credentials need client_id, client_secret and refresh_token"
@@ -332,24 +359,60 @@ async function sendViaGmail(
     .replaceAll("/", "_")
     .replace(/=+$/, "");
 
-  const res = await fetch(
-    "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-    {
+  const send = (threadId?: string) =>
+    fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token.access_token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ raw }),
-    }
-  );
+      body: JSON.stringify(threadId ? { raw, threadId } : { raw }),
+    });
+
+  let res = await send(mail.threadId);
+  // A stored conversation can be gone (deleted from the mailbox) or belong to
+  // a different mailbox than the one now sending. Gmail refuses the whole send
+  // for that, and a customer's email must not fail over a filing detail, so it
+  // goes again as a conversation of its own.
+  if (!res.ok && mail.threadId && (res.status === 404 || res.status === 400)) {
+    res = await send();
+  }
   const result = await res.json();
   if (!res.ok) {
     throw new Error(
       `Gmail refused the send: ${result?.error?.message ?? res.statusText}`
     );
   }
-  return `gmail ${result.id}`;
+
+  // THE Message-ID GMAIL ACTUALLY GAVE IT — see `Mail.messageId` for why the
+  // one we supplied is worthless here. Needs the `gmail.metadata` scope beside
+  // `gmail.send` (headers only, never bodies); a credential without it still
+  // sends, and says so in `note`.
+  let messageId: string | null = null;
+  let note: string | undefined;
+  try {
+    const meta = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(result.id)}` +
+        "?format=metadata&metadataHeaders=Message-ID",
+      { headers: { Authorization: `Bearer ${token.access_token}` } }
+    );
+    const m = await meta.json();
+    if (meta.ok) {
+      const h = ((m?.payload?.headers ?? []) as { name?: string; value?: string }[]).find(
+        (x) => (x.name ?? "").toLowerCase() === "message-id"
+      );
+      messageId = h?.value?.trim() || null;
+      if (!messageId) note = "Gmail sent the email but reported no Message-ID for it";
+    } else {
+      note =
+        `Gmail would not say which Message-ID it gave the email (${m?.error?.message ?? meta.statusText}); ` +
+        "the mailbox's credential needs the gmail.metadata scope (docs/po-email-setup.md)";
+    }
+  } catch (e) {
+    note = `the sent email's Message-ID could not be read: ${e instanceof Error ? e.message : String(e)}`;
+  }
+
+  return { ref: `gmail ${result.id}`, messageId, threadId: result.threadId ?? null, note };
 }
 
 /** A mail whose sender has been resolved — what the providers actually take. */
@@ -358,7 +421,7 @@ type ResolvedMail = Mail & { from: string };
 export const SENDERS: Record<
   string,
   // deno-lint-ignore no-explicit-any
-  (creds: any, mail: ResolvedMail) => Promise<string>
+  (creds: any, mail: ResolvedMail) => Promise<Sent>
 > = {
   resend: sendViaResend,
   gmail: sendViaGmail,
@@ -494,11 +557,17 @@ export function resolveTransport(args: {
   };
 }
 
-/** Look the sender up and send, with a readable error for an unknown kind. */
-export async function sendMail(
+/** Look the sender up and send; the provider's handle, for logs. */
+export async function sendMail(transport: ResolvedTransport, mail: Mail): Promise<string> {
+  return (await sendMailWithIds(transport, mail)).ref;
+}
+
+/** Look the sender up and send, with a readable error for an unknown kind —
+ *  and everything the send produced, for a caller that keeps a thread. */
+export async function sendMailWithIds(
   transport: ResolvedTransport,
   mail: Mail
-): Promise<string> {
+): Promise<Sent> {
   const sender = SENDERS[transport.cfg.kind!];
   if (!sender) {
     throw new TransportError(

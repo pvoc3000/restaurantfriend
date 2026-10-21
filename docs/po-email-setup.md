@@ -196,11 +196,19 @@ token that looks perfectly valid and sends as the wrong address.
 2. Gear icon (top right) → tick **Use your own OAuth credentials** → paste the
    Client ID and Client secret from A1.
 3. In the left-hand list, ignore the categories and paste this into the box
-   labelled "Input your own scopes":
+   labelled "Input your own scopes" — BOTH, separated by a space:
 
    ```
-   https://www.googleapis.com/auth/gmail.send
+   https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.metadata
    ```
+
+   **`gmail.metadata` is what makes an order's emails thread** (migration
+   210, 2026-10-21). Gmail replaces the Message-ID the app gives an email
+   with its own, so after each send the app reads back the one Gmail used and
+   threads every later email onto it. `gmail.metadata` reads headers and
+   labels only, never a message's body. A token with `gmail.send` alone still
+   sends, but the app never learns a root to reply to, so the emails do not
+   thread; the order's log says so on each one.
 
 4. Click **Authorize APIs**. Sign in **as specialorders@donutfriend.com** and
    accept. Check the account shown on the consent screen before you accept.

@@ -9,12 +9,22 @@
 // first name when the approval and paid-online notices joined it (2026-09-24);
 // Settings labels it for all three.
 //
+// WHERE: in the ORDER'S CONVERSATION when the notice is about one order
+// (Mark, 2026-10-21: "from the inquiry email forward, all emails to this
+// customer regarding their order should be together in a single thread,
+// including the notification emails"). Threading takes the order's subject,
+// because Gmail splits a conversation on a changed one, so "Quote approved
+// #SO-10136 — …" moves from the subject to the notice's own heading and the
+// inbox shows it as the conversation's latest message. A notice about several
+// orders (a weekly invoice) keeps its own subject and its own conversation.
+//
 // Never throws: a notice is bookkeeping, and the thing it reports (the lead,
 // the approval, the payment) has already happened.
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 
-import { resolveTransport, sendMail, type ProviderConfig } from "./email.ts";
+import { resolveTransport, sendMailWithIds, type ProviderConfig } from "./email.ts";
+import { orderThread } from "./orderThread.ts";
 import { buildPaymentNotice, type Notice } from "./shopNotices.ts";
 
 /** A link into the app, or null when the `APP_URL` secret is not set — the
@@ -35,6 +45,9 @@ export async function sendShopNotice(
     what: string;
     replyTo?: string | null;
     attachment?: { filename: string; base64: string };
+    /** The ONE order whose conversation this notice joins; omitted, it is a
+     *  message of its own. */
+    threadOrderId?: string | null;
   }
 ): Promise<"sent" | "off" | "error"> {
   const log = async (message: string) => {
@@ -53,7 +66,12 @@ export async function sendShopNotice(
     const { data: org } = await admin.from("orgs").select("name, settings").eq("id", args.orgId).maybeSingle();
     const settings = (org?.settings ?? {}) as {
       email_provider?: ProviderConfig;
-      special_orders?: { email_provider?: ProviderConfig; reply_to?: string; inquiry_notify?: string };
+      special_orders?: {
+        email_provider?: ProviderConfig;
+        reply_to?: string;
+        inquiry_notify?: string;
+        thread_subject?: string;
+      };
       billing?: { email?: string };
     };
     const to = (settings.special_orders?.inquiry_notify ?? "")
@@ -68,18 +86,30 @@ export async function sendShopNotice(
       orgName: org?.name ?? "Orders",
       replyToFallbacks: [settings.special_orders?.reply_to, settings.billing?.email],
     });
-    await sendMail(transport, {
+    const thread = args.threadOrderId
+      ? await orderThread(admin, args.threadOrderId, transport.cfg.from, {
+          org: org?.name,
+          template: settings.special_orders?.thread_subject,
+        })
+      : null;
+    const subject = thread?.subject ?? args.notice.subject;
+    const sent = await sendMailWithIds(transport, {
       // The first address as To and any others as Cc: Resend reads `to` as ONE
       // address, while `cc` is split on commas by both providers.
       to: to[0],
       cc: to.length > 1 ? to.slice(1).join(", ") : undefined,
-      subject: args.notice.subject,
+      subject,
       text: args.notice.text,
       html: args.notice.html,
       replyTo: args.replyTo?.trim() || undefined,
       attachment: args.attachment,
+      ...(thread?.headers ?? {}),
     });
+    // A phone-only inquiry has nobody to write to, so its notice is the first
+    // email and starts the conversation; otherwise this only files it.
+    const threadProblem = thread ? await thread.record(sent, subject) : null;
     await log(`${args.what} emailed to ${to.join(", ")}`);
+    if (threadProblem) await log(`${args.what}: ${threadProblem}`);
     return "sent";
   } catch (e) {
     const why = e instanceof Error ? e.message : String(e);
@@ -155,12 +185,14 @@ export async function notifyInvoicePaid(
       },
       appLink(`/customer-invoices/${args.invoiceId}`)
     );
+    const orderIds = [...new Set(rows.map((l) => l.special_order_id).filter((o): o is string => !!o))];
     return await sendShopNotice(admin, {
       orgId: args.orgId,
       notice,
-      orderIds: [...new Set(rows.map((l) => l.special_order_id).filter((o): o is string => !!o))],
+      orderIds,
       what: "Paid-online notice",
       replyTo: customer?.email ?? null,
+      threadOrderId: orderIds.length === 1 ? orderIds[0] : null,
     });
   } catch (e) {
     console.error("shop notice (paid invoice)", e instanceof Error ? e.message : String(e));

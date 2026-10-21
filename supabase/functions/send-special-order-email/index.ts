@@ -37,6 +37,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   resolveTransport,
   sendMail,
+  sendMailWithIds,
   TransportError,
   withGapBeforeAttachment,
   type ProviderConfig,
@@ -246,7 +247,7 @@ Deno.serve(async (req) => {
           template: orgSettings.special_orders?.thread_subject,
         });
 
-    const providerId = await sendMail(transport, {
+    const sent = await sendMailWithIds(transport, {
       to,
       cc: cc || undefined,
       subject,
@@ -254,12 +255,13 @@ Deno.serve(async (req) => {
       attachment: { filename, base64: pdf_base64 },
       ...(thread?.headers ?? {}),
     });
+    const providerId = sent.ref;
 
     /* ---- from here down, nothing may turn a sent email into a failure ---- */
 
     const warnings: string[] = [];
     if (thread) {
-      const threadProblem = await thread.record(subject);
+      const threadProblem = await thread.record(sent, subject);
       if (threadProblem) warnings.push(threadProblem);
     }
     // The ORG's calendar day. `toISOString` was the UTC date, which stamped a
@@ -492,7 +494,7 @@ async function sendCustomerInvoice(
       })
     : null;
 
-  const providerId = await sendMail(transport, {
+  const sent = await sendMailWithIds(transport, {
     to,
     cc: cc || undefined,
     subject,
@@ -500,12 +502,13 @@ async function sendCustomerInvoice(
     attachment: { filename, base64: pdf_base64 },
     ...(thread?.headers ?? {}),
   });
+  const providerId = sent.ref;
 
   /* ---- from here down, nothing may turn a sent email into a failure ---- */
 
   const warnings: string[] = [];
   if (thread) {
-    const threadProblem = await thread.record(subject);
+    const threadProblem = await thread.record(sent, subject);
     if (threadProblem) warnings.push(threadProblem);
   }
 
