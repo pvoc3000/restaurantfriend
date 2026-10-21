@@ -627,6 +627,45 @@ export function premadeGroups<
   });
 }
 
+/**
+ * What a premade line SOLD — `v_production_schedule_lines.sold`'s rule, which
+ * is the one definition: made − left − rescued, a blank Left or Rescued taking
+ * nothing off, and no figure at all until Made is entered.
+ *
+ * Restated here only because the email is built from the report's DRAFT
+ * counts, which reach that view when `submit_shift_report` flushes them — after
+ * the email is composed. Change one, change the other.
+ */
+export function premadeSold(line: {
+  made: number | null;
+  leftover: number | null;
+  rescued: number | null;
+}): number | null {
+  if (line.made === null) return null;
+  return line.made - (line.leftover ?? 0) - (line.rescued ?? 0);
+}
+
+/**
+ * A schedule's Totals row (Mark, 2026-10-20). Each column sums the lines that
+ * have a figure; a column with none stays null and prints "—", so a night
+ * nobody counted does not read as a night that sold nothing.
+ */
+export function premadeTotals(
+  lines: { par: number | null; made: number | null; leftover: number | null; rescued: number | null }[]
+): { par: number | null; made: number | null; rescued: number | null; leftover: number | null; sold: number | null } {
+  const sum = (values: (number | null)[]): number | null => {
+    const present = values.filter((v): v is number => v !== null);
+    return present.length === 0 ? null : present.reduce((a, b) => a + b, 0);
+  };
+  return {
+    par: sum(lines.map((l) => l.par)),
+    made: sum(lines.map((l) => l.made)),
+    rescued: sum(lines.map((l) => l.rescued)),
+    leftover: sum(lines.map((l) => l.leftover)),
+    sold: sum(lines.map(premadeSold)),
+  };
+}
+
 const S = {
   // SINGLE quotes around the multi-word family, not double. These strings go
   // into `style="..."` attributes, so a double quote here TERMINATES THE
@@ -641,6 +680,17 @@ const S = {
   thr: "text-align:right;padding:6px 10px 6px 0;border-bottom:2px solid #111;font-size:11px;text-transform:uppercase;letter-spacing:.08em",
   td: "padding:6px 10px 6px 0;border-bottom:1px solid #e5e5e5",
   tdr: "padding:6px 10px 6px 0;border-bottom:1px solid #e5e5e5;text-align:right",
+  // The Premades counts — Par, Made, Rescued, Left, Sold (Mark, 2026-10-20:
+  // "closer together and equally spaced"). Under `width:100%` an auto layout
+  // spread the spare width across every column, so the numbers drifted apart
+  // by however long the names were. A fixed width on each count column gives
+  // the spare width to Item and Note instead; 64px fits RESCUED, the widest
+  // heading, in 11px caps.
+  thn: "width:64px;white-space:nowrap;text-align:right;padding:6px 0 6px 8px;border-bottom:2px solid #111;font-size:11px;text-transform:uppercase;letter-spacing:.08em",
+  tdn: "width:64px;white-space:nowrap;text-align:right;padding:6px 0 6px 8px;border-bottom:1px solid #e5e5e5",
+  // The Totals row: the app's black rule over it, and bold.
+  tot: "padding:6px 10px 6px 0;border-top:2px solid #111;font-weight:600",
+  totn: "width:64px;white-space:nowrap;text-align:right;padding:6px 0 6px 8px;border-top:2px solid #111;font-weight:600",
   muted: "color:#666;font-size:13px",
   // The Premades groups (2026-10-14) — the app's black band and caps heading.
   band: "background:#111;color:#fff;padding:6px 8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em",
@@ -650,6 +700,10 @@ const S = {
   // white measures 1.43:1.
   mark: "background:#fef08a;padding:0 3px",
 } as const;
+
+/** The gap between the last count and Sold out, which has no left padding of
+ *  its own and would otherwise sit against the Sold figure. */
+const AFTER_COUNTS = "padding-left:16px";
 
 function esc(raw: string): string {
   return raw
@@ -851,9 +905,10 @@ export function supervisorBody(report: EmailReport): string {
     if (section.lines.length === 0) continue;
     parts.push(
       `<h3 style="${S.h3}">${esc(section.title)}</h3><table style="${S.table}"><tr>` +
-        `<th style="${S.th}">Item</th><th style="${S.thr}">Par</th>` +
-        `<th style="${S.thr}">Made</th><th style="${S.thr}">Rescued</th>` +
-        `<th style="${S.thr}">Left</th><th style="${S.th}">Sold out</th>` +
+        `<th style="${S.th}">Item</th><th style="${S.thn}">Par</th>` +
+        `<th style="${S.thn}">Made</th><th style="${S.thn}">Rescued</th>` +
+        `<th style="${S.thn}">Left</th><th style="${S.thn}">Sold</th>` +
+        `<th style="${S.th};${AFTER_COUNTS}">Sold out</th>` +
         `<th style="${S.th}">Note</th></tr>`
     );
     for (const { row: p, typeHead, cutHead } of premadeGroups(section.lines)) {
@@ -861,20 +916,21 @@ export function supervisorBody(report: EmailReport): string {
       // with its count, and a caps heading on a black rule for the cut.
       if (typeHead) {
         parts.push(
-          `<tr><td colspan="7" style="${S.band}">${esc(typeHead.label)}` +
+          `<tr><td colspan="8" style="${S.band}">${esc(typeHead.label)}` +
             `<span style="${S.bandCount}">${typeHead.count}</span></td></tr>`
         );
       }
       if (cutHead) {
-        parts.push(`<tr><td colspan="7" style="${S.cut}">${esc(cutHead)}</td></tr>`);
+        parts.push(`<tr><td colspan="8" style="${S.cut}">${esc(cutHead)}</td></tr>`);
       }
       parts.push(
-        `<tr><td style="${S.td}">${esc(p.name)}</td><td style="${S.tdr}">${p.par ?? "—"}</td>` +
-          `<td style="${S.tdr}">${p.made ?? "—"}</td><td style="${S.tdr}">${p.rescued ?? "—"}</td>` +
-          `<td style="${S.tdr}">${p.leftover ?? "—"}</td>` +
+        `<tr><td style="${S.td}">${esc(p.name)}</td><td style="${S.tdn}">${p.par ?? "—"}</td>` +
+          `<td style="${S.tdn}">${p.made ?? "—"}</td><td style="${S.tdn}">${p.rescued ?? "—"}</td>` +
+          `<td style="${S.tdn}">${p.leftover ?? "—"}</td>` +
+          `<td style="${S.tdn}">${premadeSold(p) ?? "—"}</td>` +
           // Blank, not a dash, when it did not sell out — the usual case, and a
           // column of dashes would shout over the few times that matter.
-          `<td style="${S.td}">${esc(formatTypedTime(p.soldOutAt))}</td>` +
+          `<td style="${S.td};${AFTER_COUNTS}">${esc(formatTypedTime(p.soldOutAt))}</td>` +
           // The column that makes the three numbers mean something: "18 made, 0
           // left" and the same with "dropped a tray, re-fried" are different
           // nights. Empty is a thin space rather than an em dash — a dash in
@@ -882,6 +938,13 @@ export function supervisorBody(report: EmailReport): string {
           `<td style="${S.td}">${esc(p.note ?? "")}</td></tr>`
       );
     }
+    const t = premadeTotals(section.lines);
+    parts.push(
+      `<tr><td style="${S.tot}">Totals</td><td style="${S.totn}">${t.par ?? "—"}</td>` +
+        `<td style="${S.totn}">${t.made ?? "—"}</td><td style="${S.totn}">${t.rescued ?? "—"}</td>` +
+        `<td style="${S.totn}">${t.leftover ?? "—"}</td><td style="${S.totn}">${t.sold ?? "—"}</td>` +
+        `<td style="${S.tot};${AFTER_COUNTS}"></td><td style="${S.tot}"></td></tr>`
+    );
     parts.push("</table>");
   }
 

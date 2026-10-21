@@ -8,6 +8,8 @@ import {
   submitReadiness,
   submitBlockers,
   premadeGroups,
+  premadeSold,
+  premadeTotals,
   attentionReason,
   missingNights,
   supervisorBody,
@@ -1103,4 +1105,37 @@ test("missingNights: a night the calendar closed the shop is not missing", () =>
   const input = { reportDates: ["2026-12-24"], openDays: [1, 2, 3, 4, 5, 6, 7], days };
   eq(missingNights(input), ["2026-12-25", "2026-12-26"]);
   eq(missingNights({ ...input, closedDates: new Set(["2026-12-25"]) }), ["2026-12-26"]);
+});
+
+/* -- Sold and Totals (Mark, 2026-10-20) ----------------------------------- */
+
+test("premadeSold is the view's rule: made − left − rescued, nothing until Made", () => {
+  eq(premadeSold({ made: 12, leftover: 3, rescued: 7 }), 2);
+  eq(premadeSold({ made: 12, leftover: null, rescued: null }), 12, "a blank Left or Rescued takes nothing off");
+  eq(premadeSold({ made: null, leftover: 3, rescued: 0 }), null, "no Made, no figure");
+});
+
+test("premadeTotals sums each column over the lines that have a figure", () => {
+  const t = premadeTotals([
+    { par: 12, made: 12, leftover: 3, rescued: 7 },
+    { par: 24, made: null, leftover: null, rescued: null },
+    { par: 6, made: 6, leftover: 1, rescued: null },
+  ]);
+  eq(t, { par: 42, made: 18, rescued: 7, leftover: 4, sold: 7 });
+  eq(
+    premadeTotals([{ par: 5, made: null, leftover: null, rescued: null }]),
+    { par: 5, made: null, rescued: null, leftover: null, sold: null },
+    "an uncounted night is blank, not zero"
+  );
+});
+
+test("the email has a Sold column after Left and a Totals row per schedule", () => {
+  for (const body of [supervisorBody(REPORT), managementBody(REPORT)]) {
+    ok(body.indexOf(">Left<") < body.indexOf(">Sold<"), "Left · Sold headings");
+    ok(body.indexOf(">Sold<") < body.indexOf(">Sold out<"), "Sold before Sold out");
+    // Angry Samoa: 12 made − 3 left − 7 rescued.
+    ok(/>3<\/td><td[^>]*>2<\/td>/.test(body), "Angry Samoa sold 2");
+    eq(body.split(">Totals<").length - 1, 2, "one Totals row per non-empty schedule");
+    ok(/>Totals<\/td><td[^>]*>24<\/td><td[^>]*>24<\/td><td[^>]*>0<\/td><td[^>]*>0<\/td><td[^>]*>24<\/td>/.test(body), "the order's totals");
+  }
 });

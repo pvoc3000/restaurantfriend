@@ -895,3 +895,16 @@ this report and the day is not settled (`squareSales` prop, null otherwise).
 If Square still cannot answer, the stored row is quoted, marked provisional, as
 before. A figure TYPED over Square's is still lost by a reload — the known cost
 in `SalesPage`'s header. Typechecked and linted; not seen in a browser.
+
+**THE EMAIL'S PREMADES TABLE: COUNTS CLOSE AND EVEN, A SOLD COLUMN, A TOTALS
+ROW (Mark, 2026-10-20).** Par · Made · Rescued · Left · Sold now each carry a
+fixed 64px width (`S.thn`/`S.tdn`), so under the table's `width:100%` the
+spare width goes to Item and Note instead of spreading the numbers apart.
+Measured at desktop width: all five 72px. AT PHONE WIDTH THEY ARE NOT EQUAL —
+the browser shrinks each to its own minimum and RESCUED, the longest heading,
+stays wider (68px against Par's 33 at 422px). Sold is `premadeSold`, a restated
+copy of `v_production_schedule_lines.sold` (made − left − rescued, null until
+Made), because the email is built from DRAFT counts that reach the view only at
+submit — change one, change the other. The Totals row under each schedule sums
+the lines that have a figure; a column with none prints "—", never 0.
+Fixtures: three cases, checked by dropping `rescued` from `premadeSold` (3 red).
