@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { addDays } from "@/lib/payPeriods";
+import { isDayComplete } from "@/lib/sales";
 
 /**
  * Pull sales and tips from Square.
@@ -50,12 +51,16 @@ export type SyncRow = { label: string; onSelect: () => void; disabled: boolean }
 
 export function SyncFromSquare({
   today,
+  timeZone,
   range,
   children,
 }: {
   today: string;
+  /** The org's zone, which `isDayComplete` needs to find an unfinished day for
+   *  the rolling window to reach back to. Without it the window is seven days. */
+  timeZone?: string;
   /**
-   * Pull exactly these days instead of this month and last. The Close Pay
+   * Pull exactly these days instead of the rolling window. The Close Pay
    * Period panel passes its period (2026-09-29), because a tip figure is only
    * written for a day an open period covers, and the fix for a missing one
    * belongs where the panel reports it.
@@ -154,19 +159,54 @@ export function SyncFromSquare({
     return out;
   }
 
-  // The ordinary case: this month and last, which covers every day anybody is
-  // likely to be looking at and re-pulls recent days in case a tip settled
-  // late — up to and including TODAY, whose figure the screen then marks as
-  // still being taken.
-  // Never past today: Square has nothing for tomorrow.
+  /**
+   * THE ORDINARY CASE IS A ROLLING WINDOW (Mark, 2026-10-21): the last seven
+   * days, reaching further back only to the oldest day `isDayComplete` calls
+   * unfinished, and never past the 1st of last month.
+   *
+   * It used to be this month and last, whole — 51 days × 2 shops on Oct 21,
+   * re-pulling some 100 settled shop-days every press. Seven days is what can
+   * still move: offline payments upload the next morning, and refunds and tip
+   * adjustments land a few days late. The reach-back is for the one case a fixed
+   * window misses — a day pulled at 4pm and never again is a part-day forever,
+   * and the next sync should finish it whenever it comes. The floor is the old
+   * window, so nothing is ever pulled that the old command would not have.
+   *
+   * The days on screen play no part: what you are LOOKING at is a view, and a
+   * 90-day view should not make the pull slower.
+   */
+  async function rollingFrom(): Promise<string> {
+    const lastMonth = addDays(`${today.slice(0, 7)}-01`, -1);
+    const floor = `${lastMonth.slice(0, 7)}-01`;
+    const recent = addDays(today, -6);
+    if (!timeZone) return recent;
+
+    // At most ~45 days × the shops still trading, well under PostgREST's
+    // 1,000-row cap. A failed read falls back to the floor — the old window —
+    // since pulling too much is slow and pulling too little is wrong.
+    const { data, error } = await supabase
+      .from("daily_sales")
+      .select("business_date, synced_at, source")
+      .gte("business_date", floor)
+      .lt("business_date", recent)
+      .order("business_date");
+    if (error) return floor;
+    const unfinished = (data ?? []).find(
+      (r) => !isDayComplete({ business_date: r.business_date, syncedAt: r.synced_at, source: r.source }, timeZone)
+    );
+    return unfinished?.business_date ?? recent;
+  }
+
+  // Up to and including TODAY, whose figure the screen marks as still being
+  // taken. Never past today: Square has nothing for tomorrow.
   const until = range ? (range.to < today ? range.to : today) : today;
   const sync = () => {
     if (range) {
       void run(monthsBetween(range.from, until), "Syncing");
       return;
     }
-    const from = addDays(`${today.slice(0, 7)}-01`, -1);
-    void run(monthsBetween(`${from.slice(0, 7)}-01`, today), "Syncing");
+    setBusy("Syncing");
+    void rollingFrom().then((from) => run(monthsBetween(from, today), "Syncing"));
   };
 
   return (

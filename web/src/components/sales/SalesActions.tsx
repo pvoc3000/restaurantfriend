@@ -34,6 +34,7 @@ export type ActionPayout = SquarePayout & { locationCode: string; posted_at: str
  */
 export function SalesActions({
   today,
+  timeZone,
   orgId,
   postingReady,
   connected,
@@ -43,6 +44,7 @@ export function SalesActions({
   shopCodes,
 }: {
   today: string;
+  timeZone: string;
   orgId: string;
   /** Migration 104 is applied. Off, the two QuickBooks rows say so. */
   postingReady: boolean;
@@ -63,7 +65,7 @@ export function SalesActions({
 
   return (
     <>
-      <SyncFromSquare today={today}>
+      <SyncFromSquare today={today} timeZone={timeZone}>
         {(sync) => {
           const items: ActionMenuItem[] = [
             { label: sync.label, onSelect: sync.onSelect, disabled: sync.disabled },

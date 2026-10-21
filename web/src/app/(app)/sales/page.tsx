@@ -302,6 +302,7 @@ export default async function SalesPage({
           canPost ? (
             <SalesActions
               today={today}
+              timeZone={timeZone}
               orgId={session.membership.org_id}
               postingReady={postingSchema}
               connected={qboConnected}
