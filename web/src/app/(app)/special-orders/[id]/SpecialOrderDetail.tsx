@@ -56,6 +56,7 @@ import { FulfillmentCell } from "@/components/specialOrders/FulfillmentCell";
 import { MarkNoteRead } from "@/components/specialOrders/MarkNoteRead";
 import { OrderLog, type OrderEventRow } from "@/components/specialOrders/OrderLog";
 import { OrderCommandMenu } from "@/components/specialOrders/OrderCommandMenu";
+import { receiptGaps } from "@/lib/receiptReadiness";
 import { OrderDelivery } from "@/components/specialOrders/OrderDelivery";
 import { TimeCell } from "@/components/specialOrders/TimeCell";
 import { StandingOrderBlock } from "@/components/specialOrders/StandingOrderBlock";
@@ -870,6 +871,14 @@ export async function SpecialOrderDetail({
                       workflow: row as never,
                       orgSettings: session.orgSettings,
                       today,
+                      receiptGaps: receiptGaps({
+                        status,
+                        fulfillment: (row.fulfillment as string | null) ?? null,
+                        delivery_scheduled_at: (row.delivery_scheduled_at as string | null) ?? null,
+                        event_date: (row.event_date as string | null) ?? null,
+                        event_time: (row.event_time as string | null) ?? null,
+                        balance: totals.balance,
+                      }),
                       invoice: {
                         liveInvoiceId: liveInvoice?.id ?? null,
                         liveInvoiceLabel: liveInvoice?.label ?? null,

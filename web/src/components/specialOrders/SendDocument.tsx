@@ -43,6 +43,7 @@ import { CreateInvoiceDialog } from "@/components/customerInvoices/CreateInvoice
 import { sendIntent, type InvoiceCandidate } from "@/lib/customerInvoices";
 import { withFrom } from "@/lib/breadcrumbs";
 import { renderOrderDocument } from "./renderOrderDocument";
+import { confirmDialog } from "@/lib/confirm";
 
 /**
  * PRODUCE AND SEND — decision 11's four documents and decision 12's compose
@@ -93,6 +94,7 @@ export function SendDocument({
   today,
   children,
   invoice = null,
+  receiptGaps = [],
 }: {
   /**
    * Render the three verbs as rows of an `ui/ActionMenu` instead of three
@@ -107,6 +109,13 @@ export function SendDocument({
   canWrite: boolean;
   orgSettings: Record<string, unknown>;
   today: string;
+  /**
+   * WHAT THE ORDER STILL LACKS FOR ITS RECEIPT — `lib/receiptReadiness`, from
+   * the record and its balance (Mark, 2026-10-20). Send ▸ Receipt and
+   * Download ▸ Receipt ask before going ahead when it is not empty; Preview
+   * never asks, because previewing commits to nothing.
+   */
+  receiptGaps?: string[];
   /**
    * SEND ▸ INVOICE GOES THROUGH A CUSTOMER INVOICE (Mark, 2026-09-23, for
    * every order: "the user chooses send invoice, the create invoice dialogue
@@ -230,8 +239,24 @@ export function SendDocument({
    * next week is not a second send, and overwriting would move the date the
    * customer's own copy was dated.
    */
-  const download = (k: DocumentKind) =>
-    run("download", async () => {
+  /**
+   * AN INCOMPLETE ORDER'S RECEIPT ASKS FIRST (Mark, 2026-10-20). Both routes
+   * out stamp `receipt_sent_at` — downloading is printing, and a printed
+   * receipt is a sent one — so both ask. A complete order goes straight
+   * through.
+   */
+  const receiptGoAhead = async (k: DocumentKind, verb: "Send" | "Download") =>
+    k !== "receipt" ||
+    receiptGaps.length === 0 ||
+    confirmDialog({
+      title: `${verb} a receipt for an incomplete order?`,
+      body: `This order isn’t complete:\n${receiptGaps.map((g) => `· ${g}`).join("\n")}`,
+      confirmLabel: `${verb} Anyway`,
+    });
+
+  const download = async (k: DocumentKind) => {
+    if (!(await receiptGoAhead(k, "Download"))) return;
+    return run("download", async () => {
       const { blob, name, ofInvoice } = await renderFile(k);
       downloadBlob(blob, name);
 
@@ -251,6 +276,7 @@ export function SendDocument({
       }
       propose(k);
     });
+  };
 
   /** What a document going out implies for the ladder — asked once, after it
    *  has gone. An empty answer opens nothing. */
@@ -374,7 +400,8 @@ export function SendDocument({
   ];
 
   /** Send, with Invoice routed through a customer invoice when one is wired. */
-  const sendAct = (k: DocumentKind) => {
+  const sendAct = async (k: DocumentKind) => {
+    if (!(await receiptGoAhead(k, "Send"))) return;
     if (k !== "invoice" || !invoice) return void openCompose(k);
     if (invoice.liveInvoiceId) {
       router.push(withFrom(`/customer-invoices/${invoice.liveInvoiceId}?send=${sendIntent()}`, invoice.from));

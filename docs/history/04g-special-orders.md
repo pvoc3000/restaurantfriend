@@ -5954,3 +5954,33 @@ or the current day."
 - **Verified:** dry run of 201 on the hosted database, never committed
   (yesterday and today refused, tomorrow created); the form in a browser;
   a fixture broken and restored; `tsc`, eslint, 2,366 fixtures. **201 APPLIED 2026-10-13**; the live gate answers `date_past` for today.
+
+### 2026-10-20 — a receipt for an incomplete order asks first
+
+Mark: "if a user tries to send a receipt for a special order that isn't
+complete, i.e. isn't paid for, or doesn't have delivery scheduled, etc., then
+the app should warn them before continuing."
+
+- **The rule** is `lib/receiptReadiness`'s `receiptGaps`, read off what the app
+  already says complete means: `paidTodo` puts Send Receipt after the money
+  AND the courier, and the receipt's fulfillment paragraph prints the event day
+  and the ready time (`event_time`). Missing, in this order: still a Lead or
+  Quote (a price offered, not a debt, so no amount is named); a balance over
+  half a cent; a delivery with no `delivery_scheduled_at`; no event date; no
+  event time ("pickup time" or "delivery time"). A canceled order says only
+  that it is canceled.
+- **Calls made without asking, for Mark to overrule:** `ignore_balance` does
+  NOT excuse a balance (the flag keeps an order off the unpaid queue; it does
+  not make it paid); a credit counts as paid; a pickup needs no booking;
+  production (printed, scheduled) is not asked, since a paid order's to-do has
+  gone straight to Send Receipt since 2026-10-01; a receipt already sent is not
+  a gap.
+- **Where:** Send ▸ Receipt and Download ▸ Receipt, before anything renders,
+  via `confirmDialog` ("Send a receipt for an incomplete order?" with the gaps
+  as a `·` list, "Send Anyway" / "Download Anyway"). Download asks too because
+  it stamps `receipt_sent_at` like a send. Preview never asks. A complete order
+  goes straight through. The detail page computes the gaps from the row and
+  `totals.balance` and hands them to `SendDocument` as `receiptGaps`.
+- **Verified:** 17 fixtures, broken four ways (no delivery clause, no epsilon,
+  balance excused, no canceled early return) and restored; `tsc`, eslint, 2,446
+  fixtures. **NOT checked in a browser**: the pane sat on `/lock`.

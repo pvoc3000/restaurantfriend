@@ -63,6 +63,7 @@ import "./percent.fixtures";
 import "./specialOrderRange.fixtures";
 import "./invoiceRange.fixtures";
 import "./orderWorkflow.fixtures";
+import "./receiptReadiness.fixtures";
 import "./overtime.fixtures";
 import "./overtimeOrder.fixtures";
 import "./packLabel.fixtures";
