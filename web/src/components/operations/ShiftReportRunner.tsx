@@ -17,7 +17,12 @@ import {
   type ShiftReportPage,
   type ShiftSlot,
 } from "@/lib/shiftReports";
-import { salesSnapshot, serverSalesSnapshot, subscribeSales } from "@/lib/shiftReportSales";
+import {
+  askSquareForDay,
+  salesSnapshot,
+  serverSalesSnapshot,
+  subscribeSales,
+} from "@/lib/shiftReportSales";
 import { usePublishedHeight } from "@/lib/tableHead";
 import { BarLabel, ICON_ARROW_BACK, ICON_CHECK } from "@/components/tablet/BarLabel";
 
@@ -75,6 +80,7 @@ export function ShiftReportRunner({
   blockers,
   readOnlyNote,
   checklistRun,
+  squareSales,
 }: {
   reportId: string;
   shift: ShiftSlot;
@@ -131,6 +137,12 @@ export function ShiftReportRunner({
    * `finishChecklist` below safe to call unconditionally on send.
    */
   checklistRun: { id: string; title: string } | null;
+  /**
+   * Which shop and day Send asks Square about when the Sales page's figure is
+   * not in hand. Null when the report has no Sales page, or the day is already
+   * settled and stored — there is nothing fresher to ask for then.
+   */
+  squareSales: { locationId: string; reportDate: string } | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -357,12 +369,33 @@ export function ShiftReportRunner({
       //    be a second implementation of the one rule that must never drift —
       //    that the supervisor version carries no names or scores. This is
       //    `send-po-email`'s shape: the client composes, the function sends.
+      //
+      //    TODAY'S SALES ARE ASKED FOR HERE when the store has none (Mark,
+      //    2026-10-20: closing emails quoting the figure "I downloaded that
+      //    morning"). The store lives in the tab's memory, and the idle lock and
+      //    a PIN switch are both full page loads, so it is empty whenever the
+      //    supervisor read the Sales page before a lock and sent after it — the
+      //    unlock lands on the page they were on, past Sales. The fallback was
+      //    then the server's stored row: on a day you synced in the morning,
+      //    that is a one-hour part-day ($7.90 for DF01 on 10/09). If Square
+      //    cannot answer, the stored row is still quoted, marked provisional.
+      let live = liveSales?.reportId === reportId ? liveSales : null;
+      if (!live && squareSales) {
+        setBusy("Asking Square for today’s sales…");
+        const answer = await askSquareForDay(
+          supabase,
+          squareSales.reportDate,
+          squareSales.locationId
+        );
+        if (!("failed" in answer)) live = { reportId, ...answer, provisional: true };
+      }
+
       setBusy("Emailing the team…");
-      const withSales: EmailReport = liveSales?.reportId === reportId
+      const withSales: EmailReport = live
         ? {
             ...emailReport,
-            netSalesCents: liveSales.netCents,
-            salesAreProvisional: liveSales.provisional,
+            netSalesCents: live.netCents,
+            salesAreProvisional: live.provisional,
           }
         : emailReport;
 

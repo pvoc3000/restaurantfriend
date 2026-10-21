@@ -1,3 +1,5 @@
+import type { createClient } from "@/lib/supabase/client";
+
 /**
  * The provisional sales figure, shared between two siblings.
  *
@@ -48,4 +50,31 @@ export function salesSnapshot(): ProvisionalSales | null {
 
 export function serverSalesSnapshot(): ProvisionalSales | null {
   return null;
+}
+
+/**
+ * Ask Square what one shop has taken so far on one reporting day.
+ *
+ * `sync-square-sales`' preview mode, which writes nothing. Shared by the Sales
+ * page (on arrival, and its button) and by the runner's Send, which asks for
+ * itself when this store is empty — see the runner for why that happens.
+ */
+export async function askSquareForDay(
+  supabase: ReturnType<typeof createClient>,
+  reportDate: string,
+  locationId: string
+): Promise<{ netCents: number; tipsCents: number } | { failed: string }> {
+  const { data, error } = await supabase.functions.invoke("sync-square-sales", {
+    body: { from: reportDate, to: reportDate, preview: true },
+  });
+  if (error) {
+    return {
+      failed: `Square could not be reached: ${error.message}. The figures will arrive on tomorrow's sync either way.`,
+    };
+  }
+  const row = (data?.rows ?? []).find(
+    (r: { location_id: string }) => r.location_id === locationId
+  );
+  if (!row) return { failed: "Square has nothing for this shop and day yet." };
+  return { netCents: row.net_sales_cents, tipsCents: row.tips_cents };
 }

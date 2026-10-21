@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { publishSales, salesSnapshot } from "@/lib/shiftReportSales";
+import { askSquareForDay, publishSales, salesSnapshot } from "@/lib/shiftReportSales";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 
@@ -193,35 +193,19 @@ export function SalesPage({
   const load = useCallback(async () => {
     setBusy(true);
     setFailed(null);
-    const { data, error } = await supabase.functions.invoke("sync-square-sales", {
-      body: { from: reportDate, to: reportDate, preview: true },
-    });
+    const answer = await askSquareForDay(supabase, reportDate, locationId);
     setBusy(false);
-    if (error) {
-      setFailed(
-        `Square could not be reached: ${error.message}. The figures will arrive on tomorrow's sync either way.`
-      );
+    if ("failed" in answer) {
+      setFailed(answer.failed);
       return;
     }
-    const row = (data?.rows ?? []).find(
-      (r: { location_id: string }) => r.location_id === locationId
-    );
-    if (!row) {
-      setFailed("Square has nothing for this shop and day yet.");
-      return;
-    }
-    setToday({ netCents: row.net_sales_cents, tipsCents: row.tips_cents });
-    setNetText(dollars(row.net_sales_cents));
-    setTipsText(dollars(row.tips_cents));
+    setToday(answer);
+    setNetText(dollars(answer.netCents));
+    setTipsText(dollars(answer.tipsCents));
     setProvisional(true);
     // So the email can quote what the supervisor is looking at. See
     // `lib/shiftReportSales` for why this is a store and not a prop.
-    publishSales({
-      reportId,
-      netCents: row.net_sales_cents,
-      tipsCents: row.tips_cents,
-      provisional: true,
-    });
+    publishSales({ reportId, ...answer, provisional: true });
   }, [supabase, reportDate, locationId, reportId]);
 
   /**

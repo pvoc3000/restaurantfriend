@@ -878,3 +878,20 @@ box stays Rescued), and on the page (grouped by type and cut; the → arrow;
 Nothing rescued after entering the boxed donuts; Sold out blank if it didn't).
 A red note: the report won't send with a blank Rescued or Left, and the buttons
 fill only empty boxes. Seen rendered at /guides/shift-report.
+
+**SEND ASKS SQUARE FOR TODAY'S SALES WHEN IT HAS NO LIVE FIGURE (Mark,
+2026-10-20: "sometimes the sales reported on their report are the values I
+downloaded that morning").** The live figure lived only in `lib/shiftReportSales`,
+in the tab's memory, and the idle lock and a PIN switch are both full page
+loads (`window.location.assign`). Read Sales → lock → unlock on `?page=N`, past
+Sales → Send found the store empty and quoted the server's stored row, which
+on a morning-synced day is a one-hour part-day. Six of the last 25 closing
+emails did it: DF02 10/20 $254.57 (day $1,302.62), 10/14 $27.50, 10/11 $208.34,
+10/09 $19.65, 10/08 $421.64; DF01 10/09 $7.90. Not proven to be the lock rather
+than a failed Square call (the edge logs were not reachable), but both fall
+back the same way and the fix covers both. Now Send asks Square itself
+(`askSquareForDay`, shared with the Sales page) when the store has nothing for
+this report and the day is not settled (`squareSales` prop, null otherwise).
+If Square still cannot answer, the stored row is quoted, marked provisional, as
+before. A figure TYPED over Square's is still lost by a reload — the known cost
+in `SalesPage`'s header. Typechecked and linted; not seen in a browser.

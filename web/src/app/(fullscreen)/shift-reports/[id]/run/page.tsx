@@ -1117,6 +1117,11 @@ export default async function RunShiftReportPage({
           ? { id: linkedRun.id as string, title: linkedRun.title as string }
           : null
       }
+      squareSales={
+        wants("sales") && !todayIsSettled
+          ? { locationId: report.location_id as string, reportDate }
+          : null
+      }
     />
   );
 }
