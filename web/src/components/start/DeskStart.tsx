@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 import type { AppSession } from "@/lib/session";
 import { readStartLayout, visibleWidgets, type WidgetKind } from "@/lib/startLayout";
+import { tilesForRole } from "@/lib/tablet/landing";
+import { flatTiles } from "@/lib/tablet/pins";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 
 import { NewDayBackLink } from "./NewDayBackLink";
@@ -83,7 +85,13 @@ export async function DeskStart({ session }: { session: AppSession }) {
   );
 
   return (
-    <StartGrid heading={heading} serverLayout={layout} access={access} bodies={Object.fromEntries(rendered)} />
+    <StartGrid
+      heading={heading}
+      serverLayout={layout}
+      access={access}
+      bodies={Object.fromEntries(rendered)}
+      actionChoices={flatTiles(tilesForRole(role)).map((t) => ({ key: t.key, label: t.label }))}
+    />
   );
 }
 

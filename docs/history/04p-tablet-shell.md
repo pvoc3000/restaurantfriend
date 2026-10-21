@@ -326,3 +326,25 @@ employee document from anyone below manager, table and bucket both. Letting a
 supervisor scan into a personnel file is a migration, not a cell.
 **NOT exercised in a browser** — the test pane was signed out, and it has no
 camera in any case. tsc, eslint and 2,221 fixtures pass.
+
+**PINNED TILES (2026-10-20, migration 208).** Mark: "for the tablet, I would
+love to have an area at the top to display 'Pinned' actions that the user uses
+often. For instance … 'run the order guide' … since I use it a lot." Decided:
+- **An Edit switch** at the top of the tablet Start (`?edit=1`). While it is on
+  no tile is a door: tapping one pins or unpins it, and a pinned tile gets
+  ← → (44px) to move it. Saved as you go (`lib/latestWrite`).
+- **A pinned tile moves up** into Pinned and leaves its group; an emptied group
+  goes (`withPinned`, `lib/tablet/pins`, fixture-tested). It keeps its live
+  note ("10 this week").
+- **Per person**, `org_members.tablet_pins` (text[]), written only by
+  `set_my_tablet_pins` — on the shared iPad each person's PIN brings their own
+  pins. A pin the role can no longer use is hidden, not deleted.
+- **The desk gets an Actions widget instead** ("a desktop widget where you could
+  add the tablet tiles"), with its OWN list (Mark: separate) — see 04q.
+`Landing` is now a client component; one tile is `tablet/TileCell`, shared with
+the desk widget. **Verified:** 208 dry-run by raised exception (own pins saved;
+a bad key and 33 keys refused; staff cannot update any row directly; `anon`
+cannot execute; null clears), applied, re-probed. Rendered both shells from the
+dev server with a one-off owner session and test pins (owner's pins and layout
+restored byte-for-byte after), and looked at static snapshots at 1024.
+**Not verified:** tapping through edit mode on a real iPad.

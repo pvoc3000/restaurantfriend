@@ -186,3 +186,14 @@ badge on the home icon is just noise. Let's remove it." `HomeButton`,
 Home button is the plain house again. With it went the reason for setting
 informational counts in ink, so every count above zero is on the yellow fill
 again, as before. The new-day move and the Start breadcrumb stay.
+
+**THE ACTIONS WIDGET (2026-10-20).** Mark: "I had a vision of a desktop widget
+where you could add the tablet tiles to it that you used often … called
+'Actions'." A widget kind (`actions`, title not a link) holding tablet tiles
+chosen with **Choose actions…** in its corner menu — a checklist of the role's
+tiles (`tilesForRole`), applied as you tick, in tick order. Its list lives in
+its own `start_layout` entry (`actions`), SEPARATE from the tablet's pins
+(Mark's choice). The tiles are `tablet/TileCell`, so a request or a scan acts
+in place exactly as on the tablet; no live notes on the desk. One, two or three
+columns of tiles with the widget's width. Rendered from the dev server with a
+test layout (owner's layout restored after).

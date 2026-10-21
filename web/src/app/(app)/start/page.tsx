@@ -13,6 +13,7 @@ import { getAppSession } from "@/lib/session";
 import { ordersForKitchen } from "@/lib/specialOrderSchedule";
 import { createClient } from "@/lib/supabase/server";
 import { tilesForRole, type TileKey } from "@/lib/tablet/landing";
+import { readTileKeys } from "@/lib/tablet/pins";
 import {
   batchLogsState,
   checklistState,
@@ -256,6 +257,7 @@ export default async function StartPage() {
     </div>
     <Landing
       groups={groups}
+      pins={readTileKeys(session.membership.tablet_pins)}
       state={state}
       today={today}
       request={

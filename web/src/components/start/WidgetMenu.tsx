@@ -3,6 +3,8 @@
 import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { Checkbox } from "@/components/ui/Checkbox";
+import { Dialog, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { RowMenu, type RowMenuItem } from "@/components/ui/RowMenu";
 import { MENU_PANEL_CLASS, useAnchoredPanel } from "@/lib/anchoredPanel";
 import {
@@ -14,6 +16,8 @@ import {
   type Span,
   type TintKey,
 } from "@/lib/startLayout";
+import type { TileKey } from "@/lib/tablet/landing";
+import { togglePin } from "@/lib/tablet/pins";
 
 /**
  * A WIDGET'S CORNER MENU — everything that affects this widget alone (Mark,
@@ -34,6 +38,8 @@ export function WidgetMenu({
   onSpan,
   onTint,
   onDays,
+  onActions,
+  actionChoices,
   onStep,
   onRemove,
 }: {
@@ -44,12 +50,17 @@ export function WidgetMenu({
   onSpan: (span: Span) => void;
   onTint: (tint: TintKey | null) => void;
   onDays: (days: CalendarDays) => void;
+  /** Actions only: the tiles chosen, in order. */
+  onActions: (actions: TileKey[]) => void;
+  /** Actions only: every tile this role may put in it. */
+  actionChoices: { key: TileKey; label: string }[];
   onStep: (step: -1 | 1) => void;
   onRemove: () => void;
 }) {
   const anchorRef = useRef<HTMLSpanElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [picking, setPicking] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const close = useCallback(() => setPicking(false), []);
   const box = useAnchoredPanel({ open: picking, triggerRef: anchorRef, panelRef, align: "right", onClose: close });
 
@@ -78,6 +89,7 @@ export function WidgetMenu({
           ...widths,
           { label: "Color…", onSelect: () => setPicking(true) },
           ...dayItems,
+          ...(widget.kind === "actions" ? [{ label: "Choose actions…", onSelect: () => setChoosing(true) }] : []),
           { label: "Move earlier", disabled: !canStepEarlier, onSelect: () => onStep(-1) },
           { label: "Move later", disabled: !canStepLater, onSelect: () => onStep(1) },
           { label: "Remove", hint: "Add it back from Add widget", danger: true, onSelect: onRemove },
@@ -115,6 +127,32 @@ export function WidgetMenu({
           </div>,
           document.body,
         )}
+      {choosing && (
+        // Each tick applies at once (in tick order — the widget's order) and is
+        // saved behind, like every other change in edit mode; Done just closes.
+        <Dialog
+          title="Choose actions"
+          onClose={() => setChoosing(false)}
+          footer={
+            <button type="button" onClick={() => setChoosing(false)} className={DIALOG_COMMIT_CLASS}>
+              Done
+            </button>
+          }
+        >
+          <ul className="space-y-2">
+            {actionChoices.map((tile) => (
+              <li key={tile.key}>
+                <Checkbox
+                  checked={(widget.actions ?? []).includes(tile.key)}
+                  onChange={() => onActions(togglePin(widget.actions ?? [], tile.key))}
+                >
+                  {tile.label}
+                </Checkbox>
+              </li>
+            ))}
+          </ul>
+        </Dialog>
+      )}
     </span>
   );
 }

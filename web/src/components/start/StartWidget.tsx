@@ -40,7 +40,8 @@ export function StartWidget({
 }: {
   kind: string;
   title: string;
-  href: string;
+  /** Null: the widget is not a window onto a list, so its title is plain. */
+  href: string | null;
   span: Span;
   tint: TintKey | null;
   editing: boolean;
@@ -70,7 +71,7 @@ export function StartWidget({
             </button>
           )}
           <h2 className="min-w-0 truncate text-[16px] font-bold uppercase tracking-[0.08em]">
-            {editing ? (
+            {editing || !href ? (
               title
             ) : (
               <Link href={href} className="text-ink no-underline hover:underline">

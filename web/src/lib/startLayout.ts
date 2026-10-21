@@ -13,6 +13,8 @@
 // widget renamed or retired next year must cost its tile, not the page.
 
 import { moveInOrder, type DropTarget } from "./moveInOrder";
+import type { TileKey } from "./tablet/landing";
+import { readTileKeys } from "./tablet/pins";
 
 export const WIDGET_KINDS = [
   "reminders",
@@ -25,6 +27,7 @@ export const WIDGET_KINDS = [
   "paperwork",
   "calendar",
   "today",
+  "actions",
 ] as const;
 
 export type WidgetKind = (typeof WIDGET_KINDS)[number];
@@ -41,14 +44,18 @@ export type PlacedWidget = {
   tint: TintKey | null;
   /** Calendar only. Absent = `DEFAULT_CALENDAR_DAYS`. */
   days?: CalendarDays;
+  /** Actions only: the tablet tiles chosen for it, in order (2026-10-20). Its
+   *  own list — the tablet's pins are a separate one (`tablet_pins`, 208). */
+  actions?: TileKey[];
 };
 
 export type StartLayout = { version: 1; widgets: PlacedWidget[] };
 
 export const DEFAULT_CALENDAR_DAYS: CalendarDays = 14;
 
-/** A widget's name, the list it opens, and the width it is added at. */
-export const WIDGET_META: Record<WidgetKind, { title: string; href: string; span: Span }> = {
+/** A widget's name, the list it opens (null: its title is not a link), and the
+ *  width it is added at. */
+export const WIDGET_META: Record<WidgetKind, { title: string; href: string | null; span: Span }> = {
   reminders: { title: "Reminders", href: "/order-guide", span: 3 },
   sales: { title: "Sales", href: "/sales", span: 3 },
   bills: { title: "Bills", href: "/bills", span: 1 },
@@ -59,6 +66,10 @@ export const WIDGET_META: Record<WidgetKind, { title: string; href: string; span
   paperwork: { title: "Employee paperwork", href: "/employees", span: 1 },
   calendar: { title: "Calendar", href: "/calendar", span: 1 },
   today: { title: "Today", href: "/calendar?view=day", span: 2 },
+  // The tablet's tiles you reach for most (Mark, 2026-10-20: "a desktop widget
+  // where you could add the tablet tiles to it that you used often"). Not a
+  // list of its own, so the title is not a link.
+  actions: { title: "Actions", href: null, span: 1 },
 };
 
 /**
@@ -138,6 +149,7 @@ export function readStartLayout(raw: unknown): StartLayout {
     if (kind === "calendar" && (CALENDAR_DAYS as readonly unknown[]).includes(w.days)) {
       placed.days = w.days as CalendarDays;
     }
+    if (kind === "actions") placed.actions = readTileKeys(w.actions);
     widgets.push(placed);
   }
   return { version: 1, widgets };
@@ -187,6 +199,10 @@ export function withTint(layout: StartLayout, kind: WidgetKind, tint: TintKey | 
 
 export function withDays(layout: StartLayout, kind: WidgetKind, days: CalendarDays): StartLayout {
   return mapWidget(layout, kind, (w) => ({ ...w, days }));
+}
+
+export function withActions(layout: StartLayout, kind: WidgetKind, actions: TileKey[]): StartLayout {
+  return mapWidget(layout, kind, (w) => ({ ...w, actions }));
 }
 
 export function withoutWidget(layout: StartLayout, kind: WidgetKind): StartLayout {

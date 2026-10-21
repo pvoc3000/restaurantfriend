@@ -34,7 +34,7 @@ test("startLayout: the default is the pre-widget page, with Today and Calendar l
     "reminders", "sales", "bills", "purchase_orders", "special_orders", "invoices", "shift_reports", "paperwork",
   ]);
   eq(DEFAULT_LAYOUT.widgets.map((w) => w.span), [3, 3, 1, 1, 1, 1, 1, 1]);
-  eq(addableKinds(DEFAULT_LAYOUT, all), ["calendar", "today"]);
+  eq(addableKinds(DEFAULT_LAYOUT, all), ["calendar", "today", "actions"]);
 });
 
 test("startLayout: unknown kinds and second copies are dropped, order kept", () => {
@@ -71,6 +71,19 @@ test("startLayout: an unknown tint or day count is forgotten; days only on Calen
   eq(readStartLayout({ version: 1, widgets: [{ kind: "calendar", span: 1, days: 9 }] }).widgets[0].days, undefined);
 });
 
+test("startLayout: Actions keeps its tiles, known ones only, and only on Actions", () => {
+  const l = readStartLayout({
+    version: 1,
+    widgets: [
+      { kind: "actions", span: 1, actions: ["order_guide", "weather", "tags", "order_guide"] },
+      { kind: "bills", span: 1, actions: ["order_guide"] },
+    ],
+  });
+  eq(l.widgets[0].actions, ["order_guide", "tags"]);
+  no("actions" in l.widgets[1], "actions on Bills");
+  eq(readStartLayout({ version: 1, widgets: [{ kind: "actions", span: 1 }] }).widgets[0].actions, [], "none chosen yet");
+});
+
 test("startLayout: an empty list is kept, not replaced by the default", () => {
   eq(kinds(readStartLayout({ version: 1, widgets: [] })), []);
 });
@@ -88,7 +101,7 @@ test("startLayout: a widget the role can't open is hidden but stays in the layou
     "reminders", "sales", "purchase_orders", "special_orders", "invoices", "shift_reports",
   ]);
   ok(kinds(DEFAULT_LAYOUT).includes("paperwork"), "still stored");
-  eq(addableKinds(withoutWidget(DEFAULT_LAYOUT, "paperwork"), may), ["calendar", "today"], "nor offered to add");
+  eq(addableKinds(withoutWidget(DEFAULT_LAYOUT, "paperwork"), may), ["calendar", "today", "actions"], "nor offered to add");
 });
 
 // --- edits -------------------------------------------------------------------

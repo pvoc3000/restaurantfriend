@@ -15,6 +15,7 @@ import {
   DEFAULT_LAYOUT,
   visibleWidgets,
   WIDGET_META,
+  withActions,
   withDays,
   withMove,
   withoutWidget,
@@ -27,6 +28,7 @@ import {
   type WidgetKind,
 } from "@/lib/startLayout";
 import { createClient } from "@/lib/supabase/client";
+import type { TileKey } from "@/lib/tablet/landing";
 import { useTileDrag } from "@/lib/tileDrag";
 
 import { StartWidget } from "./StartWidget";
@@ -54,6 +56,7 @@ export function StartGrid({
   serverLayout,
   access,
   bodies,
+  actionChoices,
 }: {
   heading: ReactNode;
   /** The stored layout, already read (`readStartLayout`). */
@@ -61,6 +64,8 @@ export function StartGrid({
   access: WidgetAccess;
   /** A body for each widget the server fetched. */
   bodies: Partial<Record<WidgetKind, ReactNode>>;
+  /** The tablet tiles this role may put in an Actions widget. */
+  actionChoices: { key: TileKey; label: string }[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -195,12 +200,16 @@ export function StartGrid({
                     onSpan={(span) => change(withSpan(layout, w.kind, span))}
                     onTint={(tint) => change(withTint(layout, w.kind, tint))}
                     onDays={(days) => change(withDays(layout, w.kind, days))}
+                    onActions={(actions) => change(withActions(layout, w.kind, actions))}
+                    actionChoices={actionChoices}
                     onStep={(step) => change(withStep(layout, w.kind, step, visibleKinds))}
                     onRemove={() => change(withoutWidget(layout, w.kind))}
                   />
                 }
               >
-                <WidgetSettingsProvider value={{ span: w.span, days: w.days ?? DEFAULT_CALENDAR_DAYS }}>
+                <WidgetSettingsProvider
+                  value={{ span: w.span, days: w.days ?? DEFAULT_CALENDAR_DAYS, actions: w.actions ?? [] }}
+                >
                   {body ?? <p className="text-sm text-muted">Loading…</p>}
                 </WidgetSettingsProvider>
               </StartWidget>
