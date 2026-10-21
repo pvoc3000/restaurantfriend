@@ -172,10 +172,19 @@ there is nothing to create there.
 
 ### A1. Get the OAuth client id and secret you already have
 
-console.cloud.google.com → make sure the project selector at the top says
-**project 765339329273** (the one the info@ credential was made in) → **APIs &
-Services → Credentials** → under "OAuth 2.0 Client IDs", open the Web
-application client → copy the **Client ID** and **Client secret**.
+console.cloud.google.com → pick the project the specialorders@ credential
+was made in → **APIs & Services → Credentials** → under "OAuth 2.0 Client
+IDs", open the Web application client → copy the **Client ID** and **Client
+secret**.
+
+**Which project that is:** a client ID begins with its project's NUMBER
+(`967634606189-….apps.googleusercontent.com`), and every email the app sends
+names the same number in its first header (`Received: from 967634606189 …
+by gmailapi.google.com`). Read 2026-10-21 off specialorders@'s sent mail:
+**967634606189**, "donutfriend.com › My Project", signed in as
+specialorders@. (This step used to name 765339329273, which matches none of
+the projects either account can see.) Re-minting with the SAME client means
+only the refresh token changes in the secret.
 
 If the client's **Authorised redirect URIs** does not already list
 
@@ -389,7 +398,7 @@ Documents tab, or do the test on a throwaway order you delete after.
 | --- | --- |
 | `secret EMAIL_CREDS_SPECIALORDERS is not set` | A3 didn't run, or the name is misspelled. `supabase secrets list` shows the real name. |
 | `Gmail auth failed: invalid_grant` | The refresh token is wrong, or it was minted against a different client id than the one in the same secret. Redo A2 — the two must come from the same OAuth client. |
-| `Gmail refused the send: Precondition check failed` | The Gmail API is not enabled **in project 765339329273**. Enable it there; the error is about the project, not the account. |
+| `Gmail refused the send: Precondition check failed` | The Gmail API is not enabled in the project the credential's client belongs to (the number its client ID starts with). Enable it there; the error is about the project, not the account. |
 | `email_provider config is incomplete` | The JSON in A4/Path B is missing `kind`, `secret_ref` or `from`. |
 | `secret EMAIL_CREDS_… is not valid JSON` | A stray line break got into the value — pasting a ~100-character refresh token does this. Re-run A3 (the send now strips control characters, so this should be rare). |
 | `Bad control character in string literal in JSON at position …` | The same thing, from a function deployed before 2026-08-17. Redeploy the three functions. |
