@@ -231,3 +231,6 @@
    the creates got 1001 and 1002 after Dulce's 1000, an explicit 2000 was kept
    and the next became 2001, a duplicate was refused by the unique key, and
    `anon` could not call the function. Nothing was left behind.
+   **APPLIED 2026-10-20** with Mark's OK (`db query --linked -f`). Dulce
+   already read 1000 when it ran, typed in by hand, so the backfill was a no-op;
+   trigger present, setting 1000, `anon` cannot execute.

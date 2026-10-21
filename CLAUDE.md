@@ -59,7 +59,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 3. ✅ FMP → Postgres migration + web catalog admin (inventory, vendors, vendor items) — `docs/history/03-catalog.md`
 4. 🚧 Order guide, PO generation/processing/email, receiving screen, purchase requests — `docs/history/04-order-guide-and-pos.md`
 4b. 🚧 Location module (`/locations`, shop sections, working location) — `docs/history/04b-locations.md`
-4c. 🚧 HR + app access (employees, invites, /welcome, revoke) — `docs/history/04c-hr-access.md`
+4c. 🚧 HR + app access (employees, invites, /welcome, revoke; 209 new hires get an Organization ID from 1000, APPLIED 2026-10-20) — `docs/history/04c-hr-access.md`
 4d. 🚧 Timesheets / payroll prep (pay periods, overtime, breaks, tips, Gusto export, benefits, workday boundary) — `docs/history/04d-timesheets.md`
 4d. 🚧 Bills (vendor bills, approval, financials lock, filing on close) — `docs/history/04d-invoices.md` (named Invoices until 2026-09-20; see Table naming)
 4e. ✅ Employee events (`employee_events`, `/events`) — `docs/history/04e-employee-events.md`
