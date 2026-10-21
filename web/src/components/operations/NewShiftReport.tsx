@@ -82,12 +82,15 @@ export function NewShiftReport({
   const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState<string | null>(today);
-  const [shift, setShift] = useState<ShiftSlot>("closing");
+  // NO DEFAULT (Mark, 2026-10-20). It opened on Closing, so an opener who
+  // pressed Start without looking filed an opening report as a closing one —
+  // with the closing pages. A field starts empty; Start waits for a pick.
+  const [shift, setShift] = useState<ShiftSlot | null>(null);
   const [nextDay, setNextDay] = useState<string | null>(daysBefore(today, -1));
   const [failed, setFailed] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const ready = date !== null && !pending;
+  const ready = date !== null && shift !== null && !pending;
 
   // A handover legitimately produces two closing reports for one night, so this
   // WARNS and never blocks — `findPossibleRehires`' treatment, and the reason
@@ -95,7 +98,7 @@ export function NewShiftReport({
   // The STATUS rides along so the sentence can say which it is: "completed" of
   // a draft would be a claim the list two inches away contradicts.
   const duplicate =
-    date === null
+    date === null || shift === null
       ? null
       : // A DRAFT FIRST: when there is both a sent report and a draft for the
         // night, the draft is the one somebody means to get back to.
@@ -121,6 +124,7 @@ export function NewShiftReport({
   }
 
   function create() {
+    if (shift === null) return;
     startTransition(async () => {
       const { data, error } = await supabase
         .from("shift_reports")
@@ -273,7 +277,7 @@ export function NewShiftReport({
                 <p className="text-sm">
                   <span className="bg-mark-fill px-1">
                     There is already a {duplicate.status === "sent" ? "sent" : "draft"}{" "}
-                    {SHIFT_SLOT_LABEL[shift].toLowerCase()} shift report on {date}.
+                    {SHIFT_SLOT_LABEL[duplicate.shift].toLowerCase()} shift report on {date}.
                   </span>{" "}
                   {duplicate.status === "sent" ? (
                     // A SENT report cannot be resumed; it is REOPENED — by its

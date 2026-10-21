@@ -180,8 +180,9 @@ export default function ShiftReportGuide() {
             </p>
           </li>
           <li>
-            Check the <strong>Date</strong>, <strong>Shift</strong> and{" "}
-            <strong>Next production day</strong>, then tap <Ui go>Start the report</Ui>.
+            Pick your <strong>Shift</strong> (nothing is chosen until you do), check the{" "}
+            <strong>Date</strong> and <strong>Next production day</strong>, then tap{" "}
+            <Ui go>Start the report</Ui>.
             <p>
               <strong>Supervisor</strong> should be your name. If it is somebody else’s, the
               iPad is still signed in as them: tap <Ui>Cancel</Ui>, then <Ui>Switch user</Ui>.

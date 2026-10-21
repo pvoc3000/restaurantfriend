@@ -908,3 +908,12 @@ Made), because the email is built from DRAFT counts that reach the view only at
 submit — change one, change the other. The Totals row under each schedule sums
 the lines that have a figure; a column with none prints "—", never 0.
 Fixtures: three cases, checked by dropping `rescued` from `premadeSold` (3 red).
+
+**THE NEW-REPORT DIALOG NO LONGER PICKS A SHIFT (Mark, 2026-10-20: "allow the
+user to decide what shift the report is instead of setting a default").**
+`NewShiftReport` opened with Closing chosen, so a Start pressed without looking
+filed a closing report — closing pages and all. Shift now starts empty, Start
+the report stays disabled until one is picked, and the duplicate/resume check
+waits for it too. It is the only insert into `shift_reports`, so the tablet's
+tile goes through the same dialog. The guide's step now says to pick the shift.
+Typechecked and linted; not seen in a browser (the pane was on `/lock`).
