@@ -49,7 +49,7 @@ export function Breadcrumbs({
                 href={crumb.href}
                 aria-label="Start"
                 title="Start"
-                className="-m-1 grid place-items-center p-1 text-muted hover:bg-neutral-100 hover:text-ink"
+                className="-m-1 grid place-items-center p-1 text-subtle hover:bg-neutral-100 hover:text-ink"
               >
                 <HomeIcon />
               </Link>
