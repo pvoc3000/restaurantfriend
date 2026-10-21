@@ -202,3 +202,7 @@ is better than just 'Actions'"), with its menu item and dialog ("Choose
 favorite actions…"). The stored kind stays `actions`, so saved layouts keep the
 widget. The new name also stops it reading like the app's many "Actions"
 command menus.
+**The Start crumb is the house (Mark, 2026-10-21):** "instead of 'start' in
+the breadcrumb trail can we have the home glyph instead". `Breadcrumbs` draws
+any crumb to /start as the masthead's `HomeIcon`, still a link, named "Start"
+for screen readers and on hover.

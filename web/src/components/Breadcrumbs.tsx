@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HomeIcon } from "@/components/ui/IconButton";
 import type { Crumb } from "@/lib/breadcrumbs";
 
 const START_CRUMB: Crumb = { href: "/start", label: "Start" };
@@ -41,12 +42,25 @@ export function Breadcrumbs({
             which is exactly when an index key is the right one. */}
         {trail.map((crumb, i) => (
           <li key={`${i}-${crumb.href}`} className="flex items-center gap-3">
-            <Link
-              href={crumb.href}
-              className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-            >
-              {crumb.label}
-            </Link>
+            {crumb.href.split("?")[0] === "/start" ? (
+              // Start is the house, as in the masthead (Mark, 2026-10-21:
+              // "instead of 'start' in the breadcrumb trail … the home glyph").
+              <Link
+                href={crumb.href}
+                aria-label="Start"
+                title="Start"
+                className="-m-1 grid place-items-center p-1 text-ink hover:bg-neutral-100"
+              >
+                <HomeIcon />
+              </Link>
+            ) : (
+              <Link
+                href={crumb.href}
+                className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+              >
+                {crumb.label}
+              </Link>
+            )}
             <span aria-hidden className="text-neutral-300">
               /
             </span>
