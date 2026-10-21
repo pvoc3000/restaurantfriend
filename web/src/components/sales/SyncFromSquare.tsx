@@ -5,8 +5,11 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
+import { ControlField } from "@/components/ui/ControlField";
+import { RangePicker } from "@/components/ui/RangePicker";
 import { addDays } from "@/lib/payPeriods";
-import { isDayComplete } from "@/lib/sales";
+import type { DateRange, RangePresetSpec } from "@/lib/dateRange";
 
 /**
  * Pull sales and tips from Square.
@@ -51,16 +54,12 @@ export type SyncRow = { label: string; onSelect: () => void; disabled: boolean }
 
 export function SyncFromSquare({
   today,
-  timeZone,
   range,
   children,
 }: {
   today: string;
-  /** The org's zone, which `isDayComplete` needs to find an unfinished day for
-   *  the rolling window to reach back to. Without it the window is seven days. */
-  timeZone?: string;
   /**
-   * Pull exactly these days instead of the rolling window. The Close Pay
+   * Pull exactly these days instead of asking which. The Close Pay
    * Period panel passes its period (2026-09-29), because a tip figure is only
    * written for a day an open period covers, and the fix for a missing one
    * belongs where the panel reports it.
@@ -160,54 +159,55 @@ export function SyncFromSquare({
   }
 
   /**
-   * THE ORDINARY CASE IS A ROLLING WINDOW (Mark, 2026-10-21): the last seven
-   * days, reaching further back only to the oldest day `isDayComplete` calls
-   * unfinished, and never past the 1st of last month.
+   * THE ORDINARY CASE ASKS WHICH DAYS (Mark, 2026-10-21), defaulting to the
+   * last seven, and pulls every one of them — no skipping days already pulled,
+   * because "pulled" is not "final": the 10-06 offline register uploaded 37
+   * payments the next morning, after its day had been pulled after closing.
    *
-   * It used to be this month and last, whole — 51 days × 2 shops on Oct 21,
-   * re-pulling some 100 settled shop-days every press. Seven days is what can
-   * still move: offline payments upload the next morning, and refunds and tip
-   * adjustments land a few days late. The reach-back is for the one case a fixed
-   * window misses — a day pulled at 4pm and never again is a part-day forever,
-   * and the next sync should finish it whenever it comes. The floor is the old
-   * window, so nothing is ever pulled that the old command would not have.
+   * It used to be this month and last, whole and unasked — 51 days × 2 shops
+   * on Oct 21, re-pulling some 100 settled shop-days every press. Seven days is
+   * what can still move (offline uploads, refunds, tip adjustments); a deeper
+   * re-pull is a choice somebody now makes in the same dialog. The days on
+   * screen play no part: what you are LOOKING at is a view, and a 90-day view
+   * should not make the pull slower.
    *
-   * The days on screen play no part: what you are LOOKING at is a view, and a
-   * 90-day view should not make the pull slower.
+   * A caller with a `range` skips the question — the Close Pay Period panel's
+   * range IS the answer.
    */
-  async function rollingFrom(): Promise<string> {
-    const lastMonth = addDays(`${today.slice(0, 7)}-01`, -1);
-    const floor = `${lastMonth.slice(0, 7)}-01`;
-    const recent = addDays(today, -6);
-    if (!timeZone) return recent;
-
-    // At most ~45 days × the shops still trading, well under PostgREST's
-    // 1,000-row cap. A failed read falls back to the floor — the old window —
-    // since pulling too much is slow and pulling too little is wrong.
-    const { data, error } = await supabase
-      .from("daily_sales")
-      .select("business_date, synced_at, source")
-      .gte("business_date", floor)
-      .lt("business_date", recent)
-      .order("business_date");
-    if (error) return floor;
-    const unfinished = (data ?? []).find(
-      (r) => !isDayComplete({ business_date: r.business_date, syncedAt: r.synced_at, source: r.source }, timeZone)
-    );
-    return unfinished?.business_date ?? recent;
-  }
+  const lastSeven = (t: string): DateRange => ({ from: addDays(t, -6), to: t });
+  const presets: RangePresetSpec[] = [
+    { key: "last_7_days", label: "Last 7 Days", range: lastSeven },
+    "today",
+    "yesterday",
+    "this_month",
+    "last_month",
+  ];
+  const [asking, setAsking] = useState(false);
+  const [chosen, setChosen] = useState<DateRange>(() => lastSeven(today));
+  const [pulledTo, setPulledTo] = useState(today);
 
   // Up to and including TODAY, whose figure the screen marks as still being
   // taken. Never past today: Square has nothing for tomorrow.
-  const until = range ? (range.to < today ? range.to : today) : today;
+  const pull = (r: DateRange) => {
+    const to = r.to < today ? r.to : today;
+    setPulledTo(to);
+    void run(monthsBetween(r.from, to), "Syncing");
+  };
   const sync = () => {
     if (range) {
-      void run(monthsBetween(range.from, until), "Syncing");
+      pull(range);
       return;
     }
-    setBusy("Syncing");
-    void rollingFrom().then((from) => run(monthsBetween(from, today), "Syncing"));
+    setChosen(lastSeven(today));
+    setAsking(true);
   };
+  const canPull = chosen.from <= today;
+  const confirm = () => {
+    if (!canPull) return;
+    setAsking(false);
+    pull(chosen);
+  };
+  const label = range ? "Sync from Square" : "Sync from Square…";
 
   return (
     // RIGHT-ALIGNED AS A BLOCK (Mark, 2026-09-13: the button "should be
@@ -217,14 +217,49 @@ export function SyncFromSquare({
     // to the right margin, and the sentences read right-aligned beneath it.
     <div className="flex flex-col items-end gap-2 text-right">
       {children ? (
-        children({ label: "Sync from Square", onSelect: sync, disabled: busy !== null })
+        children({ label, onSelect: sync, disabled: busy !== null })
       ) : (
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button type="button" className={BUTTON_CLASS} disabled={busy !== null} onClick={sync}>
-            Sync from Square
+            {label}
           </button>
         </div>
       )}
+
+      {asking ? (
+        <Dialog
+          title="Sync from Square"
+          onClose={() => setAsking(false)}
+          width="max-w-md"
+          onSubmit={confirm}
+          footer={
+            <div className="flex items-center justify-end gap-3">
+              <button type="button" className={DIALOG_CANCEL_CLASS} onClick={() => setAsking(false)}>
+                Cancel
+              </button>
+              <button type="button" className={DIALOG_COMMIT_CLASS} disabled={!canPull} onClick={confirm}>
+                Sync
+              </button>
+            </div>
+          }
+        >
+          <div className="text-left">
+            <ControlField label="Dates to pull">
+              <RangePicker
+                value={chosen}
+                onChange={(picked) => {
+                  if (picked) setChosen(picked);
+                }}
+                presets={presets}
+                today={today}
+                ariaLabel="Which days to pull from Square"
+                clearable={false}
+                boxed
+              />
+            </ControlField>
+          </div>
+        </Dialog>
+      ) : null}
 
       {busy ? <ProgressBand label={busy} /> : null}
 
@@ -234,8 +269,8 @@ export function SyncFromSquare({
         // at 4pm gets four hours of trading, and somebody reading the total
         // straight afterwards should not have to work that out.
         <p className="text-xs text-muted">
-          {result} Up to {until}
-          {until === today ? ", whose figure is still being taken." : "."}
+          {result} Up to {pulledTo}
+          {pulledTo === today ? ", whose figure is still being taken." : "."}
         </p>
       ) : null}
 

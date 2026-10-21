@@ -179,14 +179,16 @@ live line ids, and `savedLinesMatch` found the same count kept — a doubled
 entry would have kept twice the lines and failed. QuickBooks replaces a
 JournalEntry's lines on a full update; only the Deposit appended.
 
-**SYNC FROM SQUARE PULLS A ROLLING WINDOW (Mark, 2026-10-21).** The default
-was this month and last, whole — on Oct 21 that is 09-01 → 10-21, about 102
-shop-days re-pulled on every press. It is now the last seven days, reaching
-further back only to the oldest day `isDayComplete` calls unfinished, floored
-at the 1st of last month (the old window, so it never pulls more than before).
-Seven days covers what still moves (offline payments upload the next morning;
-refunds and tip adjustments land a few days late); the reach-back finishes a
-day pulled mid-day and never again. The days on screen play no part. The Close
-Pay Period panel still passes its own range. Measured on 10-21: no unfinished
-day since 09-01, so a press pulls 10-15 → 10-21, 14 shop-days in one request.
-Not pressed in a browser — a press writes real rows.
+**SYNC FROM SQUARE ASKS WHICH DAYS (Mark, 2026-10-21).** The default was
+this month and last, whole and unasked — on Oct 21 that is 09-01 → 10-21, about
+102 shop-days re-pulled on every press. The Actions row is now "Sync from
+Square…" and opens a dialog with a `RangePicker` (Last 7 Days · Today ·
+Yesterday · This Month · Last Month, or any two dates), defaulting to the last
+seven days through today; it pulls EVERY day in the range, clipped at today.
+Same day, a rolling window that reached back to the oldest day `isDayComplete`
+called unfinished was built and committed, then replaced by this. A "skip days
+already pulled" box was asked for and dropped: pulled is not final — 10-06 was
+pulled after closing and still missed 37 offline payments that uploaded the
+next morning — and skipping days splits one Square request into several. The
+Close Pay Period panel passes its own range and is not asked. Typechecked and
+linted; not walked in a browser (the pane was on the PIN lock screen).
