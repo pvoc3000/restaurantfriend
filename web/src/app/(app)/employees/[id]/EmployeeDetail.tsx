@@ -589,6 +589,8 @@ export async function EmployeeDetail({
             id={person.id}
             column="notes"
             value={person.notes}
+            multiline
+            ariaLabel="Notes about this employee"
           />
         </div>
       </section>
