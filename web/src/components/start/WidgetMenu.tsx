@@ -89,7 +89,7 @@ export function WidgetMenu({
           ...widths,
           { label: "Color…", onSelect: () => setPicking(true) },
           ...dayItems,
-          ...(widget.kind === "actions" ? [{ label: "Choose actions…", onSelect: () => setChoosing(true) }] : []),
+          ...(widget.kind === "actions" ? [{ label: "Choose favorite actions…", onSelect: () => setChoosing(true) }] : []),
           { label: "Move earlier", disabled: !canStepEarlier, onSelect: () => onStep(-1) },
           { label: "Move later", disabled: !canStepLater, onSelect: () => onStep(1) },
           { label: "Remove", hint: "Add it back from Add widget", danger: true, onSelect: onRemove },
@@ -131,7 +131,7 @@ export function WidgetMenu({
         // Each tick applies at once (in tick order — the widget's order) and is
         // saved behind, like every other change in edit mode; Done just closes.
         <Dialog
-          title="Choose actions"
+          title="Choose favorite actions"
           onClose={() => setChoosing(false)}
           footer={
             <button type="button" onClick={() => setChoosing(false)} className={DIALOG_COMMIT_CLASS}>

@@ -197,3 +197,8 @@ its own `start_layout` entry (`actions`), SEPARATE from the tablet's pins
 in place exactly as on the tablet; no live notes on the desk. One, two or three
 columns of tiles with the widget's width. Rendered from the dev server with a
 test layout (owner's layout restored after).
+**Renamed "Favorite actions" the same day** (Mark: "maybe 'Favorite Actions'
+is better than just 'Actions'"), with its menu item and dialog ("Choose
+favorite actions…"). The stored kind stays `actions`, so saved layouts keep the
+widget. The new name also stops it reading like the app's many "Actions"
+command menus.

@@ -69,7 +69,7 @@ export const WIDGET_META: Record<WidgetKind, { title: string; href: string | nul
   // The tablet's tiles you reach for most (Mark, 2026-10-20: "a desktop widget
   // where you could add the tablet tiles to it that you used often"). Not a
   // list of its own, so the title is not a link.
-  actions: { title: "Actions", href: null, span: 1 },
+  actions: { title: "Favorite actions", href: null, span: 1 },
 };
 
 /**

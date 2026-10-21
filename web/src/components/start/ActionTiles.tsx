@@ -10,7 +10,7 @@ import { useWidgetSettings } from "./widgetSettings";
 /**
  * THE ACTIONS WIDGET'S TILES — the tablet's own tiles (`tablet/TileCell`), the
  * ones chosen for this widget, in that order. The choice is read from the grid
- * (`widgetSettings`) so Choose actions… shows at once; the tiles a role may
+ * (`widgetSettings`) so Choose favorite actions… shows at once; the tiles a role may
  * use come from the server. One column narrow, two from two columns, three at
  * three.
  */
@@ -27,7 +27,7 @@ export function ActionTiles({
   const { actions } = useWidgetSettings();
   const chosen = chosenTiles([{ label: "", tiles }], actions);
   if (chosen.length === 0) {
-    return <p className="text-sm text-muted">No actions chosen. Pick them with Choose actions… in Edit layout.</p>;
+    return <p className="text-sm text-muted">No favorite actions chosen. Pick them with Choose favorite actions… in Edit layout.</p>;
   }
   return (
     <ul className="grid gap-3 text-[16px] @xl:grid-cols-2 @4xl:grid-cols-3">
