@@ -218,6 +218,19 @@ export function findPossibleRehires<
 }
 
 /**
+ * The first Organization ID the database gives someone created in the app
+ * (migration 209's trigger). FileMaker's numbers all sit below it. Read from
+ * `orgs.settings.hr.first_employee_number`, with 209's own fallback.
+ */
+export const FIRST_EMPLOYEE_NUMBER = 1000;
+
+export function firstEmployeeNumber(settings: Record<string, unknown>): number {
+  const hr = settings.hr as { first_employee_number?: unknown } | undefined;
+  const n = Number(hr?.first_employee_number);
+  return Number.isInteger(n) && n > 0 ? n : FIRST_EMPLOYEE_NUMBER;
+}
+
+/**
  * What deleting this employee would cost, counted before the choice is offered.
  *
  * `employees` had NO delete policy until migration 023, deliberately — an
@@ -227,7 +240,9 @@ export function findPossibleRehires<
  *
  * - `migrated` — `legacy_id` is FileMaker's employee id, and `field-map.md`
  *   calls it "the join key every child table uses". Reviews and timesheets
- *   still reference it, so deleting can break records elsewhere.
+ *   still reference it, so deleting can break records elsewhere. Since 209 the
+ *   database also numbers people created in the app, from `firstNumber` up, so
+ *   only a number BELOW it says the person came from FileMaker.
  * - `hasAccess` — deleting revokes their sign-in. Worth saying out loud.
  * - `documents` — the I-9s and food handler cards go with the row (021
  *   cascades), and those are the records you're required to keep.
@@ -252,9 +267,11 @@ export type DeleteWarnings = {
 export function deleteWarnings(
   employee: Pick<Employee, "legacy_id" | "user_id">,
   documentCount: number,
-  eventCount = 0
+  eventCount = 0,
+  firstNumber = FIRST_EMPLOYEE_NUMBER
 ): DeleteWarnings {
-  const migrated = employee.legacy_id ?? null;
+  const id = employee.legacy_id ?? null;
+  const migrated = id !== null && id < firstNumber ? id : null;
   const hasAccess = employee.user_id !== null;
   return {
     migrated,

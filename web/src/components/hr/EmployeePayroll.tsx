@@ -66,8 +66,10 @@ export function EmployeePayroll({
           1–736 — and until now the detail screen queried it only to tell the
           delete confirm that this person came from FileMaker.
 
-          EDITABLE, because someone hired in the app has none and will want one.
-          Two things follow from that: it is UNIQUE per org, so a clash comes
+          Since migration 209 the database gives someone created in the app
+          the next one from 1000 (`orgs.settings.hr.first_employee_number`),
+          so FileMaker's numbers and the app's never meet. Still EDITABLE —
+          Homebase's Payroll ID has to match it. Two things follow from that: it is UNIQUE per org, so a clash comes
           back as a Postgres error in the cell; and the migration scripts join
           on it, so CHANGING an existing one breaks reconciliation against the
           FileMaker export. Neither is a reason to make it read-only — both are

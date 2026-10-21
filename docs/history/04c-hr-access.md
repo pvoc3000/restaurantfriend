@@ -205,3 +205,29 @@
    FMP keeps writing until their own modules are built. See
    `migration/field-map.md` for the per-field reasons and the traps in each
    child file.
+   **ORGANIZATION IDs FOR NEW HIRES (migration 209, 2026-10-20).** Mark: "when
+   creating a new employee, they should be assigned an organization ID. We can
+   start from 1000 so we don't duplicate anything from FMP." "Organization ID"
+   is the Payroll tab's existing label for `employees.legacy_id` — FileMaker's
+   Employee_ID, and Homebase's `Payroll ID`, which the timesheet import matches
+   on. Measured first: 449 people, 447 numbered, 1–739 (738 and 739 typed by
+   hand for two app hires), none at 1000 or above, one org — so 1000 clears
+   FileMaker. A BEFORE INSERT trigger (`assign_employee_number`, security
+   definer, `anon` revoked) fills a null `legacy_id` with the larger of the
+   org's highest + 1 and `orgs.settings.hr.first_employee_number` (1000), under
+   an advisory lock so two creates take turns; `unique (org_id, legacy_id)` is
+   the backstop. A trigger and not a sequence because one sequence would number
+   every org from one counter. An insert naming its own number keeps it, and
+   the field stays editable. `NewEmployee.tsx` is unchanged.
+   **Mark's choices:** only Dulce Hernandez (created that morning) was
+   backfilled, to 1000; Marcos Benavidez (inactive, blank) stays blank. The
+   number shows on the Payroll tab only — no `/employees` column.
+   **The delete dialog had to change with it:** "Migrated from FileMaker" was
+   any `legacy_id`; it is now one below the first number (`firstEmployeeNumber`
+   in `lib/employees`), with fixtures. 738 and 739 still read as FileMaker,
+   which is wrong for those two and harmless (it only defaults the dialog to
+   Deactivate).
+   Dry-run on the hosted DB in a transaction that never committed, as the owner:
+   the creates got 1001 and 1002 after Dulce's 1000, an explicit 2000 was kept
+   and the next became 2001, a duplicate was refused by the unique key, and
+   `anon` could not call the function. Nothing was left behind.

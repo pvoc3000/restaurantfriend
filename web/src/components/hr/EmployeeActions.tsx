@@ -57,6 +57,7 @@ export function EmployeeActions({
   role,
   currentUserId,
   afterDelete = "refresh",
+  firstNumber,
 }: {
   employee: Pick<Employee, "id" | "legacy_id" | "user_id" | "status">;
   /** "Prentice, Ada" — what to call them in the dialog. */
@@ -66,6 +67,8 @@ export function EmployeeActions({
   /** Who is doing this, for the self-delete refusal. */
   currentUserId: string;
   afterDelete?: "refresh" | { href: string };
+  /** The org's first app-assigned Organization ID (209); below it is FileMaker's. */
+  firstNumber?: number;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -77,7 +80,7 @@ export function EmployeeActions({
 
   const self = isSelf(employee, currentUserId);
   const warnings: DeleteWarnings | null =
-    docs === null ? null : deleteWarnings(employee, docs.paths.length, eventCount ?? 0);
+    docs === null ? null : deleteWarnings(employee, docs.paths.length, eventCount ?? 0, firstNumber);
 
   async function openConfirm() {
     setConfirming(true);

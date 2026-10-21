@@ -13,6 +13,7 @@ import {
   employeeTabHref,
   parseEmployeeTab,
   deleteWarnings,
+  firstEmployeeNumber,
   findPossibleRehires,
   isSelf,
   type EmployeeStatus,
@@ -125,6 +126,20 @@ test("a migrated record names its FileMaker id", () => {
   const w = deleteWarnings({ legacy_id: 214, user_id: null }, 0);
   ok(w.any, "any");
   eq(w.migrated, 214);
+});
+
+test("a number the database assigned (1000 up) is not a FileMaker one", () => {
+  const w = deleteWarnings({ legacy_id: 1000, user_id: null }, 0);
+  no(w.any, "any");
+  eq(w.migrated, null);
+  eq(deleteWarnings({ legacy_id: 999, user_id: null }, 0).migrated, 999);
+});
+
+test("the first number comes from settings, and falls back to 1000", () => {
+  eq(firstEmployeeNumber({}), 1000);
+  eq(firstEmployeeNumber({ hr: { first_employee_number: 5000 } }), 5000);
+  eq(firstEmployeeNumber({ hr: { first_employee_number: "junk" } }), 1000);
+  eq(deleteWarnings({ legacy_id: 1200, user_id: null }, 0, 0, 5000).migrated, 1200);
 });
 
 test("legacy_id 0 is still a migrated record, not a missing one", () => {

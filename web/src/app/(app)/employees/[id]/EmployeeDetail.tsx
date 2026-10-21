@@ -14,6 +14,7 @@ import {
   STATUS_OPTIONS,
   type Employee,
   type EmployeeStatus,
+  firstEmployeeNumber,
 } from "@/lib/employees";
 import {
   expiryState,
@@ -865,6 +866,7 @@ export async function EmployeeDetail({
           role={(membership?.role ?? null) as Role | null}
           currentUserId={session.userId}
           afterDelete={{ href: "/employees" }}
+          firstNumber={firstEmployeeNumber(session.orgSettings)}
         />
       </div>
 
