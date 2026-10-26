@@ -8,6 +8,8 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { PickList } from "@/components/ui/PickList";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { countTotals, planDeviation, type ScheduleLine } from "@/lib/productionSchedule";
@@ -253,6 +255,7 @@ export function ScheduleLines({
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
 
   const sorted = useMemo(() => {
@@ -269,6 +272,14 @@ export function ScheduleLines({
     );
   }, [rows, grouping]);
 
+  // THE NAME SEARCH (Mark, 2026-10-26): a substring of the item's name, case
+  // blind. Everything that acts on "every item" — the select-all box, the
+  // totals — acts on what is SHOWN, so a search never selects a hidden line.
+  const needle = search.trim().toLocaleLowerCase();
+  const shown = needle
+    ? sorted.filter((r) => r.item_name.toLocaleLowerCase().includes(needle))
+    : sorted;
+
   function toggle(id: string) {
     setChecked((prev) => {
       const next = new Set(prev);
@@ -278,7 +289,7 @@ export function ScheduleLines({
     });
   }
 
-  const allChecked = sorted.length > 0 && sorted.every((r) => checked.has(r.id));
+  const allChecked = shown.length > 0 && shown.every((r) => checked.has(r.id));
 
   /**
    * ONE IMPLEMENTATION BEHIND BOTH DOORS — the selection bar and a row's own ⋯
@@ -405,7 +416,7 @@ export function ScheduleLines({
               <Checkbox
                 checked={allChecked}
                 onChange={() =>
-                  setChecked(allChecked ? new Set() : new Set(sorted.map((r) => r.id)))
+                  setChecked(allChecked ? new Set() : new Set(shown.map((r) => r.id)))
                 }
                 label="Select every item"
               />
@@ -719,7 +730,7 @@ export function ScheduleLines({
       {error ? <p className="text-sm text-accent">{error}</p> : null}
 
       <DataTable
-        rows={sorted}
+        rows={shown}
         columns={columns}
         rowKey={(r) => r.id}
         storageKey="production-schedule-lines.v2"
@@ -730,10 +741,14 @@ export function ScheduleLines({
         // same sums each group's subtotal shows.
         totals={(shown) => ({ item: "Total", ...lineTotals(shown) })}
         empty={
+          needle ? (
+            <p className="text-sm text-muted">No item on this schedule matches “{search.trim()}”.</p>
+          ) : (
           <p className="text-sm text-muted">
             Nothing on this schedule. Add an item, or regenerate the day if the
             plans have changed.
           </p>
+          )
         }
         // THE HEADING AND GROUP BY SHARE ONE LINE (Mark, 2026-09-12: move the
         // picker "to the right of the datatable title"), in the table's
@@ -742,7 +757,15 @@ export function ScheduleLines({
         // caption above it would drop the picker below the heading's line.
         leading={
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
-            <SectionHeading count={rows.length}>Items</SectionHeading>
+            <SectionHeading count={shown.length}>Items</SectionHeading>
+            <TextInput
+              value={search}
+              onValueChange={setSearch}
+              aria-label="Search items by name"
+              clearLabel="Clear the search"
+              search
+              icon={<SearchGlyph />}
+            />
             <div className="flex items-center gap-2">
               <span className="text-xs uppercase tracking-[0.12em] text-subtle">Group by</span>
               {/* A PICKLIST since 2026-09-19 (Mark), the list screens' Group by. */}
