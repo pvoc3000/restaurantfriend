@@ -8,8 +8,7 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { PickList } from "@/components/ui/PickList";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { TextInput } from "@/components/ui/TextInput";
-import { SearchGlyph } from "@/components/ui/SearchGlyph";
+import { useScheduleSearch } from "@/components/production/ScheduleSearch";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { countTotals, planDeviation, type ScheduleLine } from "@/lib/productionSchedule";
@@ -255,7 +254,7 @@ export function ScheduleLines({
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const search = useScheduleSearch();
 
 
   const sorted = useMemo(() => {
@@ -273,7 +272,7 @@ export function ScheduleLines({
   }, [rows, grouping]);
 
   // THE NAME SEARCH (Mark, 2026-10-26): a substring of the item's name, case
-  // blind. Everything that acts on "every item" — the select-all box, the
+  // blind, typed in the record's field grid (`ScheduleSearchBox`). Everything that acts on "every item" — the select-all box, the
   // totals — acts on what is SHOWN, so a search never selects a hidden line.
   const needle = search.trim().toLocaleLowerCase();
   const shown = needle
@@ -758,14 +757,6 @@ export function ScheduleLines({
         leading={
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
             <SectionHeading count={shown.length}>Items</SectionHeading>
-            <TextInput
-              value={search}
-              onValueChange={setSearch}
-              aria-label="Search items by name"
-              clearLabel="Clear the search"
-              search
-              icon={<SearchGlyph />}
-            />
             <div className="flex items-center gap-2">
               <span className="text-xs uppercase tracking-[0.12em] text-subtle">Group by</span>
               {/* A PICKLIST since 2026-09-19 (Mark), the list screens' Group by. */}

@@ -21,6 +21,10 @@ import {
 import { ScheduleActions } from "@/components/production/ScheduleActions";
 import type { AddableItem } from "@/components/production/AddScheduleItems";
 import { canEditPage } from "@/lib/pageAccess";
+import {
+  ScheduleSearchBox,
+  ScheduleSearchProvider,
+} from "@/components/production/ScheduleSearch";
 
 /**
  * One committed night.
@@ -277,6 +281,7 @@ export async function ScheduleDetail({
     : null;
 
   return (
+    <ScheduleSearchProvider>
     <div className="space-y-8">
       <Breadcrumbs
         trail={trail}
@@ -412,41 +417,49 @@ export async function ScheduleDetail({
             </span>
           )}
         </Field>
+        {/* THE ITEM SEARCH IN THE FIRST COLUMN, Sells at and Made at sharing
+            the second (Mark, 2026-10-26): a shop code is four characters and
+            did not need half the page each. */}
+        <Field label="Search">
+          <ScheduleSearchBox />
+        </Field>
         {/* Re-pointable in place (Mark, 2026-09-30), the list's picklists in
             the record's box. `activeLocations` is what may be CHOSEN; a closed
             shop the schedule already names stays on the list, sunk. */}
-        <Field label="Sells at">
-          {editable ? (
-            <ScheduleLocationCell
-              boxed={BOXED_FIELDS}
-              scheduleId={id}
-              column="location_id"
-              value={schedule.location_id as string}
-              code={sellsCode}
-              locations={shops}
-              ariaLabel="Sells at"
-              className="font-medium"
-            />
-          ) : (
-            <span className={`${READ_ONLY_VALUE} font-medium`}>{sellsCode}</span>
-          )}
-        </Field>
-        <Field label="Made at">
-          {editable ? (
-            <ScheduleLocationCell
-              boxed={BOXED_FIELDS}
-              scheduleId={id}
-              column="kitchen_location_id"
-              value={schedule.kitchen_location_id as string}
-              code={kitchenCode}
-              locations={shops}
-              ariaLabel="Made at"
-              className="font-medium"
-            />
-          ) : (
-            <span className={`${READ_ONLY_VALUE} font-medium`}>{kitchenCode}</span>
-          )}
-        </Field>
+        <div className="grid grid-cols-2 gap-x-4">
+          <Field label="Sells at">
+            {editable ? (
+              <ScheduleLocationCell
+                boxed={BOXED_FIELDS}
+                scheduleId={id}
+                column="location_id"
+                value={schedule.location_id as string}
+                code={sellsCode}
+                locations={shops}
+                ariaLabel="Sells at"
+                className="font-medium"
+              />
+            ) : (
+              <span className={`${READ_ONLY_VALUE} font-medium`}>{sellsCode}</span>
+            )}
+          </Field>
+          <Field label="Made at">
+            {editable ? (
+              <ScheduleLocationCell
+                boxed={BOXED_FIELDS}
+                scheduleId={id}
+                column="kitchen_location_id"
+                value={schedule.kitchen_location_id as string}
+                code={kitchenCode}
+                locations={shops}
+                ariaLabel="Made at"
+                className="font-medium"
+              />
+            ) : (
+              <span className={`${READ_ONLY_VALUE} font-medium`}>{kitchenCode}</span>
+            )}
+          </Field>
+        </div>
         <Field label="Note" span>
           {editable ? (
             <InlineValue
@@ -488,6 +501,7 @@ export async function ScheduleDetail({
         vocabulary={vocabulary}
       />
     </div>
+    </ScheduleSearchProvider>
   );
 }
 
