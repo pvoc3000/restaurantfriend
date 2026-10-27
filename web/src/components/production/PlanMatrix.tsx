@@ -1619,11 +1619,14 @@ export function PlanMatrix({
                 {/* THE RUN'S SUBTOTAL, TRAILING IT (Mark, 2026-10-26) —
                     `buildMatrix` puts it on the run's last row only. The lists'
                     closing row: `DataTable`'s `summary`, a 2px rule above and
-                    13px semibold, each figure under its day — but GREY, rule
-                    and figures (Mark, same day), so the black Total at the foot
-                    stays the one that reads first. */}
+                    13px semibold, each figure under its day — but a LIGHT
+                    GREY, rule and figures (Mark, same day: grey, then "an even
+                    lighter shade"), so the black Total at the foot stays the
+                    one that reads first. 32px of air after it, before the next
+                    band. */}
                 {row.groupTotals ? (
-                  <tr className="border-t-2 border-muted text-muted">
+                  <>
+                  <tr className="border-t-2 border-faint text-faint">
                     {row.groupTotals.byDay.map((n, i) => (
                       <td
                         key={WEEKDAYS[i].iso}
@@ -1635,6 +1638,10 @@ export function PlanMatrix({
                     ))}
                     <td className="h-11" />
                   </tr>
+                  <tr aria-hidden="true">
+                    <td colSpan={WEEKDAYS.length + 1} className="h-8 p-0" />
+                  </tr>
+                  </>
                 ) : null}
                 </Fragment>
               );
