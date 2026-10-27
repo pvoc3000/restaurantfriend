@@ -165,7 +165,7 @@ export function Dialog({
         role="dialog"
         aria-label={ariaLabel ?? (typeof title === "string" ? title : undefined)}
         onClick={(e) => e.stopPropagation()}
-        className={`flex ${height} w-full ${width} flex-col whitespace-normal border-2 border-ink bg-white text-ink`}
+        className={`flex ${height} w-full ${width} flex-col whitespace-normal border-2 border-ink bg-white text-left text-ink`}
       >
         <div className="flex shrink-0 items-center justify-between gap-4 bg-ink px-6 py-3 text-white">
           <h2 className="text-[13px] font-bold uppercase tracking-[0.06em]">{title}</h2>

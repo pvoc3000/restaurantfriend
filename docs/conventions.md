@@ -890,8 +890,11 @@
   names white on white (Mark, 2026-07-27 — "the vendor names are unreadable…");
   and `white-space: nowrap` from a `DataTable` cell's `truncate`, which stopped
   every paragraph in the vendor-item delete dialog from wrapping and ran the
-  sentences off the panel's right edge (2026-07-31). **Both are now set once on
-  `ui/Dialog`'s panel (`text-ink whitespace-normal`)**, which is the fix — patching
+  sentences off the panel's right edge (2026-07-31). A third, `text-right`
+  from `SyncFromSquare`'s column, which wraps the whole `/timesheets` Actions
+  menu, right-aligned every caption in New Timesheet (Mark, 2026-10-27).
+  **All three are now set once on `ui/Dialog`'s panel (`text-left text-ink
+  whitespace-normal`)**, which is the fix — patching
   each line only defers it to the next line. A new overlay that ISN'T a `Dialog`
   inherits the problem back.
 - **ENTER COMMITS A DIALOG THAT IS A FORM, and it is OPT-IN** (Mark,

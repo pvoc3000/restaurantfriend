@@ -17,6 +17,7 @@ import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { Radio } from "@/components/ui/Radio";
 import { localTime, resolveLocal } from "@/lib/timeZone";
 import { parseWorkdayStart, punchDateFor, formatWorkdayStart } from "@/lib/workday";
 import { formatPeriodRange, type PayPeriodStatus } from "@/lib/payPeriods";
@@ -463,8 +464,8 @@ export function NewTimesheet({
               </p>
             </div>
 
-            <div className="flex flex-wrap items-end gap-6">
-              <label className="space-y-1.5">
+            <div className="grid grid-cols-3 items-end gap-x-6 gap-y-4">
+              <label className="block min-w-0 space-y-1.5">
                 <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
                   Employee
                 </span>
@@ -475,18 +476,18 @@ export function NewTimesheet({
                   onPick={setEmployeeId}
                   options={employeeOptions}
                   placeholder="Choose"
-                  className="w-64"
+                  className="w-full"
                 />
               </label>
 
-              <label className="space-y-1.5">
+              <label className="block min-w-0 space-y-1.5">
                 <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
                   Day
                 </span>
-                <DateField value={workday} onChange={setWorkday} ariaLabel="Workday" />
+                <DateField value={workday} onChange={setWorkday} ariaLabel="Workday" boxed />
               </label>
 
-              <label className="space-y-1.5">
+              <label className="block min-w-0 space-y-1.5">
                 <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
                   Shop
                 </span>
@@ -496,14 +497,14 @@ export function NewTimesheet({
                   value={locationId}
                   onPick={setLocationId}
                   options={locations.map((l) => ({ value: l.id, label: l.code }))}
-                  className="w-32"
+                  className="w-full"
                 />
               </label>
             </div>
 
             {kind === "shift" ? (
-              <div className="flex flex-wrap items-end gap-6">
-                <label className="space-y-1.5">
+              <div className="grid grid-cols-3 items-end gap-x-6 gap-y-4">
+                <label className="block min-w-0 space-y-1.5">
                   <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
                     Clock in
                   </span>
@@ -513,10 +514,10 @@ export function NewTimesheet({
                     placeholder="hh:mm"
                     aria-label="Clock in"
                     clearLabel="Clear"
-                    className="w-32"
+                    fullWidth
                   />
                 </label>
-                <label className="space-y-1.5">
+                <label className="block min-w-0 space-y-1.5">
                   <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
                     Clock out
                   </span>
@@ -526,10 +527,10 @@ export function NewTimesheet({
                     placeholder="hh:mm"
                     aria-label="Clock out"
                     clearLabel="Clear"
-                    className="w-32"
+                    fullWidth
                   />
                 </label>
-                <label className="space-y-1.5">
+                <label className="block min-w-0 space-y-1.5">
                   <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
                     Break (hours)
                   </span>
@@ -538,10 +539,10 @@ export function NewTimesheet({
                     onValueChange={setBreakHours}
                     aria-label="Unpaid break in hours"
                     clearLabel="Clear"
-                    className="w-28"
+                    fullWidth
                   />
                 </label>
-                <p className="pb-1.5 text-sm text-muted">
+                <p className="col-span-3 text-sm text-muted empty:hidden">
                   {workedPreview === null ? (
                     inTime.trim() !== "" || outTime.trim() !== "" ? (
                       <span className="text-accent">Times read like 6:00am or 18:30.</span>
@@ -557,7 +558,7 @@ export function NewTimesheet({
                 </p>
                 {/* Say it, or the punch silently lands on a day nobody typed. */}
                 {punchDate !== null && workday !== null && punchDate !== workday && (
-                  <p className="pb-1.5 text-sm">
+                  <p className="col-span-3 text-sm">
                     <span className="bg-mark-fill px-1">Clocks in on {punchDate}</span>{" "}
                     — this person&rsquo;s workday starts at{" "}
                     {formatWorkdayStart(
@@ -568,22 +569,24 @@ export function NewTimesheet({
                 )}
               </div>
             ) : (
-              <div className="flex flex-wrap items-end gap-6">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-3 items-end gap-x-6 gap-y-4">
+                <div className="min-w-0 space-y-1.5">
                   <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
                     Paid as
                   </span>
-                  <TabPicker
-                    ariaLabel="Paid as"
-                    value={payKind}
-                    onChange={(k) => setPayKind(k as "sick" | "regular")}
-                    options={[
-                      { key: "sick", label: "Sick" },
-                      { key: "regular", label: "Regular" },
-                    ]}
-                  />
+                  <div className="flex h-9 items-center">
+                    <Radio
+                      ariaLabel="Paid as"
+                      value={payKind}
+                      onChange={setPayKind}
+                      options={[
+                        { value: "sick", label: "Sick" },
+                        { value: "regular", label: "Regular" },
+                      ]}
+                    />
+                  </div>
                 </div>
-                <label className="space-y-1.5">
+                <label className="block min-w-0 space-y-1.5">
                   <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
                     Hours
                   </span>
@@ -592,11 +595,11 @@ export function NewTimesheet({
                     onValueChange={setHours}
                     aria-label="Hours"
                     clearLabel="Clear"
-                    className="w-28"
+                    fullWidth
                   />
                 </label>
                 {payKind === "sick" && (
-                  <p className="max-w-[40ch] pb-1.5 text-[13px] text-muted">
+                  <p className="col-span-3 max-w-[60ch] text-[13px] text-muted">
                     Recorded and reconciled here, and deliberately absent from
                     the Gusto file — Gusto already pays sick time, and exporting
                     it would pay it twice.
@@ -614,7 +617,7 @@ export function NewTimesheet({
                 onValueChange={setNote}
                 aria-label="Reason"
                 clearLabel="Clear the reason"
-                className="w-full"
+                fullWidth
               />
               {/* Required, like every other decision in this module. A row that
                   someone typed into payroll with no account of why is the one
