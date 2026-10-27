@@ -1616,6 +1616,26 @@ export function PlanMatrix({
                     </div>
                   </td>
                 </tr>
+                {/* THE RUN'S SUBTOTAL, TRAILING IT (Mark, 2026-10-26) —
+                    `buildMatrix` puts it on the run's last row only. The lists'
+                    closing row: `DataTable`'s `summary`, a 2px rule above and
+                    13px semibold, each figure under its day — but GREY, rule
+                    and figures (Mark, same day), so the black Total at the foot
+                    stays the one that reads first. */}
+                {row.groupTotals ? (
+                  <tr className="border-t-2 border-muted text-muted">
+                    {row.groupTotals.byDay.map((n, i) => (
+                      <td
+                        key={WEEKDAYS[i].iso}
+                        className="h-11 px-2 py-2 text-center text-[13px] font-semibold tabular-nums"
+                        aria-label={`${row.groupTotals!.label} total for ${WEEKDAYS[i].long}`}
+                      >
+                        {n.toLocaleString()}
+                      </td>
+                    ))}
+                    <td className="h-11" />
+                  </tr>
+                ) : null}
                 </Fragment>
               );
             })}

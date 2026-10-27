@@ -385,6 +385,30 @@ test("grouping never rewrites the plan — the input trays are untouched", () =>
   eq(own.map((t) => t.tray_number), ["03", "01", "04", "02"]);
 });
 
+test("each run's subtotal trails it: its own trays, per weekday, an unset par as none", () => {
+  const m = buildMatrix(
+    TRAYS,
+    [
+      { id: "1", tray_id: "b", weekday: 1, item_id: "x", par: 12 },
+      { id: "2", tray_id: "c", weekday: 1, item_id: "x", par: 6 },
+      { id: "3", tray_id: "c", weekday: 7, item_id: "x", par: null },
+      { id: "4", tray_id: "c", weekday: 6, item_id: "x", par: 24 },
+      { id: "5", tray_id: "a", weekday: 1, item_id: "x", par: 100 },
+    ],
+    new Map(),
+    "category"
+  );
+  // 02 and 03 are CLASSIC: the total rides on 03, the run's last row, only.
+  eq(m.map((r) => r.groupTotals), [
+    null,
+    { label: "CLASSIC", byDay: [18, 0, 0, 0, 0, 24, 0] },
+    { label: "RAISED", byDay: [100, 0, 0, 0, 0, 0, 0] },
+    { label: NO_CATEGORY, byDay: [0, 0, 0, 0, 0, 0, 0] },
+  ]);
+  // Grouping by tray has no runs, so nothing to subtotal.
+  eq(buildMatrix(TRAYS, [], new Map(), "tray").map((r) => r.groupTotals), [null, null, null, null]);
+});
+
 test("each band counts the trays in its OWN run, not the whole plan", () => {
   const m = buildMatrix(TRAYS, [], new Map(), "category");
   // CLASSIC 2, RAISED 1, No category 1 — and the count rides with the label, so

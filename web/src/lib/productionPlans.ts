@@ -304,7 +304,10 @@ function groupOf(
  * groups, which is why the label comes from the same function that sorts.
  * `groupCount` rides with it: how many trays that run holds, computed here
  * rather than by the caller for the same reason — this is the function that
- * knows where the run ends.
+ * knows where the run ends. `groupTotals` is the other end of the same run:
+ * on its LAST row, each weekday's pars summed across the run's trays (Mark,
+ * 2026-10-26: subtotals trailing each category and item type, the lists'
+ * rule), an unset par counting as none.
  */
 export function buildMatrix(
   trays: MatrixTrayInput[],
@@ -324,6 +327,8 @@ export function buildMatrix(
   days: TraySlot[][];
   groupLabel: string | null;
   groupCount: number | null;
+  /** On the last row of a run: its label and its par per weekday, Monday first. */
+  groupTotals: { label: string; byDay: number[] } | null;
   /** The second band level — the CUT, under a type. Null when there isn't one. */
   subGroupLabel: string | null;
   /** Last row of its cut run, so the caller can leave a gap after it. */
@@ -382,6 +387,20 @@ export function buildMatrix(
       groupCount: startsRun
         ? ordered.filter((o) => o.group.key === group.key).length
         : null,
+      groupTotals:
+        grouping !== "tray" &&
+        (i === ordered.length - 1 || group.key !== ordered[i + 1].group.key)
+          ? {
+              label: group.label,
+              byDay: WEEKDAYS.map((d) =>
+                ordered
+                  .filter((o) => o.group.key === group.key)
+                  .flatMap((o) => byTray.get(o.tray.id) ?? [])
+                  .filter((s) => s.weekday === d.iso)
+                  .reduce((n, s) => n + (s.par ?? 0), 0)
+              ),
+            }
+          : null,
       subGroupLabel:
         group.subLabel !== null &&
         (i === 0 || group.subKey !== ordered[i - 1].group.subKey)
