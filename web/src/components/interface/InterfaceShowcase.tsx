@@ -61,6 +61,7 @@ import { RecordNav } from "@/components/ui/RecordNav";
 import { RevealPanel } from "@/components/ui/RevealPanel";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
+import { Steppers } from "@/components/ui/Steppers";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { StickyFooter } from "@/components/ui/StickyFooter";
@@ -524,6 +525,7 @@ function TypingBlock() {
   const [search, setSearch] = useState("");
   const [full, setFull] = useState("");
   const [small, setSmall] = useState("");
+  const [stepped, setStepped] = useState(12);
   const [calc, setCalc] = useState("2 * 6");
   const [notes, setNotes] = useState("");
   const calcField = useCalcField();
@@ -534,6 +536,18 @@ function TypingBlock() {
       <Grid>
         <Specimen name="TextInput">
           <TextInput value={plain} onValueChange={setPlain} aria-label="Name" className="w-72" />
+        </Specimen>
+        <Specimen name="Steppers · one box of 6">
+          <span className="flex items-center gap-1 text-sm tabular-nums">
+            <span className="w-6 text-right">{stepped}</span>
+            <Steppers
+              disabled={false}
+              onUp={() => setStepped((n) => n + 6)}
+              onDown={() => setStepped((n) => Math.max(0, n - 6))}
+              labelUp="Raise by one box"
+              labelDown="Lower by one box"
+            />
+          </span>
         </Specimen>
         <Specimen name="TextInput · search, SearchGlyph">
           <TextInput

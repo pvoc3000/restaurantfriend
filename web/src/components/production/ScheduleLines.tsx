@@ -11,6 +11,9 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { useScheduleSearch } from "@/components/production/ScheduleSearch";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { RowMenu } from "@/components/ui/RowMenu";
+import { Steppers } from "@/components/ui/Steppers";
+import { useLatestWrite } from "@/lib/latestWrite";
+import { stepPar } from "@/lib/productionPlans";
 import { countTotals, planDeviation, type ScheduleLine } from "@/lib/productionSchedule";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { formatTypedTime } from "@/lib/timeInput";
@@ -128,6 +131,85 @@ function SoldOutCell({ row, countable }: { row: ScheduleLineRow; countable: bool
         return { error: error ? error.message : null };
       }}
     />
+  );
+}
+
+/**
+ * THE PAR, TYPED OR STEPPED (Mark, 2026-10-26: the plan's ▲▼ "to the right of
+ * the par column", so a night can be nudged a box at a time). One box is the
+ * item's `tally_box_size`, the plan's step — `stepPar`, shared with it.
+ *
+ * A TAP NEVER WAITS (`lib/latestWrite`): the number changes on the tap and the
+ * write follows, three quick taps landing as three boxes rather than one. Both
+ * doors write `par_source = 'manual'` in the SAME update as the par, the typed
+ * cell's rule, so a stepped par cannot claim to have come from the plan.
+ */
+function ParCell({ row }: { row: ScheduleLineRow }) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [overlay, setOverlay] = useState<number | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  // Fresh rows from the server replace the overlay, by adjusting during render.
+  const [seen, setSeen] = useState(row.par);
+  if (seen !== row.par) {
+    setSeen(row.par);
+    setOverlay(null);
+  }
+  const par = overlay ?? row.par;
+
+  const save = useLatestWrite<number>(
+    async (next) => {
+      const { data, error } = await supabase
+        .from("production_schedule_items")
+        .update({ par: next, par_source: "manual" })
+        .eq("id", row.id)
+        .select("id");
+      return error?.message ?? (data?.length ? null : "That par could not be changed.");
+    },
+    (error) => {
+      if (error) {
+        setOverlay(null);
+        setFailed(error);
+      }
+      router.refresh();
+    }
+  );
+
+  function step(direction: 1 | -1) {
+    const next = stepPar(par, row.tally_box_size, direction);
+    if (next === par) return; // already on the floor
+    setFailed(null);
+    setOverlay(next);
+    save(next);
+  }
+
+  return (
+    <span className="flex flex-col items-end">
+      <span className="flex items-center gap-1">
+        <InlineValue
+          table="production_schedule_items"
+          id={row.id}
+          column="par"
+          kind="number"
+          align="right"
+          nullable={false}
+          value={par}
+          // ONE update, so the pair can't half-succeed: a par that
+          // disagrees with the plan while still claiming to have come
+          // from it is the outcome worth preventing.
+          alsoUpdate={() => ({ par_source: "manual" })}
+          className="w-auto"
+        />
+        <Steppers
+          disabled={false}
+          onUp={() => step(1)}
+          onDown={() => step(-1)}
+          labelUp={`Raise ${row.item_name} by one box`}
+          labelDown={`Lower ${row.item_name} by one box`}
+        />
+      </span>
+      {failed ? <span className="text-xs text-accent">{failed}</span> : null}
+    </span>
   );
 }
 
@@ -518,7 +600,8 @@ export function ScheduleLines({
       // 20px wider than it was, which is what the mark costs. It comes out of
       // Name (240 → 220), the one column with slack at this width: it WRAPS,
       // so what it loses is a wrap point rather than any of its text.
-      width: 120,
+      // 140 since the steppers joined it (2026-10-26): their 16px and the gap.
+      width: 140,
       align: "right",
       sortValue: (r) => r.par,
       /**
@@ -554,20 +637,7 @@ export function ScheduleLines({
           <span className="flex items-center justify-end gap-1">
             {mark}
             {editable ? (
-              <InlineValue
-                table="production_schedule_items"
-                id={r.id}
-                column="par"
-                kind="number"
-                align="right"
-                nullable={false}
-                value={r.par}
-                // ONE update, so the pair can't half-succeed: a par that
-                // disagrees with the plan while still claiming to have come
-                // from it is the outcome worth preventing.
-                alsoUpdate={() => ({ par_source: "manual" })}
-                className="w-auto"
-              />
+              <ParCell row={r} />
             ) : (
               <span className={`${READ_ONLY_VALUE} tabular-nums`}>{r.par}</span>
             )}
