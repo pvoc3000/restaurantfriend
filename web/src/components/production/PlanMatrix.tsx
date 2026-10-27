@@ -16,6 +16,7 @@ import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import {
   STICKY_HEAD_ROW,
+  STICKY_TOTALS_ROW,
   useOverflowOnlyWhenNeeded,
 } from "@/lib/tableHead";
 import {
@@ -1619,6 +1620,32 @@ export function PlanMatrix({
               );
             })}
           </tbody>
+          {/* EACH DAY'S TOTAL, TRAILING THE TRAYS (Mark, 2026-10-26) — every
+              par on that day summed, an unset par counting as none. Read off
+              `slots`, which carries the steppers' overlay, so a tap moves the
+              total on the same frame as the par. The lists' totals row:
+              `STICKY_TOTALS_ROW`, its 2px rule and 13px semibold. */}
+          {slots.length > 0 ? (
+            <tfoot>
+              <tr className={STICKY_TOTALS_ROW}>
+                {WEEKDAYS.map((d) => (
+                  <td
+                    key={d.iso}
+                    className="h-11 px-2 py-2 text-center text-[13px] font-semibold tabular-nums"
+                    aria-label={`Total for ${d.long}`}
+                  >
+                    {slots
+                      .filter((s) => s.weekday === d.iso)
+                      .reduce((n, s) => n + (s.par ?? 0), 0)
+                      .toLocaleString()}
+                  </td>
+                ))}
+                <td className="h-11 px-1 py-2 text-[11px] uppercase tracking-[0.12em] text-muted">
+                  Total
+                </td>
+              </tr>
+            </tfoot>
+          ) : null}
         </table>
       </div>
 
