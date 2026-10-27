@@ -1137,3 +1137,57 @@
    closed, 1 in review, none exported; `freeze_pay_period` gone,
    `close_pay_period` / `reopen_pay_period` / the guard trigger present; all
    801 snapshotted rows on 07-20 → 09-27 still frozen.
+   **2026-10-27 — THE IMPORTER ASKS WHICH SHIFTS TO WRITE** (Mark: "I don't
+   want to lose the work I've done to other timesheets by reimporting them").
+   Skymarie Baiza's 10/23 shift came in at $19 under her Sr. Donut Friend role
+   where she earns $21, and the only fix was a re-import — which puts every
+   row's hours split, break and notes back to Homebase's. The plan screen now
+   has a **Shifts** table (`DataTable`), one checkbox per matched shift, and
+   Commit writes only the ticked ones. Each shift is classified by
+   `lib/importReview` against the row already under its `source_row_key`:
+   **New** (no row), **Unchanged**, **Changed in Homebase** (hours, break,
+   clock-out, role, pay rate or notes differ from what the last import
+   stored) and **Edited here** (hours ≠ source or any `ot_decision` other
+   than `source`, break ≠ source, or a note ≠ the one Homebase sent).
+   Edited wins over changed and starts UNTICKED (Mark's rule); everything
+   else starts ticked. "What differs" names the fields on each side.
+   The existing rows are read when the file is dropped — by org, `homebase`,
+   the file's shop and its punch-date range, PAGED past PostgREST's 1,000 —
+   and the commit waits for them, because a list that hasn't looked would
+   call every shift New and tick the edits. `rowKeyOf` is now shared by the
+   checklist and the upsert, so a box and the row it writes cannot disagree.
+   Measured on Oct 12–25: 141 Homebase rows, 2 would read Edited here (both
+   hours), and every one's stored payload matches its stored columns on role,
+   hours, break, rate and clock-out — so an identical re-import reads
+   Unchanged. **Not changed:** the closed-period and uncovered-day blocks
+   still look at every matched shift, ticked or not. A punch fixed in Homebase
+   still changes the key (clock times are in it), so it arrives as New beside
+   the old row rather than as Changed. 2459 fixtures pass, 10 new; breaking the
+   edited rule turns three red. Checked in the browser on a signed-out scratch
+   page with the DF01 fixture file (all New there, since nothing is readable
+   signed out): ticking, tick-all, untick-all, the count and the disabled
+   Import with its reason.
+   **The same day — ONE ROW PER EMPLOYEE** (Mark: "present the user with a
+   list of employees instead of all the timesheets"). The table's rows are
+   now people, collapsed, each with the `DataTable` disclosure `/timesheets`
+   uses; their shifts open beneath as a ruled grid with their own boxes. The
+   box by a name ticks or unticks all of that person's shifts, and is ticked
+   only when every one is — `Checkbox` has no half-ticked state, so a partly
+   ticked person shows an empty box and "2 of 5" in the Ticked column. Status
+   counts each person's shifts ("1 edited here · 4 unchanged", the edit in
+   yellow) and sorts edited people first. The shifts are a grid, not a nested
+   `DataTable`: a table inside a cell would bring sticky labels and its own
+   saved widths to five lines. Checked in the browser the same way: expand,
+   untick one shift (box clears, 5 of 6), tick the person (all six), untick
+   the person (all six off, the other person untouched).
+   **The same day — IMPORT TIMESHEETS AS AN OVERLAY, tried and NOT kept**
+   (Mark: "let's see what the import timesheets dialogue looks like as an
+   overlay", then "I prefer the full page"). It stays `/timesheets/import`,
+   reached from the Actions menu; the page lost its redundant "Back to the
+   shifts" link, since Done already leaves. The trial was a `max-w-5xl`
+   `Dialog` with the commands pinned in its footer, built and verified, then
+   removed. **One finding worth keeping for the next DataTable put in a
+   dialog:** column labels stick at `--rf-header-h` (the masthead, 64px), so
+   the dialog body has to set it to `-1.5rem` — NEGATIVE, because a sticky
+   edge is measured inside the scroller's `p-6`, and `0px` left a 24px strip
+   with rows scrolling through it (measured flush after the fix).

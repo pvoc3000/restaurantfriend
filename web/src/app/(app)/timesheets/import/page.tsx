@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canRunPayroll } from "@/lib/roles";
@@ -72,14 +70,7 @@ export default async function ImportTimesheetsPage() {
         <p className="max-w-[72ch] text-sm text-muted">
           Drop the CSV Homebase exports. You&rsquo;ll see exactly what it
           contains, where it lands and who it can&rsquo;t match, before anything
-          is written.{" "}
-          <Link
-            href="/timesheets"
-            className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-          >
-            Back to the shifts
-          </Link>
-          .
+          is written.
         </p>
       </div>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -8,6 +9,18 @@ import { FileDropZone } from "@/components/ui/FileDropZone";
 import { DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { PickList } from "@/components/ui/PickList";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Checkbox } from "@/components/ui/Checkbox";
+import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
+import {
+  IMPORT_STATUS_COUNT_LABEL,
+  IMPORT_STATUS_LABEL,
+  reviewShift,
+  selectedByDefault,
+  type ImportStatus,
+  type IncomingShift,
+  type ShiftReview,
+  type StoredShift,
+} from "@/lib/importReview";
 import {
   planImport,
   whyCommitIsBlocked,
@@ -69,6 +82,45 @@ type Matched = {
   workdayStart: number | null;
 };
 
+/** A shift in the checklist: the file's row, who it matched, and what a write would do. */
+type ReviewRow = { key: string; m: Matched; review: ShiftReview };
+/** A person in the checklist, and their shifts in the order they were worked. */
+type EmployeeRow = { id: string; name: string; shifts: ReviewRow[] };
+
+/** The order statuses are counted in, most in need of a look first. */
+const STATUS_ORDER: readonly ImportStatus[] = ["edited", "changed", "new", "unchanged"];
+
+/** The columns `reviewShift` compares — everything the upsert would overwrite. */
+const STORED_COLUMNS =
+  "source_row_key, source_hours_regular, source_hours_overtime, source_hours_double_ot, " +
+  "source_hours_paid, source_break_minutes, hours_regular, hours_overtime, hours_double_ot, " +
+  "ot_decision, unpaid_break_minutes, clock_out, position, employee_note, manager_note, source_payload";
+
+/** "01 Overnight Baker" → "Overnight Baker" — what `position` stores. */
+function roleOf(s: ParsedShift): string | null {
+  return s.role ? s.role.replace(/^\d+\s+/, "") : null;
+}
+
+/**
+ * The upsert's conflict target. THE PUNCH DATE, never the workday — see the
+ * note where the rows are built. Shared by the commit and the checklist, so
+ * the shift a box describes is the row it writes.
+ */
+function rowKeyOf(s: ParsedShift, locationCode: string): string {
+  return [
+    s.payrollId ?? s.name,
+    s.punchDate,
+    s.source.clockInTime ?? "-",
+    s.source.clockOutTime ?? "-",
+    locationCode,
+  ].join("|");
+}
+
+function wall(dateISO: string, minutes: number) {
+  const [y, mo, d] = dateISO.split("-").map(Number);
+  return { year: y, month: mo, day: d, hour: Math.floor(minutes / 60), minute: minutes % 60 };
+}
+
 /**
  * Drop → plan → commit, with NOTHING WRITTEN BEFORE COMMIT.
  *
@@ -104,12 +156,87 @@ export function ImportTimesheets({
   /** Manual links the reader has made, keyed by the file's Payroll ID or name. */
   const [links, setLinks] = useState<Record<string, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
+  /**
+   * The rows already imported for this file's shop and dates, by key. Null
+   * while they are being read — the commit waits for them, because a checklist
+   * that has not looked yet would call every shift New and tick the edited ones.
+   */
+  const [existing, setExisting] = useState<Map<string, StoredShift> | null>(null);
+  /** Ticked shifts, by row key. Only these are written. */
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   async function take(f: File) {
     setError(null);
     setDone(null);
     setFile(f);
-    setPlan(planImport(await f.text()));
+    setExisting(null);
+    setSelected(new Set());
+    const next = planImport(await f.text());
+    setPlan(next);
+
+    const loc = next.locationCode
+      ? (locations.find((l) => l.code === next.locationCode) ?? null)
+      : null;
+    // No shop, no shifts: the commit is blocked for its own stated reason, and
+    // there is nothing to compare against.
+    if (!loc || next.shifts.length === 0) {
+      setExisting(new Map());
+      return;
+    }
+
+    const dates = next.shifts.map((s) => s.punchDate).sort();
+    const found = new Map<string, StoredShift>();
+    // PAGED: PostgREST stops at 1,000 rows without saying so, and a shift it
+    // dropped would read as New and be ticked over an edit.
+    for (let from = 0; ; from += 1000) {
+      const { data, error: e } = await supabase
+        .from("timesheets")
+        .select(STORED_COLUMNS)
+        .eq("org_id", orgId)
+        .eq("source", "homebase")
+        .eq("location_id", loc.id)
+        .gte("business_date", dates[0])
+        .lte("business_date", dates[dates.length - 1])
+        .order("id")
+        .range(from, from + 999);
+      if (e) {
+        setError(`Could not read the shifts already imported: ${e.message}`);
+        return;
+      }
+      for (const r of (data ?? []) as unknown as (StoredShift & { source_row_key: string })[]) {
+        found.set(r.source_row_key, r);
+      }
+      if (!data || data.length < 1000) break;
+    }
+
+    setExisting(found);
+    setSelected(
+      new Set(
+        next.shifts
+          .map((s) => rowKeyOf(s, loc.code))
+          .filter((k, i) => selectedByDefault(reviewShift(incomingOf(next.shifts[i]), found.get(k) ?? null).status))
+      )
+    );
+  }
+
+  /** What the file says about a shift, in the terms the stored row uses. */
+  function incomingOf(s: ParsedShift): IncomingShift {
+    const outAt =
+      s.clockOutDate === null || s.clockOutMinutes === null
+        ? null
+        : resolveLocal(timeZone, wall(s.clockOutDate, s.clockOutMinutes));
+    return {
+      regular: s.source.regularHours,
+      overtime: s.source.overtimeHours,
+      double_ot: s.source.doubleOtHours,
+      paid: s.source.totalPaidHours,
+      breakMinutes: s.unpaidBreakMinutes,
+      clockOut: outAt ? new Date(outAt.instant).toISOString() : null,
+      position: roleOf(s),
+      wageRate: s.source.wageRate,
+      employeeNote: s.source.employeeNote,
+      managerNote: s.source.managerNote,
+    };
   }
 
   /* -- matching ---------------------------------------------------------- */
@@ -189,6 +316,27 @@ export function ImportTimesheets({
   const location = plan?.locationCode
     ? (locations.find((l) => l.code === plan.locationCode) ?? null)
     : null;
+
+  /** Every matched shift, with what writing it would do. */
+  const reviewRows: ReviewRow[] = useMemo(() => {
+    if (!location || existing === null) return [];
+    return matched
+      .filter((m) => m.employeeId)
+      .map((m) => {
+        const key = rowKeyOf(m.shift, location.code);
+        return { key, m, review: reviewShift(incomingOf(m.shift), existing.get(key) ?? null) };
+      });
+    // incomingOf closes over the time zone only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matched, location, existing]);
+
+  const chosen = reviewRows.filter((r) => selected.has(r.key));
+
+  const statusCounts = useMemo(() => {
+    const out: Record<ImportStatus, number> = { new: 0, unchanged: 0, changed: 0, edited: 0 };
+    for (const r of reviewRows) out[r.review.status] += 1;
+    return out;
+  }, [reviewRows]);
 
   // Which fortnight owns these shifts. Looked up from the file's own dates, so
   // the screen can say "that period is closed" before anything is written
@@ -327,6 +475,8 @@ export function ImportTimesheets({
     plan !== null &&
     file !== null &&
     plan.shifts.length > 0 &&
+    existing !== null &&
+    chosen.length > 0 &&
     location !== null &&
     blockedPeriods.length === 0 &&
     targetPeriods.length > 0 &&
@@ -381,9 +531,8 @@ export function ImportTimesheets({
       //    the same export updates rather than duplicating — which matters,
       //    because Homebase emits no shift id and a fortnight gets re-exported
       //    every time somebody fixes a punch.
-      const rows = matched
-        .filter((m) => m.employeeId)
-        .map((m) => {
+      const rows = chosen
+        .map(({ m }) => {
           const s = m.shift;
           const inAt = resolveLocal(timeZone, wall(s.punchDate, s.clockInMinutes));
           const outAt =
@@ -398,13 +547,7 @@ export function ImportTimesheets({
           // database before 061: field [1] equals `workday` on 321 of 321
           // Homebase rows and 1000 of 1000 FileMaker rows, so keying on the
           // punch date leaves every existing key byte-identical.
-          const natural = [
-            s.payrollId ?? s.name,
-            s.punchDate,
-            s.source.clockInTime ?? "-",
-            s.source.clockOutTime ?? "-",
-            location.code,
-          ].join("|");
+          const natural = rowKeyOf(s, location.code);
 
           return {
             org_id: orgId,
@@ -441,7 +584,7 @@ export function ImportTimesheets({
             scheduled_hours: s.source.scheduledHours,
             // "01 Overnight Baker" → "Overnight Baker". The FMP export no longer
             // carries FileMaker's numbering; the Homebase Role column still does.
-            position: s.role ? s.role.replace(/^\d+\s+/, "") : null,
+            position: roleOf(s),
             employee_note: s.source.employeeNote,
             manager_note: s.source.managerNote,
             source: "homebase",
@@ -514,13 +657,10 @@ export function ImportTimesheets({
       setDone(`${written?.length ?? 0} shifts imported.`);
       setPlan(null);
       setFile(null);
+      setExisting(null);
+      setSelected(new Set());
       router.refresh();
     });
-  }
-
-  function wall(dateISO: string, minutes: number) {
-    const [y, mo, d] = dateISO.split("-").map(Number);
-    return { year: y, month: mo, day: d, hour: Math.floor(minutes / 60), minute: minutes % 60 };
   }
 
   /** Link an unmatched person, writing `homebase_id` so the next import matches. */
@@ -536,9 +676,259 @@ export function ImportTimesheets({
     });
   }
 
+  /* -- the checklist ------------------------------------------------------- */
+
+  /**
+   * ONE ROW PER EMPLOYEE, their shifts behind the disclosure (Mark,
+   * 2026-10-27: "present the user with a list of employees instead of all the
+   * timesheets"). A fortnight is ~150 shifts and ~20 people, and the decision
+   * is usually about a person — re-import Sky, leave everyone else — so the
+   * person is the row and the box beside their name ticks all of their shifts.
+   * The shifts stay individually tickable inside, for the one edited shift
+   * among five that should be left alone.
+   */
+  const employeeRows: EmployeeRow[] = useMemo(() => {
+    const by = new Map<string, ReviewRow[]>();
+    for (const r of reviewRows) {
+      const id = r.m.employeeId as string;
+      const list = by.get(id);
+      if (list) list.push(r);
+      else by.set(id, [r]);
+    }
+    return [...by.entries()].map(([id, shifts]) => ({
+      id,
+      name: employeeName(id),
+      shifts: shifts
+        .slice()
+        .sort(
+          (a, b) =>
+            a.m.shift.punchDate.localeCompare(b.m.shift.punchDate) ||
+            a.m.shift.clockInMinutes - b.m.shift.clockInMinutes
+        ),
+    }));
+    // employeeName reads `byId`, which changes only with `employees`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewRows]);
+
+  const allChosen = reviewRows.length > 0 && chosen.length === reviewRows.length;
+
+  function setTicked(keys: string[], on: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const k of keys) {
+        if (on) next.add(k);
+        else next.delete(k);
+      }
+      return next;
+    });
+  }
+
+  const tickedOf = (e: EmployeeRow) => e.shifts.filter((r) => selected.has(r.key)).length;
+
+  /** "pay rate, notes" — what differs, said once per side. */
+  function differs(r: ShiftReview): string {
+    const parts: string[] = [];
+    if (r.edited.length > 0) parts.push(`Here: ${r.edited.join(", ")}`);
+    if (r.changed.length > 0) parts.push(`Homebase: ${r.changed.join(", ")}`);
+    return parts.join(" · ");
+  }
+
+  /** "2 new · 1 edited here" — an employee's shifts by status, in one order. */
+  function statusLine(e: EmployeeRow): ReactNode {
+    const counts: Record<ImportStatus, number> = { new: 0, unchanged: 0, changed: 0, edited: 0 };
+    for (const r of e.shifts) counts[r.review.status] += 1;
+    return STATUS_ORDER.filter((k) => counts[k] > 0).map((k, i) => (
+      <span key={k}>
+        {i > 0 && " · "}
+        {/* Yellow on the one a person has to decide: an edit, which a write
+            would overwrite. */}
+        <span className={k === "edited" ? "bg-mark-fill px-1" : ""}>
+          {counts[k]} {IMPORT_STATUS_COUNT_LABEL[k]}
+        </span>
+      </span>
+    ));
+  }
+
+  const paidOf = (rows: ReviewRow[]) =>
+    rows.reduce((n, r) => n + (r.m.shift.source.totalPaidHours ?? 0), 0);
+
+  const employeeColumns: DataColumn<EmployeeRow>[] = [
+    {
+      key: "pick",
+      label: "",
+      width: 48,
+      header: (
+        <Checkbox
+          checked={allChosen}
+          onChange={() =>
+            setSelected(allChosen ? new Set() : new Set(reviewRows.map((r) => r.key)))
+          }
+          label="Tick every shift"
+        />
+      ),
+      // TICKED ONLY WHEN EVERY SHIFT IS. A partly ticked person shows an empty
+      // box and "2 of 5" beside it, and a click ticks the rest — the box says
+      // what one click will do to the whole person.
+      render: (e) => {
+        const all = tickedOf(e) === e.shifts.length;
+        return (
+          <Checkbox
+            checked={all}
+            onChange={() => setTicked(e.shifts.map((r) => r.key), !all)}
+            label={`Import every shift for ${e.name}`}
+          />
+        );
+      },
+    },
+    {
+      key: "employee",
+      label: "Employee",
+      width: 240,
+      pinned: true,
+      sortValue: (e) => e.name,
+      render: (e) => e.name,
+    },
+    {
+      key: "shifts",
+      label: "Shifts",
+      width: 80,
+      align: "right",
+      sortValue: (e) => e.shifts.length,
+      render: (e) => <span className="tabular-nums">{e.shifts.length}</span>,
+    },
+    {
+      key: "ticked",
+      label: "Ticked",
+      width: 90,
+      align: "right",
+      sortValue: (e) => tickedOf(e),
+      render: (e) => (
+        <span className="tabular-nums">
+          {tickedOf(e)} of {e.shifts.length}
+        </span>
+      ),
+    },
+    {
+      key: "paid",
+      label: "Paid hours",
+      width: 100,
+      align: "right",
+      sortValue: (e) => paidOf(e.shifts),
+      render: (e) => <span className="tabular-nums">{paidOf(e.shifts).toFixed(2)}</span>,
+    },
+    {
+      key: "status",
+      label: "Status",
+      width: 320,
+      wrap: true,
+      // Edited people first, then changed, so the ones worth opening rise.
+      sortValue: (e) =>
+        e.shifts.some((r) => r.review.status === "edited")
+          ? 0
+          : e.shifts.some((r) => r.review.status === "changed")
+            ? 1
+            : e.shifts.some((r) => r.review.status === "new")
+              ? 2
+              : 3,
+      render: statusLine,
+    },
+  ];
+
+  /**
+   * One person's shifts, inside the disclosure. A ruled grid rather than a
+   * second `DataTable`: a table nested in a cell would bring sticky column
+   * labels and its own saved widths to a list of five lines.
+   */
+  function shiftList(e: EmployeeRow) {
+    return (
+      <div className="py-2 text-sm">
+        <div className="grid grid-cols-[2rem_9.5rem_10rem_5rem_10rem_minmax(0,1fr)] items-center gap-x-4 border-b border-hairline pb-1 text-[11px] uppercase tracking-[0.12em] text-muted">
+          <span />
+          <span>Clocked in</span>
+          <span>Role</span>
+          <span className="text-right">Paid hours</span>
+          <span>Status</span>
+          <span>What differs</span>
+        </div>
+        {e.shifts.map((r) => (
+          <div
+            key={r.key}
+            className="grid grid-cols-[2rem_9.5rem_10rem_5rem_10rem_minmax(0,1fr)] items-center gap-x-4 border-b border-hairline py-2 last:border-b-0"
+          >
+            <Checkbox
+              checked={selected.has(r.key)}
+              onChange={(on) => setTicked([r.key], on)}
+              label={`Import ${e.name}, ${r.m.shift.punchDate}`}
+            />
+            <span className="tabular-nums">
+              {r.m.shift.punchDate} {clockLabel(r.m.shift.clockInMinutes)}
+            </span>
+            <span className="truncate">{roleOf(r.m.shift) ?? "—"}</span>
+            <span className="text-right tabular-nums">
+              {r.m.shift.source.totalPaidHours?.toFixed(2) ?? "—"}
+            </span>
+            <span>
+              {r.review.status === "edited" ? (
+                <span className="bg-mark-fill px-1">{IMPORT_STATUS_LABEL.edited}</span>
+              ) : (
+                IMPORT_STATUS_LABEL[r.review.status]
+              )}
+            </span>
+            <span className="text-muted">{differs(r.review)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   /* -- render -------------------------------------------------------------- */
 
-  return (
+  // THE COMMIT, and therefore black (Mark, 2026-08-22: "the 'import x sheets'
+  // button should be black and not the 'done' button, shouldn't it?"). It
+  // should: these only exist once a file is loaded, and at that moment
+  // importing is the one outcome the screen is for — a commit standing beside
+  // no peers, which is what the panel-commit exception actually turns on. Done
+  // is the escape beside it and gives the fill up while a plan is up.
+  const commitButton = (
+    <button type="button" disabled={!canCommit} onClick={commit} className={DIALOG_COMMIT_CLASS}>
+      {pending ? "Importing…" : `Import ${chosen.length} shift${chosen.length === 1 ? "" : "s"}`}
+    </button>
+  );
+  const discardButton = (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() => {
+        setPlan(null);
+        setFile(null);
+        setLinks({});
+        setExisting(null);
+        setSelected(new Set());
+      }}
+      className="text-[12px] uppercase tracking-[0.06em] text-muted underline underline-offset-4"
+    >
+      Discard
+    </button>
+  );
+  const commitReason =
+    commitBlockedBecause ??
+    (existing === null
+      ? "Checking which of these shifts are already imported…"
+      : chosen.length === 0
+        ? "Tick at least one shift to import."
+        : "Nothing has been written yet.");
+  const doneButton = (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() => router.push("/timesheets")}
+      className={plan ? BUTTON : DIALOG_COMMIT_CLASS}
+    >
+      Done
+    </button>
+  );
+
+  const body = (
     <div className="space-y-8">
       <FileDropZone
         accept={ACCEPT}
@@ -699,6 +1089,30 @@ export function ImportTimesheets({
             )}
           </section>
 
+          {employeeRows.length > 0 && (
+            <DataTable
+              rows={employeeRows}
+              columns={employeeColumns}
+              rowKey={(e) => e.id}
+              storageKey="rf.timesheetImport.employees.v1"
+              defaultSort={{ key: "employee" }}
+              expand={{ render: shiftList, columnKey: "employee" }}
+              leading={
+                <div className="space-y-1">
+                  <SectionHeading count={employeeRows.length}>Employees</SectionHeading>
+                  <p className="text-sm text-muted tabular-nums">
+                    {reviewRows.length} shifts:{" "}
+                    {STATUS_ORDER.filter((k) => statusCounts[k] > 0)
+                      .map((k) => `${statusCounts[k]} ${IMPORT_STATUS_COUNT_LABEL[k]}`)
+                      .join(" · ")}
+                    {" — "}
+                    {chosen.length} ticked
+                  </p>
+                </div>
+              }
+            />
+          )}
+
           {unmatchedPeople.length > 0 && (
             <section className="space-y-3">
               <SectionHeading count={unmatchedPeople.length}>Unmatched people</SectionHeading>
@@ -777,38 +1191,9 @@ export function ImportTimesheets({
           )}
 
           <div className="flex flex-wrap items-center gap-4">
-            {/* THE COMMIT, and therefore black (Mark, 2026-08-22: "the 'import
-                x sheets' button should be black and not the 'done' button,
-                shouldn't it?"). It should: this row only exists once a file is
-                loaded, and at that moment importing is the one outcome the
-                screen is for — a commit standing beside no peers, which is what
-                the panel-commit exception actually turns on. Done is the escape
-                beside it and gives the fill up while a plan is up. */}
-            <button
-              type="button"
-              disabled={!canCommit}
-              onClick={commit}
-              className={DIALOG_COMMIT_CLASS}
-            >
-              {pending
-                ? "Importing…"
-                : `Import ${matched.filter((m) => m.employeeId).length} shifts`}
-            </button>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => {
-                setPlan(null);
-                setFile(null);
-                setLinks({});
-              }}
-              className="text-[12px] uppercase tracking-[0.06em] text-muted underline underline-offset-4"
-            >
-              Discard
-            </button>
-            <span className="text-sm text-muted">
-              {commitBlockedBecause ?? "Nothing has been written yet."}
-            </span>
+            {commitButton}
+            {discardButton}
+            <span className="text-sm text-muted">{commitReason}</span>
           </div>
         </div>
       )}
@@ -826,16 +1211,9 @@ export function ImportTimesheets({
           escape beside it; before and after, Done is the only thing to press and
           is the commit. A screen with two black buttons has said nothing about
           which one finishes the task (Mark, 2026-08-22). */}
-      <div className="flex justify-end border-t border-hairline pt-6">
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => router.push("/timesheets")}
-          className={plan ? BUTTON : DIALOG_COMMIT_CLASS}
-        >
-          Done
-        </button>
-      </div>
+      <div className="flex justify-end border-t border-hairline pt-6">{doneButton}</div>
     </div>
   );
+
+  return body;
 }
