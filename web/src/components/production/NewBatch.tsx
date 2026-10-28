@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
-import { PickList } from "@/components/ui/PickList";
+import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { BAR_CELL } from "@/components/tablet/barCell";
 import { BarLabel, ICON_ADD } from "@/components/tablet/BarLabel";
@@ -69,6 +70,14 @@ export function NewBatch({
     { id: string; name: string; kind: string; is_active: boolean }[]
   >([]);
   const [elementId, setElementId] = useState<string | null>(null);
+  const [term, setTerm] = useState("");
+
+  // Every word typed must appear in the name, in any order — the inventory
+  // search's rule, done here in the browser because the list is already loaded.
+  const words = term.toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = elements.filter(
+    (e) => e.is_active && words.every((w) => e.name.toLowerCase().includes(w))
+  );
 
   // Loaded when the dialog opens, not on every page load: ~470 elements is a
   // real payload and the list screen has no other use for it.
@@ -78,8 +87,6 @@ export function NewBatch({
     void (async () => {
       const { data } = await supabase
         .from("production_elements")
-        // Inactive ones come too — `PickList` sinks them under their own
-        // heading rather than pretending they do not exist.
         .select("id, name, kind, is_active")
         .order("name");
       if (!cancelled)
@@ -98,11 +105,12 @@ export function NewBatch({
     if (pending) return;
     setOpen(false);
     setElementId(null);
+    setTerm("");
     setFailed(null);
   }
 
-  function add() {
-    if (!ready) return;
+  function add(picked: string | null = elementId) {
+    if (!picked || pending) return;
     setFailed(null);
     startTransition(async () => {
       // The number comes from 044's definer — a plain `nextval` is not reachable
@@ -121,7 +129,7 @@ export function NewBatch({
         .insert({
           org_id: orgId,
           log_id: logId,
-          element_id: elementId,
+          element_id: picked,
           location_id: locationId,
           batch_number: number as string,
           is_generated: false,
@@ -170,7 +178,7 @@ export function NewBatch({
           title="Log a batch"
           onClose={close}
           busy={pending}
-          onSubmit={ready ? add : undefined}
+          onSubmit={ready ? () => add() : undefined}
           footer={
             <>
               <button
@@ -183,7 +191,7 @@ export function NewBatch({
               </button>
               <button
                 type="button"
-                onClick={add}
+                onClick={() => add()}
                 disabled={!ready || pending}
                 className={DIALOG_COMMIT_CLASS}
               >
@@ -202,25 +210,63 @@ export function NewBatch({
               photo go on the record.
             </p>
 
-            <label className="block space-y-1.5">
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+            <div className="space-y-1.5">
+              <span
+                id="new-batch-element"
+                className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
+              >
                 Element
               </span>
-              <PickList
-                value={elementId}
-                onPick={(next) => setElementId(next || null)}
-                variant="field"
-                ariaLabel="Which element"
-                activateTable="production_elements"
-                placeholder={elements.length ? "Pick one" : "Loading…"}
-                options={elements.map((e) => ({
-                  value: e.id,
-                  label: e.name,
-                  hint: e.kind,
-                  inactive: e.is_active === false,
-                }))}
+              <TextInput
+                autoFocus
+                value={term}
+                onValueChange={setTerm}
+                clearLabel="Clear the search"
+                search
+                fullWidth
+                aria-label="Search elements"
+                icon={<SearchGlyph />}
               />
-            </label>
+              {/* A SCROLL VIEW, not a popup (Mark, 2026-10-28): the choices are
+                  on screen the moment the dialog opens, and a tap is the pick.
+                  Active elements only — `PickList` used to sink the inactive
+                  ones under a heading and offer to revive them, which needs
+                  purchaser+, and staff log batches. */}
+              <ul
+                role="listbox"
+                aria-labelledby="new-batch-element"
+                className="h-72 overflow-y-auto overscroll-contain border border-ink"
+              >
+                {elements.length === 0 ? (
+                  <li className="px-3 py-2 text-sm text-subtle">Loading…</li>
+                ) : shown.length === 0 ? (
+                  <li className="px-3 py-2 text-sm text-subtle">No elements match.</li>
+                ) : (
+                  shown.map((e) => {
+                    const chosen = e.id === elementId;
+                    return (
+                      <li key={e.id} role="option" aria-selected={chosen}>
+                        <button
+                          type="button"
+                          onClick={() => setElementId(e.id)}
+                          // A double-click is the pick AND the commit.
+                          onDoubleClick={() => {
+                            setElementId(e.id);
+                            add(e.id);
+                          }}
+                          className={`flex w-full items-baseline gap-2 border-b border-hairline px-3 py-2 text-left text-sm any-pointer-coarse:py-3 ${
+                            chosen ? "bg-[#c0c0c0]" : "hover:bg-neutral-100"
+                          }`}
+                        >
+                          <span className="min-w-0 flex-1 truncate">{e.name}</span>
+                          <span className="shrink-0 text-xs text-subtle">{e.kind}</span>
+                        </button>
+                      </li>
+                    );
+                  })
+                )}
+              </ul>
+            </div>
           </div>
         </Dialog>
       )}
