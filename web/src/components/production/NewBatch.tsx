@@ -195,7 +195,7 @@ export function NewBatch({
                 disabled={!ready || pending}
                 className={DIALOG_COMMIT_CLASS}
               >
-                {pending ? "Logging…" : "Log batch"}
+                {pending ? "Adding…" : "Add batch"}
               </button>
             </>
           }
