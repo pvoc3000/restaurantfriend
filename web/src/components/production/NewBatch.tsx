@@ -216,12 +216,6 @@ export function NewBatch({
             </p>
 
             <div className="space-y-1.5">
-              <span
-                id="new-batch-element"
-                className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
-              >
-                Element
-              </span>
               <Radio
                 ariaLabel="Which kind of element"
                 value={kind}
@@ -249,7 +243,7 @@ export function NewBatch({
                   purchaser+, and staff log batches. */}
               <ul
                 role="listbox"
-                aria-labelledby="new-batch-element"
+                aria-label="Elements"
                 className="h-72 overflow-y-auto overscroll-contain border border-ink"
               >
                 {elements.length === 0 ? (
