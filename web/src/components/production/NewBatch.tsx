@@ -175,7 +175,7 @@ export function NewBatch({
 
       {open && (
         <Dialog
-          title="Log a batch"
+          title="Add a Batch"
           onClose={close}
           busy={pending}
           onSubmit={ready ? () => add() : undefined}
