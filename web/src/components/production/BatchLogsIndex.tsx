@@ -22,7 +22,7 @@ import {
   batchLogRangeHref,
   type BatchLogWindow,
 } from "@/lib/batchLogFilters";
-import { scheduleLabel } from "@/lib/production";
+import { SCHEDULE_CLASSES, scheduleLabel } from "@/lib/production";
 
 export type BatchLogRow = {
   id: string;
@@ -112,6 +112,9 @@ export function BatchLogsIndex({
   const tier: Tier = isTier(storedTier) ? storedTier : "all";
   const [storedGrouping, setGrouping] = useRememberedView<string>("batch-logs.grouping", "none");
   const grouping: Grouping = isGroupingKey(storedGrouping) ? storedGrouping : "none";
+  // WHICH SCHEDULE (Mark, 2026-10-28). "all", a stored schedule value, or
+  // "none" for the FileMaker logs, which predate a log having one.
+  const [schedule, setSchedule] = useRememberedView<string>("batch-logs.schedule", "all");
   const [term, setTerm] = useRememberedView("batch-logs.search", "");
   const [sort, setSort] = useRememberedView<{ key: string; dir: SortDir }>("batch-logs.sort", {
     key: "date",
@@ -130,19 +133,25 @@ export function BatchLogsIndex({
     [rows, today]
   );
 
+  const scheduleCount = (value: string | null) =>
+    rows.filter((r) => r.schedule === value).length;
+  const hasUnscheduled = rows.some((r) => r.schedule === null);
+
   const shown = useMemo(() => {
     const q = term.trim().toLowerCase();
     return rows.filter((r) => {
       if (tier === "open" && r.status !== "open") return false;
       if (tier === "today" && r.log_date !== today) return false;
       if (tier === "complete" && r.status !== "complete") return false;
+      if (schedule === "none" && r.schedule !== null) return false;
+      if (schedule !== "all" && schedule !== "none" && r.schedule !== schedule) return false;
       if (!q) return true;
       return [r.log_date, r.kitchenCode, scheduleLabel(r.schedule), r.generatedByName ?? "", r.note ?? ""]
         .join(" ")
         .toLowerCase()
         .includes(q);
     });
-  }, [rows, tier, term, today]);
+  }, [rows, tier, schedule, term, today]);
 
   const visible = useMemo(() => {
     const value = (r: BatchLogRow): string | number => {
@@ -318,7 +327,7 @@ export function BatchLogsIndex({
         action={action}
       />
 
-      {/* THE FILTER ROW, left-aligned: search · window · show · group by.
+      {/* THE FILTER ROW, left-aligned: search · window · show · schedule · group by.
           The two TabPickers became captioned `PickList`s (Mark, 2026-09-10),
           the purchasing lists' conversion — the counts ride as hints, and
           `fit` sizes each trigger to its widest option. The search is the one
@@ -365,6 +374,27 @@ export function BatchLogsIndex({
               { value: "today", label: "Today", hint: String(counts.today) },
               { value: "complete", label: "Complete", hint: String(counts.complete) },
               { value: "all", label: "All", hint: String(counts.all) },
+            ]}
+            fit
+          />
+        </ControlField>
+
+        <ControlField label="Schedule">
+          <PickList
+            ariaLabel="Which schedule"
+            variant="field"
+            value={schedule}
+            onPick={(next) => setSchedule(next || "all")}
+            options={[
+              { value: "all", label: "All", hint: String(rows.length) },
+              ...SCHEDULE_CLASSES.map((value) => ({
+                value,
+                label: scheduleLabel(value),
+                hint: String(scheduleCount(value)),
+              })),
+              ...(hasUnscheduled
+                ? [{ value: "none", label: "None", hint: String(scheduleCount(null)) }]
+                : []),
             ]}
             fit
           />
