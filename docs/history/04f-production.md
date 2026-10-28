@@ -2059,7 +2059,7 @@ summary adds "Sold out on N of those nights", over counted nights only.
 Premades page widths re-cut to sum to 100 — 203's came to 104, which a fixed
 table scales down without saying so.
 
-## 211 — staff can generate a batch log (2026-10-28)
+## 211 — staff can generate a batch log (APPLIED 2026-10-28)
 
 A staff member pressing New batch log got "insufficient role to generate a
 batch log". 092 had already opened batch logging to every member — the sheet
