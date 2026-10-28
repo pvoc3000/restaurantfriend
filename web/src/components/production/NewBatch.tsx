@@ -22,7 +22,9 @@ import { myEmployeeId } from "@/lib/myEmployee";
  * NULL, so an omitted org_id reports as an RLS violation and sends you looking
  * at roles), then land on the new record.
  *
- * It asks for the four things a batch cannot be without and stops. The yield,
+ * It asks for the element and stops. Which batch of the day is left empty
+ * (Mark, 2026-10-28: "I don't see the need for it") — the record still edits
+ * it for the day that does. The yield,
  * the on-hand, the recipe version and the photo are all set on
  * the record, where `InlineValue` already edits them — a create form that also
  * took them would be a second editor to keep in step with the first.
@@ -67,7 +69,6 @@ export function NewBatch({
     { id: string; name: string; kind: string; is_active: boolean }[]
   >([]);
   const [elementId, setElementId] = useState<string | null>(null);
-  const [label, setLabel] = useState<string | null>(null);
 
   // Loaded when the dialog opens, not on every page load: ~470 elements is a
   // real payload and the list screen has no other use for it.
@@ -97,7 +98,6 @@ export function NewBatch({
     if (pending) return;
     setOpen(false);
     setElementId(null);
-    setLabel(null);
     setFailed(null);
   }
 
@@ -124,7 +124,6 @@ export function NewBatch({
           element_id: elementId,
           location_id: locationId,
           batch_number: number as string,
-          batch_label: label?.trim() ? label.trim() : null,
           is_generated: false,
           status: "complete",
           operator_employee_id: operatorId,
@@ -222,26 +221,6 @@ export function NewBatch({
                 }))}
               />
             </label>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block space-y-1.5">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                  Which batch
-                </span>
-                <PickList
-                  value={label}
-                  onPick={(next) => setLabel(next || null)}
-                  variant="field"
-                  allowNew
-                  ariaLabel="Which batch of the day"
-                  placeholder="—"
-                  // A LABEL, not a position: 040 measured "Blueberry",
-                  // "Caramel" and "x2" among the real values, so this offers
-                  // the ordinary ones and takes anything.
-                  options={["1", "2", "3", "4", "5"].map((v) => ({ value: v, label: v }))}
-                />
-              </label>
-            </div>
           </div>
         </Dialog>
       )}
