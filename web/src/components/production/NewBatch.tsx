@@ -29,9 +29,9 @@ import { myEmployeeId } from "@/lib/myEmployee";
  * the record, where `InlineValue` already edits them — a create form that also
  * took them would be a second editor to keep in step with the first.
  *
- * `status` defaults to COMPLETE here, where a generated row defaults to to-do,
- * and the asymmetry is the point: generation writes a job to be done, and this
- * writes down something that already happened.
+ * `status` defaults to TO-DO, the same as a generated row (Mark, 2026-10-28).
+ * It used to default to complete, on the reading that an added batch writes
+ * down something that already happened; in practice it is added to be made.
  *
  * EVERY BATCH BELONGS TO A LOG (045), and this command lives ON one — so the
  * log is a prop and there is nothing to find or create. That is also why the
@@ -125,7 +125,7 @@ export function NewBatch({
           location_id: locationId,
           batch_number: number as string,
           is_generated: false,
-          status: "complete",
+          status: "to_do",
           operator_employee_id: operatorId,
         })
         .select("id")
@@ -198,7 +198,7 @@ export function NewBatch({
             <p className="text-sm text-muted">
               For something the weekly round doesn&rsquo;t carry — an AB or
               donut element, an extra batch, a test. It joins the {locationCode}{" "}
-              log for {logDate}, marked complete; the yield, who made it and the
+              log for {logDate}, marked to-do; the yield, who made it and the
               photo go on the record.
             </p>
 
