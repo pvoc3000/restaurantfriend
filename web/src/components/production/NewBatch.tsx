@@ -204,10 +204,8 @@ export function NewBatch({
 
           <div className="space-y-4">
             <p className="text-sm text-muted">
-              For something the weekly round doesn&rsquo;t carry — an AB or
-              donut element, an extra batch, a test. It joins the {locationCode}{" "}
-              log for {logDate}, marked to-do; the yield, who made it and the
-              photo go on the record.
+              Add a production element batch to the {locationCode} log for{" "}
+              {logDate}
             </p>
 
             <div className="space-y-1.5">
