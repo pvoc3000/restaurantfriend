@@ -2058,3 +2058,14 @@ summary adds "Sold out on N of those nights", over counted nights only.
 
 Premades page widths re-cut to sum to 100 — 203's came to 104, which a fixed
 table scales down without saying so.
+
+## 211 — staff can generate a batch log (2026-10-28)
+
+A staff member pressing New batch log got "insufficient role to generate a
+batch log". 092 had already opened batch logging to every member — the sheet
+has Batch Logs at W for staff, the log and batch tables' insert/update
+policies are membership-only, `next_batch_number` checks only membership — but
+`generate_production_batches` kept 047's supervisor+ gate, restated unchanged
+by 153, 157, 158, 159 and 175. 211 is 175's body with that gate replaced by a
+membership check. Deleting a batch stays purchaser+. **When the function is
+next restated, start from 211, not an older migration**, or the gate comes back.
