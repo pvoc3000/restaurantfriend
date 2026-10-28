@@ -12,6 +12,8 @@ import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { BAR_CELL } from "@/components/tablet/barCell";
 import { BarLabel, ICON_ADD } from "@/components/tablet/BarLabel";
 import { myEmployeeId } from "@/lib/myEmployee";
+import { ELEMENT_KINDS, ELEMENT_KIND_LABEL, type ElementKind } from "@/lib/production";
+import { Radio } from "@/components/ui/Radio";
 
 /**
  * Log a batch that isn't on the weekly round.
@@ -71,12 +73,16 @@ export function NewBatch({
   >([]);
   const [elementId, setElementId] = useState<string | null>(null);
   const [term, setTerm] = useState("");
+  // Made first and by default (Mark, 2026-10-28): a batch is nearly always
+  // something the kitchen makes, and there are four purchased elements for
+  // every made one. Manual rides along so its twelve are still reachable.
+  const [kind, setKind] = useState<ElementKind>("made");
 
   // Every word typed must appear in the name, in any order — the inventory
   // search's rule, done here in the browser because the list is already loaded.
   const words = term.toLowerCase().split(/\s+/).filter(Boolean);
   const shown = elements.filter(
-    (e) => e.is_active && words.every((w) => e.name.toLowerCase().includes(w))
+    (e) => e.is_active && e.kind === kind && words.every((w) => e.name.toLowerCase().includes(w))
   );
 
   // Loaded when the dialog opens, not on every page load: ~470 elements is a
@@ -106,6 +112,7 @@ export function NewBatch({
     setOpen(false);
     setElementId(null);
     setTerm("");
+    setKind("made");
     setFailed(null);
   }
 
@@ -215,6 +222,16 @@ export function NewBatch({
               >
                 Element
               </span>
+              <Radio
+                ariaLabel="Which kind of element"
+                value={kind}
+                onChange={(next) => {
+                  setKind(next);
+                  // A choice the list no longer shows must not stay chosen.
+                  setElementId(null);
+                }}
+                options={ELEMENT_KINDS.map((k) => ({ value: k, label: ELEMENT_KIND_LABEL[k] }))}
+              />
               <TextInput
                 autoFocus
                 value={term}
@@ -257,7 +274,6 @@ export function NewBatch({
                           }`}
                         >
                           <span className="min-w-0 flex-1 truncate">{e.name}</span>
-                          <span className="shrink-0 text-xs text-subtle">{e.kind}</span>
                         </button>
                       </li>
                     );
