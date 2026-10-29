@@ -5,6 +5,7 @@ import { getAppSession } from "@/lib/session";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { PlanMatrix } from "@/components/production/PlanMatrix";
@@ -187,12 +188,28 @@ export async function PlanDetail({
                 })}
                 )
               </span>
-              {!plan.is_active ? (
-                <span className="text-[12px] uppercase tracking-[0.12em] text-muted">Inactive</span>
-              ) : null}
             </div>
 
-            <dl className="grid max-w-[min(46rem,max(32rem,50%))] grid-cols-[minmax(7rem,auto)_1fr] items-center gap-x-6 gap-y-3 text-[14px] sm:grid-cols-[minmax(7rem,auto)_1fr_minmax(7rem,auto)_1fr] sm:[&>*:nth-child(4n+3)]:pl-6">
+            <dl className="grid max-w-[min(46rem,max(32rem,50%))] grid-cols-[minmax(7rem,auto)_1fr] items-center gap-x-6 gap-y-3 text-[14px] sm:grid-cols-[minmax(7rem,auto)_1fr_minmax(7rem,auto)_1fr]">
+              {/* ACTIVE FIRST, as on the vendor and inventory records, and the
+                  same switch as the list's Active column (Mark, 2026-10-29). It
+                  replaces the "Inactive" word that sat beside the title — the
+                  switch says the state, and read-only it says it in a word.
+                  On a line of its own so Starts and Ends stay a pair. Refreshes
+                  the route, so "Also active at this shop" follows it. */}
+              <Row label="Active" wide>
+                <ActiveToggle
+                  // Keyed by the plan: walking the found set keeps this
+                  // component mounted, and it seeds its state from `active`.
+                  key={id}
+                  readOnly={!editable}
+                  table="production_plans"
+                  id={id}
+                  active={plan.is_active as boolean}
+                  control="switch"
+                  label="Plan active"
+                />
+              </Row>
               {/* Both shops are CHOSEN from a list — a known vocabulary is never
                   typed. Enumerating over ACTIVE locations only (design rule 3): a
                   closed shop is not one you can plan a menu for. */}
@@ -231,7 +248,7 @@ export async function PlanDetail({
                   field claiming to answer a question that now has seven answers,
                   which is 016's `nextDeliveryDate` trap. `READ_ONLY_VALUE` gives it
                   the editable cells' own padding so the column does not kink. */}
-              <Row label="Made at">
+              <Row label="Made at" second>
                 <span className={`${READ_ONLY_VALUE} text-muted`}>Set below, per day.</span>
               </Row>
               <Row label="Starts">
@@ -245,7 +262,7 @@ export async function PlanDetail({
                   <span className={READ_ONLY_VALUE}>{plan.starts_on as string}</span>
                 )}
               </Row>
-              <Row label="Ends">
+              <Row label="Ends" second>
                 {editable ? (
                   <InlineValue
                     boxed={BOXED_FIELDS}
@@ -344,9 +361,16 @@ export async function PlanDetail({
 function Row({
   label,
   wide = false,
+  second = false,
   children,
 }: {
   label: string;
+  /**
+   * The SECOND pair on its line, whose label is set off from the value before
+   * it. Named per row rather than picked by `nth-child(4n+3)`, which counted
+   * children and went wrong the moment a wide row sat anywhere but last.
+   */
+  second?: boolean;
   /**
    * Run the VALUE to the end of the row (Mark, 2026-09-09, of Notes).
    *
@@ -364,7 +388,11 @@ function Row({
 }) {
   return (
     <>
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+      <dt
+        className={`text-[11px] font-semibold uppercase tracking-[0.12em] text-muted ${
+          second ? "sm:pl-6" : ""
+        }`}
+      >
         {label}
       </dt>
       <dd className={`min-w-0 ${wide ? "sm:col-span-3" : ""}`}>{children}</dd>
