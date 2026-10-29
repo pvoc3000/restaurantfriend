@@ -317,3 +317,13 @@ hashing (with a fixture that reverses the lines). Every posted day's stored hash
 is in the old style, so each is offered as an update ONE more time; after that
 post, re-pulls no longer move it. `sales-nightly` carries the generated copy and
 has to be redeployed with this.
+
+**And the deposits paid for it.** `depositHash` was built on `journalHash`, so
+sorting the lines changed every stored deposit hash too ("Credit" sorts before
+"Debit"), and every posted deposit read "update". Mark posted; the run re-sent
+both 10/01 deposits and then stopped at DF01's 10/02 deposit, which QuickBooks
+no longer has ("Deposit 550951 is no longer in QuickBooks (deleted there?)").
+That failure had been invisible while the deposit read "skip". `depositHash`
+now has its own fixed-order canonical form, exactly as before; rebuilt from
+live data, 50 of 52 posted deposits match their stored hash again, and the two
+that don't are the 10/01 pair re-sent during that hour.

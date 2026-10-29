@@ -300,18 +300,23 @@ export function centsToAmount(cents: number): number {
  * dependency. Its job is "did anything change", not secrecy.
  */
 export function journalHash(input: { docNumber: string; txnDate: string; lines: readonly JournalLine[] }): string {
-  const canonical = JSON.stringify({
-    d: input.docNumber,
-    t: input.txnDate,
-    // SORTED, so the order of the lines does not count (2026-10-29). The
-    // breakdown lists them in the order Square returned its rows, which is
-    // not the same from one pull to the next — so an unsorted hash called
-    // every re-pulled day changed, and 52 of 56 posted days in October were
-    // offered as updates with not a cent moved.
-    l: input.lines
-      .map((l) => JSON.stringify([l.posting, l.cents, l.account.ref, l.source.kind, l.source.key]))
-      .sort(),
-  });
+  return fnv64(
+    JSON.stringify({
+      d: input.docNumber,
+      t: input.txnDate,
+      // SORTED, so the order of the lines does not count (2026-10-29). The
+      // breakdown lists them in the order Square returned its rows, which is
+      // not the same from one pull to the next — so an unsorted hash called
+      // every re-pulled day changed, and all 56 posted days in October were
+      // offered as updates with not a cent moved.
+      l: input.lines
+        .map((l) => JSON.stringify([l.posting, l.cents, l.account.ref, l.source.kind, l.source.key]))
+        .sort(),
+    })
+  );
+}
+
+function fnv64(canonical: string): string {
   let h = 0x811c9dc5;
   for (let i = 0; i < canonical.length; i++) {
     h ^= canonical.charCodeAt(i);
@@ -759,14 +764,20 @@ export function docNumberForPayout(payout: Pick<SquarePayout, "end_to_end_id" | 
 }
 
 export function depositHash(input: { docNumber: string; txnDate: string; cents: number; bankRef: string; accountRef: string; classRef: string; deptRef: string }): string {
-  return journalHash({
-    docNumber: input.docNumber,
-    txnDate: input.txnDate,
-    lines: [
-      { posting: "Debit", cents: input.cents, account: { ref: input.bankRef, name: null }, description: "", source: { kind: "tender", key: input.classRef } },
-      { posting: "Credit", cents: input.cents, account: { ref: input.accountRef, name: null }, description: "", source: { kind: "tender", key: input.deptRef } },
-    ],
-  });
+  // Its own canonical form, in the fixed order it has always had — NOT
+  // `journalHash`, whose sorting (2026-10-29) would have changed every stored
+  // deposit hash, and did for an hour: every posted deposit read "update".
+  // A deposit's two lines are built here, so their order never varies.
+  return fnv64(
+    JSON.stringify({
+      d: input.docNumber,
+      t: input.txnDate,
+      l: [
+        ["Debit", input.cents, input.bankRef, "tender", input.classRef],
+        ["Credit", input.cents, input.accountRef, "tender", input.deptRef],
+      ],
+    })
+  );
 }
 
 /**
