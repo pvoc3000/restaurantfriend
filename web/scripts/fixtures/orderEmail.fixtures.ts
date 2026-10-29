@@ -105,6 +105,9 @@ test("readMessage: in, out, and the app talking to itself", () => {
   eq(inbound.ok && inbound.message.direction, "in", "a customer is in");
   eq(inbound.ok && inbound.message.sentAt, "2026-10-28T14:02:00.000Z", "Gmail's own date");
   eq(inbound.ok && inbound.message.rfcMessageId, "<abc@mail.gmail.com>", "the Message-ID");
+  const quoted = { ...message("Kelly <kelly@gmail.com>", mailbox), snippet: "Thanks! On Oct 8, Special Orders &lt;specialorders@donutfriend.com&gt; wrote &#39;hi&#39;" };
+  const withSnippet = readMessage(quoted, mailbox);
+  eq(withSnippet.ok && withSnippet.message.snippet, "Thanks! On Oct 8, Special Orders <specialorders@donutfriend.com> wrote 'hi'", "the snippet is decoded");
   const outbound = readMessage(message("Donut Friend <SpecialOrders@donutfriend.com>", "kelly@gmail.com"), mailbox);
   eq(outbound.ok && outbound.message.direction, "out", "the mailbox is out, case-blind");
   eq(readMessage(message("specialorders@donutfriend.com", "specialorders@donutfriend.com"), mailbox), {

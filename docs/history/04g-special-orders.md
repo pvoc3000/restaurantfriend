@@ -6118,3 +6118,27 @@ after the inbox was measured: "Build the tab."
   an Unmatched list for mail no rule ties (a brand-new customer's first
   email), attaching the quote PDF to a reply, an overdue alert, a morning
   summary.
+
+### 2026-10-29 — 214 live: the first check, and what it found
+
+Mark re-minted the specialorders@ token (gmail.send + gmail.readonly) and said
+go ahead. 214 APPLIED; `order-mail` DEPLOYED with `--no-verify-jwt` (v2 decodes
+Gmail's snippet, which arrives with its HTML entities still in — `&lt;`).
+The first check was run from a script as Mark's owner account (a minted
+magic-link session, signed out after), four runs because one reads at most 150:
+**317 messages tied to 49 orders, 30 days back, no error.** By rule: 87
+inbound by thread, 2 by subject, **0 by sender address**; outbound 106 by
+thread, 122 by subject. Traci's Mail.app replies ARE among the outbound — Mail
+saves to Gmail's Sent, so they settle a waiting message exactly as an app send
+does. Every message has a body (none fell back to the snippet); 168 carry files.
+
+**7 left waiting.** Four are thank-yous (SO-10048, -10121, -10144, -10175 —
+though -10175 also asks whether there are holiday donuts), one says a PDF was
+signed (SO-10157), and two are real: **SO-10152 asks for a refund for donut
+holes left out of the order (Oct 26)**, and SO-10156 asks to swap letter
+flavors (today). That ratio is the case for No reply needed being one click.
+
+215 is NOT applied: the cron secret is a secret-store write, which Mark does by
+hand (`ORDER_MAIL_SECRET` edge secret + the `order_mail_url` and
+`order_mail_secret` Vault entries, both values the same). Until then the mailbox
+is checked only by Check for email on an order's Email tab.

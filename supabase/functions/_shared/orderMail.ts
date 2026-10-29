@@ -269,7 +269,8 @@ export function readMessage(
       subject: header(message.payload, "Subject"),
       rfcMessageId: header(message.payload, "Message-ID") ?? header(message.payload, "Message-Id"),
       sentAt: new Date(Number.isFinite(ms) && ms > 0 ? ms : Date.now()).toISOString(),
-      snippet: message.snippet?.trim() || null,
+      // Gmail sends the snippet with its HTML entities still in ("&lt;").
+      snippet: htmlToText(message.snippet ?? "") || null,
       text: messageText(message.payload),
       attachments: messageAttachments(message.payload),
     },
