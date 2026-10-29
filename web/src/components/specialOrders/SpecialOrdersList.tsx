@@ -669,8 +669,8 @@ export function SpecialOrdersList({
   }, [rows, today, thresholds]);
 
   const listHref = filterHref(PATH, dimensions, filters, search, sort);
-  const detailHref = (id: string) =>
-    withFrom(`/special-orders/${id}`, { href: listHref, label: "Orders" });
+  const detailHref = (id: string, tab?: string) =>
+    withFrom(`/special-orders/${id}${tab ? `?tab=${tab}` : ""}`, { href: listHref, label: "Orders" });
 
   const columns: DataColumn<SpecialOrderRow>[] = [
     /**
@@ -938,7 +938,7 @@ export function SpecialOrdersList({
        * has waited — it had a column of its own for a day (Mark, 2026-10-29:
        * "merge the email warnings … into the to-do column"). It is a to-do
        * in the plainest sense, and Status → Waiting for Reply still finds
-       * every one.
+       * every one. It links straight to the order's Email tab.
        */
       render: (r) => {
         return (
@@ -946,9 +946,9 @@ export function SpecialOrdersList({
             {r.waiting_since ? (
               <span className="flex items-center gap-1.5 whitespace-nowrap">
                 <AlertMark label="An email is waiting for a reply" />
-                <span>
+                <Link href={detailHref(r.id, "emails")} className="underline underline-offset-2 hover:text-ink">
                   Reply to email · <span className="tabular-nums">{waitingFor(r.waiting_since, nowMs)}</span>
-                </span>
+                </Link>
               </span>
             ) : null}
             {r.todo ? (
