@@ -100,11 +100,13 @@ export function PostToQuickBooksDialog({
             orgName: ctx.orgName,
           });
           if (!build.ok) return { day, read: r, build, action: "refused" as const };
+          // Unchanged means the entry it would send is the one QuickBooks
+          // holds. Not the breakdown's hash: that includes `pulled_at`, so
+          // every re-sync moved it and a day whose figures had not changed
+          // was sent again (2026-10-29). Any change of figure or mapping
+          // changes the entry, so its hash alone catches every real change.
           const stored = r.external_ref?.qbo;
-          const unchanged =
-            Boolean(stored?.id) &&
-            stored?.journal_hash === build.hash &&
-            stored?.breakdown_hash === r.breakdown_hash;
+          const unchanged = Boolean(stored?.id) && stored?.journal_hash === build.hash;
           return { day, read: r, build, action: unchanged ? ("skip" as const) : build.mode };
         });
       setPlanned(out);

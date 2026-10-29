@@ -292,3 +292,16 @@ at 600 and at 375 wide — no sideways scroll at 375, after narrowing the bars,
 stacking the change chip, folding each deposit's QuickBooks document onto a
 second line and trimming the gutters. Seen in Chromium only, not yet in Mail
 or Gmail. The shift report email is untouched.
+
+### 2026-10-29 — Post to QuickBooks skips on the entry alone
+
+Mark noticed the dialog offering "update" for 24 already-posted days whose
+figures had not moved. The dialog called a day unchanged only when BOTH the
+journal hash and the breakdown hash matched what was stored, and the breakdown
+hash includes `pulled_at` — so every Sync from Square (and the morning run's
+seven-day re-sync) made every re-pulled day look changed. Posting would have
+rewritten them in place with identical figures: harmless, but 24 pointless
+QuickBooks calls. The dialog now compares `journal_hash` alone, as
+`sales-nightly` already did; any change of figure or mapping changes the entry
+and so its hash. The "pulled again" tag on the list has the same cause and is
+not changed here.
