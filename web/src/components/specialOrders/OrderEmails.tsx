@@ -267,21 +267,24 @@ export function OrderEmails({
                 className={FORM_FIELD_DRESS}
               />
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-3">
-              {answered?.subject ? (
-                <span className="mr-auto text-[12px] text-subtle">In the conversation “{answered.subject}”</span>
-              ) : null}
-              <button type="button" className={BUTTON_CLASS} onClick={() => void cancelReply()} disabled={pending}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={PRIMARY_BUTTON_CLASS}
-                onClick={send}
-                disabled={pending || !to.trim() || !typed.trim()}
-              >
-                {busy === "send" ? "Sending…" : "Send reply"}
-              </button>
+            {/* The conversation's name wraps in its own space; the two buttons stay a pair. */}
+            <div className="flex items-center gap-3">
+              <span className="min-w-0 flex-1 break-words text-[12px] text-subtle">
+                {answered?.subject ? `In the conversation “${answered.subject}”` : null}
+              </span>
+              <span className="flex shrink-0 items-center gap-3">
+                <button type="button" className={BUTTON_CLASS} onClick={() => void cancelReply()} disabled={pending}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={PRIMARY_BUTTON_CLASS}
+                  onClick={send}
+                  disabled={pending || !to.trim() || !typed.trim()}
+                >
+                  {busy === "send" ? "Sending…" : "Send reply"}
+                </button>
+              </span>
             </div>
           </div>
         ) : null}
