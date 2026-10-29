@@ -402,13 +402,13 @@ export function renderSummaryEmail(run: RunForEmail): { subject: string; html: s
 
     const window = `${shortDate(run.window.from)} – ${shortDate(run.window.to)}`;
     html.push(
-      `<h2 style="font-size:16px;margin:16px 0 8px">Posted to QuickBooks</h2>` +
+      `<h2 style="font-size:16px;margin:16px 0 8px">${run.dryRun ? "Would post" : "Posted"} to QuickBooks</h2>` +
         `<p style="margin:0">${esc(tallyLine(s.entries, ["journal entry", "journal entries"]))}<br>` +
         `${esc(tallyLine(s.depositTally, ["deposit", "deposits"]))}<br>` +
         `<span style="color:#555">Synced from Square: ${esc(window)}.</span></p>`
     );
     text.push(
-      "POSTED TO QUICKBOOKS",
+      run.dryRun ? "WOULD POST TO QUICKBOOKS" : "POSTED TO QUICKBOOKS",
       `  ${tallyLine(s.entries, ["journal entry", "journal entries"])}`,
       `  ${tallyLine(s.depositTally, ["deposit", "deposits"])}`,
       `  Synced from Square: ${window}.`,

@@ -279,7 +279,7 @@ async function runForOrg(
     const ctx = await readContext(admin, org);
     const { data: dayRows, error: dayErr } = await admin
       .from("daily_sales")
-      .select("id, location_id, business_date, net_sales_cents, tips_cents, breakdown, breakdown_hash, external_ref")
+      .select("id, location_id, business_date, net_sales_cents, tips_cents, breakdown, external_ref")
       .eq("org_id", org.id)
       .gte("business_date", window.from)
       .lte("business_date", window.to)
@@ -325,9 +325,15 @@ async function runForOrg(
         seen.dates.add(label.date);
         unmapped.set(key, seen);
       }
+      // UNCHANGED MEANS THE ENTRY IS THE SAME, not the breakdown. 104's
+      // `breakdown_hash` is an md5 of the whole document, `pulled_at`
+      // included, so every sync makes every re-pulled day look "pulled again"
+      // — and this run re-syncs a week each morning. The journal hash covers
+      // the DocNumber, the date and every line (side, cents, account, source);
+      // when it matches what was posted, QuickBooks already holds this entry,
+      // and sending it again would be twelve identical updates a day.
       const stored = (r.external_ref as SalesPostingRef | null)?.qbo;
-      const unchanged =
-        Boolean(stored?.id) && stored?.journal_hash === build.hash && stored?.breakdown_hash === r.breakdown_hash;
+      const unchanged = Boolean(stored?.id) && stored?.journal_hash === build.hash;
       days.push({ label, build, action: unchanged ? "skip" : build.mode, id: r.id as string });
     }
     for (const u of unmapped.values()) {
@@ -362,8 +368,10 @@ async function runForOrg(
     }
 
     // --- 4. post, one after another ------------------------------------------
-    const entries = tallyOf(days);
-    const depositTally = tallyOf(deposits);
+    // A test run sends nothing, so it counts what it WOULD send as created
+    // or updated; the email heads that block "Would post" on a dry run.
+    const entries = tallyOf(days, opts.dryRun);
+    const depositTally = tallyOf(deposits, opts.dryRun);
     const depositState = new Map<string, string>();
     for (const d of deposits) depositState.set(d.id, d.action === "skip" ? "already posted" : d.action === "refused" ? "refused" : "not sent");
 
@@ -439,7 +447,14 @@ async function runForOrg(
     // --- 5. the summary: yesterday, and the same weekday a year ago ---------
     const yesterday = window.to;
     const lastYear = sameDayLastYear(yesterday);
-    const shopsWithSquare = [...ctx.shops.values()].filter((s) => s.square && s.active).sort((a, b) => a.code.localeCompare(b.code));
+    // THE SHOPS THAT TRADED THIS WEEK, not every active one with a Square id:
+    // ONLINE has both and has not sold since July, and listing it would be a
+    // row of dashes and a "no sales yesterday" problem every morning. A shop
+    // that sold during the week and not yesterday is the gap worth naming.
+    const tradedThisWeek = new Set(((dayRows ?? []) as Record<string, unknown>[]).map((r) => r.location_id as string));
+    const shopsWithSquare = [...ctx.shops.values()]
+      .filter((s) => s.square && s.active && tradedThisWeek.has(s.id))
+      .sort((a, b) => a.code.localeCompare(b.code));
     const { data: compareRows, error: cmpErr } = await admin
       .from("daily_sales")
       .select("location_id, business_date, net_sales_cents")
@@ -684,11 +699,13 @@ function toPayout(r: Record<string, unknown>): SquarePayout {
   };
 }
 
-function tallyOf(planned: { action: string }[]): Tally {
+function tallyOf(planned: { action: string }[], wouldSend: boolean): Tally {
   const t = emptyTally();
   for (const p of planned) {
     if (p.action === "skip") t.skipped++;
     if (p.action === "refused") t.refused++;
+    if (wouldSend && p.action === "create") t.created++;
+    if (wouldSend && p.action === "update") t.updated++;
   }
   return t;
 }

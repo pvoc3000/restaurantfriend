@@ -154,6 +154,8 @@ test("email: a run that stopped before the summary still sends, and a dry run sa
   ok(renderSummaryEmail(crashed).text.includes("boom"));
   ok(emailSubject(sampleRun({ dryRun: true })).startsWith("[DRY RUN] "));
   ok(renderSummaryEmail(sampleRun({ dryRun: true })).text.startsWith("DRY RUN"));
+  ok(renderSummaryEmail(sampleRun({ dryRun: true })).text.includes("WOULD POST TO QUICKBOOKS"), "a test counts what it would send");
+  no(renderSummaryEmail(sampleRun()).text.includes("WOULD POST"), "a real run says Posted");
 });
 
 test("email: a shop with no day reads as a dash, not $0.00", () => {

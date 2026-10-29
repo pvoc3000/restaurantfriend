@@ -244,3 +244,21 @@ secret" to a wrong cron header; no run row was written. **Still to do, Mark's:**
 choose the member in Settings → Integrations → Square → Morning Sales Run and
 Send a Test Email; set `SALES_AUTOMATION_SECRET` and the two Vault entries;
 apply 213; switch on Runs at 7 AM.
+
+**Mark's first test email (2026-10-29, a dry run) read clean and showed two
+faults, fixed and redeployed the same day (`sales-nightly` v3).** *Probe,
+don't read this line.* (1) **The run would have re-sent twelve unchanged
+entries every morning.** 104's `breakdown_hash` is `md5(breakdown::text)` and
+the breakdown carries `pulled_at`, so every sync makes every re-pulled day
+differ from what was posted — 12 of the window's 14 days, all posted, after
+Mark's 14:47 sync of the week. The run now calls a day unchanged when its
+JOURNAL hash matches the posted one (DocNumber, date, every line), however
+recently it was pulled. The Sales screen's "pulled again" label still reads
+the breakdown hash and still lights up on every re-pull; making that hash
+ignore `pulled_at` would quiet it and is a separate change to 104's generated
+column. (2) **ONLINE** (active, a Square id, no sales since 2026-07-28) was a
+row of dashes, and in a real run a "no sales yesterday" problem every
+morning; the summary now lists the shops with a day in the week's window. A
+dry run also now counts what it WOULD post, under "Would post to QuickBooks".
+The vault secret, the URL and the edge secret were proven to match by
+calling the function with Vault's values: "not enabled, or not 7 AM".
