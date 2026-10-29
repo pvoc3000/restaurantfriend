@@ -40,7 +40,7 @@ export type ProductionGraph = {
  * the timesheets audit lesson (44,661 rows fetched holding 27,795 distinct
  * ids), and it applies to any paginated read.
  */
-async function fetchAll(
+export async function fetchAll(
   supabase: SupabaseClient,
   table: string,
   select: string,

@@ -1113,9 +1113,10 @@ export function PlanMatrix({
           {/* PAR CHECK MODE IS A SWITCH, not a menu command (Mark, 2026-09-23:
               "might be more intuitive"). It is a MODE — it stays on and changes
               what every slot shows — and a menu item that renamed itself to
-              "Stop Checking Pars" hid that state behind a click. Off and with
-              nothing to check, it cannot be turned on: the count above the
-              table already says every par matches.
+              "Stop Checking Pars" hid that state behind a click. It is NEVER
+              disabled, even with nothing to check (Mark, 2026-10-29: "There's
+              no way for the user to know there's nothing to check") — turned
+              on, the line above the table says every par matches.
               UNDER Group by, set apart by `mt-3` (Mark, same day, after trying
               it between the menu and the picker and then in a strip above the
               table): the two are different kinds of control — one arranges
@@ -1124,7 +1125,6 @@ export function PlanMatrix({
             <Switch
               checked={review}
               onChange={setReview}
-              disabled={!review && differing.length === 0}
               title={`Offer ${locationCode}'s default beside every par that differs from it`}
               className="mt-3"
             >

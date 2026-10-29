@@ -3,6 +3,7 @@ import { getAppSession } from "@/lib/session";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { PlansList, type PlanRow } from "@/components/production/PlansList";
 import { planKitchens, planMigrationHint } from "@/lib/productionPlans";
+import { fetchAll } from "@/lib/productionQueries";
 import { NewPlan } from "@/components/production/NewPlan";
 import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
 import { canEditPage } from "@/lib/pageAccess";
@@ -35,8 +36,11 @@ export default async function PlansPage({
       .from("production_plans")
       .select("id, title, location_id, kitchen_by_weekday, starts_on, ends_on, is_active, notes")
       .order("starts_on", { ascending: false }),
-    supabase.from("production_plan_trays").select("id, plan_id"),
-    supabase.from("production_plan_tray_items").select("id, tray_id"),
+    // Paged, because PostgREST stops at 1,000 rows without saying so: at
+    // 1,703 slots the newest plans' slots fell off the end and a fresh
+    // duplicate read "0" slots filled (2026-10-29).
+    fetchAll(supabase, "production_plan_trays", "id, plan_id"),
+    fetchAll(supabase, "production_plan_tray_items", "id, tray_id"),
   ]);
 
   if (error) {
