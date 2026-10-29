@@ -1116,20 +1116,40 @@ export function PlanMatrix({
               "Stop Checking Pars" hid that state behind a click. It is NEVER
               disabled, even with nothing to check (Mark, 2026-10-29: "There's
               no way for the user to know there's nothing to check") — turned
-              on, the line above the table says every par matches.
+              on, the line under it says every par matches.
               UNDER Group by, set apart by `mt-3` (Mark, same day, after trying
               it between the menu and the picker and then in a strip above the
               table): the two are different kinds of control — one arranges
               the rows, the other changes what every slot says. */}
           {editable ? (
-            <Switch
-              checked={review}
-              onChange={setReview}
-              title={`Offer ${locationCode}'s default beside every par that differs from it`}
-              className="mt-3"
-            >
-              Par Check Mode
-            </Switch>
+            <div className="mt-3 flex flex-col items-end gap-1">
+              <Switch
+                checked={review}
+                onChange={setReview}
+                title={`Offer ${locationCode}'s default beside every par that differs from it`}
+              >
+                Par Check Mode
+              </Switch>
+              {/* How many pars disagree with this shop's defaults — the count
+                  you need to decide whether to turn the mode on, stated BEFORE
+                  you do. Under the switch it describes (Mark, 2026-10-29),
+                  where it used to sit above the table. */}
+              {differing.length > 0 || review ? (
+                <p className="text-[13px] text-muted">
+                  {differing.length === 0 ? (
+                    <>Every par matches {locationCode}’s defaults.</>
+                  ) : (
+                    <>
+                      <span className="font-medium text-ink">
+                        {differing.length} par{differing.length === 1 ? "" : "s"}
+                      </span>{" "}
+                      differ{differing.length === 1 ? "s" : ""} from {locationCode}’s defaults
+                      {review ? " — checking" : ""}.
+                    </>
+                  )}
+                </p>
+              ) : null}
+            </div>
           ) : null}
           {/* The grand total, under the picker (Mark, 2026-09-12). */}
           <span className="text-[13px] text-muted">
@@ -1139,24 +1159,6 @@ export function PlanMatrix({
       </div>
 
       <div className="space-y-3">
-      {/* How many pars disagree with this shop's defaults — the count you need
-          to decide whether to turn Par Check Mode on, stated BEFORE you do. */}
-      {editable && (differing.length > 0 || review) ? (
-        <p className="text-[13px] text-muted">
-          {differing.length === 0 ? (
-            <>Every par matches {locationCode}&rsquo;s defaults.</>
-          ) : (
-            <>
-              <span className="font-medium text-ink">
-                {differing.length} par{differing.length === 1 ? "" : "s"}
-              </span>{" "}
-              differ{differing.length === 1 ? "s" : ""} from {locationCode}&rsquo;s defaults
-              {review ? " — checking" : ""}.
-            </>
-          )}
-        </p>
-      ) : null}
-
       <div ref={scrollerRef} className="overflow-x-auto">
         {/* `table-fixed` is what makes the widths below actual widths. Without
             it the browser lays the table out by content and a long item name
