@@ -305,3 +305,15 @@ QuickBooks calls. The dialog now compares `journal_hash` alone, as
 `sales-nightly` already did; any change of figure or mapping changes the entry
 and so its hash. The "pulled again" tag on the list has the same cause and is
 not changed here.
+
+**The same afternoon: the real cause was line ORDER.** With the breakdown hash
+gone, all 56 posted October days still offered "update". Rebuilt from live data,
+none matched its stored `journal_hash`. But reordering each day's lines within
+their kind reproduced the stored hash for all 56 (the four with seven
+categories needed the search widened to 7!). `sync-square-sales` appends lines
+in the order Square returns its rows, which changes from one pull to the next,
+and `journalHash` hashed them in that order. It now sorts the line tuples before
+hashing (with a fixture that reverses the lines). Every posted day's stored hash
+is in the old style, so each is offered as an update ONE more time; after that
+post, re-pulls no longer move it. `sales-nightly` carries the generated copy and
+has to be redeployed with this.

@@ -360,6 +360,15 @@ test("the hash is stable across builds and moves when a line moves", () => {
   eq(journalHash({ docNumber: "x", txnDate: "2026-01-01", lines: [] }).length, 16);
 });
 
+test("the hash ignores the order Square listed the lines in", () => {
+  // Square returns rows in a different order on each pull, so the same day
+  // re-pulled lists its categories and tenders differently (2026-10-29).
+  const a = built().hash;
+  const day = realDay();
+  day.lines = [...day.lines].reverse();
+  eq(built({ breakdown: day }).hash, a, "reordered lines, same hash");
+});
+
 // --- warnings -----------------------------------------------------------------
 
 test("a hand-corrected net figure is a warning, and the entry follows the breakdown", () => {

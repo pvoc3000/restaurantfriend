@@ -300,7 +300,14 @@ export function journalHash(input: { docNumber: string; txnDate: string; lines: 
   const canonical = JSON.stringify({
     d: input.docNumber,
     t: input.txnDate,
-    l: input.lines.map((l) => [l.posting, l.cents, l.account.ref, l.source.kind, l.source.key]),
+    // SORTED, so the order of the lines does not count (2026-10-29). The
+    // breakdown lists them in the order Square returned its rows, which is
+    // not the same from one pull to the next — so an unsorted hash called
+    // every re-pulled day changed, and 52 of 56 posted days in October were
+    // offered as updates with not a cent moved.
+    l: input.lines
+      .map((l) => JSON.stringify([l.posting, l.cents, l.account.ref, l.source.kind, l.source.key]))
+      .sort(),
   });
   let h = 0x811c9dc5;
   for (let i = 0; i < canonical.length; i++) {
