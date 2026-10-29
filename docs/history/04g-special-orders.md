@@ -6147,3 +6147,12 @@ is checked only by Check for email on an order's Email tab.
 entries (one generated value, never displayed). The job's first firing at
 23:30 UTC succeeded and `special_order_mail_sync.checked_at` moved to 23:30:01
 with no `last_error` — the cron door accepted the secret end to end.
+
+**The Orders list's Email column is gone (Mark, 2026-10-29)** — its warning
+moved into To-do, first line: "! Reply to email · 1 d 1 h", with the order's own
+to-do under it. Status → Waiting for Reply still filters to them. The Email
+tab meanwhile became: history newest first, each message boxed; Reply (in the
+waiting band, or right-aligned beside Check for email) opens a compose box that
+quotes the answered message the Mail.app way, fills To and Cc (Reply All, never
+the shop's own addresses — `orderMailboxes`) and puts the caret at the top; Send
+or Cancel (Discard / Keep Writing once anything is typed) puts it away.

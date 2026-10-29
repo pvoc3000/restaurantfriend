@@ -741,28 +741,6 @@ export function SpecialOrdersList({
       ),
     },
     {
-      /**
-       * A CUSTOMER'S EMAIL NOBODY HAS ANSWERED (214, Mark, 2026-10-29), and
-       * for how long. Right after the number, because it is the thing on the
-       * row that most needs doing. Sorted oldest first: the longest wait is
-       * the most urgent. Empty rows sort last.
-       */
-      key: "email",
-      label: "Email",
-      width: 104,
-      sortValue: (r) => r.waiting_since ?? "",
-      sortTiebreaks: [(r) => r.number],
-      render: (r) =>
-        r.waiting_since ? (
-          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-            <AlertMark label="An email is waiting for a reply" />
-            <span className="tabular-nums">{waitingFor(r.waiting_since, nowMs)}</span>
-          </span>
-        ) : (
-          <span className="text-faint">—</span>
-        ),
-    },
-    {
       key: "kitchen",
       label: "Kitchen",
       width: 128,
@@ -955,12 +933,27 @@ export function SpecialOrdersList({
        * sentence somebody typed for the next person to read. It is red, not
        * yellow, which is why it is not what was asked to go.
        */
+      /*
+       * A CUSTOMER'S EMAIL NOBODY HAS ANSWERED (214) leads, with how long it
+       * has waited — it had a column of its own for a day (Mark, 2026-10-29:
+       * "merge the email warnings … into the to-do column"). It is a to-do
+       * in the plainest sense, and Status → Waiting for Reply still finds
+       * every one.
+       */
       render: (r) => {
         return (
           <span className="block">
+            {r.waiting_since ? (
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <AlertMark label="An email is waiting for a reply" />
+                <span>
+                  Reply to email · <span className="tabular-nums">{waitingFor(r.waiting_since, nowMs)}</span>
+                </span>
+              </span>
+            ) : null}
             {r.todo ? (
-              <span>{r.todo}</span>
-            ) : (
+              <span className="block">{r.todo}</span>
+            ) : r.waiting_since ? null : (
               <span className="text-faint">—</span>
             )}
             {r.flag_reason ? (
