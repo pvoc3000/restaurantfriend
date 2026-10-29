@@ -177,7 +177,7 @@ export function OrderEmails({
 
       <div className={`grid items-start gap-4 ${canWrite ? "lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" : ""}`}>
         {canWrite ? (
-          <div className="space-y-2 border border-ink p-3">
+          <div className="space-y-2 border-2 border-ink bg-white p-3 shadow-[4px_4px_0_0_#000]">
             <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
               <label className="contents">
                 <span className="text-xs uppercase tracking-[0.12em] text-subtle">To</span>
