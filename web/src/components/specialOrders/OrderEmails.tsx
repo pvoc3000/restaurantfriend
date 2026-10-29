@@ -9,7 +9,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { FORM_FIELD_DRESS } from "@/components/ui/fieldMetrics";
 import { TextInput } from "@/components/ui/TextInput";
-import { useFillViewportHeight } from "@/lib/tableHead";
+import { useFillViewportHeight, useViewportAtLeast } from "@/lib/tableHead";
 import {
   answering,
   conversation,
@@ -81,6 +81,10 @@ export function OrderEmails({
   const [draft, setDraft] = useState("");
   const typed = body.endsWith(draft) ? body.slice(0, body.length - draft.length) : body;
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  // Side by side, the reply box ends at the window's foot like the history
+  // beside it, so Send is never below the fold. Stacked, it keeps its rows.
+  const sideBySide = useViewportAtLeast(1024);
+  useFillViewportHeight(bodyRef, composing && sideBySide, 160);
 
   const historyRef = useRef<HTMLDivElement>(null);
   useFillViewportHeight(historyRef, thread.length > 0, 320);
@@ -113,7 +117,13 @@ export function OrderEmails({
   }
 
   async function cancelReply() {
-    if (typed.trim() && !(await confirmDialog({ title: "Discard this reply?", body: "What you typed will be lost.", tone: "danger" }))) {
+    if (typed.trim() && !(await confirmDialog({
+        title: "Discard this reply?",
+        body: "What you typed will be lost.",
+        confirmLabel: "Discard",
+        cancelLabel: "Keep Writing",
+        tone: "danger",
+      }))) {
       return;
     }
     setComposing(false);
