@@ -1517,6 +1517,7 @@ export async function SpecialOrderDetail({
                 messages={(messageRows ?? []) as unknown as OrderMessage[]}
                 contactEmail={(row.contact_email as string | null) ?? customer?.email ?? null}
                 mailboxes={orderMailboxes(session.orgSettings)}
+                startReplying={rawParams.reply === "1"}
                 canWrite={canWrite}
                 check={(mailCheck ?? null) as MailCheck}
                 timeZone={timeZone}

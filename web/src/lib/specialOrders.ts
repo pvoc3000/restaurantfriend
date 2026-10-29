@@ -1260,7 +1260,9 @@ export function orderTabHref(
 ): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (key === "tab") continue;
+    // `reply` opens the Email tab's compose box once (the Orders list's Reply
+    // to email); a tab link must not carry it on and open it again.
+    if (key === "tab" || key === "reply") continue;
     const single = Array.isArray(value) ? value[0] : value;
     if (single) search.set(key, single);
   }

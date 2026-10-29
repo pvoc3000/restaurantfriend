@@ -671,6 +671,8 @@ export function SpecialOrdersList({
   const listHref = filterHref(PATH, dimensions, filters, search, sort);
   const detailHref = (id: string, tab?: string) =>
     withFrom(`/special-orders/${id}${tab ? `?tab=${tab}` : ""}`, { href: listHref, label: "Orders" });
+  // Reply to email lands on the Email tab with the reply already open.
+  const replyHref = (id: string) => `${detailHref(id, "emails")}&reply=1`;
 
   const columns: DataColumn<SpecialOrderRow>[] = [
     /**
@@ -938,7 +940,8 @@ export function SpecialOrdersList({
        * has waited — it had a column of its own for a day (Mark, 2026-10-29:
        * "merge the email warnings … into the to-do column"). It is a to-do
        * in the plainest sense, and Status → Waiting for Reply still finds
-       * every one. It links straight to the order's Email tab.
+       * every one. It links straight to the order's Email tab with the reply
+       * open and quoted, as if Reply had been pressed there.
        */
       render: (r) => {
         return (
@@ -946,7 +949,7 @@ export function SpecialOrdersList({
             {r.waiting_since ? (
               <span className="flex items-center gap-1.5 whitespace-nowrap">
                 <AlertMark label="An email is waiting for a reply" />
-                <Link href={detailHref(r.id, "emails")} className="underline underline-offset-2 hover:text-ink">
+                <Link href={replyHref(r.id)} className="underline underline-offset-2 hover:text-ink">
                   Reply to email · <span className="tabular-nums">{waitingFor(r.waiting_since, nowMs)}</span>
                 </Link>
               </span>

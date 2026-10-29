@@ -48,6 +48,7 @@ export function OrderEmails({
   messages,
   contactEmail,
   mailboxes,
+  startReplying = false,
   canWrite,
   check,
   timeZone,
@@ -58,6 +59,8 @@ export function OrderEmails({
   contactEmail: string | null;
   /** The shop's own addresses, which a reply never copies. */
   mailboxes: string[];
+  /** Open the reply on arrival — the Orders list's Reply to email. */
+  startReplying?: boolean;
   canWrite: boolean;
   check: MailCheck;
   timeZone: string;
@@ -128,6 +131,20 @@ export function OrderEmails({
     }
     setComposing(false);
   }
+
+  // Arriving from Reply to email: press Reply once, then take `reply` off the
+  // address so a refresh or Back does not open it again.
+  const arrivedReplying = useRef(false);
+  useEffect(() => {
+    if (!startReplying || !canWrite || arrivedReplying.current) return;
+    arrivedReplying.current = true;
+    startReply();
+    const url = new URL(window.location.href);
+    url.searchParams.delete("reply");
+    window.history.replaceState(window.history.state, "", url);
+    // Once, on arrival; startReply reads the messages as they render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startReplying, canWrite]);
 
   const replyButton =
     canWrite && !composing ? (
