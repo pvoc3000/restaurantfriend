@@ -195,9 +195,11 @@ export async function PlanDetail({
                   same switch as the list's Active column (Mark, 2026-10-29). It
                   replaces the "Inactive" word that sat beside the title — the
                   switch says the state, and read-only it says it in a word.
-                  On a line of its own so Starts and Ends stay a pair. Refreshes
-                  the route, so "Also active at this shop" follows it. */}
-              <Row label="Active" wide>
+                  Paired with Sells at, which took the place of the read-only
+                  "Made at" signpost (Mark, 2026-10-29) — the seven day columns
+                  below say where each day is made. Refreshes the route, so
+                  "Also active at this shop" follows it. */}
+              <Row label="Active">
                 <ActiveToggle
                   // Keyed by the plan: walking the found set keeps this
                   // component mounted, and it seeds its state from `active`.
@@ -210,10 +212,10 @@ export async function PlanDetail({
                   label="Plan active"
                 />
               </Row>
-              {/* Both shops are CHOSEN from a list — a known vocabulary is never
+              {/* The shop is CHOSEN from a list — a known vocabulary is never
                   typed. Enumerating over ACTIVE locations only (design rule 3): a
                   closed shop is not one you can plan a menu for. */}
-              <Row label="Sells at">
+              <Row label="Sells at" second>
                 {editable ? (
                   <InlineValue
                     boxed={BOXED_FIELDS}
@@ -231,25 +233,6 @@ export async function PlanDetail({
                     {codeById.get(plan.location_id as string) ?? "—"}
                   </span>
                 )}
-              </Row>
-              {/* MADE AT IS A SIGNPOST, NOT A FIELD (Mark, 2026-09-09: "it's
-                  unclear what the kitchen picker is doing … we put back 'Made At'
-                  but with text that says 'Set Below.'").
-
-                  101 moved the kitchen onto the seven day columns and took this row
-                  out of the block with it, which left the record silent about
-                  where anything is made — so a reader met `MON DF01 ⌄` in the
-                  header with nothing having told them DF01 was a KITCHEN. The row
-                  is back, in the slot beside Sells at, saying where the answer
-                  lives and that there is one per day.
-
-                  IT STAYS READ-ONLY, and that is the whole point of it. An editor
-                  here would be the single "Made at" 101 deliberately dropped — one
-                  field claiming to answer a question that now has seven answers,
-                  which is 016's `nextDeliveryDate` trap. `READ_ONLY_VALUE` gives it
-                  the editable cells' own padding so the column does not kink. */}
-              <Row label="Made at" second>
-                <span className={`${READ_ONLY_VALUE} text-muted`}>Set below, per day.</span>
               </Row>
               <Row label="Starts">
                 {editable ? (
