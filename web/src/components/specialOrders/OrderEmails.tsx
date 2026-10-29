@@ -215,7 +215,7 @@ export function OrderEmails({
         <span>
           {check?.checked_at ? `Checked ${when(check.checked_at)}` : "The mailbox has not been checked yet."}
         </span>
-        {waiting.length === 0 ? replyButton : null}
+        {waiting.length === 0 && replyButton ? <span className="flex flex-1 justify-end">{replyButton}</span> : null}
       </div>
       {check?.last_error ? (
         <p className="text-[13px] text-accent">The last check failed: {check.last_error}</p>
