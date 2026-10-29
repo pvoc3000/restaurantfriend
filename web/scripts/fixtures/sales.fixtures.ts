@@ -323,11 +323,26 @@ test("`last-period` is the one before that, not merely an earlier one", () => {
   eq(r.range, { from: "2026-08-03", to: "2026-08-16" });
 });
 
-test("the pay-period windows FALL BACK when no period covers today", () => {
-  // After the FileMaker load there was no open period at all. A screen that
-  // renders nothing because the calendar has a hole is worse than one that
-  // shows a pay period and says so.
-  const r = resolveSalesRange("period", "2027-01-01", PERIODS);
+test("a period not created yet is the newest one's cadence carried forward", () => {
+  // Mark, 2026-10-29: the calendar ended 10/25, so "this pay period" showed
+  // the last 14 days on 10/29 instead of 10/26–11/8.
+  const live = [{ start_date: "2026-10-12", end_date: "2026-10-25" }, { start_date: "2026-09-28", end_date: "2026-10-11" }];
+  const r = resolveSalesRange("period", "2026-10-29", live);
+  eq(r.range, { from: "2026-10-26", to: "2026-11-08" });
+  eq(r.fellBack, false, "a carried-forward period is a real period");
+  eq(resolveSalesRange("period", "2026-10-26", live).range.from, "2026-10-26", "its first day");
+  eq(resolveSalesRange("period", "2026-11-08", live).range.to, "2026-11-08", "its last day");
+  eq(resolveSalesRange("period", "2026-11-09", live).range, { from: "2026-11-09", to: "2026-11-22" }, "two ahead");
+  eq(resolveSalesRange("last-period", "2026-10-29", live).range, { from: "2026-10-12", to: "2026-10-25" });
+  // Months past the calendar, the cadence still holds.
+  eq(resolveSalesRange("period", "2027-01-01", PERIODS).range, { from: "2026-12-21", to: "2027-01-03" });
+});
+
+test("the pay-period windows FALL BACK only with no calendar at all", () => {
+  // After the FileMaker load there was no period at all. A screen that
+  // renders nothing because the calendar is empty is worse than one that
+  // shows two weeks and says so.
+  const r = resolveSalesRange("period", "2027-01-01", []);
   eq(r.fellBack, true, "it says it fell back");
   eq(r.range, { from: "2026-12-19", to: "2027-01-01" }, "14 days");
 });

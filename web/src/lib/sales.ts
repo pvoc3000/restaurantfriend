@@ -497,7 +497,8 @@ export function resolveSalesRange(
   custom?: { from?: string | null; to?: string | null }
 ): { range: DateRange; label: string; fellBack: boolean } {
   const sorted = [...periods].sort((a, b) => (a.start_date < b.start_date ? 1 : -1));
-  const containing = sorted.find((p) => p.start_date <= today && today <= p.end_date);
+  const containing =
+    sorted.find((p) => p.start_date <= today && today <= p.end_date) ?? continuedPeriod(sorted[0], today);
 
   const twoWeeks = (): DateRange => ({ from: addDays(today, -13), to: today });
 
@@ -555,6 +556,28 @@ export function resolveSalesRange(
       return { range, label: `${range.from} – ${range.to}`, fellBack: false };
     }
   }
+}
+
+/**
+ * The period containing `today` when the calendar has not reached it yet — the
+ * newest period's cadence carried forward (Mark, 2026-10-29: "This pay period"
+ * showed the last 14 days because 10/26–11/8 had not been created, when it
+ * should have been 10/26–11/8). A period is created when payroll gets to it,
+ * so for the first days of every period there is no row; the length comes
+ * from the newest row itself, so it follows whatever the calendar does.
+ * Null only with no periods at all, or one that starts after today.
+ */
+function continuedPeriod(
+  newest: { start_date: string; end_date: string } | undefined,
+  today: string
+): { start_date: string; end_date: string } | null {
+  if (!newest || newest.end_date >= today) return null;
+  // `daysBetween` counts both ends: a 10/12–10/25 period is 14.
+  const length = daysBetween(newest.start_date, newest.end_date);
+  if (length < 1) return null;
+  const steps = Math.ceil((daysBetween(newest.end_date, today) - 1) / length);
+  const start = addDays(newest.start_date, steps * length);
+  return { start_date: start, end_date: addDays(start, length - 1) };
 }
 
 function isISODate(v: string | null | undefined): boolean {

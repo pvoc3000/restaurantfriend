@@ -338,3 +338,13 @@ Matched and the app's deposits were then deleted as duplicates. Same accounts
 carried the DF02 DTLA location. Both `square_payouts` rows now point at the
 bank-feed ids (`relinked_from` keeps the old id; `deposit_hash` cleared so the
 next post UPDATES them in place with the app's class and location).
+
+### 2026-10-29 — "This pay period" before the period exists
+
+Mark: the Sales range picker's "This pay period" showed 10/16–10/29 when it
+should be 10/26–11/8. The newest `pay_periods` row ended 10/25 (a period is
+created when payroll reaches it), so nothing covered today and
+`resolveSalesRange` fell back to the last 14 days, with the note saying so. It
+now carries the newest period's own cadence forward (its length, from the row)
+to the period containing today, and "last pay period" is the newest row. The
+14-day fallback remains only for an empty calendar.
