@@ -64,6 +64,8 @@ import {
   type RunSummary,
   type ShopDay,
   type Tally,
+  type WeekDay,
+  WINDOW_DAYS,
 } from "../_shared/salesAutomation.ts";
 import { resolveTransport, sendMail, TransportError, type ProviderConfig } from "../_shared/email.ts";
 
@@ -455,11 +457,15 @@ async function runForOrg(
     const shopsWithSquare = [...ctx.shops.values()]
       .filter((s) => s.square && s.active && tradedThisWeek.has(s.id))
       .sort((a, b) => a.code.localeCompare(b.code));
+    // The week and the same week a year earlier, for the table AND the chart
+    // at the top of the email: two short ranges, every shop that traded.
+    const weekDates = Array.from({ length: WINDOW_DAYS }, (_, i) => addDays(window.from, i));
+    const lastYearDates = weekDates.map(sameDayLastYear);
     const { data: compareRows, error: cmpErr } = await admin
       .from("daily_sales")
       .select("location_id, business_date, net_sales_cents")
       .eq("org_id", org.id)
-      .in("business_date", [yesterday, lastYear]);
+      .in("business_date", [...weekDates, ...lastYearDates]);
     if (cmpErr) throw new Error(cmpErr.message);
     const net = new Map<string, number>();
     for (const r of (compareRows ?? []) as Record<string, unknown>[]) {
@@ -469,6 +475,19 @@ async function runForOrg(
       shop: s.code,
       netCents: net.get(`${s.id}|${yesterday}`) ?? null,
       lastYearCents: net.get(`${s.id}|${lastYear}`) ?? null,
+    }));
+    const dayTotal = (date: string): number | null => {
+      let sum: number | null = null;
+      for (const shop of shopsWithSquare) {
+        const v = net.get(`${shop.id}|${date}`);
+        if (v !== undefined) sum = (sum ?? 0) + v;
+      }
+      return sum;
+    };
+    const week: WeekDay[] = weekDates.map((date) => ({
+      date,
+      netCents: dayTotal(date),
+      lastYearCents: dayTotal(sameDayLastYear(date)),
     }));
     for (const s of shopDays) {
       if (s.netCents === null && !opts.dryRun) {
@@ -495,6 +514,7 @@ async function runForOrg(
       businessDate: yesterday,
       lastYearDate: lastYear,
       shops: shopDays,
+      week,
       deposits: depositLines,
       entries,
       depositTally,

@@ -196,3 +196,26 @@ test("isStuck and runProblems: a run cut off, and an email that did not go, are 
   eq(runProblems(run({ email_error: "no mailbox" }), later).map((p) => p.kind), ["email"]);
   eq(runProblems(run(), later), [], "a clean run has nothing");
 });
+
+test("email: the week's chart leads, labels yesterday only, and the text carries its figures", () => {
+  const run = sampleRun();
+  run.summary!.week = [
+    { date: "2026-10-22", netCents: 3_100_00, lastYearCents: 3_400_00 },
+    { date: "2026-10-23", netCents: 4_200_00, lastYearCents: null },
+    { date: "2026-10-24", netCents: null, lastYearCents: 5_000_00 },
+    { date: "2026-10-25", netCents: 4_000_00, lastYearCents: 4_100_00 },
+    { date: "2026-10-26", netCents: 2_900_00, lastYearCents: 3_000_00 },
+    { date: "2026-10-27", netCents: 3_000_00, lastYearCents: 3_200_00 },
+    { date: "2026-10-28", netCents: 3_412_50, lastYearCents: 3_251_10 },
+  ];
+  const { html, text } = renderSummaryEmail(run);
+  ok(html.indexOf("The last 7 days") < html.indexOf("By shop"), "the chart sits above the tables");
+  ok(html.includes(">$3,413<"), "yesterday's bar carries its value");
+  no(html.includes(">$3,100<"), "the other days do not");
+  ok(html.includes("width:14px;height:130px;background:#c0c0c0"), "last year's $5,000 sets the scale: 132px, less its 1px outline top and bottom");
+  ok(html.includes("width:16px;height:111px;background:#000000"), "this week's best day, $4,200, to the same scale");
+  ok(text.includes("THE LAST 7 DAYS"), "the text fallback carries the week");
+  ok(/Sat, Oct 24\s+—/.test(text), "a missing day is a dash");
+  ok(html.includes("background:#ffe98a") === false, "no yellow without a problem");
+  ok(html.includes("Restaurant Friend"), "the wordmark");
+});

@@ -223,11 +223,22 @@ export function emptyTally(): Tally {
   return { created: 0, updated: 0, skipped: 0, refused: 0, failed: 0 };
 }
 
+/** One day of the chart: every shop's net sales together, beside the same
+ *  weekday 52 weeks earlier. Null where Square has no day. */
+export type WeekDay = {
+  date: string;
+  netCents: number | null;
+  lastYearCents: number | null;
+};
+
 export type RunSummary = {
   /** Yesterday — the day the sales block is about. */
   businessDate: string;
   lastYearDate: string;
   shops: ShopDay[];
+  /** The window's days, oldest first, for the chart at the top. Absent on
+   *  runs recorded before the chart existed. */
+  week?: WeekDay[];
   deposits: DepositLine[];
   entries: Tally;
   depositTally: Tally;
@@ -318,47 +329,336 @@ function link(appUrl: string | null, href: string | undefined): string | null {
   return `${appUrl.replace(/\/$/, "")}${href}`;
 }
 
+// ---------------------------------------------------------------------------
+// The email
+// ---------------------------------------------------------------------------
+//
+// IN THE APP'S OWN LOOK (Mark, 2026-10-29: "give the morning email a little
+// Restaurant Friend design flair … add a sales graph to the top"). The design
+// system's rules, as an email can carry them:
+//   · structure is black — the masthead, the window's 2px frame and hard
+//     shadow, the black section bands with white caps, the Mac title bar's
+//     ruled stripes;
+//   · colour is state — yellow only as the FILL behind what needs you, red and
+//     green only behind the change on last year, never as ink;
+//   · Helvetica, no webfonts, caps always tracked (+0.06em names, +0.12em
+//     labels); square corners; 48px for the one number worth staring at.
+// Tables and inline styles only: Gmail strips <style>, SVG and gradients, so
+// the stripes are 1px table rows and the chart is bars of table cells. A
+// client that drops the shadow loses nothing that carries meaning.
+
+const C = {
+  ink: "#000000",
+  body: "#333333",
+  secondary: "#545454",
+  caption: "#757575",
+  faint: "#9b9b9b",
+  page: "#f1f1f1",
+  macGrey: "#c0c0c0",
+  yellowFill: "#ffe98a",
+  greenFill: "#cfe8cb",
+  redFill: "#ffcfc9",
+};
+const FONT = `ui-sans-serif,system-ui,-apple-system,'Helvetica Neue',Helvetica,Arial,sans-serif`;
+const LABEL = `font-family:${FONT};font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${C.secondary};`;
+const CAPS = `letter-spacing:0.06em;text-transform:uppercase;`;
+const NUM = `font-variant-numeric:tabular-nums;`;
+
+/** `THU 22` under a chart bar. */
+function axisDay(iso: string): [string, string] {
+  const d = new Date(`${iso}T00:00:00Z`);
+  const wd = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short" }).format(d).toUpperCase();
+  return [wd, String(d.getUTCDate())];
+}
+
+/** `$3,616` — the chart's one label, whole dollars. */
+function wholeDollars(cents: number): string {
+  return `${cents < 0 ? "-" : ""}$${Math.round(Math.abs(cents) / 100).toLocaleString("en-US")}`;
+}
+
+/** The Mac title bar: six 1px rules either side of the title in a white
+ *  break — `ui/MacTitleBar`, drawn with table rows. */
+function macTitleBar(title: string): string {
+  const stripes =
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">` +
+    Array.from({ length: 11 }, (_, i) =>
+      `<tr><td height="1" style="height:1px;line-height:1px;font-size:0;background:${i % 2 === 0 ? C.ink : "#ffffff"}">&nbsp;</td></tr>`
+    ).join("") +
+    `</table>`;
+  return (
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom:2px solid ${C.ink}">` +
+    `<tr><td style="padding:6px 8px 6px 8px">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
+    `<td valign="middle" width="50%" style="width:50%">${stripes}</td>` +
+    `<td valign="middle" style="padding:0 12px;white-space:nowrap;font-family:${FONT};font-size:12px;font-weight:700;${CAPS}color:${C.ink}">${esc(title)}</td>` +
+    `<td valign="middle" width="50%" style="width:50%">${stripes}</td>` +
+    `</tr></table></td></tr></table>`
+  );
+}
+
+/** A black band with white caps — the app's group band. */
+function band(title: string): string {
+  return (
+    `<tr><td style="padding:28px 0 0 0">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
+    `<td style="background:${C.ink};color:#ffffff;padding:7px 12px;font-family:${FONT};font-size:12px;font-weight:700;${CAPS}">${esc(title)}</td>` +
+    `</tr></table></td></tr>`
+  );
+}
+
+/**
+ * THE WEEK, AT THE TOP. Seven days of every shop together, each beside the
+ * same weekday a year earlier — the comparison the email exists for, seen
+ * before it is read. Black bars are this week; last year is the Mac grey with
+ * a black outline, because grey alone is under 3:1 on white. One value label,
+ * on yesterday, the day the rest of the email is about; the exact figures
+ * are the table below. No hover in an email, so nothing else is labelled.
+ */
+function weekChart(week: readonly WeekDay[], businessDate: string): string {
+  const H = 132;
+  const max = Math.max(1, ...week.flatMap((d) => [d.netCents ?? 0, d.lastYearCents ?? 0]));
+  const h = (c: number | null) => (c === null || c <= 0 ? 0 : Math.max(2, Math.round((c / max) * H)));
+  const bar = (cents: number | null, now: boolean) => {
+    const px = h(cents);
+    if (px === 0) return `<div style="width:16px;height:0;font-size:0;line-height:0">&nbsp;</div>`;
+    return now
+      ? `<div style="width:16px;height:${px}px;background:${C.ink};font-size:0;line-height:0">&nbsp;</div>`
+      : `<div style="width:14px;height:${Math.max(0, px - 2)}px;background:${C.macGrey};border:1px solid ${C.ink};font-size:0;line-height:0">&nbsp;</div>`;
+  };
+  const cols = week
+    .map((d) => {
+      const [wd, dom] = axisDay(d.date);
+      const isYesterday = d.date === businessDate;
+      const label =
+        isYesterday && d.netCents !== null
+          ? `<div style="font-family:${FONT};font-size:11px;font-weight:700;color:${C.ink};${NUM}padding-bottom:4px;white-space:nowrap">${wholeDollars(d.netCents)}</div>`
+          : "";
+      return (
+        `<td valign="bottom" align="center" style="padding:0 2px">` +
+        `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>` +
+        `<td valign="bottom" align="center" height="${H + 20}" style="height:${H + 20}px">${label}${bar(d.netCents, true)}</td>` +
+        `<td width="2" style="width:2px;font-size:0">&nbsp;</td>` +
+        `<td valign="bottom">${bar(d.lastYearCents, false)}</td>` +
+        `</tr></table>` +
+        `<div style="border-top:2px solid ${C.ink};margin-top:0;padding-top:6px;font-family:${FONT};font-size:11px;${isYesterday ? "font-weight:700;" : ""}letter-spacing:0.12em;color:${isYesterday ? C.ink : C.secondary}">${wd}<br><span style="${NUM}letter-spacing:0">${dom}</span></div>` +
+        `</td>`
+      );
+    })
+    .join("");
+  const key = (now: boolean) =>
+    now
+      ? `<span style="display:inline-block;width:10px;height:10px;background:${C.ink};vertical-align:middle"></span>`
+      : `<span style="display:inline-block;width:8px;height:8px;background:${C.macGrey};border:1px solid ${C.ink};vertical-align:middle"></span>`;
+  return (
+    `<tr><td style="padding:24px 0 0 0">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
+    `<td style="${LABEL}">The last 7 days · all shops</td>` +
+    `</tr><tr>` +
+    `<td style="padding-top:6px;font-family:${FONT};font-size:11px;color:${C.secondary}">` +
+    `<span style="white-space:nowrap">${key(true)}&nbsp; This week</span> &nbsp;&nbsp; ` +
+    `<span style="white-space:nowrap">${key(false)}&nbsp; Same day last year</span></td>` +
+    `</tr></table>` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px"><tr>${cols}</tr></table>` +
+    `</td></tr>`
+  );
+}
+
+/** The change on last year as a filled chip: green up, red down — state,
+ *  never ink. */
+function changeChip(now: number | null, before: number | null): string {
+  const pct = percentChange(now, before);
+  if (!pct || now === null || before === null) {
+    return `<span style="font-family:${FONT};font-size:13px;color:${C.secondary}">No day to compare with last year</span>`;
+  }
+  const up = now >= before;
+  return (
+    `<span style="display:inline-block;background:${up ? C.greenFill : C.redFill};color:${C.ink};padding:4px 8px;font-family:${FONT};font-size:13px;font-weight:700;white-space:nowrap;${NUM}">` +
+    `${up ? "+" : ""}${formatCents(now - before)} · ${pct}</span>`
+  );
+}
+
+function renderHtml(run: RunForEmail): string {
+  const s = run.summary;
+  const rows: string[] = [];
+  const cell = `padding:10px 12px 10px 0;font-family:${FONT};font-size:14px;color:${C.body};`;
+  const numCell = `${cell}text-align:right;${NUM}`;
+  const head = `padding:0 12px 8px 0;border-bottom:2px solid ${C.ink};${LABEL}`;
+
+  if (run.dryRun) {
+    rows.push(
+      `<tr><td style="padding:0 0 16px 0"><div style="border:1px solid ${C.ink};padding:10px 12px;font-family:${FONT};font-size:13px;color:${C.ink}">` +
+        `<b style="${CAPS}">Test</b> — nothing was synced or posted; this is what the morning email would say.</div></td></tr>`
+    );
+  }
+
+  // The headline: yesterday's total, 48px, and its change on last year.
+  if (s) {
+    const t = totals(s.shops);
+    rows.push(
+      `<tr><td style="${LABEL}">Net sales · ${esc(shortDate(s.businessDate))}</td></tr>` +
+        `<tr><td style="padding:6px 0 0 0;font-family:${FONT};font-size:48px;line-height:52px;font-weight:700;letter-spacing:-0.02em;color:${C.ink};${NUM}">${t.netCents === null ? "—" : formatCents(t.netCents)}</td></tr>` +
+        `<tr><td style="padding:10px 0 0 0">${changeChip(t.netCents, t.lastYearCents)}` +
+        `<span style="font-family:${FONT};font-size:13px;color:${C.secondary}">&nbsp; vs ${esc(longDate(s.lastYearDate))}${t.lastYearCents !== null ? ` · ${formatCents(t.lastYearCents)}` : ""}</span></td></tr>`
+    );
+    if (s.week && s.week.length) rows.push(weekChart(s.week, s.businessDate));
+  }
+
+  // What needs you: a yellow FILL, black type — the app's "look at this".
+  if (run.problems.length) {
+    const items = run.problems
+      .map((p) => {
+        const where = [p.shop, p.date ? shortDate(p.date) : null].filter(Boolean).join(" · ");
+        const url = link(run.appUrl, p.href);
+        return (
+          `<tr><td style="padding:12px 0 0 0;font-family:${FONT};font-size:14px;color:${C.ink}">` +
+          (where ? `<b>${esc(where)}</b> — ` : "") +
+          `${esc(p.message)}<br><span style="color:${C.secondary}">${esc(p.fix)}</span>` +
+          (url ? ` <a href="${esc(url)}" style="color:${C.ink};text-decoration:underline">${esc(p.hrefLabel ?? "Open")}</a>` : "") +
+          `</td></tr>`
+        );
+      })
+      .join("");
+    rows.push(
+      `<tr><td style="padding:28px 0 0 0">` +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:2px solid ${C.ink}">` +
+        `<tr><td style="background:${C.yellowFill};border-bottom:2px solid ${C.ink};padding:8px 12px;font-family:${FONT};font-size:12px;font-weight:700;${CAPS}color:${C.ink}">` +
+        `Needs you · ${run.problems.length}</td></tr>` +
+        `<tr><td style="padding:0 12px 14px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${items}</table></td></tr>` +
+        `</table></td></tr>`
+    );
+  }
+
+  if (s) {
+    // By shop.
+    rows.push(band(`By shop · ${shortDate(s.businessDate)}`));
+    const shopRows = s.shops.length > 1 ? [...s.shops, totals(s.shops)] : s.shops;
+    const body = shopRows
+      .map((r) => {
+        const total = r.shop === "Total";
+        const top = total ? `border-top:2px solid ${C.ink};font-weight:700;color:${C.ink};` : "";
+        const pct = percentChange(r.netCents, r.lastYearCents);
+        const diff = r.netCents !== null && r.lastYearCents !== null ? r.netCents - r.lastYearCents : null;
+        const change =
+          diff === null || !pct
+            ? `<span style="color:${C.faint}">—</span>`
+            : // Dollars over percent, so the column stays narrow on a phone.
+              `<span style="display:inline-block;background:${diff >= 0 ? C.greenFill : C.redFill};color:${C.ink};padding:3px 6px;line-height:18px;white-space:nowrap">${diff >= 0 ? "+" : ""}${formatCents(diff)}<br>${pct}</span>`;
+        return (
+          `<tr>` +
+          `<td style="${cell}${top}font-weight:700;color:${C.ink};${CAPS}">${esc(r.shop)}</td>` +
+          `<td style="${numCell}${top}">${r.netCents === null ? `<span style="color:${C.faint}">—</span>` : formatCents(r.netCents)}</td>` +
+          `<td style="${numCell}${top}color:${C.secondary};">${r.lastYearCents === null ? `<span style="color:${C.faint}">—</span>` : formatCents(r.lastYearCents)}</td>` +
+          `<td style="${numCell}${top}padding-right:0">${change}</td>` +
+          `</tr>`
+        );
+      })
+      .join("");
+    rows.push(
+      `<tr><td style="padding:14px 0 0 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">` +
+        `<tr><td style="${head}">Shop</td><td style="${head}text-align:right">Net sales</td>` +
+        `<td style="${head}text-align:right">${esc(longDate(s.lastYearDate))}</td><td style="${head}text-align:right;padding-right:0">Change</td></tr>` +
+        `${body}</table></td></tr>`
+    );
+
+    // Deposits.
+    rows.push(band("Square deposits"));
+    if (s.deposits.length === 0) {
+      rows.push(`<tr><td style="padding:14px 0 0 0;font-family:${FONT};font-size:14px;color:${C.secondary}">None arriving yesterday, today or tomorrow.</td></tr>`);
+    } else {
+      // The QuickBooks document rides a small second line under its row, so
+      // the table is three columns wide and fits a phone.
+      const dep = s.deposits
+        .map(
+          (d) =>
+            `<tr><td style="${cell}padding-bottom:2px;font-weight:700;color:${C.ink};${CAPS}">${esc(d.shop)}</td>` +
+            `<td style="${cell}padding-bottom:2px">${esc(shortDate(d.arrivalDate))}</td>` +
+            `<td style="${numCell}padding-bottom:2px;padding-right:0">${formatCents(d.amountCents)}</td></tr>` +
+            `<tr><td colspan="3" style="padding:0 0 10px 0;font-family:${FONT};font-size:12px;color:${C.secondary}">` +
+            `QuickBooks: ${d.docNumber ? `<span style="${NUM}">${esc(d.docNumber)}</span> · ` : ""}${esc(d.state)}</td></tr>`
+        )
+        .join("");
+      rows.push(
+        `<tr><td style="padding:14px 0 0 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">` +
+          `<tr><td style="${head}">Shop</td><td style="${head}">Arrives</td><td style="${head}text-align:right;padding-right:0">Amount</td></tr>` +
+          `${dep}</table></td></tr>`
+      );
+    }
+
+    // What was posted.
+    rows.push(band(`${run.dryRun ? "Would post" : "Posted"} to QuickBooks`));
+    rows.push(
+      `<tr><td style="padding:14px 0 0 0;font-family:${FONT};font-size:14px;line-height:22px;color:${C.body}">` +
+        `${esc(tallyLine(s.entries, ["journal entry", "journal entries"]))}<br>` +
+        `${esc(tallyLine(s.depositTally, ["deposit", "deposits"]))}<br>` +
+        `<span style="color:${C.secondary}">Synced from Square: ${esc(shortDate(run.window.from))} – ${esc(shortDate(run.window.to))}.</span></td></tr>`
+    );
+
+    if (s.notes.length) {
+      rows.push(
+        `<tr><td style="padding:20px 0 0 0;${LABEL}">Notes from Square</td></tr>` +
+          s.notes
+            .map((n) => `<tr><td style="padding:6px 0 0 0;font-family:${FONT};font-size:13px;color:${C.secondary}">${esc(n)}</td></tr>`)
+            .join("")
+      );
+    }
+  }
+
+  // The one command: a white Mac button with its hard shadow.
+  const salesUrl = link(run.appUrl, "/sales");
+  if (salesUrl) {
+    rows.push(
+      `<tr><td style="padding:32px 0 4px 0">` +
+        `<a href="${esc(salesUrl)}" style="display:inline-block;background:#ffffff;border:1px solid ${C.ink};box-shadow:3px 3px 0 0 ${C.ink};` +
+        `padding:10px 18px;font-family:${FONT};font-size:12px;font-weight:600;${CAPS}color:${C.ink};text-decoration:none">Open Daily Sales</a></td></tr>`
+    );
+  }
+
+  const title = s ? `Morning sales · ${shortDate(s.businessDate)}` : "Morning sales run";
+  return (
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
+    `<meta name="color-scheme" content="light only"><title>${esc(title)}</title></head>` +
+    `<body style="margin:0;padding:0;background:${C.page}">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.page}"><tr><td align="center" style="padding:24px 8px">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px">` +
+    // The masthead: the wordmark set in type, black, as the app's is.
+    `<tr><td style="background:${C.ink};padding:12px 12px">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
+    `<td style="font-family:${FONT};font-size:13px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#ffffff">Restaurant Friend</td>` +
+    `<td align="right" style="font-family:${FONT};font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:${C.faint}">${esc(run.orgName)}</td>` +
+    `</tr></table></td></tr>` +
+    `<tr><td height="16" style="height:16px;font-size:0;line-height:0">&nbsp;</td></tr>` +
+    // The window: 2px frame, hard shadow, the title bar.
+    `<tr><td style="background:#ffffff;border:2px solid ${C.ink};box-shadow:4px 4px 0 0 ${C.ink}">` +
+    macTitleBar(title) +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="padding:24px 12px 24px 12px">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows.join("")}</table>` +
+    `</td></tr></table></td></tr>` +
+    `<tr><td style="padding:16px 2px 0 2px;font-family:${FONT};font-size:11px;line-height:16px;color:${C.caption}">` +
+    `Sent by the morning sales run at 7 AM. It syncs the last seven days from Square and posts what changed.</td></tr>` +
+    `</table></td></tr></table></body></html>`
+  );
+}
+
 /** The email, as HTML and as its plain-text fallback. */
 export function renderSummaryEmail(run: RunForEmail): { subject: string; html: string; text: string } {
   const subject = emailSubject(run);
-  const html: string[] = [];
   const text: string[] = [];
-  const cell = "padding:4px 12px 4px 0;border-bottom:1px solid #ddd;";
-  const num = `${cell}text-align:right;font-variant-numeric:tabular-nums;`;
 
-  html.push(`<div style="font-family:-apple-system,Helvetica,Arial,sans-serif;font-size:14px;color:#111;max-width:640px">`);
-  if (run.dryRun) {
-    html.push(`<p style="background:#eee;padding:8px"><b>Dry run.</b> Nothing was synced or posted; this is what the email would say.</p>`);
-    text.push("DRY RUN — nothing was synced or posted.", "");
-  }
+  if (run.dryRun) text.push("DRY RUN — nothing was synced or posted.", "");
 
   // Issues first: they are the reason to open it.
   if (run.problems.length) {
-    html.push(`<h2 style="font-size:16px;margin:16px 0 8px">Needs you</h2><ol style="padding-left:20px;margin:0">`);
     text.push("NEEDS YOU");
     for (const p of run.problems) {
       const where = [p.shop, p.date ? shortDate(p.date) : null].filter(Boolean).join(" · ");
       const url = link(run.appUrl, p.href);
-      html.push(
-        `<li style="margin-bottom:10px">${where ? `<b>${esc(where)}</b> — ` : ""}${esc(p.message)}<br>` +
-          `<span style="color:#555">${esc(p.fix)}</span>` +
-          (url ? ` <a href="${esc(url)}">${esc(p.hrefLabel ?? "Open")}</a>` : "") +
-          `</li>`
-      );
       text.push(`- ${where ? `${where}: ` : ""}${p.message}`, `  Fix: ${p.fix}${url ? ` ${url}` : ""}`);
     }
-    html.push(`</ol>`);
     text.push("");
   }
 
   const s = run.summary;
   if (s) {
-    html.push(
-      `<h2 style="font-size:16px;margin:16px 0 8px">Sales for ${esc(shortDate(s.businessDate))}</h2>` +
-        `<table style="border-collapse:collapse"><tr>` +
-        `<th style="${cell}text-align:left">Shop</th><th style="${num}">Net sales</th>` +
-        `<th style="${num}">${esc(longDate(s.lastYearDate))}</th><th style="${num}">Change</th></tr>`
-    );
     text.push(`SALES FOR ${shortDate(s.businessDate).toUpperCase()} (vs ${longDate(s.lastYearDate)})`);
     const rows = s.shops.length > 1 ? [...s.shops, totals(s.shops)] : s.shops;
     for (const r of rows) {
@@ -367,71 +667,44 @@ export function renderSummaryEmail(run: RunForEmail): { subject: string; html: s
       const now = r.netCents === null ? "—" : formatCents(r.netCents);
       const before = r.lastYearCents === null ? "—" : formatCents(r.lastYearCents);
       const change = pct ? `${diff} (${pct})` : "—";
-      const bold = r.shop === "Total" ? "font-weight:600;" : "";
-      html.push(
-        `<tr><td style="${cell}${bold}">${esc(r.shop)}</td><td style="${num}${bold}">${now}</td>` +
-          `<td style="${num}${bold}">${before}</td><td style="${num}${bold}">${esc(change)}</td></tr>`
-      );
       text.push(`  ${r.shop.padEnd(6)} ${now.padStart(12)}   last year ${before.padStart(12)}   ${change}`);
     }
-    html.push(`</table>`);
     text.push("");
 
-    html.push(`<h2 style="font-size:16px;margin:16px 0 8px">Square deposits</h2>`);
-    text.push("SQUARE DEPOSITS");
-    if (s.deposits.length === 0) {
-      html.push(`<p style="margin:0">None arriving yesterday, today or tomorrow.</p>`);
-      text.push("  None arriving yesterday, today or tomorrow.");
-    } else {
-      html.push(
-        `<table style="border-collapse:collapse"><tr><th style="${cell}text-align:left">Shop</th>` +
-          `<th style="${cell}text-align:left">Arrives</th><th style="${num}">Amount</th>` +
-          `<th style="${cell}text-align:left">QuickBooks</th></tr>`
-      );
-      for (const d of s.deposits) {
-        const qbo = d.docNumber ? `${d.docNumber} · ${d.state}` : d.state;
-        html.push(
-          `<tr><td style="${cell}">${esc(d.shop)}</td><td style="${cell}">${esc(shortDate(d.arrivalDate))}</td>` +
-            `<td style="${num}">${formatCents(d.amountCents)}</td><td style="${cell}">${esc(qbo)}</td></tr>`
-        );
-        text.push(`  ${d.shop.padEnd(6)} ${shortDate(d.arrivalDate).padEnd(12)} ${formatCents(d.amountCents).padStart(12)}   ${qbo}`);
+    if (s.week && s.week.length) {
+      text.push("THE LAST 7 DAYS, ALL SHOPS (vs the same day last year)");
+      for (const d of s.week) {
+        const now = d.netCents === null ? "—" : formatCents(d.netCents);
+        const before = d.lastYearCents === null ? "—" : formatCents(d.lastYearCents);
+        text.push(`  ${shortDate(d.date).padEnd(12)} ${now.padStart(12)}   last year ${before.padStart(12)}`);
       }
-      html.push(`</table>`);
+      text.push("");
+    }
+
+    text.push("SQUARE DEPOSITS");
+    if (s.deposits.length === 0) text.push("  None arriving yesterday, today or tomorrow.");
+    for (const d of s.deposits) {
+      const qbo = d.docNumber ? `${d.docNumber} · ${d.state}` : d.state;
+      text.push(`  ${d.shop.padEnd(6)} ${shortDate(d.arrivalDate).padEnd(12)} ${formatCents(d.amountCents).padStart(12)}   ${qbo}`);
     }
     text.push("");
 
-    const window = `${shortDate(run.window.from)} – ${shortDate(run.window.to)}`;
-    html.push(
-      `<h2 style="font-size:16px;margin:16px 0 8px">${run.dryRun ? "Would post" : "Posted"} to QuickBooks</h2>` +
-        `<p style="margin:0">${esc(tallyLine(s.entries, ["journal entry", "journal entries"]))}<br>` +
-        `${esc(tallyLine(s.depositTally, ["deposit", "deposits"]))}<br>` +
-        `<span style="color:#555">Synced from Square: ${esc(window)}.</span></p>`
-    );
     text.push(
       run.dryRun ? "WOULD POST TO QUICKBOOKS" : "POSTED TO QUICKBOOKS",
       `  ${tallyLine(s.entries, ["journal entry", "journal entries"])}`,
       `  ${tallyLine(s.depositTally, ["deposit", "deposits"])}`,
-      `  Synced from Square: ${window}.`,
+      `  Synced from Square: ${shortDate(run.window.from)} – ${shortDate(run.window.to)}.`,
       ""
     );
 
     if (s.notes.length) {
-      html.push(`<h2 style="font-size:14px;margin:16px 0 8px;color:#555">Notes from Square</h2><ul style="color:#555;padding-left:20px;margin:0">`);
       text.push("NOTES FROM SQUARE");
-      for (const n of s.notes) {
-        html.push(`<li>${esc(n)}</li>`);
-        text.push(`  - ${n}`);
-      }
-      html.push(`</ul>`);
+      for (const n of s.notes) text.push(`  - ${n}`);
       text.push("");
     }
   }
 
   const salesUrl = link(run.appUrl, "/sales");
-  if (salesUrl) {
-    html.push(`<p style="margin-top:20px"><a href="${esc(salesUrl)}">Open the Sales screen</a></p>`);
-    text.push(`Sales screen: ${salesUrl}`);
-  }
-  html.push(`</div>`);
-  return { subject, html: html.join("\n"), text: text.join("\n") };
+  if (salesUrl) text.push(`Sales screen: ${salesUrl}`);
+  return { subject, html: renderHtml(run), text: text.join("\n") };
 }

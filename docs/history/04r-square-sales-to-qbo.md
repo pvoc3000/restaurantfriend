@@ -272,3 +272,23 @@ fire and the function answers "not enabled" until Runs at 7 AM is switched on.
 To see what a firing did: `cron.job_run_details` (did the job run) and
 `net._http_response` (what the function answered), then the run's row in
 `sales_automation_runs`.
+
+**THE EMAIL IN THE APP'S LOOK, WITH THE WEEK CHARTED (Mark, 2026-10-29: "give
+the morning email a little Restaurant Friend design flair … Add a sales graph
+to the top"; `sales-nightly` v4).** *Probe, don't read this line.* A black
+masthead with the wordmark set in type, a 2px window with a hard shadow and
+the Mac title bar's ruled stripes (1px table rows — Gmail strips gradients,
+SVG and `<style>`), the 48px total with its change on last year as a FILLED
+chip (green up, red down, black ink), then the chart: the window's seven days,
+every shop together, black bars this week beside the Mac grey with a black
+outline for the same weekday last year (grey alone is under 3:1 on white —
+dataviz's validator; its lightness/chroma "fails" are the design system's
+no-decorative-colour rule, ΔE between the two is 77). One value label, on
+yesterday. Then Needs you on the yellow FILL, the black group bands (By shop,
+Square deposits, Posted to QuickBooks), and a white Mac button. `RunSummary`
+gained `week` (the function now reads the window and the same seven days a
+year back in one query). Rendered from the real 10-22..28 figures and checked
+at 600 and at 375 wide — no sideways scroll at 375, after narrowing the bars,
+stacking the change chip, folding each deposit's QuickBooks document onto a
+second line and trimming the gutters. Seen in Chromium only, not yet in Mail
+or Gmail. The shift report email is untouched.
