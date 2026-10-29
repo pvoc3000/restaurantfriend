@@ -8,9 +8,10 @@ in place when the day is pulled again. And every **Square payout** becomes
 **one bank deposit** for its exact amount, so the bank feed matches it
 (migration 105).
 
-It is a **button, not a schedule**: `Sales → Actions → Post to QuickBooks…`.
-A nightly run is a later second door, once a few weeks of posts have read
-clean beside Shogo's.
+It is a button — `Sales → Actions → Post to QuickBooks…` — **and, since
+2026-10-29, a morning run** that does the sync and the post itself at 7 AM and
+emails a summary (see *The morning run* below). The button stays; pressing it
+beside the run is harmless, because an unchanged day is skipped.
 
 ---
 
@@ -92,6 +93,76 @@ the entry is updated in place under the same document number.
    QuickBooks finds the deposit already on the books and offers **Match**.
    Take the match. If it offers to *Add* instead, the deposit has not been
    posted yet — sync and post, then come back.
+
+---
+
+## The morning run
+
+`sales-nightly` does the daily routine on its own at **7 AM in the org's
+timezone**, after weeks of the button went cleanly (Mark, 2026-10-29):
+
+1. **Syncs the last seven days** from Square (yesterday and the six before),
+   so a day synced before an offline register uploaded its payments heals
+   itself the next morning.
+2. **Posts every new or changed day and deposit**, one after another — the
+   same builder as the dialog (`_shared/generated/salesPosting.ts` IS
+   `web/src/lib/salesPosting.ts`, copied). An unchanged day is skipped; the
+   first QuickBooks failure stops the rest, which are named.
+3. **Emails the owner and managers** (by role — there is no list): yesterday's
+   net sales per shop beside the **same weekday 52 weeks earlier**, the Square
+   deposits arriving yesterday through tomorrow, what was posted, and — first,
+   when there are any — **the issues, each with its fix and a link**.
+4. **Records the run** (`sales_automation_runs`, migration 212). The Sales
+   screen shows a quiet line when it was clean and a ruled box listing the
+   issues when not, and says so when 8 AM passes with no run. **Run Now** on
+   either reruns it.
+
+It signs in as **its own member** and does exactly what the Sales screen does,
+so every permission check applies to it and its posts carry that member's name.
+
+### Setting it up (once)
+
+1. **Make the member.** Supabase Studio → Authentication → Add user, an
+   address like `sales-bot@donutfriend.com`, **Auto Confirm** on, no password
+   needed (the run signs in with a one-off link it never emails). Then give it
+   a membership:
+
+   ```sql
+   insert into org_members (org_id, user_id, role, display_name)
+   select o.id, u.id, 'purchaser', 'Morning Sales Run'
+     from orgs o, auth.users u
+    where u.email = 'sales-bot@donutfriend.com';
+   ```
+2. **Apply migration 212** (the run log).
+3. **Deploy the function**, without JWT verification (the cron has none; the
+   function checks both of its callers itself):
+   `supabase functions deploy sales-nightly --no-verify-jwt`.
+4. **Settings → Integrations → Square → Morning Sales Run**: choose the member
+   under *Signs in as*, then **Send a Test Email** — a dry run that syncs and
+   posts nothing and emails the owner and managers what it would have said.
+5. **The secret.** Make up a long random value. Put it in Edge Functions →
+   Secrets as `SALES_AUTOMATION_SECRET`, and in the SQL editor:
+
+   ```sql
+   select vault.create_secret('https://kltxioacvneshbyhxtaj.supabase.co/functions/v1/sales-nightly', 'sales_nightly_url');
+   select vault.create_secret('<the same value>', 'sales_automation_secret');
+   ```
+6. **Apply migration 213** (the schedule: pg_cron at 14:00 and 15:00 UTC — one
+   of them is 7 AM Pacific whatever the clocks say; the other does nothing).
+7. **Turn on *Runs at 7 AM*.**
+
+### Changing the builder
+
+`web/src/lib/salesPosting.ts` (and `quickbooks.ts`, which it imports) reach
+the function as **generated copies**. After editing either, run
+`npm run sync-shared` in `web/` and **redeploy `sales-nightly`**. `npm run
+fixtures` refuses to pass while a copy is stale.
+
+### Reading a run that went wrong
+
+Every run is a row in `sales_automation_runs` — its window, status, problems
+and summary. A run still `running` after twenty minutes was cut off; the
+function's log in Supabase (Edge Functions → sales-nightly → Logs) says why.
 
 ---
 

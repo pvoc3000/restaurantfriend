@@ -11,6 +11,8 @@ import { MessagesIntro, SpecialOrderSettings } from "@/components/settings/Speci
 import { AccountingSettings, type AccountingStatus } from "@/components/settings/AccountingSettings";
 import { LaborAccountsSettings, type LaborAccountRow } from "@/components/settings/LaborAccountsSettings";
 import { SalesMappingsTable, type SalesMappingRow } from "@/components/settings/SalesMappingsTable";
+import { MorningRunSettings, type RunMember } from "@/components/settings/MorningRunSettings";
+import type { SalesRun } from "@/lib/salesRun";
 import { SharedDevices, type RegisteredDevice } from "@/components/settings/SharedDevices";
 import { thisDeviceId } from "@/app/deviceActions";
 import { SectionNav } from "@/components/ui/SectionNav";
@@ -82,9 +84,13 @@ export default async function SettingsPage({
   let salesMappingsError: string | null = null;
   let laborAccounts: LaborAccountRow[] = [];
   let laborAccountsError: string | null = null;
+  // The morning sales run (212), on the Square tab: who it may sign in as, and
+  // its latest run of any kind.
+  let runMembers: RunMember[] = [];
+  let lastRun: SalesRun | null = null;
   if (tab === "accounting") {
     const supabase = await createClient();
-    const [{ data: qbo }, maps, labor] = await Promise.all([
+    const [{ data: qbo }, maps, labor, botMembers, runs] = await Promise.all([
       supabase.rpc("accounting_connection_status", { p_org: session.membership.org_id }),
       // Migration 104's grid. A missing table is a sentence on the tab, never
       // a broken settings screen.
@@ -101,7 +107,23 @@ export default async function SettingsPage({
             .select("id, account_ref, account_name")
             .eq("org_id", session.membership.org_id)
         : Promise.resolve({ data: [], error: null }),
+      integrationsTab === "square"
+        ? supabase
+            .from("org_members")
+            .select("user_id, display_name, role")
+            .eq("org_id", session.membership.org_id)
+            .in("role", ["owner", "admin", "purchaser"])
+        : Promise.resolve({ data: [], error: null }),
+      integrationsTab === "square"
+        ? supabase
+            .from("sales_automation_runs")
+            .select("id, trigger, dry_run, local_date, started_at, finished_at, status, problems, emailed_to, email_error")
+            .order("started_at", { ascending: false })
+            .limit(1)
+        : Promise.resolve({ data: [], error: null }),
     ]);
+    runMembers = (botMembers.data ?? []) as RunMember[];
+    lastRun = ((runs.data ?? []) as SalesRun[])[0] ?? null;
     laborAccounts = (labor.data ?? []) as LaborAccountRow[];
     laborAccountsError = labor.error?.message ?? null;
     accounting = Array.isArray(qbo) ? ((qbo[0] as AccountingStatus | undefined) ?? null) : null;
@@ -312,6 +334,14 @@ export default async function SettingsPage({
                       connected={accounting?.status === "connected"}
                     />
                   )}
+                  <MorningRunSettings
+                    orgId={orgId}
+                    settings={settings}
+                    editable={editable}
+                    members={runMembers}
+                    lastRun={lastRun}
+                    timeZone={(settings.timezone as string | undefined) ?? serverTimeZone()}
+                  />
                 </div>
               )}
             </div>

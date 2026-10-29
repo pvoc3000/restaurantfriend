@@ -20,6 +20,8 @@ import {
 import { daysBetween } from "@/lib/payPeriods";
 import { SalesActions, type ActionPayout } from "@/components/sales/SalesActions";
 import { SalesScreen } from "@/components/sales/SalesScreen";
+import { MorningRunBanner } from "@/components/sales/MorningRunBanner";
+import { morningRunNow, readSalesRunSettings, type SalesRun } from "@/lib/salesRun";
 import type { PayoutPostingRef, SalesPostingRef } from "@/lib/salesPosting";
 
 /**
@@ -225,19 +227,35 @@ export default async function SalesPage({
   const canPost = canSyncSales(session.membership.role);
   let qboConnected = false;
   let unmappedNames = 0;
+  // THE MORNING RUN (212): the latest real runs, for the banner. Dry runs
+  // post nothing, so they neither raise a problem nor clear one. A missing
+  // table (212 pending) is simply no banner.
+  let latestRun: SalesRun | null = null;
+  let lastFinishedLocalDate: string | null = null;
   if (postingSchema) {
-    const [conn, unmapped] = await Promise.all([
+    const [conn, unmapped, runs] = await Promise.all([
       supabase.rpc("accounting_connection_status", { p_org: session.membership.org_id }),
       supabase
         .from("accounting_sales_mappings")
         .select("id", { count: "exact", head: true })
         .neq("kind", "role")
         .is("account_ref", null),
+      supabase
+        .from("sales_automation_runs")
+        .select("id, trigger, dry_run, local_date, started_at, finished_at, status, problems, emailed_to, email_error")
+        .eq("dry_run", false)
+        .order("started_at", { ascending: false })
+        .limit(10),
     ]);
     qboConnected =
       Array.isArray(conn.data) && (conn.data[0] as { status?: string } | undefined)?.status === "connected";
     unmappedNames = unmapped.count ?? 0;
+    const runRows = (runs.data ?? []) as SalesRun[];
+    latestRun = runRows[0] ?? null;
+    lastFinishedLocalDate = runRows.find((r) => r.finished_at)?.local_date ?? null;
   }
+  const runSettings = readSalesRunSettings(session.orgSettings);
+  const morning = morningRunNow({ enabled: runSettings.enabled, zone: timeZone, lastFinishedLocalDate });
   // THE PAYOUTS IN RANGE (105), by the date they reach the bank — every shop,
   // for the same reason as the days. A missing table means 105 is pending:
   // the deposit half stays off and the screen says so, the sales unaffected.
@@ -312,6 +330,14 @@ export default async function SalesPage({
             />
           ) : null
         }
+      />
+
+      <MorningRunBanner
+        run={latestRun}
+        overdue={morning.overdue}
+        canRun={canPost}
+        timeZone={timeZone}
+        now={morning.now}
       />
 
       <SalesScreen

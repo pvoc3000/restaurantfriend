@@ -192,3 +192,45 @@ pulled after closing and still missed 37 offline payments that uploaded the
 next morning — and skipping days splits one Square request into several. The
 Close Pay Period panel passes its own range and is not asked. Typechecked and
 linted; not walked in a browser (the pane was on the PIN lock screen).
+
+**THE MORNING RUN (Mark, 2026-10-29; migrations 212 and 213 WRITTEN, NOT
+APPLIED; `sales-nightly` WRITTEN, NOT DEPLOYED).** "I've been manually syncing
+square sales and pushing them to qbo every morning for a few weeks now, and
+everything has gone without a hitch. I think it's safe to turn this task into a
+cron job, with some sort of fallback mechanism to let me know when there is an
+issue." And on the email: "A nice summary email when the job runs that includes
+sales and deposits for the previous day. compares sales to the same day 52
+weeks ago. This is what Shogo did and I miss it. The email can let us know when
+there is a problem as well, and with what. We should also include a banner on
+the daily sales page when there is an issue and how to fix it." 7 AM Pacific.
+**THE FIRST CRON IN THE APP.** pg_cron fires at 14:00 and 15:00 UTC; the
+function goes ahead only when it is 7 AM in `orgs.settings.timezone`, and a
+partial unique index on `(org_id, local_date)` for real cron runs makes a
+second run on one date a conflict. pg_net does not wait: the function answers
+202 and works under `EdgeRuntime.waitUntil`.
+**IT SIGNS IN AS A MEMBER OF ITS OWN** (`orgs.settings.sales_automation.
+bot_user_id`, a purchaser), minted with service_role by `generateLink` +
+`verifyOtp` and signed out at the end, and calls `sync-square-sales` and
+`qbo-sync` exactly as the browser does. Neither function changed; the other
+way — a service_role door in both — would have rewritten the gates on the code
+that writes money.
+**THE BUILDER IS THE BROWSER'S, COPIED, NOT TWINNED.** `web/scripts/
+sync-shared.mjs` copies `lib/salesPosting.ts` and `lib/quickbooks.ts` to
+`supabase/functions/_shared/generated/`, rewriting only the extensionless
+imports; `npm run fixtures` runs it with `--check` first and fails on a stale
+copy (proven by appending a line to the copy). The run's own rules — the
+window (seven days through yesterday), −364 days for "the same weekday last
+year", a fix and a link per problem kind, the email — are
+`_shared/salesAutomation.ts`, pure and fixture-tested (DST: exactly one of the
+two firings runs on each of 10-31, 11-01, 11-02 and both March days); the
+screen's half (late after 8 AM, stuck after 20 minutes, an unsent email as a
+problem) is `web/src/lib/salesRun.ts`.
+**RECIPIENTS ARE BY ROLE** — owner and managers, the shift report's management
+rule — so there is no list in settings; the panel (Settings → Integrations →
+Square → Morning Sales Run) holds the on switch, the member it signs in as,
+the last run and Send a Test Email (a dry run: no sync, no posts).
+**Verified**: 2,474 fixtures; tsc and lint; `deno check sales-nightly` (via
+`npx deno`) including the generated copies. **Not yet**: 212/213 applied, the
+function deployed, the bot member created, a real or dry run, and either screen
+seen in a browser. The setup steps are in `docs/quickbooks-sales-setup.md`,
+*The morning run*.

@@ -75,7 +75,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 4o. ✅ Shared iPad PIN switching (migration 097) — `docs/history/04o-shared-ipad.md`
 4p. ✅ Tablet shell (bar, `/start` tiles, batch log on tablet) — `docs/history/04p-tablet-shell.md`
 4q. ✅ Desk start page (`/start`; customizable widgets per person, migration 207 APPLIED 2026-10-20) — `docs/history/04q-desk-start.md`
-4r. 🚧 Square sales posted to QuickBooks (journal entries, deposits) — `docs/history/04r-square-sales-to-qbo.md`
+4r. 🚧 Square sales posted to QuickBooks (journal entries, deposits; the 7 AM morning run `sales-nightly` with summary email and Sales banner — 212/213 written, NOT applied, function NOT deployed, 2026-10-29) — `docs/history/04r-square-sales-to-qbo.md`
 4s. 🚧 Calendar (blackout dates, notes, layers, iCal feeds in and out; 181–194 applied and `calendar-sync` deployed 2026-10-10; signed-in screens not yet checked in a browser) — `docs/history/04s-calendar.md`
 4t. 🚧 Labor by Shop (monthly labor split between shops by hours, posted to QuickBooks; 205 APPLIED, pool read from the general ledger (`qbo-sync` v52); Dec 2025–Sep 2026 POSTED by Mark 2026-10-15) — `docs/history/04t-labor-allocation.md`
 5. SwiftUI floor app (only after 4 is proven in real use)
