@@ -33,9 +33,10 @@ export type MailCheck = { checked_at: string | null; last_error: string | null }
  *
  * The mailbox is checked every five minutes; Check for email does it now.
  *
- * TWO COLUMNS (Mark, 2026-10-29): the reply on the left, the history on the
- * right in its own pane that ends at the foot of the window, so writing a reply
- * never scrolls the message it answers out of sight.
+ * TWO COLUMNS (Mark, 2026-10-29): the history on the left in its own pane,
+ * the reply on the right (above it on a narrow window). The pane ends at the
+ * foot of the window, so writing a reply never scrolls the message it answers
+ * out of sight.
  */
 export function OrderEmails({
   orderId,
@@ -175,9 +176,9 @@ export function OrderEmails({
         </div>
       ) : null}
 
-      <div className={`grid items-start gap-4 ${canWrite ? "lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" : ""}`}>
+      <div className={`grid items-start gap-4 ${canWrite ? "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : ""}`}>
         {canWrite ? (
-          <div className="space-y-2 border-2 border-ink bg-white p-3 shadow-[4px_4px_0_0_#000]">
+          <div className="space-y-2 border-2 border-ink bg-white p-3 shadow-[4px_4px_0_0_#000] lg:order-2">
             <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
               <label className="contents">
                 <span className="text-xs uppercase tracking-[0.12em] text-subtle">To</span>
