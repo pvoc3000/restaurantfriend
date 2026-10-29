@@ -144,8 +144,20 @@ Deno.serve(async (req) => {
       .select("user_id, role")
       .eq("org_id", report.org_id);
 
+    const { data: org } = await supabase
+      .from("orgs")
+      .select("name, settings")
+      .eq("id", report.org_id)
+      .maybeSingle();
+
+    const settings = (org?.settings ?? {}) as Record<string, unknown>;
+
+    // The morning sales run's member (212) is a purchaser so that it may sync
+    // and post, not a person who reads shift reports (Mark, 2026-10-29).
+    const salesBot = (settings.sales_automation as { bot_user_id?: unknown } | undefined)?.bot_user_id;
+
     const wanted = (members ?? []).filter((m) =>
-      [...MANAGEMENT_ROLES, ...SUPERVISOR_ROLES].includes(m.role)
+      [...MANAGEMENT_ROLES, ...SUPERVISOR_ROLES].includes(m.role) && m.user_id !== salesBot
     );
 
     // ---- 073: the supervisor version follows the access grid ---------------
@@ -205,13 +217,6 @@ Deno.serve(async (req) => {
     }
 
     // ---- transport --------------------------------------------------------
-    const { data: org } = await supabase
-      .from("orgs")
-      .select("name, settings")
-      .eq("id", report.org_id)
-      .maybeSingle();
-
-    const settings = (org?.settings ?? {}) as Record<string, unknown>;
     const shiftSettings = (settings.shift_report ?? {}) as Record<string, unknown>;
     const billing = (settings.billing ?? {}) as Record<string, unknown>;
 
