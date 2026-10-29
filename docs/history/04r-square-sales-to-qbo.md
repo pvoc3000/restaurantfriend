@@ -327,3 +327,14 @@ That failure had been invisible while the deposit read "skip". `depositHash`
 now has its own fixed-order canonical form, exactly as before; rebuilt from
 live data, 50 of 52 posted deposits match their stored hash again, and the two
 that don't are the 10/01 pair re-sent during that hour.
+
+**The missing 10/02 deposits, relinked (Mark's choice).** A read-only check of
+all 52 stored deposit ids found exactly two missing, both 10/02: #550951 (DF01
+$1,831.06) and #550952 (DF02 $1,159.79). Their place is taken by two BANK-FEED
+deposits for the same amounts, #550889 and #550893, with lower ids, so they
+predate the app's post. Most likely the bank lines were Added instead of
+Matched and the app's deposits were then deleted as duplicates. Same accounts
+(Chase ACH ← Undeposited Square Funds), but no Class on either, and DF01's
+carried the DF02 DTLA location. Both `square_payouts` rows now point at the
+bank-feed ids (`relinked_from` keeps the old id; `deposit_hash` cleared so the
+next post UPDATES them in place with the app's class and location).
