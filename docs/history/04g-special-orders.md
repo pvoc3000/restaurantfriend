@@ -6142,3 +6142,8 @@ flavors (today). That ratio is the case for No reply needed being one click.
 hand (`ORDER_MAIL_SECRET` edge secret + the `order_mail_url` and
 `order_mail_secret` Vault entries, both values the same). Until then the mailbox
 is checked only by Check for email on an order's Email tab.
+
+**215 APPLIED 2026-10-29.** Mark set `ORDER_MAIL_SECRET` and the two Vault
+entries (one generated value, never displayed). The job's first firing at
+23:30 UTC succeeded and `special_order_mail_sync.checked_at` moved to 23:30:01
+with no `last_error` — the cron door accepted the secret end to end.
