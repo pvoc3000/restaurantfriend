@@ -14,9 +14,14 @@ import {
   type GmailMessage,
 } from "../../../supabase/functions/_shared/orderMail";
 import {
+  addressesIn,
   answering,
   conversation,
+  orderMailboxes,
   replyAddress,
+  replyCc,
+  replyDraft,
+  replyQuote,
   splitQuoted,
   waitingFor,
   type OrderMessage,
@@ -192,4 +197,50 @@ test("conversation: oldest first, one copy per Message-ID", () => {
   eq(answering(conversation(list))?.id, "c", "the newest from outside");
   eq(answering([msg("a", "out", "2026-10-27T10:00:00Z", "<1@x>")])?.id, "a", "only ours: the newest");
   eq(answering([]), null, "nothing to answer");
+});
+
+test("addressesIn: addresses only, lower-cased, once", () => {
+  eq(addressesIn("Jen Lemus <Jen@X.com>, bo@y.org, jen@x.com"), ["jen@x.com", "bo@y.org"], "names dropped, deduped");
+  eq(addressesIn(null), [], "nothing");
+});
+
+test("replyCc: everyone else on the message, never the shop or the To", () => {
+  const m = {
+    ...msg("a", "in", "2026-10-29T22:21:51Z", "<1@x>", "kelly@gmail.com"),
+    to_addresses: "specialorders@donutfriend.com, Dan <dan@gmail.com>",
+    cc_addresses: "SpecialOrders@donutfriend.com, mom@aol.com, kelly@gmail.com",
+  };
+  eq(replyCc(m, "kelly@gmail.com", ["Donut Friend <specialorders@donutfriend.com>"]), "dan@gmail.com, mom@aol.com", "reply all");
+  eq(replyCc({ ...m, direction: "out" }, "kelly@gmail.com", []), "", "our own message copies nobody");
+  eq(replyCc(null, "kelly@gmail.com", []), "", "nothing answered");
+});
+
+test("replyQuote: Mail.app's attribution and > lines", () => {
+  const m = {
+    ...msg("a", "in", "2026-10-29T22:21:51Z", "<1@x>", "kelly@gmail.com"),
+    from_name: "Kelly Nygaard",
+    body_text: "Looks great!\r\n\r\nCould we swap?\n> earlier\n\n",
+  };
+  eq(
+    replyQuote(m, "America/Los_Angeles"),
+    "On Oct 29, 2026, at 3:21 PM, Kelly Nygaard <kelly@gmail.com> wrote:\n\n> Looks great!\n>\n> Could we swap?\n>> earlier",
+    "attribution in the shop's zone, blank lines kept, nested quotes deepen"
+  );
+  eq(replyDraft(m, "America/Los_Angeles").startsWith("\n\nOn Oct 29, 2026"), true, "room to type above the quote");
+  eq(replyDraft(null, "America/Los_Angeles"), "", "nothing to quote: an empty box");
+  eq(splitQuoted("Yes, will do." + replyDraft(m, "America/Los_Angeles")).main, "Yes, will do.", "the tab folds a sent reply's quote");
+});
+
+test("orderMailboxes: the sending mailbox and any reply-to", () => {
+  eq(
+    orderMailboxes({
+      special_orders: {
+        email_provider: { from: "Donut Friend <specialorders@donutfriend.com>", reply_to: "specialorders@donutfriend.com" },
+        reply_to: "Orders@DonutFriend.com",
+      },
+    }),
+    ["specialorders@donutfriend.com", "specialorders@donutfriend.com", "orders@donutfriend.com"],
+    "all three places"
+  );
+  eq(orderMailboxes({}), [], "nothing configured");
 });

@@ -122,3 +122,66 @@ export function replyAddress(messages: OrderMessage[], contactEmail: string | nu
 export function answering(messages: OrderMessage[]): OrderMessage | null {
   return [...messages].reverse().find((m) => m.direction === "in") ?? messages[messages.length - 1] ?? null;
 }
+
+/** Every address in a header-style list — "Jen <jen@x.com>, bo@y.org" —
+ *  lower-cased, in order, once each. Names are dropped: a Cc box holds
+ *  addresses, and the stored lists are `order-mail`'s own formatting. */
+export function addressesIn(list: string | null | undefined): string[] {
+  const found = (list ?? "").match(/[^\s<>,;"'()]+@[^\s<>,;"'()]+/g) ?? [];
+  return [...new Set(found.map((a) => a.toLowerCase()))];
+}
+
+/**
+ * Who a reply copies: everyone else the answered message went to or copied
+ * (Mail.app's Reply All), never the shop's own mailbox and never whoever the
+ * reply is already To. A message the shop sent copies nobody back.
+ */
+export function replyCc(message: OrderMessage | null, to: string, mailboxes: string[]): string {
+  if (!message || message.direction !== "in") return "";
+  const skip = new Set([...addressesIn(to), ...mailboxes.flatMap((m) => addressesIn(m))]);
+  return [...addressesIn(message.to_addresses), ...addressesIn(message.cc_addresses)]
+    .filter((a, i, all) => !skip.has(a) && all.indexOf(a) === i)
+    .join(", ");
+}
+
+/**
+ * The quoted message under a reply, the way Mail.app writes it:
+ *
+ *     On Oct 29, 2026, at 3:21 PM, Kelly Nygaard <kelly@gmail.com> wrote:
+ *
+ *     > Thank you - this looks great!
+ *
+ * The whole message is quoted, its own history included, because that is
+ * what a mail program does — and the tab folds it away again from the "On …
+ * wrote:" line (`splitQuoted`). Lines already quoted gain one more ">".
+ */
+export function replyQuote(message: OrderMessage | null, timeZone: string): string {
+  if (!message) return "";
+  const at = new Date(message.sent_at);
+  const day = new Intl.DateTimeFormat("en-US", { timeZone, month: "short", day: "numeric", year: "numeric" }).format(at);
+  // ICU puts a narrow no-break space before "PM"; a plain email wants a space.
+  const time = new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" })
+    .format(at)
+    .replace(/[  ]/g, " ");
+  const who = message.from_name ? `${message.from_name} <${message.from_address}>` : message.from_address;
+  const text = (message.body_text ?? message.snippet ?? "").replace(/\r\n/g, "\n").replace(/\s+$/, "");
+  const quoted = text
+    .split("\n")
+    .map((line) => (line === "" ? ">" : line.startsWith(">") ? `>${line}` : `> ${line}`))
+    .join("\n");
+  return `On ${day}, at ${time}, ${who} wrote:\n\n${quoted}`;
+}
+
+/** A new reply's text: room to type, then the quote. The caret goes at 0. */
+export function replyDraft(message: OrderMessage | null, timeZone: string): string {
+  const quote = replyQuote(message, timeZone);
+  return quote ? `\n\n${quote}` : "";
+}
+
+/** The shop's own addresses for special orders — the mailbox it sends from
+ *  and any reply-to it publishes — which a reply never copies back. */
+export function orderMailboxes(orgSettings: Record<string, unknown> | null | undefined): string[] {
+  const so = (orgSettings?.special_orders ?? {}) as Record<string, unknown>;
+  const provider = (so.email_provider ?? {}) as Record<string, unknown>;
+  return [provider.from, provider.reply_to, so.reply_to].flatMap((v) => (typeof v === "string" ? addressesIn(v) : []));
+}

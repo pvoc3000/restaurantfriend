@@ -1,9 +1,10 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
+import { confirmDialog } from "@/lib/confirm";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { FORM_FIELD_DRESS } from "@/components/ui/fieldMetrics";
@@ -14,6 +15,8 @@ import {
   conversation,
   isWaiting,
   replyAddress,
+  replyCc,
+  replyDraft,
   splitQuoted,
   waitingFor,
   type OrderMessage,
@@ -33,15 +36,18 @@ export type MailCheck = { checked_at: string | null; last_error: string | null }
  *
  * The mailbox is checked every five minutes; Check for email does it now.
  *
- * TWO COLUMNS (Mark, 2026-10-29): the history on the left in its own pane,
- * the reply on the right (above it on a narrow window). The pane ends at the
- * foot of the window, so writing a reply never scrolls the message it answers
- * out of sight.
+ * The history is a pane that ends at the foot of the window. REPLY opens the
+ * compose box beside it, on the right (above it on a narrow window), the way
+ * Mail.app's Reply does (Mark, 2026-10-29): To is whoever wrote the message
+ * being answered, Cc everyone else it went to, and the box holds that message
+ * quoted under two empty lines with the caret at the top. Sending, or Cancel,
+ * puts the box away; the sent reply is then the newest message in the pane.
  */
 export function OrderEmails({
   orderId,
   messages,
   contactEmail,
+  mailboxes,
   canWrite,
   check,
   timeZone,
@@ -50,6 +56,8 @@ export function OrderEmails({
   orderId: string;
   messages: OrderMessage[];
   contactEmail: string | null;
+  /** The shop's own addresses, which a reply never copies. */
+  mailboxes: string[];
   canWrite: boolean;
   check: MailCheck;
   timeZone: string;
@@ -65,9 +73,14 @@ export function OrderEmails({
   const thread = conversation(messages);
   const waiting = thread.filter(isWaiting);
   const answered = answering(thread);
-  const [to, setTo] = useState(() => replyAddress(thread, contactEmail));
+  const [composing, setComposing] = useState(false);
+  const [to, setTo] = useState("");
   const [cc, setCc] = useState("");
   const [body, setBody] = useState("");
+  // The quote the box opened with, so Send can tell a reply from an untouched one.
+  const [draft, setDraft] = useState("");
+  const typed = body.endsWith(draft) ? body.slice(0, body.length - draft.length) : body;
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const historyRef = useRef<HTMLDivElement>(null);
   useFillViewportHeight(historyRef, thread.length > 0, 320);
@@ -77,6 +90,41 @@ export function OrderEmails({
     const el = historyRef.current;
     if (el) el.scrollTop = 0;
   }, [newestId]);
+
+  // The caret at the very top, above the quote, the moment the box opens.
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!composing || !el) return;
+    el.focus();
+    el.setSelectionRange(0, 0);
+    el.scrollTop = 0;
+  }, [composing]);
+
+  function startReply() {
+    const address = replyAddress(thread, contactEmail);
+    const quote = replyDraft(answered, timeZone);
+    setTo(address);
+    setCc(replyCc(answered, address, mailboxes));
+    setBody(quote);
+    setDraft(quote);
+    setError(null);
+    setWarning(null);
+    setComposing(true);
+  }
+
+  async function cancelReply() {
+    if (typed.trim() && !(await confirmDialog({ title: "Discard this reply?", body: "What you typed will be lost.", tone: "danger" }))) {
+      return;
+    }
+    setComposing(false);
+  }
+
+  const replyButton =
+    canWrite && !composing ? (
+      <button type="button" className={BUTTON_CLASS} onClick={startReply} disabled={pending}>
+        Reply
+      </button>
+    ) : null;
 
   const when = (iso: string) =>
     new Intl.DateTimeFormat("en-US", {
@@ -125,8 +173,7 @@ export function OrderEmails({
       if (e) throw new Error(await functionError(e));
       if (data?.error) throw new Error(data.error);
       if (data?.warning) setWarning(data.warning);
-      setBody("");
-      setCc("");
+      setComposing(false);
     });
 
   async function openFile(messageId: string, partId: string) {
@@ -158,6 +205,7 @@ export function OrderEmails({
         <span>
           {check?.checked_at ? `Checked ${when(check.checked_at)}` : "The mailbox has not been checked yet."}
         </span>
+        {waiting.length === 0 ? replyButton : null}
       </div>
       {check?.last_error ? (
         <p className="text-[13px] text-accent">The last check failed: {check.last_error}</p>
@@ -169,15 +217,18 @@ export function OrderEmails({
             <strong>Waiting for a reply</strong> · {waitingFor(waiting[0].sent_at, nowMs)}
           </span>
           {canWrite ? (
-            <button type="button" className={BUTTON_CLASS} onClick={dismiss} disabled={pending}>
-              {busy === "dismiss" ? "Clearing…" : "No reply needed"}
-            </button>
+            <span className="flex flex-wrap items-center gap-2">
+              {replyButton}
+              <button type="button" className={BUTTON_CLASS} onClick={dismiss} disabled={pending}>
+                {busy === "dismiss" ? "Clearing…" : "No reply needed"}
+              </button>
+            </span>
           ) : null}
         </div>
       ) : null}
 
-      <div className={`grid items-start gap-4 ${canWrite ? "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : ""}`}>
-        {canWrite ? (
+      <div className={`grid items-start gap-4 ${composing ? "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : ""}`}>
+        {canWrite && composing ? (
           <div className="space-y-2 border-2 border-ink bg-white p-3 shadow-[4px_4px_0_0_#000] lg:order-2">
             <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
               <label className="contents">
@@ -190,12 +241,17 @@ export function OrderEmails({
               </label>
               <span className="self-start pt-1 text-xs uppercase tracking-[0.12em] text-subtle">Reply</span>
               <textarea
+                ref={bodyRef}
                 value={body}
-                rows={12}
+                rows={14}
                 disabled={pending}
                 onChange={(e) => setBody(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && to.trim() && body.trim()) send();
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && to.trim() && typed.trim()) send();
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    void cancelReply();
+                  }
                 }}
                 aria-label="Reply"
                 className={FORM_FIELD_DRESS}
@@ -205,11 +261,14 @@ export function OrderEmails({
               {answered?.subject ? (
                 <span className="mr-auto text-[12px] text-subtle">In the conversation “{answered.subject}”</span>
               ) : null}
+              <button type="button" className={BUTTON_CLASS} onClick={() => void cancelReply()} disabled={pending}>
+                Cancel
+              </button>
               <button
                 type="button"
                 className={PRIMARY_BUTTON_CLASS}
                 onClick={send}
-                disabled={pending || !to.trim() || !body.trim()}
+                disabled={pending || !to.trim() || !typed.trim()}
               >
                 {busy === "send" ? "Sending…" : "Send reply"}
               </button>

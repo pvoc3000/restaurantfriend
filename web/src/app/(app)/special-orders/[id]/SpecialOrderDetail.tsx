@@ -55,7 +55,7 @@ import { OrderTotals } from "@/components/specialOrders/OrderTotals";
 import { FulfillmentCell } from "@/components/specialOrders/FulfillmentCell";
 import { MarkNoteRead } from "@/components/specialOrders/MarkNoteRead";
 import { OrderEmails, type MailCheck } from "@/components/specialOrders/OrderEmails";
-import { ORDER_MESSAGE_COLUMNS, type OrderMessage } from "@/lib/orderEmail";
+import { ORDER_MESSAGE_COLUMNS, orderMailboxes, type OrderMessage } from "@/lib/orderEmail";
 import { OrderLog, type OrderEventRow } from "@/components/specialOrders/OrderLog";
 import { OrderCommandMenu } from "@/components/specialOrders/OrderCommandMenu";
 import { receiptGaps } from "@/lib/receiptReadiness";
@@ -1516,6 +1516,7 @@ export async function SpecialOrderDetail({
                 orderId={id}
                 messages={(messageRows ?? []) as unknown as OrderMessage[]}
                 contactEmail={(row.contact_email as string | null) ?? customer?.email ?? null}
+                mailboxes={orderMailboxes(session.orgSettings)}
                 canWrite={canWrite}
                 check={(mailCheck ?? null) as MailCheck}
                 timeZone={timeZone}
