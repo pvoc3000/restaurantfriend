@@ -261,9 +261,11 @@ export function TemplateActions({
           busy={busy}
           footer={
             <div className="flex items-center justify-end gap-3">
+              {/* Done is the primary button once it has run — unless Open
+                  the copy is there to be it (Mark, 2026-10-29). */}
               <button
                 type="button"
-                className={DIALOG_CANCEL_CLASS}
+                className={receipt && !newId ? DIALOG_COMMIT_CLASS : DIALOG_CANCEL_CLASS}
                 onClick={() => setOpen(false)}
               >
                 {receipt ? "Done" : "Cancel"}

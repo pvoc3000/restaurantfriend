@@ -96,20 +96,30 @@ export function MaterializeNow({
           onClose={() => setOpen(false)}
           busy={pending}
           width="max-w-lg"
-          onSubmit={through && !pending ? run : undefined}
+          onSubmit={through && !pending && !receipt ? run : undefined}
           footer={
             <div className="flex items-center justify-end gap-4">
-              <button type="button" className={DIALOG_CANCEL_CLASS} onClick={() => setOpen(false)}>
-                {receipt ? "Done" : "Cancel"}
-              </button>
-              <button
-                type="button"
-                className={DIALOG_COMMIT_CLASS}
-                onClick={run}
-                disabled={pending || !through}
-              >
-                {pending ? "Making…" : "Materialize"}
-              </button>
+              {/* Once it has run, Done is the primary button (Mark,
+                  2026-10-29); running again is a reopen away. */}
+              {receipt ? (
+                <button type="button" className={DIALOG_COMMIT_CLASS} onClick={() => setOpen(false)}>
+                  Done
+                </button>
+              ) : (
+                <>
+                  <button type="button" className={DIALOG_CANCEL_CLASS} onClick={() => setOpen(false)}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={DIALOG_COMMIT_CLASS}
+                    onClick={run}
+                    disabled={pending || !through}
+                  >
+                    {pending ? "Making…" : "Materialize"}
+                  </button>
+                </>
+              )}
             </div>
           }
         >

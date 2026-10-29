@@ -179,7 +179,8 @@ export function LaborAllocationDialog({
               Post again although nothing changed
             </Checkbox>
           ) : null}
-          <button type="button" className={DIALOG_CANCEL_CLASS} disabled={busy} onClick={onClose}>
+          {/* Once it has run, Done is the primary button (Mark, 2026-10-29). */}
+          <button type="button" className={result ? DIALOG_COMMIT_CLASS : DIALOG_CANCEL_CLASS} disabled={busy} onClick={onClose}>
             {result ? "Done" : "Cancel"}
           </button>
           {editable && !result ? (
