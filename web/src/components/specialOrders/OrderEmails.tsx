@@ -25,8 +25,8 @@ export type MailCheck = { checked_at: string | null; last_error: string | null }
  * THE ORDER'S EMAIL (migration 214, Mark, 2026-10-29: "Traci keeps missing
  * incoming special order emails").
  *
- * Every message `order-mail` could tie to this order, oldest first as a
- * conversation reads, with a reply box under the newest. A message from
+ * Every message `order-mail` could tie to this order, NEWEST FIRST (Mark,
+ * 2026-10-29), beside a reply box. A message from
  * outside is WAITING until an email to the customer follows it or somebody
  * presses No reply needed — opening this tab clears nothing, because reading
  * a question is not answering it.
@@ -35,8 +35,7 @@ export type MailCheck = { checked_at: string | null; last_error: string | null }
  *
  * TWO COLUMNS (Mark, 2026-10-29): the reply on the left, the history on the
  * right in its own pane that ends at the foot of the window, so writing a reply
- * never scrolls the message it answers out of sight. The pane opens at its
- * foot, where the newest message is.
+ * never scrolls the message it answers out of sight.
  */
 export function OrderEmails({
   orderId,
@@ -72,9 +71,10 @@ export function OrderEmails({
   const historyRef = useRef<HTMLDivElement>(null);
   useFillViewportHeight(historyRef, thread.length > 0, 320);
   const newestId = thread[thread.length - 1]?.id;
+  // A new message arrives at the top, so that is where the pane goes back to.
   useLayoutEffect(() => {
     const el = historyRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) el.scrollTop = 0;
   }, [newestId]);
 
   const when = (iso: string) =>
@@ -221,7 +221,7 @@ export function OrderEmails({
             <p className="px-3 py-3 text-sm text-muted">No email about this order has come in or gone out.</p>
           ) : (
             <ol className="px-3">
-              {thread.map((m) => (
+              {[...thread].reverse().map((m) => (
                 <Message key={m.id} message={m} when={when(m.sent_at)} onOpenFile={openFile} />
               ))}
             </ol>
