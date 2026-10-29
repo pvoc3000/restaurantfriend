@@ -234,3 +234,13 @@ the last run and Send a Test Email (a dry run: no sync, no posts).
 function deployed, the bot member created, a real or dry run, and either screen
 seen in a browser. The setup steps are in `docs/quickbooks-sales-setup.md`,
 *The morning run*.
+
+**Same day: 212 APPLIED and `sales-nightly` DEPLOYED** (v1, `verify_jwt`
+false), after Mark created the member (`sales-bot@donutfriend.com`, "Morning
+Sales Run", purchaser). *Probe, don't read this line.* Probed: the table has
+RLS on, one read policy and the one-cron-run-per-date index; the function
+answers "not signed in" with no JWT and with the bare anon key, and "wrong
+secret" to a wrong cron header; no run row was written. **Still to do, Mark's:**
+choose the member in Settings → Integrations → Square → Morning Sales Run and
+Send a Test Email; set `SALES_AUTOMATION_SECRET` and the two Vault entries;
+apply 213; switch on Runs at 7 AM.
