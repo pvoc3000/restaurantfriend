@@ -208,9 +208,17 @@ export function PostToQuickBooksDialog({
               Post unchanged days and deposits again
             </Checkbox>
           ) : null}
-          <button type="button" className={DIALOG_CANCEL_CLASS} disabled={busy !== null} onClick={onClose}>
-            {done ? "Done" : "Cancel"}
-          </button>
+          {done ? (
+            // Once it has run, closing is the only thing left to do, so it is
+            // the primary button — not the Cancel it replaced (Mark, 2026-10-29).
+            <button type="button" className={DIALOG_COMMIT_CLASS} onClick={onClose}>
+              Done
+            </button>
+          ) : (
+            <button type="button" className={DIALOG_CANCEL_CLASS} disabled={busy !== null} onClick={onClose}>
+              Cancel
+            </button>
+          )}
           {!done ? (
             <button
               type="button"
