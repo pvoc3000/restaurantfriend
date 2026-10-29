@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useLayoutEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
@@ -8,6 +8,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { FORM_FIELD_DRESS } from "@/components/ui/fieldMetrics";
 import { TextInput } from "@/components/ui/TextInput";
+import { useFillViewportHeight } from "@/lib/tableHead";
 import {
   answering,
   conversation,
@@ -31,6 +32,11 @@ export type MailCheck = { checked_at: string | null; last_error: string | null }
  * a question is not answering it.
  *
  * The mailbox is checked every five minutes; Check for email does it now.
+ *
+ * TWO COLUMNS (Mark, 2026-10-29): the reply on the left, the history on the
+ * right in its own pane that ends at the foot of the window, so writing a reply
+ * never scrolls the message it answers out of sight. The pane opens at its
+ * foot, where the newest message is.
  */
 export function OrderEmails({
   orderId,
@@ -62,6 +68,14 @@ export function OrderEmails({
   const [to, setTo] = useState(() => replyAddress(thread, contactEmail));
   const [cc, setCc] = useState("");
   const [body, setBody] = useState("");
+
+  const historyRef = useRef<HTMLDivElement>(null);
+  useFillViewportHeight(historyRef, thread.length > 0, 320);
+  const newestId = thread[thread.length - 1]?.id;
+  useLayoutEffect(() => {
+    const el = historyRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [newestId]);
 
   const when = (iso: string) =>
     new Intl.DateTimeFormat("en-US", {
@@ -133,7 +147,7 @@ export function OrderEmails({
   }
 
   return (
-    <section className="max-w-[80ch] space-y-4">
+    <section className="space-y-4">
       <SectionHeading count={thread.length}>Email</SectionHeading>
 
       <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted">
@@ -161,55 +175,59 @@ export function OrderEmails({
         </div>
       ) : null}
 
-      {thread.length === 0 ? (
-        <p className="text-sm text-muted">No email about this order has come in or gone out.</p>
-      ) : (
-        <ol className="space-y-0 border-t border-hairline">
-          {thread.map((m) => (
-            <Message key={m.id} message={m} when={when(m.sent_at)} onOpenFile={openFile} />
-          ))}
-        </ol>
-      )}
+      <div className={`grid items-start gap-4 ${canWrite ? "lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" : ""}`}>
+        {canWrite ? (
+          <div className="space-y-2 border border-ink p-3">
+            <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
+              <label className="contents">
+                <span className="text-xs uppercase tracking-[0.12em] text-subtle">To</span>
+                <TextInput value={to} onValueChange={setTo} clearLabel="Clear To" className="w-full" disabled={pending} />
+              </label>
+              <label className="contents">
+                <span className="text-xs uppercase tracking-[0.12em] text-subtle">Cc</span>
+                <TextInput value={cc} onValueChange={setCc} clearLabel="Clear Cc" className="w-full" disabled={pending} />
+              </label>
+              <span className="self-start pt-1 text-xs uppercase tracking-[0.12em] text-subtle">Reply</span>
+              <textarea
+                value={body}
+                rows={12}
+                disabled={pending}
+                onChange={(e) => setBody(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && to.trim() && body.trim()) send();
+                }}
+                aria-label="Reply"
+                className={FORM_FIELD_DRESS}
+              />
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {answered?.subject ? (
+                <span className="mr-auto text-[12px] text-subtle">In the conversation “{answered.subject}”</span>
+              ) : null}
+              <button
+                type="button"
+                className={PRIMARY_BUTTON_CLASS}
+                onClick={send}
+                disabled={pending || !to.trim() || !body.trim()}
+              >
+                {busy === "send" ? "Sending…" : "Send reply"}
+              </button>
+            </div>
+          </div>
+        ) : null}
 
-      {canWrite ? (
-        <div className="space-y-2 border border-ink p-3">
-          <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
-            <label className="contents">
-              <span className="text-xs uppercase tracking-[0.12em] text-subtle">To</span>
-              <TextInput value={to} onValueChange={setTo} clearLabel="Clear To" className="w-full" disabled={pending} />
-            </label>
-            <label className="contents">
-              <span className="text-xs uppercase tracking-[0.12em] text-subtle">Cc</span>
-              <TextInput value={cc} onValueChange={setCc} clearLabel="Clear Cc" className="w-full" disabled={pending} />
-            </label>
-            <span className="self-start pt-1 text-xs uppercase tracking-[0.12em] text-subtle">Reply</span>
-            <textarea
-              value={body}
-              rows={8}
-              disabled={pending}
-              onChange={(e) => setBody(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && to.trim() && body.trim()) send();
-              }}
-              aria-label="Reply"
-              className={FORM_FIELD_DRESS}
-            />
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            {answered?.subject ? (
-              <span className="mr-auto text-[12px] text-subtle">In the conversation “{answered.subject}”</span>
-            ) : null}
-            <button
-              type="button"
-              className={PRIMARY_BUTTON_CLASS}
-              onClick={send}
-              disabled={pending || !to.trim() || !body.trim()}
-            >
-              {busy === "send" ? "Sending…" : "Send reply"}
-            </button>
-          </div>
+        <div ref={historyRef} className="overflow-y-auto overflow-x-hidden border border-ink">
+          {thread.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-muted">No email about this order has come in or gone out.</p>
+          ) : (
+            <ol className="px-3">
+              {thread.map((m) => (
+                <Message key={m.id} message={m} when={when(m.sent_at)} onOpenFile={openFile} />
+              ))}
+            </ol>
+          )}
         </div>
-      ) : null}
+      </div>
 
       {error ? <p className="text-[13px] text-accent">{error}</p> : null}
       {warning ? <p className="text-[13px] text-accent">{warning}</p> : null}
@@ -230,7 +248,7 @@ function Message({
   const { main, quoted } = splitQuoted(m.body_text ?? m.snippet);
   const waiting = isWaiting(m);
   return (
-    <li className={`border-b border-hairline py-3 ${waiting ? "border-l-4 border-l-ink pl-3" : ""}`}>
+    <li className={`border-b border-hairline py-3 last:border-b-0 ${waiting ? "border-l-4 border-l-ink pl-3" : ""}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-[13px]">
         <span className={m.direction === "in" ? "font-semibold text-ink" : "text-muted"}>
           {m.from_name ? `${m.from_name} <${m.from_address}>` : m.from_address}
