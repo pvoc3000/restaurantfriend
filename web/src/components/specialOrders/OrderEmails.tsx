@@ -248,7 +248,7 @@ function Message({
   const { main, quoted } = splitQuoted(m.body_text ?? m.snippet);
   const waiting = isWaiting(m);
   return (
-    <li className={`border-b border-hairline py-3 last:border-b-0 ${waiting ? "border-l-4 border-l-ink pl-3" : ""}`}>
+    <li className={`border-b border-ink py-6 last:border-b-0 ${waiting ? "border-l-4 border-l-ink pl-3" : ""}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-[13px]">
         <span className={m.direction === "in" ? "font-semibold text-ink" : "text-muted"}>
           {m.from_name ? `${m.from_name} <${m.from_address}>` : m.from_address}
