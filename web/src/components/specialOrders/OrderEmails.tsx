@@ -220,7 +220,7 @@ export function OrderEmails({
           {thread.length === 0 ? (
             <p className="px-3 py-3 text-sm text-muted">No email about this order has come in or gone out.</p>
           ) : (
-            <ol className="px-3">
+            <ol className="space-y-4 bg-neutral-100 p-4">
               {[...thread].reverse().map((m) => (
                 <Message key={m.id} message={m} when={when(m.sent_at)} onOpenFile={openFile} />
               ))}
@@ -248,7 +248,7 @@ function Message({
   const { main, quoted } = splitQuoted(m.body_text ?? m.snippet);
   const waiting = isWaiting(m);
   return (
-    <li className={`border-b border-ink py-6 last:border-b-0 ${waiting ? "border-l-4 border-l-ink pl-3" : ""}`}>
+    <li className={`border border-ink bg-white p-4 ${waiting ? "border-l-[6px]" : ""}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-[13px]">
         <span className={m.direction === "in" ? "font-semibold text-ink" : "text-muted"}>
           {m.from_name ? `${m.from_name} <${m.from_address}>` : m.from_address}
