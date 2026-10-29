@@ -208,16 +208,23 @@ token that looks perfectly valid and sends as the wrong address.
    labelled "Input your own scopes" — BOTH, separated by a space:
 
    ```
-   https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.metadata
+   https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly
    ```
 
-   **`gmail.metadata` is what makes an order's emails thread** (migration
-   210, 2026-10-21). Gmail replaces the Message-ID the app gives an email
-   with its own, so after each send the app reads back the one Gmail used and
-   threads every later email onto it. `gmail.metadata` reads headers and
-   labels only, never a message's body. A token with `gmail.send` alone still
-   sends, but the app never learns a root to reply to, so the emails do not
-   thread; the order's log says so on each one.
+   **`gmail.readonly` does two jobs.** It makes an order's emails THREAD
+   (migration 210, 2026-10-21): Gmail replaces the Message-ID the app gives an
+   email with its own, so after each send the app reads back the one Gmail
+   used and threads every later email onto it. And it lets `order-mail` read
+   the customers' emails into each order's Email tab (migration 214,
+   2026-10-29), which means reading message BODIES — the reason it is readonly
+   and not 210's `gmail.metadata` (headers only). It cannot send, delete,
+   label or mark anything read; the mailbox in Mail.app is untouched.
+
+   **Do not add `gmail.metadata` beside it.** With metadata granted, Gmail
+   refuses the reads metadata does not allow even when readonly is there too,
+   and every check on the Email tab fails. A token with `gmail.send` alone
+   still sends, but nothing threads and the Email tab stays empty; the tab
+   says why.
 
 4. Click **Authorize APIs**. Sign in **as specialorders@donutfriend.com** and
    accept. Check the account shown on the consent screen before you accept.

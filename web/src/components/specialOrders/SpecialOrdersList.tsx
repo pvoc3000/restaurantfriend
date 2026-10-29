@@ -39,6 +39,8 @@ import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { SEARCH_PEN } from "@/components/ui/fieldMetrics";
 import { NewSpecialOrder } from "@/components/specialOrders/NewSpecialOrder";
 import { PageHeading } from "@/components/ui/PageHeading";
+import { AlertMark } from "@/components/ui/AlertMark";
+import { waitingFor } from "@/lib/orderEmail";
 import { StickyFooter } from "@/components/ui/StickyFooter";
 import {
   PROGRESS_LABELS,
@@ -123,6 +125,9 @@ export type SpecialOrderRow = {
   /** What its live invoices bill of it, null when none does — Create Invoice
    *  bills the rest (176), `special_order_billed`'s rule. */
   invoice_billed: number | null;
+  /** When the oldest email still waiting for a reply came in (214), or null —
+   *  the Email column and the Status menu's Waiting for Reply. */
+  waiting_since: string | null;
 };
 
 const PATH = "/special-orders";
@@ -268,7 +273,11 @@ export function SpecialOrdersList({
   topUpError = null,
   dayMarks = {},
   markCalendars = [],
+  nowMs,
 }: {
+  /** The server's clock when the page was made, so "waiting 3 h" reads the
+   *  same when the page hydrates as when it was rendered. */
+  nowMs: number;
   /** What the calendar says about each day on screen, by date — entries and
    *  subscribed events (`lib/calendarMarks`). Drawn under the day's band. */
   dayMarks?: Record<string, DayMark[]>;
@@ -421,6 +430,8 @@ export function SpecialOrdersList({
           ),
           { value: "attention", label: "Needs Attention", separatorBefore: true },
           { value: "unpaid", label: "Unpaid" },
+          // 214: a customer's email nobody has answered yet.
+          { value: "email", label: "Waiting for Reply" },
         ],
         matches: (r, v) => {
           if (v === STATUS_ALL) return true;
@@ -429,6 +440,7 @@ export function SpecialOrdersList({
           if (v === "attention") return attention.has(r.id);
           if (v === "unpaid")
             return countsAsOwed(r) && r.totals.balance > 0 && r.totals.total > 0;
+          if (v === "email") return r.waiting_since !== null;
           /* AN ORDER'S STATUS, NOT A STANDING ORDER'S (2026-09-20, migration
              112). A standing order now carries one, but it is the rung its DAYS
              start at rather than a state this record is in — and this menu
@@ -727,6 +739,28 @@ export function SpecialOrdersList({
           {r.number}
         </Link>
       ),
+    },
+    {
+      /**
+       * A CUSTOMER'S EMAIL NOBODY HAS ANSWERED (214, Mark, 2026-10-29), and
+       * for how long. Right after the number, because it is the thing on the
+       * row that most needs doing. Sorted oldest first: the longest wait is
+       * the most urgent. Empty rows sort last.
+       */
+      key: "email",
+      label: "Email",
+      width: 104,
+      sortValue: (r) => r.waiting_since ?? "",
+      sortTiebreaks: [(r) => r.number],
+      render: (r) =>
+        r.waiting_since ? (
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <AlertMark label="An email is waiting for a reply" />
+            <span className="tabular-nums">{waitingFor(r.waiting_since, nowMs)}</span>
+          </span>
+        ) : (
+          <span className="text-faint">—</span>
+        ),
     },
     {
       key: "kitchen",

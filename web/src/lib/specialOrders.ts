@@ -1205,7 +1205,7 @@ export function depositAmount(total: number, rate: number | null | undefined): n
  * The tab lives in the URL like every other piece of view state, and `info`
  * writes NO parameter so the record keeps one canonical address.
  */
-export type OrderTab = "info" | "items" | "payments" | "notes" | "delivery" | "documents";
+export type OrderTab = "info" | "items" | "payments" | "notes" | "emails" | "delivery" | "documents";
 
 /**
  * FileMaker's own tabs, minus the two this module retires: EVENT INFO · ITEMS ·
@@ -1223,13 +1223,19 @@ export type OrderTab = "info" | "items" | "payments" | "notes" | "delivery" | "d
  * the Money block, which sat under the lines on Items. It comes right after
  * Items: what was ordered, then what it costs and what has been paid.
  */
-export const ORDER_TABS: OrderTab[] = ["info", "items", "payments", "notes", "delivery", "documents"];
+/*
+ * EMAILS (migration 214, Mark, 2026-10-29) — the customer's email about the
+ * order, with a reply box and the "!" while a message waits for an answer.
+ * Beside Notes: both are what the customer said.
+ */
+export const ORDER_TABS: OrderTab[] = ["info", "items", "payments", "notes", "emails", "delivery", "documents"];
 
 export const ORDER_TAB_LABEL: Record<OrderTab, string> = {
   info: "Info",
   items: "Items",
   payments: "Billing",
   notes: "Notes",
+  emails: "Email",
   delivery: "Delivery",
   documents: "Documents",
 };
@@ -1291,6 +1297,7 @@ export function orderTabHref(
 export function tabsFor(kind: SpecialOrderKind, fulfillment: string | null): OrderTab[] {
   // A template and a standing order keep Payments: it is where their Money
   // block lives — the delivery charge and discount a duplicate inherits.
+  // Nor do they have a customer conversation: Email is an order's alone.
   if (kind !== "order") return ["info", "items", "payments", "notes"];
   return fulfillment === "delivery"
     ? ORDER_TABS

@@ -24,6 +24,15 @@ export function todayInTimeZone(timeZone: string): string {
 }
 
 /**
+ * This instant, in epoch ms, read ONCE by a server component and handed to the
+ * client components under it — "waiting 3 h" (214) must read the same when the
+ * page hydrates as when it was rendered, so the browser never reads its own.
+ */
+export function renderedAt(): number {
+  return Date.now();
+}
+
+/**
  * `days` before that calendar date, same format. Done as UTC midnight
  * arithmetic on the already-localised date, so no second timezone conversion
  * can creep in and shift it back.

@@ -326,16 +326,19 @@ function buildMime(mail: Mail & { from: string }): string {
   ].join("\r\n");
 }
 
-async function sendViaGmail(
-  creds: { client_id?: string; client_secret?: string; refresh_token?: string },
-  mail: Mail & { from: string }
-): Promise<Sent> {
+type GmailCreds = { client_id?: string; client_secret?: string; refresh_token?: string };
+
+/**
+ * An access token for the mailbox a Gmail credential set names. Sending and
+ * `order-mail`'s reading (214) both start here, so there is one refresh and
+ * one wording of its failure.
+ */
+export async function gmailAccessToken(creds: GmailCreds): Promise<string> {
   if (!creds.client_id || !creds.client_secret || !creds.refresh_token) {
     throw new Error(
       "gmail credentials need client_id, client_secret and refresh_token"
     );
   }
-
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -352,6 +355,14 @@ async function sendViaGmail(
       `Gmail auth failed: ${token?.error_description ?? token?.error ?? tokenRes.statusText}`
     );
   }
+  return token.access_token as string;
+}
+
+async function sendViaGmail(
+  creds: GmailCreds,
+  mail: Mail & { from: string }
+): Promise<Sent> {
+  const accessToken = await gmailAccessToken(creds);
 
   // The API wants the whole RFC822 message base64url-encoded.
   const raw = base64FromUtf8(buildMime(mail))
@@ -363,7 +374,7 @@ async function sendViaGmail(
     fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(threadId ? { raw, threadId } : { raw }),
@@ -385,16 +396,18 @@ async function sendViaGmail(
   }
 
   // THE Message-ID GMAIL ACTUALLY GAVE IT — see `Mail.messageId` for why the
-  // one we supplied is worthless here. Needs the `gmail.metadata` scope beside
-  // `gmail.send` (headers only, never bodies); a credential without it still
-  // sends, and says so in `note`.
+  // one we supplied is worthless here. Needs a read scope beside `gmail.send`:
+  // `gmail.metadata` (headers only) until 214, `gmail.readonly` since, which
+  // also lets `order-mail` read bodies. Not both — with metadata granted,
+  // Gmail refuses what metadata cannot do even when readonly is there too. A
+  // credential with neither still sends, and says so in `note`.
   let messageId: string | null = null;
   let note: string | undefined;
   try {
     const meta = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(result.id)}` +
         "?format=metadata&metadataHeaders=Message-ID",
-      { headers: { Authorization: `Bearer ${token.access_token}` } }
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const m = await meta.json();
     if (meta.ok) {
@@ -406,7 +419,7 @@ async function sendViaGmail(
     } else {
       note =
         `Gmail would not say which Message-ID it gave the email (${m?.error?.message ?? meta.statusText}); ` +
-        "the mailbox's credential needs the gmail.metadata scope (docs/po-email-setup.md)";
+        "the mailbox's credential needs the gmail.readonly scope (docs/po-email-setup.md)";
     }
   } catch (e) {
     note = `the sent email's Message-ID could not be read: ${e instanceof Error ? e.message : String(e)}`;

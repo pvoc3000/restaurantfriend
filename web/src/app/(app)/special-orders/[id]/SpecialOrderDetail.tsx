@@ -4,7 +4,7 @@ import { BOXED_FIELDS, BOXED_FIELD_TALL, BOXED_FIELD_TALLER } from "@/components
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
-import { daysAfter, serverTimeZone, todayInTimeZone } from "@/lib/today";
+import { daysAfter, renderedAt, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { blackoutFor, blackoutSentence } from "@/lib/blackoutDates";
 import { fetchEntries } from "@/lib/calendarQueries";
 import type { RawSearchParams } from "@/lib/filterMenus";
@@ -54,6 +54,8 @@ import { StatusCatchUp } from "@/components/specialOrders/StatusCatchUp";
 import { OrderTotals } from "@/components/specialOrders/OrderTotals";
 import { FulfillmentCell } from "@/components/specialOrders/FulfillmentCell";
 import { MarkNoteRead } from "@/components/specialOrders/MarkNoteRead";
+import { OrderEmails, type MailCheck } from "@/components/specialOrders/OrderEmails";
+import { ORDER_MESSAGE_COLUMNS, type OrderMessage } from "@/lib/orderEmail";
 import { OrderLog, type OrderEventRow } from "@/components/specialOrders/OrderLog";
 import { OrderCommandMenu } from "@/components/specialOrders/OrderCommandMenu";
 import { receiptGaps } from "@/lib/receiptReadiness";
@@ -154,6 +156,7 @@ export async function SpecialOrderDetail({
   const wantsDocuments = tab === "documents";
   const wantsMenu = tab === "items";
   const wantsCarriers = tab === "delivery";
+  const wantsEmails = tab === "emails";
 
   const [
     { data: order, error },
@@ -170,6 +173,9 @@ export async function SpecialOrderDetail({
     { data: shopRows },
     { data: rateRows },
     { data: noteRead },
+    { data: waitingRow },
+    { data: messageRows, error: messageError },
+    { data: mailCheck },
   ] = await Promise.all([
     supabase.from("special_orders").select(ORDER_COLUMNS).eq("id", id).maybeSingle(),
     wantsLines
@@ -260,6 +266,31 @@ export async function SpecialOrderDetail({
       .eq("order_id", id)
       .eq("read_by", session.userId)
       .maybeSingle(),
+    // Whether a customer's email is WAITING for a reply (214) — the Email
+    // tab's "!". One row or none, off the partial index.
+    supabase
+      .from("special_order_messages")
+      .select("id")
+      .eq("order_id", id)
+      .eq("direction", "in")
+      .is("handled_at", null)
+      .limit(1)
+      .maybeSingle(),
+    wantsEmails
+      ? supabase
+          .from("special_order_messages")
+          .select(ORDER_MESSAGE_COLUMNS)
+          .eq("order_id", id)
+          .order("sent_at", { ascending: true })
+      : SKIP,
+    // When the mailbox was last checked, and what went wrong if it did.
+    wantsEmails
+      ? supabase
+          .from("special_order_mail_sync")
+          .select("checked_at, last_error")
+          .eq("org_id", session.membership.org_id)
+          .maybeSingle()
+      : SKIP_MENU,
   ]);
 
   if (error) {
@@ -669,7 +700,12 @@ export async function SpecialOrderDetail({
     href: orderTabHref(id, t, rawParams),
     count: t === "items" ? lines.length : undefined,
     // Not while you are ON the tab: you are reading it.
-    alert: t === "notes" && unreadInquiryNote && tab !== "notes" ? "The customer’s inquiry has a note" : undefined,
+    alert:
+      t === "notes" && unreadInquiryNote && tab !== "notes"
+        ? "The customer’s inquiry has a note"
+        : t === "emails" && waitingRow && tab !== "emails"
+          ? "An email is waiting for a reply"
+          : undefined,
   }));
   // A stale `?tab=delivery` on a template would otherwise render a tab the nav
   // does not offer, which reads as the nav being broken.
@@ -1461,6 +1497,31 @@ export async function SpecialOrderDetail({
               orgSettings={session.orgSettings as Record<string, unknown>}
               orgName={session.orgName}
             />
+          )}
+
+          {/* ================= EMAIL ================= */}
+          {activeTab === "emails" && (
+            messageError ? (
+              <section className="space-y-3">
+                <SectionHeading>Email</SectionHeading>
+                <p className="text-sm text-accent">
+                  Could not load this order’s email: {messageError.message}
+                  {messageError.message.includes("special_order_messages") ? (
+                    <span className="mt-2 block text-muted">Migration 214 has not been applied yet.</span>
+                  ) : null}
+                </p>
+              </section>
+            ) : (
+              <OrderEmails
+                orderId={id}
+                messages={(messageRows ?? []) as unknown as OrderMessage[]}
+                contactEmail={(row.contact_email as string | null) ?? customer?.email ?? null}
+                canWrite={canWrite}
+                check={(mailCheck ?? null) as MailCheck}
+                timeZone={timeZone}
+                nowMs={renderedAt()}
+              />
+            )
           )}
 
           {/* ================= DOCUMENTS ================= */}

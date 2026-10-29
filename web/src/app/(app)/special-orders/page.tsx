@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { daysAfter, serverTimeZone, todayInTimeZone } from "@/lib/today";
+import { daysAfter, renderedAt, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { RawSearchParams } from "@/lib/filterMenus";
 import { parseFilterSearch } from "@/lib/filterMenus";
 import {
@@ -205,6 +205,25 @@ export default async function SpecialOrdersPage({
     }
   }
 
+  // WHICH ORDERS HAVE A CUSTOMER'S EMAIL WAITING FOR A REPLY (214), and since
+  // when — the oldest unanswered message per order. Org-wide off the partial
+  // index, so a handful of rows. A failed read (214 unapplied, or a role RLS
+  // does not let read the mail) is no marks, never a broken list.
+  const waitingSince = new Map<string, string>();
+  {
+    const { data } = await supabase
+      .from("special_order_messages")
+      .select("order_id, sent_at")
+      .eq("org_id", session.membership.org_id)
+      .eq("direction", "in")
+      .is("handled_at", null)
+      .order("sent_at", { ascending: true })
+      .limit(1000);
+    for (const m of data ?? []) {
+      if (!waitingSince.has(m.order_id as string)) waitingSince.set(m.order_id as string, m.sent_at as string);
+    }
+  }
+
   // WHICH ORDERS A CUSTOMER INVOICE BILLS (124): bulk Record Payment skips
   // them, and Create Invoice bills only what they do not (176). A failed read
   // (124 unapplied) leaves every order unbilled, which is what they were
@@ -322,6 +341,7 @@ export default async function SpecialOrdersPage({
         ? Math.round((billedOf.get(o.id as string) ?? 0) * 100) / 100
         : null,
       totals: orderTotals(money, lines.get(o.id as string) ?? [], payments.get(o.id as string) ?? [], settings.rush),
+      waiting_since: waitingSince.get(o.id as string) ?? null,
     };
   });
 
@@ -341,6 +361,7 @@ export default async function SpecialOrdersPage({
       topUpError={topUpError?.message ?? null}
       dayMarks={marks}
       markCalendars={markCalendars}
+      nowMs={renderedAt()}
     />
   );
 }

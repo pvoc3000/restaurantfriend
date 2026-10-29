@@ -6055,3 +6055,66 @@ threaded.
   quote-approved notice (`approve-quote`) and the paid-online pair
   (`square-pay`, `qbo-webhook`/`qbo-sync`) — same `orderThread` path, but no
   real send has gone through them.
+
+### 2026-10-29 — an order's emails, and whether anybody answered them (migrations 214, 215)
+
+Mark: "Traci keeps missing incoming special order emails … is it possible to
+have a tab on the special order detail page for reading and responding to
+emails? could the app flag when a message comes in about an order?" Then,
+after the inbox was measured: "Build the tab."
+
+- **Measured first** (Gmail connector, specialorders@, 14 days to
+  2026-10-29): ~117 inbox conversations held mail the app sent ITSELF (the
+  `special_orders.email_cc` copy of every quote and invoice, and the shop
+  notices to itself) against ~26 from customers and carriers. Traci reads the
+  inbox in Mail.app on her laptop, so each customer reply sits among four of
+  ours. Clearing `email_cc` (a setting, read by `documentCc`) was offered and
+  not taken yet; the tab came first.
+- **`special_order_messages` (214) MIRRORS the mailbox**; Gmail stays the
+  record. Written only by `order-mail` with service_role; supervisor+ read,
+  like the log. `special_order_mail_sync` holds where the check got to and
+  its last error, which the tab prints.
+- **`order-mail`** (new function, `--no-verify-jwt`; cron + three signed-in
+  modes): `check` lists `after:<last check − 1 h>` (first check: 30 days),
+  skips what is copied, reads ≤150 per run oldest first, and ties each to an
+  order by (1) its Gmail conversation — an already-copied message, or
+  `thread_conversation_id` — (2) exactly one order number in the subject
+  (`number_prefix` + digits, case-blind), (3) inbound only: a sender who is
+  the contact or customer of exactly ONE open order (not canceled, event ≥ 3
+  days ago). Untied mail is not copied. A message from the mailbox to nobody
+  but itself (a shop notice) is skipped; so are drafts, spam, trash, chats.
+  `reply` sends in the conversation of the message it answers ("Re: " its
+  base subject, In-Reply-To its Message-ID, its threadId), copies the sent
+  message in at once, settles, and logs "Reply emailed to …". `attachment`
+  re-reads the message and finds the file by PART ID, because Gmail mints a
+  fresh `attachmentId` on every fetch.
+- **WAITING IS NOT UNREAD.** An inbound message waits until an email to the
+  customer follows it (`settle_special_order_messages` — the tab's reply, the
+  app's documents, or Traci's reply from Mail.app, all of which land in Sent
+  and are copied) or somebody presses **No reply needed**
+  (`dismiss_special_order_messages`, definer, supervisor+, writes the log
+  line). Opening the tab clears nothing.
+- **Screens:** the order's **Email** tab (after Notes; orders only, not
+  templates or standing orders) — conversation oldest first, quoted history
+  folded (`lib/orderEmail` `splitQuoted`: "On … wrote:", wrapped Gmail
+  attribution, Outlook From/Sent, trailing ">" runs), attachments as buttons,
+  a yellow Waiting band, a reply box (⌘↵ sends), Check for email with the last
+  check's time and error. The tab carries `AlertMark`'s "!" while a message
+  waits. The **Orders list** gained an **Email** column after Number (the "!"
+  and how long, oldest sorts first) and **Waiting for Reply** in the Status
+  menu. The wait is computed against `renderedAt()` (`lib/today`) so it does
+  not change between server render and hydration.
+- **The credential needs `gmail.readonly`** beside `gmail.send`, and NOT
+  `gmail.metadata` as well (`po-email-setup.md` A2 rewritten). `_shared/email.ts`
+  gained `gmailAccessToken`, which `sendViaGmail` now uses — byte-identical
+  behaviour, but every function importing it picks it up only on redeploy.
+- **Fixtures:** `orderEmail.fixtures.ts` (addresses, order numbers, Re:
+  stripping, text/HTML bodies, attachments, in/out/notice, quote folding,
+  wait wording, de-duplication). Checked by breaking the ">" rule: red.
+- **NOT DONE AS OF WRITING:** 214 not applied, `order-mail` not deployed,
+  token not re-minted, 215 (the every-5-minutes cron, vault secrets
+  `order_mail_url` and `order_mail_secret`, edge secret `ORDER_MAIL_SECRET`)
+  not applied. Not seen in a browser: the pane was at the PIN lock. Not built:
+  an Unmatched list for mail no rule ties (a brand-new customer's first
+  email), attaching the quote PDF to a reply, an overdue alert, a morning
+  summary.
