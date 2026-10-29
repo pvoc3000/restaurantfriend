@@ -262,3 +262,13 @@ morning; the summary now lists the shops with a day in the week's window. A
 dry run also now counts what it WOULD post, under "Would post to QuickBooks".
 The vault secret, the URL and the edge secret were proven to match by
 calling the function with Vault's values: "not enabled, or not 7 AM".
+
+**213 APPLIED the same day (Mark: "Apply 213").** *Probe, don't read this
+line.* pg_cron 1.6.4 and pg_net 0.20.4 installed; `sales-nightly-14utc` and
+`sales-nightly-15utc` scheduled and active, each reading
+`sales_automation_secret` from Vault. At application the org had the bot
+member chosen, timezone America/Los_Angeles, and `enabled` false — the jobs
+fire and the function answers "not enabled" until Runs at 7 AM is switched on.
+To see what a firing did: `cron.job_run_details` (did the job run) and
+`net._http_response` (what the function answered), then the run's row in
+`sales_automation_runs`.
