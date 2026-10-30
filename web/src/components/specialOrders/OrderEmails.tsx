@@ -10,7 +10,7 @@ import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { FORM_FIELD_DRESS } from "@/components/ui/fieldMetrics";
 import { MenuButton } from "@/components/ui/MenuButton";
 import { TextInput } from "@/components/ui/TextInput";
-import { useFillViewportHeight, useViewportAtLeast } from "@/lib/tableHead";
+import { spaceBelow, useFillViewportHeight, useViewportAtLeast } from "@/lib/tableHead";
 import {
   answering,
   conversation,
@@ -149,7 +149,42 @@ export function OrderEmails({
   useFillViewportHeight(bodyRef, composing && sideBySide && !doc, 160);
 
   const historyRef = useRef<HTMLDivElement>(null);
-  useFillViewportHeight(historyRef, thread.length > 0, 320);
+  /**
+   * THE HISTORY ENDS AT THE FOOT OF THE WINDOW, measured honestly (Mark,
+   * 2026-10-29: "the scroll view … grows but is always too small. It hasn't
+   * reached the bottom of the window yet").
+   *
+   * `useFillViewportHeight` reads what follows a pane off the BODY's bottom
+   * edge, and here that edge lies twice: on a page shorter than the window it
+   * is the window's foot, so the slack counts as content and the cap never
+   * grows; and while the compose column beside the pane is taller than it
+   * (with a PDF under it, much taller) the whole column counts as "below".
+   * `spaceBelow` adds up only what really follows the pane in its own flow —
+   * the compose column sits BESIDE it and is not counted. The top is a
+   * document coordinate, so a scrolled page measures the same.
+   */
+  const hasHistory = thread.length > 0;
+  useLayoutEffect(() => {
+    const el = historyRef.current;
+    if (!el) return;
+    if (!hasHistory) {
+      el.style.maxHeight = "";
+      return;
+    }
+    const measure = () => {
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const target = Math.max(320, window.innerHeight - top - spaceBelow(el));
+      if (Math.abs(parseFloat(el.style.maxHeight || "0") - target) > 1) el.style.maxHeight = `${target}px`;
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [hasHistory]);
   const newestId = thread[thread.length - 1]?.id;
   // A new message arrives at the top, so that is where the pane goes back to.
   useLayoutEffect(() => {
