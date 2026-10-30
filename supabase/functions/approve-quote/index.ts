@@ -37,7 +37,7 @@ import {
   withGapBeforeAttachment,
   type ProviderConfig,
 } from "../_shared/email.ts";
-import { buildApprovalNotice } from "../_shared/shopNotices.ts";
+import { buildApprovalNotice, stampIn } from "../_shared/shopNotices.ts";
 import { orderThread } from "../_shared/orderThread.ts";
 import { copySentToOrder } from "../_shared/orderMailCopy.ts";
 import { appLink, sendShopNotice } from "../_shared/shopNotify.ts";
@@ -206,7 +206,12 @@ Deno.serve(async (req) => {
         const confirmation =
           `Thank you — we have your approval for quote #${order?.number ?? ""}.\n\n` +
           `Approved by: ${state.approved_name}\n` +
-          `When: ${state.approved_at}\n\n` +
+          // In the org's zone and in words — "Thursday, October 29, 2026 at
+          // 9:07 PM" — as the shop's notice says it, not the raw timestamp.
+          `When: ${
+            stampIn(state.approved_at, ((org?.settings ?? {}) as { timezone?: string }).timezone ?? "UTC") ??
+            state.approved_at
+          }\n\n` +
           `Your invoice will follow by email. If anything needs changing, just reply to this message.\n`;
         const subject = thread?.subject ??
           `Quote #${order?.number ?? ""} approved${order?.title ? ` — ${order.title}` : ""}`;
