@@ -6,6 +6,8 @@ import { eq, test } from "./harness";
 import {
   baseSubject,
   htmlToText,
+  mailFilesFrom,
+  MAX_ATTACHMENT_BYTES,
   messageAttachments,
   messageText,
   orderNumbersIn,
@@ -17,7 +19,10 @@ import {
   addressesIn,
   answering,
   conversation,
+  insertBlock,
   orderMailboxes,
+  removeBlock,
+  reSubject,
   replyAddress,
   replyCc,
   replyDraft,
@@ -243,4 +248,40 @@ test("orderMailboxes: the sending mailbox and any reply-to", () => {
     "all three places"
   );
   eq(orderMailboxes({}), [], "nothing configured");
+});
+
+test("mailFilesFrom: named base64 files under the ceiling", () => {
+  eq(mailFilesFrom(undefined), { files: [] }, "none");
+  eq(
+    mailFilesFrom([{ filename: " cake.jpg ", base64: "QUJD\n", content_type: "image/jpeg" }]),
+    { files: [{ filename: "cake.jpg", base64: "QUJD", contentType: "image/jpeg" }] },
+    "trimmed, whitespace out of the base64"
+  );
+  eq(mailFilesFrom([{ filename: "a.pdf", base64: "QQ==" }]), { files: [{ filename: "a.pdf", base64: "QQ==" }] }, "no type given");
+  eq("error" in mailFilesFrom([{ filename: "", base64: "QQ==" }]), true, "a name is required");
+  eq("error" in mailFilesFrom([{ filename: "x", base64: "not base64!" }]), true, "garbage refused");
+  eq("error" in mailFilesFrom("x"), true, "not a list");
+  const big = "A".repeat(Math.ceil(((MAX_ATTACHMENT_BYTES + 3) * 4) / 3 / 4) * 4);
+  eq("error" in mailFilesFrom([{ filename: "big.bin", base64: big }]), true, "over the ceiling");
+  const atLimit = "A".repeat((MAX_ATTACHMENT_BYTES / 3) * 4 - ((MAX_ATTACHMENT_BYTES / 3) * 4) % 4);
+  eq("files" in mailFilesFrom([{ filename: "ok.bin", base64: atLimit }]), true, "just under it");
+});
+
+test("insertBlock/removeBlock: the document's paragraph between the typing and the quote", () => {
+  const quote = "On Oct 29, Kelly wrote:\n\n> swap the letters?";
+  const block = "Hi Kelly,\n\nHere is your revised quote.";
+  eq(insertBlock("\n\n" + quote, quote, block), block + "\n\n" + quote, "nothing typed: the paragraph leads");
+  eq(insertBlock("Done!\n\n" + quote, quote, block), "Done!\n\n" + block + "\n\n" + quote, "below what was typed");
+  eq(insertBlock("", "", block), block, "a new message: just the paragraph");
+  eq(insertBlock("Note first", "", block), "Note first\n\n" + block, "new message with typing");
+  eq(insertBlock("quote edited away", quote, block), "quote edited away\n\n" + block, "a quote that is gone: at the end");
+  eq(removeBlock(block + "\n\n" + quote, block), "\n\n" + quote, "back to the reply as it opened");
+  eq(removeBlock("Done!\n\n" + block + "\n\n" + quote, block), "Done!\n\n" + quote, "the typing stays");
+  eq(removeBlock("Hi Kelly, changed", block), "Hi Kelly, changed", "an edited paragraph stays");
+});
+
+test("reSubject: one Re: on the base subject", () => {
+  eq(reSubject("Re: Fwd: Donut Friend SO-1: Birthday"), "Re: Donut Friend SO-1: Birthday", "run collapsed");
+  eq(reSubject("Reorder for Friday"), "Re: Reorder for Friday", "a word starting Re is not a prefix");
+  eq(reSubject(null), "Re:", "no subject");
 });

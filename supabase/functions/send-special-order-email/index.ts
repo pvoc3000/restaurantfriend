@@ -42,7 +42,8 @@ import {
   withGapBeforeAttachment,
   type ProviderConfig,
 } from "../_shared/email.ts";
-import { orderThread } from "../_shared/orderThread.ts";
+import { bracketed, orderThread } from "../_shared/orderThread.ts";
+import { mailFilesFrom } from "../_shared/orderMail.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -163,6 +164,12 @@ Deno.serve(async (req) => {
        *  is real and editable. Binding it to the document is this function's
        *  job — see below. */
       quote_token,
+      /** The customer's email this answers (214's `special_order_messages`
+       *  row), when the document goes out from the Email tab as a reply:
+       *  then it threads on THAT message, under the subject the tab chose. */
+      answering,
+      /** More files beside the document — the Email tab's Attach ▸ Other…. */
+      files,
     } = payload;
 
     if (!order_id || !kind || !to || !subject || !pdf_base64 || !filename) {
@@ -214,6 +221,25 @@ Deno.serve(async (req) => {
     const linkProblem = checkApprovalLink(body ?? "");
     if (linkProblem) return json(400, { error: linkProblem });
 
+    const extra = mailFilesFrom(files);
+    if ("error" in extra) return json(400, { error: extra.error });
+
+    // A REPLY TO ONE OF THE CUSTOMER'S EMAILS (the Email tab): read through the
+    // caller's client, so RLS decides whether they may see it, and it must be
+    // this order's. The kitchen sheet never answers anybody.
+    let answered: { gmail_thread_id: string | null; rfc_message_id: string | null } | null = null;
+    if (answering && kind !== "order") {
+      const { data: row } = await supabase
+        .from("special_order_messages")
+        .select("order_id, gmail_thread_id, rfc_message_id")
+        .eq("id", String(answering))
+        .maybeSingle();
+      if (!row || row.order_id !== order_id) {
+        return json(404, { error: "the email being answered is not on this order" });
+      }
+      answered = row as { gmail_thread_id: string | null; rfc_message_id: string | null };
+    }
+
     const { data: org } = await supabase
       .from("orgs")
       .select("name, settings")
@@ -240,7 +266,7 @@ Deno.serve(async (req) => {
     // until 167 it threaded onto the customer's inquiry like everything else.
     // The subject is the caller's, composed and shown on the compose card
     // (`orderEmailSubject`); the first send fixes it on the order.
-    const thread = kind === "order"
+    const thread = kind === "order" || answered
       ? null
       : await orderThread(supabase, order_id, transport.cfg.from, {
           org: org?.name,
@@ -253,7 +279,14 @@ Deno.serve(async (req) => {
       subject,
       text: withGapBeforeAttachment(body ?? ""),
       attachment: { filename, base64: pdf_base64 },
-      ...(thread?.headers ?? {}),
+      attachments: extra.files,
+      ...(answered
+        ? {
+            inReplyTo: answered.rfc_message_id ? bracketed(answered.rfc_message_id) : undefined,
+            references: answered.rfc_message_id ? bracketed(answered.rfc_message_id) : undefined,
+            threadId: answered.gmail_thread_id ?? undefined,
+          }
+        : thread?.headers ?? {}),
     });
     const providerId = sent.ref;
 

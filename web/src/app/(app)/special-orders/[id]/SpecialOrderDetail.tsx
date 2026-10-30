@@ -56,6 +56,7 @@ import { FulfillmentCell } from "@/components/specialOrders/FulfillmentCell";
 import { MarkNoteRead } from "@/components/specialOrders/MarkNoteRead";
 import { OrderEmails, type MailCheck } from "@/components/specialOrders/OrderEmails";
 import { ORDER_MESSAGE_COLUMNS, orderMailboxes, type OrderMessage } from "@/lib/orderEmail";
+import { orderEmailSubject } from "@/lib/specialOrderDocs";
 import { OrderLog, type OrderEventRow } from "@/components/specialOrders/OrderLog";
 import { OrderCommandMenu } from "@/components/specialOrders/OrderCommandMenu";
 import { receiptGaps } from "@/lib/receiptReadiness";
@@ -112,7 +113,7 @@ const ORDER_COLUMNS = `
   date_initiated, quote_sent_at, quote_returned_at, invoice_sent_at,
   invoice_paid_at, receipt_sent_at, delivery_scheduled_at,
   order_printed_at, order_scheduled_at,
-  production_schedule_id, inbound_subject, source,
+  production_schedule_id, inbound_subject, thread_subject, source,
   customers ( id, first_name, last_name, company, phone, email )
 `;
 
@@ -712,6 +713,17 @@ export async function SpecialOrderDetail({
   const activeTab = tabs.includes(tab) ? tab : "info";
 
 
+  /** What the order still lacks for its receipt — Send ▸ Receipt and the
+   *  Email tab's Attach ▸ Receipt both ask first when it is not empty. */
+  const orderReceiptGaps = receiptGaps({
+    status,
+    fulfillment: (row.fulfillment as string | null) ?? null,
+    delivery_scheduled_at: (row.delivery_scheduled_at as string | null) ?? null,
+    event_date: (row.event_date as string | null) ?? null,
+    event_time: (row.event_time as string | null) ?? null,
+    balance: totals.balance,
+  });
+
   /** Every shop, for the two pickers. Active only — design rule 3. */
   const locationOptions = [
     { value: "", label: "Not set" },
@@ -907,14 +919,7 @@ export async function SpecialOrderDetail({
                       workflow: row as never,
                       orgSettings: session.orgSettings,
                       today,
-                      receiptGaps: receiptGaps({
-                        status,
-                        fulfillment: (row.fulfillment as string | null) ?? null,
-                        delivery_scheduled_at: (row.delivery_scheduled_at as string | null) ?? null,
-                        event_date: (row.event_date as string | null) ?? null,
-                        event_time: (row.event_time as string | null) ?? null,
-                        balance: totals.balance,
-                      }),
+                      receiptGaps: orderReceiptGaps,
                       invoice: {
                         liveInvoiceId: liveInvoice?.id ?? null,
                         liveInvoiceLabel: liveInvoice?.label ?? null,
@@ -1517,7 +1522,24 @@ export async function SpecialOrderDetail({
                 messages={(messageRows ?? []) as unknown as OrderMessage[]}
                 contactEmail={(row.contact_email as string | null) ?? customer?.email ?? null}
                 mailboxes={orderMailboxes(session.orgSettings)}
+                defaultSubject={orderEmailSubject(
+                  row as { thread_subject?: string | null; number?: string | null; title?: string | null },
+                  session.orgName,
+                  session.orgSettings
+                )}
+                documents={
+                  kind === "order"
+                    ? {
+                        orgId: row.org_id as string,
+                        workflow: row as never,
+                        orgSettings: session.orgSettings,
+                        today,
+                        receiptGaps: orderReceiptGaps,
+                      }
+                    : null
+                }
                 startReplying={rawParams.reply === "1"}
+                startSending={typeof rawParams.send === "string" ? rawParams.send : undefined}
                 canWrite={canWrite}
                 check={(mailCheck ?? null) as MailCheck}
                 timeZone={timeZone}

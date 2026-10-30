@@ -330,8 +330,13 @@ export async function sendSpecialOrderEmail(
     blob: Blob;
     filename: string;
     quoteToken?: string | null;
+    /** The customer's email this answers, when it goes out from the Email
+     *  tab as a reply (`special_order_messages.id`). */
+    answering?: string | null;
+    /** More files beside the document — the Email tab's Attach ▸ Other…. */
+    files?: { filename: string; content_type: string; base64: string }[];
   }
-): Promise<{ warning?: string }> {
+): Promise<{ warning?: string; id?: string }> {
   const { data, error } = await supabase.functions.invoke("send-special-order-email", {
     body: {
       order_id: args.orderId,
@@ -343,6 +348,8 @@ export async function sendSpecialOrderEmail(
       pdf_base64: await blobToBase64(args.blob),
       filename: args.filename,
       quote_token: args.quoteToken ?? undefined,
+      answering: args.answering ?? undefined,
+      files: args.files?.length ? args.files : undefined,
     },
   });
   if (error) {
@@ -359,7 +366,8 @@ export async function sendSpecialOrderEmail(
     }
     throw new Error(message);
   }
-  return { warning: (data as { warning?: string } | null)?.warning };
+  const result = data as { warning?: string; id?: string } | null;
+  return { warning: result?.warning, id: result?.id };
 }
 
 /* ==========================================================================

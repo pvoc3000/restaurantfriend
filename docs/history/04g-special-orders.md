@@ -6167,3 +6167,38 @@ needed does not. Dry-run on the live DB in a raised-exception transaction:
 SO-10156 (reply after the waiting email) → cleared; SO-10175 (reply, then the
 customer wrote again) → kept, 1 waiting. The 00:10 UTC cron check ran clean on
 the new function.
+
+### 2026-10-29 — one compose box: Send… moves into the Email tab
+
+Mark: "we now have two different ways to send emails … combine these into one
+clean workflow", then: Attach offers Quote, Receipt and Other… (files from
+outside the app); the kitchen order uses the same box with To and Cc empty
+("almost never get used"); drop the shop's standing Cc ("what we've built is
+better now"); quote the customer's email only when it is a reply; keep the PDF
+preview, under the compose box, only while a document is attached.
+
+- **Actions ▸ Send… ▸ Quote / Receipt / Kitchen Order** now go to
+  `?tab=emails&send=<kind>.<n>` (the counter makes a second choice a new
+  request; `orderTabHref` strips `send` like `reply`). Send ▸ Invoice still
+  goes through a customer invoice. `SendDocument`'s compose window is gone; its
+  render-mint-build step is `orderDocumentDraft.prepareDocument`, used by the tab.
+- **The compose box** gained Subject and an Attach menu; one document at a
+  time, any number of files (10 MB together, checked both sides —
+  `mailFilesFrom`). A customer document answers their WAITING email when there
+  is one (Re: subject, quoted, Reply-All Cc), else starts fresh in the order's
+  conversation with To = the customer and Cc = the contact when different —
+  never `email_cc`. Its paragraph goes in below what was typed and above the
+  quote (`insertBlock`) and comes back out on detach if unedited (`removeBlock`).
+- **Send with a document** binds a quote's snapshot first, then calls
+  `send-special-order-email` (v32: `answering` threads on that message instead
+  of the order root; `files` ride along), which still stamps, logs, files the
+  PDF and retires old links. Then `order-mail`'s new `record` mode copies the
+  sent email into the order and settles what it answers, and the workflow
+  offer appears. **Without a document** it is `order-mail`'s reply (v4: takes
+  `subject` and `files`).
+- **`_shared/email.ts` carries several files of any type** (`attachments`,
+  `contentType`, RFC 2231 names). Checked by compiling the old and new
+  `buildMime`: plain, one-PDF and HTML+PDF messages are byte-identical, so
+  every other function is unchanged whether or not it is redeployed.
+- NOT YET DONE when written: a browser walk-through (the pane was at the PIN
+  lock), and a real send of each kind.

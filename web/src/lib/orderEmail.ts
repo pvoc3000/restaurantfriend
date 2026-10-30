@@ -185,3 +185,32 @@ export function orderMailboxes(orgSettings: Record<string, unknown> | null | und
   const provider = (so.email_provider ?? {}) as Record<string, unknown>;
   return [provider.from, provider.reply_to, so.reply_to].flatMap((v) => (typeof v === "string" ? addressesIn(v) : []));
 }
+
+/**
+ * A DOCUMENT'S PARAGRAPH GOES IN BELOW WHAT HAS BEEN TYPED AND ABOVE THE QUOTE
+ * (Mark, 2026-10-29). `quote` is the reply's quoted history as the box opened
+ * with it (`replyDraft`), or "" for a message that answers nobody.
+ */
+export function insertBlock(body: string, quote: string, block: string): string {
+  const tail = quote && body.endsWith(quote) ? quote : "";
+  const head = body.slice(0, body.length - tail.length).replace(/\s+$/, "");
+  const top = head ? `${head}\n\n${block}` : block;
+  return tail ? `${top}\n\n${tail.replace(/^\n+/, "")}` : top;
+}
+
+/**
+ * Take a document's paragraph back out when it is detached — only if it is
+ * still there word for word. An edited paragraph is the writer's now, and
+ * stays.
+ */
+export function removeBlock(body: string, block: string): string {
+  if (!block || !body.includes(block)) return body;
+  return body.replace(block, "").replace(/\n{3,}/g, "\n\n");
+}
+
+/** A reply's subject: the answered one with its Re:/Fwd: run taken off and
+ *  one "Re: " put back — `order-mail`'s `baseSubject` rule, for the box. */
+export function reSubject(subject: string | null | undefined): string {
+  const base = (subject ?? "").replace(/^(\s*(re|fwd?|fw)\s*:\s*)+/i, "").trim();
+  return base ? `Re: ${base}` : "Re:";
+}

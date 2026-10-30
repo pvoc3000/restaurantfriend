@@ -282,3 +282,34 @@ export function formatAddresses(list: Address[]): string | null {
   if (!list.length) return null;
   return list.map((a) => (a.name ? `${a.name} <${a.address}>` : a.address)).join(", ");
 }
+
+/** At most this many bytes of files on one email from the Email tab — Gmail's
+ *  own ceiling is 25 MB, and every byte crosses the function as base64. */
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+/**
+ * The files an Email-tab send carries (Attach ▸ Other…), checked: each needs a
+ * name and base64 content, and together they fit `MAX_ATTACHMENT_BYTES`.
+ * Returns the files in the mailer's shape, or what is wrong with them.
+ */
+export function mailFilesFrom(
+  value: unknown
+): { files: { filename: string; base64: string; contentType?: string }[] } | { error: string } {
+  if (value == null) return { files: [] };
+  if (!Array.isArray(value)) return { error: "files must be a list" };
+  const files: { filename: string; base64: string; contentType?: string }[] = [];
+  let bytes = 0;
+  for (const f of value as Record<string, unknown>[]) {
+    const filename = String(f?.filename ?? "").trim();
+    const base64 = String(f?.base64 ?? "").replace(/\s+/g, "");
+    if (!filename || !base64) return { error: "every file needs a filename and its content" };
+    if (!/^[A-Za-z0-9+/]+=*$/.test(base64)) return { error: `${filename} is not base64` };
+    bytes += Math.floor((base64.length * 3) / 4) - (base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0);
+    const type = String(f?.content_type ?? "").trim();
+    files.push({ filename, base64, ...(type ? { contentType: type } : {}) });
+  }
+  if (bytes > MAX_ATTACHMENT_BYTES) {
+    return { error: `the files come to ${(bytes / 1048576).toFixed(1)} MB — the most one email can carry from here is ${MAX_ATTACHMENT_BYTES / 1048576} MB` };
+  }
+  return { files };
+}

@@ -4,29 +4,10 @@ import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
-import { FORM_FIELD_DRESS } from "@/components/ui/fieldMetrics";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
-import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { MenuButton } from "@/components/ui/MenuButton";
 import type { ActionMenuItem } from "@/components/ui/ActionMenu";
-import { TextInput } from "@/components/ui/TextInput";
-import {
-  DOCUMENT_LABEL,
-  buildDocumentEmail,
-  documentFileName,
-  type DocumentKind,
-  type EmailParts,
-  type OrderDocData,
-  type DocOrg,
-} from "@/lib/specialOrderDocs";
-import {
-  approvalUrl,
-  bindQuoteSnapshot,
-  mintQuoteToken,
-  quoteSnapshot,
-  resolveAppBase,
-  sendSpecialOrderEmail,
-} from "@/lib/specialOrderSend";
+import { DOCUMENT_LABEL, documentFileName, type DocumentKind } from "@/lib/specialOrderDocs";
 import { downloadBlob, openWindowNow, showBlob } from "@/lib/poProcessing";
 import {
   DOCUMENT_STAMPS,
@@ -46,8 +27,15 @@ import { renderOrderDocument } from "./renderOrderDocument";
 import { confirmDialog } from "@/lib/confirm";
 
 /**
- * PRODUCE AND SEND — decision 11's four documents and decision 12's compose
- * card, as one control on the order's command bar.
+ * PRODUCE AND SEND — decision 11's four documents, as one control on the
+ * order's command bar.
+ *
+ * SEND… NO LONGER HAS A WINDOW OF ITS OWN (Mark, 2026-10-29: "we now have two
+ * different ways to send emails … combine these into one clean workflow").
+ * Send ▸ Quote, Receipt and Kitchen Order open the order's Email tab with the
+ * document attached to its compose box (`OrderEmails`), which renders it,
+ * mints a quote's link, shows the PDF and sends it through the same function
+ * this window did. Send ▸ Invoice still goes through a customer invoice.
  *
  * THREE VERBS, EACH ONE A MENU OF THE FOUR DOCUMENTS (Mark, 2026-08-19:
  * "Delete the document selection picklist, then make Preview, Download, and
@@ -79,16 +67,17 @@ import { confirmDialog } from "@/lib/confirm";
  * an `await` is silently blocked. The window is opened SYNCHRONOUSLY in the
  * click handler and navigated to the blob later.
  */
+/** Counts Send… requests, so the same document chosen twice is two requests
+ *  to the Email tab rather than one it has already acted on. */
+let sendRequests = 0;
+
 export function SendDocument({
   orderId,
   orgId,
-  number,
   canWrite,
   /** Enough of the order for `lib/orderWorkflow` to reason about what a sent
    *  document implies. */
   workflow,
-  /** `orgs.settings`, for the email templates (design rule 2). */
-  orgSettings,
   /** Today in the org's timezone — the snapshot records when the quote went
    *  out, and a browser's own idea of today is the browser's timezone. */
   today,
@@ -145,32 +134,11 @@ export function SendDocument({
   const [moneyOpen, setMoneyOpen] = useState<"invoice" | "payment" | null>(null);
   const [offerTitle, setOfferTitle] = useState<string | undefined>(undefined);
   const supabase = createClient();
-  const [kind, setKind] = useState<DocumentKind>("quote");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sentNote, setSentNote] = useState<string | null>(null);
-
-  const [compose, setCompose] = useState<EmailParts | null>(null);
-  // Everything the open dialog is holding: the exact blob it previews and will
-  // send, the assembled document behind it, and — for a quote — the token whose
-  // link is already sitting in the body.
-  const [pending, setPending] = useState<{
-    order: OrderDocData;
-    org: DocOrg;
-    blob: Blob;
-    url: string;
-    filename: string;
-    token: string | null;
-  } | null>(null);
   const [offer, setOffer] = useState<Consequence[] | null>(null);
 
   if (!canWrite) return children ? <>{children([])}</> : null;
-
-  function closeCompose() {
-    if (pending) URL.revokeObjectURL(pending.url);
-    setPending(null);
-    setCompose(null);
-  }
 
   async function run(label: string, fn: () => Promise<void>) {
     setBusy(label);
@@ -286,104 +254,6 @@ export function SendDocument({
   }
 
   /**
-   * Open the compose dialog: render the attachment ONCE so the preview pane
-   * shows the exact document Send will transmit, and — for a quote — mint the
-   * approval token FIRST, so the link is a real URL in a body the human can
-   * read and edit before it goes anywhere.
-   */
-  const openCompose = (k: DocumentKind) =>
-    run("compose", async () => {
-      // Recorded FIRST, because everything the dialog renders reads it — the
-      // title, the templates, the sent note — and it is no longer set by a
-      // control the reader can see.
-      setKind(k);
-      const { blob, order, org } = await render(k);
-
-      // THE LINK IS RESOLVED BEFORE THE TOKEN IS MINTED. If the deployment's
-      // address is unknown there is no usable link, and refusing here costs
-      // nothing — where refusing after the mint would leave an orphan token
-      // behind every attempt, and refusing at SEND would waste an email
-      // somebody had already written.
-      let token: string | null = null;
-      let link = "";
-      if (k === "quote") {
-        const resolved = resolveAppBase(window.location.origin);
-        if ("error" in resolved) throw new Error(resolved.error);
-        token = await mintQuoteToken(supabase, { orderId, orgId });
-        link = approvalUrl(token, resolved.base);
-      }
-      setSentNote(null);
-      setCompose(
-        buildDocumentEmail(
-          k,
-          order,
-          orgSettings,
-          {
-            approve_url: link,
-            // The whole paragraph, so a template that omits `{approve_line}`
-            // simply doesn't offer the link rather than printing a bare URL in
-            // the middle of a sentence.
-            approve_line: link
-              ? `\nYou can review and approve it here — no printing or scanning needed:\n${link}\n`
-              : "",
-            // The pay link is a customer invoice's (145); an order's own paper
-            // carries none, and these stay empty rather than print braces.
-            pay_url: "",
-            pay_line: "",
-          },
-          // `{cutoff_clause}` is the only token that needs to know what day it
-          // is, and this is the org's day rather than the browser's.
-          today,
-          // The conversation subject's `{org}` (167).
-          org.name
-        )
-      );
-      setPending({
-        order,
-        org,
-        blob,
-        url: URL.createObjectURL(blob),
-        filename: documentFileName(k, order.number, order.event_date ?? today),
-        token,
-      });
-    });
-
-  const send = () =>
-    run("send", async () => {
-      if (!compose || !pending) return;
-
-      // Decision 17: the snapshot is written BEFORE the send. A live link
-      // nobody has been given is harmless; a link the customer HAS that says
-      // the quote does not exist is not. See `bindQuoteSnapshot`.
-      if (pending.token) {
-        await bindQuoteSnapshot(
-          supabase,
-          pending.token,
-          quoteSnapshot(pending.order, pending.org, today)
-        );
-      }
-
-      const { warning } = await sendSpecialOrderEmail(supabase, {
-        orderId,
-        kind,
-        to: compose.to,
-        cc: compose.cc,
-        subject: compose.subject,
-        body: compose.body,
-        blob: pending.blob,
-        filename: pending.filename,
-        quoteToken: pending.token,
-      });
-      const to = compose.to;
-      closeCompose();
-      setSentNote(`${DOCUMENT_LABEL[kind]} sent to ${to}${warning ? ` — ${warning}` : ""}`);
-      router.refresh();
-      // The edge function has already stamped the stage date (its own
-      // STAGE_COLUMN map), so what is left to ask about is the LADDER.
-      propose(kind);
-    });
-
-  /**
    * The four documents, in the order the workflow produces them — quote before
    * invoice before receipt, and the kitchen order last because it is the one
    * that never leaves the building.
@@ -402,7 +272,15 @@ export function SendDocument({
   /** Send, with Invoice routed through a customer invoice when one is wired. */
   const sendAct = async (k: DocumentKind) => {
     if (!(await receiptGoAhead(k, "Send"))) return;
-    if (k !== "invoice" || !invoice) return void openCompose(k);
+    if (k !== "invoice" || !invoice) {
+      // To the Email tab, with the document attached there. The number makes
+      // choosing the same document twice a second request.
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", "emails");
+      url.searchParams.set("send", `${k}.${++sendRequests}`);
+      router.push(`${url.pathname}${url.search}`);
+      return;
+    }
     if (invoice.liveInvoiceId) {
       router.push(withFrom(`/customer-invoices/${invoice.liveInvoiceId}?send=${sendIntent()}`, invoice.from));
       return;
@@ -475,12 +353,9 @@ export function SendDocument({
         <>
           {children(documentItems)}
           {busy && busy !== "send" ? (
-            <p className="text-[13px] text-muted">{busy === "compose" ? "Loading…" : "Rendering…"}</p>
+            <p className="text-[13px] text-muted">Rendering…</p>
           ) : null}
-          {sentNote && (
-            <p className="max-w-sm text-right text-[13px] text-[var(--rf-green-600)]">{sentNote}</p>
-          )}
-          {error && !compose && <p className="max-w-sm text-right text-[13px] text-accent">{error}</p>}
+          {error && <p className="max-w-sm text-right text-[13px] text-accent">{error}</p>}
         </>
       ) : (
       <div className="flex flex-wrap items-center gap-3">
@@ -508,118 +383,15 @@ export function SendDocument({
         />
         <MenuButton
           label="Send which document"
-          trigger={busy === "compose" ? "Loading…" : "Send…"}
+          trigger="Send…"
           triggerClassName={BUTTON_CLASS}
           caret
           disabled={busy !== null}
           items={menu(sendAct)}
         />
 
-        {sentNote && <p className="text-[13px] text-[var(--rf-green-600)]">{sentNote}</p>}
-        {error && !compose && <p className="text-[13px] text-accent">{error}</p>}
+        {error && <p className="text-[13px] text-accent">{error}</p>}
       </div>
-      )}
-
-      {compose && pending && (
-        <Dialog
-          title={`Email ${DOCUMENT_LABEL[kind].toLowerCase()} #${number}`}
-          ariaLabel={`Email the ${DOCUMENT_LABEL[kind].toLowerCase()} for order ${number}`}
-          onClose={closeCompose}
-          busy={busy !== null}
-          width="max-w-5xl"
-          top="pt-[4vh]"
-          // A DEFINITE height, not the cap: this panel's point is a big pane to
-          // look at, and shrink-wrapped it would be the preview's own floor.
-          height="h-[88vh]"
-          bodyClassName="grid min-h-0 gap-4 p-6 md:grid-cols-2 md:grid-rows-1"
-          footer={
-            <>
-              <span className="mr-auto text-xs text-subtle">
-                Attached: {pending.filename} — the document shown here is what sends
-              </span>
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={closeCompose}
-                className={DIALOG_CANCEL_CLASS}
-              >
-                Cancel
-              </button>
-              {/* BLACK, the endorsed panel-commit exception: a panel exists to
-                  produce ONE outcome, so its footer is a two-weight decision
-                  rather than a row of peers. */}
-              <button
-                type="button"
-                disabled={busy !== null || !compose.to.trim()}
-                onClick={send}
-                className={DIALOG_COMMIT_CLASS}
-                title={
-                  compose.to.trim()
-                    ? "Send now — the date stamps itself and the log writes itself"
-                    : "Add a recipient first"
-                }
-              >
-                {busy === "send" ? "Sending…" : "Send"}
-              </button>
-            </>
-          }
-        >
-          <div className="space-y-2">
-            <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
-              {(
-                [
-                  ["To", "to"],
-                  ["Cc", "cc"],
-                  ["Subject", "subject"],
-                ] as const
-              ).map(([label, field]) => (
-                <label key={field} className="contents">
-                  <span className="text-xs uppercase tracking-[0.12em] text-subtle">{label}</span>
-                  <TextInput
-                    value={compose[field]}
-                    disabled={busy !== null}
-                    onValueChange={(next) => setCompose({ ...compose, [field]: next })}
-                    clearLabel={`Clear ${label}`}
-                    className="w-full"
-                  />
-                </label>
-              ))}
-              <span className="self-start pt-1 text-xs uppercase tracking-[0.12em] text-subtle">
-                Body
-              </span>
-              <textarea
-                value={compose.body}
-                rows={12}
-                disabled={busy !== null}
-                onChange={(e) => setCompose({ ...compose, body: e.target.value })}
-                className={FORM_FIELD_DRESS}
-              />
-            </div>
-
-            {pending.token && (
-              <p className="text-[12px] text-muted">
-                The approval link in this message is live until a newer quote is
-                sent, and the customer’s typed name is filed as a signed quote.
-              </p>
-            )}
-
-            {/* A send failure must surface INSIDE the dialog — the bar's own
-                error line is behind the overlay. */}
-            {error && <p className="text-sm text-accent">{error}</p>}
-          </div>
-
-          <object
-            data={pending.url}
-            type="application/pdf"
-            aria-label={`Preview of ${pending.filename}`}
-            className="h-[26rem] w-full border border-ink md:h-full md:min-h-[26rem]"
-          >
-            <div className="flex h-full items-center justify-center p-4 text-center text-xs text-subtle">
-              This browser can&apos;t preview PDFs inline — use Preview to open it
-              in its own tab.
-            </div>
-          </object>
-        </Dialog>
       )}
 
       {/* Asked AFTER the document has gone, and only about the ladder — the

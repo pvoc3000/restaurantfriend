@@ -32,6 +32,45 @@
 // "Send mail as" aliases, or Gmail rewrites it.
 
 
+/** One attached file. `contentType` is the PDF's unless said otherwise. */
+export type MailFile = { filename: string; base64: string; contentType?: string };
+
+/** Every file a message carries: `attachment` first, then `attachments`. */
+function filesOf(mail: Mail): MailFile[] {
+  return [...(mail.attachment ? [mail.attachment] : []), ...(mail.attachments ?? [])];
+}
+
+/**
+ * The Content-Type and Content-Disposition of one file part. A plain ASCII
+ * name prints exactly as it always has; anything else — a customer's
+ * "Torta – final.pdf" — is carried as RFC 2231's `filename*` so the name
+ * survives, and a quote or a line break cannot end the header early.
+ */
+function fileHeaders(file: MailFile): string[] {
+  const type = file.contentType || "application/pdf";
+  const plain = file.filename.replace(/[\r\n"\\]/g, "_");
+  // deno-lint-ignore no-control-regex
+  if (/^[\x20-\x7E]*$/.test(plain)) {
+    return [
+      `Content-Type: ${type}; name="${plain}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; filename="${plain}"`,
+    ];
+  }
+  const encoded = encodeURIComponent(file.filename).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  const fallback = plain.replace(/[^\x20-\x7E]/g, "_");
+  return [
+    `Content-Type: ${type}; name="${fallback}"`,
+    "Content-Transfer-Encoding: base64",
+    `Content-Disposition: attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`,
+  ];
+}
+
+/** Every file as MIME parts, each opened by the boundary. */
+function fileParts(files: MailFile[], boundary: string): string[] {
+  return files.flatMap((f) => [`--${boundary}`, ...fileHeaders(f), "", fold(f.base64)]);
+}
+
 export type Mail = {
   /** Set by `sendMail` from the resolved transport — callers never pass it,
    *  because WHO the mail is from is the transport's decision, not the
@@ -69,6 +108,14 @@ export type Mail = {
    * `approval.txt` in a customer's inbox.
    */
   attachment?: { filename: string; base64: string };
+  /**
+   * MORE FILES, OF ANY TYPE (2026-10-29: the order Email tab's Attach ▸
+   * Other…). They follow `attachment`, in order. With neither set the message
+   * is plain text, exactly as before, and a single `attachment` alone produces
+   * the same bytes it always did — `contentType` defaults to the PDF that
+   * every older caller sends.
+   */
+  attachments?: MailFile[];
   /**
    * Decision 12: threading, done properly.
    *
@@ -175,8 +222,12 @@ async function sendViaResend(
       text: mail.text,
       html: mail.html ?? undefined,
       headers: resendHeaders(mail),
-      attachments: mail.attachment
-        ? [{ filename: mail.attachment.filename, content: mail.attachment.base64 }]
+      attachments: filesOf(mail).length
+        ? filesOf(mail).map((f) => ({
+            filename: f.filename,
+            content: f.base64,
+            ...(f.contentType ? { content_type: f.contentType } : {}),
+          }))
         : undefined,
     }),
   });
@@ -221,6 +272,7 @@ function encodeHeader(value: string): string {
 /** One multipart/mixed message: plain-text body + the PDF. */
 function buildMime(mail: Mail & { from: string }): string {
   const boundary = "rf-po-boundary";
+  const files = filesOf(mail);
   const headers = [
     `From: ${mail.from}`,
     `To: ${mail.to}`,
@@ -238,7 +290,7 @@ function buildMime(mail: Mail & { from: string }): string {
   // The order is the spec's and it is load-bearing — a client picks the LAST
   // part it can render, so text-then-html gets HTML where possible and plain
   // text where not. Reversed, every client shows the plain-text version.
-  if (mail.html && !mail.attachment) {
+  if (mail.html && !files.length) {
     return [
       ...headers.filter((h) => !String(h).startsWith("Content-Type: multipart")),
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
@@ -262,7 +314,7 @@ function buildMime(mail: Mail & { from: string }): string {
   // one-part multipart — some clients render the latter as an empty body with
   // a mysterious attachment, which is the opposite of what a confirmation
   // should look like.
-  if (!mail.attachment) {
+  if (!files.length) {
     return [
       ...headers.filter((h) => !String(h).startsWith("Content-Type: multipart")),
       'Content-Type: text/plain; charset="UTF-8"',
@@ -296,12 +348,7 @@ function buildMime(mail: Mail & { from: string }): string {
       "",
       fold(base64FromUtf8(mail.html)),
       `--${inner}--`,
-      `--${boundary}`,
-      `Content-Type: application/pdf; name="${mail.attachment.filename}"`,
-      "Content-Transfer-Encoding: base64",
-      `Content-Disposition: attachment; filename="${mail.attachment.filename}"`,
-      "",
-      fold(mail.attachment.base64),
+      ...fileParts(files, boundary),
       `--${boundary}--`,
       "",
     ].join("\r\n");
@@ -315,12 +362,7 @@ function buildMime(mail: Mail & { from: string }): string {
     "Content-Transfer-Encoding: base64",
     "",
     fold(base64FromUtf8(mail.text)),
-    `--${boundary}`,
-    `Content-Type: application/pdf; name="${mail.attachment.filename}"`,
-    "Content-Transfer-Encoding: base64",
-    `Content-Disposition: attachment; filename="${mail.attachment.filename}"`,
-    "",
-    fold(mail.attachment.base64),
+    ...fileParts(files, boundary),
     `--${boundary}--`,
     "",
   ].join("\r\n");

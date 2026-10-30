@@ -15,8 +15,13 @@
 //     header matching the ORDER_MAIL_SECRET edge secret: check every org whose
 //     special-orders mailbox is Gmail.
 //   · `{ mode: "check" }` — Check for email on the tab: the caller's org, now.
-//   · `{ mode: "reply", order_id, answering?, to, cc?, body }` — send a reply
-//     in the conversation of the message it answers, and record it at once.
+//   · `{ mode: "reply", order_id, answering?, to, cc?, subject?, body, files? }`
+//     — send a reply in the conversation of the message it answers, and record
+//     it at once.
+//   · `{ mode: "record", order_id, ref }` — copy one email this mailbox just
+//     sent into the order (a document sent from the Email tab goes out through
+//     `send-special-order-email`, which files and stamps it; this puts it in
+//     the history and answers what it answers, without waiting for a check).
 //   · `{ mode: "attachment", message_id, part_id }` — one file from a
 //     message, for the tab to open.
 //   Deployed --no-verify-jwt, because the cron has no JWT; the other three
@@ -53,6 +58,7 @@ import {
   baseSubject,
   formatAddresses,
   leaves,
+  mailFilesFrom,
   orderNumbersIn,
   readMessage,
   type GmailMessage,
@@ -178,7 +184,8 @@ Deno.serve(async (req) => {
       }, body);
     }
     if (body.mode === "attachment") return await attachment(caller, org as Org, body);
-    return json(400, { error: 'mode must be "check", "reply" or "attachment"' });
+    if (body.mode === "record") return await recordSent(admin, caller, org as Org, body);
+    return json(400, { error: 'mode must be "check", "reply", "record" or "attachment"' });
   } catch (e) {
     if (e instanceof TransportError) return json(e.status, { error: e.message });
     return json(500, { error: e instanceof Error ? e.message : String(e) });
@@ -418,9 +425,12 @@ async function reply(
   const to = String(body.to ?? "").trim();
   const cc = String(body.cc ?? "").trim();
   const text = String(body.body ?? "");
+  const chosenSubject = String(body.subject ?? "").trim();
   if (!orderId || !to || !text.trim()) {
     return json(400, { error: "a reply needs order_id, to and a body" });
   }
+  const extra = mailFilesFrom(body.files);
+  if ("error" in extra) return json(400, { error: extra.error });
 
   // Through the CALLER's client: RLS decides whether they may see the order.
   const { data: order } = await caller
@@ -466,7 +476,16 @@ async function reply(
     record = thread.record;
   }
 
-  const sent = await sendMailWithIds(transport, { to, cc: cc || undefined, subject, text, ...headers });
+  // The tab shows the subject and lets it be changed; what it sends wins.
+  if (chosenSubject) subject = chosenSubject;
+  const sent = await sendMailWithIds(transport, {
+    to,
+    cc: cc || undefined,
+    subject,
+    text,
+    attachments: extra.files,
+    ...headers,
+  });
 
   /* ---- from here down, nothing may turn a sent email into a failure ---- */
   const warnings: string[] = [];
@@ -477,25 +496,8 @@ async function reply(
 
   // Copy the reply in now rather than at the next check, so it is on the tab
   // when the page refreshes — and so it answers what it answers.
-  try {
-    const { token, mailbox } = await mailboxToken(org);
-    const gmailId = sent.ref.replace(/^gmail\s+/, "");
-    const message = await gmail<GmailMessage>(token, `/messages/${gmailId}?format=full`);
-    const read = readMessage(message, mailbox);
-    if (read.ok) {
-      const { error } = await admin.from("special_order_messages").upsert(
-        rowFor(org.id, orderId, message, read.message, "sent"),
-        { onConflict: "org_id,gmail_message_id", ignoreDuplicates: true }
-      );
-      if (error) warnings.push(`the reply was not copied to the order: ${error.message}`);
-      const { error: settleError } = await admin.rpc("settle_special_order_messages", { p_orders: [orderId] });
-      if (settleError) warnings.push(`the order still shows as waiting: ${settleError.message}`);
-    }
-  } catch (e) {
-    warnings.push(
-      `the reply is not on the tab until the next check: ${e instanceof Error ? e.message : String(e)}`
-    );
-  }
+  const copyProblem = await copySent(admin, org, orderId, sent.ref);
+  if (copyProblem) warnings.push(copyProblem);
 
   const { error: logError } = await caller.from("special_order_events").insert({
     org_id: org.id,
@@ -511,6 +513,48 @@ async function reply(
     id: sent.ref,
     warning: warnings.length ? `sent, but ${warnings.join("; ")}` : undefined,
   });
+}
+
+/**
+ * Copy one email this mailbox sent into the order, at once, and settle what it
+ * answers. Returns a problem worth a warning, or null; never throws — the
+ * email has gone either way, and the next check would copy it anyway.
+ */
+async function copySent(admin: SupabaseClient, org: Org, orderId: string, ref: string): Promise<string | null> {
+  try {
+    const { token, mailbox } = await mailboxToken(org);
+    const gmailId = ref.replace(/^gmail\s+/, "");
+    const message = await gmail<GmailMessage>(token, `/messages/${gmailId}?format=full`);
+    const read = readMessage(message, mailbox);
+    if (!read.ok) return null;
+    const { error } = await admin.from("special_order_messages").upsert(
+      rowFor(org.id, orderId, message, read.message, "sent"),
+      { onConflict: "org_id,gmail_message_id", ignoreDuplicates: true }
+    );
+    if (error) return `the email was not copied to the order: ${error.message}`;
+    const { error: settleError } = await admin.rpc("settle_special_order_messages", { p_orders: [orderId] });
+    if (settleError) return `the order still shows as waiting: ${settleError.message}`;
+    return null;
+  } catch (e) {
+    return `the email is not on the tab until the next check: ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+
+/** `{ mode: "record" }` — see the header. The order goes through the CALLER's
+ *  client, so RLS decides whether they may see it. */
+async function recordSent(
+  admin: SupabaseClient,
+  caller: SupabaseClient,
+  org: Org,
+  body: Record<string, unknown>
+): Promise<Response> {
+  const orderId = String(body.order_id ?? "");
+  const ref = String(body.ref ?? "");
+  if (!orderId || !/^gmail\s+\S+$/.test(ref)) return json(400, { error: "record needs order_id and a gmail ref" });
+  const { data: order } = await caller.from("special_orders").select("id, org_id").eq("id", orderId).maybeSingle();
+  if (!order || order.org_id !== org.id) return json(404, { error: "special order not found" });
+  const problem = await copySent(admin, org, orderId, ref);
+  return json(200, { warning: problem ?? undefined });
 }
 
 // ---------------------------------------------------------------------------
