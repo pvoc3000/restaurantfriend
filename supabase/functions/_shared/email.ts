@@ -257,21 +257,87 @@ function fold(b64: string): string {
  * and each encoded-word maxes at 75 chars, so long subjects are chunked into
  * adjacent words folded across lines (decoders join them, dropping the fold).
  * Chunks split on CODE POINTS so a multi-byte character never tears.
+ *
+ * AS FEW WORDS AS FIT, which is how Gmail writes them (Mark, 2026-10-30): 45
+ * bytes a word is 60 base64 characters, 72 with the wrapper. It used to be ten
+ * code points a word, six folded lines for one subject, and iPhone Mail showed
+ * those messages as raw source — see `buildMime`.
  */
 function encodeHeader(value: string): string {
   // deno-lint-ignore no-control-regex
   if (/^[\x00-\x7F]*$/.test(value)) return value;
-  const points = Array.from(value);
+  const encoder = new TextEncoder();
   const words: string[] = [];
-  for (let i = 0; i < points.length; i += 10) {
-    words.push(`=?UTF-8?B?${base64FromUtf8(points.slice(i, i + 10).join(""))}?=`);
+  let chunk = "";
+  for (const point of Array.from(value)) {
+    if (chunk && encoder.encode(chunk + point).length > 45) {
+      words.push(`=?UTF-8?B?${base64FromUtf8(chunk)}?=`);
+      chunk = "";
+    }
+    chunk += point;
   }
+  if (chunk) words.push(`=?UTF-8?B?${base64FromUtf8(chunk)}?=`);
   return words.join("\r\n ");
 }
 
-/** One multipart/mixed message: plain-text body + the PDF. */
+/**
+ * Quoted-printable (RFC 2045 §6.7), the encoding Gmail itself gives a text
+ * body: ASCII stays readable, everything else is `=XX` per UTF-8 byte, and no
+ * line passes 76 characters (a soft break is a trailing `=`). Line breaks in
+ * the text are kept as real CRLFs.
+ */
+function quotedPrintable(text: string): string {
+  const encoder = new TextEncoder();
+  const hex = (b: number) => `=${b.toString(16).toUpperCase().padStart(2, "0")}`;
+  const out: string[] = [];
+  for (const line of text.split(/\r\n|\r|\n/)) {
+    const bytes = encoder.encode(line);
+    const tokens: string[] = [];
+    bytes.forEach((b, i) => {
+      const last = i === bytes.length - 1;
+      if (b === 0x3d || b > 0x7e || (b < 0x20 && b !== 0x09) || ((b === 0x20 || b === 0x09) && last)) {
+        tokens.push(hex(b));
+      } else {
+        tokens.push(String.fromCharCode(b));
+      }
+    });
+    let current = "";
+    for (const t of tokens) {
+      if (current.length + t.length > 75) {
+        out.push(`${current}=`);
+        current = "";
+      }
+      current += t;
+    }
+    out.push(current);
+  }
+  return out.join("\r\n");
+}
+
+/** One text body part: its headers, the blank line, then the body. */
+function textPart(subtype: "plain" | "html", body: string): string[] {
+  return [
+    `Content-Type: text/${subtype}; charset="UTF-8"`,
+    "Content-Transfer-Encoding: quoted-printable",
+    "",
+    quotedPrintable(body),
+  ];
+}
+
+/**
+ * One RFC 822 message, PACKAGED THE WAY GMAIL PACKAGES ITS OWN (Mark,
+ * 2026-10-30). The sender's Sent folder keeps this exact text, and iPhone Mail
+ * showed it as raw source — dividers and base64 — in any conversation that
+ * pulled in the info@ Sent copy, while the recipients' copies, which Gmail
+ * repackages on delivery, rendered. Both versions were valid MIME (a strict
+ * parser finds nothing wrong with either), so the fix is to stop differing
+ * from the one that renders: a fresh random divider, quoted-printable text
+ * bodies, the subject in as few encoded words as fit, and a Date header of
+ * our own. Attachments stay base64, as Gmail's do.
+ */
 function buildMime(mail: Mail & { from: string }): string {
-  const boundary = "rf-po-boundary";
+  // A fresh divider per message, as Gmail makes them, never a fixed word.
+  const boundary = `rf-${crypto.randomUUID().replaceAll("-", "")}`;
   const files = filesOf(mail);
   const headers = [
     `From: ${mail.from}`,
@@ -282,6 +348,7 @@ function buildMime(mail: Mail & { from: string }): string {
     mail.messageId ? `Message-ID: ${mail.messageId}` : null,
     mail.inReplyTo ? `In-Reply-To: ${mail.inReplyTo}` : null,
     mail.references ? `References: ${mail.references}` : null,
+    `Date: ${new Date().toUTCString()}`,
     "MIME-Version: 1.0",
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
   ].filter(Boolean);
@@ -296,15 +363,9 @@ function buildMime(mail: Mail & { from: string }): string {
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
       "",
       `--${boundary}`,
-      'Content-Type: text/plain; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      fold(base64FromUtf8(mail.text)),
+      ...textPart("plain", mail.text),
       `--${boundary}`,
-      'Content-Type: text/html; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      fold(base64FromUtf8(mail.html)),
+      ...textPart("html", mail.html),
       `--${boundary}--`,
       "",
     ].join("\r\n");
@@ -317,10 +378,7 @@ function buildMime(mail: Mail & { from: string }): string {
   if (!files.length) {
     return [
       ...headers.filter((h) => !String(h).startsWith("Content-Type: multipart")),
-      'Content-Type: text/plain; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      fold(base64FromUtf8(mail.text)),
+      ...textPart("plain", mail.text),
       "",
     ].join("\r\n");
   }
@@ -338,15 +396,9 @@ function buildMime(mail: Mail & { from: string }): string {
       `Content-Type: multipart/alternative; boundary="${inner}"`,
       "",
       `--${inner}`,
-      'Content-Type: text/plain; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      fold(base64FromUtf8(mail.text)),
+      ...textPart("plain", mail.text),
       `--${inner}`,
-      'Content-Type: text/html; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      fold(base64FromUtf8(mail.html)),
+      ...textPart("html", mail.html),
       `--${inner}--`,
       ...fileParts(files, boundary),
       `--${boundary}--`,
@@ -358,10 +410,7 @@ function buildMime(mail: Mail & { from: string }): string {
     ...headers,
     "",
     `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
-    "",
-    fold(base64FromUtf8(mail.text)),
+    ...textPart("plain", mail.text),
     ...fileParts(files, boundary),
     `--${boundary}--`,
     "",

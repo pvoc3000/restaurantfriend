@@ -348,3 +348,18 @@ created when payroll reaches it), so nothing covered today and
 now carries the newest period's own cadence forward (its length, from the row)
 to the period containing today, and "last pay period" is the newest row. The
 14-day fallback remains only for an empty calendar.
+
+### 2026-10-30 — App emails shown as raw source on iPhone
+
+Mark: the shift report and the morning sales email "sometimes" showed on his
+iPhone as raw MIME (`--rf-po-boundary` and base64). Traced with three raw
+sources he pasted: the copies delivered to mark@donutfriend.com and to
+trombino@mac.com were both REPACKAGED by Gmail on delivery (its own divider,
+quoted-printable) and well-formed; the broken one was info@donutfriend.com's
+SENT copy, which keeps the app's own text verbatim, pulled into the thread on
+an iPhone that has info@ as an account — hence "sometimes". That text was also
+valid MIME (Python's strict parser: no defects), so `_shared/email.ts` now
+packages like Gmail does: a random divider per message, quoted-printable text
+bodies, the subject in as few encoded words as fit (two, where it was six
+folded lines), and its own Date header. Every function that imports the module
+has to be redeployed for it to take effect.
