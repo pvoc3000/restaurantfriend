@@ -6234,3 +6234,14 @@ have to" press Check for email).
   body's bottom edge (`useFillViewportHeight`), which counted the page's slack
   and the tall compose column beside it. 1440×900: the pane ends 32px above
   the window's foot with the page not scrolling, Reply open or closed.
+
+**An open Email tab refreshes itself** (Mark, 2026-10-29: "I was expecting the
+page to reload if a new email came in"). Measured first: the approval
+confirmation and its neighbor reached `special_order_messages` 1–2 s after
+sending (`matched_by = 'sent'`), and the cron was running on time — the tab
+simply never asked again. Now, every 30 s while visible, it reads this order's
+`id, handled_at` and calls `router.refresh()` when they differ from what it
+shows (so a message answered or cleared elsewhere updates too); and opening the
+tab or coming back to the window runs a quiet mailbox check, at most once a
+minute. Seen in the pane: the messages query at 31 s after load; a `focus` ran
+the check.
