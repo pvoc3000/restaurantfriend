@@ -44,6 +44,7 @@ import {
 } from "../_shared/email.ts";
 import { bracketed, orderThread } from "../_shared/orderThread.ts";
 import { mailFilesFrom } from "../_shared/orderMail.ts";
+import { copySentToOrder } from "../_shared/orderMailCopy.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -297,6 +298,10 @@ Deno.serve(async (req) => {
       const threadProblem = await thread.record(sent, subject);
       if (threadProblem) warnings.push(threadProblem);
     }
+    // Onto the order's Email tab now, not at the next check — the kitchen
+    // sheet too, since it is an email about this order.
+    const copyProblem = await copySentToOrder({ transport, orgId: order.org_id, orderId: order_id, ref: sent.ref });
+    if (copyProblem) warnings.push(copyProblem);
     // The ORG's calendar day. `toISOString` was the UTC date, which stamped a
     // send after 5pm Pacific as tomorrow (found 2026-09-23 building 124).
     const today = orgToday((org?.settings as { timezone?: string } | null)?.timezone);
@@ -543,6 +548,15 @@ async function sendCustomerInvoice(
   if (thread) {
     const threadProblem = await thread.record(sent, subject);
     if (threadProblem) warnings.push(threadProblem);
+    // Onto that order's Email tab now. An invoice for several orders belongs
+    // to none of their conversations, as above.
+    const copyProblem = await copySentToOrder({
+      transport,
+      orgId: invoice.org_id,
+      orderId: invoiceOrders[0],
+      ref: sent.ref,
+    });
+    if (copyProblem) warnings.push(copyProblem);
   }
 
   let documentPath: string | null =

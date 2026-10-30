@@ -39,6 +39,7 @@ import {
 } from "../_shared/email.ts";
 import { buildApprovalNotice } from "../_shared/shopNotices.ts";
 import { orderThread } from "../_shared/orderThread.ts";
+import { copySentToOrder } from "../_shared/orderMailCopy.ts";
 import { appLink, sendShopNotice } from "../_shared/shopNotify.ts";
 
 const CORS = {
@@ -225,6 +226,14 @@ Deno.serve(async (req) => {
           const threadProblem = await thread.record(sent, subject);
           if (threadProblem) warnings.push(threadProblem);
         }
+        // Onto the order's Email tab now, not at the next check.
+        const copyProblem = await copySentToOrder({
+          transport,
+          orgId: state.org_id as string,
+          orderId: state.order_id as string,
+          ref: sent.ref,
+        });
+        if (copyProblem) warnings.push(copyProblem);
       }
     } catch (e) {
       warnings.push(
@@ -273,7 +282,7 @@ Deno.serve(async (req) => {
         appLink(`/special-orders/${state.order_id}`)
       );
       await sendShopNotice(admin, {
-        orgId: state.org_id,
+        orgId: state.org_id as string,
         notice,
         orderIds: [state.order_id],
         what: "Quote-approved notice",

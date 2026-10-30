@@ -34,6 +34,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { resolveTransport, sendMailWithIds, type ProviderConfig } from "../_shared/email.ts";
 import { notifyInvoicePaid } from "../_shared/shopNotify.ts";
+import { copySentToOrder } from "../_shared/orderMailCopy.ts";
 import { orderThread } from "../_shared/orderThread.ts";
 import { buildSquareOrder, type PayBreakdown } from "../_shared/squareOrder.ts";
 
@@ -473,6 +474,15 @@ Deno.serve(async (req) => {
         if (thread) {
           const threadProblem = await thread.record(sent, subject);
           if (threadProblem) warnings.push(threadProblem);
+          // Onto the order's Email tab now, not at the next check. An invoice
+          // for several orders belongs to none of their conversations.
+          const copyProblem = await copySentToOrder({
+            transport,
+            orgId: claim.org_id as string,
+            orderId: orders[0],
+            ref: sent.ref,
+          });
+          if (copyProblem) warnings.push(copyProblem);
         }
       } catch (e) {
         warnings.push(`the payment confirmation email was not sent: ${e instanceof Error ? e.message : String(e)}`);
@@ -485,7 +495,7 @@ Deno.serve(async (req) => {
     // for a payment the shop was already told about.
     if ((recorded as { state?: string } | null)?.state === "recorded") {
       await notifyInvoicePaid(admin, {
-        orgId: claim.org_id,
+        orgId: claim.org_id as string,
         invoiceId: claim.customer_invoice_id,
         amount,
         method,

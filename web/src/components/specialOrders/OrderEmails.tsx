@@ -60,7 +60,9 @@ const SEND_KINDS: DocumentKind[] = ["quote", "receipt", "order"];
  * customer follows it or somebody presses No reply needed — opening this tab
  * clears nothing, because reading a question is not answering it.
  *
- * The mailbox is checked every five minutes; Check for email does it now.
+ * The mailbox is checked every five minutes, whenever this tab opens, and on
+ * Check for email. An email the app sends about the order is copied in the
+ * moment it goes (`_shared/orderMailCopy`), wherever it was sent from.
  *
  * ONE COMPOSE BOX FOR EVERY EMAIL ABOUT THE ORDER (Mark, 2026-10-29: "we now
  * have two different ways to send emails … we could combine these into one
@@ -407,6 +409,26 @@ export function OrderEmails({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startReplying, startSending, canWrite]);
 
+  /**
+   * OPENING THE TAB CHECKS THE MAILBOX (Mark, 2026-10-29: "have the email tab
+   * run a mailbox check whenever it's opened"). Quietly — no busy state, so a
+   * reply started by the Orders list's link is not frozen while it runs — and
+   * the page refreshes only when the check copied something in. Skipped when
+   * a check ran in the last minute (the five-minute job, or the last visit).
+   */
+  const checkedOnOpen = useRef(false);
+  useEffect(() => {
+    if (checkedOnOpen.current || !canWrite) return;
+    checkedOnOpen.current = true;
+    const last = check?.checked_at ? new Date(check.checked_at).getTime() : 0;
+    if (nowMs - last < 60_000) return;
+    void createClient()
+      .functions.invoke("order-mail", { body: { mode: "check" } })
+      .then(({ data }) => {
+        if ((data as { copied?: number } | null)?.copied) router.refresh();
+      });
+  }, [canWrite, check, nowMs, router]);
+
   const replyButton =
     canWrite && !composing ? (
       <button type="button" className={BUTTON_CLASS} onClick={startReply} disabled={pending || busy !== null}>
@@ -479,11 +501,6 @@ export function OrderEmails({
           answering: doc.kind === "order" ? null : answeringId,
           files: mailFiles,
         });
-        // Into the history now, and answering what it answers, rather than at
-        // the next check. A failure here is only a delay.
-        if (result.id?.startsWith("gmail ")) {
-          await supabase.functions.invoke("order-mail", { body: { mode: "record", order_id: orderId, ref: result.id } });
-        }
         const kind = doc.kind;
         if (result.warning) setWarning(result.warning);
         setSentNote(`${DOCUMENT_LABEL[kind]} sent to ${to}`);

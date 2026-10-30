@@ -18,10 +18,6 @@
 //   · `{ mode: "reply", order_id, answering?, to, cc?, subject?, body, files? }`
 //     — send a reply in the conversation of the message it answers, and record
 //     it at once.
-//   · `{ mode: "record", order_id, ref }` — copy one email this mailbox just
-//     sent into the order (a document sent from the Email tab goes out through
-//     `send-special-order-email`, which files and stamps it; this puts it in
-//     the history and answers what it answers, without waiting for a check).
 //   · `{ mode: "attachment", message_id, part_id }` — one file from a
 //     message, for the tab to open.
 //   Deployed --no-verify-jwt, because the cron has no JWT; the other three
@@ -54,13 +50,14 @@ import {
   type ProviderConfig,
 } from "../_shared/email.ts";
 import { bracketed, orderThread } from "../_shared/orderThread.ts";
+import { copySentToOrder } from "../_shared/orderMailCopy.ts";
 import {
   baseSubject,
-  formatAddresses,
   leaves,
   mailFilesFrom,
   orderNumbersIn,
   readMessage,
+  rowFor,
   type GmailMessage,
   type ReadMessage,
 } from "../_shared/orderMail.ts";
@@ -184,8 +181,7 @@ Deno.serve(async (req) => {
       }, body);
     }
     if (body.mode === "attachment") return await attachment(caller, org as Org, body);
-    if (body.mode === "record") return await recordSent(admin, caller, org as Org, body);
-    return json(400, { error: 'mode must be "check", "reply", "record" or "attachment"' });
+    return json(400, { error: 'mode must be "check", "reply" or "attachment"' });
   } catch (e) {
     if (e instanceof TransportError) return json(e.status, { error: e.message });
     return json(500, { error: e instanceof Error ? e.message : String(e) });
@@ -309,33 +305,6 @@ async function checkMailbox(admin: SupabaseClient, org: Org): Promise<CheckResul
     });
     return { read: 0, copied: 0, waiting_settled: 0, error: message };
   }
-}
-
-function rowFor(
-  orgId: string,
-  orderId: string,
-  message: GmailMessage,
-  read: ReadMessage,
-  by: "thread" | "subject" | "address" | "sent"
-) {
-  return {
-    org_id: orgId,
-    order_id: orderId,
-    gmail_message_id: message.id,
-    gmail_thread_id: message.threadId,
-    rfc_message_id: read.rfcMessageId,
-    direction: read.direction,
-    from_address: read.from.address,
-    from_name: read.from.name,
-    to_addresses: formatAddresses(read.to),
-    cc_addresses: formatAddresses(read.cc),
-    subject: read.subject,
-    sent_at: read.sentAt,
-    snippet: read.snippet,
-    body_text: read.text,
-    attachments: read.attachments,
-    matched_by: by,
-  };
 }
 
 /** `ilike` with the address taken literally — `_` is common in addresses
@@ -496,7 +465,7 @@ async function reply(
 
   // Copy the reply in now rather than at the next check, so it is on the tab
   // when the page refreshes — and so it answers what it answers.
-  const copyProblem = await copySent(admin, org, orderId, sent.ref);
+  const copyProblem = await copySentToOrder({ transport, orgId: org.id, orderId, ref: sent.ref });
   if (copyProblem) warnings.push(copyProblem);
 
   const { error: logError } = await caller.from("special_order_events").insert({
@@ -513,48 +482,6 @@ async function reply(
     id: sent.ref,
     warning: warnings.length ? `sent, but ${warnings.join("; ")}` : undefined,
   });
-}
-
-/**
- * Copy one email this mailbox sent into the order, at once, and settle what it
- * answers. Returns a problem worth a warning, or null; never throws — the
- * email has gone either way, and the next check would copy it anyway.
- */
-async function copySent(admin: SupabaseClient, org: Org, orderId: string, ref: string): Promise<string | null> {
-  try {
-    const { token, mailbox } = await mailboxToken(org);
-    const gmailId = ref.replace(/^gmail\s+/, "");
-    const message = await gmail<GmailMessage>(token, `/messages/${gmailId}?format=full`);
-    const read = readMessage(message, mailbox);
-    if (!read.ok) return null;
-    const { error } = await admin.from("special_order_messages").upsert(
-      rowFor(org.id, orderId, message, read.message, "sent"),
-      { onConflict: "org_id,gmail_message_id", ignoreDuplicates: true }
-    );
-    if (error) return `the email was not copied to the order: ${error.message}`;
-    const { error: settleError } = await admin.rpc("settle_special_order_messages", { p_orders: [orderId] });
-    if (settleError) return `the order still shows as waiting: ${settleError.message}`;
-    return null;
-  } catch (e) {
-    return `the email is not on the tab until the next check: ${e instanceof Error ? e.message : String(e)}`;
-  }
-}
-
-/** `{ mode: "record" }` — see the header. The order goes through the CALLER's
- *  client, so RLS decides whether they may see it. */
-async function recordSent(
-  admin: SupabaseClient,
-  caller: SupabaseClient,
-  org: Org,
-  body: Record<string, unknown>
-): Promise<Response> {
-  const orderId = String(body.order_id ?? "");
-  const ref = String(body.ref ?? "");
-  if (!orderId || !/^gmail\s+\S+$/.test(ref)) return json(400, { error: "record needs order_id and a gmail ref" });
-  const { data: order } = await caller.from("special_orders").select("id, org_id").eq("id", orderId).maybeSingle();
-  if (!order || order.org_id !== org.id) return json(404, { error: "special order not found" });
-  const problem = await copySent(admin, org, orderId, ref);
-  return json(200, { warning: problem ?? undefined });
 }
 
 // ---------------------------------------------------------------------------

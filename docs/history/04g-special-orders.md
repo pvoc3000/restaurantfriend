@@ -6211,3 +6211,26 @@ preview, under the compose box, only while a document is attached.
   pane's Chromium cannot draw a PDF in an `<object>`, so the preview frame is
   blank there; it is the same element the old window used.
 - NOT YET DONE: a real send of each kind (it emails a person).
+
+**Every email the app sends about an order is on its Email tab at once, and
+opening the tab checks the mailbox** (Mark, 2026-10-29, after a test approval:
+the confirmation "did not appear in the email thread … seems like I shouldn't
+have to" press Check for email).
+- `_shared/orderMailCopy.copySentToOrder` reads the just-sent message back from
+  the mailbox and writes it to `special_order_messages` (its own service-role
+  client — the table has no write policy) and settles what it answers. Called
+  beside `orderThread.record` by `approve-quote` (v24, the confirmation),
+  `square-pay` (v23, "Payment received"), `submit-inquiry` (v24, the inquiry
+  confirmation), `send-special-order-email` (v33, documents and one-order
+  customer invoices) and `order-mail`'s reply (v5). An invoice for several
+  orders belongs to none of their conversations and is not copied, as before.
+  Never throws; the five-minute check is still the backstop. `rowFor` moved
+  into `_shared/orderMail`; `order-mail`'s short-lived `record` mode is gone.
+- The tab runs a quiet check on open (no busy state, refresh only when
+  something was copied), skipped if one ran in the last minute. Seen working:
+  opening SO-10179's tab at 04:03:53 UTC ran a check between the 04:00 and
+  04:05 jobs, no error.
+- The history pane's height now comes from `spaceBelow` rather than the
+  body's bottom edge (`useFillViewportHeight`), which counted the page's slack
+  and the tall compose column beside it. 1440×900: the pane ends 32px above
+  the window's foot with the page not scrolling, Reply open or closed.

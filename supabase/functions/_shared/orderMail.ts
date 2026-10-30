@@ -313,3 +313,32 @@ export function mailFilesFrom(
   }
   return { files };
 }
+
+/** The `special_order_messages` row for one message (214). */
+export function rowFor(
+  orgId: string,
+  orderId: string,
+  message: GmailMessage,
+  read: ReadMessage,
+  by: "thread" | "subject" | "address" | "sent"
+) {
+  return {
+    org_id: orgId,
+    order_id: orderId,
+    gmail_message_id: message.id,
+    gmail_thread_id: message.threadId,
+    rfc_message_id: read.rfcMessageId,
+    direction: read.direction,
+    from_address: read.from.address,
+    from_name: read.from.name,
+    to_addresses: formatAddresses(read.to),
+    cc_addresses: formatAddresses(read.cc),
+    subject: read.subject,
+    sent_at: read.sentAt,
+    snippet: read.snippet,
+    body_text: read.text,
+    attachments: read.attachments,
+    matched_by: by,
+  };
+}
+

@@ -53,6 +53,7 @@ import { quoteDelivery } from "../_shared/deliveryQuote.ts";
 import { buildInquiryNotice } from "../_shared/shopNotices.ts";
 import { orderThread } from "../_shared/orderThread.ts";
 import { appLink, sendShopNotice } from "../_shared/shopNotify.ts";
+import { copySentToOrder } from "../_shared/orderMailCopy.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -501,6 +502,14 @@ Deno.serve(async (req) => {
         // it. Worth saying out loud, because the symptom later is silent.
         warnings.push(`the reply thread was not recorded: ${stampError?.message ?? threadProblem}`);
       }
+      // Onto the order's Email tab now, not at the next check.
+      const copyProblem = await copySentToOrder({
+        transport,
+        orgId: state.org_id as string,
+        orderId: state.order_id as string,
+        ref: sent.ref,
+      });
+      if (copyProblem) warnings.push(copyProblem);
 
       await admin.from("special_order_events").insert({
         org_id: state.org_id,
