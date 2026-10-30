@@ -6156,3 +6156,14 @@ waiting band, or right-aligned beside Check for email) opens a compose box that
 quotes the answered message the Mail.app way, fills To and Cc (Reply All, never
 the shop's own addresses — `orderMailboxes`) and puts the caret at the top; Send
 or Cancel (Discard / Keep Writing once anything is typed) puts it away.
+
+**216 APPLIED 2026-10-29 — an emailed reply clears "Respond to Email/Call"**
+(Mark: "remove any 'respond to email' to-dos after replying to an email").
+`settle_special_order_messages` became plpgsql (the second update must see the
+first; one statement's CTEs share a snapshot) and, after settling, clears that
+exact to-do on the orders it settled — only when nothing inbound is still
+waiting. So a reply from the tab and one from Mail.app both clear it; No reply
+needed does not. Dry-run on the live DB in a raised-exception transaction:
+SO-10156 (reply after the waiting email) → cleared; SO-10175 (reply, then the
+customer wrote again) → kept, 1 waiting. The 00:10 UTC cron check ran clean on
+the new function.
