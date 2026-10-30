@@ -6200,5 +6200,14 @@ preview, under the compose box, only while a document is attached.
   `contentType`, RFC 2231 names). Checked by compiling the old and new
   `buildMime`: plain, one-PDF and HTML+PDF messages are byte-identical, so
   every other function is unchanged whether or not it is redeployed.
-- NOT YET DONE when written: a browser walk-through (the pane was at the PIN
-  lock), and a real send of each kind.
+- **Walked through in the browser, SO-10156, 1440 wide, nothing sent:**
+  Send… ▸ Quote landed on the tab answering Kelly's waiting email (To her, Re:
+  subject, quote paragraph above her quoted email, PDF chip and preview, Send
+  reply on); ✕ put the text back exactly as a plain reply; typing then Attach
+  ▸ Quote put the paragraph below the typing and above the quote; a test file
+  through Other… got its chip and an 11 MB one was refused; Cancel asked
+  (Keep Writing / Discard); Send… ▸ Kitchen Order opened with To and Cc empty,
+  its own subject, nothing quoted and Send off. No console errors. The
+  pane's Chromium cannot draw a PDF in an `<object>`, so the preview frame is
+  blank there; it is the same element the old window used.
+- NOT YET DONE: a real send of each kind (it emails a person).
