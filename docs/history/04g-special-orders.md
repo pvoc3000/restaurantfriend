@@ -6245,3 +6245,18 @@ shows (so a message answered or cleared elsewhere updates too); and opening the
 tab or coming back to the window runs a quiet mailbox check, at most once a
 minute. Seen in the pane: the messages query at 31 s after load; a `focus` ran
 the check.
+
+**CUSTOMER CREDIT MEMOS — DESIGNED 2026-10-31, NOT BUILT.** Mark: "we
+accidentally shorted Knotted some donuts this morning (518 when it should have
+been 560). Since they paid in advance, I think I need to create a credit memo."
+SO-10137 is on INV-10025-2 (QuickBooks, paid 10/22), and the next invoice,
+INV-10033, was paid 10/30. The short is 42 × $1.55 = $65.10. Nothing in the
+app could carry it: Revise refuses a QuickBooks invoice with money on it, 143's
+credit never reaches a QuickBooks invoice, and lowering the order to 518 hides
+the $65.10 (over-billed orders are not counted). The design is
+`docs/customer-credit-memos-brief.md`: a memo is its own document, credits what
+was taken off the order (176 in reverse), is a second source of credit beside
+payments in `payment_applications`, and is pushed as a QuickBooks `CreditMemo`
+applied by a zero-total `Payment`. It also found a trap that must be fixed in
+the same release: `sync_qbo_payments` and `qbo-webhook` would record that
+zero-total Payment as $65.10 of cash.

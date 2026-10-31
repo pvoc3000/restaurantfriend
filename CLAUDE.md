@@ -440,7 +440,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   4. **Statements** can be downloaded but never emailed.
   5. **Not built, by choice so far:** an A/R aging screen across all
      customers; overdue reminder emails; making the weekly Knotted invoice
-     automatically; taxable or Rush-type other charges; credit-note documents.
+     automatically; taxable or Rush-type other charges.
+  6. **Credit memos — DESIGNED 2026-10-31, not built** (Knotted shorted 42 on
+     a paid QuickBooks invoice): `docs/customer-credit-memos-brief.md`, with
+     six questions for Mark before any migration.
   Before building any of them, ask.
 
 
