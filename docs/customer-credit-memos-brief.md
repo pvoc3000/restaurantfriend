@@ -1,9 +1,9 @@
 # Customer credit memos — design brief
 
-**Status: DESIGNED 2026-10-31, NOT BUILT.** Read `CLAUDE.md` (the customer
-invoices thread), then `docs/history/04g-special-orders.md` from "THE TEXTBOOK
-A/R MODEL" on, then this. The decisions marked **ASK** are Mark's to make
-before any migration is written.
+**Status: DESIGNED 2026-10-31, NOT BUILT. All six questions answered by Mark
+the same day** (see "Mark's answers" at the end). Read `CLAUDE.md` (the
+customer invoices thread), then `docs/history/04g-special-orders.md` from "THE
+TEXTBOOK A/R MODEL" on, then this.
 
 ---
 
@@ -44,7 +44,7 @@ The only credit memos in the app before this were VENDOR ones
 ## The model in one paragraph
 
 A **credit memo** is a document we issue, like an invoice, that says what we
-owe the customer back and why. It has its own number ("CM-1000"), its own
+owe the customer back and why. It has its own number ("CM-10000"), its own
 lines, and is frozen once issued. Its total is **credit**, which is applied to
 the customer's next invoice the way 143's credit already is: automatically on
 send, or by hand. A credit memo is **not money received**. Nothing that adds
@@ -55,65 +55,63 @@ on a QuickBooks invoice possible: QuickBooks now knows about it.
 
 ---
 
-## Decisions (recommended)
+## Decisions
 
-### 1. A credit memo usually comes from the ORDER being corrected
+### 1. The order keeps what was ORDERED; the memo says what was short
 
-The app's rule since 141 is that the order is the truth and documents copy it:
-an invoice copies an order's lines, and 176 makes a later invoice bill only
-what was ADDED. A credit memo is the reverse: **it credits what was taken
-away.**
+Mark, 2026-10-31: an order's quantity means what was **ordered**. So SO-10137
+stays at 560, and the memo carries the short itself: "Knotted Bismark — 42
+short", 42 × $1.55 = $65.10.
 
-So for Knotted: change SO-10137's quantity to 518, as it really was. The order
-now asks $852.90 and its invoices bill $918.00. The order screen says so, with
-a button:
+That means **a memo line names the order and the item it credits, but does
+not change what the order is billed.** `special_order_billed`,
+`special_order_unbilled` and `order_item_billing` are left alone, and must
+stay that way. If memo lines lowered the order's billed amount, a 560-donut
+order would look under-billed by $65.10 and be invoiced again. The order
+and its invoice still agree at $918. The memo is a separate fact beside them.
 
-> Billed $65.10 more than the order now comes to. **Issue Credit Memo…**
+What the order shows instead is a **Credited** figure beside Billed and Paid
+("Credited $65.10 · CM-10000"), plus a line in its event log, so nobody
+reading SO-10137 thinks Knotted got 560.
 
-The memo's lines are copied the way 176 copies additions, in reverse. For each
-item, the quantity billed and no longer on the order is credited at the price
-it was billed at ("Knotted Bismark — 42 short", −42 × $1.55). Any decrease in
-delivery, rush, discount or tax gets its own line.
+**Issue Credit Memo…** on an order lists its items with the quantity billed
+and the quantity already credited. You enter the quantity short, which can't
+exceed billed less credited. It is credited at the price it was **billed** at,
+not today's price. The order's delivery, rush and tax can each be credited as
+an amount, up to what was billed, less anything already credited. A discount
+is never credited: the memo is worked out from the lines it credits, so the
+discount is already counted. **Tax** on a taxed item is credited at the rate
+it was billed at, as its own line, worked out the same way the invoice did it.
 
-After it is issued, the order is **billed exactly what it now asks**:
-`special_order_billed` and `order_item_billing` subtract memo lines, so the
-order is not over-billed and is never re-invoiced by mistake. If the 42 are
-delivered later (a make-good), the order goes back to 560 and the next invoice
-bills "42 in addition", as 176 already does.
+**A make-good** (the 42 delivered later) is not something the memo handles.
+If it is still unapplied, void it. If it is already applied, a later order
+for 42 is billed as usual.
 
-**Free lines** cover credits that change nothing on the order, such as a
-goodwill credit or "quality issues" on donuts that were delivered. They have no
-order, just like an invoice's other charges: a description and an amount,
-untaxed. They must never carry a `special_order_id`, or the order would look
-under-billed and be invoiced again.
-
-**ASK: does an order's quantity mean ORDERED or DELIVERED?** This design
-assumes delivered, the quantity we bill. If the kitchen needs "ordered 560"
-kept, the memo needs its own quantity, not the order's, and the order stays
-over-billed on paper.
+**Free lines** cover credits with no item behind them (goodwill, a late
+delivery). They have a description and an amount, are untaxed, and can name
+an order for the record, which changes nothing about how the order is billed.
 
 ### 2. Where you start from
 
-- **The order** (the banner above, or Actions → Issue Credit Memo…). This is
-  the usual path.
-- **A sent invoice** (Actions → Issue Credit Memo…). It opens the same dialog,
-  showing every order on that invoice that is over-billed, plus free lines.
+- **The order** (Actions → Issue Credit Memo…). This is the usual path: items
+  and charges as above, plus free lines.
+- **A sent invoice** (Actions → Issue Credit Memo…). It opens the same dialog
+  across every order on that invoice.
 - **The customer record** (Credit section → New Credit Memo…). Free lines only.
 
-The dialog asks for: the lines (prefilled from the decrease, editable down but
-not past it), a **reason** that prints on the memo ("Shorted 42 at pickup"),
-and the date. Then **Issue**, or **Issue and Email**.
+The dialog asks for the lines, a **reason** that prints on the memo ("Shorted
+42 at pickup"), and the date. Then **Issue**, or **Issue and Email** (the
+default).
 
 ### 3. Its credit uses 143's machinery, with a second source
 
 Today `payment_applications.payment_id` is the only source of credit. Add
 `credit_memo_id` beside it, with exactly one of the two set. Then:
 
-- `customer_credit` lists unapplied memos alongside unapplied payments, oldest
-  first.
-- `apply_credit_to_invoice` uses them in the same oldest-first walk, before
-  payments. **ASK** whether a memo goes first. Recommended: yes, because a
-  memo can't be refunded through Square and a payment can.
+- `customer_credit` lists unapplied memos alongside unapplied payments.
+- `apply_credit_to_invoice` uses **memos first**, oldest first, **then**
+  payments, oldest first (Mark, 2026-10-31). Payment credit can still be
+  refunded through Square; memo credit can't.
 - `customer_invoice_paid` already adds up applications, so an invoice's
   balance includes the credit. Its label becomes "Payments and credits".
 - `customer_balances.credit`, `customer_account_entries` and the statement
@@ -144,7 +142,7 @@ The credit is applied **automatically when the next invoice is SENT**, the rule
   stored on the application, so it is never recorded twice.
 
 The paper invoice prints the credit as its own line under the total: "Credit
-CM-1000 (10/31) −$65.10 · Balance due". The application exists before the PDF
+CM-10000 (10/31) −$65.10 · Balance due". The application exists before the PDF
 is rendered.
 
 **Apply Credit by hand** stops refusing QuickBooks invoices, for memo credit
@@ -198,18 +196,18 @@ in QuickBooks the same day. A new `qbo-sync` mode, `push_credit_memo`, mirrors
 A memo for a **Square-collected** customer is NOT pushed. Square's sales go
 into QuickBooks by the nightly journal entry, and a CreditMemo against revenue
 QuickBooks never saw as an invoice would reverse it twice. Same rule as
-invoices: **whether the app pushes depends on who collects.** **ASK** whether
-a Square customer's memo should carry a note for whoever does the books, or
-nothing. Its credit simply lowers what the pay link collects, which the journal
-entry then books correctly.
+invoices: **whether the app pushes depends on who collects.** It leaves no
+trace in QuickBooks at all (Mark, 2026-10-31). Its credit lowers what the pay
+link collects, and the journal entry books the smaller sale correctly.
 
 ### 7. Number, document, email
 
 - **Number:** its own series, `customer_credit_memos.first_number` and
-  `prefix` in `orgs.settings`, beside the invoice settings (design rule 2).
-  **ASK** about the prefix and first number. Proposed: "CM-", from 1000. A
-  separate series keeps QuickBooks' duplicate-number warning quiet and never
-  makes an invoice number look skipped.
+  `prefix` in `orgs.settings`, beside the invoice settings (design rule 2):
+  **"CM-", from 10000**, matching the invoices' five digits (Mark,
+  2026-10-31). A separate series keeps QuickBooks' duplicate-number warning
+  quiet and never makes an invoice number look skipped. The number STORES no
+  prefix and the paper prints it, as invoices do (147).
 - **PDF:** a new form, "Credit memo", in `components/forms/formCatalog.ts`. It
   uses the invoice's layout and parts: the customer, the memo number and date,
   "Credits invoice INV-10025-2" (or "Account credit" for free lines), the
@@ -223,21 +221,22 @@ entry then books correctly.
 
 - **Frozen once issued**, like a sent invoice.
 - **Void…** while nothing of it is applied. It is voided in QuickBooks first
-  (refused there, and so here, if QuickBooks has applied it), and the order
-  goes back to over-billed.
+  (refused there, and so here, if QuickBooks has applied it), and the
+  order's Credited figure drops back.
 - **Once applied**, it is changed only by voiding the invoice it was applied
   to, which releases the application (140's void trigger, taught the new
   source), then voiding the memo. A second memo is never the way to undo the
   first.
-- **Refunding memo credit** (paying the customer back instead) is NOT in v1.
-  The money never came from Square, so `square-refund` can't do it. **ASK** if
-  it should be in v1. It would be "record a check or cash refund", a negative
-  entry against the memo, plus a QuickBooks `RefundReceipt` for a QuickBooks
-  customer.
+- **Refunding memo credit** (paying the customer back instead) is NOT in v1
+  (Mark, 2026-10-31: later). The money never came from Square, so
+  `square-refund` can't do it. When it comes, it is "record a check or cash
+  refund", a negative entry against the memo, plus a QuickBooks
+  `RefundReceipt` for a QuickBooks customer. The customer's Credit section
+  offers no Refund… on memo credit until then.
 
 ### 9. Who may issue one
 
-**ASK.** Recommended: **manager and up** (owner, admin). A memo gives money
+**Manager and up** (owner, admin; Mark, 2026-10-31). A memo gives money
 away, which matches refunds (`payment_credit_refundable` is owner/admin) rather
 than Revise (supervisor+). It goes into `lib/pageAccess.ts` as a write on the
 special orders and customers pages, not inline.
@@ -252,19 +251,22 @@ special orders and customers pages, not inline.
   location_id (the collecting shop, as for invoices), document_path,
   external_ref, sent_at, voided_at, created_by. Unique (org, number).
 - `customer_credit_memo_lines`: memo_id, special_order_id,
-  special_order_item_id, line_type (item · delivery · rush · discount · tax),
-  description, qty, unit_price, amount, taxable, tax_rate, sort. Check: a line
-  with no order is item or delivery, as 141 checks for invoices.
+  special_order_item_id, line_type (item · delivery · rush · tax),
+  description, qty, unit_price, amount, taxable, tax_rate, sort. Checks: a line
+  with no order is item or delivery, as 141 checks for invoices; an item
+  line's quantity, with what earlier memos credited, never exceeds what was
+  billed of that item.
 - `payment_applications.credit_memo_id`, `payment_id` made nullable, a check
   that exactly one is set, and the QuickBooks Payment id that applied it.
-- New functions: `order_credit_lines(order)` (the decrease, in reverse of 176's
-  `order_invoice_lines`), `issue_credit_memo`, `void_credit_memo`,
-  `next_credit_memo_number`.
-- Changed: `special_order_billed`, `special_order_unbilled`,
-  `order_item_billing`, `customer_credit`, `apply_credit_to_invoice`,
+- New functions: `order_creditable(order)` (per item and charge: billed,
+  already credited, the most that can be credited), `special_order_credited`,
+  `issue_credit_memo`, `void_credit_memo`, `next_credit_memo_number`.
+- **NOT changed, deliberately:** `special_order_billed`,
+  `special_order_unbilled`, `order_item_billing` (§1).
+- Changed: `customer_credit`, `apply_credit_to_invoice`,
   `apply_customer_credit`, `customer_balances`, `customer_account_entries`,
   the void-releases-payments trigger, `trg_log_payment_application`, and the
-  order's event log ("Credit memo CM-1000 issued, $65.10").
+  order's event log ("Credit memo CM-10000 issued, $65.10").
 - RLS on both tables (org-scoped read, writes only through the definer
   functions). Every new function is revoked from `anon` by name.
   **EVERY INSERT PASSES `org_id`.**
@@ -275,12 +277,13 @@ apply step in `push_customer_invoice`, and §5's fix in `sync_qbo_payments`),
 Each `--no-verify-jwt` flag is checked against the live function before
 deploying.
 
-**Web:** the order's over-billed banner and command, the Issue dialog, a credit
+**Web:** the order's Credited figure and Issue Credit Memo… command, the
+Issue dialog, a credit
 memo record screen (`/credit-memos/[id]`, walking the customer's found set),
 the customer record's Credit section listing memos, the invoice's "Credit
 CM-…" line, the statement row, the PDF and its specimen in
-`components/forms/formSamples.ts`, and fixtures for `order_credit_lines`' JS
-mirror if there is one.
+`components/forms/formSamples.ts`, and fixtures for any JS mirror of
+`order_creditable` (the dialog's caps).
 
 ---
 
@@ -294,16 +297,17 @@ mirror if there is one.
    and `qbo-webhook`, deployed together. Then apply credit on QuickBooks
    invoices is switched on. Checked against one real memo, by Mark.
 3. **Paper.** The PDF, the email, the invoice's credit line and the statement.
-4. **Screens.** The banner, the dialog, the record and the customer's section,
+4. **Screens.** The order's Credited figure, the dialog, the record and the customer's section,
    checked in the browser pane.
 
 Phases 1 and 2 must ship together for QuickBooks customers. Phase 1 alone must
 not let memo credit reach a QuickBooks invoice.
 
-**Scenarios to test:** the Knotted case (560 → 518 on a paid QuickBooks
-invoice, memo $65.10, next invoice $65.10 less in the app and in QuickBooks, no
-cash recorded); a make-good back to 560 billed "in addition"; a free-line
-credit; a memo larger than the next invoice (the rest stays credit); two memos
+**Scenarios to test:** the Knotted case (SO-10137 stays at 560 on a paid
+QuickBooks invoice, memo 42 short = $65.10, the order still billed $918 and
+NOT offered for invoicing again, next invoice $65.10 less in the app and in
+QuickBooks, no cash recorded); a second memo on the same item capped at what is
+left; a free-line credit; a memo larger than the next invoice (the rest stays credit); two memos
 oldest first; void before apply; void refused after apply; voiding the invoice
 it was applied to brings the credit back; a Square customer (no push, the pay
 link asks less); a QuickBooks Payment of cash plus credit recorded as the cash
@@ -311,14 +315,15 @@ only; `AutoApplyCredit` on and off; staff and supervisor refused.
 
 ---
 
-## Open questions for Mark (the ASKs above)
+## Mark's answers (2026-10-31)
 
-1. Does an order's quantity mean ordered or delivered? (§1)
-2. Prefix and first number: "CM-" from 1000? (§7)
-3. Who may issue a memo: manager and up? (§9)
-4. Does memo credit go before payment credit? (§3)
-5. Refunding memo credit: v1 or later? (§8)
-6. A Square customer's memo: no QuickBooks trace, or a note? (§6)
+1. An order's quantity means **ordered**. The memo carries the short; the
+   order is not changed (§1).
+2. Numbering: **"CM-" from 10000** (§7).
+3. Issued by **manager and up** (§9).
+4. **Memo credit first**, then payment credit (§3).
+5. Refunding memo credit: **later**, not v1 (§8).
+6. A Square customer's memo: **nothing in QuickBooks** (§6).
 
 ---
 

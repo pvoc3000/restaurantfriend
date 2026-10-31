@@ -6260,3 +6260,8 @@ payments in `payment_applications`, and is pushed as a QuickBooks `CreditMemo`
 applied by a zero-total `Payment`. It also found a trap that must be fixed in
 the same release: `sync_qbo_payments` and `qbo-webhook` would record that
 zero-total Payment as $65.10 of cash.
+**Mark answered the brief's six questions the same day:** an order's quantity
+means ORDERED, so the memo carries the short and the order's billing is left
+alone (the design had assumed delivered and has been rewritten); "CM-" from
+10000; manager and up; memo credit before payment credit; no refunding memo
+credit in v1; a Square customer's memo leaves nothing in QuickBooks.
