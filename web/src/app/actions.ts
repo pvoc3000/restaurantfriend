@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { throwQueryError } from "@/lib/supabase/queryError";
 import { DEVICE_COOKIE } from "@/lib/sharedDevice";
 import { SHELL_COOKIE, type Shell } from "@/lib/shell";
 import { clearSessionCookies } from "@/lib/sessionCookies";
@@ -38,7 +39,7 @@ export async function setActiveLocation(locationId: string) {
     p_location_id: locationId,
   });
 
-  if (error) throw error;
+  if (error) await throwQueryError(error);
 
   revalidatePath("/", "layout");
 }
@@ -76,6 +77,6 @@ export async function setDisplayName(name: string) {
   const { error } = await supabase.rpc("set_my_member_profile", {
     p_display_name: name.trim(),
   });
-  if (error) throw error;
+  if (error) await throwQueryError(error);
   revalidatePath("/", "layout");
 }

@@ -2,6 +2,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { throwQueryError } from "@/lib/supabase/queryError";
 import type { Role } from "@/lib/roles";
 import { DEVICE_COOKIE, PIN_SESSION_COOKIE } from "@/lib/sharedDevice";
 import { SHELL_COOKIE, resolveShell, type Shell } from "@/lib/shell";
@@ -167,7 +168,7 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
     supabase.from("location_members").select("location_id").eq("user_id", user.id),
   ]);
 
-  if (membershipError) throw membershipError;
+  if (membershipError) await throwQueryError(membershipError);
   if (!membership) {
     throw new Error(
       `Signed in as ${user.email} but this user has no org_members row. ` +
@@ -175,7 +176,7 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
     );
   }
 
-  if (locationsError) throw locationsError;
+  if (locationsError) await throwQueryError(locationsError);
 
   // `labor_rate` is a numeric column, and PostgREST hands numerics back as
   // strings often enough that costing would silently multiply hours by "35".
