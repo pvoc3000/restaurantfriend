@@ -6265,3 +6265,14 @@ means ORDERED, so the memo carries the short and the order's billing is left
 alone (the design had assumed delivered and has been rewritten); "CM-" from
 10000; manager and up; memo credit before payment credit; no refunding memo
 credit in v1; a Square customer's memo leaves nothing in QuickBooks.
+**REVISED AROUND A DELIVERY RECORD, same day.** Mark: "just issuing a credit on
+its own is problematic as well … I want whatever we design for credit memos to
+follow world class accounting standards." Standard order-to-cash keeps three
+quantities (ordered, delivered, invoiced), each with its own document, and a
+credit memo's quantity comes from the delivery record. The app had no delivery
+record, so the brief now adds one (`special_order_items.delivered_qty`,
+recorded at the handover) and derives the memo from billed − delivered, capped.
+Allowances (no quantity, a reason code) are a separate kind. Mark asked whether
+the premade sheet's "made" count could serve: measured since 2026-09-01, 227 of
+228 counted special-order lines read made = planned and none read less (the
+shop's own lines vary normally), so it is kept as a cross-check, not the record.
