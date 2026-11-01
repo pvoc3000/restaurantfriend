@@ -445,7 +445,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
      a paid QuickBooks invoice): `docs/customer-credit-memos-brief.md`. The
      standard three quantities: the order keeps ORDERED, a new delivery record
      says what went out (on the order, defaulting to ordered), and a memo is
-     derived from billed − delivered. Three questions still open there.
+     derived from billed − delivered; an order not yet invoiced simply bills
+     what was delivered. Two questions still open there.
   Before building any of them, ask.
 
 

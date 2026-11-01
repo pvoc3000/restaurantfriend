@@ -155,10 +155,10 @@ order shows the short, a manager decides, and the memo is the only document
 that moves money:
 
 1. **The order says it** (below), and the Orders list's **To-do** gains
-   "Short, not credited" until a memo covers it or the short is cleared.
-   **ASK:** Mark's "no To-do flag" (2026-10-31) was about orders nobody
-   touched; this is a different one, for a short somebody recorded and nobody
-   has credited yet.
+   **"Short, not credited"** until a memo covers it, a manager marks it "no
+   credit" (with a reason), or the short is cleared (Mark, 2026-11-01). It
+   is raised only for a short on quantity already BILLED; a short recorded
+   before invoicing never needs one (below).
 2. **A manager issues the memo** (Issue Credit Memo…, prefilled below), or
    decides against it (a make-good on the next delivery, or no credit).
 3. **The memo becomes the customer's credit** (§5) and is **applied to their
@@ -166,9 +166,14 @@ that moves money:
    pushed as a QuickBooks CreditMemo and applied there too (§7, §8).
 4. **The memo is emailed** to the customer in the order's conversation (§9).
 
-**If the order has not been invoiced yet**, v1 still bills what was ordered
-and the short is credited the same way, once billed. Billing what was
-delivered instead is the bookkeeper's arrears question.
+**If the order has not been invoiced yet, the invoice bills what was
+delivered and no memo is made** (Mark, 2026-11-01). That is the textbook
+rule, not the arrears question: you invoice what shipped, and a credit memo
+exists only to correct an invoice that already went out. The invoice line
+says both — "518 × Knotted Bismark (560 ordered, 42 short)" — so the customer
+can match it to their order. A DRAFT invoice that already copied 560 reads
+"The order has changed", and Update re-copies it at 518 (176's mechanism). A
+SENT invoice is frozen, so a short on it is a memo.
 
 
 When delivered < billed on an order an invoice has billed, the order says so:
@@ -190,21 +195,33 @@ The dialog is **prefilled and capped by the record**, not typed:
 A manager can credit **less** than the record supports, never more. To credit
 more, correct the delivery record first, which leaves its own trace.
 
-**The order is never edited.** `special_order_billed`, `special_order_unbilled`
-and `order_item_billing` are left alone, and must stay that way: if memo lines
-lowered an order's billed amount, a 560-donut order would look under-billed by
-$65.10 and be invoiced again. The order shows **Ordered · Delivered · Billed ·
-Credited** side by side.
+**The order is never edited**: it keeps 560 ordered. What changes is the
+quantity the billing functions aim at. Today `order_item_billing` and
+`special_order_unbilled` compare what earlier invoices billed with the
+ORDERED quantity; they now compare it with the **billable** quantity,
+`coalesce(delivered_qty, qty)`. Two rules keep that from going wrong:
+
+- **credits count as billing.** The quantity a memo credits is netted
+  against what was billed, so 560 billed − 42 credited = 518 billable, and the
+  order is not offered for invoicing again;
+- **a short on billed quantity never becomes "Less invoice".** 176 copies a
+  decrease on an already-billed order as "Less invoice N" when the order goes
+  on another invoice. A delivery short must NOT take that route: it would
+  credit the customer with no memo, no approval and nothing in QuickBooks (and
+  QuickBooks refuses the line anyway). Billed − credited above billable is
+  left off the copy and raises the To-do flag instead.
+
+The order shows **Ordered · Delivered · Billed · Credited** side by side.
 
 **A make-good** (the 42 delivered later, on another day) is recorded as
 delivered on the order it goes out with. If that order is a new one, it is
 billed as usual. If the memo is still unapplied, it can be voided instead.
 
-**If delivery is recorded BEFORE the order is invoiced**, nothing needs a
-memo. **ASK** whether the invoice should then bill what was delivered. That is
-how billing in arrears works, and it is the bookkeeper's question below. Not
-in v1: today every Knotted order is invoiced a week or more before it goes
-out.
+**Billing in arrears as a policy** (invoice a week AFTER, for what was
+delivered) is still the bookkeeper's question below. The rule above already
+does the right thing either way; arrears would only make it the common case.
+Today every Knotted order is invoiced a week or more before it goes out, so
+for them a short is nearly always a memo.
 
 ### 4. Allowances: a credit with a reason and no quantity
 
@@ -413,8 +430,10 @@ do, so this design works either way. The questions to ask:
   already credited, the most that can be credited), `special_order_credited`,
   `issue_credit_memo`, `issue_allowance`, `void_credit_memo`,
   `next_credit_memo_number`.
-- **NOT changed, deliberately:** `special_order_billed`,
-  `special_order_unbilled`, `order_item_billing` (§3).
+- **Changed to bill the billable quantity** (§3): `order_item_billing`,
+  `special_order_unbilled`, `order_invoice_lines` (the "(560 ordered, 42
+  short)" wording, and a billed short left off rather than copied as "Less
+  invoice"). `special_order_billed` still reports what invoices billed.
 - Changed: `customer_credit`, `apply_credit_to_invoice`,
   `apply_customer_credit`, `customer_balances`, `customer_account_entries`,
   the void-releases-payments trigger, `trg_log_payment_application`, and the
@@ -443,9 +462,9 @@ for recording a short on the order.
 
 ## Build phases
 
-0. **The delivery record**, on its own. It is useful the day it ships (the
-   order says what went out) and it is what every memo reads. Shipping it first
-   also gives a few weeks of real records before memos depend on them.
+0. **The delivery record**, with billing what was delivered on orders not yet
+   invoiced. Useful the day it ships, and what every memo reads. A short on an
+   already-billed order shows and flags, but cannot be credited until phase 1.
 1. **Ledger.** Memos, allowances and the second credit source, with memo
    credit applied to SQUARE invoices only. Harness-tested on PG15 against the
    scenarios below, rehearsed on the live DB in a transaction that never
@@ -474,7 +493,10 @@ Square customer (no push, the pay link asks less); a QuickBooks Payment of cash
 plus credit recorded as the cash only; `AutoApplyCredit` on and off; staff and
 supervisor refused a memo; an order nobody touched counts as delivered in
 full and offers no memo; delivered above ordered refused; a short set back to
-ordered clears the notice; staff refused a short.
+ordered clears the notice; staff refused a short; a short recorded before invoicing bills 518 with no
+memo and no flag; a draft holding 560 reads changed and re-copies at 518; a
+short after billing produces no "Less invoice" line on the next invoice and
+raises the flag; after its memo the order is not offered for invoicing.
 
 ---
 
@@ -494,12 +516,14 @@ ordered clears the notice; staff refused a short.
    No To-do flag (§1).
 9. Recording one: **staff and up**; correcting one: **supervisor and up** (§10).
 10. **No cross-check** against the premade made count; the `→` stays (§2).
+11. **A To-do flag** for a short on billed quantity that is not yet credited
+    (2026-11-01, §3).
+12. **An order not yet invoiced bills what was delivered**; no memo (§3).
 
 ## Still open (ASK)
 
-1. A To-do flag for a short that is recorded but not credited? (§3)
-2. Should staff be able to record a short on the order? (§10)
-3. The bookkeeper's three questions: billing in advance or in arrears, the
+1. Should staff be able to record a short on the order? (§10)
+2. The bookkeeper's three questions: billing in advance or in arrears, the
    allowance account, tax on allowances.
 
 ---

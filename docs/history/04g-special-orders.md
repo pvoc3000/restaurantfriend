@@ -6294,3 +6294,11 @@ and Record Short… with a required reason. Recording a short moves no money; a
 manager issues the memo. Since staff only read `/special-orders`, recording a
 short is supervisor and up unless Mark gives staff that one write (asked).
 Also asked: a To-do flag for a short recorded but not yet credited.
+
+**Credit memos — an order not yet invoiced bills what was DELIVERED, and a
+short on billed quantity is flagged (Mark, 2026-11-01).** A memo only corrects
+an invoice that went out. So the billing functions now aim at the billable
+quantity, `coalesce(delivered_qty, qty)`, net of memo credits, and a short on
+an already-billed order must NOT fall into 176's "Less invoice" fallback
+(that would credit with no memo and no QuickBooks record); it raises a To-do
+flag, "Short, not credited", instead.
