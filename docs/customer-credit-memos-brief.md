@@ -3,7 +3,7 @@
 **Status: DESIGNED 2026-10-31, NOT BUILT. Revised the same day** around a
 DELIVERY RECORD (Mark: "I want whatever we design for credit memos to follow
 world class accounting standards and do things the proper way"). Mark's
-answers so far are at the end; the questions marked **ASK** are still open.
+answers are at the end; the bookkeeper's questions are the only ones open.
 Read `CLAUDE.md` (the customer invoices thread), then
 `docs/history/04g-special-orders.md` from "THE TEXTBOOK A/R MODEL" on, then
 this.
@@ -90,34 +90,33 @@ standard practice doesn't allow.
 ### 1. The delivery record: a delivered quantity on every order line
 
 **New:** `special_order_items.delivered_qty`, with a stamp on the order
-(`delivered_at`, `delivered_by`) once the order's delivery is recorded. Null
-means **not recorded**, never "delivered in full". A short needs a **reason**
-(`delivery_note`), which the event log keeps ("Delivered 518 of 560 Knotted
-Bismark — dropped a rack. Recorded by …").
+(`delivered_at`, `delivered_by`) once the order's delivery is confirmed. A
+short needs a **reason** (`delivery_note`), which the event log keeps
+("Delivered 518 of 560 Knotted Bismark — dropped a rack. Recorded by …").
 
-**Recorded at the handover**, by whoever gives the order to the customer or
-the driver. That is where the Knotted short was actually noticed, and it is
-what a delivery ticket records. **ASK: where.** The candidates:
+**Delivered defaults to ordered** (Mark, 2026-10-31: "set the delivery amount
+to the ordered amount by default. we can change it if anything ever goes
+wrong"). This is exception-based delivery recording, the common practice for
+a business whose deliveries nearly always go out in full: an order counts as
+delivered in full unless someone records a short. Two things keep it honest:
 
-- **(a) the order screen**: a **Record Delivery…** command;
-- **(b) a tablet tile** on `/start`: today's orders at this shop, tap one,
-  confirm;
-- **(c) the shift report**: a page listing the shift's special orders.
+- **the record says which it is.** A null `delivered_qty` means *not
+  confirmed* and is READ as the ordered quantity; a confirmed one carries a
+  name and a time. The order shows "Delivered 560 (not confirmed)" and
+  "Delivered 560 — confirmed by …" differently, so an audit can tell an
+  assumption from a confirmation;
+- **nothing is flagged, and nothing is blocked.** An unconfirmed order is
+  not a To-do (Mark's answer replaces the To-do flag this brief recommended).
 
-Recommended: (a) now, plus (b) when the floor needs it. (c) comes too late in
-the day: it is the closer, often the next morning, recording what someone
-else handed over.
-
-**The two answers it asks for:** **Delivered in full** (one tap), or **Short…**
-(enter each line's delivered quantity and a reason). Delivered-in-full being
-one tap is deliberate, since it is nearly always the answer, but it is an act
-somebody takes and is stamped with their name. It is **not a prefilled box**:
-the shift report's `→` copies the planned amount for the same reason, and §2
-shows what that does to a record.
-
-**ASK: is it required?** An order that is past its date with no delivery
-recorded could appear on the To-do list (161's flags), so a short can't simply
-go unmentioned. Recommended: a To-do flag, not a block on anything.
+**Recorded on the SHIFT REPORT** (Mark, 2026-10-31). A new page,
+**Special orders**, lists the orders handed over during the shift at that
+shop, each line showing delivered = ordered. Leaving it alone and finishing
+the report confirms them all in full, stamped with the runner's name. A short
+is entered there: change the line's delivered quantity and give a reason.
+Because the report is often finished by the closer, a short noticed at the
+handover has to reach them — the staff guide for handing over an order says
+so. A delivery is **corrected after the report is submitted** with
+**Correct Delivery…** on the order screen (§10).
 
 ### 2. The premade sheet's "made" count is a CROSS-CHECK, not the record
 
@@ -149,12 +148,9 @@ counted honestly:
 - not every order goes through a schedule (53 lines were never counted).
 
 So the two records stay separate, as production and shipping records are in
-any business, and the app **reconciles** them: when an order's
-made − left over is less than ordered, the order and its To-do say so ("Made
-518 of 560 — delivery recorded in full"). That catches a short that nobody
-recorded at the handover. **ASK** whether this check is wanted. It is only
-worth having if the made count is honest, which means retraining the `→`
-habit on special-order pages, or removing the `→` there.
+any business. **No cross-check** between them (Mark, 2026-10-31): the made
+count stays a production figure, the delivery record is the only source a
+memo reads, and the `→` on special-order premade pages is left as it is.
 
 ### 3. The credit memo comes FROM the delivery record
 
@@ -345,9 +341,10 @@ read-only before building, and tell Mark which way it is set.
   Mark, 2026-10-31). A memo gives money away, which matches refunds
   (`payment_credit_refundable` is owner/admin) rather than Revise
   (supervisor+).
-- **Record a delivery:** **ASK.** Recommended: **staff and up**, since
-  whoever hands the order over records it. Correcting a recorded delivery is
-  supervisor and up, and leaves a trace.
+- **Record a delivery:** **staff and up** (Mark, 2026-10-31): whoever runs the
+  shift report confirms its Special orders page. **Correcting** a delivery
+  after the report is submitted is **supervisor and up**, on the order screen,
+  and leaves a trace in the order's events.
 
 Both go into `lib/pageAccess.ts`, not inline.
 
@@ -381,8 +378,8 @@ do, so this design works either way. The questions to ask:
 - `special_order_items.delivered_qty`; `special_orders.delivered_at`,
   `delivered_by`, `delivery_note`. A definer function `record_order_delivery`
   (in full, or per line with a reason for any short) and its correction,
-  logged to the order's events. A To-do flag (161) for an order past its date
-  with nothing recorded.
+  logged to the order's events. Null `delivered_qty` is read as the ordered
+  quantity everywhere (`coalesce`). No To-do flag.
 - `customer_credit_memos`: org, customer, number, kind (`short_shipment` ·
   `allowance`), reason_code, note, issued_on, credits_invoice_id,
   location_id (the collecting shop, as for invoices), document_path,
@@ -414,15 +411,16 @@ apply step in `push_customer_invoice`, and §8's fix in `sync_qbo_payments`),
 Each `--no-verify-jwt` flag is checked against the live function before
 deploying.
 
-**Web:** Record Delivery… on the order (and the tablet tile if chosen); the
-order's Ordered · Delivered · Billed · Credited figures; the made-vs-delivered
-cross-check (if wanted); the Issue Credit Memo and New Allowance dialogs; a
+**Web:** the shift report's Special orders page and Correct Delivery… on the
+order; the order's Ordered · Delivered · Billed · Credited figures, with
+"not confirmed" shown as such; the Issue Credit Memo and New Allowance dialogs; a
 credit memo record screen (`/credit-memos/[id]`, walking the customer's found
 set); the customer record's Credit section listing memos; the invoice's
 "Credit CM-…" line; the statement row; the PDF and its specimen in
 `components/forms/formSamples.ts`; fixtures for any JS mirror of
 `order_creditable` (the dialog's caps); and the staff guide in `app/guides/`
-for recording a delivery.
+for recording a delivery (the shift report guide gains the page, and the
+handover tells the closer about a short).
 
 ---
 
@@ -457,8 +455,9 @@ rest stays credit); two memos oldest first; void before apply; void refused
 after apply; voiding the invoice it was applied to brings the credit back; a
 Square customer (no push, the pay link asks less); a QuickBooks Payment of cash
 plus credit recorded as the cash only; `AutoApplyCredit` on and off; staff and
-supervisor refused a memo; made 518 vs delivered in full raising the
-cross-check.
+supervisor refused a memo; an order never confirmed counts as delivered in
+full and offers no memo; a shift report submitted untouched confirms its
+orders in full; staff refused a correction after submission.
 
 ---
 
@@ -472,16 +471,15 @@ cross-check.
 4. **Memo credit first**, then payment credit (§5).
 5. Refunding memo credit: **later**, not v1 (§9).
 6. A Square customer's memo: **nothing in QuickBooks** (§7).
+7. A delivery is recorded on the **shift report** (§1).
+8. **Delivered defaults to ordered**; a short is the exception someone records.
+   No To-do flag (§1).
+9. Recording one: **staff and up**; correcting one: **supervisor and up** (§10).
+10. **No cross-check** against the premade made count; the `→` stays (§2).
 
 ## Still open (ASK)
 
-1. Where a delivery is recorded: the order screen, a tablet tile, the shift
-   report? (§1)
-2. Is recording one required (a To-do flag when it is missing)? (§1)
-3. Who may record one: staff and up? (§10)
-4. The made-vs-delivered cross-check: wanted, and what happens to the `→` on
-   special-order premade pages? (§2)
-5. The bookkeeper's three questions: billing in advance or in arrears, the
+1. The bookkeeper's three questions: billing in advance or in arrears, the
    allowance account, tax on allowances.
 
 ---

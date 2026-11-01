@@ -6276,3 +6276,14 @@ Allowances (no quantity, a reason code) are a separate kind. Mark asked whether
 the premade sheet's "made" count could serve: measured since 2026-09-01, 227 of
 228 counted special-order lines read made = planned and none read less (the
 shop's own lines vary normally), so it is kept as a cross-check, not the record.
+
+**Credit memos — the delivery questions answered (Mark, 2026-10-31).** A
+delivery is recorded on the SHIFT REPORT, on a new Special orders page.
+Delivered DEFAULTS TO ORDERED ("we can change it if anything ever goes
+wrong"): exception-based recording, with null `delivered_qty` read as ordered
+and shown as "not confirmed", so an assumption and a confirmation stay
+distinguishable. There is no To-do flag. Staff and up record a delivery;
+supervisor and up correct one after the report is submitted. There is NO
+cross-check against the premade made count, and the `→` stays. Only the
+bookkeeper's questions (advance vs arrears, the allowance account, tax on
+allowances) remain open.
