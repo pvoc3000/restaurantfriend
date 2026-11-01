@@ -548,7 +548,8 @@ export function OrderLines({
                 [
                   ["item", "Item", "left"],
                   ["note", "Note", "left"],
-                  ["qty", "Qty", "right"],
+                  // Beside Delivered it is what was ORDERED (Mark, 2026-11-01).
+                  ["qty", delivered ? "Ordered" : "Qty", "right"],
                   ...(delivered ? ([["delivered", "Delivered", "right"]] as const) : []),
                   ["price", "Price", "right"],
                   ["tax", "Tax", "left"],
