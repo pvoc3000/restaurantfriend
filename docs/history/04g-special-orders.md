@@ -6302,3 +6302,5 @@ quantity, `coalesce(delivered_qty, qty)`, net of memo credits, and a short on
 an already-billed order must NOT fall into 176's "Less invoice" fallback
 (that would credit with no memo and no QuickBooks record); it raises a To-do
 flag, "Short, not credited", instead.
+
+Recording a short is **supervisor and up** (Mark, 2026-11-01), the order screen's existing write access. Only the bookkeeper's questions remain open.

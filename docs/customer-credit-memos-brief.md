@@ -3,7 +3,7 @@
 **Status: DESIGNED 2026-10-31, NOT BUILT. Revised the same day** around a
 DELIVERY RECORD (Mark: "I want whatever we design for credit memos to follow
 world class accounting standards and do things the proper way"). Mark's
-answers are at the end; the questions marked **ASK** are still open.
+answers are at the end; the bookkeeper's questions are the only ones open.
 Read `CLAUDE.md` (the customer invoices thread), then
 `docs/history/04g-special-orders.md` from "THE TEXTBOOK A/R MODEL" on, then
 this.
@@ -377,9 +377,8 @@ read-only before building, and tell Mark which way it is set.
   (supervisor+).
 - **Record or change a short:** **supervisor and up**, because the order
   screen is read-only to staff in `lib/pageAccess.ts` (`/special-orders` is
-  R for staff, W from supervisor). Mark's 2026-10-31 answer was "staff and
-  up" for a shift report page; on the order it would mean giving staff one
-  write on a read-only screen. **ASK** if staff should have it.
+  R for staff, W from supervisor). Confirmed by Mark, 2026-11-01; it
+  replaces his "staff and up" for the shift report page.
 
 Both go into `lib/pageAccess.ts`, not inline.
 
@@ -519,11 +518,12 @@ raises the flag; after its memo the order is not offered for invoicing.
 11. **A To-do flag** for a short on billed quantity that is not yet credited
     (2026-11-01, §3).
 12. **An order not yet invoiced bills what was delivered**; no memo (§3).
+13. Recording a short: **supervisor and up**, the order screen's existing
+    write access (§10).
 
 ## Still open (ASK)
 
-1. Should staff be able to record a short on the order? (§10)
-2. The bookkeeper's three questions: billing in advance or in arrears, the
+1. The bookkeeper's three questions: billing in advance or in arrears, the
    allowance account, tax on allowances.
 
 ---
