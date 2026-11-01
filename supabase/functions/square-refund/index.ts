@@ -61,16 +61,20 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
-    const { payment_id, credit_payment_id, amount, reason, idempotency_key } = await req.json();
+    const input = (await req.json()) as {
+      payment_id?: string; credit_payment_id?: string; credit_memo_id?: string;
+      amount?: number; reason?: string; idempotency_key?: string;
+    };
+    const { credit_payment_id, credit_memo_id, reason, idempotency_key } = input;
+    let { payment_id, amount } = input;
     // 143: `credit_payment_id` refunds a payment's CREDIT — money of the
     // customer's applied to nothing — rather than an order's share of it.
     const fromCredit = Boolean(credit_payment_id);
-    if ((!payment_id && !credit_payment_id) || !idempotency_key) {
+    // 218: `credit_memo_id` refunds a CREDIT MEMO (§6a) — its whole amount,
+    // from the pay-link payment on the invoice it credits.
+    const fromMemo = Boolean(credit_memo_id);
+    if ((!payment_id && !credit_payment_id && !credit_memo_id) || !idempotency_key) {
       return json(400, { error: "missing payment_id or idempotency_key" });
-    }
-    const cents = Math.round(Number(amount) * 100);
-    if (!Number.isFinite(cents) || cents <= 0) {
-      return json(400, { error: "The refund amount must be more than zero." });
     }
 
     /* ---- the caller ---------------------------------------------------- */
@@ -84,6 +88,26 @@ Deno.serve(async (req) => {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return json(401, { error: "not signed in" });
+
+    if (fromMemo) {
+      const [{ data: sources, error: srcError }, { data: total, error: totalError }] = await Promise.all([
+        supabase.rpc("credit_memo_refund_source", { p_memo: credit_memo_id }),
+        supabase.rpc("credit_memo_total", { p_memo: credit_memo_id }),
+      ]);
+      if (srcError || totalError) return json(400, { error: (srcError ?? totalError)!.message });
+      const source = ((sources ?? []) as { application_id: string; processor: string }[]).find((x) => x.processor === "square");
+      if (!source) {
+        return json(400, {
+          error: "No pay-link payment on the invoice this memo credits has enough left to refund it. Refund it by hand, or apply it as credit.",
+        });
+      }
+      payment_id = source.application_id;
+      amount = Number(total);
+    }
+    const cents = Math.round(Number(amount) * 100);
+    if (!Number.isFinite(cents) || cents <= 0) {
+      return json(400, { error: "The refund amount must be more than zero." });
+    }
 
     // `payment_id` is the Payments tab's row: this ORDER's slice of a payment
     // (140's application); `credit_payment_id` is the payment itself (143).
@@ -206,7 +230,15 @@ Deno.serve(async (req) => {
 
     // The function dates it in the org's own day, takes the org from the
     // payment, and re-checks the manager role and the cap.
-    const { data: inserted, error: insertError } = fromCredit
+    const { data: inserted, error: insertError } = fromMemo
+      ? await supabase.rpc("record_credit_memo_refund", {
+          p_memo: credit_memo_id,
+          p_application: row.id,
+          p_refund_id: refund.id,
+          p_note: note,
+          p_type: null,
+        })
+      : fromCredit
       ? await supabase.rpc("record_credit_refund", {
           p_payment: row.id,
           p_amount: cents / 100,

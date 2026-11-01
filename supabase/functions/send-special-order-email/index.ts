@@ -147,6 +147,8 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     // 124: a customer invoice is its own send — one invoice, many orders.
     if (payload.customer_invoice_id) return await sendCustomerInvoice(req, payload);
+    // 218: a customer credit memo, in its order's conversation.
+    if (payload.credit_memo_id) return await sendCreditMemo(req, payload);
     // A delivery quote request goes to the CARRIER, with no document.
     if (payload.kind === "delivery_quote" || payload.kind === "delivery_request") {
       return await sendDeliveryQuoteRequest(req, payload);
@@ -627,6 +629,130 @@ async function sendCustomerInvoice(
     id: providerId,
     warning: warnings.length ? `sent, but ${warnings.join("; ")}` : undefined,
   });
+}
+
+/**
+ * A CUSTOMER CREDIT MEMO (migration 218, brief §9) — sent the way an invoice
+ * is: in its order's conversation when it comes from one order, filed under
+ * the memo (`{org}/credit-memos/{id}/…`) and copied to the order's Documents
+ * tab, then stamped sent. Manager and up, who issue them. The email going out
+ * is the fact; nothing after it turns into a failure.
+ */
+async function sendCreditMemo(
+  req: Request,
+  payload: { credit_memo_id: string; to?: string; cc?: string; subject?: string; body?: string; pdf_base64?: string; filename?: string }
+): Promise<Response> {
+  const { credit_memo_id, to, cc, subject, body, pdf_base64, filename } = payload;
+  if (!to || !subject || !pdf_base64 || !filename) {
+    return json(400, { error: "missing to, subject, pdf_base64 or filename" });
+  }
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: req.headers.get("Authorization")! } } }
+  );
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return json(401, { error: "not signed in" });
+
+  const { data: memo, error: memoError } = await supabase
+    .from("customer_credit_memos")
+    .select("id, org_id, number, voided_at, special_order_id")
+    .eq("id", credit_memo_id)
+    .maybeSingle();
+  if (memoError) return json(400, { error: memoError.message });
+  if (!memo) return json(404, { error: "credit memo not found" });
+  if (memo.voided_at) return json(400, { error: "this credit memo is void" });
+
+  const { data: member } = await supabase
+    .from("org_members")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("org_id", memo.org_id)
+    .maybeSingle();
+  if (!member || !["owner", "admin"].includes(member.role)) {
+    return json(403, { error: "a manager or the owner sends credit memos" });
+  }
+
+  const { data: org } = await supabase.from("orgs").select("name, settings").eq("id", memo.org_id).maybeSingle();
+  const orgSettings = (org?.settings ?? {}) as {
+    email_provider?: ProviderConfig;
+    special_orders?: { email_provider?: ProviderConfig; reply_to?: string; thread_subject?: string };
+    billing?: { email?: string };
+  };
+  const transport = resolveTransport({
+    explicit: orgSettings.special_orders?.email_provider,
+    orgProvider: orgSettings.email_provider,
+    orgName: org?.name ?? "Orders",
+    replyToFallbacks: [orgSettings.special_orders?.reply_to, orgSettings.billing?.email],
+  });
+  const orderId = memo.special_order_id as string | null;
+  const thread = orderId
+    ? await orderThread(supabase, orderId, transport.cfg.from, {
+        org: org?.name,
+        template: orgSettings.special_orders?.thread_subject,
+      })
+    : null;
+
+  const sent = await sendMailWithIds(transport, {
+    to,
+    cc: cc || undefined,
+    subject,
+    text: withGapBeforeAttachment(body ?? ""),
+    attachment: { filename, base64: pdf_base64 },
+    ...(thread?.headers ?? {}),
+  });
+
+  /* ---- from here down, nothing may turn a sent email into a failure ---- */
+
+  const warnings: string[] = [];
+  if (thread && orderId) {
+    const threadProblem = await thread.record(sent, subject);
+    if (threadProblem) warnings.push(threadProblem);
+    const copyProblem = await copySentToOrder({ transport, orgId: memo.org_id, orderId, ref: sent.ref });
+    if (copyProblem) warnings.push(copyProblem);
+  }
+  const bytes = Uint8Array.from(atob(pdf_base64), (c) => c.charCodeAt(0));
+  let documentPath: string | null = `${memo.org_id}/credit-memos/${memo.id}/${crypto.randomUUID()}.pdf`;
+  const { error: uploadError } = await supabase.storage
+    .from("special-order-attachments")
+    .upload(documentPath, bytes, { contentType: "application/pdf" });
+  if (uploadError) {
+    warnings.push(`the sent memo was not filed: ${uploadError.message}`);
+    documentPath = null;
+  }
+  const { error: markError } = await supabase.rpc("record_credit_memo_sent", {
+    p_memo: memo.id,
+    p_document_path: documentPath,
+  });
+  if (markError) warnings.push(`the memo was not marked sent: ${markError.message}`);
+
+  if (orderId) {
+    const copyPath = `${memo.org_id}/${orderId}/${crypto.randomUUID()}.pdf`;
+    const { error: copyError } = await supabase.storage
+      .from("special-order-attachments")
+      .upload(copyPath, bytes, { contentType: "application/pdf" });
+    if (copyError) {
+      warnings.push(`the memo was not filed on the order: ${copyError.message}`);
+    } else {
+      const { error: rowError } = await supabase.from("special_order_attachments").insert({
+        org_id: memo.org_id,
+        order_id: orderId,
+        kind: "document",
+        storage_path: copyPath,
+        file_name: filename,
+        content_type: "application/pdf",
+        byte_size: bytes.byteLength,
+        uploaded_by: user.id,
+      });
+      if (rowError) {
+        await supabase.storage.from("special-order-attachments").remove([copyPath]);
+        warnings.push(`the memo was not recorded on the order: ${rowError.message}`);
+      }
+    }
+  }
+  return json(200, { id: sent.ref, warning: warnings.length ? `sent, but ${warnings.join("; ")}` : undefined });
 }
 
 /**

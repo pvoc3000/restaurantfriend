@@ -45,6 +45,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { splitRefund } from "../_shared/refundSplit.ts";
+import { invoiceCoding, memoSalesLines, paymentCash, type MemoLine } from "../_shared/qboCredit.ts";
 import { chooseTaxCode, taxCodesWithRates } from "../_shared/taxCodes.ts";
 import {
   INTUIT_AUTHORIZE,
@@ -614,6 +615,142 @@ async function bookRefundReceipt(
     }).catch(() => undefined);
     throw new Error(
       `QuickBooks worked the receipt out at $${(cents(made.TotalAmt) / 100).toFixed(2)}, not $${(args.cents / 100).toFixed(2)}, so it was removed — enter this refund in QuickBooks`
+    );
+  }
+  return { id: made.Id, existing: false };
+}
+
+// ---------------------------------------------------------------------------
+// CREDIT MEMOS (218, docs/customer-credit-memos-brief.md §6a, §7, §8)
+// ---------------------------------------------------------------------------
+
+type QboRef = { value: string; name?: string };
+type QboInvoiceDoc = {
+  Id?: string;
+  DocNumber?: string;
+  TotalAmt?: number;
+  Balance?: number;
+  CustomerRef?: QboRef;
+  DepartmentRef?: QboRef;
+  GlobalTaxCalculation?: string;
+  TxnTaxDetail?: { TxnTaxCodeRef?: QboRef; TotalTax?: number };
+  Line?: {
+    Amount?: number;
+    DetailType?: string;
+    SalesItemLineDetail?: { ItemRef?: QboRef; TaxCodeRef?: QboRef; ClassRef?: QboRef };
+  }[];
+};
+
+/** A memo, its lines, and the QuickBooks invoice it credits, read through the
+ *  CALLER's RLS. Throws a sentence. */
+async function loadMemoForQbo(
+  supabase: SupabaseClient,
+  admin: SupabaseClient,
+  conn: Awaited<ReturnType<typeof loadConnection>>,
+  orgId: string,
+  memoId: string
+) {
+  const { data: memo, error } = await supabase
+    .from("customer_credit_memos")
+    .select("id, org_id, number, kind, reason_code, note, issued_on, processor, settlement, voided_at, external_ref, customer_id, credits_invoice_id, customer_invoices:credits_invoice_id ( number, revision, external_ref )")
+    .eq("id", memoId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!memo || memo.org_id !== orgId) throw new Error("credit memo not found");
+  const { data: lineRows, error: lineError } = await supabase
+    .from("customer_credit_memo_lines")
+    .select("line_type, description, qty, unit_price, amount, taxable, tax_rate, sort")
+    .eq("memo_id", memoId)
+    .order("sort", { ascending: true });
+  if (lineError) throw new Error(lineError.message);
+  const lines = (lineRows ?? []).map((l) => ({
+    ...l,
+    qty: l.qty === null ? null : Number(l.qty),
+    unit_price: l.unit_price === null ? null : Number(l.unit_price),
+    amount: Number(l.amount),
+  })) as (MemoLine & { tax_rate: number | null })[];
+  const total = Math.round(lines.reduce((a, l) => a + l.amount * 100, 0));
+  const { data: org } = await supabase.from("orgs").select("name, settings").eq("id", orgId).maybeSingle();
+  const settings = (org?.settings ?? {}) as { customer_credit_memos?: { prefix?: string }; customer_invoices?: { prefix?: string } };
+  const label = `${settings.customer_credit_memos?.prefix ?? ""}${memo.number}`;
+  const credited = memo.customer_invoices as unknown as { number: number; revision: number; external_ref: { qbo?: { id?: string } } | null } | null;
+  const invoiceLabel = credited
+    ? `${settings.customer_invoices?.prefix ?? ""}${credited.number}${credited.revision > 1 ? `-${credited.revision}` : ""}`
+    : null;
+  const { data: refs } = await admin
+    .from("accounting_connections")
+    .select("invoice_item_ref, rush_item_ref, delivery_item_ref")
+    .eq("org_id", orgId)
+    .eq("provider", "qbo")
+    .maybeSingle();
+  let invoice: QboInvoiceDoc | null = null;
+  const qboInvoiceId = credited?.external_ref?.qbo?.id ?? null;
+  if (qboInvoiceId) {
+    invoice = ((await qboFetch(admin, conn, `invoice/${encodeURIComponent(qboInvoiceId)}`)) as { Invoice?: QboInvoiceDoc })?.Invoice ?? null;
+  }
+  const coding = invoice
+    ? invoiceCoding(invoice, refs?.rush_item_ref ?? null, refs?.delivery_item_ref ?? null)
+    : refs?.invoice_item_ref
+    ? [{ itemRef: refs.invoice_item_ref as string, taxable: false, classRef: null }]
+    : [];
+  return {
+    memo, lines, total, label, invoiceLabel, invoice, coding,
+    rushItemRef: (refs?.rush_item_ref as string | null) ?? null,
+    orgName: (org?.name as string | undefined) ?? "",
+  };
+}
+
+/** THE BOOKS FOR A REFUNDED MEMO (§6a): one ITEMIZED RefundReceipt naming what
+ *  was credited, on the invoice's own item, class, location and tax code — in
+ *  place of a QuickBooks CreditMemo, which would reverse the sale twice. Paid
+ *  from where the Payment was deposited, a record only, its total checked.
+ *  Idempotent on the refund id, as `bookRefundReceipt` is. */
+async function bookMemoRefundReceipt(
+  admin: SupabaseClient,
+  conn: Awaited<ReturnType<typeof loadConnection>>,
+  m: Awaited<ReturnType<typeof loadMemoForQbo>>,
+  args: { qboPaymentId: string; refundId: string }
+): Promise<{ id: string; existing: boolean }> {
+  const docNumber = args.refundId.slice(0, 21);
+  const found = (await qboFetch(
+    admin,
+    conn,
+    `query?query=${encodeURIComponent(`select Id from RefundReceipt where DocNumber = '${docNumber.replace(/'/g, "")}'`)}`
+  )) as { QueryResponse?: { RefundReceipt?: { Id: string }[] } };
+  const prior = found?.QueryResponse?.RefundReceipt?.[0];
+  if (prior) return { id: prior.Id, existing: true };
+
+  const pay = ((await qboFetch(admin, conn, `payment/${encodeURIComponent(args.qboPaymentId)}`)) as {
+    Payment?: { CustomerRef?: QboRef; DepositToAccountRef?: QboRef; PaymentMethodRef?: QboRef };
+  })?.Payment;
+  if (!pay?.DepositToAccountRef) throw new Error("QuickBooks did not say which account the payment went to");
+  const built = memoSalesLines(m.lines, m.coding, m.rushItemRef);
+  if (built.error) throw new Error(built.error);
+  const body: Record<string, unknown> = {
+    DocNumber: docNumber,
+    CustomerRef: m.invoice?.CustomerRef ?? pay.CustomerRef,
+    DepositToAccountRef: pay.DepositToAccountRef,
+    ...(pay.PaymentMethodRef ? { PaymentMethodRef: pay.PaymentMethodRef } : {}),
+    ...(m.invoice?.DepartmentRef ? { DepartmentRef: m.invoice.DepartmentRef } : {}),
+    ...(m.invoice?.GlobalTaxCalculation ? { GlobalTaxCalculation: m.invoice.GlobalTaxCalculation } : {}),
+    ...(built.taxed && m.invoice?.TxnTaxDetail?.TxnTaxCodeRef
+      ? { TxnTaxDetail: { TxnTaxCodeRef: m.invoice.TxnTaxDetail.TxnTaxCodeRef } }
+      : {}),
+    Line: built.lines,
+    PrivateNote: `Credit memo ${m.label}${m.invoiceLabel ? `, crediting invoice ${m.invoiceLabel}` : ""} · refund ${args.refundId} (${m.orgName})`.slice(0, 4000),
+  };
+  const made = ((await qboFetch(admin, conn, `refundreceipt?requestid=${encodeURIComponent(`rr-${docNumber}`)}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  })) as { RefundReceipt?: { Id: string; SyncToken: string; TotalAmt?: number } })?.RefundReceipt;
+  if (!made) throw new Error("QuickBooks did not return the refund receipt");
+  if (Math.round(Number(made.TotalAmt ?? 0) * 100) !== m.total) {
+    await qboFetch(admin, conn, "refundreceipt?operation=delete", {
+      method: "POST",
+      body: JSON.stringify({ Id: made.Id, SyncToken: made.SyncToken }),
+    }).catch(() => undefined);
+    throw new Error(
+      `QuickBooks worked the receipt out at $${Number(made.TotalAmt ?? 0).toFixed(2)}, not $${(m.total / 100).toFixed(2)}, so it was removed — enter this refund in QuickBooks`
     );
   }
   return { id: made.Id, existing: false };
@@ -2143,8 +2280,32 @@ Deno.serve(async (req) => {
       if (!isManager) return json(403, { error: "Only a manager or the owner can refund a payment." });
       const b = body as unknown as {
         application_id?: unknown; amount?: unknown; reason?: unknown; idempotency_key?: unknown;
+        credit_memo_id?: unknown;
       };
       const key = typeof b.idempotency_key === "string" ? b.idempotency_key.slice(0, 50) : "";
+      // 218 (§6a): `credit_memo_id` refunds a CREDIT MEMO — its whole amount,
+      // from the QuickBooks Payments payment on the invoice it credits, booked
+      // as an ITEMIZED refund receipt.
+      const memoId = typeof b.credit_memo_id === "string" ? b.credit_memo_id : null;
+      let memo: Awaited<ReturnType<typeof loadMemoForQbo>> | null = null;
+      if (memoId) {
+        const conn0 = await loadConnection(admin, orgId);
+        try {
+          memo = await loadMemoForQbo(supabase, admin, conn0, orgId, memoId);
+        } catch (e) {
+          return json(400, { error: e instanceof Error ? e.message : String(e) });
+        }
+        const { data: sources, error: srcErr } = await supabase.rpc("credit_memo_refund_source", { p_memo: memoId });
+        if (srcErr) return json(400, { error: srcErr.message });
+        const source = ((sources ?? []) as { application_id: string; processor: string }[]).find((x) => x.processor === "quickbooks");
+        if (!source) {
+          return json(400, {
+            error: "No QuickBooks Payments payment on the invoice this memo credits has enough left to refund it. Apply it as credit instead.",
+          });
+        }
+        b.application_id = source.application_id;
+        b.amount = memo.total / 100;
+      }
       if (typeof b.application_id !== "string" || !key) {
         return json(400, { error: "missing application_id or idempotency_key" });
       }
@@ -2224,15 +2385,23 @@ Deno.serve(async (req) => {
         return json(400, { error: `QuickBooks refused the refund${result?.status ? `: ${result.status}` : ""}.` });
       }
 
-      const note = ["Refunded through QuickBooks Payments", reason]
+      const note = ["Refunded through QuickBooks Payments", memo ? `credit memo ${memo.label}` : "", reason]
         .filter(Boolean)
         .join(" · ");
-      const { data: inserted, error: insertError } = await supabase.rpc("record_payment_refund", {
-        p_application: row.id,
-        p_amount: cents / 100,
-        p_refund_id: result.id,
-        p_note: note,
-      });
+      const { data: inserted, error: insertError } = memoId
+        ? await supabase.rpc("record_credit_memo_refund", {
+            p_memo: memoId,
+            p_application: row.id,
+            p_refund_id: result.id,
+            p_note: note,
+            p_type: null,
+          })
+        : await supabase.rpc("record_payment_refund", {
+            p_application: row.id,
+            p_amount: cents / 100,
+            p_refund_id: result.id,
+            p_note: note,
+          });
       if (insertError || !inserted) {
         const warning = `refunded $${(cents / 100).toFixed(2)} in QuickBooks (${result.id}) but it was NOT recorded here — record −$${(cents / 100).toFixed(2)} as 'QuickBooks Refund' by hand${insertError ? `: ${insertError.message}` : ""}`;
         if (row.special_order_id) {
@@ -2251,12 +2420,14 @@ Deno.serve(async (req) => {
       let receipt: { id: string; existing: boolean } | null = null;
       let booking: string | null = null;
       try {
-        receipt = await bookRefundReceipt(admin, conn, {
-          qboPaymentId: pay.external_ref,
-          refundId: result.id,
-          cents,
-          note: `Refund ${result.id} through QuickBooks Payments${reason ? ` · ${reason}` : ""} (restaurantfriend)`,
-        });
+        receipt = memo
+          ? await bookMemoRefundReceipt(admin, conn, memo, { qboPaymentId: pay.external_ref, refundId: result.id })
+          : await bookRefundReceipt(admin, conn, {
+              qboPaymentId: pay.external_ref,
+              refundId: result.id,
+              cents,
+              note: `Refund ${result.id} through QuickBooks Payments${reason ? ` · ${reason}` : ""} (restaurantfriend)`,
+            });
       } catch (e) {
         booking = e instanceof Error ? e.message : String(e);
       }
@@ -2779,17 +2950,26 @@ Deno.serve(async (req) => {
             Payment?: {
               Id?: unknown;
               TxnDate?: string;
+              TotalAmt?: unknown;
               Line?: { Amount?: unknown; LinkedTxn?: { TxnId?: unknown; TxnType?: unknown }[] }[];
             }[];
           };
         };
         for (const p of payRes.QueryResponse?.Payment ?? []) {
-          for (const line of p.Line ?? []) {
-            for (const t of line.LinkedTxn ?? []) {
-              if (t.TxnType !== "Invoice") continue;
+          // 218: the CASH in it, never a credit memo applied through it.
+          const cash = paymentCash(p as Parameters<typeof paymentCash>[0]);
+          if (cash.problem) {
+            for (const line of p.Line ?? []) for (const t of line.LinkedTxn ?? []) {
+              const mine = t.TxnType === "Invoice" ? ours.get(String(t.TxnId)) : undefined;
+              if (mine) problems.push(`Invoice ${mine.number}: ${cash.problem}`);
+            }
+            continue;
+          }
+          {
+            for (const t of cash.invoices.map((c) => ({ TxnId: c.txnId, amount: c.amount }))) {
               const mine = ours.get(String(t.TxnId));
               if (!mine) continue;
-              const amount = Number(line.Amount ?? 0);
+              const amount = t.amount;
               const { data: said, error: recErr } = await admin.rpc("record_qbo_invoice_payment", {
                 p_realm: conn.realm_id,
                 p_qbo_invoice: String(t.TxnId),
@@ -3133,8 +3313,77 @@ Deno.serve(async (req) => {
         });
       }
 
+      // 218: THE CUSTOMER'S CREDIT MEMOS, applied in QuickBooks the way
+      // QuickBooks applies one — a Payment of nothing that links the invoice
+      // and each memo — so its pay link asks for the balance. Memos first,
+      // oldest first (`invoice_memo_credit`). If QuickBooks already has money
+      // or credit on the invoice (its own "Automatically apply credits" is
+      // OFF for this company, read 2026-11-01), nothing is guessed at.
+      const memoCredit: { label: string; amount: number }[] = [];
+      {
+        const { data: credits, error: creditErr } = await supabase.rpc("invoice_memo_credit", { p_invoice: inv.id });
+        const list = ((credits ?? []) as { memo_id: string; label: string; qbo_id: string | null; amount: number }[])
+          .filter((c) => c.qbo_id && Number(c.amount) > 0);
+        if (creditErr) warnings.push(`Credit memos were not applied: ${creditErr.message}`);
+        if (list.length) {
+          const liveInv = live?.Invoice as unknown as { TotalAmt?: unknown; Balance?: unknown } | undefined;
+          const balance = Math.round(Number(liveInv?.Balance ?? liveInv?.TotalAmt ?? 0) * 100);
+          const total = Math.round(Number(liveInv?.TotalAmt ?? 0) * 100);
+          if (balance < total) {
+            warnings.push(
+              `QuickBooks already has money or credit on this invoice, so ${list.map((c) => c.label).join(", ")} ` +
+                "was not applied. Apply it in QuickBooks, or tell whoever keeps the books."
+            );
+          } else {
+            let room = balance;
+            const lines = list.flatMap((c) => {
+              const cents = Math.min(Math.round(Number(c.amount) * 100), room);
+              room -= cents;
+              return cents > 0 ? [{ ...c, cents }] : [];
+            });
+            const sum = lines.reduce((a, c) => a + c.cents, 0);
+            if (sum > 0) {
+              const payment = {
+                CustomerRef: { value: customerRef },
+                TotalAmt: 0,
+                PrivateNote: `Credit memo ${lines.map((c) => c.label).join(", ")} applied to this invoice`,
+                Line: [
+                  { Amount: sum / 100, LinkedTxn: [{ TxnId: String(doc.Id), TxnType: "Invoice" }] },
+                  ...lines.map((c) => ({ Amount: c.cents / 100, LinkedTxn: [{ TxnId: String(c.qbo_id), TxnType: "CreditMemo" }] })),
+                ],
+              };
+              try {
+                const made = ((await qboFetch(
+                  admin,
+                  conn,
+                  `payment?requestid=${encodeURIComponent(`cm${String(inv.id).replace(/-/g, "").slice(0, 24)}${sum}`)}`,
+                  { method: "POST", body: JSON.stringify(payment) }
+                )) as { Payment?: { Id?: string } })?.Payment;
+                if (!made?.Id) throw new Error("QuickBooks returned no payment");
+                for (const c of lines) {
+                  const { error: appErr } = await supabase.rpc("record_qbo_memo_application", {
+                    p_memo: c.memo_id,
+                    p_invoice: inv.id,
+                    p_amount: c.cents / 100,
+                    p_qbo_payment: String(made.Id),
+                  });
+                  if (appErr) {
+                    warnings.push(`${c.label} was applied in QuickBooks (payment ${made.Id}) but NOT recorded here: ${appErr.message}`);
+                  } else {
+                    memoCredit.push({ label: c.label, amount: c.cents / 100 });
+                  }
+                }
+              } catch (e) {
+                warnings.push(`Credit memos were not applied in QuickBooks: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }
+          }
+        }
+      }
+
       return json(200, {
         entity: "Invoice",
+        memo_credit: memoCredit,
         warnings,
         qbo_id: String(doc.Id),
         doc_number: ref.qbo.doc_number,
@@ -3148,6 +3397,124 @@ Deno.serve(async (req) => {
         attachment_results: attachmentResults,
         ref,
       });
+    }
+
+    // -----------------------------------------------------------------------
+    // push_credit_memo — a QuickBooks CreditMemo for one of ours (218, §7)
+    // -----------------------------------------------------------------------
+    // Pushed when the memo is ISSUED, for a memo on an invoice QuickBooks
+    // collects and settled as credit. A refunded memo is booked as a
+    // RefundReceipt by `refund_payment` instead, and a Square one leaves no
+    // trace in QuickBooks at all (Mark, 2026-10-31). Idempotent: a memo
+    // already in QuickBooks answers with what is recorded.
+    if (mode === "push_credit_memo") {
+      if (!isManager) return json(403, { error: "Only a manager or the owner can send a credit memo to QuickBooks." });
+      const memoId = (body as unknown as { credit_memo_id?: unknown }).credit_memo_id;
+      if (typeof memoId !== "string") return json(400, { error: "missing credit_memo_id" });
+      let m: Awaited<ReturnType<typeof loadMemoForQbo>>;
+      try {
+        m = await loadMemoForQbo(supabase, admin, conn, orgId, memoId);
+      } catch (e) {
+        return json(400, { error: e instanceof Error ? e.message : String(e) });
+      }
+      if (m.memo.processor !== "quickbooks") return json(400, { error: "This memo's invoice is collected through Square, so nothing goes to QuickBooks." });
+      if (m.memo.settlement !== "credit") return json(400, { error: "A refunded memo is booked in QuickBooks as a refund receipt, not a credit memo." });
+      if (m.memo.voided_at) return json(400, { error: "This memo is void." });
+      const existing = (m.memo.external_ref as { qbo?: { id?: string } } | null)?.qbo;
+      if (existing?.id) return json(200, { qbo_id: existing.id, existing: true });
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("external_ref")
+        .eq("id", m.memo.customer_id)
+        .maybeSingle();
+      const customerRef = (customer?.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id ?? null;
+      if (!customerRef) return json(400, { error: "This customer is not linked to a QuickBooks customer yet." });
+
+      const built = memoSalesLines(m.lines, m.coding, m.rushItemRef);
+      if (built.error) return json(400, { error: `QuickBooks: ${built.error}.` });
+      const payload: Record<string, unknown> = {
+        CustomerRef: { value: customerRef },
+        TxnDate: m.memo.issued_on,
+        DocNumber: m.label.slice(0, 21),
+        Line: built.lines,
+        CustomerMemo: { value: [m.memo.reason_code, m.memo.note].filter(Boolean).join(" — ").slice(0, 1000) },
+        PrivateNote: [m.orgName, `credit memo ${m.memo.id}`, m.invoiceLabel ? `credits invoice ${m.invoiceLabel}` : ""]
+          .filter(Boolean).join(" · ").slice(0, 4000),
+        ...(m.invoice?.DepartmentRef ? { DepartmentRef: m.invoice.DepartmentRef } : {}),
+      };
+      if (built.taxed) {
+        payload.TxnTaxDetail = {};
+        const rates = m.lines.filter((l) => l.line_type === "tax" && l.amount !== 0).map((l) => Number(l.tax_rate) || 0);
+        const taxRefusal = await applyTaxCode(admin, conn, orgId, payload, rates);
+        if (taxRefusal) return json(400, { error: taxRefusal });
+      }
+      const { saved } = await postDocument(admin, conn, "CreditMemo", payload);
+      const doc = saved?.CreditMemo as { Id?: string; SyncToken?: string; DocNumber?: string; TotalAmt?: number } | undefined;
+      if (!doc?.Id) return json(502, { error: "QuickBooks saved the credit memo but returned no id." });
+      if (Math.round(Number(doc.TotalAmt ?? 0) * 100) !== m.total) {
+        await qboFetch(admin, conn, "creditmemo?operation=delete", {
+          method: "POST",
+          body: JSON.stringify({ Id: doc.Id, SyncToken: doc.SyncToken }),
+        }).catch(() => undefined);
+        return json(400, {
+          error: `QuickBooks worked the memo out at $${Number(doc.TotalAmt ?? 0).toFixed(2)}, not $${(m.total / 100).toFixed(2)}, so it was removed. Nothing was sent.`,
+        });
+      }
+      const ref = {
+        qbo: { id: String(doc.Id), sync_token: String(doc.SyncToken ?? "0"), doc_number: doc.DocNumber ?? null, entity: "CreditMemo" },
+      };
+      const { error: recErr } = await supabase.rpc("record_credit_memo_external_ref", { p_memo: memoId, p_ref: ref });
+      if (recErr) {
+        return json(500, {
+          error: `It reached QuickBooks (credit memo ${doc.Id}) but could not be recorded here, so sending again would make a second one: ${recErr.message}`,
+          qbo_id: String(doc.Id),
+        });
+      }
+      return json(200, { qbo_id: String(doc.Id), doc_number: doc.DocNumber ?? null, total: Number(doc.TotalAmt ?? 0), ref });
+    }
+
+    // -----------------------------------------------------------------------
+    // void_credit_memo — in QuickBooks first, then here (218, §9)
+    // -----------------------------------------------------------------------
+    // QuickBooks refuses to void a memo it has applied, and that refusal is
+    // passed on as it is.
+    if (mode === "void_credit_memo") {
+      if (!isManager) return json(403, { error: "Only a manager or the owner can void a credit memo." });
+      const memoId = (body as unknown as { credit_memo_id?: unknown }).credit_memo_id;
+      if (typeof memoId !== "string") return json(400, { error: "missing credit_memo_id" });
+      const { data: memo, error: memoErr } = await supabase
+        .from("customer_credit_memos")
+        .select("id, org_id, external_ref, voided_at")
+        .eq("id", memoId)
+        .maybeSingle();
+      if (memoErr) return json(400, { error: memoErr.message });
+      if (!memo || memo.org_id !== orgId) return json(404, { error: "credit memo not found" });
+      const { count: applied } = await supabase
+        .from("payment_applications")
+        .select("id", { count: "exact", head: true })
+        .eq("credit_memo_id", memoId);
+      if ((applied ?? 0) > 0) {
+        return json(400, { error: "This memo is applied — void the invoice it was applied to first." });
+      }
+      const q = (memo.external_ref as { qbo?: { id?: string } } | null)?.qbo;
+      if (q?.id) {
+        const token = await currentSyncToken(admin, conn, "CreditMemo", q.id, "");
+        if (!token) return json(502, { error: "Could not read the credit memo from QuickBooks." });
+        await qboFetch(admin, conn, "creditmemo?operation=void", {
+          method: "POST",
+          body: JSON.stringify({ Id: q.id, SyncToken: token }),
+        });
+      }
+      const { error: voidErr } = await supabase.rpc("void_credit_memo", { p_memo: memoId });
+      if (voidErr) {
+        return json(500, {
+          error: q?.id
+            ? `Voided in QuickBooks but NOT here: ${voidErr.message}. Void it here again.`
+            : voidErr.message,
+        });
+      }
+      return json(200, { voided: true, qbo_id: q?.id ?? null });
     }
 
     // -----------------------------------------------------------------------

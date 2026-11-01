@@ -33,6 +33,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { QboError, loadConnection, qboFetch } from "../_shared/qbo.ts";
 import { notifyInvoicePaid, qboInvoice } from "../_shared/shopNotify.ts";
+import { paymentCash } from "../_shared/qboCredit.ts";
 
 type Event = { realm: string; entity: string; id: string; operation: string };
 
@@ -101,15 +102,23 @@ async function handlePayment(admin: SupabaseClient, ev: Event): Promise<void> {
   const res = (await qboFetch(admin, conn, `payment/${encodeURIComponent(ev.id)}`)) as {
     Payment?: {
       TxnDate?: string;
+      TotalAmt?: unknown;
       Line?: { Amount?: unknown; LinkedTxn?: { TxnId?: string; TxnType?: string }[] }[];
     };
   };
   const p = res?.Payment;
   if (!p) return log("payment not found");
 
-  for (const line of p.Line ?? []) {
-    for (const t of line.LinkedTxn ?? []) {
-      if (t.TxnType !== "Invoice" || !t.TxnId) continue;
+  // 218: the CASH in it. A Payment that only applies a credit memo (ours, from
+  // `qbo-sync`, or one applied in QuickBooks) is no money received.
+  const cash = paymentCash(p);
+  if (cash.problem) return log(cash.problem);
+  if (cash.credit.length > 0) log("credit memo applied", { credit: cash.credit });
+
+  {
+    for (const c of cash.invoices) {
+      const t = { TxnId: c.txnId };
+      const line = { Amount: c.amount };
       const { data, error } = await admin.rpc("record_qbo_invoice_payment", {
         p_realm: ev.realm,
         p_qbo_invoice: String(t.TxnId),
