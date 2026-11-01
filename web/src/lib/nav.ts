@@ -369,6 +369,14 @@ export const SECTIONS: NavSection[] = [
         built: true,
       },
       {
+        // 218 (Mark, 2026-11-01): their own list, right after Invoices — a
+        // memo is its own document with its own number series.
+        slug: "credit-memos",
+        label: "Credit Memos",
+        href: "/credit-memos",
+        built: true,
+      },
+      {
         slug: "customers",
         label: "Customers",
         href: "/customers",
