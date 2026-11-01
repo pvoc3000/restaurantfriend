@@ -6287,3 +6287,10 @@ supervisor and up correct one after the report is submitted. There is NO
 cross-check against the premade made count, and the `→` stays. Only the
 bookkeeper's questions (advance vs arrears, the allowance account, tax on
 allowances) remain open.
+
+**Credit memos — a short is recorded ON THE ORDER (Mark, 2026-11-01)**, not on
+the shift report: a Delivered column on the Items tab, defaulting to ordered,
+and Record Short… with a required reason. Recording a short moves no money; a
+manager issues the memo. Since staff only read `/special-orders`, recording a
+short is supervisor and up unless Mark gives staff that one write (asked).
+Also asked: a To-do flag for a short recorded but not yet credited.

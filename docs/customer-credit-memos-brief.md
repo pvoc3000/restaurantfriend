@@ -3,7 +3,7 @@
 **Status: DESIGNED 2026-10-31, NOT BUILT. Revised the same day** around a
 DELIVERY RECORD (Mark: "I want whatever we design for credit memos to follow
 world class accounting standards and do things the proper way"). Mark's
-answers are at the end; the bookkeeper's questions are the only ones open.
+answers are at the end; the questions marked **ASK** are still open.
 Read `CLAUDE.md` (the customer invoices thread), then
 `docs/history/04g-special-orders.md` from "THE TEXTBOOK A/R MODEL" on, then
 this.
@@ -98,25 +98,21 @@ short needs a **reason** (`delivery_note`), which the event log keeps
 to the ordered amount by default. we can change it if anything ever goes
 wrong"). This is exception-based delivery recording, the common practice for
 a business whose deliveries nearly always go out in full: an order counts as
-delivered in full unless someone records a short. Two things keep it honest:
+delivered in full unless someone records a short. A null `delivered_qty` means
+**as ordered** and is read as the ordered quantity everywhere; a recorded one
+carries a name, a time and a reason. The order shows "Delivered 560 (as
+ordered)" and "Delivered 518 — recorded by …" differently, so an audit can
+tell an assumption from a record. Nothing is flagged or blocked for an order
+nobody touched.
 
-- **the record says which it is.** A null `delivered_qty` means *not
-  confirmed* and is READ as the ordered quantity; a confirmed one carries a
-  name and a time. The order shows "Delivered 560 (not confirmed)" and
-  "Delivered 560 — confirmed by …" differently, so an audit can tell an
-  assumption from a confirmation;
-- **nothing is flagged, and nothing is blocked.** An unconfirmed order is
-  not a To-do (Mark's answer replaces the To-do flag this brief recommended).
-
-**Recorded on the SHIFT REPORT** (Mark, 2026-10-31). A new page,
-**Special orders**, lists the orders handed over during the shift at that
-shop, each line showing delivered = ordered. Leaving it alone and finishing
-the report confirms them all in full, stamped with the runner's name. A short
-is entered there: change the line's delivered quantity and give a reason.
-Because the report is often finished by the closer, a short noticed at the
-handover has to reach them — the staff guide for handing over an order says
-so. A delivery is **corrected after the report is submitted** with
-**Correct Delivery…** on the order screen (§10).
+**Entered ON THE ORDER** (Mark, 2026-11-01, replacing the shift report
+answer of 2026-10-31). The Items tab gains a **Delivered** column beside the
+quantity, showing the ordered amount until someone changes it. Changing it
+opens **Record Short…**: the delivered quantity for each short line and a
+**reason** (required). Saving logs it to the order's events and starts what
+happens next (§3). Setting it back to the ordered amount clears the short,
+and is logged the same way. A delivered quantity above ordered is refused;
+extra donuts are a new line, billed as usual.
 
 ### 2. The premade sheet's "made" count is a CROSS-CHECK, not the record
 
@@ -153,6 +149,27 @@ count stays a production figure, the delivery record is the only source a
 memo reads, and the `→` on special-order premade pages is left as it is.
 
 ### 3. The credit memo comes FROM the delivery record
+
+**What a short starts.** Recording one changes **no money by itself**. The
+order shows the short, a manager decides, and the memo is the only document
+that moves money:
+
+1. **The order says it** (below), and the Orders list's **To-do** gains
+   "Short, not credited" until a memo covers it or the short is cleared.
+   **ASK:** Mark's "no To-do flag" (2026-10-31) was about orders nobody
+   touched; this is a different one, for a short somebody recorded and nobody
+   has credited yet.
+2. **A manager issues the memo** (Issue Credit Memo…, prefilled below), or
+   decides against it (a make-good on the next delivery, or no credit).
+3. **The memo becomes the customer's credit** (§5) and is **applied to their
+   next invoice when it is sent** (§6). For a QuickBooks customer the memo is
+   pushed as a QuickBooks CreditMemo and applied there too (§7, §8).
+4. **The memo is emailed** to the customer in the order's conversation (§9).
+
+**If the order has not been invoiced yet**, v1 still bills what was ordered
+and the short is credited the same way, once billed. Billing what was
+delivered instead is the bookkeeper's arrears question.
+
 
 When delivered < billed on an order an invoice has billed, the order says so:
 
@@ -341,10 +358,11 @@ read-only before building, and tell Mark which way it is set.
   Mark, 2026-10-31). A memo gives money away, which matches refunds
   (`payment_credit_refundable` is owner/admin) rather than Revise
   (supervisor+).
-- **Record a delivery:** **staff and up** (Mark, 2026-10-31): whoever runs the
-  shift report confirms its Special orders page. **Correcting** a delivery
-  after the report is submitted is **supervisor and up**, on the order screen,
-  and leaves a trace in the order's events.
+- **Record or change a short:** **supervisor and up**, because the order
+  screen is read-only to staff in `lib/pageAccess.ts` (`/special-orders` is
+  R for staff, W from supervisor). Mark's 2026-10-31 answer was "staff and
+  up" for a shift report page; on the order it would mean giving staff one
+  write on a read-only screen. **ASK** if staff should have it.
 
 Both go into `lib/pageAccess.ts`, not inline.
 
@@ -411,16 +429,15 @@ apply step in `push_customer_invoice`, and §8's fix in `sync_qbo_payments`),
 Each `--no-verify-jwt` flag is checked against the live function before
 deploying.
 
-**Web:** the shift report's Special orders page and Correct Delivery… on the
-order; the order's Ordered · Delivered · Billed · Credited figures, with
-"not confirmed" shown as such; the Issue Credit Memo and New Allowance dialogs; a
+**Web:** the Items tab's Delivered column and Record Short… on the order; the
+order's Ordered · Delivered · Billed · Credited figures, with "as ordered"
+shown as such; the "short, not credited" notice and its To-do flag; the Issue Credit Memo and New Allowance dialogs; a
 credit memo record screen (`/credit-memos/[id]`, walking the customer's found
 set); the customer record's Credit section listing memos; the invoice's
 "Credit CM-…" line; the statement row; the PDF and its specimen in
 `components/forms/formSamples.ts`; fixtures for any JS mirror of
 `order_creditable` (the dialog's caps); and the staff guide in `app/guides/`
-for recording a delivery (the shift report guide gains the page, and the
-handover tells the closer about a short).
+for recording a short on the order.
 
 ---
 
@@ -455,9 +472,9 @@ rest stays credit); two memos oldest first; void before apply; void refused
 after apply; voiding the invoice it was applied to brings the credit back; a
 Square customer (no push, the pay link asks less); a QuickBooks Payment of cash
 plus credit recorded as the cash only; `AutoApplyCredit` on and off; staff and
-supervisor refused a memo; an order never confirmed counts as delivered in
-full and offers no memo; a shift report submitted untouched confirms its
-orders in full; staff refused a correction after submission.
+supervisor refused a memo; an order nobody touched counts as delivered in
+full and offers no memo; delivered above ordered refused; a short set back to
+ordered clears the notice; staff refused a short.
 
 ---
 
@@ -471,7 +488,8 @@ orders in full; staff refused a correction after submission.
 4. **Memo credit first**, then payment credit (§5).
 5. Refunding memo credit: **later**, not v1 (§9).
 6. A Square customer's memo: **nothing in QuickBooks** (§7).
-7. A delivery is recorded on the **shift report** (§1).
+7. A short is recorded **on the order** (2026-11-01, replacing "on the shift
+   report") (§1).
 8. **Delivered defaults to ordered**; a short is the exception someone records.
    No To-do flag (§1).
 9. Recording one: **staff and up**; correcting one: **supervisor and up** (§10).
@@ -479,7 +497,9 @@ orders in full; staff refused a correction after submission.
 
 ## Still open (ASK)
 
-1. The bookkeeper's three questions: billing in advance or in arrears, the
+1. A To-do flag for a short that is recorded but not credited? (§3)
+2. Should staff be able to record a short on the order? (§10)
+3. The bookkeeper's three questions: billing in advance or in arrears, the
    allowance account, tax on allowances.
 
 ---

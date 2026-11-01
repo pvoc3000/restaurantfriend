@@ -444,9 +444,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   6. **Credit memos — DESIGNED 2026-10-31, not built** (Knotted shorted 42 on
      a paid QuickBooks invoice): `docs/customer-credit-memos-brief.md`. The
      standard three quantities: the order keeps ORDERED, a new delivery record
-     says what went out (on the shift report, defaulting to ordered), and a memo
-     is derived from billed − delivered. Only the bookkeeper's questions are
-     still open.
+     says what went out (on the order, defaulting to ordered), and a memo is
+     derived from billed − delivered. Three questions still open there.
   Before building any of them, ask.
 
 
