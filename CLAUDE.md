@@ -447,7 +447,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
      says what went out (on the order, defaulting to ordered), and a memo is
      derived from billed − delivered; an order not yet invoiced simply bills
      what was delivered; the invoice takes the quote's columns, with Delivered.
-     Two questions still open there.
+     A retail short is refunded through
+     the memo. Only the bookkeeper's questions are open.
   Before building any of them, ask.
 
 

@@ -6322,3 +6322,5 @@ which still bills the item, so INV-10032 reopens with that amount due. The
 brief's §6a: the same credit memo, settled by "Refund to the card", the refund
 applied to the memo so the invoice stays paid, and an itemized RefundReceipt
 instead of a QuickBooks CreditMemo. Asked whether this goes into v1.
+
+A memo refunded to the card when it is issued is **in v1** (Mark, 2026-11-01): phase 1 for Square and by hand, phase 2 for QuickBooks. Refunding credit later, once unapplied, stays out.

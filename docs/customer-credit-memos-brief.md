@@ -3,7 +3,7 @@
 **Status: DESIGNED 2026-10-31, NOT BUILT. Revised the same day** around a
 DELIVERY RECORD (Mark: "I want whatever we design for credit memos to follow
 world class accounting standards and do things the proper way"). Mark's
-answers are at the end; the questions marked **ASK** are still open.
+answers are at the end; the bookkeeper's questions are the only ones open.
 Read `CLAUDE.md` (the customer invoices thread), then
 `docs/history/04g-special-orders.md` from "THE TEXTBOOK A/R MODEL" on, then
 this.
@@ -331,8 +331,10 @@ the item or the reason, and a QuickBooks invoice with money on it cannot be
 revised here (143). The memo is what fixes it: it says why the invoice is
 owed less.
 
-**ASK:** Mark's answer 5 ("later") is reversed by this. Does refunding a memo
-go into v1, phase 1 (Square and hand-recorded) and phase 2 (QuickBooks)?
+**In v1** (Mark, 2026-11-01, reversing answer 5 for a memo refunded when it
+is issued): phase 1 builds it for Square and hand-recorded refunds, phase 2
+for QuickBooks (the itemized RefundReceipt). Refunding credit LATER, once it
+is sitting unapplied, stays out of v1 (§9).
 
 ### 7. The QuickBooks CreditMemo itself
 
@@ -567,11 +569,13 @@ for recording a short on the order.
    what every memo reads. A short on an
    already-billed order shows and flags, but cannot be credited until phase 1.
 1. **Ledger.** Memos, allowances and the second credit source, with memo
-   credit applied to SQUARE invoices only. Harness-tested on PG15 against the
+   credit applied to SQUARE invoices only, and a memo refunded when issued
+   through Square or by hand (§6a). Harness-tested on PG15 against the
    scenarios below, rehearsed on the live DB in a transaction that never
    commits, then applied by Mark.
 2. **QuickBooks.** First the read-only probe of `AutoApplyCredit`. Then
-   `push_credit_memo`, the apply step, and §8's fix in both `sync_qbo_payments`
+   `push_credit_memo`, a memo refunded through QuickBooks Payments with its
+   itemized RefundReceipt (§6a), the apply step, and §8's fix in both `sync_qbo_payments`
    and `qbo-webhook`, deployed together. Then apply credit on QuickBooks
    invoices is switched on. Checked against one real memo, by Mark.
 3. **Paper.** The PDF, the email, the invoice's credit line and the statement.
@@ -597,7 +601,11 @@ full and offers no memo; delivered above ordered refused; a short set back to
 ordered clears the notice; staff refused a short; a short recorded before invoicing bills 518 with no
 memo and no flag; a draft holding 560 reads changed and re-copies at 518; a
 short after billing produces no "Less invoice" line on the next invoice and
-raises the flag; after its memo the order is not offered for invoicing.
+raises the flag; after its memo the order is not offered for invoicing. A retail memo refunded to the card: the
+invoice stays paid in full, the refund names the memo, QuickBooks gets one
+itemized RefundReceipt and no CreditMemo; a refund over the memo refused;
+a refund that fails at the processor leaves the memo issued and unsettled,
+said so on the order.
 
 ---
 
@@ -610,7 +618,7 @@ raises the flag; after its memo the order is not offered for invoicing.
 3. Memos are issued by **manager and up** (§10).
 4. **Memo credit first**, then payment credit (§5).
 5. Refunding memo credit: **later**, not v1 (§9). **Reopened 2026-11-01 by
-   SO-10152** for a memo refunded when it is issued (§6a, asked).
+   SO-10152**: a memo refunded when it is issued IS in v1 (§6a).
 6. A Square customer's memo: **nothing in QuickBooks** (§7).
 7. A short is recorded **on the order** (2026-11-01, replacing "on the shift
    report") (§1).
@@ -630,8 +638,7 @@ raises the flag; after its memo the order is not offered for invoicing.
 
 ## Still open (ASK)
 
-1. A memo refunded to the card when issued, in v1? (§6a)
-2. The bookkeeper's three questions: billing in advance or in arrears, the
+1. The bookkeeper's three questions: billing in advance or in arrears, the
    allowance account, tax on allowances.
 
 ---
