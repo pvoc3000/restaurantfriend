@@ -282,6 +282,58 @@ is rendered.
 only. Payment credit on a QuickBooks invoice is still refused, because that
 money is Square's or QuickBooks' own and has no QuickBooks document to link.
 
+### 6a. A retail order is REFUNDED, not credited forward
+
+Mark, 2026-11-01, on SO-10152 (a retail pickup 10/25, $164.05 paid by
+card through QuickBooks on INV-10032, missing an item): "Since this is a
+special order and not a wholesale order, I would like to refund the customer
+the cost of the missing item." A retail customer usually has no next invoice,
+so credit carried forward never gets used. The brief had deferred refunding
+memo credit (answer 5); this brings it into v1.
+
+**The same memo, settled differently.** A missing item is a short like any
+other: Delivered 0 on that line, the flag, Issue Credit Memo… prefilled
+(1 × the item + its tax, at the billed price). The dialog then asks **how it
+is settled**:
+
+- **Refund to the card** — the default when the customer has no open or
+  standing order (retail);
+- **Apply to the next invoice** — the default for a customer with a standing
+  order (wholesale, §6).
+
+**Refund to the card** issues the memo and refunds its amount through the
+processor that took the payment, in one step:
+
+- the memo credits the invoice (it is applied to INV-10032, the invoice it
+  names), and the refund is recorded as a negative payment applied to the
+  MEMO, not to the invoice. So INV-10032 stays **paid in full**: $164.05 paid,
+  less the memo's credit, less the refund, nets to nothing due;
+- **QuickBooks customer:** the money goes back by `qbo-sync`'s
+  `refund_payment` (Payments API, 149), and the books get one **itemized
+  RefundReceipt** naming the missing item, its tax and the invoice's
+  Class/Location. That RefundReceipt takes the place of a QuickBooks
+  CreditMemo for a refunded memo (pushing both would reverse the sale twice);
+- **Square customer:** `square-refund`, and the nightly journal entry books
+  it (with the wrong-accounts problem in the refunds thread, unchanged);
+- **cash or check:** recorded by hand as a refund against the memo;
+- the memo PDF says "Refunded to Visa ending 2998 on 11/1" instead of "will
+  be applied to your next invoice", and is emailed in the order's
+  conversation.
+
+**What the Refund… command does today, and why it isn't enough.** It
+refunds any amount and, for a QuickBooks payment, books a RefundReceipt
+PROPORTIONALLY across the invoice's lines (`_shared/refundSplit.ts`; the part
+refund path has not been run live). The money and QuickBooks' books come out
+right. The APP's record does not: the refund is applied to the invoice, which
+still bills the missing item, so INV-10032 reopens with that amount due and
+the order reads unpaid ("a refund reopens the invoice", 149). Nothing names
+the item or the reason, and a QuickBooks invoice with money on it cannot be
+revised here (143). The memo is what fixes it: it says why the invoice is
+owed less.
+
+**ASK:** Mark's answer 5 ("later") is reversed by this. Does refunding a memo
+go into v1, phase 1 (Square and hand-recorded) and phase 2 (QuickBooks)?
+
 ### 7. The QuickBooks CreditMemo itself
 
 Pushed when the memo is **issued** (not when it is applied), so the credit is
@@ -361,7 +413,7 @@ read-only before building, and tell Mark which way it is set.
   to, which releases the application (140's void trigger, taught the new
   source), then voiding the memo. A second memo is never the way to undo the
   first.
-- **Refunding memo credit** (paying the customer back instead) is NOT in v1
+- **Refunding memo credit LATER**, once it is sitting as credit, is NOT in v1
   (Mark, 2026-10-31: later). The money never came from Square, so
   `square-refund` can't do it. When it comes, it is "record a check or cash
   refund", a negative entry against the memo, plus a QuickBooks
@@ -406,15 +458,16 @@ Knotted Bismark @ $1.55 ……… $868.00", `invoicePaper` in
 **The memo's paper uses the same table:** Item · Billed · Delivered · Price ·
 Short · Credit ("Knotted Bismark · 560 · 518 · $1.55 · 42 · $65.10").
 
-**ASK: the several-order invoice** (the weekly Knotted one, and any invoice
-with more than one order). It is not itemized at all: a row per order with
+**The several-order invoice stays a row per order** (Mark, 2026-11-01; the
+weekly Knotted one, and any invoice with more than one order). It is not
+itemized: a row per order with
 Subtotal, Discount, Delivery, Rush and Tax columns. There is nowhere for a
 Delivered column. Choices: (a) leave it a row per order and let the memo
 paper carry the item detail; (b) itemize every order, a band per order with
 the item table under it and its charges as rows, so a weekly after-the-fact
-invoice shows each day's deliveries. Recommended: (a) while Knotted is
-invoiced in advance, since nothing on that invoice can have been delivered
-yet; (b) if the bookkeeper says to bill in arrears.
+invoice shows each day's deliveries. **(a)**, chosen: nothing on an
+in-advance invoice has been delivered yet. Revisit (b) if the bookkeeper says
+to bill in arrears.
 
 ### 10. Who may do what
 
@@ -556,7 +609,8 @@ raises the flag; after its memo the order is not offered for invoicing.
 2. Numbering: **"CM-" from 10000** (§9).
 3. Memos are issued by **manager and up** (§10).
 4. **Memo credit first**, then payment credit (§5).
-5. Refunding memo credit: **later**, not v1 (§9).
+5. Refunding memo credit: **later**, not v1 (§9). **Reopened 2026-11-01 by
+   SO-10152** for a memo refunded when it is issued (§6a, asked).
 6. A Square customer's memo: **nothing in QuickBooks** (§7).
 7. A short is recorded **on the order** (2026-11-01, replacing "on the shift
    report") (§1).
@@ -571,11 +625,12 @@ raises the flag; after its memo the order is not offered for invoicing.
     write access (§10).
 14. The invoice takes the **quote's columns**: Item · Ordered · Price ·
     Delivered · Notes · Cost, Cost = price × delivered, and Delivered shown
-    only for an order billed after the fact (§9a).
+    only for an order billed after the fact (§9a). The several-order invoice
+    stays a row per order.
 
 ## Still open (ASK)
 
-1. The several-order invoice: a row per order as now, or itemized? (§9a)
+1. A memo refunded to the card when issued, in v1? (§6a)
 2. The bookkeeper's three questions: billing in advance or in arrears, the
    allowance account, tax on allowances.
 

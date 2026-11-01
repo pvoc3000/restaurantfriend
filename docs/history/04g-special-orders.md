@@ -6312,3 +6312,13 @@ before the invoice's issue date). Applies to the one-order (itemized) invoice;
 a 176 "what was added" line prints the quantity THIS invoice bills, so Cost
 still equals Qty × Price. Asked: the several-order invoice is a row per order
 with no items, so it has nowhere for Delivered.
+
+**Credit memos — several-order invoices stay a row per order; a retail short is
+REFUNDED (Mark, 2026-11-01).** SO-10152 (a retail pickup 10/25, $164.05 on
+QuickBooks invoice INV-10032) was missing an item, and Mark wants its cost
+refunded. Today's Refund… (149) moves the money and books a proportional
+RefundReceipt in QuickBooks, but the app applies the refund to the invoice,
+which still bills the item, so INV-10032 reopens with that amount due. The
+brief's §6a: the same credit memo, settled by "Refund to the card", the refund
+applied to the memo so the invoice stays paid, and an itemized RefundReceipt
+instead of a QuickBooks CreditMemo. Asked whether this goes into v1.
