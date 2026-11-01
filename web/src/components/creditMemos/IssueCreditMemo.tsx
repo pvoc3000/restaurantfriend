@@ -134,7 +134,7 @@ export function IssueCreditMemo({
           <button type="button" className={DIALOG_CANCEL_CLASS} onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className={DIALOG_COMMIT_CLASS} disabled={busy || !!problem}>
+          <button type="button" onClick={() => void issue()} className={DIALOG_COMMIT_CLASS} disabled={busy || !!problem}>
             {settle === "refund" ? "Issue and Refund" : "Issue"}
           </button>
         </>

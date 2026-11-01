@@ -266,7 +266,7 @@ function RecordShortDialog({
           <button type="button" className={DIALOG_CANCEL_CLASS} onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className={DIALOG_COMMIT_CLASS} disabled={busy || !!problem || changed.length === 0}>
+          <button type="button" onClick={() => void save()} className={DIALOG_COMMIT_CLASS} disabled={busy || !!problem || changed.length === 0}>
             Save
           </button>
         </>
@@ -356,7 +356,7 @@ function NoCreditDialog({ orderId, current, onClose }: { orderId: string; curren
           <button type="button" className={DIALOG_CANCEL_CLASS} onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className={DIALOG_COMMIT_CLASS} disabled={busy || !note.trim()}>
+          <button type="button" onClick={() => void save()} className={DIALOG_COMMIT_CLASS} disabled={busy || !note.trim()}>
             Save
           </button>
         </>
