@@ -5,8 +5,8 @@ import { parseFilterSearch } from "@/lib/filterMenus";
 import { customerLabel } from "@/lib/specialOrders";
 import { invoiceNumberText, readInvoiceTerms } from "@/lib/customerInvoices";
 import { sweepRows } from "@/lib/customerInvoiceQueries";
-import { creditMemoNumberText, readMemoPrefix, type CreditMemoKind } from "@/lib/creditMemos";
-import { CreditMemosList, memoStatus, type CreditMemoRow } from "@/components/creditMemos/CreditMemosList";
+import { creditMemoNumberText, memoStatus, readMemoPrefix, type CreditMemoKind } from "@/lib/creditMemos";
+import { CreditMemosList, type CreditMemoRow } from "@/components/creditMemos/CreditMemosList";
 
 /**
  * EVERY CUSTOMER CREDIT MEMO (218), newest first — their own list beside

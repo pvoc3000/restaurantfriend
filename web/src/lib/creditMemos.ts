@@ -434,3 +434,25 @@ export const DEFAULT_CREDIT_MEMO_EMAIL = {
     "{settlement_line}\n\n" +
     "Thank you,\n{employee_name}",
 };
+
+/** A memo's state on the Credit Memos list — the record's `settlementLabel`,
+ *  as a value a filter can hold. Here and not in the list, because the
+ *  SERVER page works it out and the list is a client component. */
+export type CreditMemoStatus = "open" | "partly" | "applied" | "to_refund" | "refunded" | "void";
+
+export const CREDIT_MEMO_STATUS_LABEL: Record<CreditMemoStatus, string> = {
+  open: "Credit, not yet applied",
+  partly: "Partly applied",
+  applied: "Applied as credit",
+  to_refund: "To be refunded",
+  refunded: "Refunded",
+  void: "Void",
+};
+export const CREDIT_MEMO_STATUS_ORDER: CreditMemoStatus[] = ["to_refund", "open", "partly", "applied", "refunded", "void"];
+
+export function memoStatus(m: { voided: boolean; settlement: "credit" | "refund"; total: number; used: number }): CreditMemoStatus {
+  if (m.voided) return "void";
+  if (m.settlement === "refund") return m.used > 0 ? "refunded" : "to_refund";
+  if (m.total - m.used <= 0.005) return "applied";
+  return m.used > 0 ? "partly" : "open";
+}

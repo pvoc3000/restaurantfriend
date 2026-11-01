@@ -27,27 +27,13 @@ import { sortRows } from "@/lib/tableSort";
 import { money } from "@/lib/specialOrders";
 import { usDate } from "@/lib/specialOrderDocs";
 import { PROCESSOR_LABEL } from "@/lib/customerInvoices";
-import { CREDIT_MEMO_KIND_LABEL, type CreditMemoKind } from "@/lib/creditMemos";
-
-export type CreditMemoStatus = "open" | "partly" | "applied" | "to_refund" | "refunded" | "void";
-
-export const CREDIT_MEMO_STATUS_LABEL: Record<CreditMemoStatus, string> = {
-  open: "Credit, not yet applied",
-  partly: "Partly applied",
-  applied: "Applied as credit",
-  to_refund: "To be refunded",
-  refunded: "Refunded",
-  void: "Void",
-};
-const STATUS_ORDER: CreditMemoStatus[] = ["to_refund", "open", "partly", "applied", "refunded", "void"];
-
-/** The record's `settlementLabel`, as a value a filter can hold. */
-export function memoStatus(m: { voided: boolean; settlement: "credit" | "refund"; total: number; used: number }): CreditMemoStatus {
-  if (m.voided) return "void";
-  if (m.settlement === "refund") return m.used > 0 ? "refunded" : "to_refund";
-  if (m.total - m.used <= 0.005) return "applied";
-  return m.used > 0 ? "partly" : "open";
-}
+import {
+  CREDIT_MEMO_KIND_LABEL,
+  CREDIT_MEMO_STATUS_LABEL,
+  CREDIT_MEMO_STATUS_ORDER as STATUS_ORDER,
+  type CreditMemoKind,
+  type CreditMemoStatus,
+} from "@/lib/creditMemos";
 
 export type CreditMemoRow = {
   id: string;
