@@ -665,3 +665,5 @@ delivery record exists.
 **Do not** create the CreditMemo by hand in QuickBooks. QuickBooks would apply
 it, the app would not know, Knotted would pay $65.10 less than the app's
 invoice, and the app would show them owing it.
+
+**SO-10152 waits for the build** (Mark, 2026-11-01): its missing item is refunded by a memo with Refund to the card once phase 2 ships, not with today's Refund…, so INV-10032 never reads as owing. It is the first real case to run through §6a.
