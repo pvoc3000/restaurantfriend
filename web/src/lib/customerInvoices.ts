@@ -164,11 +164,25 @@ export type CustomerInvoiceLine = {
 
 /**
  * A CREDIT MEMO'S CREDIT ON AN INVOICE (218) — applied, or about to be when
- * the invoice is sent (`invoice_memo_credit`). The Totals window prints each
- * as its own line, "Credit CM-10000 (10/31)", apart from Payments: a memo is
- * not money received.
+ * the invoice is sent (`invoice_memo_credit`). Its own CREDITS section on the
+ * paper (Mark, 2026-11-01: "We should have a 'credits' section on the
+ * invoice"), one row a memo — "CM-10000 (11/1) · Short shipment · order
+ * SO-10137, invoice INV-10025-2" — and their sum is ONE "Credits" line in the
+ * Totals window, after Tax, apart from Payments: a memo is not money received.
  */
-export type InvoiceCredit = { label: string; issued_on: string | null; amount: number };
+export type InvoiceCredit = {
+  label: string;
+  issued_on: string | null;
+  amount: number;
+  memo_id?: string;
+  /** What the memo was for and what it corrects — `describeInvoiceCredits`. */
+  detail?: string | null;
+};
+
+/** The Totals window's Credits figure: every memo on the invoice, summed. */
+export function creditsTotal(credits: Pick<InvoiceCredit, "amount">[] | undefined): number {
+  return cents((credits ?? []).reduce((a, c) => a + c.amount, 0));
+}
 
 export type InvoiceStatus = "draft" | "sent" | "overdue" | "paid" | "void";
 
@@ -273,10 +287,10 @@ export function invoiceTotalsBreakdown(
   };
 }
 
-/** "Credit CM-10000 (10/31)" — a memo's line in the Totals window. */
+/** "CM-10000 (10/31)" — a memo's row in the Credits section. */
 export function creditLineLabel(c: Pick<InvoiceCredit, "label" | "issued_on">): string {
   const m = /^\d{4}-(\d{2})-(\d{2})/.exec(c.issued_on ?? "");
-  return `Credit ${c.label}${m ? ` (${Number(m[1])}/${Number(m[2])})` : ""}`;
+  return `${c.label}${m ? ` (${Number(m[1])}/${Number(m[2])})` : ""}`;
 }
 
 /* ==========================================================================
@@ -632,7 +646,7 @@ export function paperTotals(
     { label: "Rush fee", value: b.rush },
     { label: "Tax", value: b.tax },
     { label: "Invoiced earlier", value: -b.prior },
-    ...(b.credits ?? []).map((c) => ({ label: creditLineLabel(c), value: -c.amount })),
+    { label: "Credits", value: -creditsTotal(b.credits) },
     { label: "Paid", value: -paid },
   ];
   return lines
@@ -671,6 +685,13 @@ export function paperText(
   const charges = paper.rows.filter((r) => r.free);
   const out: string[] = [...orders.flatMap(row)];
   if (charges.length) out.push(...(orders.length ? ["", "Other charges"] : []), ...charges.flatMap(row));
+  if (b.credits?.length) {
+    out.push(
+      "",
+      "Credits",
+      ...b.credits.map((c) => `${creditLineLabel(c)}${c.detail ? ` · ${c.detail}` : ""} — ${dollars(-c.amount)}`)
+    );
+  }
   out.push("", ...paperTotals(b, paid, due).map((t) => `${t.label}: ${dollars(t.value)}`));
   return out.join("\n");
 }

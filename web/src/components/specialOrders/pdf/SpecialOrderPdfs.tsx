@@ -60,7 +60,7 @@ import { AGING_BUCKETS, type StatementDocument, type StatementRow } from "@/lib/
 
 import { customerLabel, lineTotal } from "@/lib/specialOrders";
 import { groupLines } from "@/lib/specialOrderLines";
-import { creditLineLabel, paperColumns, type InvoiceTotalsBreakdown, type PaperRow } from "@/lib/customerInvoices";
+import { creditLineLabel, creditsTotal, paperColumns, type InvoiceTotalsBreakdown, type PaperRow } from "@/lib/customerInvoices";
 import { dateInTimeZone, serverTimeZone } from "@/lib/today";
 import {
   Field,
@@ -940,6 +940,31 @@ export function CustomerInvoicePdf({
               </View>
             ))}
 
+          {/* CREDITS (218; Mark, 2026-11-01: "We should have a 'credits'
+              section on the invoice") — headed like Orders and Other charges,
+              one row a memo, what it was for beside it. Their sum is the one
+              Credits line in the Totals window. */}
+          {(invoice.totals.credits ?? []).length > 0 ? (
+            <View style={s.items}>
+              <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
+                Credits <Text style={s.sectionCount}>{(invoice.totals.credits ?? []).length}</Text>
+              </Text>
+              <View style={s.tableHead} fixed>
+                <Text style={[s.th, s.invDesc]}>Credit memo</Text>
+                <Text style={[s.th, s.invAmount]}>Amount</Text>
+              </View>
+              {(invoice.totals.credits ?? []).map((c, ci) => (
+                <View key={ci} style={s.invRow} wrap={false}>
+                  <Text style={s.invDesc}>
+                    {creditLineLabel(c)}
+                    {c.detail ? <Text style={{ color: MUTED }}>{`  ·  ${c.detail}`}</Text> : null}
+                  </Text>
+                  <Text style={s.invAmount}>{money(-c.amount)}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           <View style={s.foot} wrap={false}>
             <View style={s.notes}>
               <Text style={s.sectionHead}>Notes</Text>
@@ -966,11 +991,9 @@ export function CustomerInvoicePdf({
                   {invoice.totals.prior ? (
                     <TotalRow label="Invoiced earlier" value={-invoice.totals.prior} />
                   ) : null}
-                  {/* CREDIT MEMOS (218), each its own line — a credit is not
-                      a payment, so it never hides inside Payments. */}
-                  {(invoice.totals.credits ?? []).map((c, ci) => (
-                    <TotalRow key={ci} label={creditLineLabel(c)} value={-c.amount} />
-                  ))}
+                  {/* CREDITS (218): the Credits section, summed — a credit is
+                      not a payment, so it never hides inside Payments. */}
+                  <TotalRow label="Credits" value={-creditsTotal(invoice.totals.credits)} />
                   <TotalRow label="Payments" value={invoice.totals.payments ? -invoice.totals.payments : 0} />
                 </View>
                 <View style={settled ? [s.grand, { backgroundColor: "#fff" }] : s.grand}>

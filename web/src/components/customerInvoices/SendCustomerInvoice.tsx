@@ -42,7 +42,7 @@ import {
   type AccountingRef,
   type CustomerInvoicePushInputs,
 } from "@/lib/quickbooks";
-import { fetchInvoiceView, type InvoiceView } from "@/lib/customerInvoiceQueries";
+import { describeInvoiceCredits, fetchInvoiceView, type InvoiceView } from "@/lib/customerInvoiceQueries";
 import { QuickBooksCustomerStep } from "@/components/specialOrders/QuickBooksCustomerStep";
 import {
   groupTotals,
@@ -87,9 +87,12 @@ export function paperOptionsOf(view: InvoiceView) {
 export async function pendingMemoCredit(supabase: SupabaseClient, id: string): Promise<InvoiceCredit[]> {
   const { data, error } = await supabase.rpc("invoice_memo_credit", { p_invoice: id });
   if (error) throw new Error(error.message);
-  return ((data ?? []) as { label: string; issued_on: string | null; amount: number }[])
-    .filter((c) => Number(c.amount) > 0.005)
-    .map((c) => ({ label: c.label, issued_on: c.issued_on, amount: Number(c.amount) }));
+  return describeInvoiceCredits(
+    supabase,
+    ((data ?? []) as { memo_id: string; label: string; issued_on: string | null; amount: number }[])
+      .filter((c) => Number(c.amount) > 0.005)
+      .map((c) => ({ memo_id: c.memo_id, label: c.label, issued_on: c.issued_on, amount: Number(c.amount) }))
+  );
 }
 
 /**

@@ -450,15 +450,21 @@ test("invoicePaper: a line billing only what was added says what was ordered and
   eq(r.notes, "1,300 ordered · 560 on INV-10000");
 });
 
-test("credit memos (218): their own lines in the Totals window, never inside Paid", () => {
-  const b = invoiceTotalsBreakdown(knottedDay("o1", "x"), 100, [{ label: "CM-10000", issued_on: "2026-10-31", amount: 65.1 }]);
+test("credit memos (218): one Credits line after Tax, never inside Paid; each memo in its own section", () => {
+  const b = invoiceTotalsBreakdown(knottedDay("o1", "x"), 100, [
+    { label: "CM-10000", issued_on: "2026-10-31", amount: 65.1, detail: "Short shipment · order SO-10137" },
+    { label: "CM-10001", issued_on: "2026-11-01", amount: 4.9 },
+  ]);
   eq(b.payments, 100, "Payments is money only");
-  eq(creditLineLabel({ label: "CM-10000", issued_on: "2026-10-31" }), "Credit CM-10000 (10/31)");
-  const t = paperTotals(b, 100, 458.4);
+  eq(creditLineLabel({ label: "CM-10000", issued_on: "2026-10-31" }), "CM-10000 (10/31)");
+  const t = paperTotals(b, 100, 388.5);
   eq(
     t.map((x) => `${x.label} ${x.value}`),
-    ["Subtotal 573.5", "Delivery 50", "Credit CM-10000 (10/31) -65.1", "Paid -100", "Amount due 458.4"]
+    ["Subtotal 573.5", "Delivery 50", "Credits -70", "Paid -100", "Amount due 388.5"],
+    "the memos summed, once"
   );
+  const text = paperText(invoicePaper(groupInvoiceLines(knottedDay("o1", "x"), orders)), b, 100, 388.5);
+  ok(text.includes("Credits\nCM-10000 (10/31) · Short shipment · order SO-10137 — -$65.10\nCM-10001 (11/1) — -$4.90"), "the email lists each memo");
 });
 
 test("paperText: the email says what the columns say, in lines", () => {

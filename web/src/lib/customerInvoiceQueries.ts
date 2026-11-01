@@ -286,12 +286,16 @@ export async function fetchInvoiceView(
     if (!p.credit_memo) continue;
     const had = creditOf.get(p.credit_memo.id);
     creditOf.set(p.credit_memo.id, {
+      memo_id: p.credit_memo.id,
       label: p.credit_memo.label,
       issued_on: p.paid_on,
       amount: Math.round(((had?.amount ?? 0) + p.amount) * 100) / 100,
     });
   }
-  const credits = [...creditOf.values()].sort((a, b) => (a.issued_on ?? "").localeCompare(b.issued_on ?? ""));
+  const credits = await describeInvoiceCredits(
+    supabase,
+    [...creditOf.values()].sort((a, b) => (a.issued_on ?? "").localeCompare(b.issued_on ?? ""))
+  );
 
   const groupState = new Map<string, InvoiceGroupState>(
     ((groupRows ?? []) as InvoiceGroupState[]).map((g) => [
@@ -406,4 +410,42 @@ export async function fetchStatement(
     customer: (customer ?? null) as StatementDocument["customer"],
     statement: buildStatement({ invoices, entries, from, to }),
   };
+}
+
+/**
+ * WHAT EACH CREDIT IS FOR, for the invoice's Credits section: "Short shipment
+ * · order SO-10137, invoice INV-10025-2", or an allowance's reason. One read
+ * of the memos named; a credit with no `memo_id` is left as it is.
+ */
+export async function describeInvoiceCredits(
+  supabase: SupabaseClient,
+  credits: InvoiceCredit[]
+): Promise<InvoiceCredit[]> {
+  const ids = [...new Set(credits.map((c) => c.memo_id).filter((v): v is string => !!v))];
+  if (!ids.length) return credits;
+  const [{ data: memos }, { data: org }] = await Promise.all([
+    supabase
+      .from("customer_credit_memos")
+      .select("id, kind, reason_code, customer_invoices:credits_invoice_id ( number, revision ), special_orders ( number )")
+      .in("id", ids),
+    supabase.from("orgs").select("settings").maybeSingle(),
+  ]);
+  const prefix =
+    ((org?.settings as { customer_invoices?: { prefix?: string } } | null)?.customer_invoices?.prefix ?? "") as string;
+  const about = new Map(
+    ((memos ?? []) as unknown as {
+      id: string;
+      kind: string;
+      reason_code: string;
+      customer_invoices: { number: number; revision: number } | null;
+      special_orders: { number: string } | null;
+    }[]).map((m) => {
+      const what = [
+        m.special_orders?.number ? `order ${m.special_orders.number}` : null,
+        m.customer_invoices ? `invoice ${invoiceNumberText(m.customer_invoices.number, { prefix }, m.customer_invoices.revision)}` : null,
+      ].filter(Boolean);
+      return [m.id, [m.reason_code, what.join(", ")].filter(Boolean).join(" · ")] as const;
+    })
+  );
+  return credits.map((c) => (c.memo_id && about.has(c.memo_id) ? { ...c, detail: about.get(c.memo_id) ?? null } : c));
 }

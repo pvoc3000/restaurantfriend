@@ -204,7 +204,7 @@ export const sampleCustomerInvoice: CustomerInvoiceDoc = {
     tax: 0,
     prior: 0,
     payments: 0,
-    credits: [{ label: "CM-10000", issued_on: "2026-09-14", amount: 65.1 }],
+    credits: [{ label: "CM-10000", issued_on: "2026-09-14", amount: 65.1, detail: "Short shipment · order SO-10137, invoice INV-10025-2" }],
   },
   total: sampleWeekTotal,
   paid: 65.1,
