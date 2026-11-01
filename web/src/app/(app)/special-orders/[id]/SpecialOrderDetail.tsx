@@ -38,7 +38,8 @@ import { SectionNav } from "@/components/ui/SectionNav";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { resolveItemPrice } from "@/lib/productionPrice";
-import { OrderLines, type OrderLineRow } from "@/components/specialOrders/OrderLines";
+import { type OrderLineRow } from "@/components/specialOrders/OrderLines";
+import { OrderItemsTab } from "@/components/specialOrders/OrderItemsTab";
 import { OrderNumberCell } from "@/components/specialOrders/OrderNumberCell";
 import type { MenuItem } from "@/components/specialOrders/AddOrderLine";
 import {
@@ -177,6 +178,7 @@ export async function SpecialOrderDetail({
     { data: waitingRow },
     { data: messageRows, error: messageError },
     { data: mailCheck },
+    { data: deliveryRaw },
   ] = await Promise.all([
     supabase.from("special_orders").select(ORDER_COLUMNS).eq("id", id).maybeSingle(),
     wantsLines
@@ -190,7 +192,7 @@ export async function SpecialOrderDetail({
       : SKIP,
     supabase
       .from("order_payments")
-      .select("id, payment_id, paid_on, amount, payment_type, note, external_ref, processor, customer_invoice_id, refund_of")
+      .select("id, payment_id, paid_on, amount, payment_type, note, external_ref, processor, customer_invoice_id, refund_of, credit_memo_id")
       .eq("order_id", id)
       .order("paid_on", { ascending: true, nullsFirst: false }),
     wantsLog
@@ -233,7 +235,7 @@ export async function SpecialOrderDetail({
     // a payment taken on an invoice later voided still names it.
     supabase
       .from("customer_invoice_lines")
-      .select("invoice_id, amount, kind, line_type, customer_invoices ( id, number, revision, revision_of, sent_at, paid_at, voided_at, due_on )")
+      .select("invoice_id, amount, kind, line_type, customer_invoices ( id, number, revision, revision_of, sent_at, paid_at, voided_at, due_on, processor )")
       .eq("special_order_id", id),
     // THE DELIVERY TAB'S CARRIERS (Mark, 2026-10-01): the active vendors of
     // type Delivery, with each shop's phone, for the Company picklist.
@@ -292,6 +294,12 @@ export async function SpecialOrderDetail({
           .eq("org_id", session.membership.org_id)
           .maybeSingle()
       : SKIP_MENU,
+    // THE DELIVERY RECORD (217): Ordered · Delivered · Billed · Credited per
+    // line, for the Items tab's Delivered column and its short notice — and,
+    // on every tab, what is left to bill, which since 217 is aimed at what was
+    // DELIVERED and net of credit memos, so the client cannot work it out from
+    // the order's total alone.
+    supabase.rpc("order_delivery", { p_order: id }),
   ]);
 
   if (error) {
@@ -390,7 +398,7 @@ export async function SpecialOrderDetail({
    * Payments tab and the Info tab; void ones only name payments.
    */
   const invoiceTerms = readInvoiceTerms(session.orgSettings as Record<string, unknown>);
-  type InvoiceRef = { id: string; number: number; revision: number; revision_of: string | null; sent_at: string | null; paid_at: string | null; voided_at: string | null; due_on: string | null };
+  type InvoiceRef = { id: string; number: number; revision: number; revision_of: string | null; sent_at: string | null; paid_at: string | null; voided_at: string | null; due_on: string | null; processor?: string | null };
   // AN ORDER IS SEVERAL LINES ON AN INVOICE since 141 (its charges, copied),
   // so the rows are summed per invoice: what THIS order bills on each, and
   // whether that is a deposit or its charges.
@@ -476,13 +484,17 @@ export async function SpecialOrderDetail({
   // What New Invoice may still bill (141) — `special_order_unbilled`. A DRAFT
   // revision is a proposal: the invoice it would replace is still the bill
   // (143), so it is not counted twice.
-  const unbilled = unbilledAmount({
-    total: totals.total,
-    cancelled: row.status === "cancelled",
-    liveLines: liveInvoices
-      .filter((l) => !(l.invoice.revision_of && !l.invoice.sent_at))
-      .map((l) => ({ amount: l.amount })),
-  });
+  const unbilledFromRecord = (deliveryRaw as { unbilled?: number | string } | null)?.unbilled;
+  const unbilled =
+    unbilledFromRecord !== undefined && unbilledFromRecord !== null
+      ? Number(unbilledFromRecord)
+      : unbilledAmount({
+          total: totals.total,
+          cancelled: row.status === "cancelled",
+          liveLines: liveInvoices
+            .filter((l) => !(l.invoice.revision_of && !l.invoice.sent_at))
+            .map((l) => ({ amount: l.amount })),
+        });
 
   const attention = needsAttention(row as never, today, totals, settings.attention);
 
@@ -1414,7 +1426,7 @@ export async function SpecialOrderDetail({
                       </span>
                     </p>
                   ) : null}
-                  <OrderLines
+                  <OrderItemsTab
                     orderId={id}
                     orgId={row.org_id as string}
                     rows={lines}
@@ -1424,6 +1436,26 @@ export async function SpecialOrderDetail({
                     grouping={row.line_grouping as string | null}
                     canGroup={canWrite}
                     menu={menu}
+                    delivery={
+                      kind === "order"
+                        ? {
+                            raw: deliveryRaw ?? null,
+                            // Recording a short is NOT the schedule's lock: the
+                            // kitchen having the order is exactly when it goes out.
+                            canRecord: canWrite && status !== "cancelled",
+                            canIssue: canRefundPayments(session.membership.role),
+                            orderNumber: row.number as string,
+                            standing: Boolean(row.standing_order_id),
+                            invoices: liveInvoices
+                              .filter((l) => l.invoice.sent_at || l.invoice.paid_at)
+                              .map((l) => ({
+                                id: l.invoice.id,
+                                label: invoiceLabel(l.invoice),
+                                processor: l.invoice.processor === "quickbooks" ? ("quickbooks" as const) : ("square" as const),
+                              })),
+                          }
+                        : null
+                    }
                   />
                 </>
               )}

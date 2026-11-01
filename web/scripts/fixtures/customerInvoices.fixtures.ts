@@ -19,6 +19,7 @@ import {
   groupInvoiceLines,
   groupTotals,
   invoicePaper,
+  creditLineLabel,
   PAPER_COLUMNS,
   paperColumns,
   paperText,
@@ -350,7 +351,7 @@ test("invoicePaper: one order is itemized, unless an other charge is Delivery", 
   const one = knottedDay("o1", "Order #10057 · Cafe Knotted · 10/5/2026");
   const itemized = invoicePaper(groupInvoiceLines([...one, line({ line_type: "item", description: "Box", amount: 5, sort: 0 })], orders));
   no(itemized.columns);
-  eq(itemized.rows[0].detail?.rows, [{ label: "370 × Knotted Bismark - 42g @ $1.55", amount: 573.5 }]);
+  eq(itemized.rows[0].detail?.rows.map((r) => ({ label: r.label, amount: r.amount })), [{ label: "370 × Knotted Bismark - 42g @ $1.55", amount: 573.5 }]);
   eq(itemized.rows[1].amount, 5, "an Item charge adds to the Subtotal the items do");
   // 179: an item hidden from the customer is not listed; the order's row still charges for it.
   const hid = invoicePaper(groupInvoiceLines(one.map((l) => (l.line_type === "item" ? { ...l, hidden: true } : l)), orders));
@@ -407,10 +408,57 @@ test("what was added: one order is itemized by the added quantity; a price chang
   );
   no(paper.columns);
   eq(paper.rows[0].amount, 92, "a price change is in the subtotal");
-  eq(paper.rows[0].detail?.rows, [
+  eq(paper.rows[0].detail?.rows.map((r) => ({ label: r.label, amount: r.amount })), [
     { label: "40 × Bismark @ $1.60", amount: 64 },
     { label: "Bismark — price change on 560 already invoiced", amount: 28 },
   ]);
+  eq(paper.rows[0].detail?.rows[1].qty, null, "a price change has no quantity");
+  eq(paper.rows[0].detail?.rows[1].price, null, "and no price of its own");
+});
+
+// §9a (Mark, 2026-11-01): the itemized order in the QUOTE's columns, with a
+// Delivered column when it is billed after the fact. Checked by breaking:
+// `afterTheFact` always false turns the first case red; Qty printing the
+// ordered quantity on an added line turns the second.
+test("invoicePaper: billed after the fact, the Delivered column — ordered 560, delivered 518", () => {
+  const short = [
+    { ...line({ special_order_id: "o1", description: "Knotted Bismark - 42g", qty: 518, unit_price: 1.55, amount: 802.9, order_label: "Order #10057", sort: 0 }), ordered_qty: 560, item_notes: "Glazed" },
+  ];
+  const dates = new Map<string, string | null>([["o1", "2026-10-31"]]);
+  const after = invoicePaper(groupInvoiceLines(short, orders), { issuedOn: "2026-11-01", eventDates: dates });
+  eq(after.rows[0].detail?.delivered, true, "after the fact");
+  const r = after.rows[0].detail!.rows[0];
+  eq([r.item, r.qty, r.price, r.delivered, r.notes, r.amount], ["Knotted Bismark - 42g", 560, 1.55, 518, "Glazed", 802.9]);
+  eq(r.label, "518 of 560 delivered × Knotted Bismark - 42g @ $1.55", "the email's wording");
+  eq(
+    paperText(after, invoiceTotalsBreakdown(short, 0), 0, 802.9).split("\n")[1],
+    "   518 of 560 delivered × Knotted Bismark - 42g @ $1.55 — $802.90"
+  );
+  const ahead = invoicePaper(groupInvoiceLines(short, orders), { issuedOn: "2026-10-25", eventDates: dates });
+  eq(ahead.rows[0].detail?.delivered, false, "invoiced in advance: no Delivered column");
+  eq([ahead.rows[0].detail!.rows[0].qty, ahead.rows[0].detail!.rows[0].delivered], [518, null], "Qty is what it bills");
+  eq(invoicePaper(groupInvoiceLines(short, orders)).rows[0].detail?.delivered, false, "no dates: no Delivered column");
+});
+
+test("invoicePaper: a line billing only what was added says what was ordered and where the rest went (176)", () => {
+  const add = [
+    { ...line({ special_order_id: "o1", description: "Bismark", qty: 740, unit_price: 1.55, amount: 1147, order_label: `Order #10057${ADDED}`, sort: 0 }), ordered_qty: 1300 },
+  ];
+  const p = invoicePaper(groupInvoiceLines(add, orders), { issuedOn: "2026-11-01", eventDates: new Map([["o1", "2026-10-05"]]) });
+  const r = p.rows[0].detail!.rows[0];
+  eq([r.qty, r.delivered], [740, null], "Qty is what THIS invoice bills, so Qty × Price is the Cost");
+  eq(r.notes, "1,300 ordered · 560 on INV-10000");
+});
+
+test("credit memos (218): their own lines in the Totals window, never inside Paid", () => {
+  const b = invoiceTotalsBreakdown(knottedDay("o1", "x"), 100, [{ label: "CM-10000", issued_on: "2026-10-31", amount: 65.1 }]);
+  eq(b.payments, 100, "Payments is money only");
+  eq(creditLineLabel({ label: "CM-10000", issued_on: "2026-10-31" }), "Credit CM-10000 (10/31)");
+  const t = paperTotals(b, 100, 458.4);
+  eq(
+    t.map((x) => `${x.label} ${x.value}`),
+    ["Subtotal 573.5", "Delivery 50", "Credit CM-10000 (10/31) -65.1", "Paid -100", "Amount due 458.4"]
+  );
 });
 
 test("paperText: the email says what the columns say, in lines", () => {

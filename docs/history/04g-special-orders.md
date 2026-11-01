@@ -6324,3 +6324,58 @@ applied to the memo so the invoice stays paid, and an itemized RefundReceipt
 instead of a QuickBooks CreditMemo. Asked whether this goes into v1.
 
 A memo refunded to the card when it is issued is **in v1** (Mark, 2026-11-01): phase 1 for Square and by hand, phase 2 for QuickBooks. Refunding credit later, once unapplied, stays out.
+
+**Credit memos — BUILT 2026-11-01 (Mark: "build it. build all phases").**
+Migrations 217, 218, 219 APPLIED; `qbo-sync` v59, `qbo-webhook` v12
+(--no-verify-jwt kept), `square-refund` v11, `send-special-order-email` v35
+DEPLOYED. What landed where:
+- **217 — the delivery record.** `special_order_items.delivered_qty` (null =
+  as ordered) with note/by/at; `record_order_short` (supervisor+, refuses more
+  than ordered and a short without a reason; a line set back to ordered is
+  cleared); `decide_order_short` (manager+, "no credit" with why);
+  `order_delivery` (Ordered · Delivered · Billed on invoices that went out ·
+  Credited · creditable, per item). BILLING AIMS AT A TARGET:
+  `target = greatest(billable, least(billed − credited, ordered))`, so an
+  order not yet invoiced bills what was delivered, a short on billed quantity
+  stays billed (the memo's to correct) and never becomes "Less invoice", and a
+  credited order is not offered again. `special_order_target_money` is
+  `special_order_money` at the target — over 8,461 orders it came to exactly
+  `special_order_money` for every one (no order moved). `order_invoice_lines`
+  and `order_item_billing` were dropped and recreated (new columns,
+  `ordered_qty` on lines); `customer_invoice_lines.ordered_qty` backfilled
+  where the line billed the whole item. The to-do "Issue Credit Memo" is set
+  over an empty to-do and cleared when nothing is left to decide.
+- **218 — the ledger.** `customer_credit_memos` + `_lines` (read by the org,
+  written only by definer functions). `payment_applications.payment_id` is
+  nullable beside `credit_memo_id` (exactly one) and `qbo_payment_id`.
+  `issue_credit_memo` works out the discount/rush/tax lines so billed −
+  credited equals the target's money TO THE CENT (SO-10152's four Brown Bites:
+  $17.80 + $1.82 = $19.62, which is 15.25 − 13.43 of tax). Memo credit is
+  applied memos-first at send (Square in `mark_customer_invoice_sent`,
+  QuickBooks in `push_customer_invoice`, only to an invoice the same processor
+  collects). `record_credit_memo_refund` applies the memo to the invoice it
+  credits BEFORE taking the refund off it, so the invoice never reopens and
+  its paid date is kept (the first rehearsal moved INV-10032's 10/24 to 11/01;
+  fixed by the order). An invoice a live memo corrects cannot be voided or
+  revised; voiding an invoice a memo was applied to gives the credit back.
+  `record_qbo_invoice_payment` answers 'credit memo' for a Payment id we
+  stored, the second lock behind `_shared/qboCredit.ts`'s `paymentCash`
+  (TotalAmt 0 = no cash; one invoice beside memo lines = the difference;
+  credit spread over several invoices = a problem). 219 only rewords a
+  refusal.
+- **QuickBooks.** `AutoApplyCredit` read 2026-11-01: FALSE for this company
+  (read-only `select * from Preferences` through a minted owner session,
+  signed out after). `push_credit_memo` builds the CreditMemo server-side on
+  the credited invoice's own item/class/location (`invoiceCoding`), checks
+  QuickBooks' total against ours and deletes on a mismatch; a refunded memo is
+  an ITEMIZED RefundReceipt instead (`bookMemoRefundReceipt`), never both.
+- **Rehearsed on the live DB in transactions that never committed**, against
+  SO-10137/INV-10025-2 (two memos 20 + 22, a third refused, cap message, void
+  and revise guards, next invoice SO-10168 credited $65.10 through a test QBO
+  id, voiding it gave the credit back, clearing the short re-bills the 20
+  still credited), SO-10152 (refund memo $19.62, invoice still $164.05 paid on
+  10/24, second refund refused), SO-10048 (short before invoicing bills 11 of
+  12 each, $99.45 = target) and a Square customer (memo applied at send).
+  Not exercised live: a real QuickBooks CreditMemo, the zero Payment, and a
+  memo refund through either processor — the first real ones are Knotted's
+  and SO-10152's.

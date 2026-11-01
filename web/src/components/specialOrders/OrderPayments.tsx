@@ -48,6 +48,9 @@ export type PaymentRow = {
   invoice?: { label: string; href: string } | null;
   /** What is left to refund of it (`refundLeft`); 0 once given back in full. */
   refundable?: number;
+  /** 218: not money but a CREDIT MEMO applied here. Read-only — it changes on
+   *  its own record, never as a payment. */
+  credit_memo_id?: string | null;
 };
 
 /** One of the order's invoices (139: an order can be on several — a deposit,
@@ -265,10 +268,13 @@ export function OrderPayments({
             </tr>
           </thead>
           <tbody>
-            {rows.map((p) => (
+            {rows.map((p) => {
+              const memo = Boolean(p.credit_memo_id);
+              const editable = canWrite && !memo;
+              return (
               <tr key={p.id} className="hover:bg-neutral-50">
                 <td className="px-3 py-2">
-                  {canWrite ? (
+                  {editable ? (
                     <InlineValue boxed={BOXED_FIELDS} table="order_payments" id={p.id} column="paid_on" kind="date"
                                  value={p.paid_on} ariaLabel="Payment date" onWrite={writeField(p, "paid_on")} />
                   ) : (
@@ -278,7 +284,7 @@ export function OrderPayments({
                 <td className="px-3 py-2 text-right tabular-nums">
                   {/* A processor's figure is the processor's, and a split
                       payment's is the payment's (140). */}
-                  {canWrite && amountEditable(p) ? (
+                  {editable && amountEditable(p) ? (
                     <InlineValue boxed={BOXED_FIELDS} table="order_payments" id={p.id} column="amount" kind="number"
                                  value={p.amount} nullable={false} align="right" className="text-right"
                                  ariaLabel="Payment amount" format={(v) => money(Number(v))}
@@ -288,7 +294,11 @@ export function OrderPayments({
                   )}
                 </td>
                 <td className="px-3 py-2">
-                  {canWrite ? (
+                  {memo ? (
+                    <Link href={`/credit-memos/${p.credit_memo_id}`} className="underline underline-offset-2">
+                      {p.payment_type ?? "Credit memo"}
+                    </Link>
+                  ) : editable ? (
                     <InlineValue boxed={BOXED_FIELDS} table="order_payments" id={p.id} column="payment_type" kind="pick"
                                  allowNew clearable options={PAYMENT_TYPES} value={p.payment_type}
                                  ariaLabel="How it was paid" onWrite={writeField(p, "payment_type")} />
@@ -308,7 +318,7 @@ export function OrderPayments({
                   </td>
                 ) : null}
                 <td className="px-3 py-2">
-                  {canWrite ? (
+                  {editable ? (
                     <InlineValue boxed={BOXED_FIELDS} table="order_payments" id={p.id} column="note" value={p.note}
                                  ariaLabel="Payment note" placeholder="—" onWrite={writeField(p, "note")} />
                   ) : (
@@ -317,7 +327,7 @@ export function OrderPayments({
                 </td>
                 {canWrite ? (
                   <td className="whitespace-nowrap px-1 py-2 text-right">
-                    {canRefund && isRefundablePayment(p) && (p.refundable ?? Number(p.amount ?? 0)) > 0.005 ? (
+                    {!memo && canRefund && isRefundablePayment(p) && (p.refundable ?? Number(p.amount ?? 0)) > 0.005 ? (
                       <button
                         type="button"
                         onClick={() => setRefunding(p)}
@@ -327,7 +337,7 @@ export function OrderPayments({
                         Refund…
                       </button>
                     ) : null}
-                    {!removable(p) ? null : (
+                    {memo || !removable(p) ? null : (
                       <button
                         type="button"
                         onClick={() => remove(p)}
@@ -341,7 +351,8 @@ export function OrderPayments({
                   </td>
                 ) : null}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       )}

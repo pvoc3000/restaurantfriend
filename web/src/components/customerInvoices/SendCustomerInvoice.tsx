@@ -56,6 +56,7 @@ import {
   snapshotLines,
   sumBreakdowns,
   type CustomerInvoiceSnapshot,
+  type InvoiceCredit,
 } from "@/lib/customerInvoices";
 
 /** The org row the documents need: its name, settings and the doc header. */
@@ -66,8 +67,42 @@ export async function loadOrg(supabase: SupabaseClient) {
   return { settings, doc };
 }
 
-/** The invoice as a PDF, from the same read the record screen draws. */
-export async function renderInvoicePdf(supabase: SupabaseClient, id: string, today: string) {
+/** What `invoicePaper` needs beyond the groups: the invoice's date and each
+ *  order's, for the Delivered column (§9a). */
+export function paperOptionsOf(view: InvoiceView) {
+  return {
+    issuedOn: view.invoice.issued_on,
+    eventDates: new Map([...view.orders].map(([k, o]) => [k, o.event_date] as [string, string | null])),
+  };
+}
+
+/**
+ * THE CREDIT MEMOS A SEND WILL APPLY (218) — `invoice_memo_credit`, oldest
+ * first, only what the invoice still owes. Square applies them when the send
+ * is marked; QuickBooks when the invoice is pushed. Printed on the paper being
+ * sent so it says what the customer will be asked for. Already-applied credit
+ * is the view's own and is never asked for here twice: the function counts it
+ * as paid.
+ */
+export async function pendingMemoCredit(supabase: SupabaseClient, id: string): Promise<InvoiceCredit[]> {
+  const { data, error } = await supabase.rpc("invoice_memo_credit", { p_invoice: id });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as { label: string; issued_on: string | null; amount: number }[])
+    .filter((c) => Number(c.amount) > 0.005)
+    .map((c) => ({ label: c.label, issued_on: c.issued_on, amount: Number(c.amount) }));
+}
+
+/**
+ * The invoice as a PDF, from the same read the record screen draws. With
+ * `previewCredit` (a send), the credit memos the send will apply are printed
+ * too, and the balance is what will be left.
+ */
+export async function renderInvoicePdf(
+  supabase: SupabaseClient,
+  id: string,
+  today: string,
+  opts: { previewCredit?: boolean } = {}
+) {
   const [{ settings, doc }, { pdf }, docs] = await Promise.all([
     loadOrg(supabase),
     import("@react-pdf/renderer"),
@@ -76,6 +111,10 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
   const view = await fetchInvoiceView(supabase, id, readSettings(settings).rush);
   if (!view) throw new Error("That invoice is gone.");
   const terms = readInvoiceTerms(settings);
+  const pending = opts.previewCredit && !view.invoice.voided_at ? await pendingMemoCredit(supabase, id) : [];
+  const credits = [...view.credits, ...pending];
+  const creditSum = Math.round(credits.reduce((a, c) => a + c.amount, 0) * 100) / 100;
+  const balance = Math.round((view.total - view.cashPaid - creditSum) * 100) / 100;
   const blob = await pdf(
     <docs.CustomerInvoicePdf
       org={doc}
@@ -89,15 +128,15 @@ export async function renderInvoicePdf(supabase: SupabaseClient, id: string, tod
           phone: view.customer?.phone ?? null,
           email: view.customer?.email ?? null,
         },
-        ...(({ columns, rows }) => ({ columns, lines: rows }))(invoicePaper(view.groups)),
-        totals: invoiceTotalsBreakdown(view.lines, view.paid),
+        ...(({ columns, rows }) => ({ columns, lines: rows }))(invoicePaper(view.groups, paperOptionsOf(view))),
+        totals: invoiceTotalsBreakdown(view.lines, view.cashPaid, credits),
         total: view.total,
-        paid: view.paid,
-        balance: view.balance,
+        paid: Math.round((view.cashPaid + creditSum) * 100) / 100,
+        balance,
       }}
     />
   ).toBlob();
-  return { blob, view, settings, doc, terms };
+  return { blob, view, settings, doc, terms, credits, pending, balance };
 }
 
 /**
@@ -207,7 +246,9 @@ export function SendCustomerInvoice({
       const { data: problems, error: pe } = await supabase.rpc("customer_invoice_send_problems", { p_invoice: id });
       if (pe) throw new Error(pe.message);
       if ((problems as string[] | null)?.length) throw new Error((problems as string[]).join(" "));
-      const { blob, view, settings, doc, terms } = await renderInvoicePdf(supabase, id, today);
+      const { blob, view, settings, doc, terms, credits, balance } = await renderInvoicePdf(supabase, id, today, {
+        previewCredit: true,
+      });
       const number = invoiceNumberText(view.invoice.number, terms, view.invoice.revision);
 
       // The pay link, on SendDocument's terms: only when online payment is
@@ -228,8 +269,8 @@ export function SendCustomerInvoice({
         }
         const refusals = customerInvoiceRefusals({ ...qbo, billEmail: view.customer?.email ?? "-" });
         if (refusals.length > 0) throw new Error(refusals[0]);
-        if (view.balance > 0.005) pay = QBO_LINK_PLACEHOLDER;
-      } else if (configured && view.balance > 0.005) {
+        if (balance > 0.005) pay = QBO_LINK_PLACEHOLDER;
+      } else if (configured && balance > 0.005) {
         const resolved = resolveAppBase(window.location.origin);
         if ("error" in resolved) throw new Error(resolved.error);
         payToken = await mintPayToken(supabase, { customerInvoiceId: id, orgId });
@@ -279,7 +320,10 @@ export function SendCustomerInvoice({
         if (one) conversation = orderEmailSubject(one, doc.name, settings);
       }
       setCompose(
-        invoiceEmail(view, number, settings, pay, viaQbo, (me as string | null) || doc.name, conversation, contacts)
+        invoiceEmail(view, number, settings, pay, viaQbo, (me as string | null) || doc.name, conversation, contacts, {
+          credits,
+          balance,
+        })
       );
       setPending({
         replacesInQbo,
@@ -337,6 +381,11 @@ export function SendCustomerInvoice({
         const pushed = await pushToQuickBooks(supabase, pending.qbo, compose.to, pending.blob, pending.filename);
         body = body.split(QBO_LINK_PLACEHOLDER).join(pushed.link);
         qboNotes.push(...pushed.warnings);
+        if (pushed.memoCredit.length) {
+          qboNotes.push(
+            `Credit applied in QuickBooks: ${pushed.memoCredit.map((c) => `${c.label} ${money(c.amount)}`).join(", ")}.`
+          );
+        }
         // It is in QuickBooks now. Should the email fail, Send again must
         // UPDATE that invoice, not try to create a second.
         const qbo = { ...pending.qbo, invoice: { ...pending.qbo.invoice, external_ref: pushed.ref } };
@@ -512,7 +561,7 @@ function invoiceSnapshotOf(
     // subtracts every payment tagged with the invoice, so a link re-sent
     // after a part-payment still asks for the rest and no more.
     totals: { total: view.total },
-    paper: invoicePaper(view.groups),
+    paper: invoicePaper(view.groups, paperOptionsOf(view)),
     breakdown: withoutPayments(invoiceTotalsBreakdown(view.lines, 0)),
     notes_quote: view.invoice.notes,
     org: { name: org.name, addressLine: org.addressLine, contactLine: org.contactLine, terms: org.terms },
@@ -532,7 +581,9 @@ function invoiceEmail(
   /** The order's conversation subject, for an invoice covering one order. */
   conversation: string | null = null,
   /** The contact email of each order on the invoice. */
-  contacts: (string | null)[] = []
+  contacts: (string | null)[] = [],
+  /** What the send will leave owed, credit memos counted (218). */
+  after: { credits: InvoiceCredit[]; balance: number } = { credits: view.credits, balance: view.balance }
 ): Compose {
   const so = (settings.special_orders ?? {}) as Record<string, unknown>;
   const templates = (so.email ?? {}) as Record<string, { subject?: string; body?: string }>;
@@ -544,9 +595,14 @@ function invoiceEmail(
     number,
     first_name: (view.customer?.first_name ?? "").trim() || fullName.split(/\s+/)[0] || "there",
     full_name: fullName,
-    total: money(view.balance),
+    total: money(after.balance),
     due_on: view.invoice.due_on ? usDate(view.invoice.due_on) : "on receipt",
-    orders: paperText(invoicePaper(view.groups), invoiceTotalsBreakdown(view.lines, 0), view.paid, view.balance),
+    orders: paperText(
+      invoicePaper(view.groups, paperOptionsOf(view)),
+      invoiceTotalsBreakdown(view.lines, 0, after.credits),
+      view.cashPaid,
+      after.balance
+    ),
     pay_url: pay,
     pay_line: viaQbo ? quickBooksPayLine(pay) : payLine(pay),
     employee_name: employeeName,
@@ -675,7 +731,7 @@ export async function pushToQuickBooks(
   to: string,
   pdf: Blob,
   fileName: string
-): Promise<{ link: string; warnings: string[]; ref: AccountingRef }> {
+): Promise<{ link: string; warnings: string[]; ref: AccountingRef; memoCredit: { label: string; amount: number }[] }> {
   // The first address only: QuickBooks' BillEmail is one address.
   const billEmail = to.split(/[,;]/)[0]?.trim() ?? "";
   const { body } = buildCustomerInvoicePayload({ ...inputs, billEmail });
@@ -726,6 +782,10 @@ export async function pushToQuickBooks(
   const ourTax = inputs.lines.reduce((a, l) => a + Number(l.totals?.tax ?? 0), 0);
   const theirs = taxDisagreement(Math.round(ourTax * 100) / 100, data?.tax as number | undefined);
   if (theirs) warnings.push(theirs);
-  return { link, warnings, ref: recorded };
+  const memoCredit = ((data?.memo_credit as { label: string; amount: number }[] | undefined) ?? []).map((c) => ({
+    label: c.label,
+    amount: Number(c.amount),
+  }));
+  return { link, warnings, ref: recorded, memoCredit };
 }
 

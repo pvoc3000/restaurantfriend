@@ -171,6 +171,9 @@ export const TODO_OPTIONS: PickOption[] = [
   { value: "Post Event Followup", label: "Post Event Followup" },
   { value: "Resolve Issue", label: "Resolve Issue" },
   { value: "Invoice Overdue!", label: "Invoice Overdue!" },
+  // 217: set by the app over an empty to-do when a short on BILLED quantity
+  // has no credit memo yet; cleared when one covers it.
+  { value: "Issue Credit Memo", label: "Issue Credit Memo" },
 ];
 
 /**

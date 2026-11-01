@@ -153,7 +153,22 @@ export type CustomerInvoiceLine = {
   item_type?: string | null;
   item_cut?: string | null;
   item_size?: string | null;
+  /** 217: what the order ORDERED of the item, beside `qty`, the quantity the
+   *  line bills — which is what was DELIVERED once a short is recorded before
+   *  invoicing. Null on lines copied before 217 that did not match. */
+  ordered_qty?: number | null;
+  /** The order item's own note, read LIVE like `hidden` — the quote's Notes
+   *  column, which the itemized invoice now prints too (§9a). */
+  item_notes?: string | null;
 };
+
+/**
+ * A CREDIT MEMO'S CREDIT ON AN INVOICE (218) — applied, or about to be when
+ * the invoice is sent (`invoice_memo_credit`). The Totals window prints each
+ * as its own line, "Credit CM-10000 (10/31)", apart from Payments: a memo is
+ * not money received.
+ */
+export type InvoiceCredit = { label: string; issued_on: string | null; amount: number };
 
 export type InvoiceStatus = "draft" | "sent" | "overdue" | "paid" | "void";
 
@@ -227,8 +242,10 @@ export type InvoiceTotalsBreakdown = {
   tax: number;
   /** "Less invoice N" — what the orders' other invoices already bill (141). */
   prior: number;
-  /** What has been applied to this invoice. */
+  /** What has been PAID to this invoice — money, not memo credit. */
   payments: number;
+  /** Credit memos applied (or applying at send) — 218. */
+  credits?: InvoiceCredit[];
 };
 
 /**
@@ -239,7 +256,8 @@ export type InvoiceTotalsBreakdown = {
  */
 export function invoiceTotalsBreakdown(
   lines: Pick<CustomerInvoiceLine, "line_type" | "amount">[],
-  paid: number
+  paid: number,
+  credits: InvoiceCredit[] = []
 ): InvoiceTotalsBreakdown {
   const by = (types: InvoiceLineType[]) =>
     cents(lines.filter((l) => types.includes(l.line_type)).reduce((a, l) => a + Number(l.amount || 0), 0));
@@ -251,7 +269,14 @@ export function invoiceTotalsBreakdown(
     tax: by(["tax"]),
     prior: -by(["prior_billing"]),
     payments: cents(paid),
+    ...(credits.length ? { credits: credits.map((c) => ({ ...c, amount: cents(c.amount) })) } : {}),
   };
+}
+
+/** "Credit CM-10000 (10/31)" — a memo's line in the Totals window. */
+export function creditLineLabel(c: Pick<InvoiceCredit, "label" | "issued_on">): string {
+  const m = /^\d{4}-(\d{2})-(\d{2})/.exec(c.issued_on ?? "");
+  return `Credit ${c.label}${m ? ` (${Number(m[1])}/${Number(m[2])})` : ""}`;
 }
 
 /* ==========================================================================
@@ -409,6 +434,26 @@ export const PAPER_COLUMNS: { key: keyof PaperParts; label: string }[] = [
   { key: "tax", label: "Tax" },
 ];
 
+/**
+ * One item of a one-order invoice, in the quote's columns (§9a, Mark,
+ * 2026-11-01): Item · Qty (Ordered) · Price · Delivered · Notes · Cost.
+ * `label` is the same item as one sentence — the email and the pay page,
+ * which have no columns, read it.
+ */
+export type PaperDetailRow = {
+  label: string;
+  /** The Cost column: what the line bills. */
+  amount: number;
+  item?: string;
+  /** The Qty column — what was ORDERED, or, on a line billing only what was
+   *  added (176), the quantity this invoice bills. Null on a price change. */
+  qty?: number | null;
+  price?: number | null;
+  /** Only when the order is billed after the fact (`PaperRow.detail.delivered`). */
+  delivered?: number | null;
+  notes?: string | null;
+};
+
 /** One band of a one-order invoice's items — `groupLines`' band, for paper. */
 export type PaperDetailGroup = {
   label: string;
@@ -416,7 +461,7 @@ export type PaperDetailGroup = {
   /** The Item type band: sorted by, never printed (the order PDFs' rule). */
   unprinted: boolean;
   amount: number;
-  rows: { label: string; amount: number }[];
+  rows: PaperDetailRow[];
 };
 
 export type PaperRow = {
@@ -428,7 +473,10 @@ export type PaperRow = {
   /** A one-order invoice's items, when the paper is itemized. */
   detail?: {
     /** In the order they print — the order's Group by, when it has one. */
-    rows: { label: string; amount: number }[];
+    rows: PaperDetailRow[];
+    /** The order is billed AFTER THE FACT — its date on or before the
+     *  invoice's — so the paper has a Delivered column (§9a). */
+    delivered?: boolean;
     /** The same rows under their bands, when the order is grouped. A band's
      *  `rows` are empty unless it is a leaf. */
     groups?: PaperDetailGroup[];
@@ -453,10 +501,19 @@ export type PaperRow = {
  *
  * "Invoiced earlier" and the payments are the invoice's, not a row's, and
  * stay in the Totals window alone.
+ *
+ * THE ITEMIZED ORDER TAKES THE QUOTE'S COLUMNS (§9a, Mark, 2026-11-01), and
+ * a DELIVERED column when the order is billed after the fact — its date
+ * (`opts.eventDates`) on or before the invoice's (`opts.issuedOn`). Cost is
+ * the line's own amount, so it still adds up to the Subtotal.
  */
 export function invoicePaper<
-  L extends Pick<CustomerInvoiceLine, "special_order_id" | "line_type" | "amount" | "sort" | "order_label" | "description" | "qty" | "unit_price" | "taxable" | "hidden" | "grouping" | "item_donut" | "item_type" | "item_cut" | "item_size">
->(groups: InvoiceGroup<L>[]): { columns: boolean; rows: PaperRow[] } {
+  L extends Pick<CustomerInvoiceLine, "special_order_id" | "line_type" | "amount" | "sort" | "order_label" | "description" | "qty" | "unit_price" | "taxable" | "hidden" | "grouping" | "item_donut" | "item_type" | "item_cut" | "item_size"> &
+    Partial<Pick<CustomerInvoiceLine, "ordered_qty" | "item_notes">>
+>(
+  groups: InvoiceGroup<L>[],
+  opts: { issuedOn?: string | null; eventDates?: Map<string, string | null> } = {}
+): { columns: boolean; rows: PaperRow[] } {
   const orderCount = groups.filter((g) => g.orderId).length;
   const freeDelivery = groups.some((g) => !g.orderId && g.lines.some((l) => l.line_type === "delivery"));
   const columns = orderCount !== 1 || freeDelivery;
@@ -481,13 +538,35 @@ export function invoicePaper<
     // 179: an item hidden from the customer is not listed. The order's row
     // still charges for it — `t` above is over every line.
     const items = g.lines.filter((l) => l.line_type === "item" && !l.hidden);
-    const itemRow = (i: L) => ({
-      label:
-        i.qty !== null && i.unit_price !== null
-          ? `${qtyText(Number(i.qty))} × ${i.description} @ ${dollars(Number(i.unit_price))}`
-          : i.description,
-      amount: cents(Number(i.amount)),
-    });
+    const event = g.orderId ? opts.eventDates?.get(g.orderId) ?? null : null;
+    const afterTheFact = !!(event && opts.issuedOn && event.slice(0, 10) <= opts.issuedOn.slice(0, 10));
+    // 176: a line billing only what was ADDED says what was ordered and where
+    // the rest was billed, since its quantity is not the order's.
+    const earlier = /in addition to (.+)$/.exec(items[0]?.order_label ?? g.label)?.[1]?.trim() ?? null;
+    const itemRow = (i: L): PaperDetailRow => {
+      const priced = i.qty !== null && i.unit_price !== null;
+      const qty = priced ? Number(i.qty) : null;
+      const ordered = i.ordered_qty === null || i.ordered_qty === undefined ? qty : Number(i.ordered_qty);
+      const added = !!earlier && priced && ordered !== null && qty !== null && ordered !== qty;
+      const shown = afterTheFact && !added;
+      const addedNote =
+        added && ordered !== null && qty !== null
+          ? `${ordered.toLocaleString("en-US")} ordered · ${(ordered - qty).toLocaleString("en-US")} on ${earlier}`
+          : null;
+      return {
+        label: !priced
+          ? i.description
+          : shown && ordered !== null && ordered !== qty
+            ? `${qtyText(qty!)} of ${qtyText(ordered)} delivered × ${i.description} @ ${dollars(Number(i.unit_price))}`
+            : `${qtyText(qty!)} × ${i.description} @ ${dollars(Number(i.unit_price))}`,
+        amount: cents(Number(i.amount)),
+        item: i.description,
+        qty: !priced ? null : shown ? ordered : qty,
+        price: priced ? Number(i.unit_price) : null,
+        delivered: shown && priced ? qty : null,
+        notes: [addedNote, i.item_notes?.trim() || null].filter(Boolean).join(" · ") || null,
+      };
+    };
     // Banded as the order's Items tab is (Mark, 2026-10-08).
     const grouping = items.find((i) => i.grouping)?.grouping ?? "none";
     const bands =
@@ -515,6 +594,7 @@ export function invoicePaper<
             ? bands
               ? {
                   rows: bands.filter((b) => b.leaf).flatMap((b) => b.rows.map((r) => itemRow(r.line))),
+                  delivered: afterTheFact,
                   groups: bands.map((b) => ({
                     label: b.label,
                     level: b.level,
@@ -523,7 +603,7 @@ export function invoicePaper<
                     rows: b.leaf ? b.rows.map((r) => itemRow(r.line)) : [],
                   })),
                 }
-              : { rows: items.map(itemRow) }
+              : { rows: items.map(itemRow), delivered: afterTheFact }
             : undefined,
       },
     ];
@@ -552,6 +632,7 @@ export function paperTotals(
     { label: "Rush fee", value: b.rush },
     { label: "Tax", value: b.tax },
     { label: "Invoiced earlier", value: -b.prior },
+    ...(b.credits ?? []).map((c) => ({ label: creditLineLabel(c), value: -c.amount })),
     { label: "Paid", value: -paid },
   ];
   return lines

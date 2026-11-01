@@ -24,7 +24,8 @@ export type LedgerRow = {
  * by hand is always one application.
  */
 export function paymentsToCount(rows: LedgerRow[]): string[] {
-  return [...new Set(rows.filter((r) => r.customer_invoice_id || r.processor).map((r) => r.payment_id))];
+  // A credit memo's row (218) has no payment at all.
+  return [...new Set(rows.filter((r) => r.payment_id && (r.customer_invoice_id || r.processor)).map((r) => r.payment_id))];
 }
 
 /** How many places each payment went, from its application rows. */

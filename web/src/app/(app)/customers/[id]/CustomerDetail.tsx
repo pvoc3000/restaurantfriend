@@ -33,6 +33,8 @@ import { usDate } from "@/lib/specialOrderDocs";
 import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
 import { CustomerCredit, type CreditRow } from "@/components/customerInvoices/CustomerCredit";
 import { canRefundPayments } from "@/lib/roles";
+import { CustomerCreditMemos, type CustomerMemoRow } from "@/components/creditMemos/CustomerCreditMemos";
+import { creditMemoNumberText, readMemoPrefix } from "@/lib/creditMemos";
 
 const CUSTOMERS_CRUMB = { href: "/customers", label: "Customers" };
 
@@ -152,7 +154,7 @@ export async function CustomerDetail({
   // WHAT THEY OWE (144), in three parts, and their invoices (124) with each
   // one's money — a failed read hides a part rather than breaking the record.
   // The balances are read on both tabs: the line under the name states them.
-  const [{ data: balanceRows }, { data: uninvoicedRows }, { data: invoiceRows }, { data: creditData }] =
+  const [{ data: balanceRows }, { data: uninvoicedRows }, { data: invoiceRows }, { data: creditData }, { data: memoData }] =
     await Promise.all([
       supabase.rpc("customer_balances", { p_org: customer.org_id, p_customer: id }),
       billing ? supabase.rpc("customer_uninvoiced_orders", { p_customer: id }) : SKIP,
@@ -166,6 +168,8 @@ export async function CustomerDetail({
         : SKIP,
       // Their CREDIT (143): money applied to nothing.
       billing ? supabase.rpc("customer_credit", { p_customer: id }) : SKIP,
+      // Their CREDIT MEMOS (218), every one.
+      billing ? supabase.rpc("customer_credit_memo_list", { p_customer: id }) : SKIP,
     ]);
   const owes = ((balanceRows ?? []) as { invoiced: number; not_invoiced: number; credit: number }[])[0];
   const invoiced = Number(owes?.invoiced ?? 0);
@@ -244,6 +248,26 @@ export async function CustomerDetail({
   }));
 
   const creditRows = ((creditData ?? []) as CreditRow[]).map((c) => ({ ...c, credit: Number(c.credit) }));
+  const memoPrefix = readMemoPrefix(session.orgSettings as Record<string, unknown>);
+  const memoRows: CustomerMemoRow[] = ((memoData ?? []) as Record<string, unknown>[]).map((m) => ({
+    id: String(m.id),
+    // The function's label, or the number with the org's prefix.
+    label: (m.label as string | null) ?? creditMemoNumberText(Number(m.number ?? 0), memoPrefix),
+    kind: m.kind as CustomerMemoRow["kind"],
+    reason_code: String(m.reason_code ?? ""),
+    issued_on: String(m.issued_on ?? ""),
+    total: Number(m.total ?? 0),
+    unapplied: Number(m.unapplied ?? 0),
+    settlement: m.settlement as CustomerMemoRow["settlement"],
+    processor: m.processor as CustomerMemoRow["processor"],
+    invoice_label: (m.invoice_label as string | null) ?? null,
+    order_number: (m.order_number as string | null) ?? null,
+    voided_at: (m.voided_at as string | null) ?? null,
+  }));
+  const memoSettings = ((session.orgSettings as Record<string, unknown>).customer_credit_memos ?? {}) as Record<string, unknown>;
+  const allowanceReasons = Array.isArray(memoSettings.allowance_reasons)
+    ? (memoSettings.allowance_reasons as unknown[]).filter((r): r is string => typeof r === "string")
+    : [];
 
   const trail = parseTrail(rawParams, CUSTOMERS_CRUMB);
   const address = (customer.address ?? {}) as Record<string, unknown>;
@@ -456,6 +480,20 @@ export async function CustomerDetail({
               ) : null}
 
               <CustomerCredit rows={creditRows} canRefund={canRefundPayments(session.membership.role)} />
+
+              <CustomerCreditMemos
+                customerId={id}
+                rows={memoRows}
+                canIssue={canEditPage(session.membership.role, "/credit-memos")}
+                from={here}
+                reasons={allowanceReasons}
+                orders={withMoney
+                  .filter((o) => o.kind === "order")
+                  .map((o) => ({ id: o.id, label: [o.number, o.title, o.event_date ? usDate(o.event_date) : null].filter(Boolean).join(" · ") }))}
+                invoices={invoices
+                  .filter((inv) => inv.status !== "void")
+                  .map((inv) => ({ id: inv.id, label: inv.number, posted: inv.posted }))}
+              />
             </>
           )}
         </div>

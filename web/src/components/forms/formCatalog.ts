@@ -16,6 +16,8 @@ export const FORM_GROUPS = [
       { key: "customer-invoice-one", label: "Customer invoice · one order" },
       { key: "customer-invoice", label: "Customer invoice · weekly" },
       { key: "statement", label: "Statement" },
+      { key: "credit-memo", label: "Credit memo · credit" },
+      { key: "credit-memo-refund", label: "Credit memo · refunded" },
     ],
   },
   {

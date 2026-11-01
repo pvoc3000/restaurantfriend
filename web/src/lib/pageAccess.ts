@@ -167,6 +167,11 @@ export const PAGE_ACCESS: Record<string, Record<Role, PageAccess>> = {
   // money owed rather than an order to make, so staff are not shown it;
   // supervisor+ writes, as it does on the orders it covers.
   "/customer-invoices":    row("-", "W", "W", "W", "W"),
+  // Not on the sheet — built 2026-11-01 (217/218). Money given back, so it
+  // follows the invoices it corrects: staff are not shown it. Supervisors and
+  // purchasers read; only a manager issues, voids or settles one (218's
+  // functions say the same).
+  "/credit-memos":         row("-", "R", "R", "W", "W"),
 
   // ── The tablet landing page ───────────────────────────────────────────────
   // Not on the sheet — it did not exist. A page of doors, each of which is

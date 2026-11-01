@@ -7,6 +7,13 @@ export const metadata = {
 /** Every guide, newest first. Add a row when a guide ships. */
 const GUIDES = [
   {
+    href: "/guides/short-delivery",
+    title: "A Short Delivery",
+    audience: "Supervisors and managers",
+    summary:
+      "When a special order goes out short or missing an item: recording it on the order, then crediting or refunding the customer.",
+  },
+  {
     href: "/guides/shift-report",
     title: "The Shift Report",
     audience: "Supervisors",

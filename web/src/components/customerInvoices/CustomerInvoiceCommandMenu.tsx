@@ -162,7 +162,9 @@ export function CustomerInvoiceCommandMenu({
   const sendToQuickBooks = async () => {
     await run("qbo", async () => {
       const { blob, view, inputs } = await withProgress("Preparing the invoice…", async () => {
-        const rendered = await renderInvoicePdf(supabase, id, today);
+        // The push applies the customer's credit memos (218), so the PDF it
+        // attaches says so.
+        const rendered = await renderInvoicePdf(supabase, id, today, { previewCredit: true });
         return { ...rendered, inputs: await quickBooksInputs(supabase, orgId, rendered.view, numberText) };
       });
       if (!inputs.customerRef && view.invoice.customer_id) {
@@ -193,6 +195,9 @@ export function CustomerInvoiceCommandMenu({
       const doc = pushed.ref.qbo?.doc_number ?? pushed.ref.qbo?.id ?? "";
       setNote(
         `${inQuickBooks ? "Updated" : "Sent"} in QuickBooks as Invoice ${doc}` +
+          (pushed.memoCredit.length
+            ? ` — credit applied: ${pushed.memoCredit.map((c) => `${c.label} ${money(c.amount)}`).join(", ")}`
+            : "") +
           (pushed.warnings.length ? ` — ${pushed.warnings.join(" ")}` : "")
       );
       router.refresh();

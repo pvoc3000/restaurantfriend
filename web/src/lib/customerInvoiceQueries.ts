@@ -20,6 +20,7 @@ import {
   invoiceNumberText,
   type CustomerInvoice,
   type CustomerInvoiceLine,
+  type InvoiceCredit,
   type InvoiceGroup,
   type InvoiceTerms,
 } from "./customerInvoices";
@@ -85,6 +86,9 @@ export type InvoiceViewPayment = {
   payment_id: string;
   refund_of: string | null;
   refundable: number;
+  /** 218: this row is a CREDIT MEMO's credit, not money — read-only, never
+   *  refunded or edited from here. */
+  credit_memo: { id: string; label: string } | null;
 };
 
 export type InvoiceView = {
@@ -96,6 +100,11 @@ export type InvoiceView = {
   orders: Map<string, InvoiceOrder>;
   groupState: Map<string, InvoiceGroupState>;
   payments: InvoiceViewPayment[];
+  /** 218: the credit memos applied to it, oldest first — the Totals window's
+   *  "Credit CM-10000" lines. Their money is in `paid` too. */
+  credits: InvoiceCredit[];
+  /** What was PAID, money only: `paid` less `credits`. */
+  cashPaid: number;
   /** Sent, void or holding money: its lines are settled (141). */
   frozen: boolean;
   total: number;
@@ -104,7 +113,7 @@ export type InvoiceView = {
 };
 
 const LINE_COLUMNS =
-  "id, special_order_id, line_type, description, qty, unit_price, amount, taxable, tax_rate, order_label, sort, square_item, kind, special_order_item_id";
+  "id, special_order_id, line_type, description, qty, unit_price, amount, taxable, tax_rate, order_label, sort, square_item, kind, special_order_item_id, ordered_qty";
 
 export async function fetchInvoiceView(
   supabase: SupabaseClient,
@@ -122,16 +131,20 @@ export async function fetchInvoiceView(
   if (error) throw new Error(error.message);
   if (!inv) return null;
 
-  const [{ data: lineRows, error: lineError }, { data: appRows, error: appError }, { data: groupRows }] =
+  const [{ data: lineRows, error: lineError }, { data: appRows, error: appError }, { data: groupRows }, { data: orgRow }] =
     await Promise.all([
       supabase.from("customer_invoice_lines").select(LINE_COLUMNS).eq("invoice_id", id),
       // What THIS invoice has collected, free lines' money included — the
       // ledger's applications to it (140), each with its payment's facts.
       supabase
         .from("payment_applications")
-        .select("id, payment_id, special_order_id, amount, customer_payments ( paid_on, payment_type, note, external_ref, refund_of )")
+        .select(
+          "id, payment_id, credit_memo_id, special_order_id, amount, customer_payments ( paid_on, payment_type, note, external_ref, refund_of ), customer_credit_memos ( number, issued_on )"
+        )
         .eq("customer_invoice_id", id),
       supabase.rpc("customer_invoice_groups", { p_invoice: id }),
+      // The memo series' prefix (218): "CM-".
+      supabase.from("orgs").select("settings").eq("id", (inv as { org_id: string }).org_id).maybeSingle(),
     ]);
   if (lineError) throw new Error(lineError.message);
   if (appError) throw new Error(appError.message);
@@ -141,6 +154,7 @@ export async function fetchInvoiceView(
     amount: Number(l.amount),
     qty: l.qty === null ? null : Number(l.qty),
     unit_price: l.unit_price === null ? null : Number(l.unit_price),
+    ordered_qty: l.ordered_qty === null || l.ordered_qty === undefined ? null : Number(l.ordered_qty),
   }));
   const orderIds = [...new Set(lines.map((l) => l.special_order_id).filter((o): o is string => !!o))];
 
@@ -156,7 +170,7 @@ export async function fetchInvoiceView(
         .in("id", orderIds),
       supabase
         .from("special_order_items")
-        .select("order_id, qty, unit_price, taxable, sort, id, hide_from_customer, item_donut, item_type, item_cut, item_size")
+        .select("order_id, qty, unit_price, taxable, sort, id, hide_from_customer, item_donut, item_type, item_cut, item_size, notes")
         .in("order_id", orderIds)
         .order("sort", { ascending: true, nullsFirst: false })
         .order("id"),
@@ -183,6 +197,7 @@ export async function fetchInvoiceView(
         l.item_type = item.item_type as string | null;
         l.item_cut = item.item_cut as string | null;
         l.item_size = item.item_size as string | null;
+        l.item_notes = (item.notes as string | null) ?? null;
       }
     }
     for (const l of it ?? []) {
@@ -213,33 +228,70 @@ export async function fetchInvoiceView(
   const numberOf = (orderId: string | null) => (orderId ? orders.get(orderId)?.number ?? null : null);
   const appList = ((appRows ?? []) as unknown as {
     id: string;
-    payment_id: string;
+    payment_id: string | null;
+    credit_memo_id: string | null;
     special_order_id: string | null;
     amount: number;
     customer_payments: {
       paid_on: string | null; payment_type: string | null; note: string | null; external_ref: string | null; refund_of: string | null;
     } | null;
+    customer_credit_memos: { number: number; issued_on: string | null } | null;
   }[]);
+  const memoPrefix =
+    (((orgRow?.settings ?? {}) as { customer_credit_memos?: { prefix?: unknown } }).customer_credit_memos?.prefix as string | undefined) ?? "";
+  const memoLabel = (a: (typeof appList)[number]) =>
+    a.customer_credit_memos ? `${memoPrefix}${a.customer_credit_memos.number}` : "Credit memo";
   const refundRows = appList.map((a) => ({
     refund_of: a.customer_payments?.refund_of ?? null,
     amount: Number(a.amount),
     order_id: a.special_order_id,
   }));
   const payments: InvoiceViewPayment[] = appList
-    .map((a) => ({
-      id: a.id,
-      payment_id: a.payment_id,
-      refund_of: a.customer_payments?.refund_of ?? null,
-      refundable: refundLeft({ payment_id: a.payment_id, amount: Number(a.amount), order_id: a.special_order_id }, refundRows),
-      order_id: a.special_order_id,
-      order_number: numberOf(a.special_order_id),
-      paid_on: a.customer_payments?.paid_on ?? null,
-      amount: Number(a.amount),
-      payment_type: a.customer_payments?.payment_type ?? null,
-      note: a.customer_payments?.note ?? null,
-      external_ref: a.customer_payments?.external_ref ?? null,
-    }))
+    .map((a) =>
+      a.credit_memo_id
+        ? {
+            id: a.id,
+            payment_id: a.credit_memo_id,
+            refund_of: null,
+            refundable: 0,
+            order_id: a.special_order_id,
+            order_number: numberOf(a.special_order_id),
+            paid_on: a.customer_credit_memos?.issued_on ?? null,
+            amount: Number(a.amount),
+            payment_type: "Credit memo",
+            note: memoLabel(a),
+            external_ref: null,
+            credit_memo: { id: a.credit_memo_id, label: memoLabel(a) },
+          }
+        : {
+            id: a.id,
+            payment_id: a.payment_id as string,
+            refund_of: a.customer_payments?.refund_of ?? null,
+            refundable: refundLeft({ payment_id: a.payment_id as string, amount: Number(a.amount), order_id: a.special_order_id }, refundRows),
+            order_id: a.special_order_id,
+            order_number: numberOf(a.special_order_id),
+            paid_on: a.customer_payments?.paid_on ?? null,
+            amount: Number(a.amount),
+            payment_type: a.customer_payments?.payment_type ?? null,
+            note: a.customer_payments?.note ?? null,
+            external_ref: a.customer_payments?.external_ref ?? null,
+            credit_memo: null,
+          }
+    )
     .sort((a, b) => (a.paid_on ?? "").localeCompare(b.paid_on ?? ""));
+
+  // Each memo once, however many of its orders' shares it was split into.
+  const creditOf = new Map<string, InvoiceCredit>();
+  for (const p of payments) {
+    if (!p.credit_memo) continue;
+    const had = creditOf.get(p.credit_memo.id);
+    creditOf.set(p.credit_memo.id, {
+      label: p.credit_memo.label,
+      issued_on: p.paid_on,
+      amount: Math.round(((had?.amount ?? 0) + p.amount) * 100) / 100,
+    });
+  }
+  const credits = [...creditOf.values()].sort((a, b) => (a.issued_on ?? "").localeCompare(b.issued_on ?? ""));
 
   const groupState = new Map<string, InvoiceGroupState>(
     ((groupRows ?? []) as InvoiceGroupState[]).map((g) => [
@@ -261,6 +313,8 @@ export async function fetchInvoiceView(
     orders,
     groupState,
     payments,
+    credits,
+    cashPaid: Math.round((money.paid - credits.reduce((a, c) => a + c.amount, 0)) * 100) / 100,
     frozen: Boolean(invoice.sent_at || invoice.voided_at || payments.length > 0),
     ...money,
   };

@@ -82,6 +82,8 @@ const LINE_WIDTHS: Record<string, number> = {
   item: 300,
   note: 260,
   qty: 88,
+  // 217's delivery record. Only on an ORDER (see `delivered`).
+  delivered: 96,
   price: 104,
   tax: 64,
   // "Hide From Customer" wraps to two lines at this width (a label wraps).
@@ -142,6 +144,8 @@ export function OrderLines({
   grouping: savedGrouping,
   canGroup,
   menu,
+  delivered,
+  onRecordShort,
 }: {
   orderId: string;
   orgId: string;
@@ -154,6 +158,14 @@ export function OrderLines({
   canGroup: boolean;
   /** The priced menu, resolved on the server — see `MenuItem`. */
   menu: MenuItem[];
+  /**
+   * THE DELIVERY RECORD (217), by line: what went out. Absent on a template or
+   * a standing order, which deliver nothing, and the column is not drawn. A
+   * line with no entry has never been saved to the server yet.
+   */
+  delivered?: Map<string, { delivered: number; recorded: boolean; note: string | null }>;
+  /** Opens Record Short… at a line; absent when you may not record one. */
+  onRecordShort?: (itemId: string) => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -247,12 +259,14 @@ export function OrderLines({
     "item",
     "note",
     "qty",
+    ...(delivered ? ["delivered"] : []),
     "price",
     "tax",
     "hide",
     "total",
     ...(canWrite ? ["actions"] : []),
   ];
+  const deliveredSpan = delivered ? 1 : 0;
   // `DataTable`'s own arithmetic: a weight over the visible total, as a
   // percentage. Never mixed with a px length in the same value — a `<col>` width
   // of `calc(100% - 95px)` is silently DISCARDED (measured, 2026-07-31).
@@ -535,6 +549,7 @@ export function OrderLines({
                   ["item", "Item", "left"],
                   ["note", "Note", "left"],
                   ["qty", "Qty", "right"],
+                  ...(delivered ? ([["delivered", "Delivered", "right"]] as const) : []),
                   ["price", "Price", "right"],
                   ["tax", "Tax", "left"],
                   ["hide", "Hide From Customer", "left"],
@@ -627,7 +642,7 @@ export function OrderLines({
                         <td className={`${cell} ${weight} text-right text-xs tabular-nums`}>
                           {g.rows.reduce((a, r) => a + Number(r.qty ?? 0), 0)}
                         </td>
-                        <td colSpan={3} className={cell} />
+                        <td colSpan={3 + deliveredSpan} className={cell} />
                         <td className={`${cell} ${weight} text-right text-xs tabular-nums`}>
                           {money(g.rows.reduce((a, r) => a + lineTotal(r), 0))}
                         </td>
@@ -642,7 +657,7 @@ export function OrderLines({
               const production = isProductionLine(row);
               // Line 2's trailing filler: everything after Item and Note, plus
               // the ⋯ column when it is there.
-              const tailSpan = canWrite ? 6 : 5;
+              const tailSpan = (canWrite ? 6 : 5) + deliveredSpan;
               return (
                 <tbody
                   key={row.id}
@@ -719,6 +734,16 @@ export function OrderLines({
                       (row.qty ?? 0)
                     )}
                   </td>
+
+                  {delivered ? (
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      <DeliveredCell
+                        value={delivered.get(row.id)}
+                        name={row.name}
+                        onRecord={onRecordShort ? () => onRecordShort(row.id) : undefined}
+                      />
+                    </td>
+                  ) : null}
 
                   <td className="px-3 py-2 text-right tabular-nums">
                     {/* A HIDDEN LINE'S PRICE IS LOCKED (see the Hide cell): it
@@ -890,7 +915,7 @@ export function OrderLines({
           <tbody>
             {ordered.length === 0 ? (
               <tr>
-                <td colSpan={canWrite ? 9 : 7} className="px-3 py-6 text-sm text-muted">
+                <td colSpan={columnKeys.length} className="px-3 py-6 text-sm text-muted">
                   Nothing on this order yet.
                 </td>
               </tr>
@@ -957,7 +982,7 @@ export function OrderLines({
                     </td>
                     {/* Spans Qty, Price, Tax and Hide: the Tax column alone clips this. */}
                     <td
-                      colSpan={4}
+                      colSpan={4 + deliveredSpan}
                       className="px-3 py-2 text-right align-top font-semibold whitespace-nowrap tabular-nums"
                     >
                       {pieces} {pieces === 1 ? "Item" : "Items"} / {dozens} Dozen
@@ -1117,3 +1142,40 @@ function Slot({ children }: { children: ReactNode }) {
 }
 
 const Sep = () => <span className="text-faint">·</span>;
+
+/**
+ * WHAT WENT OUT, beside what was ordered (217). As ordered it reads like the
+ * quantity, in the muted ink of a figure nobody entered; a recorded SHORT
+ * wears the yellow fill — a state worth reading, and yellow is a fill, never
+ * an ink — with its reason on hover. Pressing it opens Record Short… at the
+ * line, for whoever may record one.
+ */
+function DeliveredCell({
+  value,
+  name,
+  onRecord,
+}: {
+  value: { delivered: number; recorded: boolean; note: string | null } | undefined;
+  name: string;
+  onRecord?: () => void;
+}) {
+  if (!value) return <span className="text-subtle">—</span>;
+  const figure = Number.isInteger(value.delivered) ? String(value.delivered) : value.delivered.toFixed(2);
+  const face = value.recorded ? (
+    <span className="bg-mark-fill px-1 font-semibold text-ink">{figure}</span>
+  ) : (
+    <span className="text-muted">{figure}</span>
+  );
+  if (!onRecord) return <span title={value.note ?? undefined}>{face}</span>;
+  return (
+    <button
+      type="button"
+      onClick={onRecord}
+      title={value.recorded ? `Short: ${value.note ?? ""}` : "Delivered as ordered — record a short"}
+      aria-label={`Delivered of ${name}: ${figure}${value.recorded ? " (short)" : ""}`}
+      className="-mx-1 rounded-sm px-1 py-0.5 hover:bg-neutral-100"
+    >
+      {face}
+    </button>
+  );
+}

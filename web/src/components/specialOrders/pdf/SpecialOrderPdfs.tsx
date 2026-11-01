@@ -60,7 +60,7 @@ import { AGING_BUCKETS, type StatementDocument, type StatementRow } from "@/lib/
 
 import { customerLabel, lineTotal } from "@/lib/specialOrders";
 import { groupLines } from "@/lib/specialOrderLines";
-import { paperColumns, type InvoiceTotalsBreakdown, type PaperRow } from "@/lib/customerInvoices";
+import { creditLineLabel, paperColumns, type InvoiceTotalsBreakdown, type PaperRow } from "@/lib/customerInvoices";
 import { dateInTimeZone, serverTimeZone } from "@/lib/today";
 import {
   Field,
@@ -213,6 +213,14 @@ const s = {
   },
   invBandText: { ...caps(7.5, 0.12), fontFamily: "Helvetica-Bold", color: "#fff" },
   invDetail: { paddingLeft: 12 },
+  /* The itemized order in the QUOTE's columns (§9a, Mark, 2026-11-01):
+     Item · Qty (Ordered) · Price · Delivered · Notes · Cost, Cost lined up
+     with the Amount of the Other charges below it. */
+  ivItem: { width: 200, paddingRight: 8 },
+  ivQty: { width: 44, textAlign: "right" },
+  ivPrice: { width: 50, textAlign: "right" },
+  ivDelivered: { width: 54, textAlign: "right" },
+  ivNotes: { flexGrow: 1, flexBasis: 0, paddingLeft: 14, color: MUTED },
 
   /* ---- statement ---- */
   stNo: { width: 48, color: SUBTLE },
@@ -842,16 +850,29 @@ export function CustomerInvoicePdf({
                 <Text style={[s.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
                   {sec.title} <Text style={s.sectionCount}>{sec.rows.length}</Text>
                 </Text>
-                <View style={s.tableHead} fixed>
-                  <Text style={[s.th, s.invDesc]}>{sec.first}</Text>
-                  {invoice.columns ? (
-                    shown.map((c) => (
-                      <Text key={c.key} style={[s.th, s.invCol]}>{c.label}</Text>
-                    ))
-                  ) : (
-                    <Text style={[s.th, s.invAmount]}>Amount</Text>
-                  )}
-                </View>
+                {!invoice.columns && sec.rows.some((r) => r.detail) ? (
+                  <View style={s.tableHead} fixed>
+                    <Text style={[s.th, s.ivItem]}>Item</Text>
+                    <Text style={[s.th, s.ivQty]}>{sec.rows.some((r) => r.detail?.delivered) ? "Ordered" : "Qty"}</Text>
+                    <Text style={[s.th, s.ivPrice]}>Price</Text>
+                    {sec.rows.some((r) => r.detail?.delivered) ? (
+                      <Text style={[s.th, s.ivDelivered]}>Delivered</Text>
+                    ) : null}
+                    <Text style={[s.th, s.ivNotes]}>Notes</Text>
+                    <Text style={[s.th, s.invAmount]}>Cost</Text>
+                  </View>
+                ) : (
+                  <View style={s.tableHead} fixed>
+                    <Text style={[s.th, s.invDesc]}>{sec.first}</Text>
+                    {invoice.columns ? (
+                      shown.map((c) => (
+                        <Text key={c.key} style={[s.th, s.invCol]}>{c.label}</Text>
+                      ))
+                    ) : (
+                      <Text style={[s.th, s.invAmount]}>Amount</Text>
+                    )}
+                  </View>
+                )}
                 {sec.rows.map((l, i) =>
                   l.detail && !invoice.columns ? (
                     <View key={i}>
@@ -869,7 +890,7 @@ export function CustomerInvoicePdf({
                               gi > 0 ? <View style={{ height: 10 }} /> : null
                             ) : g.label ? (
                               <View
-                                style={[s.bandRow, s.invDetail, l.detail?.groups?.[0]?.unprinted && g.level > 1 ? s.bandCut : s.bandSize]}
+                                style={[s.bandRow, l.detail?.groups?.[0]?.unprinted && g.level > 1 ? s.bandCut : s.bandSize]}
                                 wrap={false}
                                 minPresenceAhead={30}
                               >
@@ -879,8 +900,16 @@ export function CustomerInvoicePdf({
                               </View>
                             ) : null}
                             {g.rows.map((r, j) => (
-                              <View key={j} style={[s.invRow, s.invDetail]} wrap={false}>
-                                <Text style={[s.invDesc, r.amount < 0 ? { color: MUTED } : {}]}>{r.label}</Text>
+                              <View key={j} style={s.invRow} wrap={false}>
+                                <Text style={[s.ivItem, s.itemName, r.amount < 0 ? { color: MUTED } : {}]}>{r.item ?? r.label}</Text>
+                                <Text style={r.qty == null ? [s.ivQty, s.empty] : s.ivQty}>
+                                  {r.qty == null ? "" : qtyText(r.qty)}
+                                </Text>
+                                <Text style={s.ivPrice}>{r.price == null ? "" : money(r.price)}</Text>
+                                {l.detail?.delivered ? (
+                                  <Text style={s.ivDelivered}>{r.delivered == null ? "" : qtyText(r.delivered)}</Text>
+                                ) : null}
+                                <Text style={s.ivNotes}>{r.notes ?? ""}</Text>
                                 <Text style={[s.invAmount, r.amount < 0 ? { color: MUTED } : {}]}>
                                   {r.amount ? money(r.amount) : "—"}
                                 </Text>
@@ -937,6 +966,11 @@ export function CustomerInvoicePdf({
                   {invoice.totals.prior ? (
                     <TotalRow label="Invoiced earlier" value={-invoice.totals.prior} />
                   ) : null}
+                  {/* CREDIT MEMOS (218), each its own line — a credit is not
+                      a payment, so it never hides inside Payments. */}
+                  {(invoice.totals.credits ?? []).map((c, ci) => (
+                    <TotalRow key={ci} label={creditLineLabel(c)} value={-c.amount} />
+                  ))}
                   <TotalRow label="Payments" value={invoice.totals.payments ? -invoice.totals.payments : 0} />
                 </View>
                 <View style={settled ? [s.grand, { backgroundColor: "#fff" }] : s.grand}>

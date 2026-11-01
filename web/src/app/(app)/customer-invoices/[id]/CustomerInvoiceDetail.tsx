@@ -148,7 +148,7 @@ export async function CustomerInvoiceDetail({
   // REVISIONS (143): what this replaces, and what replaces it — a draft being
   // made, or a sent one that already did. And the customer's CREDIT, which
   // Apply Credit offers while a Square invoice still owes.
-  const [{ data: originalRow }, { data: revisionRows }, { data: creditRows }] = await Promise.all([
+  const [{ data: originalRow }, { data: revisionRows }, { data: creditRows }, { data: memoCreditRows }] = await Promise.all([
     invoice.revision_of
       ? supabase.from("customer_invoices").select("id, number, revision, voided_at").eq("id", invoice.revision_of).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -156,6 +156,9 @@ export async function CustomerInvoiceDetail({
     invoice.customer_id
       ? supabase.rpc("customer_credit", { p_customer: invoice.customer_id })
       : Promise.resolve({ data: [] }),
+    // 218: the customer's CREDIT MEMOS this invoice could take — Apply Credit
+    // applies them first. Only what it still owes, so never more than that.
+    invoice.voided_at ? Promise.resolve({ data: [] }) : supabase.rpc("invoice_memo_credit", { p_invoice: id }),
   ]);
   type Related = { id: string; number: number; revision: number; sent_at?: string | null; voided_at: string | null };
   const original = (originalRow as Related | null) ?? null;
@@ -163,7 +166,12 @@ export async function CustomerInvoiceDetail({
   const pendingRevision = revisions.find((r) => !r.sent_at) ?? null;
   const replacedBy = revisions.find((r) => r.sent_at) ?? null;
   const isPendingRevision = Boolean(invoice.revision_of && !invoice.sent_at && !invoice.voided_at);
-  const credit = Math.round(((creditRows ?? []) as { credit: number }[]).reduce((a, c) => a + Number(c.credit), 0) * 100) / 100;
+  const credit =
+    Math.round(
+      (((creditRows ?? []) as { credit: number }[]).reduce((a, c) => a + Number(c.credit), 0) +
+        ((memoCreditRows ?? []) as { amount: number }[]).reduce((a, c) => a + Number(c.amount), 0)) *
+        100
+    ) / 100;
   const labelOf = (r: Related) => `Invoice ${invoiceNumberText(r.number, terms, r.revision)}`;
   const relatedHref = (r: Related) => withFrom(`/customer-invoices/${r.id}`, backHere);
 
@@ -470,7 +478,16 @@ export async function CustomerInvoiceDetail({
                           <td className="px-3 py-2 tabular-nums text-muted">{usDate(p.paid_on)}</td>
                           <td className="px-3 py-2 tabular-nums text-muted">{p.order_number ?? "Other charges"}</td>
                           <td className="px-3 py-2 text-muted">{p.payment_type ?? "—"}</td>
-                          <td className="px-3 py-2 text-muted">{p.note ?? ""}</td>
+                          <td className="px-3 py-2 text-muted">
+                            {p.credit_memo ? (
+                              // A memo's credit (218): read-only here, its record says the rest.
+                              <Link href={`/credit-memos/${p.credit_memo.id}`} className="underline underline-offset-2">
+                                {p.credit_memo.label}
+                              </Link>
+                            ) : (
+                              p.note ?? ""
+                            )}
+                          </td>
                           <td className="px-3 py-2 text-right tabular-nums">{money(p.amount)}</td>
                           {canRefund ? (
                             <td className="whitespace-nowrap px-3 py-2 text-right">

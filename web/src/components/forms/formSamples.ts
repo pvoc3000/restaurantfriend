@@ -179,7 +179,8 @@ const sampleWeek = [14, 15, 16, 17, 18, 19, 20].map((d, i) => {
 const sampleWeekTotal = sampleWeek.reduce((a, o) => a + o.totals.total, 0) + 40;
 
 /** A multi-order invoice: a row per order in columns, the wholesale week, and
- *  one other charge. */
+ *  one other charge — and a credit memo from last week's short applied to it
+ *  (218), its own line in the Totals window. */
 export const sampleCustomerInvoice: CustomerInvoiceDoc = {
   number: "INV-10042",
   issued_on: "2026-09-20",
@@ -203,21 +204,35 @@ export const sampleCustomerInvoice: CustomerInvoiceDoc = {
     tax: 0,
     prior: 0,
     payments: 0,
+    credits: [{ label: "CM-10000", issued_on: "2026-09-14", amount: 65.1 }],
   },
   total: sampleWeekTotal,
-  paid: 0,
-  balance: sampleWeekTotal,
+  paid: 65.1,
+  balance: Math.round((sampleWeekTotal - 65.1) * 100) / 100,
 };
 
-/** A one-order invoice, which prints itemized. */
+/** A one-order invoice, which prints itemized in the quote's columns — and
+ *  billed AFTER THE FACT (its order's date before the invoice's), with a short
+ *  recorded on its first line, so the Delivered column shows (§9a). */
 export const sampleItemizedInvoice: CustomerInvoiceDoc = (() => {
   const o = sampleInvoiceOrder;
   const t = o.totals;
-  const rows = [
-    ...o.lines
-      .filter((l) => l.qty * l.unit_price !== 0)
-      .map((l) => ({ label: `${l.qty} × ${l.name}`, amount: l.qty * l.unit_price })),
-  ];
+  const priced = o.lines.filter((l) => l.qty * l.unit_price !== 0);
+  const rows = priced.map((l, i) => {
+    const delivered = i === 0 && l.qty > 2 ? l.qty - 2 : l.qty;
+    const amount = Math.round(delivered * l.unit_price * 100) / 100;
+    return {
+      label: delivered === l.qty ? `${l.qty} × ${l.name}` : `${delivered} of ${l.qty} delivered × ${l.name}`,
+      amount,
+      item: l.name,
+      qty: l.qty,
+      price: l.unit_price,
+      delivered,
+      notes: l.notes ?? null,
+    };
+  });
+  // The short comes off the Subtotal (and so off what is due).
+  const short = Math.round((priced.reduce((a, l) => a + l.qty * l.unit_price, 0) - rows.reduce((a, r) => a + r.amount, 0)) * 100) / 100;
   return {
     number: "INV-10043",
     issued_on: "2026-09-25",
@@ -225,9 +240,15 @@ export const sampleItemizedInvoice: CustomerInvoiceDoc = (() => {
     notes: o.notes_invoice,
     customer: { name: "Example Studios (Dana Whitfield)", phone: "(323) 555-0101", email: "dana@example.com" },
     columns: false,
-    lines: [{ description: `Order #${o.number} · Example Studios · 10/3/2026`, amount: t.balance, detail: { rows } }],
+    lines: [
+      {
+        description: `Order #${o.number} · Example Studios · 9/20/2026`,
+        amount: Math.round((t.balance - short) * 100) / 100,
+        detail: { rows, delivered: true },
+      },
+    ],
     totals: {
-      subtotal: t.subtotal,
+      subtotal: Math.round((t.subtotal - short) * 100) / 100,
       discount: t.discount,
       delivery: t.deliveryCharge,
       rush: t.rushFee,
@@ -235,9 +256,9 @@ export const sampleItemizedInvoice: CustomerInvoiceDoc = (() => {
       prior: 0,
       payments: t.paid,
     },
-    total: t.balance,
+    total: Math.round((t.balance - short) * 100) / 100,
     paid: 0,
-    balance: t.balance,
+    balance: Math.round((t.balance - short) * 100) / 100,
   };
 })();
 

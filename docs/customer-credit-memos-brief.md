@@ -1,9 +1,13 @@
 # Customer credit memos — design brief
 
-**Status: DESIGNED 2026-10-31, NOT BUILT. Revised the same day** around a
-DELIVERY RECORD (Mark: "I want whatever we design for credit memos to follow
-world class accounting standards and do things the proper way"). Mark's
-answers are at the end; the bookkeeper's questions are the only ones open.
+**Status: BUILT 2026-11-01 — migrations 217 (the delivery record, billing what
+was delivered), 218 (the memo ledger) and 219 APPLIED; `qbo-sync`,
+`qbo-webhook`, `square-refund` and `send-special-order-email` DEPLOYED.** See
+"What was built" at the end for where each decision landed and what was
+verified. Designed 2026-10-31 and revised around a DELIVERY RECORD (Mark: "I
+want whatever we design for credit memos to follow world class accounting
+standards and do things the proper way"). The bookkeeper's questions are the
+only ones open.
 Read `CLAUDE.md` (the customer invoices thread), then
 `docs/history/04g-special-orders.md` from "THE TEXTBOOK A/R MODEL" on, then
 this.
@@ -667,3 +671,42 @@ it, the app would not know, Knotted would pay $65.10 less than the app's
 invoice, and the app would show them owing it.
 
 **SO-10152 waits for the build** (Mark, 2026-11-01): its missing item is refunded by a memo with Refund to the card once phase 2 ships, not with today's Refund…, so INV-10032 never reads as owing. It is the first real case to run through §6a.
+
+---
+
+## What was built (2026-11-01)
+
+- **Database:** 217 (delivery record, target billing, the to-do), 218 (memo
+  ledger, credit source, refunds, guards, readers), 219 (a message). Applied
+  after live rehearsals in transactions that never committed; see
+  `docs/history/04g-special-orders.md` for the figures.
+- **QuickBooks** (`qbo-sync`): `push_credit_memo`, `void_credit_memo`, memo
+  credit applied by a zero Payment inside `push_customer_invoice`,
+  `refund_payment` with `credit_memo_id` (itemized RefundReceipt), and §8's
+  cash rule in `sync_qbo_payments` and `qbo-webhook` (`_shared/qboCredit.ts`,
+  fixtures). `AutoApplyCredit` is OFF for this company (read 2026-11-01).
+- **Square** (`square-refund`): `credit_memo_id` refunds a memo from the
+  pay-link payment on the invoice it credits.
+- **Email** (`send-special-order-email`): `credit_memo_id` sends the memo in
+  its order's conversation and files it. The subject and body read
+  `orgs.settings.customer_credit_memos.email_subject` / `email_body`, with a
+  default in code until a template is added to Settings → Messages.
+- **Screens:** the Items tab's Delivered column, Record Short…, the short
+  notice with Issue Credit Memo… and No Credit… (`OrderItemsTab`,
+  `creditMemos/IssueCreditMemo`); memo rows read-only on Payments; the
+  invoice paper in the quote's columns with Credit lines; the send flow's
+  credit preview; `/credit-memos/[id]` with Email…, Send to QuickBooks,
+  Refund Again, Change to Credit/Refund and Void…; the customer's Credit
+  memos section with New Allowance…; the Credit memo PDF on `/forms`; the
+  staff guide `/guides/short-delivery`.
+- **Access:** recording a short is supervisor+ (the order's write access);
+  memos, allowances and No Credit are manager+; `/credit-memos` is read by
+  supervisors and purchasers, written by managers, and not shown to staff
+  (as invoices).
+- **Not checked in a browser** (the pane sits behind the shared-iPad PIN):
+  every screen above. Nothing has yet been sent to QuickBooks or refunded for
+  real; Knotted's short and SO-10152 are the first real cases.
+- **Known limits:** the pay page shows memo credit inside "Paid", not as its
+  own line; a 176 added line's "560 on INV-…" note is ordered − billed, which
+  is off when the order also has a short; allowances post to the order's own
+  sales item until the bookkeeper names an allowance account.

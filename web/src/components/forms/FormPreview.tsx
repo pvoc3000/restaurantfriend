@@ -132,6 +132,14 @@ async function buildElement(
       const invoice = form === "customer-invoice" ? s.sampleCustomerInvoice : s.sampleItemizedInvoice;
       return <CustomerInvoicePdf invoice={invoice} org={docOrg} />;
     }
+    case "credit-memo":
+    case "credit-memo-refund": {
+      const [{ CreditMemoPdf }, m] = await Promise.all([
+        import("@/components/creditMemos/pdf/CreditMemoPdf"),
+        import("./creditMemoSample"),
+      ]);
+      return <CreditMemoPdf memo={form === "credit-memo" ? m.sampleCreditMemo : m.sampleRefundedCreditMemo} org={docOrg} />;
+    }
     case "statement": {
       const { StatementPdf } = await import("@/components/specialOrders/pdf/SpecialOrderPdfs");
       return <StatementPdf statement={s.sampleStatement} org={docOrg} />;
