@@ -6304,3 +6304,11 @@ an already-billed order must NOT fall into 176's "Less invoice" fallback
 flag, "Short, not credited", instead.
 
 Recording a short is **supervisor and up** (Mark, 2026-11-01), the order screen's existing write access. Only the bookkeeper's questions remain open.
+
+**Credit memos — the invoice takes the QUOTE'S COLUMNS (Mark, 2026-11-01):**
+Item · Ordered · Price · Delivered · Notes · Cost, Cost = price × delivered,
+Delivered shown only for an order billed after the fact (its date on or
+before the invoice's issue date). Applies to the one-order (itemized) invoice;
+a 176 "what was added" line prints the quantity THIS invoice bills, so Cost
+still equals Qty × Price. Asked: the several-order invoice is a row per order
+with no items, so it has nowhere for Delivered.

@@ -3,7 +3,7 @@
 **Status: DESIGNED 2026-10-31, NOT BUILT. Revised the same day** around a
 DELIVERY RECORD (Mark: "I want whatever we design for credit memos to follow
 world class accounting standards and do things the proper way"). Mark's
-answers are at the end; the bookkeeper's questions are the only ones open.
+answers are at the end; the questions marked **ASK** are still open.
 Read `CLAUDE.md` (the customer invoices thread), then
 `docs/history/04g-special-orders.md` from "THE TEXTBOOK A/R MODEL" on, then
 this.
@@ -169,9 +169,8 @@ that moves money:
 **If the order has not been invoiced yet, the invoice bills what was
 delivered and no memo is made** (Mark, 2026-11-01). That is the textbook
 rule, not the arrears question: you invoice what shipped, and a credit memo
-exists only to correct an invoice that already went out. The invoice line
-says both — "518 × Knotted Bismark (560 ordered, 42 short)" — so the customer
-can match it to their order. A DRAFT invoice that already copied 560 reads
+exists only to correct an invoice that already went out. The invoice says
+both in its own columns (§9a), so the customer can match it to their order. A DRAFT invoice that already copied 560 reads
 "The order has changed", and Update re-copies it at 518 (176's mechanism). A
 SENT invoice is frozen, so a short on it is a memo.
 
@@ -348,8 +347,8 @@ read-only before building, and tell Mark which way it is set.
   prefix and the paper prints it, as invoices do (147).
 - **PDF:** a new form, "Credit memo", in `components/forms/formCatalog.ts`. It
   uses the invoice's layout and parts: the customer, the memo number and date,
-  "Credits invoice INV-10025-2", the reason, the lines ("Knotted Bismark —
-  delivered 518 of 560 on 10/31, short 42"), the total, and "This credit will
+  "Credits invoice INV-10025-2", the reason, the lines in §9a's memo table,
+  the total, and "This credit will
   be applied to your next invoice."
 - **Email:** sent the way invoices are, from the order's conversation when the
   memo comes from one order (167/210), using a template in `orgs.settings`
@@ -368,6 +367,54 @@ read-only before building, and tell Mark which way it is set.
   refund", a negative entry against the memo, plus a QuickBooks
   `RefundReceipt` for a QuickBooks customer. The customer's Credit section
   offers no Refund… on memo credit until then.
+
+### 9a. The invoice paper takes the quote's columns
+
+Mark, 2026-11-01: "they should probably more closely follow the layout of the
+quote form because it has columns instead of a single line of text." Today a
+ONE-order invoice lists each item as a sentence in one Amount column ("560 ×
+Knotted Bismark @ $1.55 ……… $868.00", `invoicePaper` in
+`lib/customerInvoices.ts`). It takes the quote's table instead
+(`OrderDocumentPdf`), with one column added:
+
+| Item | Ordered | Price | Delivered | Notes | Cost |
+|---|---|---|---|---|---|
+| Knotted Bismark | 560 | $1.55 | 518 | | $802.90 |
+
+- **Cost = price × delivered** (or × ordered where Delivered isn't shown), so
+  the Cost column still adds up to the Subtotal in the Totals window, which is
+  the rule the 2026-09-27 columns were made for.
+- **Delivered is shown only for an order billed after the fact**: one whose
+  date is on or before the invoice's issue date. An order invoiced in advance
+  prints the quote's own columns, with **Qty** for Ordered and no Delivered,
+  since nothing has gone out yet. An order with no short recorded shows
+  Delivered = Ordered, which is what an after-the-fact invoice should say.
+- **Notes** is the item's own note, as the quote prints it. Hidden lines
+  (179) stay off, and the band grouping (177) stays.
+- **A later invoice that bills only what was added** (176) prints that
+  quantity, not the whole order: Ordered **1,300** would make
+  1,300 × $1.55 disagree with the Cost. So its Qty is what THIS invoice bills
+  (740), and Notes says "1,300 ordered · 560 on INV-10000". The price-change
+  line keeps its own row ("price change on 560 already invoiced", Qty 560,
+  Price the difference).
+- The plain-text email copy of the invoice (`invoicePaper`'s text form) says
+  the same in words: "518 of 560 delivered × Knotted Bismark @ $1.55 —
+  $802.90".
+- The QuickBooks invoice is untouched: it still carries two summary lines
+  (`buildInvoicePayload`), and our PDF is the itemized document.
+
+**The memo's paper uses the same table:** Item · Billed · Delivered · Price ·
+Short · Credit ("Knotted Bismark · 560 · 518 · $1.55 · 42 · $65.10").
+
+**ASK: the several-order invoice** (the weekly Knotted one, and any invoice
+with more than one order). It is not itemized at all: a row per order with
+Subtotal, Discount, Delivery, Rush and Tax columns. There is nowhere for a
+Delivered column. Choices: (a) leave it a row per order and let the memo
+paper carry the item detail; (b) itemize every order, a band per order with
+the item table under it and its charges as rows, so a weekly after-the-fact
+invoice shows each day's deliveries. Recommended: (a) while Knotted is
+invoiced in advance, since nothing on that invoice can have been delivered
+yet; (b) if the bookkeeper says to bill in arrears.
 
 ### 10. Who may do what
 
@@ -462,7 +509,9 @@ for recording a short on the order.
 ## Build phases
 
 0. **The delivery record**, with billing what was delivered on orders not yet
-   invoiced. Useful the day it ships, and what every memo reads. A short on an
+   invoiced, and the one-order invoice in the quote's columns (§9a), since that
+   is where a delivered quantity is printed. Useful the day it ships, and
+   what every memo reads. A short on an
    already-billed order shows and flags, but cannot be credited until phase 1.
 1. **Ledger.** Memos, allowances and the second credit source, with memo
    credit applied to SQUARE invoices only. Harness-tested on PG15 against the
@@ -520,10 +569,14 @@ raises the flag; after its memo the order is not offered for invoicing.
 12. **An order not yet invoiced bills what was delivered**; no memo (§3).
 13. Recording a short: **supervisor and up**, the order screen's existing
     write access (§10).
+14. The invoice takes the **quote's columns**: Item · Ordered · Price ·
+    Delivered · Notes · Cost, Cost = price × delivered, and Delivered shown
+    only for an order billed after the fact (§9a).
 
 ## Still open (ASK)
 
-1. The bookkeeper's three questions: billing in advance or in arrears, the
+1. The several-order invoice: a row per order as now, or itemized? (§9a)
+2. The bookkeeper's three questions: billing in advance or in arrears, the
    allowance account, tax on allowances.
 
 ---

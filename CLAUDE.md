@@ -446,7 +446,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
      standard three quantities: the order keeps ORDERED, a new delivery record
      says what went out (on the order, defaulting to ordered), and a memo is
      derived from billed − delivered; an order not yet invoiced simply bills
-     what was delivered. Only the bookkeeper's questions are open.
+     what was delivered; the invoice takes the quote's columns, with Delivered.
+     Two questions still open there.
   Before building any of them, ask.
 
 
