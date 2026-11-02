@@ -6380,7 +6380,7 @@ DEPLOYED. What landed where:
   memo refund through either processor — the first real ones are Knotted's
   and SO-10152's.
 
-### 220 — every refund on an invoiced order is a credit memo (2026-11-01, WRITTEN, NOT YET APPLIED)
+### 220 — every refund on an invoiced order is a credit memo (2026-11-01, APPLIED)
 
 Mark: "Tap 'Refund…' and it brings up the 'Record Short…' dialogue … a refund
 for delivery … for the rush fee … an arbitrary refund not tied to an item …
@@ -6420,5 +6420,8 @@ QuickBooks- and Square-collected invoices alike.
   correcting, unbilled stayed 0), All refused beside it; then All alone gave
   back the remaining $144.43 with $13.43 tax and left `order_refundable` at 0
   and unbilled at 0; over-cap delivery and amounts refused by name.
-- **Not done:** applying 220 and deploying `qbo-sync` and `sync-square-sales`
-  — the session's permission guard stopped both; they wait for Mark.
+- **Applied 2026-11-01** (begin/commit, Mark's go-ahead) and `qbo-sync`,
+  `sync-square-sales` and `sales-nightly` (--no-verify-jwt, for the shared
+  `salesPosting` copy) deployed. Not yet exercised: a real memo refund through
+  the new dialog (SO-10152 is the first), and a Square memo refund in a
+  morning run.
