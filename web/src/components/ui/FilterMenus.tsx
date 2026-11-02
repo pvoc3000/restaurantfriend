@@ -9,6 +9,8 @@ import {
   dimensionDefault,
   filterCounts,
   matchesDimension,
+  pausedFilterCount,
+  searchingValues,
   type FilterDimension,
   type FilterValues,
 } from "@/lib/filterMenus";
@@ -57,6 +59,8 @@ export function FilterMenus<T>({
   trailing,
   rowAction,
   showCount = true,
+  search = "",
+  pausedNote,
 }: {
   /**
    * The rows BEFORE these menus, but after anything else that narrows the list
@@ -116,11 +120,23 @@ export function FilterMenus<T>({
    * half of this line that is not a duplicate.
    */
   showCount?: boolean;
+  /**
+   * The list's search term. While it has text the menus PAUSE — they stay as
+   * picked, dimmed, and stop filtering — see `searchingValues`. The caller
+   * must filter its own rows with the same rule, so the table and this bar
+   * agree; omitting it keeps the old AND-with-search behaviour.
+   */
+  search?: string;
+  /** Overrides the paused line, for a list where something still applies. */
+  pausedNote?: string;
 }) {
-  const counts = filterCounts(rows, dimensions, values);
+  const searching = search.trim() !== "";
+  const applied = searchingValues(dimensions, values, search);
+  const counts = filterCounts(rows, dimensions, applied);
   const active = activeFilterCount(dimensions, values);
+  const paused = pausedFilterCount(dimensions, values, search);
   const shown = rows.filter((row) =>
-    dimensions.every((d) => matchesDimension(d, row, values))
+    dimensions.every((d) => matchesDimension(d, row, applied))
   ).length;
   const population = total ?? rows.length;
 
@@ -155,7 +171,10 @@ export function FilterMenus<T>({
             // caption already follows here (the inventory list's "Last
             // ordered"): beside it, each menu would start at a different left
             // edge and the row would stop reading as a row.
-            <div key={dimension.key} className="space-y-1.5">
+            <div
+              key={dimension.key}
+              className={`space-y-1.5 ${searching && !dimension.holdsWhileSearching ? PAUSED : ""}`}
+            >
               <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                 {dimension.label}
               </span>
@@ -208,7 +227,9 @@ export function FilterMenus<T>({
       {/* Always stated, never only when filtered: "470 of 470" is a fact worth
           having, and a line that appears and disappears moves the table under
           it every time you touch a menu. */}
-      {showCount || active > 0 ? (
+      {paused > 0 ? (
+        <SearchPausedNote count={paused} note={pausedNote} />
+      ) : showCount || active > 0 ? (
         <p className="text-[13px] text-muted">
           {showCount
             ? shown === population
@@ -230,5 +251,26 @@ export function FilterMenus<T>({
         </p>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * How a paused control looks: still readable, so you can see what comes back
+ * when the search is cleared, but plainly not in force. Still clickable — a
+ * pick made now is kept for when the search is cleared.
+ */
+export const PAUSED = "opacity-50 transition-opacity";
+
+/**
+ * The line that replaces "Clear N filters" while a search is overriding them.
+ * Exported for the lists whose single Show/Status picker is not a
+ * `FilterMenus`, so every list says it the same way.
+ */
+export function SearchPausedNote({ count, note }: { count: number; note?: string }) {
+  return (
+    <p className="text-[13px] text-muted">
+      {note ??
+        `Searching past ${count === 1 ? "the filter" : `${count} filters`} — they return when the search is cleared.`}
+    </p>
   );
 }

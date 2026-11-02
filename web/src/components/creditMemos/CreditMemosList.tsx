@@ -13,6 +13,7 @@ import { usePublishRecordSet } from "@/lib/recordSet";
 import { withFrom } from "@/lib/breadcrumbs";
 import {
   applyListFilters,
+  searchingValues,
   filterHref,
   parseFilterSearch,
   parseFilterValues,
@@ -116,7 +117,12 @@ export function CreditMemosList({
       [r.numberText, r.customer, r.invoice ?? "", r.order ?? "", r.reason].some((v) => v.toLowerCase().includes(q))
     );
   }, [rows, search]);
-  const visible = useMemo(() => applyListFilters(searched, dimensions, filters), [searched, dimensions, filters]);
+  // The search looks past the menus — `searchingValues`.
+  const applied = useMemo(
+    () => searchingValues(dimensions, filters, search),
+    [dimensions, filters, search]
+  );
+  const visible = useMemo(() => applyListFilters(searched, dimensions, applied), [searched, dimensions, applied]);
 
   const listHref = filterHref(PATH, dimensions, filters, search, sort);
   const detailHref = (id: string) => withFrom(`${PATH}/${id}`, { href: listHref, label: "Credit Memos" });
@@ -246,6 +252,7 @@ export function CreditMemosList({
         noun="credit memos"
         dimensions={dimensions}
         values={filters}
+        search={search}
         onChange={changeFilters}
         showCount={false}
         leading={

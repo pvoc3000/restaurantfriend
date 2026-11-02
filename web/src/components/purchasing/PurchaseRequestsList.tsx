@@ -7,6 +7,7 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { PickList } from "@/components/ui/PickList";
 import { ControlField } from "@/components/ui/ControlField";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
@@ -14,6 +15,8 @@ import { sortRows } from "@/lib/tableSort";
 import { dateInTimeZone } from "@/lib/today";
 import {
   applyListFilters,
+  searchingValues,
+  pausedFilterCount,
   filterCounts,
   filterHref,
   parseFilterSearch,
@@ -188,11 +191,16 @@ export function PurchaseRequestsList({
     );
   }, [rows, search]);
 
-  const visible = useMemo(
-    () => applyListFilters(searched, dimensions, filters),
-    [searched, dimensions, filters]
+  // The search looks past the menus — `searchingValues`.
+  const applied = useMemo(
+    () => searchingValues(dimensions, filters, search),
+    [dimensions, filters, search]
   );
-  const counts = filterCounts(searched, dimensions, filters).status;
+  const visible = useMemo(
+    () => applyListFilters(searched, dimensions, applied),
+    [searched, dimensions, applied]
+  );
+  const counts = filterCounts(searched, dimensions, applied).status;
 
   /**
    * Who may edit the words of a request: the purchaser working the queue, and
@@ -413,20 +421,25 @@ export function PurchaseRequestsList({
           />
           {/* A CAPTIONED PICKLIST (Mark, 2026-09-13), the filter row's default
               since 2026-09-10 — the counts ride as hints. */}
-          <ControlField label="Status">
-            <PickList
-              ariaLabel="Which requests"
-              variant="field"
-              value={filters.status ?? "open"}
-              onPick={changeStatus}
-              options={dimensions[0].options.map((o) => ({
-                value: o.value,
-                label: o.label,
-                hint: String(counts[o.value] ?? 0),
-              }))}
-              fit
-            />
-          </ControlField>
+          <div className={search.trim() ? PAUSED : undefined}>
+            <ControlField label="Status">
+              <PickList
+                ariaLabel="Which requests"
+                variant="field"
+                value={filters.status ?? "open"}
+                onPick={changeStatus}
+                options={dimensions[0].options.map((o) => ({
+                  value: o.value,
+                  label: o.label,
+                  hint: String(counts[o.value] ?? 0),
+                }))}
+                fit
+              />
+            </ControlField>
+          </div>
+          {pausedFilterCount(dimensions, filters, search) > 0 ? (
+            <SearchPausedNote count={1} />
+          ) : null}
           {capped ? (
             <span className="text-[12px] text-subtle">
               Showing the most recent 500.

@@ -5,7 +5,7 @@ import Link from "next/link";
 
 import { PageHeading } from "@/components/ui/PageHeading";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
-import { FilterMenus } from "@/components/ui/FilterMenus";
+import { FilterMenus, PAUSED } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { RangePicker } from "@/components/ui/RangePicker";
@@ -23,6 +23,7 @@ import { usePublishRecordSet } from "@/lib/recordSet";
 import { withFrom } from "@/lib/breadcrumbs";
 import {
   applyListFilters,
+  searchingValues,
   filterHref,
   parseFilterSearch,
   parseFilterValues,
@@ -163,14 +164,24 @@ export function CustomerInvoicesList({
 
   // What the menus count over: the search AND the window, since the window is
   // not one of the dimensions they are handed.
+  // While searching the window pauses with the menus (`searchingValues`), so
+  // the menus count over every match.
   const ranged = useMemo(
-    () => searched.filter((r) => inInvoiceRange(r.issued_on, rangeBounds)),
-    [searched, rangeBounds]
+    () =>
+      search.trim()
+        ? searched
+        : searched.filter((r) => inInvoiceRange(r.issued_on, rangeBounds)),
+    [searched, rangeBounds, search]
   );
 
+  // The search looks past the menus — `searchingValues`.
+  const applied = useMemo(
+    () => searchingValues(dimensions, filters, search),
+    [dimensions, filters, search]
+  );
   const visible = useMemo(
-    () => applyListFilters(searched, dimensions, filters),
-    [searched, dimensions, filters]
+    () => applyListFilters(searched, dimensions, applied),
+    [searched, dimensions, applied]
   );
 
   const listHref = filterHref(PATH, dimensions, filters, search, sort);
@@ -287,6 +298,7 @@ export function CustomerInvoicesList({
         noun="invoices"
         dimensions={menuDimensions}
         values={filters}
+        search={search}
         onChange={changeFilters}
         showCount={false}
         rowAction={
@@ -316,7 +328,7 @@ export function CustomerInvoicesList({
             </div>
             {/* The window straight after the search — where the PO, bill and
                 special order lists all put theirs. */}
-            <div className="w-44 space-y-1.5">
+            <div className={`w-44 space-y-1.5 ${search.trim() ? PAUSED : ""}`}>
               <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                 Issued
               </span>

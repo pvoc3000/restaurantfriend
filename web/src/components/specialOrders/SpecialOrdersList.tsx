@@ -53,6 +53,7 @@ import { usePublishRecordSet } from "@/lib/recordSet";
 import { withFrom } from "@/lib/breadcrumbs";
 import {
   applyListFilters,
+  searchingValues,
   filterHref,
   parseFilterSearch,
   parseFilterValues,
@@ -365,6 +366,9 @@ export function SpecialOrdersList({
         accepts: isOrderRangeToken,
         // Upcoming: the working view, and the list's resting state, as it was.
         defaultValue: DEFAULT_ORDER_RANGE,
+        // The server sized its fetch from this window, so a search cannot see
+        // past it — pausing it would promise orders the page never loaded.
+        holdsWhileSearching: true,
         /**
          * PURELY A DATE TEST NOW. `upcoming` used to also require
          * `kind === "order"` and a status other than cancelled — three
@@ -596,14 +600,34 @@ export function SpecialOrdersList({
    * control says so for itself — it reads "All Time" and goes disabled.
    */
   const dateless = kindFilterIsDateless(filters.kind ?? "");
+  // The search looks past the menus — `searchingValues`.
+  const applied = useMemo(
+    () => searchingValues(dimensions, filters, search),
+    [dimensions, filters, search]
+  );
+  /**
+   * WHILE SEARCHING, THE WINDOW LETS THE DATELESS THROUGH. Templates and
+   * standing orders are loaded whatever the window says (`page.tsx`), so a
+   * search for one by name should find it — the window holds only because the
+   * DATED orders outside it were never fetched.
+   */
+  const searching = search.trim() !== "";
   const visible = useMemo(
     () =>
       applyListFilters(
         searched,
-        dateless ? dimensions.filter((d) => d.key !== "view") : dimensions,
-        filters
+        dateless
+          ? dimensions.filter((d) => d.key !== "view")
+          : searching
+            ? dimensions.map((d) =>
+                d.key === "view"
+                  ? { ...d, matches: (r: SpecialOrderRow, v: string) => !r.event_date || d.matches(r, v) }
+                  : d
+              )
+            : dimensions,
+        applied
       ),
-    [searched, dimensions, filters, dateless]
+    [searched, dimensions, applied, dateless, searching]
   );
 
   /**
@@ -1173,6 +1197,8 @@ export function SpecialOrdersList({
              See the dimension's own note. */
           dimensions={menuDimensions}
           values={filters}
+          search={search}
+          pausedNote="Searching past the filters — the dates still apply, because only those orders are loaded."
           onChange={changeFilters}
           leading={
             <>

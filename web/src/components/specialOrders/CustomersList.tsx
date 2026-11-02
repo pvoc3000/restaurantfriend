@@ -13,6 +13,7 @@ import { usePublishRecordSet } from "@/lib/recordSet";
 import { withFrom } from "@/lib/breadcrumbs";
 import {
   applyListFilters,
+  searchingValues,
   filterHref,
   parseFilterSearch,
   parseFilterValues,
@@ -135,9 +136,14 @@ export function CustomersList({
     );
   }, [rows, search]);
 
+  // The search looks past the menus — `searchingValues`.
+  const applied = useMemo(
+    () => searchingValues(dimensions, filters, search),
+    [dimensions, filters, search]
+  );
   const visible = useMemo(
-    () => applyListFilters(searched, dimensions, filters),
-    [searched, dimensions, filters]
+    () => applyListFilters(searched, dimensions, applied),
+    [searched, dimensions, applied]
   );
 
   const listHref = filterHref(PATH, dimensions, filters, search, sort);
@@ -259,6 +265,7 @@ export function CustomersList({
         noun="customers"
         dimensions={dimensions}
         values={filters}
+        search={search}
         onChange={changeFilters}
         // `PageHeading` states the count now — see `showCount`.
         showCount={false}

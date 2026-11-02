@@ -8,6 +8,7 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { PickList } from "@/components/ui/PickList";
 import { ControlField } from "@/components/ui/ControlField";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { RowMenu } from "@/components/ui/RowMenu";
@@ -17,6 +18,8 @@ import { withFrom } from "@/lib/breadcrumbs";
 import { sortRows } from "@/lib/tableSort";
 import {
   applyListFilters,
+  searchingValues,
+  pausedFilterCount,
   filterCounts,
   filterHref,
   parseFilterSearch,
@@ -214,11 +217,16 @@ export function PlansList({
     );
   }, [rows, search]);
 
-  const visible = useMemo(
-    () => applyListFilters(searched, dimensions, filters),
-    [searched, dimensions, filters]
+  // The search looks past the menus — `searchingValues`.
+  const applied = useMemo(
+    () => searchingValues(dimensions, filters, search),
+    [dimensions, filters, search]
   );
-  const counts = filterCounts(searched, dimensions, filters).tier;
+  const visible = useMemo(
+    () => applyListFilters(searched, dimensions, applied),
+    [searched, dimensions, applied]
+  );
+  const counts = filterCounts(searched, dimensions, applied).tier;
   const overlaps = useMemo(() => overlappingPlans(rows), [rows]);
 
   /** This view's own address — where a link back from a plan returns to. */
@@ -562,20 +570,25 @@ export function PlansList({
           search
           icon={<SearchGlyph />}
         />
-        <ControlField label="Show">
-          <PickList
-            ariaLabel="Which plans"
-            variant="field"
-            value={filters.tier ?? "active"}
-            onPick={changeTier}
-            options={dimensions[0].options.map((o) => ({
-              value: o.value,
-              label: o.label,
-              hint: String(counts[o.value] ?? 0),
-            }))}
-            fit
-          />
-        </ControlField>
+        <div className={search.trim() ? PAUSED : undefined}>
+          <ControlField label="Show">
+            <PickList
+              ariaLabel="Which plans"
+              variant="field"
+              value={filters.tier ?? "active"}
+              onPick={changeTier}
+              options={dimensions[0].options.map((o) => ({
+                value: o.value,
+                label: o.label,
+                hint: String(counts[o.value] ?? 0),
+              }))}
+              fit
+            />
+          </ControlField>
+        </div>
+        {pausedFilterCount(dimensions, filters, search) > 0 ? (
+          <SearchPausedNote count={1} />
+        ) : null}
       </div>
 
     <DataTable

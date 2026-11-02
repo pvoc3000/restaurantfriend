@@ -88,6 +88,16 @@ export type FilterDimension<T> = {
    * `FILTER_ALL` and "absent" would be the same URL and the default would win.
    */
   defaultValue?: string;
+  /**
+   * KEEPS FILTERING WHILE THE SEARCH BOX HAS TEXT — see `searchingValues`.
+   *
+   * Every other dimension pauses during a search. This is for the few that are
+   * not a view of the rows but a statement of WHICH rows exist on the screen:
+   * a date window the server sized its fetch from (the special order list's
+   * Dates), or a picker that chooses between two different lists (the events
+   * Show tier). Pausing either would promise matches the page never loaded.
+   */
+  holdsWhileSearching?: boolean;
 };
 
 /** What this dimension says when nothing has been chosen. */
@@ -173,6 +183,55 @@ export function activeFilterCount<T>(
   // every menu, which rests at "All".
   return dimensions.filter(
     (d) => (values[d.key] ?? dimensionDefault(d)) !== dimensionDefault(d)
+  ).length;
+}
+
+/**
+ * THE SEARCH BOX LOOKS PAST THE MENUS (Mark, 2026-11-02: "using the search bar
+ * requires unfiltering 1, 2, 3 or more filters to actually see what I'm trying
+ * to find").
+ *
+ * The menus are for BROWSING — "what's open this week". The search box is for
+ * FINDING — you already know the name or the number, and the menus you set an
+ * hour ago for browsing were hiding the very row you typed. Once a list grew
+ * four or five sticky menus, a search was more likely to come back empty than
+ * not.
+ *
+ * So while there is a search term, every dimension reads as "All" except the
+ * ones marked `holdsWhileSearching`. The stored values are NOT touched — this
+ * returns a separate record for filtering and counting, and the menus keep
+ * showing what you picked, so clearing the search puts the view back exactly
+ * as it was. A dimension resting on a real value ("Active", "Open") pauses
+ * too: an inactive recipe you search for by name is still the one you wanted.
+ *
+ * Keys for dimensions not in `dimensions` pass through untouched, so a caller
+ * may hand over the menu subset without losing the rest.
+ */
+export function searchingValues<T>(
+  dimensions: FilterDimension<T>[],
+  values: FilterValues,
+  search: string
+): FilterValues {
+  if (!search.trim()) return values;
+  const next: FilterValues = { ...values };
+  for (const d of dimensions) if (!d.holdsWhileSearching) next[d.key] = FILTER_ALL;
+  return next;
+}
+
+/**
+ * How many menus a search is currently overriding — the ones saying something
+ * other than "All". Measured against All rather than against rest (unlike
+ * `activeFilterCount`): a list resting on Active is narrowing, and a search
+ * widens it, so that pause is worth saying.
+ */
+export function pausedFilterCount<T>(
+  dimensions: FilterDimension<T>[],
+  values: FilterValues,
+  search: string
+): number {
+  if (!search.trim()) return 0;
+  return dimensions.filter(
+    (d) => !d.holdsWhileSearching && (values[d.key] ?? dimensionDefault(d)) !== FILTER_ALL
   ).length;
 }
 

@@ -7,6 +7,7 @@ import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { PickList } from "@/components/ui/PickList";
 import { ControlField } from "@/components/ui/ControlField";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { usePublishRecordSet } from "@/lib/recordSet";
@@ -14,6 +15,8 @@ import { withFrom } from "@/lib/breadcrumbs";
 import { sortRows } from "@/lib/tableSort";
 import {
   applyListFilters,
+  searchingValues,
+  pausedFilterCount,
   filterCounts,
   filterHref,
   parseFilterSearch,
@@ -177,11 +180,16 @@ export function RecipesList({
     );
   }, [rows, search]);
 
-  const visible = useMemo(
-    () => applyListFilters(searched, dimensions, filters),
-    [searched, dimensions, filters]
+  // The search looks past the menus — `searchingValues`.
+  const applied = useMemo(
+    () => searchingValues(dimensions, filters, search),
+    [dimensions, filters, search]
   );
-  const counts = filterCounts(searched, dimensions, filters).tier;
+  const visible = useMemo(
+    () => applyListFilters(searched, dimensions, applied),
+    [searched, dimensions, applied]
+  );
+  const counts = filterCounts(searched, dimensions, applied).tier;
 
   /** This view's own address — where a link back from a recipe returns to. */
   const listHref = filterHref(PATH, dimensions, filters, search, sort);
@@ -334,20 +342,25 @@ export function RecipesList({
           clearLabel="Clear the search"
           icon={<SearchGlyph />}
         />
-        <ControlField label="Show">
-          <PickList
-            ariaLabel="Which recipes"
-            variant="field"
-            value={filters.tier ?? "active"}
-            onPick={changeTier}
-            options={dimensions[0].options.map((o) => ({
-              value: o.value,
-              label: o.label,
-              hint: String(counts[o.value] ?? 0),
-            }))}
-            fit
-          />
-        </ControlField>
+        <div className={search.trim() ? PAUSED : undefined}>
+          <ControlField label="Show">
+            <PickList
+              ariaLabel="Which recipes"
+              variant="field"
+              value={filters.tier ?? "active"}
+              onPick={changeTier}
+              options={dimensions[0].options.map((o) => ({
+                value: o.value,
+                label: o.label,
+                hint: String(counts[o.value] ?? 0),
+              }))}
+              fit
+            />
+          </ControlField>
+        </div>
+        {pausedFilterCount(dimensions, filters, search) > 0 ? (
+          <SearchPausedNote count={1} />
+        ) : null}
       </div>
     <DataTable
       rows={sorted}

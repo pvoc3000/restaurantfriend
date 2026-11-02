@@ -14,6 +14,7 @@ import { withFrom } from "@/lib/breadcrumbs";
 import { employeeTabHref } from "@/lib/employees";
 import {
   applyListFilters,
+  searchingValues,
   filterCounts,
   filterHref,
   parseFilterSearch,
@@ -141,6 +142,9 @@ export function EventsList({
         key: "tier",
         label: "Tier",
         defaultValue: "narrative",
+        // Show picks WHICH list you are reading — notes or 44,000 shift
+        // ratings — so a search stays inside it rather than mixing the two.
+        holdsWhileSearching: true,
         options: TIERS.map((t) => ({ value: t, label: TIER_LABEL[t] })),
         matches: (r, v) =>
           v === "all" ? true : v === "shifts" ? r.kind === "shift" : r.kind !== "shift",
@@ -261,11 +265,16 @@ export function EventsList({
     );
   }, [rows, search]);
 
-  const visible = useMemo(
-    () => applyListFilters(searched, dimensions, filters),
-    [searched, dimensions, filters],
+  // The search looks past the menus — `searchingValues`.
+  const applied = useMemo(
+    () => searchingValues(dimensions, filters, search),
+    [dimensions, filters, search]
   );
-  const tierCounts = filterCounts(searched, dimensions, filters).tier;
+  const visible = useMemo(
+    () => applyListFilters(searched, dimensions, applied),
+    [searched, dimensions, applied],
+  );
+  const tierCounts = filterCounts(searched, dimensions, applied).tier;
 
   /**
    * THE TIER IS A DIMENSION AND NOT A MENU. It rides in `dimensions` so it lands
@@ -509,6 +518,7 @@ export function EventsList({
             noun="events"
             dimensions={menuDimensions}
             values={filters}
+            search={search}
             // The bar's own Clear resets the dimensions IT knows about, and the
             // tier is not one of them — so put it back, or "Clear 2 filters"
             // would also throw you from Shift ratings to Notes & warnings while

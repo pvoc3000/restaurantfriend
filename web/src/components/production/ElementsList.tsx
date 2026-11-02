@@ -22,6 +22,7 @@ import {
 } from "@/lib/production";
 import {
   applyListFilters,
+  searchingValues,
   filterHref,
   parseFilterSearch,
   parseFilterValues,
@@ -264,9 +265,14 @@ export function ElementsList({
     );
   }, [rows, search]);
 
+  // The search looks past the menus — `searchingValues`.
+  const applied = useMemo(
+    () => searchingValues(dimensions, filters, search),
+    [dimensions, filters, search]
+  );
   const visible = useMemo(
-    () => applyListFilters(searched, dimensions, filters),
-    [searched, dimensions, filters]
+    () => applyListFilters(searched, dimensions, applied),
+    [searched, dimensions, applied]
   );
 
   /**
@@ -452,6 +458,7 @@ export function ElementsList({
           noun="elements"
           dimensions={dimensions}
           values={filters}
+          search={search}
           onChange={changeFilters}
           // `PageHeading` states the count now — see `showCount`.
           showCount={false}
