@@ -17,6 +17,7 @@ import { readTileKeys } from "@/lib/tablet/pins";
 import {
   batchLogsState,
   checklistState,
+  maintenanceRequestState,
   planState,
   purchaseOrdersState,
   purchaseRequestState,
@@ -36,7 +37,7 @@ import { daysAfter, serverTimeZone, todayInTimeZone } from "@/lib/today";
  *
  * What follows is the TABLET page.
  *
- * EACH TILE SAYS WHAT IS OUTSTANDING. Ten small, location-scoped probes in
+ * EACH TILE SAYS WHAT IS OUTSTANDING. Eleven small, location-scoped probes in
  * one wave, every one reusing the helper its own screen reads — so a tile and
  * the screen behind it cannot disagree about what "on the plan" or "pinned for
  * tonight" means. A probe that FAILS drops its line rather than the page: a
@@ -69,7 +70,7 @@ export default async function StartPage() {
     const SKIP = Promise.resolve({ data: null, error: null, count: null });
     const want = (key: TileKey) => shown.has(key);
 
-    const [reports, templates, runs, tasks, plans, schedules, planDays, pos, requests, orders, logs] =
+    const [reports, templates, runs, tasks, maintenance, plans, schedules, planDays, pos, requests, orders, logs] =
       await Promise.all([
         want("shift_report")
           ? supabase
@@ -100,6 +101,14 @@ export default async function StartPage() {
                 "id, status, carry_forward, target_shift, due_on, created_at, priority, assigned_to"
               )
               .eq("location_id", loc)
+              .in("status", OPEN_TASK_STATUSES)
+          : SKIP,
+        want("maintenance_request")
+          ? supabase
+              .from("location_tasks")
+              .select("id", { count: "exact", head: true })
+              .eq("location_id", loc)
+              .eq("kind", "maintenance")
               .in("status", OPEN_TASK_STATUSES)
           : SKIP,
         want("plan")
@@ -199,6 +208,10 @@ export default async function StartPage() {
         open: rows.length,
         pinned: openTasksForRun(rows, null, { viewerId: session.userId }).length,
       });
+    }
+
+    if (want("maintenance_request") && !maintenance.error) {
+      state.maintenance_request = maintenanceRequestState({ open: maintenance.count ?? 0 });
     }
 
     if (want("plan") && !plans.error) {

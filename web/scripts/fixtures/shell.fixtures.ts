@@ -89,6 +89,14 @@ test("Submit a Purchase Request is for the roles that may file one", () => {
   ok(has("purchaser"), "purchaser: tile");
 });
 
+test("Submit a Maintenance Request is under Facilities, for supervisors and up", () => {
+  const facilities = (role: "staff" | "supervisor" | "admin") =>
+    tilesForRole(role).find((g) => g.label === "Facilities")?.tiles.map((t) => t.key) ?? [];
+  ok(!facilities("staff").includes("maintenance_request"), "staff: no tile (075 refuses their insert)");
+  ok(facilities("supervisor").includes("maintenance_request"), "supervisor: tile");
+  ok(facilities("admin").includes("maintenance_request"), "manager: tile");
+});
+
 test("the scan tiles follow who may file, not who may look", () => {
   const keys = (role: "staff" | "supervisor" | "purchaser" | "admin") =>
     new Set(tilesForRole(role).flatMap((g) => g.tiles.map((t) => t.key)));

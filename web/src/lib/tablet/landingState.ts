@@ -104,6 +104,12 @@ export function purchaseRequestState(input: { open: number }): TileState {
   return { note: input.open > 0 ? plural(input.open, "open request") : null };
 }
 
+/** Maintenance requests still open at this shop — said on the tile for the
+ *  purchase request tile's reason: so nobody files the same one twice. */
+export function maintenanceRequestState(input: { open: number }): TileState {
+  return { note: input.open > 0 ? plural(input.open, "open request") : null };
+}
+
 export function specialOrdersState(input: { thisWeek: number }): TileState {
   return { note: input.thisWeek > 0 ? `${input.thisWeek} this week` : "None this week" };
 }

@@ -20,6 +20,7 @@ export type TileKey =
   | "tags"
   | "checklist"
   | "tasks"
+  | "maintenance_request"
   | "plan"
   | "schedules"
   | "recipes"
@@ -59,6 +60,15 @@ export const LANDING_GROUPS: readonly TileGroup[] = [
     tiles: [
       { key: "checklist", label: "Start or Resume a Check List", href: "/checklists" },
       { key: "tasks", label: "Complete a Task", href: "/tasks" },
+      // A command like Submit a Purchase Request (Mark, 2026-11-02): the tile
+      // opens `MaintenanceRequestTile`, which lists what is already open so a
+      // second shift adds to a request rather than filing it again.
+      {
+        key: "maintenance_request",
+        label: "Submit a Maintenance Request",
+        href: "/maintenance-requests",
+        needs: "write",
+      },
     ],
   },
   {

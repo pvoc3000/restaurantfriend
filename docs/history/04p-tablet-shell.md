@@ -357,3 +357,35 @@ and filled when pinned — not the 📌 emoji, which Apple paints red.
 to it like the desktop start page (inline with the edit switch)". The desk's
 h1, from `session.orgName`, left of the Edit switch. Title only — the shop code
 stays in the bar's picker, the reason the page had no heading from 2026-09-10.
+
+**2026-11-02 — SUBMIT A MAINTENANCE REQUEST, under Facilities** (Mark: "add a
+task to the ipad homescreen under Facilities that allows the user to create a
+new maintenance request. The workflow should do what it can to avoid
+duplicating a request by a different user"). A COMMAND tile like Submit a
+Purchase Request (`tablet/MaintenanceRequestTile`), gated on WRITE to
+`/maintenance-requests` — supervisor and up, which is also 075's insert policy;
+staff get no tile. Its line counts what is open at the shop
+(`maintenanceRequestState`), the purchase request tile's reason.
+**THE DIALOG'S JOB IS AS MUCH NOT FILING AS FILING.** It asks the floor's
+questions — what's wrong, equipment, where (filled from the equipment, never
+over a chosen shelf: `NewTask`'s rule), details, how urgent — and under them
+lists EVERYTHING open at the shop, re-ranked as you type (`lib/maintenanceMatch`,
+fixture-tested): same equipment is a likely match on its own, the same shelf is
+weak, shared word roots count up to three, and the equipment's NAME counts as
+words, so "walk in too warm" finds a request filed against the Walk-in Cooler.
+Each row carries **Same Problem**, which appends "Also reported by Karina on
+Nov 2: …" to THAT request's details and raises its priority if they called it
+high (never lowers it). With a likely match on screen the commit button reads
+**Submit as New**. Nothing is ever refused — ranked, not blocked, because a
+false match costs a glance and a hidden one costs a duplicate.
+**FETCHED ON THE TAP AND AGAIN ON SUBMIT**: if a NEW likely match has appeared
+since the dialog opened (the other shift, typing at the same time), the submit
+stops and names who reported it. Same Problem re-reads the details before
+writing, so two people adding to one request don't overwrite each other, and
+refuses a request closed in the meantime. A courtesy, not a lock: two inserts in
+the same second can still both land.
+The desk's New maintenance request (`tasks/NewTask`) is untouched — it asks the
+manager's questions (assignee, due date, shift, carry-forward). A tablet request
+takes the table's defaults, so it carries forward like the desk's.
+Verified: tsc, eslint, 2,522 fixtures. **NOT exercised in a browser** — the test
+pane sat on the shared-device lock screen, which takes a real person's PIN.

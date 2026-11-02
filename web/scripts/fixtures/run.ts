@@ -19,6 +19,7 @@ import "./breakRules.fixtures";
 import "./timesheetIssues.fixtures";
 import "./checklists.fixtures";
 import "./facilityTasks.fixtures";
+import "./maintenanceMatch.fixtures";
 import "./columnOrder.fixtures";
 import "./columnWidths.fixtures";
 import "./orgSettings.fixtures";

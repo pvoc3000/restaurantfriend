@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { Tile } from "@/lib/tablet/landing";
 
+import { MaintenanceRequestTile } from "./MaintenanceRequestTile";
 import { RequestTile, type RequestContext } from "./RequestTile";
 import { ScanBillTile } from "./ScanBillTile";
 import { ScanEmployeeTile } from "./ScanEmployeeTile";
@@ -16,8 +17,8 @@ export type TileState = {
 };
 
 /**
- * ONE TILE — a door, or one of the three that ARE the command (a purchase
- * request, a bill scan, an employee scan), which act in place. Shared by the
+ * ONE TILE — a door, or one of the four that ARE the command (a purchase
+ * request, a maintenance request, a bill scan, an employee scan), which act in place. Shared by the
  * tablet landing page and the desk's Actions widget (2026-10-20), so "Run the
  * Order Guide" is the same thing in both.
  */
@@ -36,6 +37,9 @@ export function TileCell({
 }) {
   if (tile.key === "purchase_request" && request) {
     return <RequestTile label={tile.label} note={state?.note ?? null} {...request} />;
+  }
+  if (tile.key === "maintenance_request" && request) {
+    return <MaintenanceRequestTile label={tile.label} note={state?.note ?? null} {...request} />;
   }
   if (tile.key === "scan_bill" && request) {
     return (
