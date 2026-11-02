@@ -60,7 +60,7 @@ export function FilterMenus<T>({
   rowAction,
   showCount = true,
   search = "",
-  pausedNote,
+  pausedHeld,
 }: {
   /**
    * The rows BEFORE these menus, but after anything else that narrows the list
@@ -127,8 +127,8 @@ export function FilterMenus<T>({
    * agree; omitting it keeps the old AND-with-search behaviour.
    */
   search?: string;
-  /** Overrides the paused line, for a list where something still applies. */
-  pausedNote?: string;
+  /** A control outside the bar that keeps filtering during a search: "Dates". */
+  pausedHeld?: string;
 }) {
   const searching = search.trim() !== "";
   const applied = searchingValues(dimensions, values, search);
@@ -228,7 +228,7 @@ export function FilterMenus<T>({
           having, and a line that appears and disappears moves the table under
           it every time you touch a menu. */}
       {paused > 0 ? (
-        <SearchPausedNote count={paused} note={pausedNote} />
+        <SearchPausedNote count={paused} held={pausedHeld} />
       ) : showCount || active > 0 ? (
         <p className="text-[13px] text-muted">
           {showCount
@@ -266,11 +266,23 @@ export const PAUSED = "opacity-50 transition-opacity";
  * Exported for the lists whose single Show/Status picker is not a
  * `FilterMenus`, so every list says it the same way.
  */
-export function SearchPausedNote({ count, note }: { count: number; note?: string }) {
+export function SearchPausedNote({
+  count,
+  note,
+  held,
+}: {
+  count: number;
+  note?: string;
+  /** A control that keeps filtering because it decides what was loaded: "Window". */
+  held?: string;
+}) {
+  const filters = count === 1 ? "the filter" : `${count} filters`;
   return (
     <p className="text-[13px] text-muted">
       {note ??
-        `Searching past ${count === 1 ? "the filter" : `${count} filters`} — they return when the search is cleared.`}
+        (held
+          ? `Searching past ${filters}. ${held} still applies — only that range is loaded.`
+          : `Searching past ${filters} — they return when the search is cleared.`)}
     </p>
   );
 }

@@ -15,6 +15,7 @@ import {
   weekdaySetLabel,
   type ChecklistKind,
 } from "@/lib/checklists";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 const WIDTHS_KEY = "rf.checklistTemplates.columnWidths.v1";
 
@@ -65,9 +66,11 @@ export function ChecklistTemplatesList({
     );
   }, [rows, search]);
 
+  // A search looks past Kind (`lib/filterMenus`' `searchingValues` rule).
+  const searching = search.trim() !== "";
   const shown = useMemo(
-    () => (kind === "all" ? searched : searched.filter((r) => r.kind === kind)),
-    [searched, kind],
+    () => (kind === "all" || searching ? searched : searched.filter((r) => r.kind === kind)),
+    [searched, kind, searching],
   );
 
   const columns: DataColumn<TemplateRow>[] = [
@@ -155,23 +158,26 @@ export function ChecklistTemplatesList({
           search
           icon={<SearchGlyph />}
         />
-        <ControlField label="Kind">
-          <PickList
-            ariaLabel="Kind"
-            variant="field"
-            value={kind}
-            options={[
-              { value: "all", label: "All", hint: String(searched.length) },
-              ...KINDS.map((k) => ({
-                value: k,
-                label: CHECKLIST_KIND_LABEL[k],
-                hint: String(searched.filter((r) => r.kind === k).length),
-              })),
-            ]}
-            onPick={(v) => setKind(v as ChecklistKind | "all")}
-            fit
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Kind">
+            <PickList
+              ariaLabel="Kind"
+              variant="field"
+              value={kind}
+              options={[
+                { value: "all", label: "All", hint: String(searched.length) },
+                ...KINDS.map((k) => ({
+                  value: k,
+                  label: CHECKLIST_KIND_LABEL[k],
+                  hint: String(searched.filter((r) => r.kind === k).length),
+                })),
+              ]}
+              onPick={(v) => setKind(v as ChecklistKind | "all")}
+              fit
+            />
+          </ControlField>
+        </div>
+        {searching && kind !== "all" ? <SearchPausedNote count={1} /> : null}
       </div>
 
       <DataTable

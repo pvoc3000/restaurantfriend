@@ -32,6 +32,7 @@ import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { deleteSchedules, deleteSchedulesMessage } from "@/components/production/scheduleWrites";
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 export type ScheduleRow = {
   id: string;
@@ -218,15 +219,23 @@ export function SchedulesList({
       ? locations.find((l) => filter.kitchens.has(l.id))?.code ?? null
       : null;
 
+  // A search looks past Window, Show and From (`lib/filterMenus`' rule) — the
+  // window is a client filter here, so every loaded night is searchable.
+  const searching = term.trim() !== "";
+  const pausedCount = searching
+    ? [!!range, show.length > 0, origin !== "all"].filter(Boolean).length
+    : 0;
   const shown = useMemo(() => {
     const q = term.trim().toLowerCase();
     return rows.filter((r) => {
-      if (range && !inRange(r.schedule_date, range)) return false;
-      if (origin !== "all" && r.origin !== origin) return false;
-      if (filter.unprinted && r.printedAt !== null) return false;
-      if (filter.shops.size > 0 && !filter.shops.has(r.location_id)) return false;
-      if (filter.kitchens.size > 0 && !filter.kitchens.has(r.kitchen_location_id)) return false;
-      if (!q) return true;
+      if (!q) {
+        if (range && !inRange(r.schedule_date, range)) return false;
+        if (origin !== "all" && r.origin !== origin) return false;
+        if (filter.unprinted && r.printedAt !== null) return false;
+        if (filter.shops.size > 0 && !filter.shops.has(r.location_id)) return false;
+        if (filter.kitchens.size > 0 && !filter.kitchens.has(r.kitchen_location_id)) return false;
+        return true;
+      }
       // Both spellings of the date, because the column shows one and the row
       // stores the other: `packetDate` prints "Thu 8/7/2026" where the column
       // sorts on "2026-08-07". Searching only the stored form meant that typing
@@ -604,44 +613,50 @@ export function SchedulesList({
             purchasing lists' measured `w-52`. Unprinted is not a date, so it
             left the range for the Show set beside it — and now combines with
             any window, where the tier could only mean "unprinted, ever". */}
-        <ControlField label="Window">
-          <div className="w-52">
-            <RangePicker
-              value={range}
-              onChange={setRange}
-              presets={SCHEDULE_PRESETS}
-              today={today}
-              ariaLabel="Which nights"
-              placeholder="All"
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Window">
+            <div className="w-52">
+              <RangePicker
+                value={range}
+                onChange={setRange}
+                presets={SCHEDULE_PRESETS}
+                today={today}
+                ariaLabel="Which nights"
+                placeholder="All"
+              />
+            </div>
+          </ControlField>
+        </div>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Show">
+            <PickSet
+              options={showOptions}
+              value={show}
+              onChange={setShow}
+              allLabel="All"
+              label="Which schedules to show"
+              noun="filters"
             />
-          </div>
-        </ControlField>
-        <ControlField label="Show">
-          <PickSet
-            options={showOptions}
-            value={show}
-            onChange={setShow}
-            allLabel="All"
-            label="Which schedules to show"
-            noun="filters"
-          />
-        </ControlField>
-        <ControlField label="From">
-          <PickList
-            ariaLabel="Which source the schedules came from"
-            variant="field"
-            value={origin}
-            onPick={(v) => setOrigin(v as ScheduleFrom | "all")}
-            options={[
-              { value: "all", label: "All" },
-              ...ORIGIN_OPTIONS.map((o) => ({
-                ...o,
-                hint: String(rows.filter((r) => r.origin === o.value).length),
-              })),
-            ]}
-            fit
-          />
-        </ControlField>
+          </ControlField>
+        </div>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="From">
+            <PickList
+              ariaLabel="Which source the schedules came from"
+              variant="field"
+              value={origin}
+              onPick={(v) => setOrigin(v as ScheduleFrom | "all")}
+              options={[
+                { value: "all", label: "All" },
+                ...ORIGIN_OPTIONS.map((o) => ({
+                  ...o,
+                  hint: String(rows.filter((r) => r.origin === o.value).length),
+                })),
+              ]}
+              fit
+            />
+          </ControlField>
+        </div>
         <ControlField label="Group by">
           <PickList
             ariaLabel="Group the schedules"
@@ -657,6 +672,7 @@ export function SchedulesList({
             fit
           />
         </ControlField>
+        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
       </div>
 
       <DataTable

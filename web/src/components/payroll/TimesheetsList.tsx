@@ -56,6 +56,7 @@ import {
   workedHours,
   type OtDecision,
 } from "@/lib/timesheets";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 // v3: the hours columns were reordered to Worked · Regular · OT · Double ·
 // Break (Mark, 2026-08-05). The key covers widths, visibility AND ORDER, and a
@@ -439,8 +440,21 @@ export function TimesheetsList({
       }));
   }, [rows, shops]);
 
+  // A search looks past Shops, Overtime and Issues (`lib/filterMenus`' rule);
+  // the pay period holds, being the page itself.
+  const searching = search.trim() !== "";
+  const pausedCount = searching
+    ? [shops.length > 0, review !== "all", issue !== "all"].filter(Boolean).length
+    : 0;
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
+    if (q) {
+      return rows.filter((r) =>
+        `${r.employee_name} ${r.workday} ${r.location_code ?? ""} ${r.position ?? ""}`
+          .toLowerCase()
+          .includes(q)
+      );
+    }
     let base = review === "needs_review" ? rows.filter((r) => needsReview.has(r.id)) : rows;
     if (shops.length) {
       const chosen = new Set(shops);
@@ -453,12 +467,7 @@ export function TimesheetsList({
         return issue === "any" ? set.size > 0 : set.has(issue);
       });
     }
-    if (!q) return base;
-    return base.filter((r) =>
-      `${r.employee_name} ${r.workday} ${r.location_code ?? ""} ${r.position ?? ""}`
-        .toLowerCase()
-        .includes(q)
-    );
+    return base;
   }, [rows, search, review, needsReview, issue, issuesById, shops]);
 
   const sorted = useMemo(() => {
@@ -928,52 +937,59 @@ export function TimesheetsList({
         {/* SHOPS, several at once (Mark, 2026-09-15) — `PickSet`, where empty
             means every shop. Payroll is org-wide, so this is a filter rather
             than the working location. */}
-        <ControlField label="Shops">
-          <PickSet
-            options={shopOptions}
-            value={shops}
-            onChange={setShops}
-            allLabel="All shops"
-            noun="shops"
-            label="Which shops to show"
-            minWidth={200}
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Shops">
+            <PickSet
+              options={shopOptions}
+              value={shops}
+              onChange={setShops}
+              allLabel="All shops"
+              noun="shops"
+              label="Which shops to show"
+              minWidth={200}
+            />
+          </ControlField>
+        </div>
 
-        <ControlField label="Overtime">
-          <PickList
-            ariaLabel="Overtime review"
-            variant="field"
-            value={review}
-            onPick={(next) => setReview(next as typeof review)}
-            options={[
-              { value: "all", label: "All", hint: String(rows.length) },
-              { value: "needs_review", label: "Needs review", hint: String(needsReview.size) },
-            ]}
-            fit
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Overtime">
+            <PickList
+              ariaLabel="Overtime review"
+              variant="field"
+              value={review}
+              onPick={(next) => setReview(next as typeof review)}
+              options={[
+                { value: "all", label: "All", hint: String(rows.length) },
+                { value: "needs_review", label: "Needs review", hint: String(needsReview.size) },
+              ]}
+              fit
+            />
+          </ControlField>
+        </div>
 
         {/* ISSUES, between Overtime and Group by (Mark, 2026-09-15). Counts
             are over the whole pay period, like Overtime's beside it. */}
-        <ControlField label="Issues">
-          <PickList
-            ariaLabel="Issues"
-            variant="field"
-            value={issue}
-            onPick={(next) => setIssue(next as IssueFilter)}
-            options={[
-              { value: "all", label: "All", hint: String(rows.length) },
-              { value: "any", label: "Any issue", hint: String(issueCounts.get("any") ?? 0) },
-              ...TIMESHEET_ISSUES.map((i) => ({
-                value: i,
-                label: TIMESHEET_ISSUE_LABEL[i],
-                hint: String(issueCounts.get(i) ?? 0),
-              })),
-            ]}
-            fit
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Issues">
+            <PickList
+              ariaLabel="Issues"
+              variant="field"
+              value={issue}
+              onPick={(next) => setIssue(next as IssueFilter)}
+              options={[
+                { value: "all", label: "All", hint: String(rows.length) },
+                { value: "any", label: "Any issue", hint: String(issueCounts.get("any") ?? 0) },
+                ...TIMESHEET_ISSUES.map((i) => ({
+                  value: i,
+                  label: TIMESHEET_ISSUE_LABEL[i],
+                  hint: String(issueCounts.get(i) ?? 0),
+                })),
+              ]}
+              fit
+            />
+          </ControlField>
+        </div>
+        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
 
         <ControlField label="Group by">
           <PickList

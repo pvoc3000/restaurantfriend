@@ -18,6 +18,7 @@ import {
   describeAmount,
   amountTotal,
 } from "@/lib/productionBatches";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 export type BatchRow = {
   id: string;
@@ -184,16 +185,24 @@ export function BatchItemsTable({
     );
   }, [rows, term]);
 
+  // A search looks past Status and Type (`lib/filterMenus`' `searchingValues`
+  // rule): the pickers keep what you chose and stop filtering until it clears.
+  const searching = term.trim() !== "";
+  const activeStatus = searching ? "all" : status;
+  const activeTypes = useMemo(() => (searching ? [] : types), [searching, types]);
+  const pausedCount = searching ? [status !== "all", types.length > 0].filter(Boolean).length : 0;
+
   // Each picker's counts are taken AFTER the search and the OTHER picker, never
   // after itself — or every value but the chosen one would read 0
   // (lib/filterMenus' rule).
   const byType = useMemo(
-    () => (types.length === 0 ? searched : searched.filter((r) => types.includes(typeOf(r)))),
-    [searched, types]
+    () =>
+      activeTypes.length === 0 ? searched : searched.filter((r) => activeTypes.includes(typeOf(r))),
+    [searched, activeTypes]
   );
   const byStatus = useMemo(
-    () => (status === "all" ? searched : searched.filter((r) => r.status === status)),
-    [searched, status]
+    () => (activeStatus === "all" ? searched : searched.filter((r) => r.status === activeStatus)),
+    [searched, activeStatus]
   );
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -213,8 +222,9 @@ export function BatchItemsTable({
   }, [rows, byStatus, types]);
 
   const shown = useMemo(
-    () => (types.length === 0 ? byStatus : byStatus.filter((r) => types.includes(typeOf(r)))),
-    [byStatus, types]
+    () =>
+      activeTypes.length === 0 ? byStatus : byStatus.filter((r) => activeTypes.includes(typeOf(r))),
+    [byStatus, activeTypes]
   );
 
   // SORTING BY STATUS GROUPS BY STATUS (Mark, 2026-09-09). Grouping is the
@@ -542,35 +552,40 @@ export function BatchItemsTable({
             search
             icon={<SearchGlyph />}
           />
-          <ControlField label="Status">
-            <PickList
-              ariaLabel="Which statuses to show"
-              variant="field"
-              value={status}
-              onPick={setStatus}
-              options={[
-                { value: "all", label: "All statuses", hint: String(byType.length) },
-                ...BATCH_STATUSES.map((s) => ({
-                  value: s,
-                  label: BATCH_STATUS_LABEL[s],
-                  hint: String(statusCounts[s] ?? 0),
-                })),
-              ]}
-              fit
-            />
-          </ControlField>
-          <ControlField label="Type">
-            <PickSet
-              options={typeOptions}
-              value={types}
-              onChange={setTypes}
-              allLabel="All types"
-              noun="types"
-              label="Which element types to show"
-              className="max-w-[16rem]"
-              minWidth={220}
-            />
-          </ControlField>
+          <div className={searching ? PAUSED : undefined}>
+            <ControlField label="Status">
+              <PickList
+                ariaLabel="Which statuses to show"
+                variant="field"
+                value={status}
+                onPick={setStatus}
+                options={[
+                  { value: "all", label: "All statuses", hint: String(byType.length) },
+                  ...BATCH_STATUSES.map((s) => ({
+                    value: s,
+                    label: BATCH_STATUS_LABEL[s],
+                    hint: String(statusCounts[s] ?? 0),
+                  })),
+                ]}
+                fit
+              />
+            </ControlField>
+          </div>
+          <div className={searching ? PAUSED : undefined}>
+            <ControlField label="Type">
+              <PickSet
+                options={typeOptions}
+                value={types}
+                onChange={setTypes}
+                allLabel="All types"
+                noun="types"
+                label="Which element types to show"
+                className="max-w-[16rem]"
+                minWidth={220}
+              />
+            </ControlField>
+          </div>
+          {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
             <ControlField label="Group by">
               <PickList
                 ariaLabel="Group the batches"

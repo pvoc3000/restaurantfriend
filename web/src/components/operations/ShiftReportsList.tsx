@@ -28,6 +28,7 @@ import {
   SHIFT_REPORT_RANGE_PRESETS,
   shiftReportRangeToken,
 } from "@/lib/shiftReportRange";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 export type ShiftReportRow = {
   id: string;
@@ -170,15 +171,20 @@ export function ShiftReportsList({
   const draftCount = rows.filter((r) => r.status === "draft").length;
   const sentCount = rows.filter((r) => r.status === "sent").length;
 
+  // A search looks past Shift and Show (`lib/filterMenus`' rule); the Dates
+  // window holds, being what the server loaded.
+  const searching = search.trim() !== "";
+  const pausedCount = searching ? [tier !== "all", shift !== "all"].filter(Boolean).length : 0;
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
     return withReason
       .filter((r) => {
+        if (term) return true;
         if (tier === "draft") return r.status === "draft";
         if (tier === "sent") return r.status === "sent";
         return true;
       })
-      .filter((r) => shift === "all" || r.shift === shift)
+      .filter((r) => term !== "" || shift === "all" || r.shift === shift)
       .filter((r) => {
         if (term === "") return true;
         // The narrative is searchable, which is what makes the archive worth
@@ -407,40 +413,45 @@ export function ShiftReportsList({
             </ControlField>
             {/* Which shift (Mark, 2026-10-04). Counted like Show beside it,
                 over the rows the date window loaded. */}
-            <ControlField label="Shift">
-              <PickList
-                ariaLabel="Which shift"
-                variant="field"
-                value={shift}
-                onPick={(next) => setShift(next as typeof shift)}
-                options={[
-                  { value: "all", label: "All", hint: String(rows.length) },
-                  ...(Object.keys(SHIFT_SLOT_LABEL) as ShiftSlot[]).map((slot) => ({
-                    value: slot,
-                    label: SHIFT_SLOT_LABEL[slot],
-                    hint: String(rows.filter((r) => r.shift === slot).length),
-                  })),
-                ]}
-                fit
-              />
-            </ControlField>
+            <div className={searching ? PAUSED : undefined}>
+              <ControlField label="Shift">
+                <PickList
+                  ariaLabel="Which shift"
+                  variant="field"
+                  value={shift}
+                  onPick={(next) => setShift(next as typeof shift)}
+                  options={[
+                    { value: "all", label: "All", hint: String(rows.length) },
+                    ...(Object.keys(SHIFT_SLOT_LABEL) as ShiftSlot[]).map((slot) => ({
+                      value: slot,
+                      label: SHIFT_SLOT_LABEL[slot],
+                      hint: String(rows.filter((r) => r.shift === slot).length),
+                    })),
+                  ]}
+                  fit
+                />
+              </ControlField>
+            </div>
             {/* A captioned PICKLIST rather than tabs (Mark, 2026-09-10), the
                 purchasing lists' conversion: counts ride as hints, `fit`
                 sizes the trigger to its widest option. */}
-            <ControlField label="Show">
-              <PickList
-                ariaLabel="Which shift reports"
-                variant="field"
-                value={tier}
-                onPick={(next) => setTier(next as typeof tier)}
-                options={[
-                  { value: "draft", label: "Drafts", hint: String(draftCount) },
-                  { value: "sent", label: "Sent", hint: String(sentCount) },
-                  { value: "all", label: "All", hint: String(rows.length) },
-                ]}
-                fit
-              />
-            </ControlField>
+            <div className={searching ? PAUSED : undefined}>
+              <ControlField label="Show">
+                <PickList
+                  ariaLabel="Which shift reports"
+                  variant="field"
+                  value={tier}
+                  onPick={(next) => setTier(next as typeof tier)}
+                  options={[
+                    { value: "draft", label: "Drafts", hint: String(draftCount) },
+                    { value: "sent", label: "Sent", hint: String(sentCount) },
+                    { value: "all", label: "All", hint: String(rows.length) },
+                  ]}
+                  fit
+                />
+              </ControlField>
+            </div>
+            {pausedCount > 0 ? <SearchPausedNote count={pausedCount} held="Dates" /> : null}
           </div>
           {/* UNDER THE TABS, NOT OVER THEM (Mark, 2026-09-03), and ON EVERY
               TIER since the Needs-attention tab went (2026-09-09).

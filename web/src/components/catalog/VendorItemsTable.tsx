@@ -118,11 +118,15 @@ export function VendorItemsTable({
     if (!filters) return vendorItems;
     const words = term.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return vendorItems.filter((vi) => {
-      if (active === "active" && !vi.is_active) return false;
-      if (active === "inactive" && vi.is_active) return false;
-      if (category && vi.inventory_items?.category !== category) return false;
-      if (stale !== "any" && vi.stale !== stale) return false;
-      if (words.length === 0) return true;
+      // A search looks past the filters (`lib/filterMenus`' rule); `ListFilters`
+      // dims them and says so.
+      if (words.length === 0) {
+        if (active === "active" && !vi.is_active) return false;
+        if (active === "inactive" && vi.is_active) return false;
+        if (category && vi.inventory_items?.category !== category) return false;
+        if (stale !== "any" && vi.stale !== stale) return false;
+        return true;
+      }
       // Every word must appear somewhere in the row, so "bag brown" matches
       // regardless of which field each word came from.
       const haystack = [

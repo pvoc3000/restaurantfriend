@@ -30,6 +30,7 @@ import { InventoryItemActions } from "./InventoryItemActions";
 import { PickList } from "@/components/ui/PickList";
 import type { ItemRow } from "@/app/(app)/items/page";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
   { key: "active", label: "Active" },
@@ -133,6 +134,15 @@ export function ItemsList({
   const visible = useMemo(() => {
     const t = filters.q.trim().toLowerCase();
     return items.filter((i) => {
+      // A search looks past the filters (`lib/filterMenus`' `searchingValues`
+      // rule): you typed the item, so Show, Category and Last ordered would
+      // only hide it.
+      if (t) {
+        return (
+          i.name.toLowerCase().includes(t) ||
+          (i.category ?? "").toLowerCase().includes(t)
+        );
+      }
       if (filters.active === "active" && !i.is_active) return false;
       if (filters.active === "inactive" && i.is_active) return false;
       if (filters.category && i.category !== filters.category) return false;
@@ -144,13 +154,13 @@ export function ItemsList({
       ) {
         return false;
       }
-      if (!t) return true;
-      return (
-        i.name.toLowerCase().includes(t) ||
-        (i.category ?? "").toLowerCase().includes(t)
-      );
+      return true;
     });
   }, [items, filters]);
+  const searching = filters.q.trim() !== "";
+  const pausedCount = searching
+    ? [filters.active !== "all", !!filters.category, !!filters.last].filter(Boolean).length
+    : 0;
 
   const grouping = GROUPING_KEYS.includes(filters.sort) ? filters.sort : null;
 
@@ -516,44 +526,51 @@ export function ItemsList({
         {/* Last ordered, as a range over the date rather than the four age
             tabs it replaced. Its presets are those tabs' three bands; a
             client filter, so it writes the URL like the others. */}
-        <ControlField label="Last ordered">
-          <div className="w-64">
-            <RangePicker
-              value={filters.last}
-              onChange={(last) => update({ last })}
-              presets={LAST_ORDERED_PRESETS}
-              today={today}
-              ariaLabel="Last ordered"
-              placeholder="Any time"
-            />
-          </div>
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Last ordered">
+            <div className="w-64">
+              <RangePicker
+                value={filters.last}
+                onChange={(last) => update({ last })}
+                presets={LAST_ORDERED_PRESETS}
+                today={today}
+                ariaLabel="Last ordered"
+                placeholder="Any time"
+              />
+            </div>
+          </ControlField>
+        </div>
         {/* A PickList, not a native <select> (Mark, 2026-08-01 — he named this
             one). Past 8 categories it also gains the find box, which the OS
             menu could never offer on an iPad. */}
-        <ControlField label="Category">
-          <PickList
-            variant="field"
-            ariaLabel="Category"
-            value={filters.category}
-            onPick={(category) => update({ category })}
-            options={[
-              { value: "", label: "All categories" },
-              ...categories.map((c) => ({ value: c, label: c })),
-            ]}
-            className="w-56"
-          />
-        </ControlField>
-        <ControlField label="Show">
-          <PickList
-            variant="field"
-            ariaLabel="Active state"
-            value={filters.active}
-            onPick={(active) => update({ active: active as ActiveFilter })}
-            options={ACTIVE_TABS.map((t) => ({ value: t.key, label: t.label }))}
-            fit
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Category">
+            <PickList
+              variant="field"
+              ariaLabel="Category"
+              value={filters.category}
+              onPick={(category) => update({ category })}
+              options={[
+                { value: "", label: "All categories" },
+                ...categories.map((c) => ({ value: c, label: c })),
+              ]}
+              className="w-56"
+            />
+          </ControlField>
+        </div>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Show">
+            <PickList
+              variant="field"
+              ariaLabel="Active state"
+              value={filters.active}
+              onPick={(active) => update({ active: active as ActiveFilter })}
+              options={ACTIVE_TABS.map((t) => ({ value: t.key, label: t.label }))}
+              fit
+            />
+          </ControlField>
+        </div>
+        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
       </div>
 
       {/* WHAT THE LAST COMMAND SAID, in the band slot — the purchasing lists'

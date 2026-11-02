@@ -26,6 +26,7 @@ import { ROLE_LABEL, type Role } from "@/lib/roles";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { makeComparator, type SortDir, type SortValue } from "@/lib/tableSort";
 import { NewEmployee } from "./NewEmployee";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 const WIDTHS_STORAGE_KEY = "rf.employees.columnWidths.v1";
 
@@ -176,16 +177,24 @@ export function EmployeesList({
     return c;
   }, [rows]);
 
+  // A search looks past the menus (`lib/filterMenus`' `searchingValues` rule):
+  // a name is the person you want, whichever shop or status they are under.
+  const searching = search.trim() !== "";
+  const pausedCount = searching
+    ? [status !== "all", !!location, !!position].filter(Boolean).length
+    : 0;
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
+      if (q) {
+        return `${r.first_name} ${r.last_name} ${r.nickname ?? ""} ${r.email ?? ""} ${r.phone ?? ""}`
+          .toLowerCase()
+          .includes(q);
+      }
       if (status !== "all" && r.status !== status) return false;
       if (location && r.location_code !== location) return false;
       if (position && r.position !== position) return false;
-      if (!q) return true;
-      return `${r.first_name} ${r.last_name} ${r.nickname ?? ""} ${r.email ?? ""} ${r.phone ?? ""}`
-        .toLowerCase()
-        .includes(q);
+      return true;
     });
   }, [rows, search, status, location, position]);
 
@@ -387,48 +396,55 @@ export function EmployeesList({
             search
             icon={<SearchGlyph />}
           />
-          <ControlField label="Location">
-            <PickList
-              value={location}
-              onPick={setLocation}
-              variant="field"
-              placeholder="All locations"
-              ariaLabel="Filter by location"
-              options={[
-                { value: "", label: "All locations" },
-                ...locationCodes.map((c) => ({ value: c, label: c })),
-              ]}
-              className="w-44"
-            />
-          </ControlField>
-          <ControlField label="Position">
-            <PickList
-              value={position}
-              onPick={setPosition}
-              variant="field"
-              placeholder="All positions"
-              ariaLabel="Filter by position"
-              options={[
-                { value: "", label: "All positions" },
-                ...positions.map((p) => ({ value: p, label: p })),
-              ]}
-              className="w-56"
-            />
-          </ControlField>
-          <ControlField label="Status">
-            <PickList
-              value={status}
-              onPick={(v) => setStatus(v as StatusFilter)}
-              variant="field"
-              ariaLabel="Filter by status"
-              options={statusTabs.map((t) => ({
-                value: t.key,
-                label: t.label,
-                hint: String(t.count),
-              }))}
-              fit
-            />
-          </ControlField>
+          <div className={searching ? PAUSED : undefined}>
+            <ControlField label="Location">
+              <PickList
+                value={location}
+                onPick={setLocation}
+                variant="field"
+                placeholder="All locations"
+                ariaLabel="Filter by location"
+                options={[
+                  { value: "", label: "All locations" },
+                  ...locationCodes.map((c) => ({ value: c, label: c })),
+                ]}
+                className="w-44"
+              />
+            </ControlField>
+          </div>
+          <div className={searching ? PAUSED : undefined}>
+            <ControlField label="Position">
+              <PickList
+                value={position}
+                onPick={setPosition}
+                variant="field"
+                placeholder="All positions"
+                ariaLabel="Filter by position"
+                options={[
+                  { value: "", label: "All positions" },
+                  ...positions.map((p) => ({ value: p, label: p })),
+                ]}
+                className="w-56"
+              />
+            </ControlField>
+          </div>
+          <div className={searching ? PAUSED : undefined}>
+            <ControlField label="Status">
+              <PickList
+                value={status}
+                onPick={(v) => setStatus(v as StatusFilter)}
+                variant="field"
+                ariaLabel="Filter by status"
+                options={statusTabs.map((t) => ({
+                  value: t.key,
+                  label: t.label,
+                  hint: String(t.count),
+                }))}
+                fit
+              />
+            </ControlField>
+          </div>
+          {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
         </div>
 
       </div>

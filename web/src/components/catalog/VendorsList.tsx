@@ -24,6 +24,7 @@ import { PageHeading } from "@/components/ui/PageHeading";
 import { NewVendor } from "./NewVendor";
 import { PickList } from "@/components/ui/PickList";
 import type { VendorRow } from "@/app/(app)/vendors/page";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 
 const WIDTHS_STORAGE_KEY = "rf.vendors.columnWidths.v1";
@@ -130,10 +131,13 @@ export function VendorsList({
   const visible = useMemo(() => {
     const t = filters.q.trim().toLowerCase();
     return vendors.filter((v) => {
-      if (filters.active === "active" && !v.is_active) return false;
-      if (filters.active === "inactive" && v.is_active) return false;
-      if (filters.type && v.vendor_type !== filters.type) return false;
-      if (!t) return true;
+      // A search looks past Type and Show (`lib/filterMenus`' rule).
+      if (!t) {
+        if (filters.active === "active" && !v.is_active) return false;
+        if (filters.active === "inactive" && v.is_active) return false;
+        if (filters.type && v.vendor_type !== filters.type) return false;
+        return true;
+      }
       const config = v.vendor_locations[0] ?? null;
       return (
         v.name.toLowerCase().includes(t) ||
@@ -143,6 +147,10 @@ export function VendorsList({
       );
     });
   }, [vendors, filters]);
+  const searching = filters.q.trim() !== "";
+  const pausedCount = searching
+    ? [filters.active !== "all", !!filters.type].filter(Boolean).length
+    : 0;
 
   // Sorting is CONTROLLED: it lives in the URL so it survives a trip into a
   // vendor and back, so this list owns both the order of `rows` and the arrow
@@ -306,30 +314,35 @@ export function VendorsList({
             reads at full strength rather than as a placeholder. */}
         {/* Captioned (Mark, 2026-09-10), with Active a PickList now too — the
             purchasing lists' conversion. */}
-        <ControlField label="Type">
-          <PickList
-            variant="field"
-            ariaLabel="Vendor type"
-            value={filters.type}
-            onPick={(type) => update({ type })}
-            options={[
-              { value: "", label: "All types" },
-              ...types.map((t) => ({ value: t, label: t })),
-            ]}
-            className="w-48"
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Type">
+            <PickList
+              variant="field"
+              ariaLabel="Vendor type"
+              value={filters.type}
+              onPick={(type) => update({ type })}
+              options={[
+                { value: "", label: "All types" },
+                ...types.map((t) => ({ value: t, label: t })),
+              ]}
+              className="w-48"
+            />
+          </ControlField>
+        </div>
 
-        <ControlField label="Show">
-          <PickList
-            variant="field"
-            ariaLabel="Active state"
-            value={filters.active}
-            onPick={(active) => update({ active: active as ActiveFilter })}
-            options={ACTIVE_TABS.map((t) => ({ value: t.key, label: t.label }))}
-            fit
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Show">
+            <PickList
+              variant="field"
+              ariaLabel="Active state"
+              value={filters.active}
+              onPick={(active) => update({ active: active as ActiveFilter })}
+              options={ACTIVE_TABS.map((t) => ({ value: t.key, label: t.label }))}
+              fit
+            />
+          </ControlField>
+        </div>
+        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
       </div>
 
       <DataTable

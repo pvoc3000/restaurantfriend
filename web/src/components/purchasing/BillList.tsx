@@ -56,6 +56,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { BillBatchActions } from "./BillBatchActions";
 import { NewBill } from "./NewBill";
 import type { BillListRow } from "@/app/(app)/bills/page";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 const BILL_WIDTHS_KEY = "rf.bills.columnWidths.v1";
 
@@ -234,12 +235,16 @@ export function BillList({
   const beforeVendor = useMemo(() => {
     const words = filters.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return bills.filter((i) => {
-      if (filters.status !== "all" && stageOf(i) !== filters.status) return false;
-      if (filters.aging !== "all" && agingBucket(i.due_date, today) !== filters.aging) {
-        return false;
+      // A search looks past Due, Status and Type (and Vendors, below) — the
+      // `lib/filterMenus` rule. The window holds: only it was loaded.
+      if (words.length === 0) {
+        if (filters.status !== "all" && stageOf(i) !== filters.status) return false;
+        if (filters.aging !== "all" && agingBucket(i.due_date, today) !== filters.aging) {
+          return false;
+        }
+        if (filters.kind !== "all" && i.is_credit !== (filters.kind === "credit")) return false;
+        return true;
       }
-      if (filters.kind !== "all" && i.is_credit !== (filters.kind === "credit")) return false;
-      if (words.length === 0) return true;
       const haystack = [
         i.invoice_number ?? "",
         i.vendors?.name ?? "",
@@ -257,9 +262,21 @@ export function BillList({
     [beforeVendor, filters.vendors]
   );
 
+  const searching = filters.q.trim() !== "";
+  const pausedCount = searching
+    ? [
+        filters.status !== "all",
+        filters.aging !== "all",
+        filters.kind !== "all",
+        filters.vendors.length > 0,
+      ].filter(Boolean).length
+    : 0;
   const visible = useMemo(
-    () => beforeVendor.filter((i) => matchesVendorFilter(i.vendors?.name, filters.vendors)),
-    [beforeVendor, filters.vendors]
+    () =>
+      searching
+        ? beforeVendor
+        : beforeVendor.filter((i) => matchesVendorFilter(i.vendors?.name, filters.vendors)),
+    [beforeVendor, filters.vendors, searching]
   );
 
   const sorted = useMemo(
@@ -916,34 +933,38 @@ export function BillList({
           </div>
         </ControlField>
 
-        <ControlField label="Vendors">
-          <PickSet
-            options={vendorOptions}
-            value={filters.vendors}
-            onChange={(vendors) => update({ vendors })}
-            allLabel="All vendors"
-            noun="vendors"
-            label="Which vendors to show"
-            className="max-w-[16rem]"
-            minWidth={240}
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Vendors">
+            <PickSet
+              options={vendorOptions}
+              value={filters.vendors}
+              onChange={(vendors) => update({ vendors })}
+              allLabel="All vendors"
+              noun="vendors"
+              label="Which vendors to show"
+              className="max-w-[16rem]"
+              minWidth={240}
+            />
+          </ControlField>
+        </div>
 
         {/* Due, as a list rather than a row of tabs (Mark, 2026-09-08). The
             counts ride as HINTS, which is where the tabs carried them. */}
-        <ControlField label="Due">
-          <PickList
-            ariaLabel="Due"
-            variant="field"
-            value={filters.aging}
-            onPick={(aging) => update({ aging: aging as AgingFilter })}
-            options={agingTabs.map((b) => ({
-              value: b,
-              label: b === "all" ? "Any due date" : AGING_LABEL[b as AgingBucket],
-              hint: String(b === "all" ? bills.length : agingCounts[b] ?? 0),
-            }))}
-            fit          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Due">
+            <PickList
+              ariaLabel="Due"
+              variant="field"
+              value={filters.aging}
+              onPick={(aging) => update({ aging: aging as AgingFilter })}
+              options={agingTabs.map((b) => ({
+                value: b,
+                label: b === "all" ? "Any due date" : AGING_LABEL[b as AgingBucket],
+                hint: String(b === "all" ? bills.length : agingCounts[b] ?? 0),
+              }))}
+              fit          />
+          </ControlField>
+        </div>
 
         {/* A LIST RATHER THAN A ROW OF TABS (Mark, 2026-09-10) — the fourth
             time, after `/bills`' own Due, the order guide's tier and
@@ -951,40 +972,45 @@ export function BillList({
             the row by a distance: **478px** with five stages and their counts,
             against 160 as a list, and that 478 was the whole reason this row
             could not be one line at any width. */}
-        <ControlField label="Status">
-          <PickList
-            ariaLabel="Status"
-            variant="field"
-            value={filters.status}
-            onPick={(status) => update({ status: status as BillStatusFilter })}
-            options={statusTabs.map((s) => ({
-              value: s,
-              label: s === "all" ? "All" : BILL_STAGE_LABEL[s],
-              hint: String(s === "all" ? bills.length : statusCounts[s] ?? 0),
-            }))}
-            fit          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Status">
+            <PickList
+              ariaLabel="Status"
+              variant="field"
+              value={filters.status}
+              onPick={(status) => update({ status: status as BillStatusFilter })}
+              options={statusTabs.map((s) => ({
+                value: s,
+                label: s === "all" ? "All" : BILL_STAGE_LABEL[s],
+                hint: String(s === "all" ? bills.length : statusCounts[s] ?? 0),
+              }))}
+              fit          />
+          </ControlField>
+        </div>
 
-        <ControlField label="Type">
-          <PickList
-            ariaLabel="Type"
-            variant="field"
-            value={filters.kind}
-            onPick={(kind) => update({ kind: kind as BillKindFilter })}
-            options={(["all", "bill", "credit"] as const).map((k) => ({
-              value: k,
-              label: BILL_KIND_LABEL[k],
-              hint: String(
-                k === "all"
-                  ? bills.length
-                  : k === "credit"
-                    ? creditCount
-                    : bills.length - creditCount
-              ),
-            }))}
-            fit
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Type">
+            <PickList
+              ariaLabel="Type"
+              variant="field"
+              value={filters.kind}
+              onPick={(kind) => update({ kind: kind as BillKindFilter })}
+              options={(["all", "bill", "credit"] as const).map((k) => ({
+                value: k,
+                label: BILL_KIND_LABEL[k],
+                hint: String(
+                  k === "all"
+                    ? bills.length
+                    : k === "credit"
+                      ? creditCount
+                      : bills.length - creditCount
+                ),
+              }))}
+              fit
+            />
+          </ControlField>
+        </div>
+        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} held="Window" /> : null}
 
       </div>
 

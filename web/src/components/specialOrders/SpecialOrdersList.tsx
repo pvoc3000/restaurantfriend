@@ -1198,7 +1198,7 @@ export function SpecialOrdersList({
           dimensions={menuDimensions}
           values={filters}
           search={search}
-          pausedNote="Searching past the filters — the dates still apply, because only those orders are loaded."
+          pausedHeld="Dates"
           onChange={changeFilters}
           leading={
             <>

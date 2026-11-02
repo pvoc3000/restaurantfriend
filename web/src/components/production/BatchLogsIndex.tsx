@@ -23,6 +23,7 @@ import {
   type BatchLogWindow,
 } from "@/lib/batchLogFilters";
 import { SCHEDULE_CLASSES, scheduleLabel } from "@/lib/production";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 export type BatchLogRow = {
   id: string;
@@ -137,19 +138,25 @@ export function BatchLogsIndex({
     rows.filter((r) => r.schedule === value).length;
   const hasUnscheduled = rows.some((r) => r.schedule === null);
 
+  // A search looks past Show and Schedule (`lib/filterMenus`' rule); the
+  // Window holds, being what the server loaded.
+  const searching = term.trim() !== "";
+  const pausedCount = searching ? [tier !== "all", schedule !== "all"].filter(Boolean).length : 0;
   const shown = useMemo(() => {
     const q = term.trim().toLowerCase();
     return rows.filter((r) => {
+      if (q) {
+        return [r.log_date, r.kitchenCode, scheduleLabel(r.schedule), r.generatedByName ?? "", r.note ?? ""]
+          .join(" ")
+          .toLowerCase()
+          .includes(q);
+      }
       if (tier === "open" && r.status !== "open") return false;
       if (tier === "today" && r.log_date !== today) return false;
       if (tier === "complete" && r.status !== "complete") return false;
       if (schedule === "none" && r.schedule !== null) return false;
       if (schedule !== "all" && schedule !== "none" && r.schedule !== schedule) return false;
-      if (!q) return true;
-      return [r.log_date, r.kitchenCode, scheduleLabel(r.schedule), r.generatedByName ?? "", r.note ?? ""]
-        .join(" ")
-        .toLowerCase()
-        .includes(q);
+      return true;
     });
   }, [rows, tier, schedule, term, today]);
 
@@ -363,42 +370,46 @@ export function BatchLogsIndex({
           </div>
         </ControlField>
 
-        <ControlField label="Show">
-          <PickList
-            ariaLabel="Which logs"
-            variant="field"
-            value={tier}
-            onPick={(next) => setTier(next as Tier)}
-            options={[
-              { value: "open", label: "Open", hint: String(counts.open) },
-              { value: "today", label: "Today", hint: String(counts.today) },
-              { value: "complete", label: "Complete", hint: String(counts.complete) },
-              { value: "all", label: "All", hint: String(counts.all) },
-            ]}
-            fit
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Show">
+            <PickList
+              ariaLabel="Which logs"
+              variant="field"
+              value={tier}
+              onPick={(next) => setTier(next as Tier)}
+              options={[
+                { value: "open", label: "Open", hint: String(counts.open) },
+                { value: "today", label: "Today", hint: String(counts.today) },
+                { value: "complete", label: "Complete", hint: String(counts.complete) },
+                { value: "all", label: "All", hint: String(counts.all) },
+              ]}
+              fit
+            />
+          </ControlField>
+        </div>
 
-        <ControlField label="Schedule">
-          <PickList
-            ariaLabel="Which schedule"
-            variant="field"
-            value={schedule}
-            onPick={(next) => setSchedule(next || "all")}
-            options={[
-              { value: "all", label: "All", hint: String(rows.length) },
-              ...SCHEDULE_CLASSES.map((value) => ({
-                value,
-                label: scheduleLabel(value),
-                hint: String(scheduleCount(value)),
-              })),
-              ...(hasUnscheduled
-                ? [{ value: "none", label: "None", hint: String(scheduleCount(null)) }]
-                : []),
-            ]}
-            fit
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Schedule">
+            <PickList
+              ariaLabel="Which schedule"
+              variant="field"
+              value={schedule}
+              onPick={(next) => setSchedule(next || "all")}
+              options={[
+                { value: "all", label: "All", hint: String(rows.length) },
+                ...SCHEDULE_CLASSES.map((value) => ({
+                  value,
+                  label: scheduleLabel(value),
+                  hint: String(scheduleCount(value)),
+                })),
+                ...(hasUnscheduled
+                  ? [{ value: "none", label: "None", hint: String(scheduleCount(null)) }]
+                  : []),
+              ]}
+              fit
+            />
+          </ControlField>
+        </div>
 
         <ControlField label="Group by">
           <PickList
@@ -415,6 +426,7 @@ export function BatchLogsIndex({
             fit
           />
         </ControlField>
+        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} held="Window" /> : null}
       </div>
       {note}
     <DataTable

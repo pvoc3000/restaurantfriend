@@ -10,6 +10,7 @@ import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { SHIFT_SLOT_LABEL } from "@/lib/employeeEvents";
 import { CHECKLIST_KIND_LABEL, type ChecklistKind } from "@/lib/checklists";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 const WIDTHS_KEY = "rf.checklists.columnWidths.v1";
 
@@ -78,9 +79,11 @@ export function ChecklistsList({
     );
   }, [rows, search]);
 
+  // A search looks past Show (`lib/filterMenus`' `searchingValues` rule).
+  const searching = search.trim() !== "";
   const shown = useMemo(
-    () => (tier === "open" ? searched.filter((r) => r.status === "open") : searched),
-    [searched, tier],
+    () => (tier === "open" && !searching ? searched.filter((r) => r.status === "open") : searched),
+    [searched, tier, searching],
   );
 
   // What today is asked for and has NOT been walked. Stated as a sentence
@@ -196,23 +199,26 @@ export function ChecklistsList({
           search
           icon={<SearchGlyph />}
         />
-        <ControlField label="Show">
-          <PickList
-            ariaLabel="Which ones"
-            variant="field"
-            value={tier}
-            options={[
-              {
-                value: "open",
-                label: "Unfinished",
-                hint: String(searched.filter((r) => r.status === "open").length),
-              },
-              { value: "all", label: "All", hint: String(searched.length) },
-            ]}
-            onPick={(v) => setTier(v as typeof tier)}
-            fit
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Show">
+            <PickList
+              ariaLabel="Which ones"
+              variant="field"
+              value={tier}
+              options={[
+                {
+                  value: "open",
+                  label: "Unfinished",
+                  hint: String(searched.filter((r) => r.status === "open").length),
+                },
+                { value: "all", label: "All", hint: String(searched.length) },
+              ]}
+              onPick={(v) => setTier(v as typeof tier)}
+              fit
+            />
+          </ControlField>
+        </div>
+        {searching && tier !== "all" ? <SearchPausedNote count={1} /> : null}
       </div>
 
       {outstanding.length > 0 && (

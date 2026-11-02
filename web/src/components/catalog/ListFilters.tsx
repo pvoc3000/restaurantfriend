@@ -5,6 +5,7 @@ import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { PickList } from "@/components/ui/PickList";
 import { ControlField } from "@/components/ui/ControlField";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 export type ActiveFilter = "active" | "inactive" | "all";
 export type StaleFilter = StaleBucket | "any";
@@ -54,6 +55,16 @@ export function ListFilters({
   staleCounts?: Record<string, number>;
   totalCount?: number;
 }) {
+  // While there is a term the filters pause — the caller skips them, this dims
+  // them and says so (`lib/filterMenus`' `searchingValues` rule).
+  const searching = term.trim() !== "";
+  const pausedCount = searching
+    ? [
+        !!(categories && onCategory && category),
+        !!(active && onActive && active !== "all"),
+        !!(stale && onStale && stale !== "any"),
+      ].filter(Boolean).length
+    : 0;
   return (
     <div className="flex min-w-0 flex-wrap items-end gap-3">
       <TextInput
@@ -66,50 +77,57 @@ export function ListFilters({
       />
 
       {categories && onCategory && (
-        <ControlField label="Category">
-          <PickList
-            variant="field"
-            ariaLabel="Category"
-            value={category ?? ""}
-            onPick={onCategory}
-            options={[
-              { value: "", label: "All categories" },
-              ...categories.map((c) => ({ value: c, label: c })),
-            ]}
-            className="w-56"
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Category">
+            <PickList
+              variant="field"
+              ariaLabel="Category"
+              value={category ?? ""}
+              onPick={onCategory}
+              options={[
+                { value: "", label: "All categories" },
+                ...categories.map((c) => ({ value: c, label: c })),
+              ]}
+              className="w-56"
+            />
+          </ControlField>
+        </div>
       )}
 
       {active && onActive && (
-        <ControlField label="Show">
-          <PickList
-            variant="field"
-            fit
-            ariaLabel="Active state"
-            value={active}
-            onPick={(v) => onActive(v as ActiveFilter)}
-            options={ACTIVE_TABS.map((t) => ({ value: t.key, label: t.label }))}
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Show">
+            <PickList
+              variant="field"
+              fit
+              ariaLabel="Active state"
+              value={active}
+              onPick={(v) => onActive(v as ActiveFilter)}
+              options={ACTIVE_TABS.map((t) => ({ value: t.key, label: t.label }))}
+            />
+          </ControlField>
+        </div>
       )}
 
       {stale && onStale && (
-        <ControlField label="Last ordered">
-          <PickList
-            variant="field"
-            fit
-            ariaLabel="Last ordered"
-            value={stale}
-            onPick={(v) => onStale(v as StaleFilter)}
-            options={(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => ({
-              value: t,
-              label: t === "any" ? "Any age" : STALE_LABEL[t],
-              hint: String(t === "any" ? totalCount ?? 0 : staleCounts?.[t] ?? 0),
-            }))}
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Last ordered">
+            <PickList
+              variant="field"
+              fit
+              ariaLabel="Last ordered"
+              value={stale}
+              onPick={(v) => onStale(v as StaleFilter)}
+              options={(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => ({
+                value: t,
+                label: t === "any" ? "Any age" : STALE_LABEL[t],
+                hint: String(t === "any" ? totalCount ?? 0 : staleCounts?.[t] ?? 0),
+              }))}
+            />
+          </ControlField>
+        </div>
       )}
+      {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
     </div>
   );
 }

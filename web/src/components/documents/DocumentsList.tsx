@@ -21,6 +21,7 @@ import { openWindowNow } from "@/lib/poProcessing";
 import { NewDocument } from "./NewDocument";
 import { deleteDocuments, duplicateDocument } from "./documentWrites";
 import { openDocumentFiles } from "./openDocumentFiles";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 export type DocumentRow = {
   id: string;
@@ -205,10 +206,11 @@ export function DocumentsList({
 
   const filtered = useMemo(
     () =>
-      category === "all"
+      // A search looks past the category (`lib/filterMenus`' `searchingValues` rule).
+      category === "all" || needle
         ? searched
         : searched.filter((r) => (r.category ?? NO_CATEGORY) === category),
-    [searched, category]
+    [searched, category, needle]
   );
 
   const allChecked = filtered.length > 0 && filtered.every((r) => checked.has(r.id));
@@ -381,16 +383,19 @@ export function DocumentsList({
           search
           icon={<SearchGlyph />}
         />
-        <ControlField label="Category">
-          <PickList
-            ariaLabel="Which category of documents to show"
-            variant="field"
-            value={category}
-            onPick={setCategory}
-            options={categoryOptions}
-            fit
-          />
-        </ControlField>
+        <div className={needle ? PAUSED : undefined}>
+          <ControlField label="Category">
+            <PickList
+              ariaLabel="Which category of documents to show"
+              variant="field"
+              value={category}
+              onPick={setCategory}
+              options={categoryOptions}
+              fit
+            />
+          </ControlField>
+        </div>
+        {needle && category !== "all" ? <SearchPausedNote count={1} /> : null}
       </div>
       {failed && <p className="text-sm text-accent">{failed}</p>}
       <DataTable

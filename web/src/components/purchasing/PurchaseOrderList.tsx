@@ -56,6 +56,7 @@ import { RowMenu } from "@/components/ui/RowMenu";
 import type { PoListRow } from "@/app/(app)/purchase-orders/page";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 // Widths and hidden columns share this key — one table, one identity.
 const PO_WIDTHS_KEY = "rf.purchaseOrders.columnWidths.v2";
@@ -190,9 +191,12 @@ export function PurchaseOrderList({
   const beforeVendor = useMemo(() => {
     const words = filters.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return orders.filter((po) => {
-      // A set; empty means every status.
-      if (filters.status.length > 0 && !filters.status.includes(po.status)) return false;
-      if (words.length === 0) return true;
+      // A search looks past Status and Vendors — the `lib/filterMenus` rule.
+      // The window holds: only it was loaded.
+      if (words.length === 0) {
+        // A set; empty means every status.
+        return filters.status.length === 0 || filters.status.includes(po.status);
+      }
       const haystack = `${po.po_number} ${po.vendors?.name ?? ""} ${po.status}`.toLowerCase();
       return words.every((w) => haystack.includes(w));
     });
@@ -203,10 +207,16 @@ export function PurchaseOrderList({
     [beforeVendor, filters.vendors]
   );
 
+  const searching = filters.q.trim() !== "";
+  const pausedCount = searching
+    ? [filters.status.length > 0, filters.vendors.length > 0].filter(Boolean).length
+    : 0;
   const visible = useMemo(
     () =>
-      beforeVendor.filter((po) => matchesVendorFilter(po.vendors?.name, filters.vendors)),
-    [beforeVendor, filters.vendors]
+      searching
+        ? beforeVendor
+        : beforeVendor.filter((po) => matchesVendorFilter(po.vendors?.name, filters.vendors)),
+    [beforeVendor, filters.vendors, searching]
   );
 
   const sorted = useMemo(
@@ -989,18 +999,20 @@ export function PurchaseOrderList({
             question this list is asked, and eighty vendors were never going to
             be a row of tabs. It sits with the controls that NARROW the list,
             and the picker grows its own find box past eight options. */}
-        <ControlField label="Vendors">
-          <PickSet
-            options={vendorOptions}
-            value={filters.vendors}
-            onChange={(vendors) => update({ vendors })}
-            allLabel="All vendors"
-            noun="vendors"
-            label="Which vendors to show"
-            className="max-w-[16rem]"
-            minWidth={240}
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Vendors">
+            <PickSet
+              options={vendorOptions}
+              value={filters.vendors}
+              onChange={(vendors) => update({ vendors })}
+              allLabel="All vendors"
+              noun="vendors"
+              label="Which vendors to show"
+              className="max-w-[16rem]"
+              minWidth={240}
+            />
+          </ControlField>
+        </div>
 
         {/* A LIST RATHER THAN A ROW OF TABS (Mark, 2026-09-10), which is the
             conversion `/bills` made for its Due tabs and the order guide
@@ -1019,17 +1031,20 @@ export function PurchaseOrderList({
             AND THE CHOSEN STATUS IS ALWAYS IN THE LIST — see `statusTabs`,
             where keeping it is what makes the trigger read "Received" rather
             than the raw column value on a window that holds none. */}
-        <ControlField label="Status">
-          <PickSet
-            options={statusOptions}
-            value={filters.status}
-            onChange={(next) => update({ status: next as PoStatus[] })}
-            allLabel="All"
-            noun="statuses"
-            label="Which statuses to show"
-            minWidth={200}
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Status">
+            <PickSet
+              options={statusOptions}
+              value={filters.status}
+              onChange={(next) => update({ status: next as PoStatus[] })}
+              allLabel="All"
+              noun="statuses"
+              label="Which statuses to show"
+              minWidth={200}
+            />
+          </ControlField>
+        </div>
+        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} held="Window" /> : null}
       </div>
 
       {/* A BATCH'S ERROR, IN THE BAND SLOT (Mark, 2026-09-11: "batcherror could

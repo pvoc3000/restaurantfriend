@@ -28,6 +28,7 @@ import {
   type TaskStatus,
 } from "@/lib/facilityTasks";
 import { ResolveTask } from "./ResolveTask";
+import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
 
 export type TaskRow = {
   id: string;
@@ -126,11 +127,13 @@ export function TasksScreen({
     );
   }, [rows, search, assigneeName]);
 
+  // A search looks past Show (`lib/filterMenus`' `searchingValues` rule).
+  const searching = search.trim() !== "";
   const shown = useMemo(() => {
-    if (tier === "all") return searched;
+    if (tier === "all" || searching) return searched;
     if (tier === "done") return searched.filter((r) => !isTaskOpen(r));
     return searched.filter((r) => isTaskOpen(r));
-  }, [searched, tier]);
+  }, [searched, tier, searching]);
 
   const banner = staleTaskBanner(rows, today);
 
@@ -478,28 +481,31 @@ export function TasksScreen({
           search
           icon={<SearchGlyph />}
         />
-        <ControlField label="Show">
-          <PickList
-            ariaLabel="Which"
-            variant="field"
-            value={tier}
-            options={[
-              {
-                value: "open",
-                label: "Open",
-                hint: String(searched.filter((r) => isTaskOpen(r)).length),
-              },
-              {
-                value: "done",
-                label: "Finished",
-                hint: String(searched.filter((r) => !isTaskOpen(r)).length),
-              },
-              { value: "all", label: "All", hint: String(searched.length) },
-            ]}
-            onPick={(v) => setTier(v as typeof tier)}
-            fit
-          />
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Show">
+            <PickList
+              ariaLabel="Which"
+              variant="field"
+              value={tier}
+              options={[
+                {
+                  value: "open",
+                  label: "Open",
+                  hint: String(searched.filter((r) => isTaskOpen(r)).length),
+                },
+                {
+                  value: "done",
+                  label: "Finished",
+                  hint: String(searched.filter((r) => !isTaskOpen(r)).length),
+                },
+                { value: "all", label: "All", hint: String(searched.length) },
+              ]}
+              onPick={(v) => setTier(v as typeof tier)}
+              fit
+            />
+          </ControlField>
+        </div>
+        {searching && tier !== "all" ? <SearchPausedNote count={1} /> : null}
       </div>
 
       <DataTable
