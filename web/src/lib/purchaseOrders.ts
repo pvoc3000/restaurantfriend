@@ -252,14 +252,34 @@ export function isFreeLine(line: { unit_price: number | null }): boolean {
 }
 
 /**
- * Lines whose invoice price differs from the catalog price — the `≠` marker on
- * PO detail's Unit price column.
+ * Lines whose invoice price differs from the catalog price — the red
+ * difference beside PO detail's Unit price (`priceDifferenceLabel`).
  */
 export function priceDiffers(line: PoLine): boolean {
   if (line.unit_price === null || !line.vendor_items) return false;
   const catalog = line.vendor_items.price;
   if (catalog === null) return false;
   return Number(catalog) !== Number(line.unit_price);
+}
+
+/**
+ * How far a line's price is from the catalog's, as PO detail prints it beside
+ * the unit price (Mark, 2026-11-02: "+33%" in red, in place of a bare `≠`).
+ * Relative to the CATALOG, so "+33%" reads "we paid a third more than we
+ * expected". Whole percents, except under one, where rounding would print
+ * "+0%" beside two prices that differ; a typographic minus, like the rest of
+ * the app's text. Against a $0.00 catalog price there is no percentage, so it
+ * says the dollar difference instead. Null where `priceDiffers` is false.
+ */
+export function priceDifferenceLabel(line: PoLine): string | null {
+  if (!priceDiffers(line)) return null;
+  const catalog = Number(line.vendor_items!.price);
+  const paid = Number(line.unit_price);
+  const sign = paid > catalog ? "+" : "−";
+  if (catalog === 0) return `${sign}${money(Math.abs(paid - catalog))}`;
+  const pct = (Math.abs(paid - catalog) / catalog) * 100;
+  const shown = pct < 1 ? pct.toFixed(1) : String(Math.round(pct));
+  return `${sign}${shown === "0.0" ? "0.1" : shown}%`;
 }
 
 /**

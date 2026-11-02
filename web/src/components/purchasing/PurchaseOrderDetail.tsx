@@ -11,7 +11,7 @@ import {
   money,
   orderedQty,
   orderedTotal,
-  priceDiffers,
+  priceDifferenceLabel,
   receivedQty,
   receivedTotal,
   PO_STATUS_CLASS,
@@ -669,21 +669,24 @@ export function PurchaseOrderDetail({
     {
       key: "unit_price",
       label: "Unit price",
-      width: 110,
+      // Room for "$123.45 −12.5%" — the difference sits beside the price.
+      width: 130,
       align: "right",
       sortValue: (l) => (l.unit_price === null ? null : Number(l.unit_price)),
       render: (l) => {
         const catalog = l.vendor_items?.price;
-        // Editing this changes what the ORDER says it paid. The ≠ is a FLAG,
-        // not an action: pushing the number the other way onto the catalog is
-        // receiving's job now, where it's the second stage of a labelled
-        // button rather than a band of its own.
-        const marker = priceDiffers(l) && (
+        // Editing this changes what the ORDER says it paid. The difference is
+        // a FLAG, not an action: pushing the number the other way onto the
+        // catalog is receiving's job now, where it's the second stage of a
+        // labelled button rather than a band of its own. It says HOW FAR off
+        // (Mark, 2026-11-02), where a bare ≠ only said that it was.
+        const difference = priceDifferenceLabel(l);
+        const marker = difference && (
           <span
-            className="ml-1 shrink-0 text-xs font-semibold text-accent"
+            className="ml-1 shrink-0 whitespace-nowrap text-xs font-semibold tabular-nums text-accent"
             title={`Catalog price is ${money(catalog ?? null)} — settle it on the receiving screen`}
           >
-            ≠
+            {difference}
           </span>
         );
         if (!canEditLines) {

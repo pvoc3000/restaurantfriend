@@ -15,6 +15,7 @@ import {
   closeReadiness,
   isFreeLine,
   mergeTargetLine,
+  priceDifferenceLabel,
   samePrice,
 } from "../../src/lib/purchaseOrders";
 import { priceAction } from "../../src/lib/receiving";
@@ -247,4 +248,30 @@ test("sameSku: the matcher's own rules, so the Match dialog cannot disagree", ()
   no(sameSku("08779", "50021"), "a renumbered item is a real difference — copy it");
   no(sameSku(null, "08779"), "no number on the line is not a match");
   no(sameSku("08779", null));
+});
+
+// ── priceDifferenceLabel ────────────────────────────────────────────────────
+// PO detail's red "+33%" beside the unit price (Mark, 2026-11-02), relative to
+// the catalog's price.
+
+test("priceDifferenceLabel: up and down, relative to the catalog, typographic minus", () => {
+  eq(priceDifferenceLabel(withCatalog(poLine({ unit_price: 4 }), { price: 3 })), "+33%");
+  eq(priceDifferenceLabel(withCatalog(poLine({ unit_price: 2.5 }), { price: 5 })), "−50%");
+  eq(priceDifferenceLabel(withCatalog(poLine({ unit_price: 10.5 }), { price: 10 })), "+5%");
+});
+
+test("priceDifferenceLabel: under one percent is never printed as 0%", () => {
+  eq(priceDifferenceLabel(withCatalog(poLine({ unit_price: 100.5 }), { price: 100 })), "+0.5%");
+  eq(priceDifferenceLabel(withCatalog(poLine({ unit_price: 1000.01 }), { price: 1000 })), "+0.1%");
+});
+
+test("priceDifferenceLabel: nothing when the prices agree or one is missing", () => {
+  eq(priceDifferenceLabel(withCatalog(poLine({ unit_price: 3 }), { price: 3 })), null);
+  eq(priceDifferenceLabel(withCatalog(poLine({ unit_price: null }), { price: 3 })), null);
+  eq(priceDifferenceLabel(withCatalog(poLine({ unit_price: 3 }), { price: null })), null);
+  eq(priceDifferenceLabel(poLine({ unit_price: 3 })), null, "no catalog row");
+});
+
+test("priceDifferenceLabel: a $0.00 catalog price has no percentage — dollars instead", () => {
+  eq(priceDifferenceLabel(withCatalog(poLine({ unit_price: 4.25 }), { price: 0 })), "+$4.25");
 });
