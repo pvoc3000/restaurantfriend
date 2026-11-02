@@ -45,10 +45,24 @@ export type DeliveryItem = {
   taxable: boolean;
 };
 
+/** 220's `order_refundable`: what is billed and not yet given back, by kind.
+ *  Amounts; a discount is negative. */
+export type OrderRefundable = {
+  items: number;
+  discount: number;
+  delivery: number;
+  rush: number;
+  tax: number;
+  /** Already given back as an amount — "All" refuses an order with one. */
+  allowance: number;
+  total: number;
+};
+
 export type OrderDelivery = {
   items: DeliveryItem[];
   unbilled: number;
   credited: number;
+  refundable: OrderRefundable;
   short_decision: "no_credit" | null;
   short_decision_note: string | null;
   short_decision_by: string | null;
@@ -78,6 +92,13 @@ export function normalizeDelivery(raw: unknown): OrderDelivery | null {
     })),
     unbilled: num(r.unbilled),
     credited: num(r.credited),
+    refundable: (() => {
+      const f = (r.refundable ?? {}) as Record<string, unknown>;
+      return {
+        items: num(f.items), discount: num(f.discount), delivery: num(f.delivery), rush: num(f.rush),
+        tax: num(f.tax), allowance: num(f.allowance), total: num(f.total),
+      };
+    })(),
     short_decision: (r.short_decision as "no_credit" | null) ?? null,
     short_decision_note: (r.short_decision_note as string | null) ?? null,
     short_decision_by: (r.short_decision_by as string | null) ?? null,
@@ -90,6 +111,13 @@ export function normalizeDelivery(raw: unknown): OrderDelivery | null {
 export function creditableItems(d: OrderDelivery | null): DeliveryItem[] {
   if (!d || d.short_decision) return [];
   return d.items.filter((i) => i.creditable > 0);
+}
+
+/** `orgs.settings.customer_credit_memos.allowance_reasons`: why money is
+ *  given back on anything but a short. */
+export function readAllowanceReasons(settings: Record<string, unknown> | null | undefined): string[] {
+  const m = (settings?.customer_credit_memos ?? {}) as { allowance_reasons?: unknown };
+  return Array.isArray(m.allowance_reasons) ? m.allowance_reasons.filter((r): r is string => typeof r === "string") : [];
 }
 
 /** Quantities print as the order prints them: whole numbers bare. */
@@ -170,7 +198,7 @@ export async function settleCreditMemo(
  * ========================================================================== */
 
 export type CreditMemoLineRow = {
-  line_type: "item" | "discount" | "rush" | "tax" | "allowance";
+  line_type: "item" | "discount" | "delivery" | "rush" | "tax" | "allowance";
   description: string;
   qty: number | null;
   unit_price: number | null;
@@ -196,10 +224,18 @@ export type CreditMemoPaperLine = {
 export function paperLine(l: CreditMemoLineRow): CreditMemoPaperLine {
   if (l.line_type === "item") {
     const m = /^(.*) — short [\d.]+, delivered ([\d.]+) of ([\d.]+)$/.exec(l.description);
+    // 220: an item given back whole (All) is no short — its quantity rides
+    // the name, and the Short column stays empty.
+    if (!m) {
+      return {
+        item: l.qty === null ? l.description : `${l.description} × ${qtyLabel(l.qty)}`,
+        billed: null, delivered: null, price: l.unit_price, short: null, amount: l.amount, kind: l.line_type,
+      };
+    }
     return {
-      item: m ? m[1] : l.description,
-      billed: m ? Number(m[3]) : null,
-      delivered: m ? Number(m[2]) : null,
+      item: m[1],
+      billed: Number(m[3]),
+      delivered: Number(m[2]),
       price: l.unit_price,
       short: l.qty,
       amount: l.amount,

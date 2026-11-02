@@ -6379,3 +6379,46 @@ DEPLOYED. What landed where:
   Not exercised live: a real QuickBooks CreditMemo, the zero Payment, and a
   memo refund through either processor — the first real ones are Knotted's
   and SO-10152's.
+
+### 220 — every refund on an invoiced order is a credit memo (2026-11-01, WRITTEN, NOT YET APPLIED)
+
+Mark: "Tap 'Refund…' and it brings up the 'Record Short…' dialogue … a refund
+for delivery … for the rush fee … an arbitrary refund not tied to an item …
+including an 'All' option to refund the entire order", and it must work for
+QuickBooks- and Square-collected invoices alike.
+
+- **One dialog.** `IssueCreditMemo` is both Issue Credit Memo… (Items) and
+  Refund… (Billing, on a payment taken on a sent invoice; money held on an
+  order with no invoice is still refunded by amount through `RefundPayment`).
+  Each item's **Short** starts at what the record leaves creditable; raising it
+  records the short first (`record_order_short`, the Note as its reason).
+  Then **Delivery**, **Rush fee**, **Another amount**, and **All** — every
+  short, then everything else billed and not given back, tax included. Anything
+  but shorts takes a **Why** from Settings' allowance reasons.
+- **`issue_order_credit_memo`** writes one memo: shorts through 218's
+  `issue_credit_memo` (kind short_shipment), the rest as lines with
+  `corrects_billing = false` (new column; null on 218's rows = by kind). Only
+  correcting lines count in `special_order_credited`/`_item_credited`, so a
+  delivery refund or an All never makes the order offer to bill again. New
+  line type `'delivery'`. `order_refundable` (billed − every memo line, by
+  kind) caps each part and rides `order_delivery` as `refundable`. All refuses
+  an order that already had an amount given back.
+- **QuickBooks:** `memoSalesLines` puts delivery on the delivery item, untaxed;
+  a rush line keeps its own words. RefundReceipt/CreditMemo unchanged otherwise.
+- **Square (the pinned 2026-09-22 thread, option 1):** `square_memo_refunds`
+  lists each memo refund by Square reporting day (local, 01:00 rollover), with
+  goods / delivery / tax cents. `sync-square-sales` reads the refunded sale's
+  order and catalogue for the goods' categories (`memoGoodsByCategory`, three
+  calls a refund) and `_shared/memoRefundSplit` moves the refund out of the
+  Uncategorized return onto those categories, the Delivery service charge and
+  sales tax — the day's sum unchanged. A refund the day does not show as an
+  Uncategorized return of at least its amount is left alone with a warning.
+  `totals.memo_refunds_cents` records what moved; the builder's "refunded by
+  amount" warning nets it out and says what posted against the memo.
+- **Rehearsed** in a transaction that never committed, on SO-10152: the short
+  memo $19.62 (17.80 + 1.82 tax, both correcting), a $10 Goodwill amount (not
+  correcting, unbilled stayed 0), All refused beside it; then All alone gave
+  back the remaining $144.43 with $13.43 tax and left `order_refundable` at 0
+  and unbilled at 0; over-cap delivery and amounts refused by name.
+- **Not done:** applying 220 and deploying `qbo-sync` and `sync-square-sales`
+  — the session's permission guard stopped both; they wait for Mark.

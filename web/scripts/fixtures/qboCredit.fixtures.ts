@@ -138,3 +138,32 @@ test("memoSalesLines: rush needs its item; an allowance is untaxed", () => {
   eq(allowance.lines.length, 1, "one line");
   eq(((allowance.lines[0].SalesItemLineDetail as Record<string, unknown>).TaxCodeRef as { value: string }).value, "NON", "untaxed");
 });
+
+test("memoSalesLines: delivery goes on the delivery item, untaxed, and needs it (220)", () => {
+  const lines = [
+    { line_type: "delivery" as const, description: "Delivery", qty: null, unit_price: null, amount: 25, taxable: false },
+    { line_type: "rush" as const, description: "Rush fee", qty: null, unit_price: null, amount: 15, taxable: false },
+  ];
+  const r = memoSalesLines(lines, coding, "RUSH", "DEL");
+  eq(r.error, null, "no error");
+  eq(r.lines.length, 2, "rush and delivery");
+  const del = r.lines.find((l) => (l.SalesItemLineDetail as { ItemRef: { value: string } }).ItemRef.value === "DEL");
+  eq(del?.Amount, 25, "delivery on DEL");
+  eq(((del!.SalesItemLineDetail as Record<string, unknown>).TaxCodeRef as { value: string }).value, "NON", "untaxed");
+  eq(r.lines.find((l) => l !== del)?.Description, "Rush fee", "rush takes its line's own words");
+  ok(!!memoSalesLines(lines, coding, "RUSH", null).error, "refused without a delivery item");
+});
+
+test("memoSalesLines: All — every item, the discount, delivery and tax, summing to the memo", () => {
+  const lines = [
+    { line_type: "item" as const, description: "A", qty: 18, unit_price: 2.1, amount: 37.8, taxable: true },
+    { line_type: "item" as const, description: "B", qty: 1, unit_price: 17.6, amount: 17.6, taxable: true },
+    { line_type: "discount" as const, description: "Discount", qty: null, unit_price: null, amount: -5.54, taxable: false },
+    { line_type: "delivery" as const, description: "Delivery", qty: null, unit_price: null, amount: 30, taxable: false },
+    { line_type: "tax" as const, description: "Sales tax", qty: null, unit_price: null, amount: 5.11, taxable: false },
+  ];
+  const r = memoSalesLines(lines, coding, "RUSH", "DEL");
+  const total = r.lines.reduce((a, l) => a + Math.round(Number(l.Amount) * 100), 0);
+  eq(total, 3780 + 1760 - 554 + 3000, "everything but the tax, which QuickBooks computes");
+  eq(r.taxed, true, "taxed");
+});

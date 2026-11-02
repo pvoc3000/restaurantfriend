@@ -39,6 +39,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { resolveItemPrice } from "@/lib/productionPrice";
 import { type OrderLineRow } from "@/components/specialOrders/OrderLines";
+import { readAllowanceReasons } from "@/lib/creditMemos";
 import { OrderItemsTab } from "@/components/specialOrders/OrderItemsTab";
 import { OrderNumberCell } from "@/components/specialOrders/OrderNumberCell";
 import type { MenuItem } from "@/components/specialOrders/AddOrderLine";
@@ -433,6 +434,25 @@ export async function SpecialOrderDetail({
   const liveInvoice = liveInvoiceRow
     ? { id: liveInvoiceRow.id, label: invoiceLabel(liveInvoiceRow), status: invoiceStatus(liveInvoiceRow, today) }
     : null;
+
+  // WHAT A CREDIT MEMO NEEDS (218, 220), shared by Issue Credit Memo… on
+  // Items and Refund… on Billing — one dialog, opened from either.
+  const memoContext =
+    kind === "order"
+      ? {
+          raw: deliveryRaw ?? null,
+          orderNumber: row.number as string,
+          standing: Boolean(row.standing_order_id),
+          reasons: readAllowanceReasons(session.orgSettings as Record<string, unknown>),
+          invoices: liveInvoices
+            .filter((l) => l.invoice.sent_at || l.invoice.paid_at)
+            .map((l) => ({
+              id: l.invoice.id,
+              label: invoiceLabel(l.invoice),
+              processor: l.invoice.processor === "quickbooks" ? ("quickbooks" as const) : ("square" as const),
+            })),
+        }
+      : null;
 
   // A PAYMENT SPLIT ACROSS SEVERAL ORDERS OR INVOICES (140) is one payment:
   // its amount and its removal are not one order's to change. Only a payment
@@ -1437,22 +1457,13 @@ export async function SpecialOrderDetail({
                     canGroup={canWrite}
                     menu={menu}
                     delivery={
-                      kind === "order"
+                      memoContext
                         ? {
-                            raw: deliveryRaw ?? null,
+                            ...memoContext,
                             // Recording a short is NOT the schedule's lock: the
                             // kitchen having the order is exactly when it goes out.
                             canRecord: canWrite && status !== "cancelled",
                             canIssue: canRefundPayments(session.membership.role),
-                            orderNumber: row.number as string,
-                            standing: Boolean(row.standing_order_id),
-                            invoices: liveInvoices
-                              .filter((l) => l.invoice.sent_at || l.invoice.paid_at)
-                              .map((l) => ({
-                                id: l.invoice.id,
-                                label: invoiceLabel(l.invoice),
-                                processor: l.invoice.processor === "quickbooks" ? ("quickbooks" as const) : ("square" as const),
-                              })),
                           }
                         : null
                     }
@@ -1497,6 +1508,7 @@ export async function SpecialOrderDetail({
                     balance={totals.balance}
                     canWrite={canWrite}
                     canRefund={canRefundPayments(session.membership.role)}
+                    memoContext={memoContext}
                     today={today}
                     workflow={row as never}
                   />

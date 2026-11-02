@@ -23,6 +23,8 @@ type Delivery = {
   standing: boolean;
   /** The invoices that went out billing this order: what a memo can correct. */
   invoices: MemoInvoice[];
+  /** `readAllowanceReasons`. */
+  reasons: string[];
 };
 
 /**
@@ -81,8 +83,9 @@ export function OrderItemsTab({
         <IssueCreditMemo
           orderId={lines.orderId}
           orderNumber={delivery.orderNumber}
-          items={creditableItems(d)}
+          delivery={d}
           invoices={delivery.invoices}
+          reasons={delivery.reasons}
           standing={delivery.standing}
           note={d.items.find((i) => i.creditable > 0 && i.note)?.note ?? ""}
           onClose={() => setIssuing(false)}

@@ -60,7 +60,7 @@ export function paymentCash(p: QboPaymentLike): {
 
 /** A memo's own line, as 218 stores it. */
 export type MemoLine = {
-  line_type: "item" | "discount" | "rush" | "tax" | "allowance";
+  line_type: "item" | "discount" | "delivery" | "rush" | "tax" | "allowance";
   description: string;
   qty: number | null;
   unit_price: number | null;
@@ -84,13 +84,15 @@ export type CodingLine = {
  *
  * A DISCOUNT on the memo cannot sit beside a quantity and price (QuickBooks
  * holds Amount = Qty × UnitPrice), so a memo with one folds it into one line
- * per tax treatment, as the invoice push does. Rush goes on the rush item.
+ * per tax treatment, as the invoice push does. Rush goes on the rush item and
+ * delivery on the delivery item (220), both untaxed, as the invoice has them.
  * An allowance is one untaxed line on the order's own sales item.
  */
 export function memoSalesLines(
   lines: MemoLine[],
   coding: CodingLine[],
-  rushItemRef: string | null
+  rushItemRef: string | null,
+  deliveryItemRef: string | null = null
 ): { lines: Record<string, unknown>[]; taxed: boolean; error: string | null } {
   const pick = (taxable: boolean) =>
     coding.find((c) => c.taxable === taxable) ?? coding[0] ?? null;
@@ -99,6 +101,7 @@ export function memoSalesLines(
   const items = lines.filter((l) => l.line_type === "item");
   const discount = lines.filter((l) => l.line_type === "discount").reduce((a, l) => a + cents(l.amount), 0);
   const rush = lines.filter((l) => l.line_type === "rush").reduce((a, l) => a + cents(l.amount), 0);
+  const delivery = lines.filter((l) => l.line_type === "delivery").reduce((a, l) => a + cents(l.amount), 0);
   const allowance = lines.filter((l) => l.line_type === "allowance");
   const out: Record<string, unknown>[] = [];
   const sale = (amountCents: number, description: string, c: CodingLine, taxable: boolean, qty?: number | null, price?: number | null) => {
@@ -134,7 +137,12 @@ export function memoSalesLines(
   }
   if (rush > 0) {
     if (!rushItemRef) return { lines: [], taxed: false, error: "no QuickBooks item is set for rush fees" };
-    sale(rush, "Rush fee on the items credited", { itemRef: rushItemRef, taxable: false, classRef: pick(false)!.classRef }, false);
+    const label = lines.find((l) => l.line_type === "rush")?.description ?? "Rush fee";
+    sale(rush, label, { itemRef: rushItemRef, taxable: false, classRef: pick(false)!.classRef }, false);
+  }
+  if (delivery > 0) {
+    if (!deliveryItemRef) return { lines: [], taxed: false, error: "no QuickBooks item is set for delivery" };
+    sale(delivery, "Delivery", { itemRef: deliveryItemRef, taxable: false, classRef: pick(false)!.classRef }, false);
   }
   for (const a of allowance) sale(cents(a.amount), a.description, pick(false)!, false);
 

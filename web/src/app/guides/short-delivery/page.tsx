@@ -101,8 +101,15 @@ export default function ShortDeliveryGuide() {
             On the order’s Items tab, press <Ui>Issue Credit Memo…</Ui>.
             <p>
               The memo is filled in from the record: the short quantity at the price it was billed
-              at, with its tax. You can credit less than the record shows, never more.
+              at, with its tax. Raising a <strong>Short</strong> figure records that short too, so
+              type why in the <strong>Note</strong>.
             </p>
+          </li>
+          <li>
+            Give back anything else in the same memo: <strong>Delivery</strong>,{" "}
+            <strong>Rush fee</strong>, or <strong>Another amount</strong> — or tick{" "}
+            <Ui>All</Ui> for everything left on the order, tax included. These need a{" "}
+            <strong>Why</strong>.
           </li>
           <li>
             Choose how it is settled:
@@ -120,6 +127,11 @@ export default function ShortDeliveryGuide() {
             the credit memo.
           </li>
         </ol>
+        <Note head="Refunding from the Billing tab">
+          <Ui>Refund…</Ui> beside a payment taken on an invoice opens the same dialog, titled{" "}
+          <strong>Refund</strong>. Money paid before anything was invoiced is still refunded by
+          amount.
+        </Note>
         <Note head="No credit at all?">
           If the missing donuts went out on the next delivery, or the short is a gift, press{" "}
           <Ui>No Credit…</Ui> and say why. <Ui>Change Decision…</Ui> reopens it.

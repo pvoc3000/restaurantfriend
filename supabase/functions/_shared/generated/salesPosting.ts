@@ -67,6 +67,9 @@ export type SalesBreakdown = {
     itemized_returns_cents: number;
     refunds_by_amount_cents: number;
     total_collected_cents: number;
+    /** 220: of `refunds_by_amount_cents`, what was a credit memo's refund and
+     *  was moved back to the lines it was sold on by the sync. */
+    memo_refunds_cents?: number;
   };
 };
 
@@ -525,9 +528,17 @@ export function buildJournalEntry(input: BuildInput): JournalBuild {
       `This day's tips figure (${money(input.tipsCents)}) disagrees with its breakdown (${money(tipCents)}); the entry follows the breakdown.`
     );
   }
-  if (breakdown.totals.refunds_by_amount_cents) {
+  // Refunds by amount are NEGATIVE in the Sales cube; a credit memo's (220)
+  // positive, and already moved back to what it refunded.
+  const byAmountCents = breakdown.totals.refunds_by_amount_cents + (breakdown.totals.memo_refunds_cents ?? 0);
+  if (byAmountCents) {
     warnings.push(
-      `${money(-breakdown.totals.refunds_by_amount_cents)} was refunded by amount rather than by item; Square reports it as a return on the Uncategorized category, which is where it posts.`
+      `${money(-byAmountCents)} was refunded by amount rather than by item; Square reports it as a return on the Uncategorized category, which is where it posts.`
+    );
+  }
+  if (breakdown.totals.memo_refunds_cents) {
+    warnings.push(
+      `${money(breakdown.totals.memo_refunds_cents)} was refunded through credit memos, and posts against what each memo gave back: the goods, delivery and sales tax.`
     );
   }
 

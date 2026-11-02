@@ -38,6 +38,7 @@ import {
   TENDER_CHUNK_DAYS,
   TENDER_REACH_DAYS,
 } from "../_shared/tenderDay.ts";
+import { allocateCents, splitMemoRefunds, type MemoRefund } from "../_shared/memoRefundSplit.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -164,6 +165,61 @@ async function squareFetch(
   }
 
   return body;
+}
+
+/**
+ * The categories a pay-link sale's goods reported in, with a memo's goods
+ * refund spread over them in proportion to each line's gross (220). Three
+ * calls: the payment for its order, the order for its lines, the catalogue for
+ * each line's item and category — the same category `square-catalog` reads
+ * (reporting category first). A line with no catalogue item is Uncategorized,
+ * which is what Square reports it as.
+ */
+async function memoGoodsByCategory(
+  token: string,
+  squarePaymentId: string | null,
+  goodsCents: number
+): Promise<{ category: string; cents: number }[]> {
+  if (goodsCents <= 0) return [];
+  if (!squarePaymentId) throw new Error("the refund names no Square payment");
+  const pay = await squareFetch(token, `/v2/payments/${encodeURIComponent(squarePaymentId)}`);
+  const orderId = (pay.payment as { order_id?: string } | undefined)?.order_id;
+  if (!orderId) throw new Error("the payment has no order");
+  const ord = await squareFetch(token, `/v2/orders/${encodeURIComponent(orderId)}`);
+  const items = ((ord.order as { line_items?: unknown[] } | undefined)?.line_items ?? []) as {
+    catalog_object_id?: string; gross_sales_money?: unknown;
+  }[];
+  const ids = [...new Set(items.map((i) => i.catalog_object_id).filter((x): x is string => !!x))];
+  const categoryOf = new Map<string, string>();
+  if (ids.length) {
+    const cat = await squareFetch(token, "/v2/catalog/batch-retrieve", {
+      method: "POST",
+      body: JSON.stringify({ object_ids: ids, include_related_objects: true }),
+    });
+    type Obj = {
+      id: string; type: string;
+      item_variation_data?: { item_id?: string };
+      item_data?: { reporting_category?: { id?: string }; categories?: { id?: string }[]; category_id?: string };
+      category_data?: { name?: string };
+    };
+    const all = [...((cat.objects ?? []) as Obj[]), ...((cat.related_objects ?? []) as Obj[])];
+    const byId = new Map(all.map((o) => [o.id, o]));
+    for (const id of ids) {
+      const item = byId.get(byId.get(id)?.item_variation_data?.item_id ?? "")?.item_data;
+      const cid = item?.reporting_category?.id ?? item?.categories?.[0]?.id ?? item?.category_id ?? null;
+      const name = (cid ? byId.get(cid)?.category_data?.name : null)?.trim();
+      if (name) categoryOf.set(id, name);
+    }
+  }
+  const weights = new Map<string, number>();
+  for (const i of items) {
+    const c = (i.catalog_object_id && categoryOf.get(i.catalog_object_id)) || "Uncategorized";
+    weights.set(c, (weights.get(c) ?? 0) + Math.max(0, moneyToCents(i.gross_sales_money) ?? 0));
+  }
+  if (!weights.size) throw new Error("the order has no lines");
+  const names = [...weights.keys()];
+  const shares = allocateCents(goodsCents, names.map((n) => weights.get(n)!));
+  return names.map((category, k) => ({ category, cents: shares[k] })).filter((g) => g.cents !== 0);
 }
 
 /** One Reporting API query, retried through `Continue wait`. */
@@ -321,6 +377,9 @@ type Breakdown = {
     itemized_returns_cents: number;
     refunds_by_amount_cents: number;
     total_collected_cents: number;
+    /** 220: the part of `refunds_by_amount_cents` that was a credit memo's
+     *  refund, moved back to the lines it was sold on. */
+    memo_refunds_cents?: number;
   };
 };
 
@@ -1018,6 +1077,43 @@ Deno.serve(async (req) => {
         warnings.push(
           `The breakdown was not pulled for ${from} – ${to} (${e instanceof Error ? e.message : String(e)}) — net sales and tips were saved, and the QuickBooks post will refuse these days until a sync brings the breakdown`
         );
+      }
+    }
+
+    // 220: A CREDIT MEMO'S SQUARE REFUND, BOOKED AS WHAT IT WAS. Square
+    // reports it as an Uncategorized return; the memo says goods, delivery and
+    // tax, and the goods go back to the categories the original sale's lines
+    // report in. `_shared/memoRefundSplit` has the rule.
+    if (breakdowns.size) {
+      const { data: memoRefunds, error: mrErr } = await supabase.rpc("square_memo_refunds", {
+        p_org: member.org_id, p_from: from, p_to: to,
+      });
+      if (mrErr) warnings.push(`Credit memo refunds could not be read (${mrErr.message}) — any posts as Square reports it`);
+      const byDay = new Map<string, MemoRefund[]>();
+      for (const r of (memoRefunds ?? []) as {
+        memo_label: string; square_location_id: string | null; reporting_day: string; square_payment_id: string | null;
+        goods_cents: number; taxable_goods_cents: number; delivery_cents: number; tax_cents: number;
+      }[]) {
+        const key = `${r.square_location_id}|${r.reporting_day}`;
+        if (!breakdowns.has(key)) continue;
+        let goods: MemoRefund["goods"];
+        try {
+          goods = await memoGoodsByCategory(token, r.square_payment_id, Number(r.goods_cents));
+          calls += 3;
+        } catch (e) {
+          warnings.push(`${r.memo_label}'s refund posts as Square reports it: the sale it refunds could not be read (${e instanceof Error ? e.message : String(e)})`);
+          continue;
+        }
+        byDay.set(key, [...(byDay.get(key) ?? []), {
+          label: r.memo_label, goods, deliveryCents: Number(r.delivery_cents), taxCents: Number(r.tax_cents),
+        }]);
+      }
+      for (const [key, refunds] of byDay) {
+        const b = breakdowns.get(key)!;
+        const split = splitMemoRefunds(b.lines, refunds);
+        b.lines = split.lines as BreakdownLine[];
+        if (split.movedCents) b.totals.memo_refunds_cents = (b.totals.memo_refunds_cents ?? 0) + split.movedCents;
+        warnings.push(...split.warnings);
       }
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { useRouter } from "next/navigation";
@@ -12,6 +12,18 @@ import {
 } from "@/lib/orderWorkflow";
 import { WorkflowOffer } from "./WorkflowOffer";
 import { RefundPayment } from "./RefundPayment";
+import { IssueCreditMemo, type MemoInvoice } from "@/components/creditMemos/IssueCreditMemo";
+import { normalizeDelivery } from "@/lib/creditMemos";
+
+/** What a credit memo needs, from the order screen (`memoContext` there). */
+export type MemoContext = {
+  /** 217/220's `order_delivery`. */
+  raw: unknown;
+  orderNumber: string;
+  standing: boolean;
+  reasons: string[];
+  invoices: MemoInvoice[];
+};
 import { NewPaymentDialog } from "./NewPaymentDialog";
 import { NewInvoiceDialog } from "./NewInvoiceDialog";
 import type { OpenInvoice } from "@/lib/newPayment";
@@ -46,6 +58,7 @@ export type PaymentRow = {
   shared?: boolean;
   /** The customer invoice this payment was taken on (124), if any. */
   invoice?: { label: string; href: string } | null;
+  customer_invoice_id?: string | null;
   /** What is left to refund of it (`refundLeft`); 0 once given back in full. */
   refundable?: number;
   /** 218: not money but a CREDIT MEMO applied here. Read-only — it changes on
@@ -97,6 +110,7 @@ export function OrderPayments({
   balance,
   canWrite,
   canRefund = false,
+  memoContext: mc = null,
   today,
   workflow,
 }: {
@@ -115,6 +129,13 @@ export function OrderPayments({
   canWrite: boolean;
   /** Manager and up — `canRefundPayments`. Offers Refund… on pay-link rows. */
   canRefund?: boolean;
+  /**
+   * 220: what a credit memo needs. A payment taken on an invoice that went
+   * out is refunded THROUGH A MEMO — Refund… opens Issue Credit Memo's dialog,
+   * so the books say what was given back. Money held on the order, with no
+   * invoice to correct, is still refunded by amount.
+   */
+  memoContext?: MemoContext | null;
   today: string;
   /** Enough of the order to ask whether a settling payment finishes it. */
   workflow: WorkflowOrder;
@@ -126,6 +147,9 @@ export function OrderPayments({
 
   const [offer, setOffer] = useState<Consequence[] | null>(null);
   const [refunding, setRefunding] = useState<PaymentRow | null>(null);
+  const memoDelivery = useMemo(() => normalizeDelivery(mc?.raw), [mc?.raw]);
+  const memoInvoiceOf = (p: PaymentRow) =>
+    p.customer_invoice_id && mc?.invoices.some((i) => i.id === p.customer_invoice_id) ? p.customer_invoice_id : null;
   const [opening, setOpening] = useState<"invoice" | "payment" | null>(null);
 
   /**
@@ -382,7 +406,20 @@ export function OrderPayments({
           onOrderPayment={afterOrderPayment}
         />
       )}
-      {refunding && (
+      {refunding && memoDelivery && mc && memoInvoiceOf(refunding) ? (
+        <IssueCreditMemo
+          refund
+          orderId={orderId}
+          orderNumber={mc.orderNumber}
+          delivery={memoDelivery}
+          invoices={mc.invoices}
+          invoiceId={memoInvoiceOf(refunding)!}
+          reasons={mc.reasons}
+          standing={mc.standing}
+          note=""
+          onClose={() => setRefunding(null)}
+        />
+      ) : refunding && (
         <RefundPayment
           paymentId={refunding.id}
           amount={refunding.refundable ?? Number(refunding.amount ?? 0)}

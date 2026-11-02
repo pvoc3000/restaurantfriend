@@ -696,6 +696,7 @@ async function loadMemoForQbo(
   return {
     memo, lines, total, label, invoiceLabel, invoice, coding,
     rushItemRef: (refs?.rush_item_ref as string | null) ?? null,
+    deliveryItemRef: (refs?.delivery_item_ref as string | null) ?? null,
     orgName: (org?.name as string | undefined) ?? "",
   };
 }
@@ -724,7 +725,7 @@ async function bookMemoRefundReceipt(
     Payment?: { CustomerRef?: QboRef; DepositToAccountRef?: QboRef; PaymentMethodRef?: QboRef };
   })?.Payment;
   if (!pay?.DepositToAccountRef) throw new Error("QuickBooks did not say which account the payment went to");
-  const built = memoSalesLines(m.lines, m.coding, m.rushItemRef);
+  const built = memoSalesLines(m.lines, m.coding, m.rushItemRef, m.deliveryItemRef);
   if (built.error) throw new Error(built.error);
   const body: Record<string, unknown> = {
     DocNumber: docNumber,
@@ -3431,7 +3432,7 @@ Deno.serve(async (req) => {
       const customerRef = (customer?.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id ?? null;
       if (!customerRef) return json(400, { error: "This customer is not linked to a QuickBooks customer yet." });
 
-      const built = memoSalesLines(m.lines, m.coding, m.rushItemRef);
+      const built = memoSalesLines(m.lines, m.coding, m.rushItemRef, m.deliveryItemRef);
       if (built.error) return json(400, { error: `QuickBooks: ${built.error}.` });
       const payload: Record<string, unknown> = {
         CustomerRef: { value: customerRef },
