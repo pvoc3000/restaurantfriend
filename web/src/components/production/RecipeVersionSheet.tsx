@@ -679,7 +679,9 @@ function ScaleHeader({
   removable: boolean;
 }) {
   return (
-    <span className="flex min-w-0 flex-col gap-0.5 text-ink">
+    // `w-full`: the header cell is a flex row that sizes this to its content,
+    // so without it the ⊗ below could only ever sit beside the multiplier.
+    <span className="flex w-full min-w-0 flex-col gap-0.5 text-ink">
       {editable ? (
         <InlineValue
           table="production_recipe_versions"
@@ -784,7 +786,8 @@ function RemoveScaleColumn({ version, column }: { version: SheetVersion; column:
   }
 
   return (
-    <span className="shrink-0">
+    // `ml-auto`: against the column's right edge (Mark, 2026-11-03).
+    <span className="ml-auto shrink-0">
       <button
         type="button"
         onClick={() => void remove()}
