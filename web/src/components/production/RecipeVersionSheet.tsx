@@ -794,9 +794,11 @@ function RemoveScaleColumn({ version, column }: { version: SheetVersion; column:
         // ⊗, NOT × (Mark, 2026-11-03: "the 'x' character … blends with other
         // text next to it"). A bare × at header size read as part of the batch
         // name — and the multiplier under it is written "×1.25". The circle
-        // makes it a control. Ink at rest, the accent on hover; U+FE0E keeps
+        // makes it a control. Grey at rest (Mark, the same day: "make it grey
+        // again" — on its own row it no longer needs black to stand apart),
+        // the accent on hover; U+FE0E keeps
         // Apple platforms from drawing it as a coloured emoji.
-        className="px-0.5 text-[15px] font-normal leading-none text-ink hover:text-accent disabled:opacity-35"
+        className="px-0.5 text-[15px] font-normal leading-none text-subtle hover:text-accent disabled:opacity-35"
       >
         {"\u2297\uFE0E"}
       </button>
