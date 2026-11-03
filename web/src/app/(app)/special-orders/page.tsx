@@ -21,6 +21,7 @@ import {
   type SpecialOrderRow,
 } from "@/components/specialOrders/SpecialOrdersList";
 import { canEditPage } from "@/lib/pageAccess";
+import { searchWords } from "@/lib/searchQuery";
 
 /**
  * The special orders work queue.
@@ -139,7 +140,27 @@ export default async function SpecialOrdersPage({
     .order("event_date", { ascending: false })
     .limit(500);
 
-  if (bounds) {
+  /**
+   * A SEARCH LOOKS PAST THE WINDOW (Mark, 2026-11-03), and past the 500 cap:
+   * the database matches every word, all dates (`lib/searchQuery`), across
+   * what the client searches — number, title, to-do and the customer. One `or`
+   * per word, which PostgREST ANDs. The calendar below keeps the window's span:
+   * it is drawn beside the list, not searched.
+   */
+  const search = parseFilterSearch(viewParams).trim();
+  const words = searchWords(search);
+  for (const w of words) {
+    const clauses = [`number.ilike.*${w}*`, `title.ilike.*${w}*`, `todo.ilike.*${w}*`];
+    const { data: customerHits } = await supabase
+      .from("customers")
+      .select("id")
+      .or(`first_name.ilike.*${w}*,last_name.ilike.*${w}*,company.ilike.*${w}*`)
+      .limit(100);
+    if (customerHits?.length)
+      clauses.push(`customer_id.in.(${customerHits.map((c) => c.id).join(",")})`);
+    query = query.or(clauses.join(","));
+  }
+  if (bounds && words.length === 0) {
     query = query.or(
       `and(event_date.gte.${bounds.from},event_date.lte.${bounds.to}),event_date.is.null`
     );
@@ -348,6 +369,7 @@ export default async function SpecialOrdersPage({
   return (
     <SpecialOrdersList
       rows={rows}
+      searchLoaded={search}
       today={today}
       thresholds={settings.attention}
       canWrite={canEditPage(session.membership.role, "/special-orders")}

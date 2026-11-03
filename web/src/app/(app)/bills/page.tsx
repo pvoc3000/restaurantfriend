@@ -13,6 +13,7 @@ import { poRangeBounds } from "@/lib/poFilters";
 import type { BillStatus } from "@/lib/bills";
 import { BillList } from "@/components/purchasing/BillList";
 import { canEditPage } from "@/lib/pageAccess";
+import { searchWords } from "@/lib/searchQuery";
 
 export type BillListRow = {
   id: string;
@@ -68,6 +69,37 @@ export default async function InvoicesPage({
   const bounds = poRangeBounds(filters.range, today);
   const locationId = session.activeLocation.id;
 
+  // A SEARCH LOOKS PAST THE WINDOW (Mark, 2026-11-03), and past the 500 cap
+  // too: the database matches every word, all dates — `lib/searchQuery`. One
+  // `or` per word, which PostgREST ANDs; each holds every field the client
+  // searches — the number, the status, the vendor and the PO numbers.
+  const searchOrs: string[] = [];
+  for (const w of searchWords(filters.q)) {
+    const clauses = [`invoice_number.ilike.*${w}*`, `status.ilike.*${w}*`];
+    const { data: vendorHits } = await supabase
+      .from("vendors")
+      .select("id")
+      .ilike("name", `*${w}*`)
+      .limit(100);
+    if (vendorHits?.length) clauses.push(`vendor_id.in.(${vendorHits.map((v) => v.id).join(",")})`);
+    const { data: poHits } = await supabase
+      .from("purchase_orders")
+      .select("id")
+      .eq("location_id", locationId)
+      .ilike("po_number", `*${w}*`)
+      .limit(30);
+    if (poHits?.length) {
+      const { data: linked } = await supabase
+        .from("vendor_bill_lines")
+        .select("bill_id")
+        .in("purchase_order_id", poHits.map((p) => p.id))
+        .limit(150);
+      const billIds = [...new Set((linked ?? []).map((l) => l.bill_id as string))];
+      if (billIds.length) clauses.push(`id.in.(${billIds.join(",")})`);
+    }
+    searchOrs.push(clauses.join(","));
+  }
+
   // THE SELECT LIST IS WRITTEN OUT AT EACH CALL SITE, not passed in. A helper
   // taking `columns: string` reads better and breaks the types: supabase-js
   // parses the list at the TYPE level, so a `string` parameter collapses every
@@ -83,7 +115,9 @@ export default async function InvoicesPage({
     .eq("location_id", locationId)
     .order("invoice_date", { ascending: false })
     .limit(500);
-  if (bounds) query = query.gte("invoice_date", bounds.from).lte("invoice_date", bounds.to);
+  for (const or of searchOrs) query = query.or(or);
+  if (bounds && searchOrs.length === 0)
+    query = query.gte("invoice_date", bounds.from).lte("invoice_date", bounds.to);
 
   let { data: bills, error } = await query;
 
@@ -105,7 +139,9 @@ export default async function InvoicesPage({
       .eq("location_id", locationId)
       .order("invoice_date", { ascending: false })
       .limit(500);
-    if (bounds) retry = retry.gte("invoice_date", bounds.from).lte("invoice_date", bounds.to);
+    for (const or of searchOrs) retry = retry.or(or);
+    if (bounds && searchOrs.length === 0)
+      retry = retry.gte("invoice_date", bounds.from).lte("invoice_date", bounds.to);
     const fallback = await retry;
     bills = fallback.data as unknown as typeof bills;
     error = fallback.error;
@@ -215,6 +251,7 @@ export default async function InvoicesPage({
       activeLocationCode={session.activeLocation.code}
       today={today}
       capped={rows.length === 500}
+      searchLoaded={filters.q.trim()}
       orgId={session.membership.org_id}
       locationId={session.activeLocation.id}
       vendors={(vendors ?? []).map((v) => ({

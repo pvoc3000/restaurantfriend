@@ -12,6 +12,7 @@ import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { PoStatus } from "@/lib/purchaseOrders";
 import { PurchaseOrderList } from "@/components/purchasing/PurchaseOrderList";
 import { canEditPage } from "@/lib/pageAccess";
+import { searchWords } from "@/lib/searchQuery";
 
 export type PoListRow = {
   id: string;
@@ -66,7 +67,22 @@ export default async function PurchaseOrdersPage({
   // would otherwise start hiding this afternoon's orders (see lib/today).
   const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
   const bounds = poRangeBounds(filters.range, today);
-  if (bounds) {
+  // A SEARCH LOOKS PAST THE WINDOW (Mark, 2026-11-03), and past the 500 cap
+  // too: the database matches every word, all dates — `lib/searchQuery`.
+  const words = searchWords(filters.q);
+  if (words.length > 0) {
+    for (const w of words) {
+      const { data: vendorHits } = await supabase
+        .from("vendors")
+        .select("id")
+        .ilike("name", `*${w}*`)
+        .limit(100);
+      const clauses = [`po_number.ilike.*${w}*`, `status.ilike.*${w}*`];
+      if (vendorHits?.length) clauses.push(`vendor_id.in.(${vendorHits.map((v) => v.id).join(",")})`);
+      // One `or` per word; PostgREST ANDs them.
+      query = query.or(clauses.join(","));
+    }
+  } else if (bounds) {
     query = query.gte("order_date", bounds.from);
     // A PRESET HAS NO UPPER BOUND (Mark, 2026-09-21) — a PO SCHEDULED for next
     // week must not fall off the list for being ahead of today.
@@ -159,6 +175,7 @@ export default async function PurchaseOrdersPage({
       today={today}
       activeLocationCode={session.activeLocation.code}
       capped={rows.length === 500}
+      searchLoaded={filters.q.trim()}
       editable={canEditPage(session.membership.role, "/purchase-orders")}
       orgId={session.membership.org_id}
       locationId={session.activeLocation.id}

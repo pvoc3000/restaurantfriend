@@ -30,7 +30,8 @@ import {
   viewCookieValue,
 } from "@/lib/specialOrderView";
 import { SpecialOrderActions } from "@/components/specialOrders/SpecialOrderActions";
-import { FilterMenus } from "@/components/ui/FilterMenus";
+import { FilterMenus, PAUSED } from "@/components/ui/FilterMenus";
+import { useSearchLoadsAllDates } from "@/lib/searchWindow";
 import { ActionMenu } from "@/components/ui/ActionMenu";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { SpecialOrderBatchActions } from "@/components/specialOrders/SpecialOrderBatchActions";
@@ -270,6 +271,7 @@ export function SpecialOrdersList({
   takenBy,
   initialFilters,
   initialSearch = "",
+  searchLoaded,
   capped = false,
   topUpError = null,
   dayMarks = {},
@@ -297,6 +299,8 @@ export function SpecialOrdersList({
   takenBy: string;
   initialFilters?: RawSearchParams;
   initialSearch?: string;
+  /** The term the server searched for, all dates — `lib/searchWindow`. */
+  searchLoaded: string;
   capped?: boolean;
   /**
    * Why the standing-order top-up did not run, if it did not.
@@ -366,9 +370,6 @@ export function SpecialOrdersList({
         accepts: isOrderRangeToken,
         // Upcoming: the working view, and the list's resting state, as it was.
         defaultValue: DEFAULT_ORDER_RANGE,
-        // The server sized its fetch from this window, so a search cannot see
-        // past it — pausing it would promise orders the page never loaded.
-        holdsWhileSearching: true,
         /**
          * PURELY A DATE TEST NOW. `upcoming` used to also require
          * `kind === "order"` and a status other than cancelled — three
@@ -605,29 +606,23 @@ export function SpecialOrdersList({
     () => searchingValues(dimensions, filters, search),
     [dimensions, filters, search]
   );
-  /**
-   * WHILE SEARCHING, THE WINDOW LETS THE DATELESS THROUGH. Templates and
-   * standing orders are loaded whatever the window says (`page.tsx`), so a
-   * search for one by name should find it — the window holds only because the
-   * DATED orders outside it were never fetched.
-   */
-  const searching = search.trim() !== "";
   const visible = useMemo(
     () =>
       applyListFilters(
         searched,
-        dateless
-          ? dimensions.filter((d) => d.key !== "view")
-          : searching
-            ? dimensions.map((d) =>
-                d.key === "view"
-                  ? { ...d, matches: (r: SpecialOrderRow, v: string) => !r.event_date || d.matches(r, v) }
-                  : d
-              )
-            : dimensions,
+        dateless ? dimensions.filter((d) => d.key !== "view") : dimensions,
         applied
       ),
-    [searched, dimensions, applied, dateless, searching]
+    [searched, dimensions, applied, dateless]
+  );
+  /**
+   * THE DATES PAUSE WITH THE MENUS (Mark, 2026-11-03), and since the server
+   * loaded only the window — 500 at most — it is asked again, for every date,
+   * as you type (`lib/searchWindow`). Clearing the search loads the window back.
+   */
+  const searching = search.trim() !== "";
+  useSearchLoadsAllDates(search.trim(), searchLoaded, () =>
+    filterHref(PATH, dimensions, filters, search, sort)
   );
 
   /**
@@ -1198,7 +1193,6 @@ export function SpecialOrdersList({
           dimensions={menuDimensions}
           values={filters}
           search={search}
-          pausedHeld="Dates"
           onChange={changeFilters}
           leading={
             <>
@@ -1223,7 +1217,7 @@ export function SpecialOrdersList({
                   theirs. LABELLED "DATES" (Mark, 2026-10-13) — it was "Show",
                   the name of the menu it replaced, and comments here still
                   call it that. */}
-              <div className="w-44 space-y-1.5">
+              <div className={`w-44 space-y-1.5 ${searching ? PAUSED : ""}`}>
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                   Dates
                 </span>

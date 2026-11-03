@@ -57,6 +57,7 @@ import type { PoListRow } from "@/app/(app)/purchase-orders/page";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { useSearchLoadsAllDates } from "@/lib/searchWindow";
 
 // Widths and hidden columns share this key — one table, one identity.
 const PO_WIDTHS_KEY = "rf.purchaseOrders.columnWidths.v2";
@@ -105,6 +106,7 @@ export function PurchaseOrderList({
   today,
   activeLocationCode,
   capped,
+  searchLoaded,
   editable,
   orgId,
   locationId,
@@ -118,6 +120,8 @@ export function PurchaseOrderList({
   today: string;
   activeLocationCode: string;
   capped: boolean;
+  /** The term the server searched for, all dates — `lib/searchWindow`. */
+  searchLoaded: string;
   /**
    * The Page Permissions sheet's cell for /purchase-orders (2026-09-04). A
    * supervisor is Read Only there, and this list had never taken a role at
@@ -208,8 +212,15 @@ export function PurchaseOrderList({
   );
 
   const searching = filters.q.trim() !== "";
+  // The window pauses too, and the server searches every date — debounced,
+  // because the page caps at 500 and the term decides which 500.
+  useSearchLoadsAllDates(filters.q.trim(), searchLoaded, () => poListHref(filters));
   const pausedCount = searching
-    ? [filters.status.length > 0, filters.vendors.length > 0].filter(Boolean).length
+    ? [
+        poRangeBounds(filters.range, today) !== null,
+        filters.status.length > 0,
+        filters.vendors.length > 0,
+      ].filter(Boolean).length
     : 0;
   const visible = useMemo(
     () =>
@@ -982,18 +993,20 @@ export function PurchaseOrderList({
             version needed the 256px this cell used to have. MEASURED rather
             than guessed: 192 clipped it by 11, because the trigger gives 16px
             back to the clear button and the face `truncate`s in silence. */}
-        <ControlField label="Window">
-          <div className="w-52">
-            <RangePicker
-              value={poRangeBounds(filters.range, today)}
-              onChange={setRange}
-              presets={PO_RANGE_PRESETS}
-              today={today}
-              ariaLabel="Date window"
-              placeholder="All time"
-            />
-          </div>
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Window">
+            <div className="w-52">
+              <RangePicker
+                value={poRangeBounds(filters.range, today)}
+                onChange={setRange}
+                presets={PO_RANGE_PRESETS}
+                today={today}
+                ariaLabel="Date window"
+                placeholder="All time"
+              />
+            </div>
+          </ControlField>
+        </div>
 
         {/* A SET, not a one-of-N: "BakeMark and Chefs Warehouse" is the
             question this list is asked, and eighty vendors were never going to
@@ -1044,7 +1057,7 @@ export function PurchaseOrderList({
             />
           </ControlField>
         </div>
-        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} held="Window" /> : null}
+        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
       </div>
 
       {/* A BATCH'S ERROR, IN THE BAND SLOT (Mark, 2026-09-11: "batcherror could

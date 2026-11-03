@@ -12,6 +12,7 @@ import type { ShiftSlot } from "@/lib/shiftReports";
 
 import { shiftReportRangeBounds } from "@/lib/shiftReportRange";
 import type { RawSearchParams } from "@/lib/filterMenus";
+import { searchTerm } from "@/lib/searchQuery";
 
 /** The missing-night sweep's own window — `ShiftReportsList`'s `GAP_DAYS`.
  *  Fetched apart from the list, which may be showing last March. */
@@ -57,6 +58,11 @@ export default async function ShiftReportsPage({
   // window happened to load.
   const rangeParam = Array.isArray(params.range) ? params.range[0] : params.range;
   const bounds = shiftReportRangeBounds(rangeParam, today);
+  // A SEARCH LOOKS PAST THE WINDOW (Mark, 2026-11-03): with `?q=` the query
+  // takes every date, and the picker still shows the window it will return
+  // to — `lib/searchWindow`.
+  const searchingAll = searchTerm(params.q) !== "";
+  const queryBounds = searchingAll ? null : bounds;
 
   // PAGED, because PostgREST returns at most 1,000 rows and says nothing: one
   // shop writes about that many reports a year, so "All Time" would quietly
@@ -73,7 +79,7 @@ export default async function ShiftReportsPage({
           "id, report_date, shift, status, narrative, supervisor_employee_id, created_by, task_ratings_done, task_special_orders_done, task_schedules_done, sent_at, emailed_at, previously_emailed_at, updated_at"
         )
         .eq("location_id", active.id);
-      if (bounds) q = q.gte("report_date", bounds.from).lte("report_date", bounds.to);
+      if (queryBounds) q = q.gte("report_date", queryBounds.from).lte("report_date", queryBounds.to);
       const { data, error } = await q
         .order("report_date", { ascending: false })
         .order("id")
@@ -163,6 +169,7 @@ export default async function ShiftReportsPage({
       rows={rows}
       today={today}
       range={bounds}
+      searchLoaded={searchingAll ? "all" : ""}
       recentClosingDates={(recentClosings ?? []).map((r) => r.report_date as string)}
       orgId={session.membership.org_id}
       locationId={active.id}

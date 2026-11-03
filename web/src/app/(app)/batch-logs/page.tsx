@@ -9,6 +9,7 @@ import { dateInTimeZone } from "@/lib/today";
 import { batchLogWindowBounds, parseBatchLogWindow } from "@/lib/batchLogFilters";
 import { BatchLogsIndex, type BatchLogRow } from "@/components/production/BatchLogsIndex";
 import { GenerateBatches } from "@/components/production/GenerateBatches";
+import { searchTerm } from "@/lib/searchQuery";
 
 /** One page of the window, swept until it runs out. See the call site. */
 async function fetchLogs(
@@ -95,8 +96,12 @@ export default async function BatchLogsPage({
   // dates somebody chose are both edges, and "August" must not include next
   // week.
   const bounds = batchLogWindowBounds(range, today);
-  const from = bounds?.from ?? null;
-  const to = typeof range === "string" ? addDays(today, 21) : range.to;
+  // A SEARCH LOOKS PAST THE WINDOW (Mark, 2026-11-03): with `?q=` the query is
+  // All time's, and the picker still shows the window it will return to —
+  // `lib/searchWindow`.
+  const searchingAll = searchTerm(rawParams.q) !== "";
+  const from = searchingAll ? null : (bounds?.from ?? null);
+  const to = typeof range === "string" || searchingAll ? addDays(today, 21) : range.to;
 
   const [{ data: logs, error }, { data: members }] = await Promise.all([
     // POSTGREST RETURNS AT MOST 1,000 ROWS AND SAYS NOTHING ABOUT IT, and All
@@ -151,6 +156,7 @@ export default async function BatchLogsPage({
       <BatchLogsIndex
         rows={rows}
         range={range}
+        searchLoaded={searchingAll ? "all" : ""}
         today={today}
         params={rawParams}
         locationCode={active.code}

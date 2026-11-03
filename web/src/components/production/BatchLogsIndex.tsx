@@ -24,6 +24,7 @@ import {
 } from "@/lib/batchLogFilters";
 import { SCHEDULE_CLASSES, scheduleLabel } from "@/lib/production";
 import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { hrefWithSearch, useSearchLoadsAllDates } from "@/lib/searchWindow";
 
 export type BatchLogRow = {
   id: string;
@@ -77,6 +78,7 @@ const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: BatchLogRow) => string> =
 export function BatchLogsIndex({
   rows,
   range,
+  searchLoaded,
   today,
   params,
   locationCode,
@@ -90,6 +92,8 @@ export function BatchLogsIndex({
    * component, which means the URL (see lib/batchLogFilters).
    */
   range: BatchLogWindow;
+  /** "all" when the server loaded every date for a search — `lib/searchWindow`. */
+  searchLoaded: string;
   /** The org's calendar day — the presets and the Today tier resolve on it. */
   today: string;
   /** Whatever else is in the URL, so a range keeps it. */
@@ -141,7 +145,13 @@ export function BatchLogsIndex({
   // A search looks past Show and Schedule (`lib/filterMenus`' rule); the
   // Window holds, being what the server loaded.
   const searching = term.trim() !== "";
-  const pausedCount = searching ? [tier !== "all", schedule !== "all"].filter(Boolean).length : 0;
+  const pausedCount = searching
+    ? [batchLogWindowBounds(range, today) !== null, tier !== "all", schedule !== "all"].filter(Boolean)
+        .length
+    : 0;
+  // The Window pauses too, so the page is asked again for every date when a
+  // search starts, and for the window when it clears (`lib/searchWindow`).
+  useSearchLoadsAllDates(searching ? "all" : "", searchLoaded, () => hrefWithSearch(term));
   const shown = useMemo(() => {
     const q = term.trim().toLowerCase();
     return rows.filter((r) => {
@@ -355,20 +365,22 @@ export function BatchLogsIndex({
             the client yet (the order guide's day strip, for the same reason).
             `w-52`, the purchasing lists' measured width now the face carries a
             two-digit year. */}
-        <ControlField label="Window">
-          <div className="w-52">
-            <RangePicker
-              value={batchLogWindowBounds(range, today)}
-              onChange={(picked) =>
-                router.push(batchLogRangeHref(batchLogWindowFromPicker(picked, today), params))
-              }
-              presets={BATCH_LOG_PRESETS}
-              today={today}
-              ariaLabel="How far back to look"
-              placeholder="All time"
-            />
-          </div>
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Window">
+            <div className="w-52">
+              <RangePicker
+                value={batchLogWindowBounds(range, today)}
+                onChange={(picked) =>
+                  router.push(batchLogRangeHref(batchLogWindowFromPicker(picked, today), params))
+                }
+                presets={BATCH_LOG_PRESETS}
+                today={today}
+                ariaLabel="How far back to look"
+                placeholder="All time"
+              />
+            </div>
+          </ControlField>
+        </div>
 
         <div className={searching ? PAUSED : undefined}>
           <ControlField label="Show">
@@ -426,7 +438,7 @@ export function BatchLogsIndex({
             fit
           />
         </ControlField>
-        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} held="Window" /> : null}
+        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
       </div>
       {note}
     <DataTable

@@ -57,6 +57,7 @@ import { BillBatchActions } from "./BillBatchActions";
 import { NewBill } from "./NewBill";
 import type { BillListRow } from "@/app/(app)/bills/page";
 import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { useSearchLoadsAllDates } from "@/lib/searchWindow";
 
 const BILL_WIDTHS_KEY = "rf.bills.columnWidths.v1";
 
@@ -158,6 +159,7 @@ export function BillList({
   activeLocationCode,
   today,
   capped,
+  searchLoaded,
   orgId,
   locationId,
   vendors,
@@ -170,6 +172,8 @@ export function BillList({
   /** The org's calendar day, computed once on the server — see lib/today. */
   today: string;
   capped: boolean;
+  /** The term the server searched for, all dates — `lib/searchWindow`. */
+  searchLoaded: string;
   orgId: string;
   locationId: string;
   /** Every ACTIVE vendor, order_type 'none' included — the landlord and the
@@ -263,8 +267,12 @@ export function BillList({
   );
 
   const searching = filters.q.trim() !== "";
+  // The window pauses too, and the server searches every date — debounced,
+  // because the page caps at 500 and the term decides which 500.
+  useSearchLoadsAllDates(filters.q.trim(), searchLoaded, () => billListHref(filters));
   const pausedCount = searching
     ? [
+        poRangeBounds(filters.range, today) !== null,
         filters.status !== "all",
         filters.aging !== "all",
         filters.kind !== "all",
@@ -920,18 +928,20 @@ export function BillList({
           icon={<SearchGlyph />}
         />
 
-        <ControlField label="Window">
-          {/* `w-52`, measured — see the PO list, whose range cell this is. */}
-          <div className="w-52">
-            <RangePicker
-              value={poRangeBounds(filters.range, today)}
-              onChange={setRange}
-              presets={PO_RANGE_PRESETS}
-              today={today}
-              ariaLabel="Date window"
-              placeholder="All time"            />
-          </div>
-        </ControlField>
+        <div className={searching ? PAUSED : undefined}>
+          <ControlField label="Window">
+            {/* `w-52`, measured — see the PO list, whose range cell this is. */}
+            <div className="w-52">
+              <RangePicker
+                value={poRangeBounds(filters.range, today)}
+                onChange={setRange}
+                presets={PO_RANGE_PRESETS}
+                today={today}
+                ariaLabel="Date window"
+                placeholder="All time"            />
+            </div>
+          </ControlField>
+        </div>
 
         <div className={searching ? PAUSED : undefined}>
           <ControlField label="Vendors">
@@ -1010,7 +1020,7 @@ export function BillList({
             />
           </ControlField>
         </div>
-        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} held="Window" /> : null}
+        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
 
       </div>
 

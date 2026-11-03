@@ -91,11 +91,10 @@ export type FilterDimension<T> = {
   /**
    * KEEPS FILTERING WHILE THE SEARCH BOX HAS TEXT — see `searchingValues`.
    *
-   * Every other dimension pauses during a search. This is for the few that are
-   * not a view of the rows but a statement of WHICH rows exist on the screen:
-   * a date window the server sized its fetch from (the special order list's
-   * Dates), or a picker that chooses between two different lists (the events
-   * Show tier). Pausing either would promise matches the page never loaded.
+   * Every other dimension pauses during a search, date windows included (Mark,
+   * 2026-11-03 — the server-loaded ones re-fetch, see `lib/searchWindow`). This
+   * is for a picker that chooses between two different LISTS rather than
+   * narrowing one: the events Show tier, notes or shift ratings.
    */
   holdsWhileSearching?: boolean;
 };

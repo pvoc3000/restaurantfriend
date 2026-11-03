@@ -29,6 +29,7 @@ import {
   shiftReportRangeToken,
 } from "@/lib/shiftReportRange";
 import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { hrefWithSearch, useSearchLoadsAllDates } from "@/lib/searchWindow";
 
 export type ShiftReportRow = {
   id: string;
@@ -80,6 +81,7 @@ export function ShiftReportsList({
   rows,
   today,
   range,
+  searchLoaded,
   recentClosingDates,
   orgId,
   locationId,
@@ -93,6 +95,8 @@ export function ShiftReportsList({
   today: string;
   /** The date window the rows were loaded for — null is all time. */
   range: DateRange | null;
+  /** "all" when the server loaded every date for a search — `lib/searchWindow`. */
+  searchLoaded: string;
   /** The last week's closing report dates, whatever `range` is showing. */
   recentClosingDates: string[];
   orgId: string;
@@ -123,10 +127,11 @@ export function ShiftReportsList({
   function changeRange(picked: DateRange | null) {
     const token = shiftReportRangeToken(picked, today);
     startTransition(() => {
-      router.replace(
-        token === DEFAULT_SHIFT_REPORT_RANGE ? "/shift-reports" : `/shift-reports?range=${token}`,
-        { scroll: false }
-      );
+      const params = new URLSearchParams();
+      if (token !== DEFAULT_SHIFT_REPORT_RANGE) params.set("range", token);
+      // A search in progress rides along, so the page still loads every date.
+      if (search.trim()) params.set("q", search.trim());
+      router.replace(params.size ? `/shift-reports?${params}` : "/shift-reports", { scroll: false });
     });
   }
 
@@ -174,7 +179,12 @@ export function ShiftReportsList({
   // A search looks past Shift and Show (`lib/filterMenus`' rule); the Dates
   // window holds, being what the server loaded.
   const searching = search.trim() !== "";
-  const pausedCount = searching ? [tier !== "all", shift !== "all"].filter(Boolean).length : 0;
+  const pausedCount = searching
+    ? [range !== null, tier !== "all", shift !== "all"].filter(Boolean).length
+    : 0;
+  // The Dates pause too, so the page is asked again for every date when a
+  // search starts, and for the window when it clears (`lib/searchWindow`).
+  useSearchLoadsAllDates(searching ? "all" : "", searchLoaded, () => hrefWithSearch(search));
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
     return withReason
@@ -398,19 +408,21 @@ export function ShiftReportsList({
             {/* The window straight after the search, where the PO, bill and
                 invoice lists put theirs (Mark, 2026-10-04). Never empty: ✕
                 would only mean the default, so it is not offered. */}
-            <ControlField label="Dates">
-              <div className="w-52">
-                <RangePicker
-                  value={range}
-                  onChange={changeRange}
-                  presets={SHIFT_REPORT_RANGE_PRESETS}
-                  today={today}
-                  ariaLabel="Which shift reports to show, by date"
-                  placeholder="All Time"
-                  clearable={false}
-                />
-              </div>
-            </ControlField>
+            <div className={searching ? PAUSED : undefined}>
+              <ControlField label="Dates">
+                <div className="w-52">
+                  <RangePicker
+                    value={range}
+                    onChange={changeRange}
+                    presets={SHIFT_REPORT_RANGE_PRESETS}
+                    today={today}
+                    ariaLabel="Which shift reports to show, by date"
+                    placeholder="All Time"
+                    clearable={false}
+                  />
+                </div>
+              </ControlField>
+            </div>
             {/* Which shift (Mark, 2026-10-04). Counted like Show beside it,
                 over the rows the date window loaded. */}
             <div className={searching ? PAUSED : undefined}>
@@ -451,7 +463,7 @@ export function ShiftReportsList({
                 />
               </ControlField>
             </div>
-            {pausedCount > 0 ? <SearchPausedNote count={pausedCount} held="Dates" /> : null}
+            {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
           </div>
           {/* UNDER THE TABS, NOT OVER THEM (Mark, 2026-09-03), and ON EVERY
               TIER since the Needs-attention tab went (2026-09-09).
