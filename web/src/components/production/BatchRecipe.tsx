@@ -285,13 +285,21 @@ export function BatchRecipe({
                 the row — which is the same argument that puts the disclosure
                 triangle to the RIGHT of an item's name on the order guide. */}
             <colgroup>
-              <col style={{ width: "44%" }} />
-              <col style={{ width: "26%" }} />
-              <col style={{ width: "30%" }} />
+              {/* AMOUNT FIRST (Mark, 2026-11-03: "swap the positions of the
+                  ingredient and amount columns") — read the way a baker
+                  weighs: how much, then of what — and a FIXED WIDTH ("the
+                  amount column doesn't need to be so wide"): it holds a figure
+                  and a 48px unit, whatever the pane's width, so a share of it
+                  only ever grew empty space. 7rem fits "1,250.5 each" at 12px
+                  with the cell's padding; the large type gets 9rem. The
+                  ingredient takes what is left. */}
+              <col style={{ width: size === "lg" ? "9rem" : "7rem" }} />
+              <col />
+              <col style={{ width: "35%" }} />
             </colgroup>
             <thead>
               <tr className="sticky top-0 z-10 bg-white text-left">
-                {["Ingredient", "Amount", "Note"].map((h) => (
+                {["Amount", "Ingredient", "Note"].map((h) => (
                   <th
                     key={h}
                     className={`border-b border-hairline ${cell} ${size === "lg" ? "text-[12px]" : "text-[10px]"} font-semibold uppercase tracking-[0.08em] text-muted`}
@@ -324,12 +332,6 @@ export function BatchRecipe({
                     </tr>
                   ) : (
                   <tr key={line.id} className="align-top">
-                    {/* THE ELEMENT'S NAME LEADS; `label` is only a fallback —
-                        FMP's `columnName_t` override goes stale when a version
-                        is copied (2026-08-08's lesson, same order here). */}
-                    <td className={cell}>
-                      {line.production_elements?.name ?? line.label ?? "—"}
-                    </td>
                     {/* THE FIGURE RIGHT, THE UNIT LEFT, A GAP BETWEEN (Mark,
                         2026-09-09) — so the numbers line up on their ones
                         column down the list and the units line up on their
@@ -361,6 +363,12 @@ export function BatchRecipe({
                           </span>
                         );
                       })()}
+                    </td>
+                    {/* THE ELEMENT'S NAME LEADS; `label` is only a fallback —
+                        FMP's `columnName_t` override goes stale when a version
+                        is copied (2026-08-08's lesson, same order here). */}
+                    <td className={cell}>
+                      {line.production_elements?.name ?? line.label ?? "—"}
                     </td>
                     <td className={`${cell} text-muted`}>{line.note ?? ""}</td>
                   </tr>
