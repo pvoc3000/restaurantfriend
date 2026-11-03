@@ -2092,7 +2092,7 @@ sharing `copyVersionContent` with Duplicate Recipe).
 
 Verified by Mark in the app: Pavemint v06 created, active, not master.
 
-## 221 — the baker's percentage counts from a chosen line (2026-11-03, NOT YET APPLIED)
+## 221 — the baker's percentage counts from a chosen line (APPLIED 2026-11-03)
 
 The `%` column counted from the first weighable line, which is the flour in a
 dough and an accident in an ice cream base. Mark: "we should have to set which
