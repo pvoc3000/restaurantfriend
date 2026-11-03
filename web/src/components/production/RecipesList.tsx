@@ -15,6 +15,7 @@ import { withFrom } from "@/lib/breadcrumbs";
 import { sortRows } from "@/lib/tableSort";
 import {
   applyListFilters,
+  FILTER_ALL,
   searchingValues,
   filterCounts,
   filterHref,
@@ -56,6 +57,9 @@ const PATH = "/recipes";
  * Every column you can sort by — `columns` below, minus the ones with no
  * `sortValue`. KEEP THE TWO IN STEP; see the production items list for why.
  */
+/** The Type filter's value for a recipe with none — not a word a type could be. */
+const NO_TYPE = "~none";
+
 const SORT_KEYS = ["active", "name", "element", "type", "versions", "master", "cost"] as const;
 
 /**
@@ -82,9 +86,9 @@ export function RecipesList({
   action?: ReactNode;
 }) {
   /**
-   * ONE DIMENSION, so it is one captioned `PickList` (a `TabPicker` until
-   * 2026-09-10) — the app's rule for a single
-   * question, and `ui/FilterMenus` is for three or more. What it borrows from
+   * TWO DIMENSIONS, so two captioned `PickList`s (a `TabPicker` until
+   * 2026-09-10; Type added 2026-11-03) — the app's rule for one or two
+   * questions, and `ui/FilterMenus` is for three or more. What it borrows from
    * `lib/filterMenus` is the URL contract, not the control: a dimension is just
    * a declared filter, and reusing it means this list's whole view rides in the
    * query the same way the menu-driven lists' do, rather than through a
@@ -109,8 +113,25 @@ export function RecipesList({
         matches: (r, v) =>
           v === "active" ? r.is_active : v === "no-master" ? !r.masterLabel : true,
       },
+      {
+        // Its options are the types the recipes actually carry — the same
+        // open vocabulary New Recipe offers — so a type nobody uses is not
+        // offered, and one typed into a recipe today is here on the next load.
+        // "No type" last, set apart: it is the gap, not a kind of recipe.
+        key: "type",
+        label: "Type",
+        options: [
+          ...[...new Set(rows.map((r) => r.recipe_type ?? "").filter((t) => t.trim() !== ""))]
+            .sort((a, b) => a.localeCompare(b))
+            .map((t) => ({ value: t, label: t })),
+          ...(rows.some((r) => !r.recipe_type?.trim())
+            ? [{ value: NO_TYPE, label: "No type", separatorBefore: true }]
+            : []),
+        ],
+        matches: (r, v) => (v === NO_TYPE ? !r.recipe_type?.trim() : r.recipe_type === v),
+      },
     ],
-    []
+    [rows]
   );
 
   // Seeded from the ADDRESS BAR where it can be read, and only from the props
@@ -145,6 +166,12 @@ export function RecipesList({
 
   function changeTier(next: string) {
     const nextFilters = { ...filters, tier: next };
+    setFilters(nextFilters);
+    writeUrl(nextFilters, search, sort);
+  }
+
+  function changeType(next: string) {
+    const nextFilters = { ...filters, type: next };
     setFilters(nextFilters);
     writeUrl(nextFilters, search, sort);
   }
@@ -188,7 +215,9 @@ export function RecipesList({
     () => applyListFilters(searched, dimensions, applied),
     [searched, dimensions, applied]
   );
-  const counts = filterCounts(searched, dimensions, applied).tier;
+  const allCounts = filterCounts(searched, dimensions, applied);
+  const counts = allCounts.tier;
+  const typeCounts = allCounts.type;
 
   /** This view's own address — where a link back from a recipe returns to. */
   const listHref = filterHref(PATH, dimensions, filters, search, sort);
@@ -353,6 +382,26 @@ export function RecipesList({
                 label: o.label,
                 hint: String(counts[o.value] ?? 0),
               }))}
+              fit
+            />
+          </ControlField>
+        </div>
+        <div className={search.trim() ? PAUSED : undefined}>
+          <ControlField label="Type">
+            <PickList
+              ariaLabel="Recipe type"
+              variant="field"
+              value={filters.type ?? FILTER_ALL}
+              onPick={changeType}
+              options={[
+                { value: FILTER_ALL, label: "All", hint: String(typeCounts[FILTER_ALL] ?? 0) },
+                ...dimensions[1].options.map((o) => ({
+                  value: o.value,
+                  label: o.label,
+                  hint: String(typeCounts[o.value] ?? 0),
+                  separatorBefore: o.separatorBefore,
+                })),
+              ]}
               fit
             />
           </ControlField>
