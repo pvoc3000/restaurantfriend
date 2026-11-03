@@ -5,7 +5,7 @@ import { useLayoutEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
+import { BOXED_FIELDS, BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Switch } from "@/components/ui/Switch";
 import { spaceBelow, useViewportAtLeast } from "@/lib/tableHead";
@@ -293,16 +293,27 @@ function Notes({ version, editable }: { version: SheetVersion; editable: boolean
         <p className="mb-1 shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
           Testing notes
         </p>
-        <div className="min-h-0 flex-initial overflow-y-auto pr-1 xl:flex-1">
-          <span className="text-muted">
-            <Editable
-              id={version.id}
-              column="testing_notes"
-              value={version.testing_notes}
-              editable={editable}
-              multiline
-            />
-          </span>
+        {/* THE BOX IS THE SCROLLER'S, NOT THE FIELD'S (Mark, 2026-11-03: "the
+            bounding box on the testing notes field is inside the scrollview").
+            It was the field's own, so it scrolled away with the text and a
+            long note had no top or bottom edge on screen. Now the scroller
+            wears the boxed field's border and the field inside drops its own
+            (`border-0!`), so the box stays put and the words scroll within
+            it. Read-only, the field never had a scroller-sized box, so it
+            keeps the plain one `Editable` gives it. */}
+        <div
+          className={`min-h-0 flex-initial overflow-y-auto xl:flex-1 ${
+            editable ? BOXED_FIELD_BORDER : ""
+          }`}
+        >
+          <Editable
+            id={version.id}
+            column="testing_notes"
+            value={version.testing_notes}
+            editable={editable}
+            multiline
+            className="border-0! text-muted"
+          />
         </div>
       </div>
     </section>
@@ -559,12 +570,15 @@ function Editable({
   value,
   editable,
   multiline = false,
+  className,
 }: {
   id: string;
   column: string;
   value: string | null;
   editable: boolean;
   multiline?: boolean;
+  /** Reaches the field's resting button only — `InlineValue`'s rule. */
+  className?: string;
 }) {
   return editable ? (
     // THE SEAM. Every editable field in this block goes through here.
@@ -575,6 +589,7 @@ function Editable({
       column={column}
       value={value}
       multiline={multiline}
+      className={className}
     />
   ) : (
     // A read-only value carries no box — except a NOTE, where the box is doing
