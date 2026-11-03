@@ -731,7 +731,7 @@ function ScaleHeader({
           ) : (
             <span className="flex-1" />
           )}
-          {editable && removable ? <RemoveScaleColumn version={version} column={column} /> : null}
+          {editable && removable ? <ScaleColumnMenu version={version} column={column} /> : null}
         </span>
       ) : null}
     </span>
@@ -739,7 +739,7 @@ function ScaleHeader({
 }
 
 /**
- * THE ⊗ ON A BATCH SIZE'S HEADER — remove the column (Mark, 2026-11-03: "we
+ * THE ▾ ON A BATCH SIZE'S HEADER — its column menu, today holding Delete… (Mark, 2026-11-03: "we
  * need to be able to remove a column in the ingredient table"). Until now the
  * only way was to clear its name, which worked and which nobody would guess.
  *
@@ -748,7 +748,7 @@ function ScaleHeader({
  * was costed at this column. Batch logs that ran it keep their own record —
  * the slot is emptied, not reused by the columns after it.
  */
-function RemoveScaleColumn({ version, column }: { version: SheetVersion; column: ScaleColumn }) {
+function ScaleColumnMenu({ version, column }: { version: SheetVersion; column: ScaleColumn }) {
   const router = useRouter();
   const supabase = createClient();
   const [pending, start] = useTransition();
@@ -788,23 +788,21 @@ function RemoveScaleColumn({ version, column }: { version: SheetVersion; column:
   return (
     // `ml-auto`: against the column's right edge (Mark, 2026-11-03).
     <span className="ml-auto shrink-0">
-      <button
-        type="button"
-        onClick={() => void remove()}
+      {/* A ▾ MENU, not a delete button (Mark, 2026-11-03: "instead of just
+          deleting the column, it's a popup menu with the Delete… option.
+          Maybe eventually … Hide and Pin"). The column's own commands live
+          here, so the next one is a row in `items` rather than a second glyph
+          in a header that has room for one. Grey at rest; U+FE0E keeps Apple
+          platforms from drawing ▾ as an emoji. */}
+      <MenuButton
+        label={`${column.label} column`}
+        trigger={"\u25BE\uFE0E"}
+        triggerClassName="px-0.5 text-[13px] font-normal leading-none text-subtle hover:text-ink disabled:opacity-35"
         disabled={pending}
-        aria-label={`Remove the ${column.label} column`}
-        title={`Remove the ${column.label} column`}
-        // ⊗, NOT × (Mark, 2026-11-03: "the 'x' character … blends with other
-        // text next to it"). A bare × at header size read as part of the batch
-        // name — and the multiplier under it is written "×1.25". The circle
-        // makes it a control. Grey at rest (Mark, the same day: "make it grey
-        // again" — on its own row it no longer needs black to stand apart),
-        // the accent on hover; U+FE0E keeps
-        // Apple platforms from drawing it as a coloured emoji.
-        className="px-0.5 text-[15px] font-normal leading-none text-subtle hover:text-accent disabled:opacity-35"
-      >
-        {"\u2297\uFE0E"}
-      </button>
+        align="right"
+        minWidth={160}
+        items={[{ label: "Delete…", onSelect: () => void remove(), danger: true }]}
+      />
       {error ? <span className="block text-[11px] normal-case text-accent">{error}</span> : null}
     </span>
   );
