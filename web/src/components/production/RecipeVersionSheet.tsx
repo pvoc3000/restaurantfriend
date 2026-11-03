@@ -730,7 +730,7 @@ function ScaleHeader({
 }
 
 /**
- * THE × ON A BATCH SIZE'S HEADER — remove the column (Mark, 2026-11-03: "we
+ * THE ⊗ ON A BATCH SIZE'S HEADER — remove the column (Mark, 2026-11-03: "we
  * need to be able to remove a column in the ingredient table"). Until now the
  * only way was to clear its name, which worked and which nobody would guess.
  *
@@ -784,9 +784,14 @@ function RemoveScaleColumn({ version, column }: { version: SheetVersion; column:
         disabled={pending}
         aria-label={`Remove the ${column.label} column`}
         title={`Remove the ${column.label} column`}
-        className="px-0.5 text-[13px] font-normal leading-none text-subtle hover:text-accent disabled:opacity-35"
+        // ⊗, NOT × (Mark, 2026-11-03: "the 'x' character … blends with other
+        // text next to it"). A bare × at header size read as part of the batch
+        // name — and the multiplier under it is written "×1.25". The circle
+        // makes it a control. Ink at rest, the accent on hover; U+FE0E keeps
+        // Apple platforms from drawing it as a coloured emoji.
+        className="px-0.5 text-[15px] font-normal leading-none text-ink hover:text-accent disabled:opacity-35"
       >
-        ×
+        {"\u2297\uFE0E"}
       </button>
       {error ? <span className="block text-[11px] normal-case text-accent">{error}</span> : null}
     </span>
