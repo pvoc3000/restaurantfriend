@@ -203,12 +203,14 @@ export function RecipeVersionSheet({
     isBasis: i === basisAt,
   }));
 
-  const scaleColumn = (column: ScaleColumn, pinned = false): DataColumn<IngredientRow> => ({
+  // NONE OF THESE IS PINNED but Item (Mark, 2026-11-03: unlock the base
+  // amount and Auto). Column order is the reader's view and nothing is
+  // calculated from it — every amount reads its column's stored slot.
+  const scaleColumn = (column: ScaleColumn, isBase = false): DataColumn<IngredientRow> => ({
     key: `scale:${column.index}`,
     // The batch name, for the Columns menu — the header shows its editor.
     label: column.label || "Batch",
     width: W_SCALE,
-    pinned,
     header: (
       <ScaleHeader
         version={version}
@@ -217,7 +219,7 @@ export function RecipeVersionSheet({
         editable={editable}
         // The base column shows no multiplier: it is what the others are a
         // multiple OF. Nor does `%`, which is a share rather than a scale.
-        multiplier={!pinned && !column.isPercent}
+        multiplier={!isBase && !column.isPercent}
       />
     ),
     render: (r) => (
@@ -293,13 +295,11 @@ export function RecipeVersionSheet({
       ),
     },
     {
-      // Pinned, with the base amount: it sits BETWEEN the first two amount
-      // columns because that is what it governs, and a drag that moved it
-      // elsewhere would leave it labelling nothing.
+      // Declared BETWEEN the first two amount columns, FileMaker's place for
+      // it, because it governs the ones to its right. Movable since 2026-11-03.
       key: "auto",
       label: "Auto",
       width: W_AUTO,
-      pinned: true,
       render: (r) => (
         <span className="flex justify-center">
           <ScaleAutoBox
