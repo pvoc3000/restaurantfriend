@@ -56,7 +56,7 @@ import { RowMenu } from "@/components/ui/RowMenu";
 import type { PoListRow } from "@/app/(app)/purchase-orders/page";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 import { useSearchLoadsAllDates } from "@/lib/searchWindow";
 
 // Widths and hidden columns share this key — one table, one identity.
@@ -215,13 +215,6 @@ export function PurchaseOrderList({
   // The window pauses too, and the server searches every date — debounced,
   // because the page caps at 500 and the term decides which 500.
   useSearchLoadsAllDates(filters.q.trim(), searchLoaded, () => poListHref(filters));
-  const pausedCount = searching
-    ? [
-        poRangeBounds(filters.range, today) !== null,
-        filters.status.length > 0,
-        filters.vendors.length > 0,
-      ].filter(Boolean).length
-    : 0;
   const visible = useMemo(
     () =>
       searching
@@ -1057,7 +1050,6 @@ export function PurchaseOrderList({
             />
           </ControlField>
         </div>
-        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
       </div>
 
       {/* A BATCH'S ERROR, IN THE BAND SLOT (Mark, 2026-09-11: "batcherror could

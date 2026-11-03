@@ -56,7 +56,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { BillBatchActions } from "./BillBatchActions";
 import { NewBill } from "./NewBill";
 import type { BillListRow } from "@/app/(app)/bills/page";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 import { useSearchLoadsAllDates } from "@/lib/searchWindow";
 
 const BILL_WIDTHS_KEY = "rf.bills.columnWidths.v1";
@@ -270,15 +270,6 @@ export function BillList({
   // The window pauses too, and the server searches every date — debounced,
   // because the page caps at 500 and the term decides which 500.
   useSearchLoadsAllDates(filters.q.trim(), searchLoaded, () => billListHref(filters));
-  const pausedCount = searching
-    ? [
-        poRangeBounds(filters.range, today) !== null,
-        filters.status !== "all",
-        filters.aging !== "all",
-        filters.kind !== "all",
-        filters.vendors.length > 0,
-      ].filter(Boolean).length
-    : 0;
   const visible = useMemo(
     () =>
       searching
@@ -1020,7 +1011,6 @@ export function BillList({
             />
           </ControlField>
         </div>
-        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
 
       </div>
 

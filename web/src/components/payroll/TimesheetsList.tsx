@@ -56,7 +56,7 @@ import {
   workedHours,
   type OtDecision,
 } from "@/lib/timesheets";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 
 // v3: the hours columns were reordered to Worked · Regular · OT · Double ·
 // Break (Mark, 2026-08-05). The key covers widths, visibility AND ORDER, and a
@@ -443,9 +443,6 @@ export function TimesheetsList({
   // A search looks past Shops, Overtime and Issues (`lib/filterMenus`' rule);
   // the pay period holds, being the page itself.
   const searching = search.trim() !== "";
-  const pausedCount = searching
-    ? [shops.length > 0, review !== "all", issue !== "all"].filter(Boolean).length
-    : 0;
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (q) {
@@ -989,7 +986,6 @@ export function TimesheetsList({
             />
           </ControlField>
         </div>
-        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
 
         <ControlField label="Group by">
           <PickList

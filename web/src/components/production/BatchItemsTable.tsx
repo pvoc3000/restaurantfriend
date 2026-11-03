@@ -18,7 +18,7 @@ import {
   describeAmount,
   amountTotal,
 } from "@/lib/productionBatches";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 
 export type BatchRow = {
   id: string;
@@ -190,7 +190,6 @@ export function BatchItemsTable({
   const searching = term.trim() !== "";
   const activeStatus = searching ? "all" : status;
   const activeTypes = useMemo(() => (searching ? [] : types), [searching, types]);
-  const pausedCount = searching ? [status !== "all", types.length > 0].filter(Boolean).length : 0;
 
   // Each picker's counts are taken AFTER the search and the OTHER picker, never
   // after itself — or every value but the chosen one would read 0
@@ -585,7 +584,6 @@ export function BatchItemsTable({
               />
             </ControlField>
           </div>
-          {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
             <ControlField label="Group by">
               <PickList
                 ariaLabel="Group the batches"

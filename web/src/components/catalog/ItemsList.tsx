@@ -30,7 +30,7 @@ import { InventoryItemActions } from "./InventoryItemActions";
 import { PickList } from "@/components/ui/PickList";
 import type { ItemRow } from "@/app/(app)/items/page";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 
 const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
   { key: "active", label: "Active" },
@@ -158,9 +158,6 @@ export function ItemsList({
     });
   }, [items, filters]);
   const searching = filters.q.trim() !== "";
-  const pausedCount = searching
-    ? [filters.active !== "all", !!filters.category, !!filters.last].filter(Boolean).length
-    : 0;
 
   const grouping = GROUPING_KEYS.includes(filters.sort) ? filters.sort : null;
 
@@ -570,7 +567,6 @@ export function ItemsList({
             />
           </ControlField>
         </div>
-        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
       </div>
 
       {/* WHAT THE LAST COMMAND SAID, in the band slot — the purchasing lists'

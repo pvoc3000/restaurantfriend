@@ -21,7 +21,7 @@ import { openWindowNow } from "@/lib/poProcessing";
 import { NewDocument } from "./NewDocument";
 import { deleteDocuments, duplicateDocument } from "./documentWrites";
 import { openDocumentFiles } from "./openDocumentFiles";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 
 export type DocumentRow = {
   id: string;
@@ -395,7 +395,6 @@ export function DocumentsList({
             />
           </ControlField>
         </div>
-        {needle && category !== "all" ? <SearchPausedNote count={1} /> : null}
       </div>
       {failed && <p className="text-sm text-accent">{failed}</p>}
       <DataTable

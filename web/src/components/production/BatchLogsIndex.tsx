@@ -23,7 +23,7 @@ import {
   type BatchLogWindow,
 } from "@/lib/batchLogFilters";
 import { SCHEDULE_CLASSES, scheduleLabel } from "@/lib/production";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 import { hrefWithSearch, useSearchLoadsAllDates } from "@/lib/searchWindow";
 
 export type BatchLogRow = {
@@ -145,10 +145,6 @@ export function BatchLogsIndex({
   // A search looks past Show and Schedule (`lib/filterMenus`' rule); the
   // Window holds, being what the server loaded.
   const searching = term.trim() !== "";
-  const pausedCount = searching
-    ? [batchLogWindowBounds(range, today) !== null, tier !== "all", schedule !== "all"].filter(Boolean)
-        .length
-    : 0;
   // The Window pauses too, so the page is asked again for every date when a
   // search starts, and for the window when it clears (`lib/searchWindow`).
   useSearchLoadsAllDates(searching ? "all" : "", searchLoaded, () => hrefWithSearch(term));
@@ -438,7 +434,6 @@ export function BatchLogsIndex({
             fit
           />
         </ControlField>
-        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
       </div>
       {note}
     <DataTable

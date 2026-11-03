@@ -8,7 +8,7 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { PickList } from "@/components/ui/PickList";
 import { ControlField } from "@/components/ui/ControlField";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { RowMenu } from "@/components/ui/RowMenu";
@@ -19,7 +19,6 @@ import { sortRows } from "@/lib/tableSort";
 import {
   applyListFilters,
   searchingValues,
-  pausedFilterCount,
   filterCounts,
   filterHref,
   parseFilterSearch,
@@ -586,9 +585,6 @@ export function PlansList({
             />
           </ControlField>
         </div>
-        {pausedFilterCount(dimensions, filters, search) > 0 ? (
-          <SearchPausedNote count={1} />
-        ) : null}
       </div>
 
     <DataTable

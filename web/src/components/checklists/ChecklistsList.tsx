@@ -10,7 +10,7 @@ import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { SHIFT_SLOT_LABEL } from "@/lib/employeeEvents";
 import { CHECKLIST_KIND_LABEL, type ChecklistKind } from "@/lib/checklists";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 
 const WIDTHS_KEY = "rf.checklists.columnWidths.v1";
 
@@ -218,7 +218,6 @@ export function ChecklistsList({
             />
           </ControlField>
         </div>
-        {searching && tier !== "all" ? <SearchPausedNote count={1} /> : null}
       </div>
 
       {outstanding.length > 0 && (

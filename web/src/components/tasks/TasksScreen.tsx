@@ -28,7 +28,7 @@ import {
   type TaskStatus,
 } from "@/lib/facilityTasks";
 import { ResolveTask } from "./ResolveTask";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 
 export type TaskRow = {
   id: string;
@@ -505,7 +505,6 @@ export function TasksScreen({
             />
           </ControlField>
         </div>
-        {searching && tier !== "all" ? <SearchPausedNote count={1} /> : null}
       </div>
 
       <DataTable

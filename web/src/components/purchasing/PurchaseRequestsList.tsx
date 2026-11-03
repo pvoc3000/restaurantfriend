@@ -7,7 +7,7 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { PickList } from "@/components/ui/PickList";
 import { ControlField } from "@/components/ui/ControlField";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
@@ -16,7 +16,6 @@ import { dateInTimeZone } from "@/lib/today";
 import {
   applyListFilters,
   searchingValues,
-  pausedFilterCount,
   filterCounts,
   filterHref,
   parseFilterSearch,
@@ -437,9 +436,6 @@ export function PurchaseRequestsList({
               />
             </ControlField>
           </div>
-          {pausedFilterCount(dimensions, filters, search) > 0 ? (
-            <SearchPausedNote count={1} />
-          ) : null}
           {capped ? (
             <span className="text-[12px] text-subtle">
               Showing the most recent 500.

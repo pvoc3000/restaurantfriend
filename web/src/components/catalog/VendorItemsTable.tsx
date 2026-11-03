@@ -119,7 +119,7 @@ export function VendorItemsTable({
     const words = term.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return vendorItems.filter((vi) => {
       // A search looks past the filters (`lib/filterMenus`' rule); `ListFilters`
-      // dims them and says so.
+      // dims them.
       if (words.length === 0) {
         if (active === "active" && !vi.is_active) return false;
         if (active === "inactive" && vi.is_active) return false;

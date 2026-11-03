@@ -32,7 +32,7 @@ import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { deleteSchedules, deleteSchedulesMessage } from "@/components/production/scheduleWrites";
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 
 export type ScheduleRow = {
   id: string;
@@ -222,9 +222,6 @@ export function SchedulesList({
   // A search looks past Window, Show and From (`lib/filterMenus`' rule) — the
   // window is a client filter here, so every loaded night is searchable.
   const searching = term.trim() !== "";
-  const pausedCount = searching
-    ? [!!range, show.length > 0, origin !== "all"].filter(Boolean).length
-    : 0;
   const shown = useMemo(() => {
     const q = term.trim().toLowerCase();
     return rows.filter((r) => {
@@ -672,7 +669,6 @@ export function SchedulesList({
             fit
           />
         </ControlField>
-        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
       </div>
 
       <DataTable

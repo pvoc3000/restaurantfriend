@@ -28,7 +28,7 @@ import {
   SHIFT_REPORT_RANGE_PRESETS,
   shiftReportRangeToken,
 } from "@/lib/shiftReportRange";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 import { hrefWithSearch, useSearchLoadsAllDates } from "@/lib/searchWindow";
 
 export type ShiftReportRow = {
@@ -179,9 +179,6 @@ export function ShiftReportsList({
   // A search looks past Shift and Show (`lib/filterMenus`' rule); the Dates
   // window holds, being what the server loaded.
   const searching = search.trim() !== "";
-  const pausedCount = searching
-    ? [range !== null, tier !== "all", shift !== "all"].filter(Boolean).length
-    : 0;
   // The Dates pause too, so the page is asked again for every date when a
   // search starts, and for the window when it clears (`lib/searchWindow`).
   useSearchLoadsAllDates(searching ? "all" : "", searchLoaded, () => hrefWithSearch(search));
@@ -463,7 +460,6 @@ export function ShiftReportsList({
                 />
               </ControlField>
             </div>
-            {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
           </div>
           {/* UNDER THE TABS, NOT OVER THEM (Mark, 2026-09-03), and ON EVERY
               TIER since the Needs-attention tab went (2026-09-09).

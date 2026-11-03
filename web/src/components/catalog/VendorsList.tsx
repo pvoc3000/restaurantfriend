@@ -24,7 +24,7 @@ import { PageHeading } from "@/components/ui/PageHeading";
 import { NewVendor } from "./NewVendor";
 import { PickList } from "@/components/ui/PickList";
 import type { VendorRow } from "@/app/(app)/vendors/page";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 
 
 const WIDTHS_STORAGE_KEY = "rf.vendors.columnWidths.v1";
@@ -148,9 +148,6 @@ export function VendorsList({
     });
   }, [vendors, filters]);
   const searching = filters.q.trim() !== "";
-  const pausedCount = searching
-    ? [filters.active !== "all", !!filters.type].filter(Boolean).length
-    : 0;
 
   // Sorting is CONTROLLED: it lives in the URL so it survives a trip into a
   // vendor and back, so this list owns both the order of `rows` and the arrow
@@ -342,7 +339,6 @@ export function VendorsList({
             />
           </ControlField>
         </div>
-        {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
       </div>
 
       <DataTable

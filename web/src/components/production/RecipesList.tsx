@@ -7,7 +7,7 @@ import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { PickList } from "@/components/ui/PickList";
 import { ControlField } from "@/components/ui/ControlField";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { usePublishRecordSet } from "@/lib/recordSet";
@@ -16,7 +16,6 @@ import { sortRows } from "@/lib/tableSort";
 import {
   applyListFilters,
   searchingValues,
-  pausedFilterCount,
   filterCounts,
   filterHref,
   parseFilterSearch,
@@ -358,9 +357,6 @@ export function RecipesList({
             />
           </ControlField>
         </div>
-        {pausedFilterCount(dimensions, filters, search) > 0 ? (
-          <SearchPausedNote count={1} />
-        ) : null}
       </div>
     <DataTable
       rows={sorted}

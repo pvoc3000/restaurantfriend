@@ -15,7 +15,7 @@ import {
   weekdaySetLabel,
   type ChecklistKind,
 } from "@/lib/checklists";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 
 const WIDTHS_KEY = "rf.checklistTemplates.columnWidths.v1";
 
@@ -177,7 +177,6 @@ export function ChecklistTemplatesList({
             />
           </ControlField>
         </div>
-        {searching && kind !== "all" ? <SearchPausedNote count={1} /> : null}
       </div>
 
       <DataTable

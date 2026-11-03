@@ -9,7 +9,6 @@ import {
   dimensionDefault,
   filterCounts,
   matchesDimension,
-  pausedFilterCount,
   searchingValues,
   type FilterDimension,
   type FilterValues,
@@ -131,7 +130,6 @@ export function FilterMenus<T>({
   const applied = searchingValues(dimensions, values, search);
   const counts = filterCounts(rows, dimensions, applied);
   const active = activeFilterCount(dimensions, values);
-  const paused = pausedFilterCount(dimensions, values, search);
   const shown = rows.filter((row) =>
     dimensions.every((d) => matchesDimension(d, row, applied))
   ).length;
@@ -224,9 +222,7 @@ export function FilterMenus<T>({
       {/* Always stated, never only when filtered: "470 of 470" is a fact worth
           having, and a line that appears and disappears moves the table under
           it every time you touch a menu. */}
-      {paused > 0 ? (
-        <SearchPausedNote count={paused} />
-      ) : showCount || active > 0 ? (
+      {showCount || active > 0 ? (
         <p className="text-[13px] text-muted">
           {showCount
             ? shown === population
@@ -258,16 +254,3 @@ export function FilterMenus<T>({
  */
 export const PAUSED = "opacity-50 transition-opacity";
 
-/**
- * The line that replaces "Clear N filters" while a search is overriding them.
- * Exported for the lists whose single Show/Status picker is not a
- * `FilterMenus`, so every list says it the same way.
- */
-export function SearchPausedNote({ count, note }: { count: number; note?: string }) {
-  return (
-    <p className="text-[13px] text-muted">
-      {note ??
-        `Searching past ${count === 1 ? "the filter" : `${count} filters`} — they return when the search is cleared.`}
-    </p>
-  );
-}

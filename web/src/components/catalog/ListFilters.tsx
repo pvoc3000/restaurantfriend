@@ -5,7 +5,7 @@ import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { PickList } from "@/components/ui/PickList";
 import { ControlField } from "@/components/ui/ControlField";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 
 export type ActiveFilter = "active" | "inactive" | "all";
 export type StaleFilter = StaleBucket | "any";
@@ -56,15 +56,8 @@ export function ListFilters({
   totalCount?: number;
 }) {
   // While there is a term the filters pause — the caller skips them, this dims
-  // them and says so (`lib/filterMenus`' `searchingValues` rule).
+  // them (`lib/filterMenus`' `searchingValues` rule).
   const searching = term.trim() !== "";
-  const pausedCount = searching
-    ? [
-        !!(categories && onCategory && category),
-        !!(active && onActive && active !== "all"),
-        !!(stale && onStale && stale !== "any"),
-      ].filter(Boolean).length
-    : 0;
   return (
     <div className="flex min-w-0 flex-wrap items-end gap-3">
       <TextInput
@@ -127,7 +120,6 @@ export function ListFilters({
           </ControlField>
         </div>
       )}
-      {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
     </div>
   );
 }

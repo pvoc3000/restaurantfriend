@@ -217,22 +217,6 @@ export function searchingValues<T>(
   return next;
 }
 
-/**
- * How many menus a search is currently overriding — the ones saying something
- * other than "All". Measured against All rather than against rest (unlike
- * `activeFilterCount`): a list resting on Active is narrowing, and a search
- * widens it, so that pause is worth saying.
- */
-export function pausedFilterCount<T>(
-  dimensions: FilterDimension<T>[],
-  values: FilterValues,
-  search: string
-): number {
-  if (!search.trim()) return 0;
-  return dimensions.filter(
-    (d) => !d.holdsWhileSearching && (values[d.key] ?? dimensionDefault(d)) !== FILTER_ALL
-  ).length;
-}
 
 /** Every dimension back to rest. Values for unknown keys are dropped. */
 export function clearedFilters<T>(dimensions: FilterDimension<T>[]): FilterValues {

@@ -26,7 +26,7 @@ import { ROLE_LABEL, type Role } from "@/lib/roles";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { makeComparator, type SortDir, type SortValue } from "@/lib/tableSort";
 import { NewEmployee } from "./NewEmployee";
-import { PAUSED, SearchPausedNote } from "@/components/ui/FilterMenus";
+import { PAUSED } from "@/components/ui/FilterMenus";
 
 const WIDTHS_STORAGE_KEY = "rf.employees.columnWidths.v1";
 
@@ -180,9 +180,6 @@ export function EmployeesList({
   // A search looks past the menus (`lib/filterMenus`' `searchingValues` rule):
   // a name is the person you want, whichever shop or status they are under.
   const searching = search.trim() !== "";
-  const pausedCount = searching
-    ? [status !== "all", !!location, !!position].filter(Boolean).length
-    : 0;
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
@@ -444,7 +441,6 @@ export function EmployeesList({
               />
             </ControlField>
           </div>
-          {pausedCount > 0 ? <SearchPausedNote count={pausedCount} /> : null}
         </div>
 
       </div>
