@@ -800,7 +800,10 @@ function ScaleColumnMenu({ version, column }: { version: SheetVersion; column: S
         // it (`ui/RowMenu`). Not ▼ (Mark, 2026-11-03, after trying ▾ then ▼):
         // ▼ is the picklist caret and means "choose a value", which a column's
         // commands are not.
-        triggerClassName="px-1 text-[17px] font-normal leading-none text-muted hover:text-ink disabled:opacity-35"
+        // A 24px square that FILLS GREY ON HOVER (Mark, 2026-11-03: "it needs
+        // more on hover"), the app's rule for any control you press — the
+        // sortable column labels beside it already do.
+        triggerClassName="grid h-6 w-6 place-items-center text-[17px] font-normal leading-none text-muted hover:bg-neutral-100 hover:text-ink disabled:opacity-35"
         disabled={pending}
         align="right"
         minWidth={160}
@@ -874,7 +877,8 @@ function AddScaleColumn({
     <MenuButton
       label="Add a column"
       trigger={error ? <span className="text-[11px] text-accent">!</span> : "+"}
-      triggerClassName="-mx-2 px-1 text-[15px] leading-none text-subtle hover:text-ink disabled:opacity-35"
+      // Fills grey on hover, like the column menus' ⋯ beside it.
+      triggerClassName="-mx-2 grid h-6 w-6 place-items-center text-[15px] leading-none text-subtle hover:bg-neutral-100 hover:text-ink disabled:opacity-35"
       disabled={pending}
       minWidth={240}
       items={[
