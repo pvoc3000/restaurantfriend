@@ -143,6 +143,14 @@ const W_TRASH = 40;
    most of it, so a press on the + resized the column instead (2026-11-03). */
 const W_SPARE = 44;
 
+/* The header's glyph buttons — each batch size's ⋯ and the + — dressed alike:
+   a bare glyph at rest, a black 1px edge with a 2px hard shadow on hover
+   (`mac-small`'s size, the Mac look's raised control), and on press the
+   shadow closes as the button drops into it. The border is there at rest,
+   transparent, so the hover doesn't nudge the glyph by a pixel. */
+const HEADER_GLYPH_BUTTON =
+  "grid h-6 w-6 place-items-center border border-transparent text-[17px] font-normal leading-none text-muted hover:border-ink hover:text-ink hover:shadow-[2px_2px_0_0_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-35";
+
 /**
  * One version of a recipe, set the way FileMaker set it and — since 2026-08-08
  * — editable in place.
@@ -800,10 +808,11 @@ function ScaleColumnMenu({ version, column }: { version: SheetVersion; column: S
         // it (`ui/RowMenu`). Not ▼ (Mark, 2026-11-03, after trying ▾ then ▼):
         // ▼ is the picklist caret and means "choose a value", which a column's
         // commands are not.
-        // A 24px square that FILLS GREY ON HOVER (Mark, 2026-11-03: "it needs
-        // more on hover"), the app's rule for any control you press — the
-        // sortable column labels beside it already do.
-        triggerClassName="grid h-6 w-6 place-items-center text-[17px] font-normal leading-none text-muted hover:bg-neutral-100 hover:text-ink disabled:opacity-35"
+        // ON HOVER IT BECOMES A BUTTON (Mark, 2026-11-03: "instead of the grey
+        // fill, can we do a black outline and drop shadow on hover?") — see
+        // HEADER_GLYPH_BUTTON. At rest it is a bare glyph, so a header of them
+        // doesn't read as a row of buttons.
+        triggerClassName={HEADER_GLYPH_BUTTON}
         disabled={pending}
         align="right"
         minWidth={160}
@@ -877,8 +886,8 @@ function AddScaleColumn({
     <MenuButton
       label="Add a column"
       trigger={error ? <span className="text-[11px] text-accent">!</span> : "+"}
-      // Fills grey on hover, like the column menus' ⋯ beside it.
-      triggerClassName="-mx-2 grid h-6 w-6 place-items-center text-[15px] leading-none text-subtle hover:bg-neutral-100 hover:text-ink disabled:opacity-35"
+      // Raised on hover, like the column menus' ⋯ beside it.
+      triggerClassName={`-mx-2 ${HEADER_GLYPH_BUTTON}`}
       disabled={pending}
       minWidth={240}
       items={[
