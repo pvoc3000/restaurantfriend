@@ -304,8 +304,10 @@ function Notes({ version, editable }: { version: SheetVersion; editable: boolean
         <div
           className={`min-h-0 flex-initial overflow-y-auto xl:flex-1 ${
             // BLACK, not the boxed field's grey (Mark, 2026-11-03: "make the
-            // border black instead of grey").
-            editable ? "border border-ink" : ""
+            // border black instead of grey"), and it is the BOX that reads 2px
+            // on hover — the Mac look's inset 1px, `.rf-typed`'s own hover
+            // moved out here. An inset shadow does not scroll with the content.
+            editable ? "border border-ink hover:shadow-[inset_0_0_0_1px_#000]" : ""
           }`}
         >
           <Editable
@@ -314,7 +316,10 @@ function Notes({ version, editable }: { version: SheetVersion; editable: boolean
             value={version.testing_notes}
             editable={editable}
             multiline
-            className="border-0! text-muted"
+            // No border, no hover edge and no ground of its own: `.rf-typed`
+            // would draw its 2px hover on this field, and a white ground would
+            // paint over the box's inset edge.
+            className="border-0! shadow-none! bg-transparent! text-muted"
           />
         </div>
       </div>
