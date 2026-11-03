@@ -2069,3 +2069,25 @@ policies are membership-only, `next_batch_number` checks only membership — but
 by 153, 157, 158, 159 and 175. 211 is 175's body with that gate replaced by a
 membership check. Deleting a batch stays purchaser+. **When the function is
 next restated, start from 211, not an older migration**, or the gate comes back.
+
+## New Version on the recipe record (2026-11-03, no migration)
+
+Mark wanted Pavemint's v6 and reached for Duplicate Recipe, FileMaker's habit
+(duplicate the version record, bump the number) — but here a recipe is a
+FAMILY, so Duplicate copied v04 and v5 into a new "… copy" recipe. Actions now
+has **New Version**: the version on screen copied into the SAME recipe as the
+next number, lines, steps and step pictures with it (`newRecipeVersion`,
+sharing `copyVersionContent` with Duplicate Recipe).
+
+- **The number** is `nextRecipeVersion`: one past the highest of
+  `version_sort` and the label's leading digits (FileMaker left "27a" at 27.1
+  and some rows with no sort), written with two digits as 460 of the 490
+  FileMaker labels are — Pavemint's 04, 5 became 06.
+- **The copy is NOT the master.** Costing, item prices and batch logs read the
+  master, so a version still being worked out would move them the moment it
+  existed. Make master on the Info tab (already there, 036's one-master index)
+  is the deliberate second step; New Version lands on Info for that reason.
+- **Note and testing notes start empty** — they describe the version they were
+  written on. Everything else on the version row comes across.
+
+Verified by Mark in the app: Pavemint v06 created, active, not master.

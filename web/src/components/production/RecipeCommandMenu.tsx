@@ -17,6 +17,7 @@ import type { SheetVersion } from "./RecipeVersionSheet";
 import {
   deleteRecipe,
   duplicateRecipe,
+  newRecipeVersion,
   recipeDeleteCounts,
   recipeDeleteMessage,
 } from "./recipeWrites";
@@ -25,8 +26,12 @@ import {
  * THE RECIPE RECORD'S COMMANDS, AS ONE "ACTIONS" MENU (Mark, 2026-09-12), in the
  * title row where Print sheet stood:
  *
- *   New Recipe… · Duplicate Recipe · — · Add Ingredient… · Add Procedure… · — ·
- *   Print Sheet · — · Delete Recipe…
+ *   New Recipe… · Duplicate Recipe · New Version · — · Add Ingredient… ·
+ *   Add Procedure… · — · Print Sheet · — · Delete Recipe…
+ *
+ * NEW VERSION (2026-11-03) copies the version on screen into this recipe as
+ * the next number and opens it on Info, where Make master is — the copy is not
+ * the master until you say so (`newRecipeVersion`).
  *
  * `NewRecipe` and `PrintRecipe` keep owning their dialog and their window and
  * hand their rows out through render props (`OrderCommandMenu`'s arrangement).
@@ -200,6 +205,20 @@ export function RecipeCommandMenu({
     router.push(`/recipes/${result.id}`);
   }
 
+  async function addVersion() {
+    if (!version) return;
+    setBusy("Copying…");
+    setError(null);
+    const result = await newRecipeVersion(supabase, recipeId, version.id);
+    setBusy(null);
+    if ("error" in result) setError(result.error);
+    else if (result.warning) await alertDialog({ title: `v${result.label} created`, body: result.warning });
+    if (result.label) {
+      router.push(recipeHref(recipeId, { tab: "info", version: result.label }, params));
+      router.refresh();
+    }
+  }
+
   async function remove() {
     setError(null);
     const counts = await recipeDeleteCounts(supabase, recipeId);
@@ -229,6 +248,7 @@ export function RecipeCommandMenu({
     if (editable) {
       if (newRow) items.push(newRow);
       items.push({ label: "Duplicate Recipe", onSelect: () => void duplicate() });
+      items.push({ label: "New Version", onSelect: () => void addVersion(), disabled: !version });
       items.push({
         label: "Add Ingredient…",
         onSelect: () => setLineOpen(true),

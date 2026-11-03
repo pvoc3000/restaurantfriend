@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { duplicateTitle } from "@/lib/productionPlans";
 import { RECIPE_IMAGE_BUCKET, recipeImagePath } from "@/lib/recipeImages";
+import { nextRecipeVersion } from "@/lib/recipes";
 
 /**
  * The recipe record's two whole-family writes — Duplicate and Delete — for the
- * title row's Actions menu (Mark, 2026-09-12). Neither existed before.
+ * title row's Actions menu (Mark, 2026-09-12). Neither existed before. New
+ * Version (2026-11-03) is the one write here that stays inside the family.
  */
 
 type Row = Record<string, unknown>;
@@ -102,54 +104,158 @@ export async function duplicateRecipe(
     }
     const versionId = nv.id as string;
 
-    if (lines?.length) {
-      const rows = lines.map((l) => ({ ...strip(l), version_id: versionId }));
-      const { data, error: lErr } = await supabase
-        .from("production_recipe_lines")
-        .insert(rows)
-        .select("id");
-      if (lErr || data?.length !== rows.length) {
-        return {
-          id: newId,
-          error: `${title} was created, but the ingredients of v${version.version_label} could not be copied: ${lErr?.message ?? "not every line was written"}`,
-        };
-      }
+    const copied = await copyVersionContent(supabase, orgId, versionId, lines, steps);
+    if ("error" in copied) {
+      return {
+        id: newId,
+        error: `${title} was created, but the ${copied.error} of v${version.version_label} could not be copied: ${copied.message}`,
+      };
     }
-
-    if (steps?.length) {
-      const rows: Row[] = [];
-      for (const s of steps) {
-        const row: Row = { ...strip(s), version_id: versionId };
-        const from = s.image_path as string | null;
-        if (from) {
-          const to = recipeImagePath(orgId, versionId, (s.image_name as string | null) ?? from);
-          const { error: copyErr } = await supabase.storage.from(RECIPE_IMAGE_BUCKET).copy(from, to);
-          if (copyErr) {
-            row.image_path = null;
-            row.image_name = null;
-            lostImages += 1;
-          } else {
-            row.image_path = to;
-          }
-        }
-        rows.push(row);
-      }
-      const { data, error: sErr } = await supabase
-        .from("production_recipe_steps")
-        .insert(rows)
-        .select("id");
-      if (sErr || data?.length !== rows.length) {
-        return {
-          id: newId,
-          error: `${title} was created, but the procedure of v${version.version_label} could not be copied: ${sErr?.message ?? "not every step was written"}`,
-        };
-      }
-    }
+    lostImages += copied.lostImages;
   }
 
   return lostImages > 0
     ? { id: newId, warning: `${lostImages} step picture${lostImages === 1 ? "" : "s"} could not be copied.` }
     : { id: newId };
+}
+
+/**
+ * One version's ingredient lines and procedure steps, written under another
+ * version — Duplicate Recipe's inner loop, and the whole of New Version's.
+ * Each step picture becomes its own storage object (see `duplicateRecipe`); a
+ * picture that will not copy leaves its step without one and is counted.
+ */
+async function copyVersionContent(
+  supabase: SupabaseClient,
+  orgId: string,
+  versionId: string,
+  lines: Row[] | null | undefined,
+  steps: Row[] | null | undefined
+): Promise<{ lostImages: number } | { error: "ingredients" | "procedure"; message: string }> {
+  let lostImages = 0;
+
+  if (lines?.length) {
+    const rows = lines.map((l) => ({ ...strip(l), version_id: versionId }));
+    const { data, error: lErr } = await supabase
+      .from("production_recipe_lines")
+      .insert(rows)
+      .select("id");
+    if (lErr || data?.length !== rows.length) {
+      return { error: "ingredients", message: lErr?.message ?? "not every line was written" };
+    }
+  }
+
+  if (steps?.length) {
+    const rows: Row[] = [];
+    for (const s of steps) {
+      const row: Row = { ...strip(s), version_id: versionId };
+      const from = s.image_path as string | null;
+      if (from) {
+        const to = recipeImagePath(orgId, versionId, (s.image_name as string | null) ?? from);
+        const { error: copyErr } = await supabase.storage.from(RECIPE_IMAGE_BUCKET).copy(from, to);
+        if (copyErr) {
+          row.image_path = null;
+          row.image_name = null;
+          lostImages += 1;
+        } else {
+          row.image_path = to;
+        }
+      }
+      rows.push(row);
+    }
+    const { data, error: sErr } = await supabase
+      .from("production_recipe_steps")
+      .insert(rows)
+      .select("id");
+    if (sErr || data?.length !== rows.length) {
+      return { error: "procedure", message: sErr?.message ?? "not every step was written" };
+    }
+  }
+
+  return { lostImages };
+}
+
+/**
+ * NEW VERSION (Mark, 2026-11-03): FileMaker's "duplicate the version, bump the
+ * number", which Duplicate Recipe could not do — it copies the whole family.
+ * The version on screen is copied into the same recipe as the next number
+ * (`nextRecipeVersion`), with its lines, steps and pictures.
+ *
+ * THE COPY IS NOT THE MASTER. The master is what costing, item prices and batch
+ * logs read, so a version still being worked out would change them the moment
+ * it existed; Make master on the Info tab is the deliberate second step. Its
+ * note and testing notes start empty — they describe the version they were
+ * written on, and v06 carrying v5's "less sugar" would say something untrue.
+ */
+export async function newRecipeVersion(
+  supabase: SupabaseClient,
+  recipeId: string,
+  fromVersionId: string
+): Promise<
+  { label: string; warning?: string } | { error: string; label?: string }
+> {
+  const [{ data: from, error }, { data: siblings, error: sErr }] = await Promise.all([
+    supabase
+      .from("production_recipe_versions")
+      .select("*, production_recipe_lines ( * ), production_recipe_steps ( * )")
+      .eq("id", fromVersionId)
+      .maybeSingle(),
+    supabase
+      .from("production_recipe_versions")
+      .select("version_label, version_sort")
+      .eq("recipe_id", recipeId),
+  ]);
+  if (error || !from) return { error: error?.message ?? "The version could not be read." };
+  if (sErr) return { error: sErr.message };
+
+  const next = nextRecipeVersion(
+    (siblings ?? []).map((v) => ({
+      version_label: String(v.version_label),
+      version_sort: v.version_sort === null ? null : Number(v.version_sort),
+    }))
+  );
+
+  const { production_recipe_lines: lines, production_recipe_steps: steps, ...version } =
+    from as Row & { production_recipe_lines: Row[]; production_recipe_steps: Row[] };
+
+  const { data: made, error: vErr } = await supabase
+    .from("production_recipe_versions")
+    .insert({
+      ...strip(version),
+      recipe_id: recipeId,
+      version_label: next.label,
+      version_sort: next.sort,
+      is_master: false,
+      is_active: true,
+      note: null,
+      testing_notes: null,
+      source: "app",
+    })
+    .select("id")
+    .single();
+  if (vErr || !made) {
+    return { error: vErr?.message ?? `v${next.label} could not be created.` };
+  }
+
+  const copied = await copyVersionContent(
+    supabase,
+    String(version.org_id),
+    made.id as string,
+    lines,
+    steps
+  );
+  if ("error" in copied) {
+    return {
+      label: next.label,
+      error: `v${next.label} was created, but the ${copied.error} of v${version.version_label} could not be copied: ${copied.message}`,
+    };
+  }
+  return copied.lostImages > 0
+    ? {
+        label: next.label,
+        warning: `${copied.lostImages} step picture${copied.lostImages === 1 ? "" : "s"} could not be copied.`,
+      }
+    : { label: next.label };
 }
 
 /** What a delete takes with it, counted before asking. */

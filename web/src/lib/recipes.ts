@@ -158,6 +158,30 @@ export type RecipeLink = {
 };
 
 /**
+ * The number a recipe's next version takes: one past the highest it has, read
+ * from `version_sort` AND from the label's leading digits, since FileMaker left
+ * some rows with only one of the two ("27a" sorts at 27.1).
+ *
+ * Two digits, the way 460 of FileMaker's 490 labels are written and the way
+ * New Recipe writes its "01" — so Pavemint's 04, 5 is followed by 06. Bare,
+ * no "v": every reader prefixes it.
+ */
+export function nextRecipeVersion(
+  versions: { version_label: string; version_sort: number | null }[]
+): { label: string; sort: number } {
+  let high = 0;
+  for (const v of versions) {
+    if (v.version_sort !== null && Number.isFinite(v.version_sort)) {
+      high = Math.max(high, Math.floor(v.version_sort));
+    }
+    const lead = parseInt(v.version_label, 10);
+    if (Number.isFinite(lead)) high = Math.max(high, lead);
+  }
+  const n = high + 1;
+  return { label: String(n).padStart(2, "0"), sort: n };
+}
+
+/**
  * The recipe an element is costed from: its first family BY NAME that has a
  * master version.
  *
