@@ -739,7 +739,7 @@ function ScaleHeader({
 }
 
 /**
- * THE ▼ ON A BATCH SIZE'S HEADER — its column menu, today holding Delete… (Mark, 2026-11-03: "we
+ * THE ⋯ ON A BATCH SIZE'S HEADER — its column menu, today holding Delete… (Mark, 2026-11-03: "we
  * need to be able to remove a column in the ingredient table"). Until now the
  * only way was to clear its name, which worked and which nobody would guess.
  *
@@ -788,20 +788,19 @@ function ScaleColumnMenu({ version, column }: { version: SheetVersion; column: S
   return (
     // `ml-auto`: against the column's right edge (Mark, 2026-11-03).
     <span className="ml-auto shrink-0">
-      {/* A ▾ MENU, not a delete button (Mark, 2026-11-03: "instead of just
+      {/* A ⋯ MENU, not a delete button (Mark, 2026-11-03: "instead of just
           deleting the column, it's a popup menu with the Delete… option.
           Maybe eventually … Hide and Pin"). The column's own commands live
           here, so the next one is a row in `items` rather than a second glyph
-          in a header that has room for one. Grey at rest; U+FE0E keeps Apple
-          platforms from drawing ▼ as an emoji. */}
+          in a header that has room for one. Grey at rest. */}
       <MenuButton
         label={`${column.label} column`}
-        trigger={"\u25BC\uFE0E"}
-        // ▼, the full triangle, not ▾ (Mark, 2026-11-03: "make the glyph larger.
-        // it's very small"). ▾ is the SMALL triangle by design and stayed a
-        // speck even at 18px; ▼ is the picklists' own caret, so the header
-        // menu wears the mark every other "this opens a list" in the app does.
-        triggerClassName="px-1 text-[12px] font-normal leading-none text-subtle hover:text-ink disabled:opacity-35"
+        trigger="⋯"
+        // ⋯, the app's mark for "commands for this thing" — every row menu wears
+        // it (`ui/RowMenu`). Not ▼ (Mark, 2026-11-03, after trying ▾ then ▼):
+        // ▼ is the picklist caret and means "choose a value", which a column's
+        // commands are not.
+        triggerClassName="px-1 text-[17px] font-normal leading-none text-muted hover:text-ink disabled:opacity-35"
         disabled={pending}
         align="right"
         minWidth={160}
