@@ -681,8 +681,6 @@ function ScaleHeader({
   return (
     <span className="flex min-w-0 flex-col gap-0.5 text-ink">
       {editable ? (
-        <span className="flex min-w-0 items-start gap-1">
-          <span className="min-w-0 flex-1">
         <InlineValue
           table="production_recipe_versions"
           id={version.id}
@@ -695,35 +693,44 @@ function ScaleHeader({
           arrayStrip={version.scale_labels}
           arrayWidth={Math.max(width, column.index + 1)}
         />
-          </span>
-          {removable ? <RemoveScaleColumn version={version} column={column} /> : null}
-        </span>
       ) : (
         <span className={`${READ_ONLY_VALUE} font-semibold uppercase tracking-[0.06em]`}>
           {column.label}
         </span>
       )}
-      {multiplier ? (
-        editable ? (
-          <span className="normal-case tracking-normal text-subtle">
-            <InlineValue
-              table="production_recipe_versions"
-              id={version.id}
-              column="scale_multipliers"
-              kind="number"
-              placeholder="×"
-              value={column.multiplier}
-              arrayColumn="scale_multipliers"
-              arrayIndex={column.index}
-              arrayStrip={version.scale_multipliers}
-              arrayWidth={width}
-            />
-          </span>
-        ) : (
-          <span className={`${READ_ONLY_VALUE} tabular-nums normal-case tracking-normal text-subtle`}>
-            ×{column.multiplier}
-          </span>
-        )
+      {/* THE SECOND ROW: the multiplier, then the ⊗ (Mark, 2026-11-03: "move
+          it out of the first row of the column header and into the second").
+          Beside the name it crowded the one thing the header is for; down
+          here it sits with the column's other setting. The `%` column has no
+          multiplier, so its second row is the ⊗ alone. */}
+      {multiplier || (editable && removable) ? (
+        <span className="flex min-w-0 items-center gap-1">
+          {multiplier ? (
+            editable ? (
+              <span className="min-w-0 flex-1 normal-case tracking-normal text-subtle">
+                <InlineValue
+                  table="production_recipe_versions"
+                  id={version.id}
+                  column="scale_multipliers"
+                  kind="number"
+                  placeholder="×"
+                  value={column.multiplier}
+                  arrayColumn="scale_multipliers"
+                  arrayIndex={column.index}
+                  arrayStrip={version.scale_multipliers}
+                  arrayWidth={width}
+                />
+              </span>
+            ) : (
+              <span className={`${READ_ONLY_VALUE} tabular-nums normal-case tracking-normal text-subtle`}>
+                ×{column.multiplier}
+              </span>
+            )
+          ) : (
+            <span className="flex-1" />
+          )}
+          {editable && removable ? <RemoveScaleColumn version={version} column={column} /> : null}
+        </span>
       ) : null}
     </span>
   );
