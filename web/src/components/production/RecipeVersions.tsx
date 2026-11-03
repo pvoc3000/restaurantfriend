@@ -54,10 +54,13 @@ export function RecipeVersions({
             const next = versions.find((v) => v.version_label === label);
             if (next) router.push(href(next));
           }}
+          // "master" IN THE LABEL, not a hint (Mark, 2026-11-03: "instead of the
+          // picklist just showing v22 it displays v22 master"). A hint shows
+          // only in the open list; the closed picker shows the label, and that
+          // is where you need to know whether you are reading the master.
           options={versions.map((v) => ({
             value: v.version_label,
-            label: `v${v.version_label}`,
-            hint: v.is_master ? "master" : undefined,
+            label: `v${v.version_label}${v.is_master ? " master" : ""}`,
           }))}
           className="w-48"
         />
