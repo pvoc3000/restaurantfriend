@@ -2098,7 +2098,7 @@ The `%` column counted from the first weighable line, which is the flour in a
 dough and an accident in an ice cream base. Mark: "we should have to set which
 row is the reference element." `production_recipe_lines.percent_base`, at most
 one per version (partial unique index, 036's one-master rule for lines), set by
-a **Base** radio column on the Ingredients tab between the scale block and Note.
+a **Base** radio column on the Ingredients tab, between the base amount and Auto (moved there from before Note the same day).
 
 - **Nothing backfilled.** A version with no base chosen still counts from its
   first weighable line (`percentBasis`), and the radio sits on that line, so no

@@ -247,11 +247,11 @@ export function RecipeVersionSheet({
               <col style={{ width: W_SORT }} />
               <col style={{ width: W_ITEM }} />
               <col style={{ width: W_SCALE }} />
+              <col style={{ width: W_BASE }} />
               <col style={{ width: W_AUTO }} />
               {headerSlots.slice(1).map((column, i) => (
                 <col key={i} style={{ width: column ? W_SCALE : W_SPARE }} />
               ))}
-              <col style={{ width: W_BASE }} />
               {/* No width: the leftover lands here. See W_NOTE_MIN. */}
               <col />
               <col style={{ width: W_HIDE }} />
@@ -265,6 +265,8 @@ export function RecipeVersionSheet({
               <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-20 [&>th]:bg-white">
                 <th />
                 <th />
+                <th />
+                {/* Over Base. */}
                 <th />
                 {/* The multiplier sign sits over the AUTO column (Mark,
                     2026-08-08), which is the column it belongs to: the boxes
@@ -306,8 +308,7 @@ export function RecipeVersionSheet({
                     slack off the end. The moment Note became the flexible
                     column, Note was what paid for them: 46px instead of 138.
                     A header row that over-spans invents columns. */}
-                {/* Base is a fourth: Base · Note · Hide · Trash. */}
-                <th colSpan={4} />
+                <th colSpan={3} />
               </tr>
 
               {/* THE BATCH NAMES ARE COLUMN TITLES (Mark, 2026-08-11: "can the
@@ -339,6 +340,9 @@ export function RecipeVersionSheet({
                   width={width}
                   editable={editable}
                 />
+                {/* BASE BESIDE THE BASE AMOUNT (Mark, 2026-11-03), left of Auto:
+                    it picks which of these amounts the % column counts from. */}
+                <th className="px-2 py-2 text-center">Base</th>
                 <th className="px-2 py-2 text-center">Auto</th>
                 {headerSlots.slice(1).map((column, i) => (
                   <ScaleLabelCell
@@ -351,7 +355,6 @@ export function RecipeVersionSheet({
                     editable={editable}
                   />
                 ))}
-                <th className="px-2 py-2 text-center">Base</th>
                 <th className="px-3 py-2 text-left">Note</th>
                 <th className="px-2 py-2 text-center">Hide</th>
                 <th />
@@ -405,6 +408,22 @@ export function RecipeVersionSheet({
                   )}
 
                   <td className="px-2 py-2 text-center">
+                    <PercentBase
+                      versionId={version.id}
+                      lineId={line.id}
+                      previousId={baseLineId}
+                      checked={i === basisAt}
+                      // Only a weighable line can be the 100% — a radio on
+                      // "2 ea" would choose a base that blanks the column. The
+                      // line already chosen keeps its radio live whatever its
+                      // unit became, so it can be moved off.
+                      weighable={(lineGrams(line, convert) ?? 0) > 0}
+                      editable={editable}
+                      onPick={setBaseLineId}
+                    />
+                  </td>
+
+                  <td className="px-2 py-2 text-center">
                     <ScaleAutoBox
                       line={line}
                       columns={columns}
@@ -432,22 +451,6 @@ export function RecipeVersionSheet({
                       <td key={`spare${c}`} />
                     )
                   )}
-
-                  <td className="px-2 py-2 text-center">
-                    <PercentBase
-                      versionId={version.id}
-                      lineId={line.id}
-                      previousId={baseLineId}
-                      checked={i === basisAt}
-                      // Only a weighable line can be the 100% — a radio on
-                      // "2 ea" would choose a base that blanks the column. The
-                      // line already chosen keeps its radio live whatever its
-                      // unit became, so it can be moved off.
-                      weighable={(lineGrams(line, convert) ?? 0) > 0}
-                      editable={editable}
-                      onPick={setBaseLineId}
-                    />
-                  </td>
 
                   <td className="px-3 py-2 text-[13px] text-muted">
                     {editable ? (
