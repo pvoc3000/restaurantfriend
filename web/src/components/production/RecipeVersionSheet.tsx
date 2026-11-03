@@ -10,6 +10,7 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { useExactViewportHeight } from "@/lib/tableHead";
 import type { LaborCells } from "@/lib/productionCost";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import {
   scaleColumns,
   scaleWidth,
@@ -40,6 +41,15 @@ export type SheetLine = {
   hideOnPrint: boolean;
   /** Migration 221 — this line is the baker's-percentage 100%. */
   percentBase: boolean;
+};
+
+/** A row of the Ingredients table: the line, and what the sheet worked out for it. */
+type IngredientRow = {
+  line: SheetLine;
+  /** Its share of the 100% line — `bakersPercent`. */
+  percent: number | null;
+  /** It IS the 100% line — the Base radio's state. */
+  isBasis: boolean;
 };
 
 export type SheetStep = {
@@ -93,41 +103,28 @@ export type SheetVersion = {
   labor: LaborCells | null;
 };
 
-/* Column widths, in the order FileMaker sets them out. Fixed pixels rather than
-   the app's usual fluid weights: this is a DOCUMENT with a variable number of
-   columns, not a list of records, and a batch size that squeezes to 60px as a
-   version grows a fifth one is unreadable. The table takes at least the sum and
-   scrolls sideways inside its own box if the window is narrower — never the
-   page. */
+/* Column weights, in the order FileMaker sets them out. `DataTable` divides
+   the window's width in these PROPORTIONS rather than holding them as pixels —
+   until 2026-11-03 this was a hand-built table at fixed widths that scrolled
+   sideways, on the reasoning that a batch size squeezed to 60px is unreadable.
+   The trade now: the grid always fits, a batch size you don't need comes off
+   from the Columns menu, and a dragged width is remembered. The Note keeps the
+   largest share it had as the one flexible column (Mark, 2026-08-11). */
 const W_SORT = 56;
 const W_AUTO = 56;
 const W_SCALE = 118;
 const W_ITEM = 200;
-/* THE NOTE IS THE ONLY FLEXIBLE COLUMN (Mark, 2026-08-11: "all the columns are
-   fixed width it seems, which is fine, but the notes column width should be
-   flexible"). Every other column holds something of known size — a number, a
-   unit, a checkbox, a glyph — so widening them buys nothing, while a note is
-   prose and can always use more. Its `<col>` therefore carries NO width at all:
-   under `table-layout: fixed` the one column without one absorbs whatever is
-   left over, and this is the MINIMUM the table reserves for it before the whole
-   grid starts to scroll instead. */
-const W_NOTE_MIN = 120;
+const W_NOTE = 200;
 const W_HIDE = 48;
 /* Base, a 16px radio under a four-letter label — Hide's width, for the same reason. */
 const W_BASE = 48;
 const W_TRASH = 40;
 /* The trailing "add a batch size" slot — a NARROW AFFORDANCE, not a column
-   (Mark, 2026-08-11). It was a full 72px column slot, on the reasoning that it
-   becomes one; but it is a column-sized hole in every row of the grid for
-   something you press a handful of times in a recipe's life, and on a
-   five-column version it was the sixth column's worth of width that pushed the
-   table past the window.
-
-   Pressing it CREATES the column with a name you then edit in place, rather
-   than being an editor itself: an input in a 28px cell is not an input. Naming
-   it is one tap later, in the real column, where there is room — and clearing
-   that name removes the column again, because `scaleColumns` drops an
-   unlabelled slot. So a mis-tap is one gesture from undone. */
+   (Mark, 2026-08-11): a column-sized hole in every row for something pressed a
+   handful of times in a recipe's life. Pressing it CREATES the column with a
+   name you then edit in place; clearing that name removes it again, because
+   `scaleColumns` drops an unlabelled slot. So a mis-tap is one gesture from
+   undone. */
 const W_SPARE = 28;
 
 /**
@@ -140,10 +137,10 @@ const W_SPARE = 28;
  * shown four columns side by side so a baker can find the one that matches the
  * bowl in front of them.
  *
- * Above them sit the two rows that make the columns mean something — the
- * multiplier each column is the base times, and the name of the batch it makes.
- * Both are editable, and neither had any editor at all before: 036 loaded the
- * strip and no screen could touch it.
+ * Each batch size's header carries what makes the column mean something — the
+ * name of the batch it makes, and the multiplier it is the base times. Both are
+ * editable, and neither had any editor at all before: 036 loaded the strip and
+ * no screen could touch it.
  *
  * The per-row AUTO switch is the interesting control and its own component
  * explains itself. In one line: on, the columns to its right are computed
@@ -197,18 +194,185 @@ export function RecipeVersionSheet({
   // leaves a blank box at the end of both header rows for exactly this. Capped
   // at 8, which is the repetition count 036's check constraint enforces.
   const spare = editable && width < 8 ? width : null;
-  const headerSlots: (ScaleColumn | null)[] = [...columns, ...(spare === null ? [] : [null])];
 
-  const tableWidth =
-    W_SORT +
-    W_AUTO +
-    columns.length * W_SCALE +
-    (spare === null ? 0 : W_SPARE) +
-    W_ITEM +
-    W_NOTE_MIN +
-    W_BASE +
-    W_HIDE +
-    W_TRASH;
+  // A row is the line and what the sheet worked out for it: its share of
+  // the 100% line, and whether it IS that line.
+  const rows: IngredientRow[] = version.lines.map((line, i) => ({
+    line,
+    percent: percents[i],
+    isBasis: i === basisAt,
+  }));
+
+  const scaleColumn = (column: ScaleColumn, pinned = false): DataColumn<IngredientRow> => ({
+    key: `scale:${column.index}`,
+    // The batch name, for the Columns menu — the header shows its editor.
+    label: column.label || "Batch",
+    width: W_SCALE,
+    pinned,
+    header: (
+      <ScaleHeader
+        version={version}
+        column={column}
+        width={width}
+        editable={editable}
+        // The base column shows no multiplier: it is what the others are a
+        // multiple OF. Nor does `%`, which is a share rather than a scale.
+        multiplier={!pinned && !column.isPercent}
+      />
+    ),
+    render: (r) => (
+      <RecipeScaleCell
+        line={r.line}
+        column={column}
+        base={base}
+        baseIndex={baseIndex}
+        width={width}
+        editable={editable}
+        percent={r.percent}
+      />
+    ),
+  });
+
+  // NO COLUMN SORTS: the line order IS the recipe (its stored Sort), and a
+  // header click that re-ordered the screen would show an order the recipe
+  // does not have. The special-order lines table is the same case.
+  const tableColumns: DataColumn<IngredientRow>[] = [
+    {
+      key: "sort",
+      label: "Sort",
+      width: W_SORT,
+      align: "right",
+      render: (r) =>
+        editable ? (
+          <InlineValue
+            table="production_recipe_lines"
+            id={r.line.id}
+            column="sort"
+            kind="number"
+            align="right"
+            placeholder=""
+            value={r.line.sort}
+          />
+        ) : (
+          <span className={`${READ_ONLY_VALUE} tabular-nums text-subtle`}>
+            {r.line.sort ?? ""}
+          </span>
+        ),
+    },
+    {
+      key: "item",
+      label: "Item",
+      width: W_ITEM,
+      pinned: true,
+      wrap: true,
+      render: (r) => <ItemCell line={r.line} editable={editable} options={elementOptions} />,
+    },
+    ...(baseColumn ? [scaleColumn(baseColumn, true)] : []),
+    {
+      // BASE BESIDE THE BASE AMOUNT (Mark, 2026-11-03), left of Auto: it picks
+      // which of these amounts the % column counts from.
+      key: "base",
+      label: "Base",
+      width: W_BASE,
+      render: (r) => (
+        <span className="flex justify-center">
+          <PercentBase
+            versionId={version.id}
+            lineId={r.line.id}
+            previousId={baseLineId}
+            checked={r.isBasis}
+            // Only a weighable line can be the 100% — a radio on "2 ea" would
+            // choose a base that blanks the column. The line already chosen
+            // keeps its radio live whatever its unit became, so it can be
+            // moved off.
+            weighable={(lineGrams(r.line, convert) ?? 0) > 0}
+            editable={editable}
+            onPick={setBaseLineId}
+          />
+        </span>
+      ),
+    },
+    {
+      // Pinned, with the base amount: it sits BETWEEN the first two amount
+      // columns because that is what it governs, and a drag that moved it
+      // elsewhere would leave it labelling nothing.
+      key: "auto",
+      label: "Auto",
+      width: W_AUTO,
+      pinned: true,
+      render: (r) => (
+        <span className="flex justify-center">
+          <ScaleAutoBox
+            line={r.line}
+            columns={columns}
+            base={base}
+            baseIndex={baseIndex}
+            percent={r.percent}
+            editable={editable}
+          />
+        </span>
+      ),
+    },
+    ...columns.slice(1).map((c) => scaleColumn(c)),
+    // One trailing slot so a batch size can be ADDED — FileMaker's own layout
+    // leaves a blank box for exactly this. Capped at 8, the repetition count
+    // 036's check constraint enforces. No label: a control column, kept out of
+    // the Columns menu and never dragged.
+    ...(spare === null
+      ? []
+      : [
+          {
+            key: "spare",
+            label: "",
+            width: W_SPARE,
+            header: <AddScaleColumn version={version} index={spare} width={width} />,
+            render: () => null,
+          } satisfies DataColumn<IngredientRow>,
+        ]),
+    {
+      key: "note",
+      label: "Note",
+      width: W_NOTE,
+      wrap: true,
+      render: (r) =>
+        editable ? (
+          <span className="text-[13px] text-muted">
+            <InlineValue
+              table="production_recipe_lines"
+              id={r.line.id}
+              column="note"
+              value={r.line.note}
+              placeholder=""
+            />
+          </span>
+        ) : (
+          <span className={`${READ_ONLY_VALUE} text-[13px] text-muted`}>{r.line.note ?? ""}</span>
+        ),
+    },
+    {
+      key: "hide",
+      label: "Hide",
+      width: W_HIDE,
+      render: (r) => (
+        <span className="flex justify-center">
+          <HideOnPrint id={r.line.id} hidden={r.line.hideOnPrint} editable={editable} />
+        </span>
+      ),
+    },
+    {
+      key: "trash",
+      label: "",
+      width: W_TRASH,
+      render: (r) =>
+        editable ? (
+          <DeleteRecipeRow
+            table="production_recipe_lines"
+            id={r.line.id}
+            what={`"${r.line.elementName ?? r.line.label ?? "this line"}"`}
+          />
+        ) : null,
+    },
+  ];
 
 
   // ONE LIST FILLS THE WINDOW. They shared it from 2026-08-08 until
@@ -232,264 +396,26 @@ export function RecipeVersionSheet({
       {/* ------------------------------------------------------------------ */}
       {show === "ingredients" ? (
       <section className="flex min-h-0 basis-0 grow flex-col gap-3">
-        <SectionHeading count={version.lines.length}>Ingredients</SectionHeading>
-
-        {/* One scroller for BOTH axes, which is what the sticky header needs:
-            `position: sticky` resolves against the nearest scroll container, so
-            a separate horizontal wrapper would pin the labels to a box that
-            never scrolls vertically. */}
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table
-            className="w-full table-fixed border-collapse text-[14px]"
-            style={{ minWidth: tableWidth }}
-          >
-            <colgroup>
-              <col style={{ width: W_SORT }} />
-              <col style={{ width: W_ITEM }} />
-              <col style={{ width: W_SCALE }} />
-              <col style={{ width: W_BASE }} />
-              <col style={{ width: W_AUTO }} />
-              {headerSlots.slice(1).map((column, i) => (
-                <col key={i} style={{ width: column ? W_SCALE : W_SPARE }} />
-              ))}
-              {/* No width: the leftover lands here. See W_NOTE_MIN. */}
-              <col />
-              <col style={{ width: W_HIDE }} />
-              <col style={{ width: W_TRASH }} />
-            </colgroup>
-
-            <thead>
-              {/* The multiplier strip. Nothing over the base column — it is what
-                  the others are a multiple OF — and nothing over `%`, which is
-                  a share rather than a scale. */}
-              <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-20 [&>th]:bg-white">
-                <th />
-                <th />
-                <th />
-                {/* Over Base. */}
-                <th />
-                {/* The multiplier sign sits over the AUTO column (Mark,
-                    2026-08-08), which is the column it belongs to: the boxes
-                    beneath it are what decide whether the numbers to its right
-                    are the base times these figures. Left where it was, over the
-                    base amount, it labelled the one column no multiplier
-                    applies to. */}
-                <th className="px-2 pb-1 text-center text-[12px] font-semibold text-subtle">×</th>
-                {headerSlots.slice(1).map((column, i) => (
-                  <th key={`m${i}`} className="px-2 pb-1">
-                    {column && !column.isPercent && editable ? (
-                      <InlineValue
-                        table="production_recipe_versions"
-                        id={version.id}
-                        column="scale_multipliers"
-                        kind="number"
-                        // LEFT, not right. Right-aligned it sat against the
-                        // next column's batch name and read as belonging to
-                        // that one — measured 37px from the wrong label and
-                        // 111px from its own.
-                        placeholder="×"
-                        value={column.multiplier}
-                        arrayColumn="scale_multipliers"
-                        arrayIndex={column.index}
-                        arrayStrip={version.scale_multipliers}
-                        arrayWidth={width}
-                      />
-                    ) : column && !column.isPercent ? (
-                      <span className={`${READ_ONLY_VALUE} tabular-nums`}>
-                        ×{column.multiplier}
-                      </span>
-                    ) : null}
-                  </th>
-                ))}
-                {/* Note · Hide · Trash — the three columns after the scale block, and
-                    it MUST equal them. It read 5 against four trailing columns
-                    until 2026-08-11 and nothing showed, because every column
-                    was a fixed width and the two phantom ones simply took
-                    slack off the end. The moment Note became the flexible
-                    column, Note was what paid for them: 46px instead of 138.
-                    A header row that over-spans invents columns. */}
-                <th colSpan={3} />
-              </tr>
-
-              {/* THE BATCH NAMES ARE COLUMN TITLES (Mark, 2026-08-11: "can the
-                  batch names be on the same horizontal plane as the column
-                  titles?"). They were a row of their own between the
-                  multipliers and Sort/Item/Auto/Note/Hide — three header rows
-                  where two will do, and the names sitting a line above the
-                  headings they are peers of. They ARE headings: "X2.5" names
-                  its column exactly the way "Note" names its own.
-
-                  So this row carries both, and every column is now labelled in
-                  one place. It also gives the list back a row of height, which
-                  is the point of the tab split above.
-
-                  STACKED STICKY OFFSETS: two rows now, not three. 26px is the
-                  multiplier row's own height (12px text over `pb-1`), measured
-                  — and stable, because that row is fixed type at fixed
-                  padding. */}
-              <tr className="text-[11px] uppercase tracking-[0.12em] text-ink [&>th]:sticky [&>th]:top-[26px] [&>th]:z-20 [&>th]:border-b-2 [&>th]:border-ink [&>th]:bg-white">
-                <th className="px-2 py-2 text-left">Sort</th>
-                <th className="px-3 py-2 text-left">Item</th>
-                {/* The base column, then the AUTO column's own cell, then the
-                    rest — the switch sits BETWEEN the first two amount columns,
-                    which is what it governs, so the row has to step over it. */}
-                <ScaleLabelCell
-                  version={version}
-                  column={headerSlots[0] ?? null}
-                  index={headerSlots[0]?.index ?? spare ?? 0}
-                  width={width}
-                  editable={editable}
-                />
-                {/* BASE BESIDE THE BASE AMOUNT (Mark, 2026-11-03), left of Auto:
-                    it picks which of these amounts the % column counts from. */}
-                <th className="px-2 py-2 text-center">Base</th>
-                <th className="px-2 py-2 text-center">Auto</th>
-                {headerSlots.slice(1).map((column, i) => (
-                  <ScaleLabelCell
-                    key={`l${i}`}
-                    version={version}
-                    column={column}
-                    /* The spare trailing slot writes the first free index. */
-                    index={column?.index ?? spare ?? 0}
-                    width={width}
-                    editable={editable}
-                  />
-                ))}
-                <th className="px-3 py-2 text-left">Note</th>
-                <th className="px-2 py-2 text-center">Hide</th>
-                <th />
-              </tr>
-            </thead>
-
-            <tbody>
-              {version.lines.map((line, i) => (
-                <tr
-                  key={line.id}
-                  className={`align-baseline hover:bg-neutral-50 ${
-                    line.hideOnPrint ? "text-muted" : ""
-                  }`}
-                >
-                  <td className="px-2 py-2">
-                    {editable ? (
-                      <InlineValue
-                        table="production_recipe_lines"
-                        id={line.id}
-                        column="sort"
-                        kind="number"
-                        align="right"
-                        placeholder=""
-                        value={line.sort}
-                      />
-                    ) : (
-                      <span className={`${READ_ONLY_VALUE} tabular-nums text-subtle`}>
-                        {line.sort ?? ""}
-                      </span>
-                    )}
-                  </td>
-
-                  <td className="px-3 py-2">
-                    <ItemCell line={line} editable={editable} options={elementOptions} />
-                  </td>
-
-                  {baseColumn ? (
-                    <td className="px-2 py-2">
-                      <RecipeScaleCell
-                        line={line}
-                        column={baseColumn}
-                        base={base}
-                        baseIndex={baseIndex}
-                        width={width}
-                        editable={editable}
-                        percent={percents[i]}
-                      />
-                    </td>
-                  ) : (
-                    <td className="px-2 py-2" />
-                  )}
-
-                  <td className="px-2 py-2 text-center">
-                    <PercentBase
-                      versionId={version.id}
-                      lineId={line.id}
-                      previousId={baseLineId}
-                      checked={i === basisAt}
-                      // Only a weighable line can be the 100% — a radio on
-                      // "2 ea" would choose a base that blanks the column. The
-                      // line already chosen keeps its radio live whatever its
-                      // unit became, so it can be moved off.
-                      weighable={(lineGrams(line, convert) ?? 0) > 0}
-                      editable={editable}
-                      onPick={setBaseLineId}
-                    />
-                  </td>
-
-                  <td className="px-2 py-2 text-center">
-                    <ScaleAutoBox
-                      line={line}
-                      columns={columns}
-                      base={base}
-                      baseIndex={baseIndex}
-                      percent={percents[i]}
-                      editable={editable}
-                    />
-                  </td>
-
-                  {headerSlots.slice(1).map((column, c) =>
-                    column ? (
-                      <td key={column.index} className="px-2 py-2">
-                        <RecipeScaleCell
-                          line={line}
-                          column={column}
-                          base={base}
-                          baseIndex={baseIndex}
-                          width={width}
-                          editable={editable}
-                          percent={percents[i]}
-                        />
-                      </td>
-                    ) : (
-                      <td key={`spare${c}`} />
-                    )
-                  )}
-
-                  <td className="px-3 py-2 text-[13px] text-muted">
-                    {editable ? (
-                      <InlineValue
-                        table="production_recipe_lines"
-                        id={line.id}
-                        column="note"
-                        value={line.note}
-                        placeholder=""
-                      />
-                    ) : (
-                      <span className={READ_ONLY_VALUE}>{line.note ?? ""}</span>
-                    )}
-                  </td>
-
-                  <td className="px-2 py-2 text-center">
-                    <span className="flex justify-center">
-                      <HideOnPrint id={line.id} hidden={line.hideOnPrint} editable={editable} />
-                    </span>
-                  </td>
-
-                  <td className="px-1 py-2 text-center">
-                    {editable ? (
-                      <DeleteRecipeRow
-                        table="production_recipe_lines"
-                        id={line.id}
-                        what={`"${line.elementName ?? line.label ?? "this line"}"`}
-                      />
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* A `DataTable` since 2026-11-03 (Mark: "is the ingredient table one
+            of our datatables? It doesn't appear to be"). `scroll` + `fill`: the
+            frame above is sized to the window, so the pane takes what is left
+            and the column labels stay put while the lines scroll under them.
+            The heading rides in the table's own strip, beside the Columns
+            eye — the strip above a table carries that table's heading. */}
+        <div className="min-h-0 flex-1">
+        <DataTable
+          leading={<SectionHeading count={version.lines.length}>Ingredients</SectionHeading>}
+          columnChooser
+          rows={rows}
+          columns={tableColumns}
+          rowKey={(r) => r.line.id}
+          storageKey="recipe-ingredients"
+          rowClassName={(r) => (r.line.hideOnPrint ? "text-muted" : "")}
+          scroll
+          fill
+          empty={<p className="text-[13px] text-muted">No ingredients on this version.</p>}
+        />
         </div>
-
-        {version.lines.length === 0 ? (
-          <p className="shrink-0 text-[13px] text-muted">No ingredients on this version.</p>
-        ) : null}
 
         {/* No add row here: Add Ingredient… in the record's Actions menu opens
             a dialog (Mark, 2026-09-12). */}
@@ -596,39 +522,32 @@ export function RecipeVersionSheet({
 }
 
 /**
- * The name of one batch size, over the column it names.
+ * A batch size's column header: its NAME over its MULTIPLIER, both editable.
  *
- * The trailing SPARE cell is how a version grows a column: type a name into it
- * and the next render has one more. Clearing a name is how one goes away —
- * `scaleColumns` drops an unlabelled slot, which is why every column carries the
- * slot it came from rather than its position on screen.
+ * These were two header rows until 2026-11-03 — a strip of multipliers above a
+ * row of names — and became one cell each when the table moved onto
+ * `DataTable`, which has a single header row. Stacked in the column they
+ * describe, they still read as one fact ("X2.5, ×2.5") and the grid gives back
+ * a row of height.
+ *
+ * The multiplier is LEFT-aligned under the name, not right: right-aligned it
+ * sat against the next column's name and read as belonging to that one.
  */
-function ScaleLabelCell({
+function ScaleHeader({
   version,
   column,
-  index,
   width,
   editable,
+  multiplier,
 }: {
   version: SheetVersion;
-  column: ScaleColumn | null;
-  index: number;
+  column: ScaleColumn;
   width: number;
   editable: boolean;
+  multiplier: boolean;
 }) {
-  // The spare slot is 28px of affordance, not a column. See W_SPARE.
-  if (!column) {
-    return editable ? (
-      <th className="px-0 py-2 text-center">
-        <AddScaleColumn version={version} index={index} width={width} />
-      </th>
-    ) : (
-      <th />
-    );
-  }
-
   return (
-    <th className="px-2 py-2 text-left">
+    <span className="flex min-w-0 flex-col gap-0.5 text-ink">
       {editable ? (
         <InlineValue
           table="production_recipe_versions"
@@ -638,16 +557,38 @@ function ScaleLabelCell({
           placeholder="—"
           className="font-semibold uppercase tracking-[0.06em]"
           arrayColumn="scale_labels"
-          arrayIndex={index}
+          arrayIndex={column.index}
           arrayStrip={version.scale_labels}
-          arrayWidth={Math.max(width, index + 1)}
+          arrayWidth={Math.max(width, column.index + 1)}
         />
       ) : (
         <span className={`${READ_ONLY_VALUE} font-semibold uppercase tracking-[0.06em]`}>
           {column.label}
         </span>
       )}
-    </th>
+      {multiplier ? (
+        editable ? (
+          <span className="normal-case tracking-normal text-subtle">
+            <InlineValue
+              table="production_recipe_versions"
+              id={version.id}
+              column="scale_multipliers"
+              kind="number"
+              placeholder="×"
+              value={column.multiplier}
+              arrayColumn="scale_multipliers"
+              arrayIndex={column.index}
+              arrayStrip={version.scale_multipliers}
+              arrayWidth={width}
+            />
+          </span>
+        ) : (
+          <span className={`${READ_ONLY_VALUE} tabular-nums normal-case tracking-normal text-subtle`}>
+            ×{column.multiplier}
+          </span>
+        )
+      ) : null}
+    </span>
   );
 }
 
