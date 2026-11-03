@@ -118,6 +118,7 @@ export type SheetVersion = {
    18px at an 800px window — less than its own padding, so the glyph drew at
    nothing wide. */
 const W_DRAG = 36;
+/* The Procedure table's Sort — Ingredients has none since 2026-11-03. */
 const W_SORT = 56;
 const W_AUTO = 56;
 const W_SCALE = 118;
@@ -210,9 +211,8 @@ export function RecipeVersionSheet({
 
   /**
    * A drop: renumber the WHOLE list in tens, write only what moved — `renumber`
-   * owns both rules and says why. Tens, not 1..n, because this Sort column is
-   * also typed into, and the add dialogs' last-plus-ten exists so a line can
-   * go between two. Each write `.select()`s its row: an update RLS filters to
+   * owns both rules and says why. Tens, not 1..n, to stay in step with the add
+   * dialogs, which write last-plus-ten. Each write `.select()`s its row: an update RLS filters to
    * nothing returns no error.
    */
   function dropLine(dragId: string, target: DropTarget) {
@@ -337,28 +337,11 @@ export function RecipeVersionSheet({
           } satisfies DataColumn<IngredientRow>,
         ]
       : []),
-    {
-      key: "sort",
-      label: "Sort",
-      width: W_SORT,
-      align: "right",
-      render: (r) =>
-        editable ? (
-          <InlineValue
-            table="production_recipe_lines"
-            id={r.line.id}
-            column="sort"
-            kind="number"
-            align="right"
-            placeholder=""
-            value={r.line.sort}
-          />
-        ) : (
-          <span className={`${READ_ONLY_VALUE} tabular-nums text-subtle`}>
-            {r.line.sort ?? ""}
-          </span>
-        ),
-    },
+    // NO SORT COLUMN since 2026-11-03 (Mark: "is there any legit reason to keep
+    // the sort column now?"). The ⠿ grip orders the lines and scrolls the table
+    // when held at an edge, which was the one move a typed number still did
+    // better. `sort` itself stays — it IS the order — and the add dialogs keep
+    // writing last-plus-ten.
     {
       key: "item",
       label: "Item",

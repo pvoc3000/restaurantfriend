@@ -18,7 +18,7 @@
 // pinned by columnOrder.fixtures; the two cases here only assert that the
 // re-export is wired to the thing it claims to be.
 
-import { moveInOrder, renumber } from "../../src/lib/rowDrag";
+import { edgeScrollStep, moveInOrder, renumber } from "../../src/lib/rowDrag";
 import { eq, test } from "./harness";
 
 const current = (entries: [string, number | null][]) => new Map(entries);
@@ -121,4 +121,30 @@ test("moveInOrder puts the dragged id before its anchor", () => {
 test("moveInOrder puts the dragged id after its anchor, and an unknown anchor is a no-op", () => {
   eq(moveInOrder(["a", "b", "c"], "a", { after: "c" }), ["b", "c", "a"]);
   eq(moveInOrder(["a", "b", "c"], "a", { before: "zz" }), ["a", "b", "c"]);
+});
+
+// --- edgeScrollStep ---------------------------------------------------------
+// Auto-scroll while a row is held near an edge (2026-11-03), what lets a
+// recipe's lines go without a typed Sort column.
+
+test("away from both edges, no scroll", () => {
+  eq(edgeScrollStep(300, 100, 700), 0);
+});
+
+test("inside the top zone scrolls UP, faster nearer the edge", () => {
+  const near = edgeScrollStep(105, 100, 700);
+  const far = edgeScrollStep(140, 100, 700);
+  eq(near < 0 && far < 0, true, "both up");
+  eq(Math.abs(near) > Math.abs(far), true, "nearer is faster");
+});
+
+test("at or past an edge is full speed, and the bottom scrolls DOWN", () => {
+  eq(edgeScrollStep(90, 100, 700), -18, "above the box");
+  eq(edgeScrollStep(720, 100, 700), 18, "below the box");
+});
+
+test("a short box shrinks its zones so the middle still holds still", () => {
+  // 80px tall: zones of 20, so the middle 40px never scrolls.
+  eq(edgeScrollStep(140, 100, 180), 0, "middle");
+  eq(edgeScrollStep(105, 100, 180) < 0, true, "top zone");
 });

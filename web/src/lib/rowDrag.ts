@@ -81,9 +81,9 @@ import { type DropTarget } from "./moveInOrder";
  * reordered by dragging is renumbered wholesale every time, so a gap would never
  * be used and would only make the stored numbers harder to read.
  *
- * EXCEPT where the Sort is ALSO typed: the recipe's ingredient lines keep an
- * editable Sort column and an integer `sort`, so a drag there numbers in `step`
- * 10 and a line can still be typed in between two (2026-11-03).
+ * EXCEPT where something else writes the list in tens: a recipe's ingredient
+ * lines, whose add dialog writes last-plus-ten (FileMaker's habit), so a drag
+ * there numbers in `step` 10 and the two writers agree (2026-11-03).
  */
 export function renumber(
   order: readonly string[],
@@ -96,6 +96,41 @@ export function renumber(
     if (current.get(id) !== sort) writes.push({ id, sort });
   });
   return writes;
+}
+
+/**
+ * How far to scroll this frame while a dragged row is held near an EDGE of
+ * the box it scrolls in — negative up, positive down, 0 away from both.
+ *
+ * Added 2026-11-03 so a recipe's ingredient lines could lose their typed Sort
+ * column (Mark: "Auto-scroll, drop Sort"): without it a line could only be
+ * dropped somewhere already on screen, and a long recipe's top and bottom are
+ * never on screen together. The speed ramps across the zone and is full at or
+ * past the edge, the way a Finder window scrolls under a drag. A box too short
+ * for two whole zones gets a quarter of its height each, so the middle still
+ * holds still.
+ */
+export function edgeScrollStep(
+  y: number,
+  top: number,
+  bottom: number,
+  zone = 48,
+  max = 18
+): number {
+  const z = bottom - top < zone * 2 ? (bottom - top) / 4 : zone;
+  if (z <= 0) return 0;
+  if (y < top + z) return -Math.ceil(max * Math.min(1, (top + z - y) / z));
+  if (y > bottom - z) return Math.ceil(max * Math.min(1, (y - (bottom - z)) / z));
+  return 0;
+}
+
+/** The nearest ancestor that actually scrolls vertically — null for the window. */
+function scrollParent(el: Element | null): HTMLElement | null {
+  for (let n = el?.parentElement ?? null; n; n = n.parentElement) {
+    const oy = getComputedStyle(n).overflowY;
+    if ((oy === "auto" || oy === "scroll") && n.scrollHeight > n.clientHeight) return n;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +180,24 @@ export function useRowDrag({
     const from = slots.findIndex((s) => s.id === row.id);
     if (from === -1 || slots.length < 2) return;
 
+    // THE BOX THAT SCROLLS, and where it stood at pointer-down. Rows are still
+    // measured once; a scroll during the drag is added back as an offset, so
+    // the slots stay where they were measured and the pointer is read against
+    // them in CONTENT coordinates.
+    const scroller = scrollParent(body.querySelector(`[${rowAttribute}]`));
+    const readScroll = () => (scroller ? scroller.scrollTop : window.scrollY);
+    const startScroll = readScroll();
+    // The window's top edge is under the masthead, which publishes its height.
+    const edges = () => {
+      if (scroller) {
+        const r = scroller.getBoundingClientRect();
+        return { top: Math.max(r.top, 0), bottom: Math.min(r.bottom, window.innerHeight) };
+      }
+      const head =
+        parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--rf-header-h")) || 0;
+      return { top: head, bottom: window.innerHeight };
+    };
+
     const table = body.closest("table") ?? body.querySelector("table") ?? body;
     const tableRect = table.getBoundingClientRect();
     const tableLeft = Math.max(tableRect.left, 0);
@@ -159,7 +212,9 @@ export function useRowDrag({
     const previousCursor = document.body.style.cursor;
     const previousSelect = document.body.style.userSelect;
 
-    const resolve = (y: number) => {
+    const resolve = (screenY: number) => {
+      const shift = readScroll() - startScroll;
+      const y = screenY + shift;
       const last = slots[slots.length - 1];
       let target: DropTarget = { after: last.id };
       let indicatorY = last.bottom;
@@ -176,10 +231,15 @@ export function useRowDrag({
         "before" in target
           ? target.before === row.id || slots[from + 1]?.id === target.before
           : from === slots.length - 1;
-      return { target, indicatorY, noop };
+      return { target, indicatorY: indicatorY - shift, noop };
     };
 
+    let frame = 0;
+    let lastX = startX;
+    let lastY = startY;
+
     const cleanup = () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onCancel);
@@ -205,9 +265,16 @@ export function useRowDrag({
           tableLeft,
           tableWidth,
         });
+        frame = requestAnimationFrame(tick);
       }
+      lastX = e.clientX;
+      lastY = e.clientY;
+      place();
+    };
 
-      const r = resolve(e.clientY);
+    // The pointer read against the rows, and the overlay moved to say so.
+    const place = () => {
+      const r = resolve(lastY);
       currentTarget = r.noop ? null : r.target;
 
       // The overlay mounts on the render the activation setDragging triggers,
@@ -220,9 +287,23 @@ export function useRowDrag({
       }
       const chip = chipRef.current;
       if (chip) {
-        chip.style.left = `${e.clientX}px`;
-        chip.style.top = `${e.clientY}px`;
+        chip.style.left = `${lastX}px`;
+        chip.style.top = `${lastY}px`;
       }
+    };
+
+    // Every frame while the drag is live: scroll if the pointer is held at an
+    // edge, and re-read the target — a held pointer sends no moves, but the
+    // rows are passing under it.
+    const tick = () => {
+      const { top, bottom } = edges();
+      const step = edgeScrollStep(lastY, top, bottom);
+      if (step !== 0) {
+        if (scroller) scroller.scrollTop += step;
+        else window.scrollBy(0, step);
+        place();
+      }
+      frame = requestAnimationFrame(tick);
     };
 
     const onUp = () => {
