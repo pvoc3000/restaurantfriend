@@ -57,17 +57,21 @@ export function RecipeScaleCell({
   // it reads the same way: quiet text, owned by the sheet rather than by you.
   if (column.isPercent && auto) {
     return (
-      <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
-        {percent === null ? "" : `${percent.toFixed(1)}%`}
-      </span>
+      <ReadAmount
+        qty={percent === null ? "" : percent.toFixed(1)}
+        unit={percent === null ? "" : "%"}
+        muted
+      />
     );
   }
 
   if (!editable || (!isBase && auto)) {
     return (
-      <span className={`${READ_ONLY_VALUE} tabular-nums ${auto && !isBase ? "text-muted" : ""}`}>
-        {formatCell(cell)}
-      </span>
+      <ReadAmount
+        qty={formatCell({ qty: cell.qty, unit: null })}
+        unit={cell.qty === null ? "" : cell.unit ?? ""}
+        muted={auto && !isBase}
+      />
     );
   }
 
@@ -143,6 +147,23 @@ export function RecipeScaleCell({
           />
         )}
       </span>
+    </span>
+  );
+}
+
+/**
+ * A worked-out amount, set out the way an editable one is (Mark, 2026-11-03:
+ * "auto calculated fields in the ingredient list should be right aligned"):
+ * the number RIGHT-aligned in the cell's slack and the unit in the same 52px
+ * box the editor gives it. So a computed "1.7 kg" and a typed one beside it
+ * line up digit for digit, and the eye reads down a column of numbers rather
+ * than a ragged column of phrases.
+ */
+function ReadAmount({ qty, unit, muted }: { qty: string; unit: string; muted: boolean }) {
+  return (
+    <span className={`flex items-baseline gap-1 tabular-nums ${muted ? "text-muted" : ""}`}>
+      <span className={`${READ_ONLY_VALUE} min-w-0 flex-1 text-right`}>{qty}</span>
+      <span className={`${READ_ONLY_VALUE} w-[52px] shrink-0`}>{unit}</span>
     </span>
   );
 }
