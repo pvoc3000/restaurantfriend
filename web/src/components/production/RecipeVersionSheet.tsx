@@ -739,7 +739,7 @@ function ScaleHeader({
 }
 
 /**
- * THE ▾ ON A BATCH SIZE'S HEADER — its column menu, today holding Delete… (Mark, 2026-11-03: "we
+ * THE ▼ ON A BATCH SIZE'S HEADER — its column menu, today holding Delete… (Mark, 2026-11-03: "we
  * need to be able to remove a column in the ingredient table"). Until now the
  * only way was to clear its name, which worked and which nobody would guess.
  *
@@ -793,11 +793,15 @@ function ScaleColumnMenu({ version, column }: { version: SheetVersion; column: S
           Maybe eventually … Hide and Pin"). The column's own commands live
           here, so the next one is a row in `items` rather than a second glyph
           in a header that has room for one. Grey at rest; U+FE0E keeps Apple
-          platforms from drawing ▾ as an emoji. */}
+          platforms from drawing ▼ as an emoji. */}
       <MenuButton
         label={`${column.label} column`}
-        trigger={"\u25BE\uFE0E"}
-        triggerClassName="px-0.5 text-[13px] font-normal leading-none text-subtle hover:text-ink disabled:opacity-35"
+        trigger={"\u25BC\uFE0E"}
+        // ▼, the full triangle, not ▾ (Mark, 2026-11-03: "make the glyph larger.
+        // it's very small"). ▾ is the SMALL triangle by design and stayed a
+        // speck even at 18px; ▼ is the picklists' own caret, so the header
+        // menu wears the mark every other "this opens a list" in the app does.
+        triggerClassName="px-1 text-[12px] font-normal leading-none text-subtle hover:text-ink disabled:opacity-35"
         disabled={pending}
         align="right"
         minWidth={160}
