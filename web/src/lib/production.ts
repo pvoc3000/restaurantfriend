@@ -386,6 +386,31 @@ export function percentBasis(
   return first >= 0 ? first : null;
 }
 
+/**
+ * A stored strip with one batch-size SLOT emptied — what removing a column
+ * writes, to the version's labels and multipliers and to every line's typed
+ * amounts and units alike (Mark, 2026-11-03: remove the "test" column).
+ *
+ * EMPTIED, NOT SPLICED. A slot number is an identity: `cost_column` and every
+ * batch log's `scale_index` name a column by its slot (042, 044), so closing
+ * the gap would move every later column under them — last month's "3x" batch
+ * would start claiming to have been the "%". The slot is blanked in place
+ * (`scaleColumns` drops an unlabelled slot) and the strip is cut back to
+ * `width`, the slots still in use, so a trailing column frees its slot and a
+ * new one added later does not inherit its typed amounts.
+ */
+export function withoutSlot<T>(
+  strip: readonly (T | null)[] | null | undefined,
+  index: number,
+  width: number,
+  blank: T | null
+): (T | null)[] {
+  const out: (T | null)[] = [];
+  const len = Math.min(strip?.length ?? 0, width);
+  for (let i = 0; i < len; i++) out.push(i === index ? blank : strip?.[i] ?? null);
+  return out;
+}
+
 /** A line's amount in grams, or null where it has none or can't be weighed. */
 export function lineGrams(
   line: { qty: number | null; unit: string | null },

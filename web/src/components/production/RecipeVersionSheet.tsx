@@ -14,6 +14,8 @@ import type { LaborCells } from "@/lib/productionCost";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { MenuButton } from "@/components/ui/MenuButton";
+import { confirmDialog } from "@/lib/confirm";
+import { removeScaleColumn } from "./recipeWrites";
 import {
   scaleColumns,
   scaleWidth,
@@ -297,6 +299,9 @@ export function RecipeVersionSheet({
         // The base column shows no multiplier: it is what the others are a
         // multiple OF. Nor does `%`, which is a share rather than a scale.
         multiplier={!isBase && !column.isPercent}
+        // Every column but the base can be removed: the base IS the lines'
+        // own amounts, and the others are multiples of it.
+        removable={!isBase}
       />
     ),
     render: (r) => (
@@ -664,16 +669,20 @@ function ScaleHeader({
   width,
   editable,
   multiplier,
+  removable,
 }: {
   version: SheetVersion;
   column: ScaleColumn;
   width: number;
   editable: boolean;
   multiplier: boolean;
+  removable: boolean;
 }) {
   return (
     <span className="flex min-w-0 flex-col gap-0.5 text-ink">
       {editable ? (
+        <span className="flex min-w-0 items-start gap-1">
+          <span className="min-w-0 flex-1">
         <InlineValue
           table="production_recipe_versions"
           id={version.id}
@@ -686,6 +695,9 @@ function ScaleHeader({
           arrayStrip={version.scale_labels}
           arrayWidth={Math.max(width, column.index + 1)}
         />
+          </span>
+          {removable ? <RemoveScaleColumn version={version} column={column} /> : null}
+        </span>
       ) : (
         <span className={`${READ_ONLY_VALUE} font-semibold uppercase tracking-[0.06em]`}>
           {column.label}
@@ -713,6 +725,70 @@ function ScaleHeader({
           </span>
         )
       ) : null}
+    </span>
+  );
+}
+
+/**
+ * THE × ON A BATCH SIZE'S HEADER — remove the column (Mark, 2026-11-03: "we
+ * need to be able to remove a column in the ingredient table"). Until now the
+ * only way was to clear its name, which worked and which nobody would guess.
+ *
+ * Asks first, and says what goes: the typed amounts on lines with Auto off
+ * (the computed ones were never stored), and the version's cost basis when it
+ * was costed at this column. Batch logs that ran it keep their own record —
+ * the slot is emptied, not reused by the columns after it.
+ */
+function RemoveScaleColumn({ version, column }: { version: SheetVersion; column: ScaleColumn }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const typed = version.lines.filter(
+    (l) => !l.scaleAuto && l.scaleAmounts?.[column.index] != null
+  ).length;
+
+  async function remove() {
+    const body = [
+      typed > 0
+        ? `The amounts typed into it on ${typed} line${typed === 1 ? "" : "s"} go with it.`
+        : null,
+      version.cost_column === column.index
+        ? "This version is costed at this column; it will be costed at the base instead."
+        : null,
+      "Batch logs that used it keep their record.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const ok = await confirmDialog({
+      title: `Remove the “${column.label}” column from v${version.version_label}?`,
+      body,
+      confirmLabel: "Remove",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setError(null);
+    start(async () => {
+      const result = await removeScaleColumn(supabase, version, column.index);
+      if ("error" in result) setError(result.error);
+      router.refresh();
+    });
+  }
+
+  return (
+    <span className="shrink-0">
+      <button
+        type="button"
+        onClick={() => void remove()}
+        disabled={pending}
+        aria-label={`Remove the ${column.label} column`}
+        title={`Remove the ${column.label} column`}
+        className="px-0.5 text-[13px] font-normal leading-none text-subtle hover:text-accent disabled:opacity-35"
+      >
+        ×
+      </button>
+      {error ? <span className="block text-[11px] normal-case text-accent">{error}</span> : null}
     </span>
   );
 }

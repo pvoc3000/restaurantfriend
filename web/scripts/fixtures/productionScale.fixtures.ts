@@ -20,6 +20,7 @@ import {
   withSlot,
   bakersPercent,
   percentBasis,
+  withoutSlot,
 } from "../../src/lib/production";
 import { convert } from "../../src/lib/units";
 import { test, eq } from "./harness";
@@ -294,4 +295,23 @@ test("a chosen base that cannot be weighed gives NO percentages, not another lin
 test("an all-unweighable batch reports no percentages rather than dividing by zero", () => {
   const pct = bakersPercent([{ qty: 2, unit: "ea" }, { qty: 3, unit: "ea" }], convert);
   eq(pct, [null, null]);
+});
+
+/* Removing a batch-size column (2026-11-03) — Mint Town v22's real strip. */
+
+test("removing a MIDDLE column blanks its slot and moves nothing after it", () => {
+  // 4x · 5x · 3x · TEST · %  →  TEST removed: % keeps slot 4, because a batch
+  // log or cost_column naming slot 4 must still mean %.
+  const labels = ["4x 1.5G", "5x 1.5G", "3x 1.5G", "TEST", "%"];
+  eq(withoutSlot(labels, 3, 5, ""), ["4x 1.5G", "5x 1.5G", "3x 1.5G", "", "%"]);
+});
+
+test("removing the LAST column cuts the strip back, freeing the slot", () => {
+  eq(withoutSlot([null, 2, 3, 1], 3, 3, null), [null, 2, 3]);
+});
+
+test("a line's typed strip loses the slot too, so a new column can't inherit it", () => {
+  eq(withoutSlot([null, 10, 20, 99], 3, 3, null), [null, 10, 20], "trailing");
+  eq(withoutSlot([null, 10, 99, 5], 2, 4, null), [null, 10, null, 5], "middle");
+  eq(withoutSlot(null, 2, 4, null), [], "a line with no strip writes none");
 });

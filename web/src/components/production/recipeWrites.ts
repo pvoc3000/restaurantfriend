@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { duplicateTitle } from "@/lib/productionPlans";
 import { RECIPE_IMAGE_BUCKET, recipeImagePath } from "@/lib/recipeImages";
 import { nextRecipeVersion } from "@/lib/recipes";
+import { scaleColumns, scaleWidth, withoutSlot } from "@/lib/production";
 
 /**
  * The recipe record's two whole-family writes — Duplicate and Delete — for the
@@ -256,6 +257,72 @@ export async function newRecipeVersion(
         warning: `${copied.lostImages} step picture${copied.lostImages === 1 ? "" : "s"} could not be copied.`,
       }
     : { label: next.label };
+}
+
+/**
+ * REMOVE A BATCH-SIZE COLUMN from a version (Mark, 2026-11-03). The slot is
+ * emptied rather than spliced out — `withoutSlot` says why — on the version and
+ * on every line that holds something there, and a version costed AT this
+ * column goes back to being costed at the base.
+ *
+ * Version first: once its label is blank the column is gone from every screen,
+ * so a failure on the lines after it leaves stale typed values nobody can see
+ * rather than a column with half its amounts. Each write `.select()`s its row.
+ */
+export async function removeScaleColumn(
+  supabase: SupabaseClient,
+  version: {
+    id: string;
+    scale_labels: string[] | null;
+    scale_multipliers: number[] | null;
+    cost_column: number | null;
+    lines: { id: string; scaleAmounts: (number | null)[] | null; scaleUnits: (string | null)[] | null }[];
+  },
+  index: number
+): Promise<{ ok: true } | { error: string }> {
+  const remaining = scaleColumns(version.scale_labels, version.scale_multipliers).filter(
+    (c) => c.index !== index
+  );
+  const width = scaleWidth(remaining);
+
+  const { data, error } = await supabase
+    .from("production_recipe_versions")
+    .update({
+      scale_labels: withoutSlot(version.scale_labels, index, width, ""),
+      scale_multipliers: withoutSlot(version.scale_multipliers, index, width, null),
+      ...(version.cost_column === index ? { cost_column: null } : {}),
+    })
+    .eq("id", version.id)
+    .select("id");
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: "Nothing changed — this version is not one you may edit." };
+
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+  const writes = version.lines
+    .map((l) => ({
+      id: l.id,
+      amounts: withoutSlot(l.scaleAmounts, index, width, null),
+      units: withoutSlot(l.scaleUnits, index, width, null),
+      was: l,
+    }))
+    .filter((w) => !same(w.amounts, w.was.scaleAmounts) || !same(w.units, w.was.scaleUnits));
+  const results = await Promise.all(
+    writes.map((w) =>
+      supabase
+        .from("production_recipe_lines")
+        // BOTH strips in one statement — 041 keeps them the same length.
+        .update({ scale_amounts: w.amounts, scale_units: w.units })
+        .eq("id", w.id)
+        .select("id")
+    )
+  );
+  const failed = results.find((r) => r.error || !r.data?.length);
+  if (failed) {
+    return {
+      error: `The column was removed, but not every line's typed amounts were cleared: ${failed.error?.message ?? "not allowed"}`,
+    };
+  }
+  return { ok: true };
 }
 
 /** What a delete takes with it, counted before asking. */
