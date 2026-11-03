@@ -19,6 +19,7 @@ import {
   freezeScales,
   withSlot,
   bakersPercent,
+  percentBasis,
 } from "../../src/lib/production";
 import { convert } from "../../src/lib/units";
 import { test, eq } from "./harness";
@@ -264,6 +265,30 @@ test("the basis is the first WEIGHABLE line, not simply the first line", () => {
     convert
   );
   eq(pct.map((p) => (p === null ? null : Math.round(p))), [null, 100, 50]);
+});
+
+test("a CHOSEN base is the 100%, wherever it sits (221)", () => {
+  // An ice cream base: the milk first, but the percentages read off the cream.
+  const lines = [
+    { qty: 600, unit: "g" },
+    { qty: 400, unit: "g", percentBase: true },
+    { qty: 100, unit: "g" },
+  ];
+  eq(percentBasis(lines, convert), 1, "basis");
+  eq(bakersPercent(lines, convert).map((p) => Math.round(p!)), [150, 100, 25]);
+});
+
+test("with no base chosen, the first weighable line is the basis — as before 221", () => {
+  eq(percentBasis([{ qty: 1, unit: "ea" }, { qty: 400, unit: "g" }], convert), 1, "basis");
+  eq(percentBasis([{ qty: 2, unit: "ea" }], convert), null, "none");
+});
+
+test("a chosen base that cannot be weighed gives NO percentages, not another line's", () => {
+  const pct = bakersPercent(
+    [{ qty: 500, unit: "g" }, { qty: 2, unit: "ea", percentBase: true }],
+    convert
+  );
+  eq(pct, [null, null]);
 });
 
 test("an all-unweighable batch reports no percentages rather than dividing by zero", () => {

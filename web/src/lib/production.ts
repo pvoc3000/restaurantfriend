@@ -348,19 +348,50 @@ function trim(n: number): string {
  * (migration 041) is now for: a row left alone keeps the number somebody wrote.
  *
  * Lines whose unit can't be weighed get no percentage rather than a zero.
+ *
+ * THE 100% LINE IS CHOSEN since 221 (Mark, 2026-11-03): the line marked
+ * `percentBase`, picked in the sheet's Base column. Unmarked versions — every
+ * one FileMaker sent — still count from the first weighable line, so nothing
+ * moved when the column arrived. A chosen base that cannot be weighed gives no
+ * percentages at all rather than quietly counting from some other line.
  */
 export function bakersPercent(
-  lines: { qty: number | null; unit: string | null }[],
+  lines: { qty: number | null; unit: string | null; percentBase?: boolean }[],
   convert: (amount: number, from: string, to: string) => number | null
 ): (number | null)[] {
-  const grams = lines.map((l) =>
-    l.qty === null || !l.unit ? null : convert(Number(l.qty), l.unit, "g")
-  );
-  // The first line that can be weighed at all — not `grams[0]`, which on a
-  // recipe opening with "1 sheet pan" would make every percentage null.
-  const basis = grams.find((g) => g !== null && g > 0) ?? null;
+  const grams = lines.map((l) => lineGrams(l, convert));
+  const at = percentBasis(lines, convert);
+  const basis = at === null ? null : grams[at];
   if (!basis) return lines.map(() => null);
   return grams.map((g) => (g === null ? null : (g / basis) * 100));
+}
+
+/**
+ * WHICH LINE IS THE 100% — its index, or null when there is none. The marked
+ * line wherever one is marked; otherwise the first line that can be weighed at
+ * all — not line 0, which on a recipe opening with "1 sheet pan" would make
+ * every percentage null. The Base column shows this, so the radio and the
+ * numbers beside it can never disagree.
+ */
+export function percentBasis(
+  lines: { qty: number | null; unit: string | null; percentBase?: boolean }[],
+  convert: (amount: number, from: string, to: string) => number | null
+): number | null {
+  const marked = lines.findIndex((l) => l.percentBase === true);
+  if (marked >= 0) return marked;
+  const first = lines.findIndex((l) => {
+    const g = lineGrams(l, convert);
+    return g !== null && g > 0;
+  });
+  return first >= 0 ? first : null;
+}
+
+/** A line's amount in grams, or null where it has none or can't be weighed. */
+export function lineGrams(
+  line: { qty: number | null; unit: string | null },
+  convert: (amount: number, from: string, to: string) => number | null
+): number | null {
+  return line.qty === null || !line.unit ? null : convert(Number(line.qty), line.unit, "g");
 }
 
 

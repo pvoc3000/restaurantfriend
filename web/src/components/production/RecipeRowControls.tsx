@@ -233,3 +233,100 @@ export function DeleteRecipeRow({
     </span>
   );
 }
+
+/**
+ * THE BASE RADIO (migration 221; Mark, 2026-11-03: "only one row can be the
+ * base element at a time"). The checked line is the 100% the `%` column counts
+ * from. A RADIO, not a checkbox: one of N down the column, and native radios
+ * sharing a name per version give the arrow keys and the one-at-a-time rule
+ * for free. Drawn by `.mac-radio`, `ui/Radio`'s look — that part is a group
+ * laid out in a row, and this is one button per table row.
+ *
+ * With nothing chosen, the radio sits on the line the column already counts
+ * from (the first weighable one), so the screen says which line is 100% before
+ * anybody has picked one.
+ *
+ * Two statements, the old base cleared FIRST: 221's partial unique index
+ * allows one per version, so setting the new one first would trip it. The
+ * clear may match no row (nothing was chosen yet); the set must match one.
+ */
+export function PercentBase({
+  versionId,
+  lineId,
+  previousId,
+  checked,
+  weighable,
+  editable,
+  onPick,
+}: {
+  versionId: string;
+  lineId: string;
+  /** The line marked before this tap, for putting back on a failure. */
+  previousId: string | null;
+  checked: boolean;
+  weighable: boolean;
+  editable: boolean;
+  /** Moves the sheet's choice at once; the write follows. */
+  onPick: (lineId: string | null) => void;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [failed, setFailed] = useState(false);
+  const [pending, start] = useTransition();
+
+  if (!editable) {
+    return checked ? (
+      <span className="text-[11px] uppercase tracking-[0.12em] text-subtle">base</span>
+    ) : null;
+  }
+
+  function pick() {
+    // Checked only by default (nothing chosen yet) still writes: choosing the
+    // line the column already counts from pins it, so reordering the lines
+    // no longer moves the 100%.
+    if (lineId === previousId) return;
+    setFailed(false);
+    onPick(lineId);
+    start(async () => {
+      const { error: clearError } = await supabase
+        .from("production_recipe_lines")
+        .update({ percent_base: false })
+        .eq("version_id", versionId)
+        .eq("percent_base", true);
+      const { data, error } = clearError
+        ? { data: null, error: clearError }
+        : await supabase
+            .from("production_recipe_lines")
+            .update({ percent_base: true })
+            .eq("id", lineId)
+            .select("id");
+      if (error || !data?.length) {
+        onPick(previousId);
+        setFailed(true);
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="mac-radio">
+        <input
+          id={`base-${lineId}`}
+          type="radio"
+          name={`base-${versionId}`}
+          checked={checked}
+          disabled={pending || (!weighable && !checked)}
+          // CLICK, not change: a radio already checked by default fires no
+          // change when pressed, and that press is how the default gets pinned.
+          // Arrow keys dispatch a click too.
+          onClick={pick}
+          readOnly
+          aria-label="The 100% line for the % column"
+        />
+        <label htmlFor={`base-${lineId}`} />
+      </span>
+      {failed && <span className="text-[11px] uppercase text-accent">retry</span>}
+    </span>
+  );
+}

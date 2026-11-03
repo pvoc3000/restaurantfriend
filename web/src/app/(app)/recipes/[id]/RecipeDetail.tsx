@@ -72,7 +72,7 @@ export async function RecipeDetail({
            created_at, updated_at, cost_column, source_payload,
            production_recipe_lines (
              id, label, qty, unit, note, sort, element_id,
-             scale_auto, scale_amounts, scale_units, hide_on_print
+             scale_auto, scale_amounts, scale_units, hide_on_print, percent_base
            ),
            production_recipe_steps ( id, sort, body, image_path, image_name )
          )`
@@ -97,6 +97,8 @@ export async function RecipeDetail({
         Could not load this recipe: {message}
         {/cost_column/.test(message)
           ? " — migration 042 has not been applied yet."
+          : /percent_base/.test(message)
+          ? " — migration 221 has not been applied yet."
           : /scale_auto|hide_on_print|image_path/.test(message)
           ? " — migration 041 has not been applied yet."
           : /production_/.test(message)
@@ -145,6 +147,7 @@ export async function RecipeDetail({
       scale_amounts: (number | string | null)[] | null;
       scale_units: (string | null)[] | null;
       hide_on_print: boolean | null;
+      percent_base: boolean | null;
     }[];
     production_recipe_steps: {
       id: string;
@@ -205,6 +208,7 @@ export async function RecipeDetail({
               ) ?? null,
             scaleUnits: l.scale_units ?? null,
             hideOnPrint: l.hide_on_print === true,
+            percentBase: l.percent_base === true,
           };
         });
 

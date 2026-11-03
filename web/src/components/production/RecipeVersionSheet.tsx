@@ -14,12 +14,14 @@ import {
   scaleColumns,
   scaleWidth,
   bakersPercent,
+  lineGrams,
+  percentBasis,
   type ScaleColumn,
 } from "@/lib/production";
 import { convert } from "@/lib/units";
 import type { Cost } from "@/lib/productionCost";
 import { RecipeScaleCell } from "./RecipeScaleCell";
-import { ScaleAutoBox, HideOnPrint, DeleteRecipeRow } from "./RecipeRowControls";
+import { ScaleAutoBox, HideOnPrint, DeleteRecipeRow, PercentBase } from "./RecipeRowControls";
 import { RecipeStepImage } from "./RecipeStepImage";
 
 export type SheetLine = {
@@ -36,6 +38,8 @@ export type SheetLine = {
   scaleAmounts: (number | null)[] | null;
   scaleUnits: (string | null)[] | null;
   hideOnPrint: boolean;
+  /** Migration 221 — this line is the baker's-percentage 100%. */
+  percentBase: boolean;
 };
 
 export type SheetStep = {
@@ -109,6 +113,8 @@ const W_ITEM = 200;
    grid starts to scroll instead. */
 const W_NOTE_MIN = 120;
 const W_HIDE = 48;
+/* Base, a 16px radio under a four-letter label — Hide's width, for the same reason. */
+const W_BASE = 48;
 const W_TRASH = 40;
 /* The trailing "add a batch size" slot — a NARROW AFFORDANCE, not a column
    (Mark, 2026-08-11). It was a full 72px column slot, on the reasoning that it
@@ -174,10 +180,18 @@ export function RecipeVersionSheet({
   const base = baseColumn?.multiplier ?? 1;
   const width = scaleWidth(columns);
 
-  const percents = bakersPercent(
-    version.lines.map((l) => ({ qty: l.qty, unit: l.unit })),
-    convert
+  // THE 100% LINE (221). Held here as well as in the rows, so the radio moves
+  // on the tap and the whole % column re-reads with it, before the write lands.
+  const [baseLineId, setBaseLineId] = useState<string | null>(
+    () => version.lines.find((l) => l.percentBase)?.id ?? null
   );
+  const percentLines = version.lines.map((l) => ({
+    qty: l.qty,
+    unit: l.unit,
+    percentBase: l.id === baseLineId,
+  }));
+  const percents = bakersPercent(percentLines, convert);
+  const basisAt = percentBasis(percentLines, convert);
 
   // One trailing slot so a batch size can be ADDED — FileMaker's own layout
   // leaves a blank box at the end of both header rows for exactly this. Capped
@@ -192,6 +206,7 @@ export function RecipeVersionSheet({
     (spare === null ? 0 : W_SPARE) +
     W_ITEM +
     W_NOTE_MIN +
+    W_BASE +
     W_HIDE +
     W_TRASH;
 
@@ -236,6 +251,7 @@ export function RecipeVersionSheet({
               {headerSlots.slice(1).map((column, i) => (
                 <col key={i} style={{ width: column ? W_SCALE : W_SPARE }} />
               ))}
+              <col style={{ width: W_BASE }} />
               {/* No width: the leftover lands here. See W_NOTE_MIN. */}
               <col />
               <col style={{ width: W_HIDE }} />
@@ -290,7 +306,8 @@ export function RecipeVersionSheet({
                     slack off the end. The moment Note became the flexible
                     column, Note was what paid for them: 46px instead of 138.
                     A header row that over-spans invents columns. */}
-                <th colSpan={3} />
+                {/* Base is a fourth: Base · Note · Hide · Trash. */}
+                <th colSpan={4} />
               </tr>
 
               {/* THE BATCH NAMES ARE COLUMN TITLES (Mark, 2026-08-11: "can the
@@ -334,6 +351,7 @@ export function RecipeVersionSheet({
                     editable={editable}
                   />
                 ))}
+                <th className="px-2 py-2 text-center">Base</th>
                 <th className="px-3 py-2 text-left">Note</th>
                 <th className="px-2 py-2 text-center">Hide</th>
                 <th />
@@ -414,6 +432,22 @@ export function RecipeVersionSheet({
                       <td key={`spare${c}`} />
                     )
                   )}
+
+                  <td className="px-2 py-2 text-center">
+                    <PercentBase
+                      versionId={version.id}
+                      lineId={line.id}
+                      previousId={baseLineId}
+                      checked={i === basisAt}
+                      // Only a weighable line can be the 100% — a radio on
+                      // "2 ea" would choose a base that blanks the column. The
+                      // line already chosen keeps its radio live whatever its
+                      // unit became, so it can be moved off.
+                      weighable={(lineGrams(line, convert) ?? 0) > 0}
+                      editable={editable}
+                      onPick={setBaseLineId}
+                    />
+                  </td>
 
                   <td className="px-3 py-2 text-[13px] text-muted">
                     {editable ? (

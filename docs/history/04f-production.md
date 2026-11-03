@@ -2091,3 +2091,21 @@ sharing `copyVersionContent` with Duplicate Recipe).
   written on. Everything else on the version row comes across.
 
 Verified by Mark in the app: Pavemint v06 created, active, not master.
+
+## 221 — the baker's percentage counts from a chosen line (2026-11-03, NOT YET APPLIED)
+
+The `%` column counted from the first weighable line, which is the flour in a
+dough and an accident in an ice cream base. Mark: "we should have to set which
+row is the reference element." `production_recipe_lines.percent_base`, at most
+one per version (partial unique index, 036's one-master rule for lines), set by
+a **Base** radio column on the Ingredients tab between the scale block and Note.
+
+- **Nothing backfilled.** A version with no base chosen still counts from its
+  first weighable line (`percentBasis`), and the radio sits on that line, so no
+  percentage moved when the column arrived. Pressing the radio that is already
+  on by default PINS it, so reordering lines stops moving the 100%.
+- **Only weighable lines get a live radio** (g, kg, oz, lb). A chosen base that
+  later becomes unweighable blanks the column rather than counting from
+  another line, and keeps its radio live so it can be moved off.
+- Clear-then-set, in that order, for the index. New Version and Duplicate
+  Recipe copy the flag with the line.
