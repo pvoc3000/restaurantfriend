@@ -602,7 +602,7 @@ export function RecipeVersionSheet({
           rows={rows}
           columns={shownColumns}
           rowKey={(r) => r.line.id}
-          rowStyle={(r) => (r.line.kind === "divider" ? DIVIDER_RULE : undefined)}
+          rowStyle={(r, layout) => (r.line.kind === "divider" ? dividerRule(layout.boundaries) : undefined)}
           storageKey="recipe-ingredients"
           rowClassName={(r) =>
             `${r.line.hideOnPrint ? "text-muted" : ""} ${dragging?.id === r.line.id ? "opacity-40" : ""}`
@@ -1146,11 +1146,23 @@ function lineName(line: SheetLine): string {
   return line.elementName ?? line.label ?? "this line";
 }
 
-/** A divider's rule: 1px of ink through the middle of its row, edge to edge.
- *  A background, so the hover wash (a background COLOR) still shows under it. */
-const DIVIDER_RULE: React.CSSProperties = {
-  backgroundImage: "linear-gradient(#000, #000)",
-  backgroundSize: "100% 1px",
-  backgroundPosition: "center",
-  backgroundRepeat: "no-repeat",
-};
+/**
+ * A divider's rule: 1px of ink through the middle of its row, from the end of
+ * the FIRST column to the start of the LAST (Mark, 2026-11-03: "skip the first
+ * and last columns so it doesn't block the drag handle … or the ⋯"). Those two
+ * are the ⠿ and the ⋯, control columns that can't be moved. `boundaries` are
+ * DataTable's own column edges, as fractions of the row, so the rule stops on
+ * a column line however the reader has resized or hidden columns.
+ *
+ * A background, so the hover wash (a background COLOR) still shows under it.
+ */
+function dividerRule(boundaries: number[]): React.CSSProperties {
+  const from = boundaries.length > 2 ? boundaries[0] * 100 : 0;
+  const to = boundaries.length > 2 ? boundaries[boundaries.length - 2] * 100 : 100;
+  return {
+    backgroundImage: `linear-gradient(to right, transparent ${from}%, #000 ${from}%, #000 ${to}%, transparent ${to}%)`,
+    backgroundSize: "100% 1px",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+  };
+}
