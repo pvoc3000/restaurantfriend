@@ -158,6 +158,37 @@ export type RecipeLink = {
 };
 
 /**
+ * WHERE A LINE ADDED BELOW ANOTHER GOES (Mark, 2026-11-03: "selecting any
+ * add… option adds a row below the row the sending button is on").
+ *
+ * `sorts` are the version's lines in the order shown; the new line goes after
+ * `index`. Sort is an integer, so:
+ *   · the LAST line — ten past it, the add dialogs' habit;
+ *   · room before the next line — halfway into the gap (10 and 20 → 15);
+ *   · no room, or a null anywhere (a null sorts last and would put the new
+ *     line somewhere nobody chose) — `renumber` the whole list in tens first,
+ *     the drag's own numbering, and go five past this line.
+ * `renumber` is the new Sort for each EXISTING line, in the same order, or
+ * null when nothing needs to move.
+ */
+export function sortBelow(
+  sorts: readonly (number | null)[],
+  index: number
+): { sort: number; renumber: number[] | null } {
+  const cur = sorts[index];
+  const next = sorts[index + 1];
+  const clean = sorts.every((s) => s !== null);
+  if (clean && cur !== null && cur !== undefined) {
+    if (index === sorts.length - 1) return { sort: cur + 10, renumber: null };
+    if (next !== null && next !== undefined && next - cur >= 2) {
+      return { sort: cur + Math.floor((next - cur) / 2), renumber: null };
+    }
+  }
+  const renumber = sorts.map((_, i) => (i + 1) * 10);
+  return { sort: (index + 1) * 10 + 5, renumber };
+}
+
+/**
  * The number a recipe's next version takes: one past the highest it has, read
  * from `version_sort` AND from the label's leading digits, since FileMaker left
  * some rows with only one of the two ("27a" sorts at 27.1).

@@ -4,7 +4,7 @@
 // an element's FIRST recipe by name that has a master version. These pin what
 // the confirm says a move will do to both elements' costs.
 
-import { costingRecipe, nextRecipeVersion, recipeMoveNotes, type RecipeLink } from "../../src/lib/recipes";
+import { costingRecipe, nextRecipeVersion, recipeMoveNotes, sortBelow, type RecipeLink } from "../../src/lib/recipes";
 import { test, eq } from "./harness";
 
 const NAMES: Record<string, string> = { glaze: "Chocolate Glaze", cream: "Vanilla Cream", bare: "Sprinkles" };
@@ -100,4 +100,23 @@ test("a lettered or sortless FileMaker label still counts", () => {
 
 test("a recipe with no versions starts at 01", () => {
   eq(nextRecipeVersion([]).label, "01", "empty");
+});
+
+/* Adding a line BELOW another (2026-11-03). */
+
+test("below the last line: ten past it", () => {
+  eq(sortBelow([10, 20, 30], 2), { sort: 40, renumber: null });
+});
+
+test("into a gap: halfway, nothing else moves", () => {
+  eq(sortBelow([10, 20, 30], 0), { sort: 15, renumber: null });
+  eq(sortBelow([1, 2, 3, 4, 10, 90], 4), { sort: 50, renumber: null }, "FileMaker's 10 → 90");
+});
+
+test("no room between: renumber in tens, then five past", () => {
+  eq(sortBelow([1, 2, 3], 0), { sort: 15, renumber: [10, 20, 30] });
+});
+
+test("a null anywhere renumbers, since a null would sort last", () => {
+  eq(sortBelow([10, null, 30], 2), { sort: 35, renumber: [10, 20, 30] });
 });

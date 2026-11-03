@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import { moveInOrder, renumber, useRowDrag, type DropTarget } from "@/lib/rowDrag";
 import { createClient } from "@/lib/supabase/client";
 import { PickList, type PickOption } from "@/components/ui/PickList";
-import { ingredientChoice, ingredientUpdate } from "@/lib/recipes";
+import { ingredientChoice, ingredientUpdate, sortBelow } from "@/lib/recipes";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { useExactViewportHeight } from "@/lib/tableHead";
 import type { LaborCells } from "@/lib/productionCost";
@@ -16,6 +16,8 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { MenuButton } from "@/components/ui/MenuButton";
 import { confirmDialog } from "@/lib/confirm";
 import { removeScaleColumn } from "./recipeWrites";
+import { AddIngredientDialog, insertLine, type LinePlacement } from "./AddIngredientDialog";
+import { RowMenu } from "@/components/ui/RowMenu";
 import {
   scaleColumns,
   scaleWidth,
@@ -133,6 +135,10 @@ const W_NOTE = 200;
 const W_HIDE = 48;
 /* Base, a 16px radio under a four-letter label — Hide's width, for the same reason. */
 const W_BASE = 48;
+/* The row's ⋯ — a 36px square, so its share must stay clear of that plus the
+   cell's 24px of padding at a narrow window: PlansList's 60. */
+const W_MENU = 60;
+/* The Procedure table's × — its steps keep one. */
 const W_TRASH = 40;
 /* The trailing "add a batch size" slot — a NARROW AFFORDANCE, not a column
    (Mark, 2026-08-11): a column-sized hole in every row for something pressed a
@@ -269,6 +275,51 @@ export function RecipeVersionSheet({
     onDrop: dropLine,
     rowAttribute: "data-row-key",
   });
+
+  // ADDING BELOW A ROW (the row ⋯). `sortBelow` finds the Sort, renumbering
+  // in tens first when the gap is gone; only lines whose number changes are
+  // written.
+  const [addAt, setAddAt] = useState<LinePlacement | null>(null);
+  function placementBelow(i: number): LinePlacement {
+    const r = sortBelow(lines.map((l) => l.sort), i);
+    return {
+      sort: r.sort,
+      renumber: r.renumber
+        ? lines
+            .map((l, j) => ({ id: l.id, sort: r.renumber![j], was: l.sort }))
+            .filter((w) => w.sort !== w.was)
+            .map(({ id, sort }) => ({ id, sort }))
+        : [],
+    };
+  }
+  async function addSeparatorBelow(i: number, kind: "divider" | "spacer") {
+    setDragError(null);
+    const failed = await insertLine(supabase, placementBelow(i), {
+      org_id: version.org_id,
+      version_id: version.id,
+      kind,
+    });
+    if (failed) setDragError(failed);
+    router.refresh();
+  }
+  async function deleteLine(line: SheetLine) {
+    const what = line.kind === "ingredient" ? `"${lineName(line)}"` : `this ${line.kind}`;
+    const ok = await confirmDialog({
+      title: `Delete ${what} from v${version.version_label}?`,
+      body: "This cannot be undone.",
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setDragError(null);
+    const { data, error } = await supabase
+      .from("production_recipe_lines")
+      .delete()
+      .eq("id", line.id)
+      .select("id");
+    if (error || !data?.length) setDragError(error?.message ?? "Nothing was deleted — you may not have permission.");
+    router.refresh();
+  }
 
   const percentLines = lines.map((l) => ({
     qty: l.qty,
@@ -468,27 +519,43 @@ export function RecipeVersionSheet({
         </span>
       ),
     },
-    {
-      key: "trash",
-      label: "",
-      width: W_TRASH,
-      render: (r) =>
-        editable ? (
-          <DeleteRecipeRow
-            table="production_recipe_lines"
-            id={r.line.id}
-            what={r.line.kind === "ingredient" ? `"${lineName(r.line)}"` : `this ${r.line.kind}`}
-          />
-        ) : null,
-    },
+    // THE ROW'S ⋯, all the way right (Mark, 2026-11-03: "move the add
+    // ingredient/item/divider into a new ⋯ on each ingredient table row, add
+    // delete row … adds a row below the row the sending button is on"). It
+    // replaced the row's × and the Actions menu's three adds; a line now goes
+    // where you are looking, not on the end to be dragged up.
+    ...(editable
+      ? [
+          {
+            key: "menu",
+            label: "",
+            width: W_MENU,
+            align: "right",
+            render: (r: IngredientRow) => {
+              const i = lines.findIndex((l) => l.id === r.line.id);
+              return (
+                <RowMenu
+                  label={`Actions for ${lineName(r.line)}`}
+                  items={[
+                    { label: "Add Ingredient…", onSelect: () => setAddAt(placementBelow(i)) },
+                    { label: "Add Divider", onSelect: () => void addSeparatorBelow(i, "divider") },
+                    { label: "Add Spacer", onSelect: () => void addSeparatorBelow(i, "spacer") },
+                    { label: "Delete Row…", onSelect: () => void deleteLine(r.line), danger: true },
+                  ]}
+                />
+              );
+            },
+          } satisfies DataColumn<IngredientRow>,
+        ]
+      : []),
   ];
 
   // A DIVIDER OR SPACER IS A ROW WITH NOTHING IN IT (222) but the ⠿ to move it
-  // and the × to remove it — no item, amounts, Base, Auto, note or Hide. The
+  // and the ⋯ for its commands — no item, amounts, Base, Auto, note or Hide. The
   // divider's rule is drawn by `separatorStyle` across the whole row, because
   // a DataTable row is one cell per column and a rule in one of them would
   // stop at its edges.
-  const SEPARATOR_KEEPS = new Set(["drag", "trash"]);
+  const SEPARATOR_KEEPS = new Set(["drag", "menu"]);
   const shownColumns = tableColumns.map((c) =>
     SEPARATOR_KEEPS.has(c.key)
       ? c
@@ -546,6 +613,20 @@ export function RecipeVersionSheet({
         />
         </div>
         {dragError ? <p className="shrink-0 text-[13px] text-accent">{dragError}</p> : null}
+        {addAt ? (
+          <AddIngredientDialog
+            orgId={version.org_id}
+            versionId={version.id}
+            versionLabel={version.version_label}
+            elements={elementOptions}
+            placement={addAt}
+            onClose={() => setAddAt(null)}
+            onAdded={() => {
+              setAddAt(null);
+              router.refresh();
+            }}
+          />
+        ) : null}
 
         {/* PORTALLED TO THE BODY, like `ItemComponents`' and for its reason: a
             `fixed` element inside the table would be clipped by any transformed

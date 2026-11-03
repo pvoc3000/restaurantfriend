@@ -2150,3 +2150,11 @@ numbers (`opensGroup`), and the screen never showed them.
   keep only the ⠿ and the ×. Actions gains Add Divider and Add Spacer (no
   dialog; last plus ten). The batch view draws them too. The Ingredients count
   is ingredients only.
+
+**The row ⋯ (same day).** Each ingredient line's last column is a ⋯
+(`ui/RowMenu`): Add Ingredient… · Add Divider · Add Spacer · Delete Row…, the
+adds going BELOW that row (`sortBelow`: halfway into a Sort gap, ten past the
+last line, or renumber in tens first when there is no room). It replaced the
+row × and the Actions menu's three adds; Actions keeps Add Ingredient… only for
+a version with no lines. The dialog is `AddIngredientDialog`, with
+`insertLine` writing any renumbering before the insert.
