@@ -2158,3 +2158,11 @@ last line, or renumber in tens first when there is no room). It replaced the
 row × and the Actions menu's three adds; Actions keeps Add Ingredient… only for
 a version with no lines. The dialog is `AddIngredientDialog`, with
 `insertLine` writing any renumbering before the insert.
+
+**The Procedure tab on DataTable (same day).** Sort · Step · Picture and the
+row ⋯ (Add Procedure… below the step, Delete Row…) in place of the ×. Steps
+keep their typed Sort (no ⠿) and have no dividers or spacers — 222's `kind`
+is on lines only. `AddStepDialog` is the old Actions dialog, placed by the
+same `sortBelow`; Actions keeps Add Procedure… only for a version with no
+steps. `DeleteRecipeRow`, the × both tables used, had no callers left and is
+gone.

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { freezeScales, type ScalableLine, type ScaleColumn } from "@/lib/production";
-import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { useLatestWrite } from "@/lib/latestWrite";
 
 /**
@@ -172,67 +171,6 @@ export function HideOnPrint({
   );
 }
 
-/**
- * Take a row off the recipe.
- *
- * A confirm, matching the PO batch-delete pattern, and it NAMES the row
- * — a grid of numbered rows is exactly where a delete lands on the wrong one.
- * The delete `.select()`s its own result for the reason 023 taught: with no
- * matching policy Postgres removes zero rows and PostgREST returns no error, so
- * a bare call reports success and leaves the row on screen after the refresh,
- * which reads as the button being broken rather than as being refused.
- */
-export function DeleteRecipeRow({
-  table,
-  id,
-  what,
-}: {
-  table: "production_recipe_lines" | "production_recipe_steps";
-  id: string;
-  what: string;
-}) {
-  const router = useRouter();
-  const supabase = createClient();
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
-  return (
-    <span className="inline-flex items-center gap-1">
-      <button
-        type="button"
-        disabled={pending}
-        title={`Remove ${what}`}
-        aria-label={`Remove ${what}`}
-        onClick={async () => {
-          if (!(await confirmDialog({ ...splitConfirmMessage(`Remove ${what} from this version?\n\nThis cannot be undone.`), confirmLabel: "Remove", tone: "danger" }))) {
-            return;
-          }
-          setError(null);
-          start(async () => {
-            const { data, error: e } = await supabase
-              .from(table)
-              .delete()
-              .eq("id", id)
-              .select("id");
-            if (e) {
-              setError(e.message);
-              return;
-            }
-            if (!data?.length) {
-              setError("not allowed");
-              return;
-            }
-            router.refresh();
-          });
-        }}
-        className="px-1 py-0.5 text-[14px] leading-none text-subtle hover:text-accent disabled:opacity-35"
-      >
-        ×
-      </button>
-      {error && <span className="text-[11px] text-accent">{error}</span>}
-    </span>
-  );
-}
 
 /**
  * THE BASE RADIO (migration 221; Mark, 2026-11-03: "only one row can be the

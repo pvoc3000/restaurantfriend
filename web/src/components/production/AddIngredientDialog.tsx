@@ -27,17 +27,19 @@ export type LinePlacement = {
 export async function insertLine(
   supabase: ReturnType<typeof createClient>,
   placement: LinePlacement,
-  row: Record<string, unknown>
+  row: Record<string, unknown>,
+  // The Procedure's steps use the same placement (2026-11-03).
+  table: "production_recipe_lines" | "production_recipe_steps" = "production_recipe_lines"
 ): Promise<string | null> {
   const moved = await Promise.all(
     placement.renumber.map((w) =>
-      supabase.from("production_recipe_lines").update({ sort: w.sort }).eq("id", w.id).select("id")
+      supabase.from(table).update({ sort: w.sort }).eq("id", w.id).select("id")
     )
   );
   const failed = moved.find((r) => r.error || !r.data?.length);
-  if (failed) return failed.error?.message ?? "The lines could not be renumbered to make room.";
+  if (failed) return failed.error?.message ?? "The rows could not be renumbered to make room.";
   const { data, error } = await supabase
-    .from("production_recipe_lines")
+    .from(table)
     .insert({ ...row, sort: placement.sort })
     .select("id");
   if (error || !data?.length) return error?.message ?? "Nothing was added — the database refused the insert.";

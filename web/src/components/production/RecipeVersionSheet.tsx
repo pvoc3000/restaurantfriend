@@ -17,6 +17,7 @@ import { MenuButton } from "@/components/ui/MenuButton";
 import { confirmDialog } from "@/lib/confirm";
 import { removeScaleColumn } from "./recipeWrites";
 import { AddIngredientDialog, insertLine, type LinePlacement } from "./AddIngredientDialog";
+import { AddStepDialog } from "./AddStepDialog";
 import { RowMenu } from "@/components/ui/RowMenu";
 import {
   scaleColumns,
@@ -30,7 +31,7 @@ import {
 import { convert } from "@/lib/units";
 import type { Cost } from "@/lib/productionCost";
 import { RecipeScaleCell } from "./RecipeScaleCell";
-import { ScaleAutoBox, HideOnPrint, DeleteRecipeRow, PercentBase } from "./RecipeRowControls";
+import { ScaleAutoBox, HideOnPrint, PercentBase } from "./RecipeRowControls";
 import { RecipeStepImage } from "./RecipeStepImage";
 
 export type SheetLine = {
@@ -126,8 +127,12 @@ export type SheetVersion = {
    18px at an 800px window — less than its own padding, so the glyph drew at
    nothing wide. */
 const W_DRAG = 36;
-/* The Procedure table's Sort — Ingredients has none since 2026-11-03. */
+/* The Procedure table's columns — Ingredients has no Sort since 2026-11-03.
+   The step is prose and takes the largest share; the picture holds a
+   thumbnail and its controls. */
 const W_SORT = 56;
+const W_STEP = 600;
+const W_PICTURE = 180;
 const W_AUTO = 56;
 const W_SCALE = 118;
 const W_ITEM = 200;
@@ -138,8 +143,6 @@ const W_BASE = 48;
 /* The row's ⋯ — a 36px square, so its share must stay clear of that plus the
    cell's 24px of padding at a narrow window: PlansList's 60. */
 const W_MENU = 60;
-/* The Procedure table's × — its steps keep one. */
-const W_TRASH = 40;
 /* The trailing "add a batch size" slot — a NARROW AFFORDANCE, not a column
    (Mark, 2026-08-11): a column-sized hole in every row for something pressed a
    handful of times in a recipe's life. Pressing it CREATES the column with a
@@ -563,6 +566,126 @@ export function RecipeVersionSheet({
   );
 
 
+  // THE PROCEDURE'S STEPS, on DataTable with a row ⋯ (2026-11-03). Steps
+  // keep their typed Sort — they have no ⠿ — and no divider or spacer: 222
+  // gave only ingredient lines a `kind`. No column sorts, for the Ingredients
+  // tab's reason: the order IS the procedure.
+  const [stepAddAt, setStepAddAt] = useState<LinePlacement | null>(null);
+  const [stepError, setStepError] = useState<string | null>(null);
+  function stepPlacementBelow(i: number): LinePlacement {
+    const r = sortBelow(version.steps.map((st) => st.sort), i);
+    return {
+      sort: r.sort,
+      renumber: r.renumber
+        ? version.steps
+            .map((st, j) => ({ id: st.id, sort: r.renumber![j], was: st.sort }))
+            .filter((w) => w.sort !== w.was)
+            .map(({ id, sort }) => ({ id, sort }))
+        : [],
+    };
+  }
+  async function deleteStep(i: number, id: string) {
+    const ok = await confirmDialog({
+      title: `Delete step ${i + 1} from v${version.version_label}?`,
+      body: "This cannot be undone.",
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setStepError(null);
+    const { data, error } = await supabase
+      .from("production_recipe_steps")
+      .delete()
+      .eq("id", id)
+      .select("id");
+    if (error || !data?.length) setStepError(error?.message ?? "Nothing was deleted — you may not have permission.");
+    router.refresh();
+  }
+  const stepColumns: DataColumn<SheetStep>[] = [
+    {
+      key: "sort",
+      label: "Sort",
+      width: W_SORT,
+      align: "right",
+      render: (st) =>
+        editable ? (
+          <InlineValue
+            table="production_recipe_steps"
+            id={st.id}
+            column="sort"
+            kind="number"
+            align="right"
+            placeholder=""
+            value={st.sort}
+          />
+        ) : (
+          <span className={`${READ_ONLY_VALUE} tabular-nums text-subtle`}>{st.sort ?? ""}</span>
+        ),
+    },
+    {
+      key: "step",
+      label: "Step",
+      width: W_STEP,
+      pinned: true,
+      wrap: true,
+      render: (st) =>
+        editable ? (
+          <InlineValue
+            table="production_recipe_steps"
+            id={st.id}
+            column="body"
+            value={st.body}
+            multiline
+            // NOT NULL in 036 — a step with no words is not a step, and asking
+            // for one beats bouncing a Postgres null-violation back at whoever
+            // cleared the box.
+            nullable={false}
+          />
+        ) : (
+          <span className={`${READ_ONLY_VALUE} whitespace-pre-wrap`}>{st.body}</span>
+        ),
+    },
+    {
+      key: "picture",
+      label: "Picture",
+      width: W_PICTURE,
+      wrap: true,
+      render: (st) => (
+        <RecipeStepImage
+          stepId={st.id}
+          orgId={version.org_id}
+          versionId={version.id}
+          url={st.imageUrl}
+          path={st.imagePath}
+          name={st.imageName}
+          editable={editable}
+        />
+      ),
+    },
+    ...(editable
+      ? [
+          {
+            key: "menu",
+            label: "",
+            width: W_MENU,
+            align: "right",
+            render: (st: SheetStep) => {
+              const i = version.steps.findIndex((x) => x.id === st.id);
+              return (
+                <RowMenu
+                  label={`Actions for step ${i + 1}`}
+                  items={[
+                    { label: "Add Procedure…", onSelect: () => setStepAddAt(stepPlacementBelow(i)) },
+                    { label: "Delete Row…", onSelect: () => void deleteStep(i, st.id), danger: true },
+                  ]}
+                />
+              );
+            },
+          } satisfies DataColumn<SheetStep>,
+        ]
+      : []),
+  ];
+
   // ONE LIST FILLS THE WINDOW. They shared it from 2026-08-08 until
   // 2026-08-11, when the crowding that arrangement was meant to cure came back
   // at half the height (Mark: "it's a little crowded vertically") — a
@@ -667,93 +790,36 @@ export function RecipeVersionSheet({
       {/* ------------------------------------------------------------------ */}
       {show === "procedure" ? (
       <section className="flex min-h-0 basis-0 grow flex-col gap-3">
-        <SectionHeading count={version.steps.length}>Procedure</SectionHeading>
-
-        <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full table-fixed border-collapse text-[14px]">
-          <colgroup>
-            <col style={{ width: W_SORT }} />
-            <col />
-            <col style={{ width: 180 }} />
-            <col style={{ width: W_TRASH }} />
-          </colgroup>
-          <thead>
-            <tr className="text-[11px] uppercase tracking-[0.12em] text-ink [&>th]:sticky [&>th]:top-0 [&>th]:z-20 [&>th]:border-b-2 [&>th]:border-ink [&>th]:bg-white">
-              <th className="px-2 py-2 text-left">Sort</th>
-              <th className="px-3 py-2 text-left">Step</th>
-              <th className="px-3 py-2 text-left">Picture</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {version.steps.map((step) => (
-              <tr key={step.id} className="align-top hover:bg-neutral-50">
-                <td className="px-2 py-2">
-                  {editable ? (
-                    <InlineValue
-                      table="production_recipe_steps"
-                      id={step.id}
-                      column="sort"
-                      kind="number"
-                      align="right"
-                      placeholder=""
-                      value={step.sort}
-                    />
-                  ) : (
-                    <span className={`${READ_ONLY_VALUE} tabular-nums text-subtle`}>
-                      {step.sort ?? ""}
-                    </span>
-                  )}
-                </td>
-                <td className="px-3 py-2">
-                  {editable ? (
-                    <InlineValue
-                      table="production_recipe_steps"
-                      id={step.id}
-                      column="body"
-                      value={step.body}
-                      multiline
-                      // NOT NULL in 036 — a step with no words is not a step,
-                      // and asking for one beats bouncing a Postgres
-                      // null-violation back at whoever cleared the box.
-                      nullable={false}
-                    />
-                  ) : (
-                    <span className={`${READ_ONLY_VALUE} whitespace-pre-wrap`}>{step.body}</span>
-                  )}
-                </td>
-                <td className="px-3 py-2">
-                  <RecipeStepImage
-                    stepId={step.id}
-                    orgId={version.org_id}
-                    versionId={version.id}
-                    url={step.imageUrl}
-                    path={step.imagePath}
-                    name={step.imageName}
-                    editable={editable}
-                  />
-                </td>
-                <td className="px-1 py-2 text-center">
-                  {editable ? (
-                    <DeleteRecipeRow
-                      table="production_recipe_steps"
-                      id={step.id}
-                      what="this step"
-                    />
-                  ) : null}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {/* A `DataTable` since 2026-11-03, with the Ingredients tab's row ⋯ in
+            its last column in place of the ×. `scroll` + `fill`, for the same
+            frame. */}
+        <div className="min-h-0 flex-1">
+        <DataTable
+          leading={<SectionHeading count={version.steps.length}>Procedure</SectionHeading>}
+          columnChooser
+          rows={version.steps}
+          columns={stepColumns}
+          rowKey={(st) => st.id}
+          storageKey="recipe-procedure"
+          scroll
+          fill
+          empty={<p className="text-[13px] text-muted">No procedure on this version.</p>}
+        />
         </div>
-
-        {version.steps.length === 0 ? (
-          <p className="shrink-0 text-[13px] text-muted">No procedure on this version.</p>
+        {stepError ? <p className="shrink-0 text-[13px] text-accent">{stepError}</p> : null}
+        {stepAddAt ? (
+          <AddStepDialog
+            orgId={version.org_id}
+            versionId={version.id}
+            versionLabel={version.version_label}
+            placement={stepAddAt}
+            onClose={() => setStepAddAt(null)}
+            onAdded={() => {
+              setStepAddAt(null);
+              router.refresh();
+            }}
+          />
         ) : null}
-
-        {/* No add row here: Add Procedure… in the record's Actions menu opens a
-            dialog (Mark, 2026-09-12). */}
       </section>
       ) : null}
 
