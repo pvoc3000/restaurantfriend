@@ -5,7 +5,7 @@ import { useLayoutEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { BOXED_FIELDS, BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Switch } from "@/components/ui/Switch";
 import { spaceBelow, useViewportAtLeast } from "@/lib/tableHead";
@@ -303,7 +303,9 @@ function Notes({ version, editable }: { version: SheetVersion; editable: boolean
             keeps the plain one `Editable` gives it. */}
         <div
           className={`min-h-0 flex-initial overflow-y-auto xl:flex-1 ${
-            editable ? BOXED_FIELD_BORDER : ""
+            // BLACK, not the boxed field's grey (Mark, 2026-11-03: "make the
+            // border black instead of grey").
+            editable ? "border border-ink" : ""
           }`}
         >
           <Editable
