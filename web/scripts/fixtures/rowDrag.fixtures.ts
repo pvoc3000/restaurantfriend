@@ -25,6 +25,17 @@ const current = (entries: [string, number | null][]) => new Map(entries);
 
 // --- renumber ---------------------------------------------------------------
 
+test("a step numbers in tens, for a Sort that is also typed (recipe lines)", () => {
+  eq(
+    renumber(["b", "a", "c"], current([["a", 10], ["b", 20], ["c", 30]]), 10),
+    [
+      { id: "b", sort: 10 },
+      { id: "a", sort: 20 },
+    ],
+    "c stays at 30 and is not written"
+  );
+});
+
 test("all-null (the migrated state) → every row is written, 1..n", () => {
   eq(
     renumber(["b", "a", "c"], current([["a", null], ["b", null], ["c", null]])),

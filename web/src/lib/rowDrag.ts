@@ -38,7 +38,9 @@ import { useRef, useState, type PointerEvent as ReactPointerEvent, type RefObjec
  *
  * The target contract is one data attribute: any element inside `bodyRef`
  * carrying `data-row-id` is a row. A row that must never be a drop target — a
- * totals row — simply doesn't carry one.
+ * totals row — simply doesn't carry one. `rowAttribute` names another one, for
+ * a `DataTable`, whose rows already carry `data-row-key` (the recipe's
+ * ingredient lines, 2026-11-03).
  */
 
 /**
@@ -78,14 +80,19 @@ import { type DropTarget } from "./moveInOrder";
  * hand, which is what the recipe add dialogs' last-plus-ten is for; a list that is
  * reordered by dragging is renumbered wholesale every time, so a gap would never
  * be used and would only make the stored numbers harder to read.
+ *
+ * EXCEPT where the Sort is ALSO typed: the recipe's ingredient lines keep an
+ * editable Sort column and an integer `sort`, so a drag there numbers in `step`
+ * 10 and a line can still be typed in between two (2026-11-03).
  */
 export function renumber(
   order: readonly string[],
-  current: ReadonlyMap<string, number | null>
+  current: ReadonlyMap<string, number | null>,
+  step = 1
 ): { id: string; sort: number }[] {
   const writes: { id: string; sort: number }[] = [];
   order.forEach((id, i) => {
-    const sort = i + 1;
+    const sort = (i + 1) * step;
     if (current.get(id) !== sort) writes.push({ id, sort });
   });
   return writes;
@@ -110,9 +117,11 @@ export type RowDragging = {
 export function useRowDrag({
   bodyRef,
   onDrop,
+  rowAttribute = "data-row-id",
 }: {
   bodyRef: RefObject<HTMLElement | null>;
   onDrop: (dragId: string, target: DropTarget) => void;
+  rowAttribute?: string;
 }) {
   const [dragging, setDragging] = useState<RowDragging | null>(null);
   const indicatorRef = useRef<HTMLDivElement | null>(null);
@@ -127,8 +136,8 @@ export function useRowDrag({
     // once: nothing reflows during the drag, so the boundaries cannot move
     // under it.
     const slots: { id: string; top: number; mid: number; bottom: number }[] = [];
-    body.querySelectorAll<HTMLElement>("[data-row-id]").forEach((el) => {
-      const id = el.dataset.rowId;
+    body.querySelectorAll<HTMLElement>(`[${rowAttribute}]`).forEach((el) => {
+      const id = el.getAttribute(rowAttribute);
       if (!id) return;
       const r = el.getBoundingClientRect();
       slots.push({ id, top: r.top, mid: r.top + r.height / 2, bottom: r.bottom });
@@ -136,7 +145,7 @@ export function useRowDrag({
     const from = slots.findIndex((s) => s.id === row.id);
     if (from === -1 || slots.length < 2) return;
 
-    const table = body.closest("table") ?? body;
+    const table = body.closest("table") ?? body.querySelector("table") ?? body;
     const tableRect = table.getBoundingClientRect();
     const tableLeft = Math.max(tableRect.left, 0);
     const tableWidth = Math.max(Math.min(tableRect.right, window.innerWidth) - tableLeft, 0);

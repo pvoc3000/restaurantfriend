@@ -2109,3 +2109,15 @@ a **Base** radio column on the Ingredients tab, between the base amount and Auto
   another line, and keeps its radio live so it can be moved off.
 - Clear-then-set, in that order, for the index. New Version and Duplicate
   Recipe copy the flag with the line.
+
+## Ingredients on DataTable, and dragged into order (2026-11-03)
+
+The Ingredients tab moved onto `DataTable` (Mark: "is the ingredient table one
+of our datatables?"): one header row, each batch size's name over its
+multiplier; columns resize, hide and move, none sorts, only Item is pinned
+(and since the same day `pinned` only stops hiding — `fixed` holds a column in
+place). Lines reorder by a ⠿ grip (`lib/rowDrag`, `rowAttribute:
+"data-row-key"` to find DataTable's rows). A drop renumbers the whole version
+in TENS (`renumber`'s `step`), not 1..n: this Sort is also typed, and integer,
+so the gaps keep last-plus-ten working. Pavemint v06 was renumbered 10–70 by
+the live test, in its original order (it had 1, 2, 3, 4, 10, 90, 91).

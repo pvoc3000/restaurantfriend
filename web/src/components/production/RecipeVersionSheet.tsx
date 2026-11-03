@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
+import { moveInOrder, renumber, useRowDrag, type DropTarget } from "@/lib/rowDrag";
 import { createClient } from "@/lib/supabase/client";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { ingredientChoice, ingredientUpdate } from "@/lib/recipes";
@@ -110,6 +112,12 @@ export type SheetVersion = {
    The trade now: the grid always fits, a batch size you don't need comes off
    from the Columns menu, and a dragged width is remembered. The Note keeps the
    largest share it had as the one flexible column (Mark, 2026-08-11). */
+/* The ⠿ grip — a glyph, and a column only so it has somewhere to sit. Its
+   handle reaches into the cell's padding (`-mx-2`): DataTable pads every cell
+   12px a side, and a share small enough to look like a grip column measured
+   18px at an 800px window — less than its own padding, so the glyph drew at
+   nothing wide. */
+const W_DRAG = 36;
 const W_SORT = 56;
 const W_AUTO = 56;
 const W_SCALE = 118;
@@ -182,7 +190,69 @@ export function RecipeVersionSheet({
   const [baseLineId, setBaseLineId] = useState<string | null>(
     () => version.lines.find((l) => l.percentBase)?.id ?? null
   );
-  const percentLines = version.lines.map((l) => ({
+  // DRAGGED ORDER, shown at once and dropped as soon as the server's order
+  // changes under it — the refresh after the write, or anybody else's edit.
+  // `ItemComponents`' arrangement.
+  const router = useRouter();
+  const supabase = createClient();
+  const serverOrder = version.lines.map((l) => l.id).join(",");
+  const [optimistic, setOptimistic] = useState<{ order: string[]; basedOn: string } | null>(
+    null
+  );
+  const [dragError, setDragError] = useState<string | null>(null);
+  const [, startDrop] = useTransition();
+  const lines =
+    optimistic && optimistic.basedOn === serverOrder
+      ? optimistic.order
+          .map((id) => version.lines.find((l) => l.id === id))
+          .filter((l): l is SheetLine => l !== undefined)
+      : version.lines;
+
+  /**
+   * A drop: renumber the WHOLE list in tens, write only what moved — `renumber`
+   * owns both rules and says why. Tens, not 1..n, because this Sort column is
+   * also typed into, and the add dialogs' last-plus-ten exists so a line can
+   * go between two. Each write `.select()`s its row: an update RLS filters to
+   * nothing returns no error.
+   */
+  function dropLine(dragId: string, target: DropTarget) {
+    const next = moveInOrder(
+      lines.map((l) => l.id),
+      dragId,
+      target
+    );
+    const writes = renumber(next, new Map(lines.map((l) => [l.id, l.sort])), 10);
+    if (writes.length === 0) return;
+    setDragError(null);
+    setOptimistic({ order: next, basedOn: serverOrder });
+    startDrop(async () => {
+      const results = await Promise.all(
+        writes.map((w) =>
+          supabase
+            .from("production_recipe_lines")
+            .update({ sort: w.sort })
+            .eq("id", w.id)
+            .select("id")
+        )
+      );
+      const failed = results.find((r) => r.error || !r.data?.length);
+      if (failed) {
+        setOptimistic(null);
+        setDragError(failed.error?.message ?? "The new order wasn't saved.");
+      }
+      router.refresh();
+    });
+  }
+
+  // `data-row-key` is what DataTable puts on every row, and it IS the line id.
+  const dragBody = useRef<HTMLDivElement>(null);
+  const { dragging, startRowDrag, indicatorRef, chipRef } = useRowDrag({
+    bodyRef: dragBody,
+    onDrop: dropLine,
+    rowAttribute: "data-row-key",
+  });
+
+  const percentLines = lines.map((l) => ({
     qty: l.qty,
     unit: l.unit,
     percentBase: l.id === baseLineId,
@@ -197,7 +267,7 @@ export function RecipeVersionSheet({
 
   // A row is the line and what the sheet worked out for it: its share of
   // the 100% line, and whether it IS that line.
-  const rows: IngredientRow[] = version.lines.map((line, i) => ({
+  const rows: IngredientRow[] = lines.map((line, i) => ({
     line,
     percent: percents[i],
     isBasis: i === basisAt,
@@ -241,6 +311,32 @@ export function RecipeVersionSheet({
   // header click that re-ordered the screen would show an order the recipe
   // does not have. The special-order lines table is the same case.
   const tableColumns: DataColumn<IngredientRow>[] = [
+    // THE ⠿ HANDLE (Mark, 2026-11-03: "can we add drag handles to reorder
+    // rows?"). A small grip rather than the whole row: the handle has to be
+    // `touch-none` to take a vertical drag, and across a full row that would
+    // stop an iPad scrolling the table at all. No label, so it is a control
+    // column — never hidden, never moved.
+    ...(editable
+      ? [
+          {
+            key: "drag",
+            label: "",
+            width: W_DRAG,
+            render: (r: IngredientRow) => (
+              <span
+                role="button"
+                tabIndex={-1}
+                aria-label={`Reorder ${lineName(r.line)}`}
+                title={`Drag to reorder ${lineName(r.line)}`}
+                onPointerDown={(e) => startRowDrag(e, { id: r.line.id, label: lineName(r.line) })}
+                className="-mx-2 block cursor-grab touch-none select-none text-center text-[13px] leading-none text-subtle hover:text-ink"
+              >
+                ⠿
+              </span>
+            ),
+          } satisfies DataColumn<IngredientRow>,
+        ]
+      : []),
     {
       key: "sort",
       label: "Sort",
@@ -404,7 +500,7 @@ export function RecipeVersionSheet({
             and the column labels stay put while the lines scroll under them.
             The heading rides in the table's own strip, beside the Columns
             eye — the strip above a table carries that table's heading. */}
-        <div className="min-h-0 flex-1">
+        <div ref={dragBody} className="min-h-0 flex-1">
         <DataTable
           leading={<SectionHeading count={version.lines.length}>Ingredients</SectionHeading>}
           columnChooser
@@ -412,12 +508,44 @@ export function RecipeVersionSheet({
           columns={tableColumns}
           rowKey={(r) => r.line.id}
           storageKey="recipe-ingredients"
-          rowClassName={(r) => (r.line.hideOnPrint ? "text-muted" : "")}
+          rowClassName={(r) =>
+            `${r.line.hideOnPrint ? "text-muted" : ""} ${dragging?.id === r.line.id ? "opacity-40" : ""}`
+          }
           scroll
           fill
           empty={<p className="text-[13px] text-muted">No ingredients on this version.</p>}
         />
         </div>
+        {dragError ? <p className="shrink-0 text-[13px] text-accent">{dragError}</p> : null}
+
+        {/* PORTALLED TO THE BODY, like `ItemComponents`' and for its reason: a
+            `fixed` element inside the table would be clipped by any transformed
+            ancestor. Positioned per move through refs, no re-render. */}
+        {dragging
+          ? createPortal(
+              <>
+                <div
+                  ref={indicatorRef}
+                  style={{ display: "none", left: dragging.tableLeft, width: dragging.tableWidth }}
+                  className="pointer-events-none fixed z-50 h-0.5 bg-ink"
+                />
+                <div
+                  ref={chipRef}
+                  style={{
+                    left: dragging.x,
+                    top: dragging.y,
+                    transform: dragging.touch
+                      ? "translate(-50%, calc(-100% - 16px))"
+                      : "translate(14px, 18px)",
+                  }}
+                  className="pointer-events-none fixed z-50 border border-ink bg-white px-2 py-1 text-[12px] font-medium"
+                >
+                  {dragging.label}
+                </div>
+              </>,
+              document.body
+            )
+          : null}
 
         {/* No add row here: Add Ingredient… in the record's Actions menu opens
             a dialog (Mark, 2026-09-12). */}
@@ -792,4 +920,9 @@ function LinkIngredient({ line, options }: { line: SheetLine; options: PickOptio
       {error && <span className="px-1 text-[11px] text-accent">{error}</span>}
     </span>
   );
+}
+
+/** What a line is called, for the drag chip and the handle's name. */
+function lineName(line: SheetLine): string {
+  return line.elementName ?? line.label ?? "this line";
 }
