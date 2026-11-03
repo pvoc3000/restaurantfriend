@@ -13,6 +13,7 @@ import { useExactViewportHeight } from "@/lib/tableHead";
 import type { LaborCells } from "@/lib/productionCost";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
+import { MenuButton } from "@/components/ui/MenuButton";
 import {
   scaleColumns,
   scaleWidth,
@@ -133,8 +134,12 @@ const W_TRASH = 40;
    handful of times in a recipe's life. Pressing it CREATES the column with a
    name you then edit in place; clearing that name removes it again, because
    `scaleColumns` drops an unlabelled slot. So a mis-tap is one gesture from
-   undone. */
-const W_SPARE = 28;
+   undone.
+
+   44, and the button reaching into the header's padding (`-mx-2`): at 28 it
+   measured 18px at an 800px window, and the column's own resize grip covered
+   most of it, so a press on the + resized the column instead (2026-11-03). */
+const W_SPARE = 44;
 
 /**
  * One version of a recipe, set the way FileMaker set it and — since 2026-08-08
@@ -406,7 +411,14 @@ export function RecipeVersionSheet({
             key: "spare",
             label: "",
             width: W_SPARE,
-            header: <AddScaleColumn version={version} index={spare} width={width} />,
+            header: (
+              <AddScaleColumn
+                version={version}
+                index={spare}
+                width={width}
+                hasPercent={columns.some((c) => c.isPercent)}
+              />
+            ),
             render: () => null,
           } satisfies DataColumn<IngredientRow>,
         ]),
@@ -706,68 +718,81 @@ function ScaleHeader({
 }
 
 /**
- * The narrow `+` at the end of the header — press it and the version grows a
- * batch size.
+ * The narrow `+` at the end of the header — press it and choose what the
+ * version grows (Mark, 2026-11-03): a **Batch Size Column**, named "New", or a
+ * **Baker's Percentage Column**, named "%" — the label `scaleColumns` reads as
+ * a percentage column, so it fills with each line's share of the Base line
+ * rather than a multiple. Disabled when the version already has one.
  *
  * IT WRITES BOTH STRIPS IN ONE STATEMENT. `scaleColumns` reads labels and
  * multipliers in step, and 036's check constraint refuses a version whose two
  * arrays are different lengths — so a label without its multiplier slot is a
  * write the database rejects.
  *
- * The new column is named "NEW" rather than left blank, because a blank one
+ * A batch size is named "New" rather than left blank, because a blank one
  * would not exist: `scaleColumns` drops an unlabelled slot, so an empty label
  * writes a row nobody can see. Clearing that name in the real column is
- * therefore also how you REMOVE a batch size, which is what makes pressing this
- * by accident cost one gesture.
+ * therefore also how you REMOVE a column, which is what makes choosing this by
+ * accident cost one gesture.
  */
 function AddScaleColumn({
   version,
   index,
   width,
+  hasPercent,
 }: {
   version: SheetVersion;
   index: number;
   width: number;
+  hasPercent: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  return (
-    <button
-      type="button"
-      disabled={pending}
-      title="Add a batch size"
-      aria-label="Add a batch size"
-      onClick={() =>
-        start(async () => {
-          setError(null);
-          const labels = padStrings(version.scale_labels, index + 1);
-          labels[index] = "New";
-          const { data, error: e } = await supabase
-            .from("production_recipe_versions")
-            .update({
-              scale_labels: labels,
-              scale_multipliers: padTo(version.scale_multipliers, Math.max(width, index + 1)),
-            })
-            .eq("id", version.id)
-            .select("id");
-          if (e) {
-            setError(e.message);
-            return;
-          }
-          if (!data?.length) {
-            setError("not allowed");
-            return;
-          }
-          router.refresh();
+  function add(label: string) {
+    start(async () => {
+      setError(null);
+      const labels = padStrings(version.scale_labels, index + 1);
+      labels[index] = label;
+      const { data, error: e } = await supabase
+        .from("production_recipe_versions")
+        .update({
+          scale_labels: labels,
+          scale_multipliers: padTo(version.scale_multipliers, Math.max(width, index + 1)),
         })
+        .eq("id", version.id)
+        .select("id");
+      if (e) {
+        setError(e.message);
+        return;
       }
-      className="px-1 text-[15px] leading-none text-subtle hover:text-ink disabled:opacity-35"
-    >
-      {error ? <span className="text-[11px] text-accent">!</span> : "+"}
-    </button>
+      if (!data?.length) {
+        setError("not allowed");
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <MenuButton
+      label="Add a column"
+      trigger={error ? <span className="text-[11px] text-accent">!</span> : "+"}
+      triggerClassName="-mx-2 px-1 text-[15px] leading-none text-subtle hover:text-ink disabled:opacity-35"
+      disabled={pending}
+      minWidth={240}
+      items={[
+        { label: "Batch Size Column", onSelect: () => add("New") },
+        {
+          label: "Baker's Percentage Column",
+          onSelect: () => add("%"),
+          disabled: hasPercent,
+          hint: hasPercent ? "This version already has one." : undefined,
+        },
+      ]}
+    />
   );
 }
 
