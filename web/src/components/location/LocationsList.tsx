@@ -181,8 +181,10 @@ export function LocationsList({
       key: "working",
       label: "Working",
       width: 170,
-      // Hiding this would remove the screen's whole point.
+      // Hiding this would remove the screen's whole point, and moving it would
+      // undo the LAST above.
       pinned: true,
+      fixed: true,
       // No `truncate` on this cell: it clips, and the Work here button's
       // raised 3px shadow (the Mac look) would be cut off where the column
       // runs narrow, a portrait iPad above all.

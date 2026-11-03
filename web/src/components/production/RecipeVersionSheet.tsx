@@ -203,9 +203,11 @@ export function RecipeVersionSheet({
     isBasis: i === basisAt,
   }));
 
-  // NONE OF THESE IS PINNED but Item (Mark, 2026-11-03: unlock the base
-  // amount and Auto). Column order is the reader's view and nothing is
-  // calculated from it — every amount reads its column's stored slot.
+  // EVERY COLUMN MOVES (Mark, 2026-11-03: unlock the base amount and Auto,
+  // then "hiding and moving a column are two different things"). Column order
+  // is the reader's view and nothing is calculated from it — every amount
+  // reads its column's stored slot. Item is pinned, which only stops it being
+  // hidden.
   const scaleColumn = (column: ScaleColumn, isBase = false): DataColumn<IngredientRow> => ({
     key: `scale:${column.index}`,
     // The batch name, for the Columns menu — the header shows its editor.

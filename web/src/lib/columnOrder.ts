@@ -8,12 +8,18 @@
 // beside them under `${storageKey}.order`. Every DataTable gets it by having a
 // storageKey rather than by opting in, exactly like the Columns menu.
 //
-// MOVABLE = labelled and not pinned — the same set the Columns menu offers, on
-// the same reasoning: `pinned` marks the column that IS the row (the item's
-// name, the PO number), and control columns (select-all, the ⋯ menu) have no
-// label to grab. Those keep their DECLARED slots — Active stays first (Mark,
-// 2026-07-23), the ⋯ stays at the right edge — and the movable columns permute
+// MOVABLE = labelled and not `fixed`. Control columns (select-all, the ⋯ menu)
+// have no label to grab, and a `fixed` one is a labelled control whose place
+// is part of how the screen works (Locations' Work here, kept last for the
+// thumb). Those keep their DECLARED slots and the movable columns permute
 // around them.
+//
+// `pinned` is NOT part of this, since 2026-11-03 (Mark: "hiding and moving a
+// column are two different things"). It still keeps the column that IS the
+// row (the item's name, the PO number) out of the Columns menu, so it can never
+// be hidden — but you can drag it wherever you like. Until then the one flag
+// did both, and an unhideable column was an immovable one around which every
+// other column jumped.
 //
 // Stored as the full ordered key list of the movable columns at the time of the
 // drag. Reconciliation handles the app changing underneath it: a stored key
@@ -34,10 +40,10 @@ import {
 // Pure logic — fixture-tested (scripts/fixtures/columnOrder.fixtures.ts).
 // ---------------------------------------------------------------------------
 
-export type OrderableColumn = { key: string; label: string; pinned?: boolean };
+export type OrderableColumn = { key: string; label: string; fixed?: boolean };
 
 export function isMovableColumn(column: OrderableColumn): boolean {
-  return column.label !== "" && !column.pinned;
+  return column.label !== "" && !column.fixed;
 }
 
 /**

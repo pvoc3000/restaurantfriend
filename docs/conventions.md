@@ -1589,10 +1589,14 @@
 - **Every multi-column table can also REORDER columns** (`lib/columnOrder`,
   Mark, 2026-08-01: "allow the user to drag columns to whatever position they
   want them in") — drag a header sideways; a drop line shows where it lands and
-  a chip names what's in hand. Movable = exactly the set the Columns menu
-  offers (labelled, not `pinned`): pinned and control columns hold their
-  DECLARED slots, so Active stays first, the ⋯ stays at the right edge, and the
-  name column stays put. Stored under `${storageKey}.order` beside widths and
+  a chip names what's in hand. Movable = every labelled column not marked
+  `fixed`: control columns (no label) and `fixed` ones hold their DECLARED
+  slots, so the ⋯ stays at the right edge and Locations' Work here stays last.
+  **`pinned` and `fixed` are two settings** (Mark, 2026-11-03: "hiding and
+  moving a column are two different things"): `pinned` keeps the name column
+  out of the Columns menu so it can't be HIDDEN, and it still drags; until then
+  one flag did both, and every other column jumped around a name column that
+  could not move. Stored under `${storageKey}.order` beside widths and
   visibility, as the FULL movable key order — a removed column drops out, and a
   column added later surfaces at its declared position instead of being shoved
   to the end for anyone who ever dragged (fixture-tested, the reconciliation

@@ -1,21 +1,22 @@
 // lib/columnOrder — the pure half of drag-to-move columns: how a stored order
 // is applied to the declared columns, and how a drop rewrites the store.
 //
-// The cases to trust are the reconciliation ones: pinned and control columns
+// The cases to trust are the reconciliation ones: fixed and control columns
 // holding their slots, a stored key whose column is gone, and a column ADDED
 // after the user dragged — the failure mode of storing an order is a new
 // column being shoved to the end for anyone who ever dragged, so that case is
 // pinned in the direction of "it appears where the code declared it".
 
-import { applyColumnOrder, movedColumnOrder } from "../../src/lib/columnOrder";
+import { applyColumnOrder, isMovableColumn, movedColumnOrder } from "../../src/lib/columnOrder";
 import { eq, test } from "./harness";
 
-type Col = { key: string; label: string; pinned?: boolean };
+type Col = { key: string; label: string; pinned?: boolean; fixed?: boolean };
 
 const col = (key: string, opts: Partial<Col> = {}): Col => ({
   key,
   label: opts.label ?? key.toUpperCase(),
   pinned: opts.pinned,
+  fixed: opts.fixed,
 });
 const keys = (cols: Col[]) => cols.map((c) => c.key);
 
@@ -31,14 +32,21 @@ test("stored order permutes the movable columns", () => {
   eq(keys(applyColumnOrder(cols, ["c", "a", "b"])), ["c", "a", "b"]);
 });
 
-test("a pinned column holds its declared slot while others move around it", () => {
-  const cols = [col("name", { pinned: true }), col("a"), col("b"), col("c")];
-  eq(keys(applyColumnOrder(cols, ["c", "a", "b"])), ["name", "c", "a", "b"]);
+test("a fixed column holds its declared slot while others move around it", () => {
+  const cols = [col("working", { fixed: true }), col("a"), col("b"), col("c")];
+  eq(keys(applyColumnOrder(cols, ["c", "a", "b"])), ["working", "c", "a", "b"]);
 });
 
-test("a pinned column in the middle stays in the middle", () => {
-  const cols = [col("a"), col("name", { pinned: true }), col("b")];
-  eq(keys(applyColumnOrder(cols, ["b", "a"])), ["b", "name", "a"]);
+test("a fixed column in the middle stays in the middle", () => {
+  const cols = [col("a"), col("working", { fixed: true }), col("b")];
+  eq(keys(applyColumnOrder(cols, ["b", "a"])), ["b", "working", "a"]);
+});
+
+test("a PINNED column moves like any other — pinned only stops it hiding", () => {
+  // Mark, 2026-11-03: "hiding and moving a column are two different things."
+  const cols = [col("name", { pinned: true }), col("a"), col("b")];
+  eq(isMovableColumn(cols[0]), true, "movable");
+  eq(keys(applyColumnOrder(cols, ["b", "name", "a"])), ["b", "name", "a"]);
 });
 
 test("a control column (empty label) holds its slot", () => {

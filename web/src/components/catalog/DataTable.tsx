@@ -88,8 +88,22 @@ export type DataColumn<T> = {
    * For the column that IS the row — the item's name, the PO number — and for
    * control columns (select-all, the ⋯ menu), which carry no label to offer
    * anyway. Everything else is the reader's business.
+   *
+   * It does NOT hold the column in place: a pinned column still drags. See
+   * `fixed` for that.
    */
   pinned?: boolean;
+  /**
+   * Keep this column in its DECLARED place — it can't be dragged, and the
+   * movable columns flow around it.
+   *
+   * Separate from `pinned` since 2026-11-03 (Mark: "hiding and moving a column
+   * are two different things"): `pinned` only stops a column being hidden, and
+   * a pinned name column moves like any other. This is for a labelled CONTROL
+   * whose position is part of how the screen works — Locations' Work here,
+   * last for the thumb. A column with no label is already held in place.
+   */
+  fixed?: boolean;
 };
 
 /**
