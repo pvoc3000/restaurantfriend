@@ -291,11 +291,16 @@ export function BatchRecipe({
                   amount column doesn't need to be so wide"): it holds a figure
                   and a 48px unit, whatever the pane's width, so a share of it
                   only ever grew empty space. 7rem fits "1,250.5 each" at 12px
-                  with the cell's padding; the large type gets 9rem. The
-                  ingredient takes what is left. */}
+                  with the cell's padding; the large type gets 9rem.
+                  THE NOTE IS THE ONE THAT FLEXES (Mark, the same day: "the
+                  note column should grow and shrink, not the ingredient
+                  column") — the recipe sheet's rule too: a name is a known
+                  size, a note is prose. The ingredient is fixed at 14rem
+                  (18rem large), which holds a two-word catalog name on one
+                  line and wraps a long one. */}
               <col style={{ width: size === "lg" ? "9rem" : "7rem" }} />
+              <col style={{ width: size === "lg" ? "18rem" : "14rem" }} />
               <col />
-              <col style={{ width: "35%" }} />
             </colgroup>
             <thead>
               <tr className="sticky top-0 z-10 bg-white text-left">
