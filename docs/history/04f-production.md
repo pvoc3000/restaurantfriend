@@ -2121,3 +2121,32 @@ place). Lines reorder by a ⠿ grip (`lib/rowDrag`, `rowAttribute:
 in TENS (`renumber`'s `step`), not 1..n: this Sort is also typed, and integer,
 so the gaps keep last-plus-ten working. Pavemint v06 was renumbered 10–70 by
 the live test, in its original order (it had 1, 2, 3, 4, 10, 90, 91).
+
+## 222 — dividers and spacers, and FileMaker's separators restored (APPLIED 2026-11-03)
+
+Mark: "I think we used to be able to add dividers between rows … dividers and
+spacers." He was right. FileMaker grouped ingredients with separator rows —
+lines pointing at a "---" Recipe_Item (a rule) or a nameless one (a blank row),
+or simply empty — and the 036 load DROPPED them as presentation
+(`transform-production.mjs`). The print guessed them back from holes in the Sort
+numbers (`opensGroup`), and the screen never showed them.
+
+- **222** gives a line `kind` (ingredient · divider · spacer, default
+  ingredient) and a check that a separator has no element and no qty — which
+  is also what keeps them out of costing (`lineCost` already returns nothing for
+  an element-less line) and the % column. The 13 hand-typed "-" lines (the
+  blueberry glazes) became dividers.
+- **`migration/restore-recipe-separators.mjs`** re-read the export with the
+  transform's own separator test and inserted **824 (279 dividers, 545
+  spacers) across 448 versions**, each at its own Sort with `legacy_id
+  RL:<key>`; 3 belonged to no loaded version. Re-running inserts 0. Banana Cake
+  Donut v10 now reads 1, 2, [spacer 3], 4–7, [divider 98], 99–102 — exactly the
+  layout `opensGroup`'s comment described.
+- **The print draws the rows and `opensGroup` is gone.** It had to go: the
+  drag's renumbering in tens and Add Ingredient's last-plus-ten would have made
+  every line open a gap (Pavemint v06 already did).
+- The Ingredients tab draws a divider as a full-width rule (`rowStyle`, since
+  a DataTable row is one cell per column) and a spacer as an empty row; both
+  keep only the ⠿ and the ×. Actions gains Add Divider and Add Spacer (no
+  dialog; last plus ten). The batch view draws them too. The Ingredients count
+  is ingredients only.
