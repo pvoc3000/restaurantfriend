@@ -63,9 +63,11 @@ export type RecipePdfLine = {
   scaleUnits: (string | null)[] | null;
   /** FMP's HIDE box — in the recipe, off this page. */
   hidden: boolean;
-  /** Its place in the walk. A JUMP between two consecutive rows is where
-   *  FileMaker had a separator, and is what opens a gap here. */
+  /** Its place in the walk. */
   sort: number | null;
+  /** Migration 222 — a divider prints a rule, a spacer a blank row. Optional,
+   *  so a caller that never heard of them prints ingredients as before. */
+  kind?: "ingredient" | "divider" | "spacer";
 };
 
 export type RecipePdfStep = {
@@ -120,9 +122,10 @@ const styles = {
 
     row: { flexDirection: "row", paddingVertical: 3.5, alignItems: "flex-end" },
     name: { fontSize: 10 },
-    /* The gap where FileMaker had a separator row. Height, not a rule: the
-       source grouped with white space and so does this. */
+    /* A spacer line: one row's worth of white. */
     gap: { height: 9 },
+    /* A divider line: a hairline rule across the ingredient table. */
+    rule: { borderBottomWidth: 0.75, borderBottomColor: "#000", marginVertical: 4.5 },
 
     /* Procedure. */
     procedure: { marginTop: 22 },
@@ -142,6 +145,7 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
   const base = columns[0]?.multiplier ?? 1;
 
   const printed = data.lines.filter((l) => !l.hidden);
+  const ingredientCount = printed.filter((l) => (l.kind ?? "ingredient") === "ingredient").length;
 
   return (
     <Document title={`${data.recipeName} v${data.versionLabel}`}>
@@ -193,7 +197,7 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
 
         <View style={styles.items}>
         <Text style={[styles.sectionHead, { borderBottomWidth: 0, marginBottom: 6 }]}>
-          Ingredients <Text style={styles.sectionCount}>{printed.length}</Text>
+          Ingredients <Text style={styles.sectionCount}>{ingredientCount}</Text>
         </Text>
 
         <View style={styles.tableHead} fixed>
@@ -205,9 +209,18 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
           ))}
         </View>
 
-        {printed.map((line, i) => (
+        {/* DIVIDERS AND SPACERS ARE ROWS since 222, restored from FileMaker's
+            own separator rows. Until then this guessed them back from holes in
+            the Sort numbers, which every drag (numbering in tens) and every
+            Add Ingredient (last plus ten) would have turned into a gap above
+            every line. */}
+        {printed.map((line, i) =>
+          line.kind === "divider" ? (
+            <View key={`rule-${i}`} style={styles.rule} />
+          ) : line.kind === "spacer" ? (
+            <View key={`gap-${i}`} style={styles.gap} />
+          ) : (
           <React.Fragment key={`${line.name}-${i}`}>
-            {opensGroup(printed, i) ? <View style={styles.gap} /> : null}
             <View style={styles.row} wrap={false}>
               <View style={styles.colName}>
                 <Text style={styles.name}>{line.name}</Text>
@@ -217,7 +230,8 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
               ))}
             </View>
           </React.Fragment>
-        ))}
+          )
+        )}
         </View>
 
         {data.steps.length ? (
@@ -288,26 +302,6 @@ function Amount({
       <Text style={styles.amountUnit}>{unit}</Text>
     </View>
   );
-}
-
-/**
- * Whether a blank line goes ABOVE this row.
- *
- * FileMaker grouped its ingredients with separator rows — dry, then wet, then
- * the batch metadata — and those rows are presentation stored as data, so the
- * 036 load dropped them. What it could not drop is the HOLE they left in the
- * sort numbers, and that hole is the grouping: Banana Cake Donut v10 runs
- * 1, 2, (3), 4, 5, 6, 7, (98, 99), 100, 101, 102.
- *
- * Computed over the PRINTED rows, so a hidden line (Total Liquid, at 99) leaves
- * its own gap behind rather than absorbing one.
- */
-function opensGroup(rows: RecipePdfLine[], i: number): boolean {
-  if (i === 0) return false;
-  const previous = rows[i - 1].sort;
-  const current = rows[i].sort;
-  if (previous === null || current === null) return false;
-  return current - previous > 1;
 }
 
 /** Named so a caller can keep the type without importing the component. */

@@ -21,6 +21,8 @@ type Line = {
   scale_amounts: (number | string | null)[] | null;
   scale_units: (string | null)[] | null;
   hide_on_print: boolean | null;
+  /** Migration 222 — 'divider' and 'spacer' are separators, not ingredients. */
+  kind: string | null;
   production_elements: { name: string } | null;
 };
 
@@ -149,7 +151,7 @@ export function BatchRecipe({
           `id, version_label, scale_labels, scale_multipliers, recipe_id,
            production_recipe_lines (
              id, label, qty, unit, note, sort, element_id,
-             scale_auto, scale_amounts, scale_units, hide_on_print,
+             scale_auto, scale_amounts, scale_units, hide_on_print, kind,
              production_elements ( name )
            ),
            production_recipe_steps ( id, sort, body )`
@@ -307,7 +309,20 @@ export function BatchRecipe({
                   </td>
                 </tr>
               ) : (
-                lines.map((line) => (
+                lines.map((line) =>
+                  // A DIVIDER IS A RULE AND A SPACER A BLANK ROW (222) — the
+                  // same breaks the recipe sheet and its print show.
+                  line.kind === "divider" ? (
+                    <tr key={line.id} aria-hidden>
+                      <td colSpan={3} className="px-2 py-1">
+                        <div className="border-b border-ink" />
+                      </td>
+                    </tr>
+                  ) : line.kind === "spacer" ? (
+                    <tr key={line.id} aria-hidden>
+                      <td colSpan={3} className="h-4" />
+                    </tr>
+                  ) : (
                   <tr key={line.id} className="align-top">
                     {/* THE ELEMENT'S NAME LEADS; `label` is only a fallback —
                         FMP's `columnName_t` override goes stale when a version
@@ -349,7 +364,8 @@ export function BatchRecipe({
                     </td>
                     <td className={`${cell} text-muted`}>{line.note ?? ""}</td>
                   </tr>
-                ))
+                  )
+                )
               )}
             </tbody>
           </table>

@@ -75,6 +75,7 @@ export function PrintRecipe({
                 scaleUnits: l.scaleUnits,
                 hidden: l.hideOnPrint,
                 sort: l.sort,
+                kind: l.kind,
               })),
               steps: version.steps.map((s) => ({ body: s.body, imageUrl: s.imageUrl })),
               printedOn: todayInTimeZone(serverTimeZone()),

@@ -27,7 +27,12 @@ import {
  * title row where Print sheet stood:
  *
  *   New Recipe… · Duplicate Recipe · New Version · — · Add Ingredient… ·
- *   Add Procedure… · — · Print Sheet · — · Delete Recipe…
+ *   Add Divider · Add Spacer · Add Procedure… · — · Print Sheet · — ·
+ *   Delete Recipe…
+ *
+ * ADD DIVIDER AND ADD SPACER (migration 222, 2026-11-03) need no dialog —
+ * there is nothing to ask. Each goes on the end of the version on screen,
+ * where the ⠿ grip moves it into place.
  *
  * NEW VERSION (2026-11-03) copies the version on screen into this recipe as
  * the next number and opens it on Info, where Make master is — the copy is not
@@ -189,6 +194,37 @@ export function RecipeCommandMenu({
     });
   }
 
+  async function addSeparator(kind: "divider" | "spacer") {
+    if (!version) return;
+    const lastSort = version.lines.reduce<number>(
+      (a, l) => (l.sort === null ? a : Math.max(a, l.sort)),
+      0
+    );
+    setError(null);
+    const { data, error: e } = await supabase
+      .from("production_recipe_lines")
+      .insert({
+        org_id: version.org_id,
+        version_id: version.id,
+        // Last plus ten, as Add Ingredient does — the two must agree.
+        sort: lastSort + 10,
+        kind,
+      })
+      .select("id");
+    if (e || !data?.length) {
+      setError(e?.message ?? "Nothing was added — the database refused the insert.");
+      return;
+    }
+    if (tab !== "ingredients") {
+      const v = params.v;
+      router.push(
+        recipeHref(recipeId, { tab: "ingredients", version: Array.isArray(v) ? v[0] : v ?? null }, params)
+      );
+    } else {
+      router.refresh();
+    }
+  }
+
   async function duplicate() {
     setBusy("Duplicating…");
     setError(null);
@@ -255,6 +291,8 @@ export function RecipeCommandMenu({
         disabled: !version,
         separatorBefore: true,
       });
+      items.push({ label: "Add Divider", onSelect: () => void addSeparator("divider"), disabled: !version });
+      items.push({ label: "Add Spacer", onSelect: () => void addSeparator("spacer"), disabled: !version });
       items.push({ label: "Add Procedure…", onSelect: () => setStepOpen(true), disabled: !version });
     }
     items.push(

@@ -421,9 +421,13 @@ export function sampleRecipe(orgName: string): RecipePdfData {
       l(2, "Cane sugar", 3, "lb"),
       l(3, "Salt", 8, "oz"),
       l(4, "Instant yeast", 6, "oz"),
+      // A spacer between dry and wet, a divider before the butter — the two
+      // separator kinds (222), so /forms shows both.
+      { ...l(5, "", 0, ""), qty: null, unit: null, kind: "spacer" as const },
       l(10, "Whole milk", 1.5, "gal"),
       l(11, "Water", 1, "gal"),
       l(12, "Eggs", 18, "each"),
+      { ...l(13, "", 0, ""), qty: null, unit: null, kind: "divider" as const },
       l(20, "Butter, softened", 3, "lb"),
     ],
     steps: [

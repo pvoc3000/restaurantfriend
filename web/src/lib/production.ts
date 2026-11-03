@@ -411,6 +411,19 @@ export function withoutSlot<T>(
   return out;
 }
 
+/**
+ * WHAT A RECIPE LINE IS (migration 222): an ingredient, or one of FileMaker's
+ * two separators — a DIVIDER (a rule across the sheet) or a SPACER (an empty
+ * row). Neither separator carries an ingredient or an amount; 222's check
+ * says so, which is what keeps them out of costing and the % column.
+ */
+export type LineKind = "ingredient" | "divider" | "spacer";
+
+/** A stored `kind`, read defensively — anything unknown is an ingredient. */
+export function lineKind(value: string | null | undefined): LineKind {
+  return value === "divider" || value === "spacer" ? value : "ingredient";
+}
+
 /** A line's amount in grams, or null where it has none or can't be weighed. */
 export function lineGrams(
   line: { qty: number | null; unit: string | null },

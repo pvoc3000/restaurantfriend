@@ -30,6 +30,7 @@ import {
 } from "@/lib/recipes";
 import type { SheetLine, SheetVersion } from "@/components/production/RecipeVersionSheet";
 import { canEditPage } from "@/lib/pageAccess";
+import { lineKind } from "@/lib/production";
 
 /**
  * One recipe family, and whichever version you are reading.
@@ -72,7 +73,7 @@ export async function RecipeDetail({
            created_at, updated_at, cost_column, source_payload,
            production_recipe_lines (
              id, label, qty, unit, note, sort, element_id,
-             scale_auto, scale_amounts, scale_units, hide_on_print, percent_base
+             scale_auto, scale_amounts, scale_units, hide_on_print, percent_base, kind
            ),
            production_recipe_steps ( id, sort, body, image_path, image_name )
          )`
@@ -99,6 +100,8 @@ export async function RecipeDetail({
           ? " — migration 042 has not been applied yet."
           : /percent_base/.test(message)
           ? " — migration 221 has not been applied yet."
+          : /\bkind\b/.test(message)
+          ? " — migration 222 has not been applied yet."
           : /scale_auto|hide_on_print|image_path/.test(message)
           ? " — migration 041 has not been applied yet."
           : /production_/.test(message)
@@ -148,6 +151,7 @@ export async function RecipeDetail({
       scale_units: (string | null)[] | null;
       hide_on_print: boolean | null;
       percent_base: boolean | null;
+      kind: string | null;
     }[];
     production_recipe_steps: {
       id: string;
@@ -209,6 +213,7 @@ export async function RecipeDetail({
             scaleUnits: l.scale_units ?? null,
             hideOnPrint: l.hide_on_print === true,
             percentBase: l.percent_base === true,
+            kind: lineKind(l.kind),
           };
         });
 

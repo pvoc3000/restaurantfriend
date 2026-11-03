@@ -22,6 +22,7 @@ import {
   bakersPercent,
   lineGrams,
   percentBasis,
+  type LineKind,
   type ScaleColumn,
 } from "@/lib/production";
 import { convert } from "@/lib/units";
@@ -46,6 +47,8 @@ export type SheetLine = {
   hideOnPrint: boolean;
   /** Migration 221 — this line is the baker's-percentage 100%. */
   percentBase: boolean;
+  /** Migration 222 — an ingredient, or a divider or spacer between them. */
+  kind: LineKind;
 };
 
 /** A row of the Ingredients table: the line, and what the sheet worked out for it. */
@@ -474,11 +477,23 @@ export function RecipeVersionSheet({
           <DeleteRecipeRow
             table="production_recipe_lines"
             id={r.line.id}
-            what={`"${r.line.elementName ?? r.line.label ?? "this line"}"`}
+            what={r.line.kind === "ingredient" ? `"${lineName(r.line)}"` : `this ${r.line.kind}`}
           />
         ) : null,
     },
   ];
+
+  // A DIVIDER OR SPACER IS A ROW WITH NOTHING IN IT (222) but the ⠿ to move it
+  // and the × to remove it — no item, amounts, Base, Auto, note or Hide. The
+  // divider's rule is drawn by `separatorStyle` across the whole row, because
+  // a DataTable row is one cell per column and a rule in one of them would
+  // stop at its edges.
+  const SEPARATOR_KEEPS = new Set(["drag", "trash"]);
+  const shownColumns = tableColumns.map((c) =>
+    SEPARATOR_KEEPS.has(c.key)
+      ? c
+      : { ...c, render: (r: IngredientRow) => (r.line.kind === "ingredient" ? c.render(r) : null) }
+  );
 
 
   // ONE LIST FILLS THE WINDOW. They shared it from 2026-08-08 until
@@ -510,11 +525,17 @@ export function RecipeVersionSheet({
             eye — the strip above a table carries that table's heading. */}
         <div ref={dragBody} className="min-h-0 flex-1">
         <DataTable
-          leading={<SectionHeading count={version.lines.length}>Ingredients</SectionHeading>}
+          // Ingredients only — a divider or spacer is not one more of them.
+          leading={
+            <SectionHeading count={version.lines.filter((l) => l.kind === "ingredient").length}>
+              Ingredients
+            </SectionHeading>
+          }
           columnChooser
           rows={rows}
-          columns={tableColumns}
+          columns={shownColumns}
           rowKey={(r) => r.line.id}
+          rowStyle={(r) => (r.line.kind === "divider" ? DIVIDER_RULE : undefined)}
           storageKey="recipe-ingredients"
           rowClassName={(r) =>
             `${r.line.hideOnPrint ? "text-muted" : ""} ${dragging?.id === r.line.id ? "opacity-40" : ""}`
@@ -1039,5 +1060,16 @@ function LinkIngredient({ line, options }: { line: SheetLine; options: PickOptio
 
 /** What a line is called, for the drag chip and the handle's name. */
 function lineName(line: SheetLine): string {
+  if (line.kind === "divider") return "Divider";
+  if (line.kind === "spacer") return "Spacer";
   return line.elementName ?? line.label ?? "this line";
 }
+
+/** A divider's rule: 1px of ink through the middle of its row, edge to edge.
+ *  A background, so the hover wash (a background COLOR) still shows under it. */
+const DIVIDER_RULE: React.CSSProperties = {
+  backgroundImage: "linear-gradient(#000, #000)",
+  backgroundSize: "100% 1px",
+  backgroundPosition: "center",
+  backgroundRepeat: "no-repeat",
+};
