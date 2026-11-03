@@ -20,6 +20,7 @@ import { RevealPanel } from "@/components/ui/RevealPanel";
 import { useAttachmentActions } from "./useAttachmentActions";
 import { AttachMenu } from "./AttachMenu";
 import type { BillCreationOrder } from "@/lib/billFromExtraction";
+import { documentsNamingOtherOrders } from "@/lib/bills";
 
 /**
  * The paperwork for a delivery (spec §2 step 5). Until now receiving wrote
@@ -66,6 +67,7 @@ export function PoAttachments({
   canEdit,
   canFile,
   order,
+  poNumber,
 }: {
   poId: string;
   /** Not null on the table and the first segment of every object key. */
@@ -79,8 +81,14 @@ export function PoAttachments({
   /** The order these belong to, so a read invoice can be filed as a record
    *  against the right vendor and matched to the right lines. */
   order: BillCreationOrder;
+  /** This order's number, so a document printing another order's can say so —
+   *  see `documentsNamingOtherOrders`. */
+  poNumber: string;
 }) {
   const [kind, setKind] = useState<AttachmentKind>("invoice");
+  const otherOrders = new Map(
+    documentsNamingOtherOrders(attachments, poNumber).map((d) => [d.document.id, d.printed])
+  );
   const {
     phase,
     busy,
@@ -130,6 +138,16 @@ export function PoAttachments({
         {attachments.length > 0 && (
           <span className="text-sm text-muted">
             {attachments.length} {attachments.length === 1 ? "file" : "files"}
+          </span>
+        )}
+        {/* In the HEADER as well as on the document, because the card opens
+            only on its toggle: the warning has to be readable while the
+            paperwork is folded away, which is how 160-181408-02 was looked at. */}
+        {otherOrders.size > 0 && (
+          <span className="border border-ink bg-mark-fill px-2 text-[12px] uppercase tracking-[0.12em]">
+            {otherOrders.size === 1
+              ? "1 names another order"
+              : `${otherOrders.size} name other orders`}
           </span>
         )}
 
@@ -203,6 +221,20 @@ export function PoAttachments({
                   <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--rf-green-600)]">
                     {a.extraction.lines.length}{" "}
                     {a.extraction.lines.length === 1 ? "line read" : "lines read"}
+                  </p>
+                )}
+                {/* Says what it means rather than hiding it in the title — the
+                    tooltip is a native one and the iPad has no hover, the
+                    receiving screen's rule for the same chip. */}
+                {otherOrders.has(a.id) && (
+                  <p
+                    className="w-fit border border-ink bg-mark-fill px-1.5 text-[11px] uppercase tracking-[0.12em]"
+                    title={
+                      `This document prints purchase order ${otherOrders.get(a.id)!.join(", ")}, ` +
+                      `not ${poNumber}. Check the paper belongs to this order.`
+                    }
+                  >
+                    Names {otherOrders.get(a.id)!.join(", ")}
                   </p>
                 )}
                 {/* Where the reading ended up. A filed document links to its

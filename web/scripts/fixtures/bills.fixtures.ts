@@ -13,6 +13,7 @@ import {
   agingBucket,
   amountReconciliation,
   approvalReadiness,
+  documentsNamingOtherOrders,
   dueDateFromTerms,
   findPossibleDuplicates,
   invoiceHeaderFromExtraction,
@@ -881,6 +882,25 @@ test("PO disagreement: a line number is read even when the header is blank", () 
       "132-181184-01"
     ),
     ["999-99999-01"]
+  );
+});
+
+// --- documentsNamingOtherOrders --------------------------------------------
+// 160-181408-02 (2026-11-03): the scan on it was 160-181386-02's invoice.
+// Checked by breaking it: dropping the `!a.extraction` skip throws on the
+// unread document, and returning every read document reddens the agreeing one.
+
+test("other orders' paperwork: names the document that prints another order, as printed", () => {
+  const docs = [
+    { id: "scan", extraction: extraction({ purchase_order_number: "160-181386-02" }) },
+    { id: "ours", extraction: extraction({ purchase_order_number: "160-181408-02" }) },
+    { id: "unread", extraction: null },
+    { id: "silent", extraction: extraction({}) },
+  ];
+  eq(
+    documentsNamingOtherOrders(docs, "160-181408-02").map((d) => [d.document.id, d.printed]),
+    [["scan", ["160-181386-02"]]],
+    "an agreeing, an unread and a silent document all say nothing"
   );
 });
 

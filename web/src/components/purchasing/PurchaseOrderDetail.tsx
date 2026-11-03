@@ -23,7 +23,7 @@ import {
 } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import { unfiledReadings, type SignedAttachment } from "@/lib/attachments";
-import { fileReadingsLabel } from "@/lib/bills";
+import { documentsNamingOtherOrders, fileReadingsLabel } from "@/lib/bills";
 import { fileReadings } from "@/lib/billFromExtraction";
 import {
   billLinesFromOrder,
@@ -367,12 +367,23 @@ export function PurchaseOrderDetail({
       : fromReadings.reason
         ? `\n\n${fromReadings.reason}`
         : "";
+    // Named here because this is where the wrong paper costs something: a bill
+    // made with no document, or with another order's number on it. A warning,
+    // never a block — a rep mis-keying the printed number is the usual cause
+    // (see `printedPoDisagreement`), and the person holding the paper decides.
+    const otherOrders = documentsNamingOtherOrders(attachments, order.po_number);
+    const wrongPaper = otherOrders.length
+      ? `\n\nCHECK THE PAPERWORK: ${otherOrders
+          .map((d) => `${d.document.file_name ?? "a document"} prints purchase order ${d.printed.join(", ")}`)
+          .join("; ")}, not ${order.po_number}.`
+      : "";
     const ok = await confirmDialog({
       ...splitConfirmMessage(
         `Generate a bill from ${order.po_number}?\n\n` +
           `${drafts.length} ${drafts.length === 1 ? "line" : "lines"}, ${money(total)} before charges, ` +
           "at the quantities received (ordered where nothing was counted)." +
           source +
+          wrongPaper +
           already
       ),
       confirmLabel: "Generate bill",
@@ -1213,6 +1224,7 @@ export function PurchaseOrderDetail({
                 location_id: order.location_id,
                 lines,
               }}
+              poNumber={order.po_number}
             />
           )}
         </div>

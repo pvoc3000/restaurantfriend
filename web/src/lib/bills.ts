@@ -1059,6 +1059,34 @@ export function printedPoDisagreement(
 }
 
 /**
+ * The documents on an order whose reading prints some OTHER order's number,
+ * each with what it prints — `printedPoDisagreement` applied to the order's
+ * paperwork, for the screens that show the paperwork rather than one reading.
+ *
+ * It exists because of 160-181408-02 (Mark, 2026-11-03). The scan attached to
+ * it was Stumptown's invoice ARINT2000734454 for 160-181386-02 — same coffee,
+ * same $136.20 — so the reader rightly filed it with that order's bill, and
+ * Generate Bill then made 181408's bill with no document on it. Nothing on PO
+ * detail had said the paper was another order's; only the receiving screen
+ * checked.
+ *
+ * Every read document, invoice or not: a packing slip printing another order's
+ * number is the same wrong paper in the same folder.
+ */
+export function documentsNamingOtherOrders<T extends { extraction: InvoiceExtraction | null }>(
+  attachments: readonly T[],
+  poNumber: string
+): { document: T; printed: string[] }[] {
+  const out: { document: T; printed: string[] }[] = [];
+  for (const a of attachments) {
+    if (!a.extraction) continue;
+    const printed = printedPoDisagreement(a.extraction, poNumber);
+    if (printed) out.push({ document: a, printed });
+  }
+  return out;
+}
+
+/**
  * Words that say nothing about WHICH company this is.
  *
  * Legal forms, the trade the vendor is in, and the filler between. Dropping
