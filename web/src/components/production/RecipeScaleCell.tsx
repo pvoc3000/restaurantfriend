@@ -82,7 +82,7 @@ export function RecipeScaleCell({
   // one.
   return (
     <span className="flex items-baseline gap-1">
-      <span className="min-w-0 flex-1">
+      <span className={AMOUNT_BOX}>
         {isBase ? (
           <InlineValue
             table="production_recipe_lines"
@@ -115,7 +115,7 @@ export function RecipeScaleCell({
           />
         )}
       </span>
-      <span className="w-[52px] shrink-0">
+      <span className={UNIT_BOX}>
         {isBase ? (
           <InlineValue
             table="production_recipe_lines"
@@ -162,8 +162,20 @@ export function RecipeScaleCell({
 function ReadAmount({ qty, unit, muted }: { qty: string; unit: string; muted: boolean }) {
   return (
     <span className={`flex items-baseline gap-1 tabular-nums ${muted ? "text-muted" : ""}`}>
-      <span className={`${READ_ONLY_VALUE} min-w-0 flex-1 text-right`}>{qty}</span>
-      <span className={`${READ_ONLY_VALUE} w-[52px] shrink-0`}>{unit}</span>
+      <span className={`${READ_ONLY_VALUE} ${AMOUNT_BOX} text-right`}>{qty}</span>
+      <span className={`${READ_ONLY_VALUE} ${UNIT_BOX}`}>{unit}</span>
     </span>
   );
 }
+
+/*
+ * THE NUMBER KEEPS ITS WIDTH AND THE UNIT GIVES WAY (2026-11-03). Since the
+ * table went onto `DataTable` its columns divide the window, so a batch size
+ * can be 60px wide on an iPad or a narrow window — and a fixed 52px unit box
+ * beside a number allowed to shrink to nothing drew "1.4" and "kg" on top of
+ * each other. Now the number never goes below its own width, and the unit box
+ * is 52px when there is room and clips when there is not: a clipped "k…" still
+ * reads, where overprinted digits do not.
+ */
+const AMOUNT_BOX = "min-w-fit flex-1";
+const UNIT_BOX = "w-[52px] min-w-0 shrink overflow-hidden";
