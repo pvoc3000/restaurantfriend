@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -12,7 +12,6 @@ import { moveInOrder, renumber, useRowDrag, type DropTarget } from "@/lib/rowDra
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { ColumnHeader } from "@/components/catalog/ColumnHeader";
 import { useResizableColumns } from "@/lib/columnWidths";
-import { PickList } from "@/components/ui/PickList";
 import { useLatestWrite } from "@/lib/latestWrite";
 import { StickyFooter } from "@/components/ui/StickyFooter";
 import { STICKY_HEAD_ROW, useOverflowOnlyWhenNeeded } from "@/lib/tableHead";
@@ -25,10 +24,11 @@ import {
   cutLetter,
   cutOptions,
   donutOptions,
+  GROUP_LINES_EVENT,
   groupLines,
   isLineGrouping,
   isLetterCut,
-  LINE_GROUPINGS,
+  LINES_GROUPED_EVENT,
   taxonomyOptions,
   type LineGrouping,
 } from "@/lib/specialOrderLines";
@@ -493,6 +493,24 @@ export function OrderLines({
   const groups = groupLines(ordered, grouping);
   const grouped = grouping !== "none";
 
+  // The picker is in the record's header (`ItemsGroupBy`): take its choice,
+  // and tell it what is in effect.
+  const setGroupingRef = useRef(setGrouping);
+  useEffect(() => {
+    setGroupingRef.current = setGrouping;
+  });
+  useEffect(() => {
+    const onPick = (e: Event) => {
+      const next = (e as CustomEvent<unknown>).detail;
+      if (isLineGrouping(next)) setGroupingRef.current(next);
+    };
+    window.addEventListener(GROUP_LINES_EVENT, onPick);
+    return () => window.removeEventListener(GROUP_LINES_EVENT, onPick);
+  }, []);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(LINES_GROUPED_EVENT, { detail: grouping }));
+  }, [grouping]);
+
   // THE LABELS STICK (Mark, 2026-09-16), which needs the wrapper to stop being
   // a scroll container whenever the table fits: a sticky cell inside an
   // `overflow-x-auto` box pins to THAT box and leaves with the page
@@ -502,24 +520,6 @@ export function OrderLines({
 
   return (
     <section className="space-y-2">
-      {/* THE GROUP BY, ITS CAPTION INLINE (Mark, 2026-09-29: "make the label
-          inline instead of above"), AGAINST THE RIGHT EDGE over the figures it
-          sums. No "Items" heading beside it since 2026-11-04 (Mark: the tab
-          already says so, and the height is worth more). */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-xs uppercase tracking-[0.12em] text-subtle">Group by</span>
-          <PickList
-            variant="field"
-            fit
-            ariaLabel="Group items by"
-            value={grouping}
-            onPick={(next) => setGrouping(next as LineGrouping)}
-            options={LINE_GROUPINGS}
-          />
-        </div>
-      </div>
-
       <div ref={scrollerRef} className="overflow-x-auto">
         {/* `table-fixed`, which is what makes a `<col>` width mean anything at
             all — in auto layout the browser sizes columns from their content

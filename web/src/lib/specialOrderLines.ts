@@ -281,6 +281,16 @@ export function addedLineName(
  * tab … by item type, item, price")
  * ========================================================================== */
 
+/**
+ * THE GROUP BY SITS IN THE RECORD'S HEADER, beside Actions (Mark, 2026-11-04),
+ * while the Items tab owns the grouping and its save. The header picker asks
+ * with GROUP_LINES_EVENT; the tab answers with LINES_GROUPED_EVENT whenever
+ * the grouping in effect changes — a refused save included — so the picker
+ * always shows what the table is doing. `detail` is the LineGrouping.
+ */
+export const GROUP_LINES_EVENT = "rf:group-lines";
+export const LINES_GROUPED_EVENT = "rf:lines-grouped";
+
 export type LineGrouping = "none" | "type" | "cut" | "size" | "item" | "price";
 
 export const LINE_GROUPINGS: { value: LineGrouping; label: string }[] = [

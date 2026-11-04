@@ -221,6 +221,8 @@ const WEEKDAY_SHORT = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const SHOW_ROW_PROGRESS_WASH = true;
 
 const NATURAL_SORT: ListSort = { key: "date", dir: "asc" };
+/** The band over orders outside the dates shown whose email is waiting. */
+const WAITING_BAND = "Waiting for Reply";
 
 /** "SUN, AUG 16" — the band over each day's run, FileMaker's own heading. */
 function dayBand(date: string | null): string {
@@ -608,7 +610,7 @@ export function SpecialOrdersList({
     () => searchingValues(dimensions, filters, search),
     [dimensions, filters, search]
   );
-  const visible = useMemo(
+  const filtered = useMemo(
     () =>
       applyListFilters(
         searched,
@@ -617,6 +619,29 @@ export function SpecialOrdersList({
       ),
     [searched, dimensions, applied, dateless]
   );
+  /**
+   * A WAITING EMAIL OUTRANKS THE DATE (Mark, 2026-11-04: "what about orders
+   * that have already happened? What if a customer replies to an email from an
+   * order in the past?"). The reply lands on that order's Email tab, and this
+   * list is the only place anybody would notice it — so an order the date
+   * filter leaves out is shown anyway while its email waits, pinned above the
+   * days under its own band. Every OTHER menu still applies: a Location or a
+   * Status you chose is still your answer. Answering the email (or No reply
+   * needed) is what lets it go back to its date.
+   */
+  const pinned = useMemo(() => {
+    if (dateless) return [];
+    const shown = new Set(filtered.map((r) => r.id));
+    return applyListFilters(
+      searched.filter((r) => r.waiting_since !== null && !shown.has(r.id)),
+      dimensions.filter((d) => d.key !== "view"),
+      applied
+    );
+  }, [searched, filtered, dimensions, applied, dateless]);
+  const pinnedIds = useMemo(() => new Set(pinned.map((r) => r.id)), [pinned]);
+  // What is on screen, pinned rows included — the count, Select All and the
+  // bulk commands all mean these.
+  const visible = useMemo(() => [...pinned, ...filtered], [pinned, filtered]);
   /**
    * THE DATES PAUSE WITH THE MENUS (Mark, 2026-11-03), and since the server
    * loaded only the window — 500 at most — it is asked again, for every date,
@@ -1032,7 +1057,10 @@ export function SpecialOrdersList({
       : []),
   ];
 
-  const sorted = sortRows(visible, columns, sort ?? NATURAL_SORT);
+  const sorted = [
+    ...sortRows(pinned, columns, sort ?? NATURAL_SORT),
+    ...sortRows(filtered, columns, sort ?? NATURAL_SORT),
+  ];
 
   usePublishRecordSet(PATH, sorted.map((r) => ({ id: r.id, href: detailHref(r.id) })));
 
@@ -1072,12 +1100,12 @@ export function SpecialOrdersList({
   const groups: DataGroup<SpecialOrderRow>[] = [
     {
       sortKey: "date",
-      label: (r) => dayBand(r.event_date),
+      label: (r) => (pinnedIds.has(r.id) ? WAITING_BAND : dayBand(r.event_date)),
       // WHAT THE CALENDAR SAYS ABOUT THE DAY, under its band (Mark,
       // 2026-10-10): a blackout, a note, a subscribed calendar's event — each a
       // solid band in the calendar's own colour, so a day that is closed or
       // full is read before any order on it is.
-      under: (r) => marksUnder(r.event_date),
+      under: (r) => (pinnedIds.has(r.id) ? null : marksUnder(r.event_date)),
       // A DAY THE CALENDAR MARKS BUT NO ORDER IS ON still gets its band (Mark,
       // 2026-10-10) — a closed day with nothing booked is exactly the day
       // somebody is about to take an order for.
@@ -1086,6 +1114,10 @@ export function SpecialOrdersList({
         // day an order is already on, so no day is drawn for the calendar's
         // sake.
         if (activeDaysOnly) return [];
+        // The pinned band is not a place in the calendar either: the days
+        // start after it as they would at the top of the list.
+        if (next && pinnedIds.has(next.id)) return [];
+        if (prev && pinnedIds.has(prev.id)) prev = null;
         // A row with NO date (a template, a standing order) is not a place in
         // the calendar: nothing is drawn before its "No date" band, and it is
         // an open edge for whatever follows. A list of only such rows has no
@@ -1106,9 +1138,15 @@ export function SpecialOrdersList({
     {
       sortKey: "status",
       label: (r) =>
-        r.kind === "order" ? (r.status ? STATUS_LABEL[r.status] : "—") : KIND_LABEL[r.kind],
+        pinnedIds.has(r.id)
+          ? WAITING_BAND
+          : r.kind === "order"
+            ? r.status
+              ? STATUS_LABEL[r.status]
+              : "—"
+            : KIND_LABEL[r.kind],
     },
-    { sortKey: "kitchen", label: (r) => r.kitchen_code ?? "No kitchen" },
+    { sortKey: "kitchen", label: (r) => (pinnedIds.has(r.id) ? WAITING_BAND : r.kitchen_code ?? "No kitchen") },
   ];
 
   return (

@@ -57,6 +57,7 @@ import { OrderTotals } from "@/components/specialOrders/OrderTotals";
 import { FulfillmentCell } from "@/components/specialOrders/FulfillmentCell";
 import { MarkNoteRead } from "@/components/specialOrders/MarkNoteRead";
 import { OrderEmails, type MailCheck } from "@/components/specialOrders/OrderEmails";
+import { ItemsGroupBy } from "@/components/specialOrders/ItemsGroupBy";
 import { ORDER_MESSAGE_COLUMNS, orderMailboxes, type OrderMessage } from "@/lib/orderEmail";
 import { orderEmailSubject } from "@/lib/specialOrderDocs";
 import { OrderLog, type OrderEventRow } from "@/components/specialOrders/OrderLog";
@@ -932,14 +933,21 @@ export async function SpecialOrderDetail({
             heading's own margin for no reason anybody could name. Measured: the
             wrap happens between 1024 and 1280, which is where the breakpoint
             is. */}
-        {canWrite ? (
-          <div className="flex shrink-0 flex-col items-end gap-3">
+        {canWrite || (activeTab === "items" && !lineError) ? (
+          <div className="flex shrink-0 items-center gap-4">
+            {/* THE ITEMS TAB'S GROUP BY, left of Actions and only on that tab
+                (Mark, 2026-11-04). Every reader sees it, as on the tab before:
+                a reader's choice changes their view and is not saved. */}
+            {activeTab === "items" && !lineError ? (
+              <ItemsGroupBy saved={(row.line_grouping as string | null) ?? null} />
+            ) : null}
             {/* ONE "ACTIONS" BUTTON, level with the title at the right margin
                 (Mark, 2026-09-11: the command row's buttons were "all different
                 sizes and colors"). Preview, Download and Email… each open the
                 four documents; then Duplicate and Flag…, scheduling, and Cancel
                 order and Delete. Templates and standing orders get no document
                 rows: neither has a customer expecting a quote. */}
+            {canWrite ? (
             <OrderCommandMenu
               send={
                 kind === "order"
@@ -1052,6 +1060,7 @@ export async function SpecialOrderDetail({
                 activeTab === "items" && !lineError && memoContext !== null && Boolean(deliveryRaw) && status !== "cancelled"
               }
             />
+            ) : null}
           </div>
         ) : null}
       </div>

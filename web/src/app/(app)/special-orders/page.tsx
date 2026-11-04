@@ -122,6 +122,26 @@ export default async function SpecialOrdersPage({
    * with NO event date (every template and standing order) survives every
    * window, or the Kind menu would lead to an empty list.
    */
+  // WHICH ORDERS HAVE A CUSTOMER'S EMAIL WAITING FOR A REPLY (214), and since
+  // when — the oldest unanswered message per order. Org-wide off the partial
+  // index, so a handful of rows. Read BEFORE the orders, because the window
+  // lets these through whatever their date (below). A failed read (214 unapplied, or a role RLS
+  // does not let read the mail) is no marks, never a broken list.
+  const waitingSince = new Map<string, string>();
+  {
+    const { data } = await supabase
+      .from("special_order_messages")
+      .select("order_id, sent_at")
+      .eq("org_id", session.membership.org_id)
+      .eq("direction", "in")
+      .is("handled_at", null)
+      .order("sent_at", { ascending: true })
+      .limit(1000);
+    for (const m of data ?? []) {
+      if (!waitingSince.has(m.order_id as string)) waitingSince.set(m.order_id as string, m.sent_at as string);
+    }
+  }
+
   const view = Array.isArray(viewParams.view) ? viewParams.view[0] : viewParams.view;
   const bounds = orderRangeBounds(view, today);
 
@@ -162,7 +182,15 @@ export default async function SpecialOrdersPage({
   }
   if (bounds && words.length === 0) {
     query = query.or(
-      `and(event_date.gte.${bounds.from},event_date.lte.${bounds.to}),event_date.is.null`
+      [
+        `and(event_date.gte.${bounds.from},event_date.lte.${bounds.to})`,
+        "event_date.is.null",
+        // AN ORDER WITH A CUSTOMER'S EMAIL WAITING IS LOADED WHATEVER ITS DATE
+        // (Mark, 2026-11-04): a reply to last spring's order lands on that
+        // order, and the list is the only place anybody would see it. The list
+        // pins these above the days (`SpecialOrdersList`).
+        ...(waitingSince.size ? [`id.in.(${[...waitingSince.keys()].join(",")})`] : []),
+      ].join(",")
     );
   }
 
@@ -223,25 +251,6 @@ export default async function SpecialOrdersPage({
         payments.set(p.order_id as string, list);
       }
       if (!data || data.length < 1000) break;
-    }
-  }
-
-  // WHICH ORDERS HAVE A CUSTOMER'S EMAIL WAITING FOR A REPLY (214), and since
-  // when — the oldest unanswered message per order. Org-wide off the partial
-  // index, so a handful of rows. A failed read (214 unapplied, or a role RLS
-  // does not let read the mail) is no marks, never a broken list.
-  const waitingSince = new Map<string, string>();
-  {
-    const { data } = await supabase
-      .from("special_order_messages")
-      .select("order_id, sent_at")
-      .eq("org_id", session.membership.org_id)
-      .eq("direction", "in")
-      .is("handled_at", null)
-      .order("sent_at", { ascending: true })
-      .limit(1000);
-    for (const m of data ?? []) {
-      if (!waitingSince.has(m.order_id as string)) waitingSince.set(m.order_id as string, m.sent_at as string);
     }
   }
 

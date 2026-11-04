@@ -6425,3 +6425,26 @@ QuickBooks- and Square-collected invoices alike.
   `salesPosting` copy) deployed. Not yet exercised: a real memo refund through
   the new dialog (SO-10152 is the first), and a Square memo refund in a
   morning run.
+
+### A waiting email outranks the date (2026-11-04)
+
+Mark: "what about orders that have already happened? What if a customer
+replies to an email from an order in the past?" The check already matched such
+a reply to its order (by Gmail thread or the SO number in the subject, any
+date), but the only place a waiting email shows is the Orders list's To-do, and
+the date filter hid the order. Of the options offered, Mark chose "option 1":
+
+- `page.tsx` reads the waiting messages BEFORE the orders and ORs their ids
+  into the date window, so they load whatever their date.
+- `SpecialOrdersList` shows an order with a waiting email that the date filter
+  leaves out anyway, pinned above the days under a "Waiting for Reply" band.
+  Every other menu (Status, Location, Kitchen) still applies, so a CANCELLED
+  order with a reply stays hidden under the resting Active status. The count,
+  Select All and the bulk commands include the pinned rows.
+- Verified on live data: SO-10121 (Oct 10), SO-10144 (Oct 24) and SO-10175
+  (Oct 29) — real customer emails nobody had answered — now head the default
+  view; "39 of 113 orders" where it had read 36.
+
+Not done, still a gap: a NEW email (no thread, no SO number) from a past
+customer matches only orders dated from three days ago on (`matchOrder` step
+3), so it stays in Gmail. An unmatched-mail list was option 5.
