@@ -404,7 +404,11 @@ function RecipeVersionList({
           its CONTENT means the section has no content — the list would collapse
           to its heading. Basis `auto` lets the rows decide, and `min-h-0` still
           lets them give way when the column can't hold them. */}
-      <div className="min-h-0 flex-initial overflow-y-auto">
+      {/* BOXED like the Testing notes beside it (Mark, 2026-11-03: "a similar
+          box around the versions table"): a black 1px edge on the SCROLLER, so
+          the rows scroll inside a frame that stays put. No hover edge — that
+          says "type here", and the table's controls carry their own. */}
+      <div className="min-h-0 flex-initial overflow-y-auto border border-ink">
         <table className="w-full table-fixed border-collapse text-[14px]">
           {/* Tight, because this list shares its column with the Notes cell and
               the costs matrix takes the width it needs. Everything fixed adds to
