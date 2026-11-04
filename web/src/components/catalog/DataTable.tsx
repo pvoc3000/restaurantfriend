@@ -209,8 +209,9 @@ export type DataGroup<T> = {
   /**
    * A FILL FOR ONE BAND in place of the black, given the run's first row —
    * for a run that is an alarm rather than a place in the order: the special
-   * orders list's "Waiting for Reply" band is red (Mark, 2026-11-04). Return
-   * undefined for the usual black. White text either way.
+   * orders list's "Waiting for Reply" band is yellow (Mark, 2026-11-04, after
+   * trying red). The fill AND its ink, since white text does not read on a
+   * light fill. Return undefined for the usual black with white text.
    */
   bandFill?: (firstRow: T) => string | undefined;
 };
@@ -986,13 +987,13 @@ export function DataTable<T>({
                         </td>
                       </tr>
                     ) : (
-                      <tr className={`${banding!.bandFill?.(row) ?? "bg-ink"} text-white`}>
+                      <tr className={banding!.bandFill?.(row) ?? "bg-ink text-white"}>
                         <td
                           colSpan={visibleColumns.length}
                           className="px-3 py-2 text-xs font-semibold tracking-[0.12em] uppercase"
                         >
                           {label}
-                          <span className="ml-2 font-normal tracking-normal text-white/55 normal-case">
+                          <span className="ml-2 font-normal tracking-normal normal-case opacity-55">
                             {groupRows.get(label)?.length ?? 0}
                           </span>
                         </td>
