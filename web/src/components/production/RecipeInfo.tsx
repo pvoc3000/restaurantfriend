@@ -305,9 +305,14 @@ function Notes({ version, editable }: { version: SheetVersion; editable: boolean
           className={`min-h-0 flex-initial overflow-y-auto xl:flex-1 ${
             // BLACK, not the boxed field's grey (Mark, 2026-11-03: "make the
             // border black instead of grey"), and it is the BOX that reads 2px
-            // on hover — the Mac look's inset 1px, `.rf-typed`'s own hover
-            // moved out here. An inset shadow does not scroll with the content.
-            editable ? "border border-ink hover:shadow-[inset_0_0_0_1px_#000]" : ""
+            // on hover (`.rf-typed`'s own hover, moved out here). An OUTLINE
+            // 1px inside the border, not the Mac look's inset shadow: an inset
+            // shadow is painted BENEATH a box's content, and the field fills
+            // this box edge to edge, so in Chrome the 2px never showed. An
+            // outline is painted over the content, and it does not scroll.
+            editable
+              ? "border border-ink hover:outline hover:outline-1 hover:outline-black hover:-outline-offset-2"
+              : ""
           }`}
         >
           <Editable
