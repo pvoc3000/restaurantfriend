@@ -6445,6 +6445,11 @@ the date filter hid the order. Of the options offered, Mark chose "option 1":
   (Oct 29) — real customer emails nobody had answered — now head the default
   view; "39 of 113 orders" where it had read 36.
 
+- The pinned band is BLACK WITH YELLOW TEXT, 32 px of white space below it
+  before the days (Mark, 2026-11-04, after trying red, yellow, dark grey, light
+  grey, white and dark grey with yellow: "that's probably best"). Two new
+  `DataGroup` options carry it: `spaceBefore` and `bandFill` (fill and ink).
+
 Not done, still a gap: a NEW email (no thread, no SO number) from a past
 customer matches only orders dated from three days ago on (`matchOrder` step
 3), so it stays in Gmail. An unmatched-mail list was option 5.
