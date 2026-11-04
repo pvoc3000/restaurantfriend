@@ -69,6 +69,10 @@ export type OrderDelivery = {
   short_decision_at: string | null;
 };
 
+/** Actions ▸ Record Short… (Mark, 2026-11-04: the button moved off the Items
+ *  tab). The menu fires this; the open Items tab opens its own dialog. */
+export const RECORD_SHORT_EVENT = "rf:record-short";
+
 export function normalizeDelivery(raw: unknown): OrderDelivery | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;

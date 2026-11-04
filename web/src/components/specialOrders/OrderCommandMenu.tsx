@@ -4,6 +4,7 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { CHECK_ORDER_MAIL_EVENT } from "@/lib/orderEmail";
+import { RECORD_SHORT_EVENT } from "@/lib/creditMemos";
 import { LinkCustomer } from "./LinkCustomer";
 import { NewSpecialOrder } from "./NewSpecialOrder";
 import { OrderActions } from "./OrderActions";
@@ -49,9 +50,12 @@ export function OrderCommandMenu({
   customer,
   actions,
   checkMail = false,
+  recordShort = false,
 }: {
   /** On the Email tab: a Check for Email row, run by the tab itself. */
   checkMail?: boolean;
+  /** On the Items tab: a Record Short… row, whose dialog the tab owns. */
+  recordShort?: boolean;
   /** Null on a template or standing order — there is no document to send. */
   send: SendProps | null;
   /** Null on a template or standing order. No row either while QuickBooks is
@@ -119,11 +123,17 @@ export function OrderCommandMenu({
                 // doing.
                 customerItems,
                 documentItems,
-                // Its own group: the document rows end with the invoice ones,
-                // and a mailbox check is not a billing command.
-                checkMail
-                  ? [{ label: "Check for Email", onSelect: () => window.dispatchEvent(new Event(CHECK_ORDER_MAIL_EVENT)) }]
-                  : [],
+                // THE OPEN TAB'S OWN COMMANDS, in a group of their own: the
+                // document rows end with the invoice ones, and neither of
+                // these is a billing command. The tab does the work.
+                [
+                  ...(checkMail
+                    ? [{ label: "Check for Email", onSelect: () => window.dispatchEvent(new Event(CHECK_ORDER_MAIL_EVENT)) }]
+                    : []),
+                  ...(recordShort
+                    ? [{ label: "Record Short…", onSelect: () => window.dispatchEvent(new Event(RECORD_SHORT_EVENT)) }]
+                    : []),
+                ],
                 quickbooksItems,
                 edit,
                 scheduleItems,

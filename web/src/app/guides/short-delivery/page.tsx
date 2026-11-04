@@ -13,7 +13,7 @@ export const metadata = {
  * 217 and 218, docs/customer-credit-memos-brief.md).
  *
  * EVERY LABEL HERE IS THE SCREEN'S OWN: the Items tab's "Delivered" column and
- * "Record Short…" button (OrderLines), the "Record Short" dialog with Item ·
+ * Actions ▸ "Record Short…" (OrderCommandMenu), the "Record Short" dialog with Item ·
  * Ordered · Delivered, "Reason" and "Save", the notice's "Issue Credit Memo…",
  * "No Credit…" and "Change Decision…", and the memo dialog's "Apply to the
  * next invoice" / "Refund to the card" / "Refunded in cash" / "Refunded by
@@ -69,7 +69,7 @@ export default function ShortDeliveryGuide() {
             </p>
           </li>
           <li>
-            Press <Ui>Record Short…</Ui> above the lines — or press the figure in a line’s{" "}
+            Choose <Ui>Actions</Ui> ▸ <Ui>Record Short…</Ui> — or press the figure in a line’s{" "}
             <strong>Delivered</strong> column to open it at that line.
           </li>
           <li>
@@ -83,7 +83,7 @@ export default function ShortDeliveryGuide() {
           </li>
         </ol>
         <Note head="Got it wrong?">
-          Open <Ui>Record Short…</Ui> again and set the line back to its ordered quantity. That
+          Open <Ui>Actions</Ui> ▸ <Ui>Record Short…</Ui> again and set the line back to its ordered quantity. That
           clears the short, and the order’s history keeps both.
         </Note>
       </section>

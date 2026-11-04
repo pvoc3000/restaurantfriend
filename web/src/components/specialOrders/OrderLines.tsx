@@ -12,7 +12,6 @@ import { moveInOrder, renumber, useRowDrag, type DropTarget } from "@/lib/rowDra
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { ColumnHeader } from "@/components/catalog/ColumnHeader";
 import { useResizableColumns } from "@/lib/columnWidths";
-import { SectionHeading } from "@/components/ui/SectionHeading";
 import { PickList } from "@/components/ui/PickList";
 import { useLatestWrite } from "@/lib/latestWrite";
 import { StickyFooter } from "@/components/ui/StickyFooter";
@@ -503,15 +502,11 @@ export function OrderLines({
 
   return (
     <section className="space-y-2">
-      {/* THE GROUP BY SITS BESIDE THE TABLE'S NAME, ITS CAPTION INLINE (Mark,
-          2026-09-29: "make the label inline instead of above"). Beside a
-          heading, a caption above would push the menu below the heading's
-          line; inline, the heading, caption and menu share one centre line.
-          AGAINST THE RIGHT EDGE (Mark, same day), over the figures it sums:
-          `ml-auto` takes the row's free space, and still right-aligns it on
-          a line of its own if a narrow window wraps it. */}
+      {/* THE GROUP BY, ITS CAPTION INLINE (Mark, 2026-09-29: "make the label
+          inline instead of above"), AGAINST THE RIGHT EDGE over the figures it
+          sums. No "Items" heading beside it since 2026-11-04 (Mark: the tab
+          already says so, and the height is worth more). */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <SectionHeading count={ordered.length}>Items</SectionHeading>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs uppercase tracking-[0.12em] text-subtle">Group by</span>
           <PickList

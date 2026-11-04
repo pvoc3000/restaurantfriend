@@ -1046,6 +1046,11 @@ export async function SpecialOrderDetail({
                 canWrite,
               }}
               checkMail={activeTab === "emails" && !messageError}
+              // The Items tab's own rule for the dialog: an order with its
+              // delivery record, not cancelled.
+              recordShort={
+                activeTab === "items" && !lineError && memoContext !== null && Boolean(deliveryRaw) && status !== "cancelled"
+              }
             />
           </div>
         ) : null}

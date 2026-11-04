@@ -1,15 +1,15 @@
 "use client";
 
-import { useMemo, useState, type ComponentProps } from "react";
+import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
-import { BUTTON_CLASS, SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { FORM_FIELD_DRESS, FORM_TEXTAREA } from "@/components/ui/fieldMetrics";
 import { OrderLines } from "./OrderLines";
 import { IssueCreditMemo, type MemoInvoice } from "@/components/creditMemos/IssueCreditMemo";
-import { creditableItems, normalizeDelivery, qtyLabel, type OrderDelivery } from "@/lib/creditMemos";
+import { creditableItems, normalizeDelivery, qtyLabel, RECORD_SHORT_EVENT, type OrderDelivery } from "@/lib/creditMemos";
 
 type Delivery = {
   /** 217's `order_delivery`, as the server read it. */
@@ -54,6 +54,15 @@ export function OrderItemsTab({
       d ? new Map(d.items.map((i) => [i.item_id, { delivered: i.delivered, recorded: i.recorded, note: i.note }])) : undefined,
     [d]
   );
+
+  // Actions ▸ Record Short… lives in the record's menu, which only asks.
+  const canRecordShort = Boolean(delivery?.canRecord && d);
+  useEffect(() => {
+    if (!canRecordShort) return;
+    const onRecord = () => setRecording("all");
+    window.addEventListener(RECORD_SHORT_EVENT, onRecord);
+    return () => window.removeEventListener(RECORD_SHORT_EVENT, onRecord);
+  }, [canRecordShort]);
 
   return (
     <div className="space-y-6">
@@ -119,15 +128,8 @@ function ShortNotice({
   const shorts = d.items.filter((i) => i.recorded);
   const open = creditableItems(d);
   const credited = d.items.filter((i) => i.credited_qty > 0);
-  if (shorts.length === 0 && credited.length === 0 && !d.short_decision) {
-    return delivery.canRecord ? (
-      <div className="flex justify-end">
-        <button type="button" className={SMALL_BUTTON_CLASS} onClick={onRecord}>
-          Record Short…
-        </button>
-      </div>
-    ) : null;
-  }
+  // Nothing on record: no notice. Record Short… is in the Actions menu.
+  if (shorts.length === 0 && credited.length === 0 && !d.short_decision) return null;
   const billedLabel = delivery.invoices.map((i) => i.label).join(", ");
   return (
     <div className="border border-ink bg-white px-4 py-3 text-[14px]">
