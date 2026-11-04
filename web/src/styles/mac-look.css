@@ -1076,10 +1076,17 @@ span:has(> input.mac-field) {
 }
 
 /* ON: the thumb travels and the well fills. */
-/* BLACK since 2026-09-28 (Mark: "make the active switch state have a black
-   fill instead of grey"); #c0c0c0 until then. */
+/* STIPPLED since 2026-11-03 (Mark: "can we try the same grey from the
+   background of the scroll bars instead?") — the scroll track's 25% dots,
+   `.mac-stipple`'s tile, so an on switch and a scroll bar's well are one
+   texture. Black from 2026-09-28 ("make the active switch state have a black
+   fill instead of grey"), #c0c0c0 before that. The white thumb on the dots
+   is what reads as raised, as the calculator's keys do. */
 .mac-switch input:checked + label::before {
-  background: #000;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect width='1' height='1'/%3E%3Crect x='2' y='2' width='1' height='1'/%3E%3C/svg%3E");
+  background-size: 4px 4px;
+  image-rendering: pixelated;
 }
 
 .mac-switch input:checked + label::after {
@@ -1098,12 +1105,8 @@ span:has(> input.mac-field) {
   box-shadow: inset 0 0 0 1px #000;
 }
 
-/* An ON track is black, so its hover edge is WHITE (Mark, 2026-09-28), as an
-   ON weekday's is. */
-.mac-switch:hover input:checked:not(:disabled) + label::before,
-.mac-switch:active input:checked:not(:disabled) + label::before {
-  box-shadow: inset 0 0 0 1px #fff;
-}
+/* An ON track was black, and its hover edge WHITE (2026-09-28); stippled
+   since 2026-11-03, it takes the same black 2px edge as an OFF one. */
 
 /* HELD, THE THUMB SINKS HALFWAY INTO ITS SHADOW (Mark, 2026-09-11: "can the
    thumb 'push down' like other buttons when pressed", then — having seen the
