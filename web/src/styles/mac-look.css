@@ -767,13 +767,14 @@
 }
 
 /* The thumb: white, black-edged, square — never rounded. Its edge overlaps
-   the track's by a pixel so the two read as one line. */
+   the track's by a pixel so the two read as one line.
+   IT STAYS WHITE WHILE DRAGGED (Mark, 2026-11-03: "is pure black … when
+   dragging correct? Seems jarring"). It was filled black on `:active`, which
+   System 6 never did — you dragged a dotted outline of the thumb and the
+   thumb itself stayed white. Only the arrow boxes go black, while held. */
 ::-webkit-scrollbar-thumb {
   background-color: #fff;
   border: 1px solid #000;
-}
-::-webkit-scrollbar-thumb:active {
-  background-color: #000;
 }
 
 /* One arrow box at each end. `single-button` limits them to one per end;
