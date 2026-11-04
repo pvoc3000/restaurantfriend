@@ -409,7 +409,14 @@ function RecipeVersionList({
           the rows scroll inside a frame that stays put. No hover edge — that
           says "type here", and the table's controls carry their own. */}
       <div className="min-h-0 flex-initial overflow-y-auto border border-ink">
-        <table className="w-full table-fixed border-collapse text-[14px]">
+        {/* SEPARATE BORDERS, spacing 0 — it looks the same as collapsed here,
+            since the rows carry no borders, and it is what keeps the header's
+            rule ON the header (Mark, 2026-11-03: "the dividing line between
+            the header and the first table row scrolls away"). Collapsed, a
+            border belongs to the table's grid rather than the cell, so the
+            sticky header slid up over the rows and left its rule behind to
+            scroll away with them. */}
+        <table className="w-full table-fixed border-separate border-spacing-0 text-[14px]">
           {/* Tight, because this list shares its column with the Notes cell and
               the costs matrix takes the width it needs. Everything fixed adds to
               308, so the Note gets whatever is left — which is the column worth
