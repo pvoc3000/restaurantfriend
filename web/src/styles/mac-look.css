@@ -759,11 +759,21 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect width='1' height='1'/%3E%3Crect x='2' y='2' width='1' height='1'/%3E%3C/svg%3E");
   background-size: 4px 4px;
 }
+/* A BLACK OUTLINE ALL ROUND (Mark, 2026-11-03: "scrollbars need a black
+   border around them"). The track draws its sides and its start, the arrow
+   boxes their sides and the line between them, and the last box its end —
+   so the bar is a closed rectangle wherever it stands. It began with only
+   the line against the content, which left a bar at the window's edge, or in
+   an unboxed table pane, open on three sides. A bar INSIDE a black box (the
+   recipe's Testing notes and Versions) drops its outer edges — see
+   `.rf-scroll-boxed` below — or the box's line would double. */
 ::-webkit-scrollbar-track:vertical {
-  border-left: 1px solid #000;
+  border: solid #000;
+  border-width: 1px 1px 0 1px;
 }
 ::-webkit-scrollbar-track:horizontal {
-  border-top: 1px solid #000;
+  border: solid #000;
+  border-width: 1px 0 1px 1px;
 }
 
 /* The thumb: white, black-edged, square — never rounded. Its edge overlaps
@@ -818,28 +828,60 @@
 /* Vertical: the up box sits on the track, the down box under it. */
 ::-webkit-scrollbar-button:vertical:end:decrement {
   border-left-width: 1px;
+  border-right-width: 1px;
   border-top-width: 1px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' shape-rendering='crispEdges'%3E%3Cpath d='M7 3.5 L11.5 8 H9 V10.5 H5 V8 H2.5 Z' fill='%23fff' stroke='%23000'/%3E%3C/svg%3E");
 }
 ::-webkit-scrollbar-button:vertical:end:increment {
   border-left-width: 1px;
+  border-right-width: 1px;
   border-top-width: 1px;
+  border-bottom-width: 1px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' shape-rendering='crispEdges'%3E%3Cpath d='M7 10.5 L11.5 6 H9 V3.5 H5 V6 H2.5 Z' fill='%23fff' stroke='%23000'/%3E%3C/svg%3E");
 }
 /* Horizontal: the left box against the track, the right box after it. */
 ::-webkit-scrollbar-button:horizontal:end:decrement {
   border-top-width: 1px;
+  border-bottom-width: 1px;
   border-left-width: 1px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' shape-rendering='crispEdges'%3E%3Cpath d='M3.5 7 L8 2.5 V5 H10.5 V9 H8 V11.5 Z' fill='%23fff' stroke='%23000'/%3E%3C/svg%3E");
 }
 ::-webkit-scrollbar-button:horizontal:end:increment {
   border-top-width: 1px;
+  border-bottom-width: 1px;
   border-left-width: 1px;
+  border-right-width: 1px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' shape-rendering='crispEdges'%3E%3Cpath d='M10.5 7 L6 2.5 V5 H3.5 V9 H6 V11.5 Z' fill='%23fff' stroke='%23000'/%3E%3C/svg%3E");
 }
 ::-webkit-scrollbar-button:end:decrement:active,
 ::-webkit-scrollbar-button:end:increment:active {
   background-color: #000;
+}
+
+/* INSIDE A BLACK BOX the box is the bar's outer edge: a scroller that
+   carries its own `border border-ink` adds `rf-scroll-boxed`, and its bar
+   keeps only the line against the content and the lines between its parts. */
+.rf-scroll-boxed::-webkit-scrollbar-track:vertical {
+  border-right-width: 0;
+  border-top-width: 0;
+}
+.rf-scroll-boxed::-webkit-scrollbar-button:vertical:end:decrement,
+.rf-scroll-boxed::-webkit-scrollbar-button:vertical:end:increment {
+  border-right-width: 0;
+}
+.rf-scroll-boxed::-webkit-scrollbar-button:vertical:end:increment {
+  border-bottom-width: 0;
+}
+.rf-scroll-boxed::-webkit-scrollbar-track:horizontal {
+  border-bottom-width: 0;
+  border-left-width: 0;
+}
+.rf-scroll-boxed::-webkit-scrollbar-button:horizontal:end:decrement,
+.rf-scroll-boxed::-webkit-scrollbar-button:horizontal:end:increment {
+  border-bottom-width: 0;
+}
+.rf-scroll-boxed::-webkit-scrollbar-button:horizontal:end:increment {
+  border-right-width: 0;
 }
 
 /* Where two bars meet: the grow box's square, plain. */

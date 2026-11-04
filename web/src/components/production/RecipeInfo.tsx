@@ -311,7 +311,7 @@ function Notes({ version, editable }: { version: SheetVersion; editable: boolean
             // this box edge to edge, so in Chrome the 2px never showed. An
             // outline is painted over the content, and it does not scroll.
             editable
-              ? "border border-ink hover:outline hover:outline-1 hover:outline-black hover:-outline-offset-2"
+              ? "rf-scroll-boxed border border-ink hover:outline hover:outline-1 hover:outline-black hover:-outline-offset-2"
               : ""
           }`}
         >
@@ -408,7 +408,7 @@ function RecipeVersionList({
           box around the versions table"): a black 1px edge on the SCROLLER, so
           the rows scroll inside a frame that stays put. No hover edge — that
           says "type here", and the table's controls carry their own. */}
-      <div className="min-h-0 flex-initial overflow-y-auto border border-ink">
+      <div className="rf-scroll-boxed min-h-0 flex-initial overflow-y-auto border border-ink">
         {/* SEPARATE BORDERS, spacing 0 — it looks the same as collapsed here,
             since the rows carry no borders, and it is what keeps the header's
             rule ON the header (Mark, 2026-11-03: "the dividing line between
