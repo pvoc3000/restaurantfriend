@@ -7,6 +7,13 @@
  * on the tab as long as the tab.
  */
 
+/**
+ * Actions ▸ Check for Email (Mark, 2026-11-04: the button moved off the Email
+ * tab to save its height). The menu fires this; the open Email tab runs the
+ * check, so its busy state and any error still show on the tab.
+ */
+export const CHECK_ORDER_MAIL_EVENT = "rf:check-order-mail";
+
 export type OrderMessage = {
   id: string;
   direction: "in" | "out";

@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/lib/confirm";
-import { SectionHeading } from "@/components/ui/SectionHeading";
 import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { FORM_FIELD_DRESS } from "@/components/ui/fieldMetrics";
 import { MenuButton } from "@/components/ui/MenuButton";
 import { TextInput } from "@/components/ui/TextInput";
-import { spaceBelow, useFillViewportHeight, useViewportAtLeast } from "@/lib/tableHead";
+import { spaceBelow, useViewportAtLeast } from "@/lib/tableHead";
 import {
   answering,
+  CHECK_ORDER_MAIL_EVENT,
   conversation,
   insertBlock,
   isWaiting,
@@ -71,7 +71,7 @@ const SEND_KINDS: DocumentKind[] = ["quote", "receipt", "order"];
  * wrote the message being answered, Cc everyone else it went to, and the box
  * holds that message quoted with the caret at the top. ATTACH adds the order's
  * Quote or Receipt — its paragraph goes in below what was typed and above the
- * quote, its PDF shows under the box, and Send then goes through
+ * quote, its PDF shows beside the box (under it on a narrow window), and Send then goes through
  * `send-special-order-email`, which stamps the order, files the copy and binds
  * a quote's approval link exactly as the old Send… window did — or any files
  * (Other…). Actions ▸ Send… opens this box with that document attached; a
@@ -145,39 +145,74 @@ export function OrderEmails({
 
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  // Side by side and with no document, the box ends at the window's foot like
-  // the history beside it, so Send is never below the fold. With a document
-  // its preview follows the box, and the page scrolls to it.
   const sideBySide = useViewportAtLeast(1024);
-  useFillViewportHeight(bodyRef, composing && sideBySide && !doc, 160);
-
-  const historyRef = useRef<HTMLDivElement>(null);
   /**
-   * THE HISTORY ENDS AT THE FOOT OF THE WINDOW, measured honestly (Mark,
+   * THREE COLUMNS WHILE A DOCUMENT IS ATTACHED (Mark, 2026-11-04: "putting it
+   * to the right of the compose box, splitting the horizontal space equally
+   * between the email thread, the compose box, and the pdf preview"). Below
+   * the breakpoint the preview stays under the box, as before.
+   */
+  const threeUp = composing && !!doc && sideBySide;
+
+  const gridRef = useRef<HTMLDivElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLObjectElement>(null);
+  /**
+   * EVERY COLUMN ENDS AT THE FOOT OF THE WINDOW, measured honestly (Mark,
    * 2026-10-29: "the scroll view … grows but is always too small. It hasn't
    * reached the bottom of the window yet").
    *
    * `useFillViewportHeight` reads what follows a pane off the BODY's bottom
-   * edge, and here that edge lies twice: on a page shorter than the window it
-   * is the window's foot, so the slack counts as content and the cap never
-   * grows; and while the compose column beside the pane is taller than it
-   * (with a PDF under it, much taller) the whole column counts as "below".
-   * `spaceBelow` adds up only what really follows the pane in its own flow —
-   * the compose column sits BESIDE it and is not counted. The top is a
-   * document coordinate, so a scrolled page measures the same.
+   * edge, and here that edge lies: on a page shorter than the window it is the
+   * window's foot, so the slack counts as content; and a taller column BESIDE
+   * a pane (a PDF, say) counts as "below" it. So the foot is measured once, off
+   * the GRID — `spaceBelow` adds up only what really follows it in its own
+   * flow — and each column runs from its own top to that line: the history
+   * capped, the message box capped so Send is never below the fold, and the
+   * preview sized to it. Tops are document coordinates, so a scrolled page
+   * measures the same.
    */
   const hasHistory = thread.length > 0;
   useLayoutEffect(() => {
-    const el = historyRef.current;
-    if (!el) return;
-    if (!hasHistory) {
-      el.style.maxHeight = "";
-      return;
-    }
+    const grid = gridRef.current;
+    if (!grid) return;
+    const write = (el: HTMLElement | null, prop: "maxHeight" | "height", px: number | null) => {
+      if (!el) return;
+      if (px === null) {
+        if (el.style[prop]) el.style[prop] = "";
+        return;
+      }
+      // Whole pixels: a half-pixel column rounds up and scrolls the page by one.
+      const whole = Math.floor(px);
+      if (Math.abs(parseFloat(el.style[prop] || "0") - whole) > 1) el.style[prop] = `${whole}px`;
+    };
     const measure = () => {
-      const top = el.getBoundingClientRect().top + window.scrollY;
-      const target = Math.max(320, window.innerHeight - top - spaceBelow(el));
-      if (Math.abs(parseFloat(el.style.maxHeight || "0") - target) > 1) el.style.maxHeight = `${target}px`;
+      const foot = window.innerHeight - spaceBelow(grid);
+      const top = (el: HTMLElement) => el.getBoundingClientRect().top + window.scrollY;
+
+      const history = historyRef.current;
+      write(history, "maxHeight", history && hasHistory ? Math.max(320, foot - top(history)) : null);
+
+      const message = bodyRef.current;
+      const box = boxRef.current;
+      write(
+        message,
+        "maxHeight",
+        message && box && composing && sideBySide && (!doc || threeUp)
+          ? Math.max(160, foot - top(message) - (box.getBoundingClientRect().bottom - message.getBoundingClientRect().bottom))
+          : null
+      );
+
+      const preview = previewRef.current;
+      const frame = preview?.parentElement;
+      write(
+        preview,
+        "height",
+        preview && frame && threeUp
+          ? Math.max(480, foot - top(preview) - (frame.getBoundingClientRect().bottom - preview.getBoundingClientRect().bottom))
+          : null
+      );
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -187,7 +222,7 @@ export function OrderEmails({
       observer.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [hasHistory]);
+  }, [hasHistory, composing, sideBySide, doc, threeUp]);
   const newestId = thread[thread.length - 1]?.id;
   // A new message arrives at the top, so that is where the pane goes back to.
   useLayoutEffect(() => {
@@ -528,6 +563,20 @@ export function OrderEmails({
       if (data?.error) throw new Error(data.error);
     });
 
+  // Actions ▸ Check for Email lives in the record's menu, which fires an event
+  // rather than owning the check, so the busy line and any error stay here.
+  const checkRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    checkRef.current = () => {
+      if (!pending && busy === null) checkNow();
+    };
+  });
+  useEffect(() => {
+    const onCheck = () => checkRef.current();
+    window.addEventListener(CHECK_ORDER_MAIL_EVENT, onCheck);
+    return () => window.removeEventListener(CHECK_ORDER_MAIL_EVENT, onCheck);
+  }, []);
+
   const dismiss = () =>
     run("dismiss", async () => {
       const { error: e } = await createClient().rpc("dismiss_special_order_messages", { p_order: orderId });
@@ -608,21 +657,47 @@ export function OrderEmails({
     { label: "Other…", onSelect: () => fileRef.current?.click(), disabled: working },
   ];
 
+  /** THE DOCUMENT AS IT WILL GO — beside the box on a wide window, under it
+   *  on a narrow one, and only while there is a document. */
+  const preview = doc ? (
+    <div className="border border-ink">
+      <div className="flex items-center gap-3 border-b border-ink px-3 py-2 text-[13px]">
+        <span className="min-w-0 flex-1 truncate">Attached: {doc.filename}</span>
+        <a href={doc.url} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-ink">
+          Open in a new tab
+        </a>
+      </div>
+      <object
+        ref={previewRef}
+        data={doc.url}
+        type="application/pdf"
+        aria-label={`Preview of ${doc.filename}`}
+        className={`block w-full ${threeUp ? "" : "h-[80vh]"}`}
+      >
+        <div className="flex h-40 items-center justify-center p-4 text-center text-xs text-subtle">
+          This browser can’t show the PDF here — open it in a new tab.
+        </div>
+      </object>
+    </div>
+  ) : null;
+
+  // NO HEADING AND NO "CHECKED …" LINE (Mark, 2026-11-04: "I'm trying to
+  // conserve vertical space"). The tab's name says what this is, and Check for
+  // Email is in the Actions menu. The status row shows only while it has
+  // something to say.
+  const statusRow =
+    busy === "check" || busy === "attach" || sentNote || (waiting.length === 0 && replyButton);
+
   return (
     <section className="space-y-4">
-      <SectionHeading count={thread.length}>Email</SectionHeading>
-
-      <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted">
-        <button type="button" className={BUTTON_CLASS} onClick={checkNow} disabled={working}>
-          {busy === "check" ? "Checking…" : "Check for email"}
-        </button>
-        <span>
-          {check?.checked_at ? `Checked ${when(check.checked_at)}` : "The mailbox has not been checked yet."}
-        </span>
-        {busy === "attach" ? <span>Preparing the document…</span> : null}
-        {sentNote ? <span className="text-[var(--rf-green-600)]">{sentNote}</span> : null}
-        {waiting.length === 0 && replyButton ? <span className="flex flex-1 justify-end">{replyButton}</span> : null}
-      </div>
+      {statusRow ? (
+        <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted">
+          {busy === "check" ? <span>Checking for email…</span> : null}
+          {busy === "attach" ? <span>Preparing the document…</span> : null}
+          {sentNote ? <span className="text-[var(--rf-green-600)]">{sentNote}</span> : null}
+          {waiting.length === 0 && replyButton ? <span className="flex flex-1 justify-end">{replyButton}</span> : null}
+        </div>
+      ) : null}
       {check?.last_error ? (
         <p className="text-[13px] text-accent">The last check failed: {check.last_error}</p>
       ) : null}
@@ -643,10 +718,29 @@ export function OrderEmails({
         </div>
       ) : null}
 
-      <div className={`grid items-start gap-4 ${composing ? "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : ""}`}>
+      <div
+        ref={gridRef}
+        className={`grid items-start gap-4 ${
+          threeUp ? "lg:grid-cols-3" : composing ? "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : ""
+        }`}
+      >
+        {/* Thread · compose · preview, left to right. On a narrow window the
+            compose box comes first and the preview sits under it. */}
+        <div ref={historyRef} className="overflow-y-auto overflow-x-hidden border border-ink">
+          {thread.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-muted">No email about this order has come in or gone out.</p>
+          ) : (
+            <ol className="space-y-4 bg-neutral-100 p-4">
+              {[...thread].reverse().map((m) => (
+                <Message key={m.id} message={m} when={when(m.sent_at)} onOpenFile={openFile} />
+              ))}
+            </ol>
+          )}
+        </div>
+
         {canWrite && composing ? (
-          <div className="space-y-4 lg:order-2">
-            <div className="space-y-2 border-2 border-ink bg-white p-3 shadow-[4px_4px_0_0_#000]">
+          <div className="order-first space-y-4 lg:order-none">
+            <div ref={boxRef} className="space-y-2 border-2 border-ink bg-white p-3 shadow-[4px_4px_0_0_#000]">
               <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
                 <label className="contents">
                   <span className="text-xs uppercase tracking-[0.12em] text-subtle">To</span>
@@ -733,37 +827,11 @@ export function OrderEmails({
               {error ? <p className="text-[13px] text-accent">{error}</p> : null}
             </div>
 
-            {/* THE DOCUMENT AS IT WILL GO (Mark: "keep the pdf preview … under
-                the compose box … only visible if there's a document"). */}
-            {doc ? (
-              <div className="border border-ink">
-                <div className="flex items-center gap-3 border-b border-ink px-3 py-2 text-[13px]">
-                  <span className="min-w-0 flex-1 truncate">Attached: {doc.filename}</span>
-                  <a href={doc.url} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-ink">
-                    Open in a new tab
-                  </a>
-                </div>
-                <object data={doc.url} type="application/pdf" aria-label={`Preview of ${doc.filename}`} className="h-[80vh] w-full">
-                  <div className="flex h-40 items-center justify-center p-4 text-center text-xs text-subtle">
-                    This browser can’t show the PDF here — open it in a new tab.
-                  </div>
-                </object>
-              </div>
-            ) : null}
+            {threeUp ? null : preview}
           </div>
         ) : null}
 
-        <div ref={historyRef} className="overflow-y-auto overflow-x-hidden border border-ink">
-          {thread.length === 0 ? (
-            <p className="px-3 py-3 text-sm text-muted">No email about this order has come in or gone out.</p>
-          ) : (
-            <ol className="space-y-4 bg-neutral-100 p-4">
-              {[...thread].reverse().map((m) => (
-                <Message key={m.id} message={m} when={when(m.sent_at)} onOpenFile={openFile} />
-              ))}
-            </ol>
-          )}
-        </div>
+        {canWrite && composing && threeUp ? preview : null}
       </div>
 
       {error && !composing ? <p className="text-[13px] text-accent">{error}</p> : null}

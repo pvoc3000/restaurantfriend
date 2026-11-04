@@ -1045,6 +1045,7 @@ export async function SpecialOrderDetail({
                 todo: row.todo as string | null,
                 canWrite,
               }}
+              checkMail={activeTab === "emails" && !messageError}
             />
           </div>
         ) : null}
