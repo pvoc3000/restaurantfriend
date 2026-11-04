@@ -11,7 +11,7 @@ import { ControlField } from "@/components/ui/ControlField";
 import { RangePicker } from "@/components/ui/RangePicker";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
-import { READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { useRememberedView } from "@/lib/viewMemory";
 import { batchDate } from "@/lib/productionBatches";

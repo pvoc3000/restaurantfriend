@@ -11,7 +11,8 @@ import { Switch } from "@/components/ui/Switch";
 import { TextInput } from "@/components/ui/TextInput";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { RowMenu } from "@/components/ui/RowMenu";
-import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { InlineValue } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import {

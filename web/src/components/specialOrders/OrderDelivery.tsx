@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { InlineValue } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { shopPhone, shopStreetAddress, type DeliveryQuoteFacts } from "@/lib/specialOrderDocs";

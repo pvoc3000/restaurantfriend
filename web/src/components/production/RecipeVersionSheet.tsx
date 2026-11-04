@@ -8,7 +8,8 @@ import { moveInOrder, renumber, useRowDrag, type DropTarget } from "@/lib/rowDra
 import { createClient } from "@/lib/supabase/client";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { ingredientChoice, ingredientUpdate, sortBelow } from "@/lib/recipes";
-import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { InlineValue } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { useExactViewportHeight } from "@/lib/tableHead";
 import type { LaborCells } from "@/lib/productionCost";
 import { SectionHeading } from "@/components/ui/SectionHeading";

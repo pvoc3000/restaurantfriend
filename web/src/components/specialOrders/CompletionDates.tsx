@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 
-import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { InlineValue } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { COMPLETION_DATES } from "@/lib/specialOrders";
 import { createClient } from "@/lib/supabase/client";
 import { WorkflowOffer } from "./WorkflowOffer";

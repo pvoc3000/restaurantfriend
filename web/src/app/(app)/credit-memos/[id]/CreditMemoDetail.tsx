@@ -18,7 +18,7 @@ import {
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { CreditMemoCommandMenu } from "@/components/creditMemos/CreditMemoCommandMenu";
 
 const CUSTOMERS_CRUMB = { href: "/customers", label: "Customers" };

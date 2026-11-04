@@ -11,7 +11,8 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { requestShiftFocus } from "@/lib/shiftFocus";
 import { PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog } from "@/lib/confirm";
-import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { InlineValue } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import {
   buildExportRows,
   exportFileName,

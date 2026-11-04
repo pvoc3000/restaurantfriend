@@ -1,6 +1,7 @@
 "use client";
 
-import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { InlineValue } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import type { PickOption } from "@/components/ui/PickList";
 import { BATCH_STATUS_LABEL, BATCH_STATUS_OPTIONS, describeAmount } from "@/lib/productionBatches";

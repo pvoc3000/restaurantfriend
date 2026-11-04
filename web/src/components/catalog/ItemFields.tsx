@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import type { CatalogItem } from "@/lib/catalog";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
-import { InlineValue, READ_ONLY_VALUE } from "./InlineValue";
+import { InlineValue } from "./InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { ActiveToggle } from "./ActiveToggle";
 import { BaseUnitEditor } from "./BaseUnitEditor";
 

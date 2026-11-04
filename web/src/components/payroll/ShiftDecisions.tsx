@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { PickList } from "@/components/ui/PickList";
-import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { InlineValue } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { TextInput } from "@/components/ui/TextInput";
 import { SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
 import { ControlField } from "@/components/ui/ControlField";

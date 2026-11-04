@@ -34,7 +34,8 @@ import {
 import { PoAttachments } from "./PoAttachments";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { SaveLineToCatalog } from "./SaveLineToCatalog";
-import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { InlineValue } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { AddPoLines } from "./AddPoLines";

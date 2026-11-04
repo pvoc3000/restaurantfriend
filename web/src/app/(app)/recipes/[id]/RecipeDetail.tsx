@@ -16,7 +16,7 @@ import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { RecipeVersions } from "@/components/production/RecipeVersions";
 import { RecipeCommandMenu } from "@/components/production/RecipeCommandMenu";
 import { RecipeMakes } from "@/components/production/RecipeMakes";
-import { READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { RecipeVersionSheet } from "@/components/production/RecipeVersionSheet";
 import { RecipeInfo } from "@/components/production/RecipeInfo";
 import { SectionNav } from "@/components/ui/SectionNav";

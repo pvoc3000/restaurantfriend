@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { defaultColumn, type CostColumnFigures } from "@/lib/recipeCosts";
 import type { SheetVersion } from "./RecipeVersionSheet";
 

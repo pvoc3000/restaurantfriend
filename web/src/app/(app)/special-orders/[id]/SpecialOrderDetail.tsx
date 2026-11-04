@@ -36,7 +36,8 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { InlineValue } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { resolveItemPrice } from "@/lib/productionPrice";
 import { type OrderLineRow } from "@/components/specialOrders/OrderLines";
 import { readAllowanceReasons } from "@/lib/creditMemos";
@@ -1719,7 +1720,11 @@ function Cell({
       <span
         className={`${READ_ONLY_VALUE} ${
           props.multiline && boxed
-            ? `block ${(props.rows ?? 4) >= 8 ? BOXED_FIELD_TALLER : BOXED_FIELD_TALL} whitespace-pre-wrap border border-hairline`
+            ? // BLACK, like the editable notes beside it (Mark, 2026-11-04:
+              // "make them all black"). Those are black through `.rf-typed`
+              // (styles/mac-look.css), which a read-only box must not wear —
+              // its hover says "type here" — so the colour is stated here.
+              `block ${(props.rows ?? 4) >= 8 ? BOXED_FIELD_TALLER : BOXED_FIELD_TALL} whitespace-pre-wrap border border-ink bg-white`
             : ""
         }`}
       >

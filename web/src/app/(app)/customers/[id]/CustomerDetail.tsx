@@ -15,7 +15,8 @@ import {
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { InlineValue } from "@/components/catalog/InlineValue";
+import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { CustomerCommandMenu } from "@/components/specialOrders/CustomerCommandMenu";

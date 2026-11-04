@@ -187,3 +187,17 @@ export const FORM_TEXTAREA = `w-full ${FORM_FIELD_DRESS} text-sm`;
  * what pushes the command to the right edge.
  */
 export const SEARCH_PEN = "min-w-[13rem] max-w-[18rem] flex-[999_1_0%]";
+
+/**
+ * An inline value's own padding, editable or not (`InlineValue`'s resting
+ * button, its sizer and its editor all wear it), and the read-only dress built
+ * on it.
+ *
+ * THESE LIVE HERE, NOT IN `InlineValue`, because that file is "use client"
+ * (found 2026-11-04). A server component that imports a plain string from a
+ * client module gets a client REFERENCE — a function — and a template literal
+ * prints its source into `className`, so every read-only value on a server-
+ * rendered record had lost its padding without a sound. Import them from here.
+ */
+export const INLINE_BOX = "px-1 py-0.5";
+export const READ_ONLY_VALUE = `inline-block ${INLINE_BOX}`;

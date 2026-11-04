@@ -12,6 +12,8 @@ import {
   BOXED_FIELD_TALL,
   BOXED_FIELD_TALLER,
   fieldPlaceholder,
+  INLINE_BOX,
+  READ_ONLY_VALUE,
 } from "@/components/ui/fieldMetrics";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { useCalcField } from "@/components/ui/CalcPad";
@@ -122,7 +124,7 @@ function setArraySlot(
  * rest with a transparent one, which works but pushes every value — editable
  * and read-only alike — 2px further from its label across the whole app.
  */
-const INLINE_BOX = "px-1 py-0.5";
+// `INLINE_BOX` is imported from `ui/fieldMetrics` (see READ_ONLY_VALUE there).
 
 /** The resting cue — a dotted underline, the quietest possible "editable". The
  *  SIZER wears it too, or the two states differ by the underline's offset. */
@@ -280,7 +282,6 @@ function Sizer({
   );
 }
 
-export const READ_ONLY_VALUE = `inline-block ${INLINE_BOX}`;
 
 export function InlineValue({
   table,
