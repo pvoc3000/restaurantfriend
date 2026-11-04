@@ -206,6 +206,13 @@ export type DataGroup<T> = {
    * Reply" orders apart from the days below them (Mark, 2026-11-04).
    */
   spaceBefore?: (prev: T, next: T) => boolean;
+  /**
+   * A FILL FOR ONE BAND in place of the black, given the run's first row —
+   * for a run that is an alarm rather than a place in the order: the special
+   * orders list's "Waiting for Reply" band is red (Mark, 2026-11-04). Return
+   * undefined for the usual black. White text either way.
+   */
+  bandFill?: (firstRow: T) => string | undefined;
 };
 
 /**
@@ -979,7 +986,7 @@ export function DataTable<T>({
                         </td>
                       </tr>
                     ) : (
-                      <tr className="bg-ink text-white">
+                      <tr className={`${banding!.bandFill?.(row) ?? "bg-ink"} text-white`}>
                         <td
                           colSpan={visibleColumns.length}
                           className="px-3 py-2 text-xs font-semibold tracking-[0.12em] uppercase"
