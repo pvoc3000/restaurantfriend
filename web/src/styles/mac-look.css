@@ -734,7 +734,7 @@
 /* Mark, 2026-11-03: "can we mac style scrollbars?" — the classic one, to match
    everything else here: a 16px bar with a black edge against the content, a
    stippled track (`.mac-stipple`'s 25% dots), a WHITE square thumb outlined in
-   black, and an outlined arrow box at each end. App-wide, like the rest of
+   black with a ridged grip, and both arrow boxes together at the end. App-wide, like the rest of
    the look, and in every scroll area at once — the page, a table's pane, a
    note's box.
 
@@ -777,15 +777,35 @@
   border: 1px solid #000;
 }
 
-/* One arrow box at each end, chosen by POSITION — `:start:decrement` is the
-   up/left box, `:end:increment` the down/right one — and every other button
-   hidden. NOT `:single-button`: that names the button layout the operating
-   system asks for, and macOS asks for none, so in Chrome on a Mac a rule
-   keyed on it never matched and no arrows were drawn at all. */
+/* THE GRIP — three short ridges in the middle of the thumb (Mark, the same
+   day: "the middle of the scroll bar had some sort of detail that's
+   missing"). Platinum's, from the Mac OS 8.5 bar that put the arrows
+   together: it says where to take hold. Across the thumb on a vertical bar,
+   along it on a horizontal one, and always centred however long the thumb
+   grows. */
+::-webkit-scrollbar-thumb:vertical {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='7' shape-rendering='crispEdges'%3E%3Crect y='0' width='8' height='1'/%3E%3Crect y='3' width='8' height='1'/%3E%3Crect y='6' width='8' height='1'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+::-webkit-scrollbar-thumb:horizontal {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='8' shape-rendering='crispEdges'%3E%3Crect x='0' width='1' height='8'/%3E%3Crect x='3' width='1' height='8'/%3E%3Crect x='6' width='1' height='8'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* BOTH ARROWS TOGETHER at the END of the bar — bottom, or right (Mark,
+   2026-11-03: "let's put the buttons together"), the way Mac OS 8.5's Smart
+   Scrolling and then Mac OS X set them, rather than one at each end as
+   System 6 did. Chosen by POSITION — `:end:decrement` is the up/left box,
+   `:end:increment` the down/right one, in that order — and every other button
+   hidden. NOT `:single-button`/`:double-button`: those name the layout the
+   operating system asks for, and macOS asks for none, so Chrome on a Mac never
+   matched them and drew no arrows at all. */
 ::-webkit-scrollbar-button {
   display: none;
 }
-::-webkit-scrollbar-button:start:decrement,
+::-webkit-scrollbar-button:end:decrement,
 ::-webkit-scrollbar-button:end:increment {
   display: block;
   width: 16px;
@@ -795,9 +815,10 @@
   background-position: center;
   border: 0 solid #000;
 }
-::-webkit-scrollbar-button:vertical:start:decrement {
+/* Vertical: the up box sits on the track, the down box under it. */
+::-webkit-scrollbar-button:vertical:end:decrement {
   border-left-width: 1px;
-  border-bottom-width: 1px;
+  border-top-width: 1px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' shape-rendering='crispEdges'%3E%3Cpath d='M7 3.5 L11.5 8 H9 V10.5 H5 V8 H2.5 Z' fill='%23fff' stroke='%23000'/%3E%3C/svg%3E");
 }
 ::-webkit-scrollbar-button:vertical:end:increment {
@@ -805,9 +826,10 @@
   border-top-width: 1px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' shape-rendering='crispEdges'%3E%3Cpath d='M7 10.5 L11.5 6 H9 V3.5 H5 V6 H2.5 Z' fill='%23fff' stroke='%23000'/%3E%3C/svg%3E");
 }
-::-webkit-scrollbar-button:horizontal:start:decrement {
+/* Horizontal: the left box against the track, the right box after it. */
+::-webkit-scrollbar-button:horizontal:end:decrement {
   border-top-width: 1px;
-  border-right-width: 1px;
+  border-left-width: 1px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' shape-rendering='crispEdges'%3E%3Cpath d='M3.5 7 L8 2.5 V5 H10.5 V9 H8 V11.5 Z' fill='%23fff' stroke='%23000'/%3E%3C/svg%3E");
 }
 ::-webkit-scrollbar-button:horizontal:end:increment {
@@ -815,7 +837,7 @@
   border-left-width: 1px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' shape-rendering='crispEdges'%3E%3Cpath d='M10.5 7 L6 2.5 V5 H3.5 V9 H6 V11.5 Z' fill='%23fff' stroke='%23000'/%3E%3C/svg%3E");
 }
-::-webkit-scrollbar-button:start:decrement:active,
+::-webkit-scrollbar-button:end:decrement:active,
 ::-webkit-scrollbar-button:end:increment:active {
   background-color: #000;
 }
