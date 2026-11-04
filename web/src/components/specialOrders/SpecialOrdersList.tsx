@@ -222,7 +222,7 @@ const SHOW_ROW_PROGRESS_WASH = true;
 
 const NATURAL_SORT: ListSort = { key: "date", dir: "asc" };
 /** The band over orders outside the dates shown whose email is waiting. */
-const WAITING_BAND = "Waiting for Reply";
+const WAITING_BAND = "Past Orders Waiting For Reply";
 
 /** "SUN, AUG 16" — the band over each day's run, FileMaker's own heading. */
 function dayBand(date: string | null): string {
