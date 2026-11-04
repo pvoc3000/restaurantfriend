@@ -1411,8 +1411,14 @@ export async function SpecialOrderDetail({
                         correction goes in the general note. */}
                     {String(row.inquiry_note ?? "").trim() !== "" && (
                       <Row label="From the inquiry (prints nowhere)">
-                        <Cell table="special_orders" id={id} column="inquiry_note" multiline boxed
-                              value={row.inquiry_note as string | null} canWrite={false} ariaLabel="Inquiry note" />
+                        {/* A solid black frame with room inside (Mark,
+                            2026-11-04): the customer's words, set apart. */}
+                        <p
+                          aria-label="Inquiry note"
+                          className="whitespace-pre-wrap break-words border border-ink bg-white px-3 py-2 text-[14px] text-ink"
+                        >
+                          {row.inquiry_note as string}
+                        </p>
                       </Row>
                     )}
                     <Row label="On the quote">

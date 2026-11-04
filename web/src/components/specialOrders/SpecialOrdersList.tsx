@@ -1106,6 +1106,7 @@ export function SpecialOrdersList({
       // solid band in the calendar's own colour, so a day that is closed or
       // full is read before any order on it is.
       under: (r) => (pinnedIds.has(r.id) ? null : marksUnder(r.event_date)),
+      spaceBefore: (prev, next) => pinnedIds.has(prev.id) && !pinnedIds.has(next.id),
       // A DAY THE CALENDAR MARKS BUT NO ORDER IS ON still gets its band (Mark,
       // 2026-10-10) — a closed day with nothing booked is exactly the day
       // somebody is about to take an order for.
@@ -1137,6 +1138,7 @@ export function SpecialOrdersList({
        with. */
     {
       sortKey: "status",
+      spaceBefore: (prev, next) => pinnedIds.has(prev.id) && !pinnedIds.has(next.id),
       label: (r) =>
         pinnedIds.has(r.id)
           ? WAITING_BAND
@@ -1146,7 +1148,11 @@ export function SpecialOrdersList({
               : "—"
             : KIND_LABEL[r.kind],
     },
-    { sortKey: "kitchen", label: (r) => (pinnedIds.has(r.id) ? WAITING_BAND : r.kitchen_code ?? "No kitchen") },
+    {
+      sortKey: "kitchen",
+      spaceBefore: (prev, next) => pinnedIds.has(prev.id) && !pinnedIds.has(next.id),
+      label: (r) => (pinnedIds.has(r.id) ? WAITING_BAND : r.kitchen_code ?? "No kitchen"),
+    },
   ];
 
   return (

@@ -199,6 +199,13 @@ export type DataGroup<T> = {
    * to put there, in order. Only ever the filled band, never the `heading`.
    */
   gaps?: (prev: T | null, next: T | null) => { key: string; label: string; under?: ReactNode }[];
+  /**
+   * WHITE SPACE ABOVE A BAND, at a boundary the caller names — given the last
+   * row of one run and the first of the next. For a break heavier than the
+   * bands around it: the special orders list sets its pinned "Waiting for
+   * Reply" orders apart from the days below them (Mark, 2026-11-04).
+   */
+  spaceBefore?: (prev: T, next: T) => boolean;
 };
 
 /**
@@ -933,6 +940,11 @@ export function DataTable<T>({
 
               return (
                 <Fragment key={key}>
+                  {startsGroup && index > 0 && banding!.spaceBefore?.(sorted[index - 1], row) ? (
+                    <tr aria-hidden="true">
+                      <td colSpan={visibleColumns.length} className="h-8 border-0 p-0" />
+                    </tr>
+                  ) : null}
                   {gapsBefore.map(emptyBand)}
                   {/* BLACK, white text (Mark, 2026-08-02, with a screenshot of
                       the FileMaker employee list beside it). It was a grey
