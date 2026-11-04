@@ -130,6 +130,8 @@ export type SpecialOrderRow = {
   /** When the oldest email still waiting for a reply came in (214), or null —
    *  the Email column and the Status menu's Waiting for Reply. */
   waiting_since: string | null;
+  /** When the order was made — for an inquiry, when it came in. */
+  created_at: string;
 };
 
 const PATH = "/special-orders";
@@ -979,7 +981,18 @@ export function SpecialOrdersList({
               <span className="text-faint">—</span>
             )}
             {r.flag_reason ? (
-              <span className="block text-[12px] text-accent">{r.flag_reason}</span>
+              <span className="block text-[12px] text-accent">
+                {r.flag_reason}
+                {/* How long a new inquiry has waited, as the email line says it
+                    (Mark, 2026-11-04). The inquiry makes the order, so its
+                    age is the order's. */}
+                {r.flag_source === "system" && r.flag_reason === "New Inquiry" ? (
+                  <>
+                    {" · "}
+                    <span className="tabular-nums">{waitingFor(r.created_at, nowMs)}</span>
+                  </>
+                ) : null}
+              </span>
             ) : null}
           </span>
         );
