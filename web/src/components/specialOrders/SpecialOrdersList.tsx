@@ -1107,7 +1107,7 @@ export function SpecialOrdersList({
       // full is read before any order on it is.
       under: (r) => (pinnedIds.has(r.id) ? null : marksUnder(r.event_date)),
       spaceBefore: (prev, next) => pinnedIds.has(prev.id) && !pinnedIds.has(next.id),
-      bandFill: (r) => (pinnedIds.has(r.id) ? "bg-neutral-200 text-ink" : undefined),
+      bandFill: (r) => (pinnedIds.has(r.id) ? "bg-white text-ink" : undefined),
       // A DAY THE CALENDAR MARKS BUT NO ORDER IS ON still gets its band (Mark,
       // 2026-10-10) — a closed day with nothing booked is exactly the day
       // somebody is about to take an order for.
@@ -1140,7 +1140,7 @@ export function SpecialOrdersList({
     {
       sortKey: "status",
       spaceBefore: (prev, next) => pinnedIds.has(prev.id) && !pinnedIds.has(next.id),
-      bandFill: (r) => (pinnedIds.has(r.id) ? "bg-neutral-200 text-ink" : undefined),
+      bandFill: (r) => (pinnedIds.has(r.id) ? "bg-white text-ink" : undefined),
       label: (r) =>
         pinnedIds.has(r.id)
           ? WAITING_BAND
@@ -1153,7 +1153,7 @@ export function SpecialOrdersList({
     {
       sortKey: "kitchen",
       spaceBefore: (prev, next) => pinnedIds.has(prev.id) && !pinnedIds.has(next.id),
-      bandFill: (r) => (pinnedIds.has(r.id) ? "bg-neutral-200 text-ink" : undefined),
+      bandFill: (r) => (pinnedIds.has(r.id) ? "bg-white text-ink" : undefined),
       label: (r) => (pinnedIds.has(r.id) ? WAITING_BAND : r.kitchen_code ?? "No kitchen"),
     },
   ];
