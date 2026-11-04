@@ -209,8 +209,8 @@ export type DataGroup<T> = {
   /**
    * A FILL FOR ONE BAND in place of the black, given the run's first row —
    * for a run that is an alarm rather than a place in the order: the special
-   * orders list's "Waiting for Reply" band is dark grey (Mark, 2026-11-04, after
-   * trying red and yellow). The fill AND its ink, since white text does not read on a
+   * orders list's "Waiting for Reply" band is light grey (Mark, 2026-11-04, after
+   * trying red, yellow and dark grey). The fill AND its ink, since white text does not read on a
    * light fill. Return undefined for the usual black with white text.
    */
   bandFill?: (firstRow: T) => string | undefined;
