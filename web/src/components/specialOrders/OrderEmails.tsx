@@ -9,7 +9,7 @@ import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { FORM_FIELD_DRESS } from "@/components/ui/fieldMetrics";
 import { MenuButton } from "@/components/ui/MenuButton";
 import { TextInput } from "@/components/ui/TextInput";
-import { spaceBelow } from "@/lib/tableHead";
+import { spaceBelow, useViewportAtLeast } from "@/lib/tableHead";
 import { TabPicker } from "@/components/ui/TabPicker";
 import {
   answering,
@@ -147,45 +147,29 @@ export function OrderEmails({
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   /**
-   * THE LAYOUT FOLLOWS THE TAB'S OWN WIDTH, not the window's (Mark,
-   * 2026-11-05: "the three column layout is too small for some users. I need a
-   * solution that works for different screen sizes"). Three columns from
-   * 1024px left each pane ~400px on a laptop — too narrow to read a letter-size
-   * PDF (~600px), and cramped for the box and the thread. Measured off the
-   * section, so a window that is not full screen, or split, still gets the
-   * layout that fits it.
+   * TWO LAYOUTS, SWITCHING WHEN THE RECORD'S SIDE MENU APPEARS (Mark,
+   * 2026-11-05: "maybe the switch from one column to two columns should happen
+   * at the same time the side tabpicker appears"). That menu is `lg:` in
+   * SpecialOrderDetail, a 1024px window, so this asks the same question and
+   * the screen changes shape once, not twice.
    *
-   * TWO LAYOUTS, AND ONLY TWO (Mark, 2026-11-05: "we go through more layout
-   * varieties than we should … just 2 layouts"). The three-column layout is
-   * gone. And the breakpoint sits BELOW the dip the record's side menu makes:
-   * up to a 1023px window the tab is the whole width (991px there), and at
-   * 1024 the menu appears and takes it to 784. A breakpoint of 880 went two
-   * columns, back to one, then two again as a window widened; 760 is under
-   * the dip, so widening only ever goes one way.
+   * History, so nobody re-adds them: three columns from 1024px left each pane
+   * ~400px on a laptop, too narrow for a letter-size PDF ("too small for some
+   * users"); and switching on the TAB's measured width flipped one → two → one
+   * → two as a window widened, because the side menu takes ~200px at 1024
+   * ("we go through more layout varieties than we should").
    *
-   *   · TWO COLUMNS (≥ 760px): thread on the left, compose on the right. With
-   *     a document attached, the compose column switches between the Message
-   *     (the whole box) and the Attachment — it belongs to the email being
-   *     written, not to the thread (Mark, 2026-11-05: "conceptually, the
-   *     compose box and the attachment should be together"). It opens on the
-   *     Message, and the compose side is the wider column.
-   *     Not the body alone: under To, Cc and Subject the PDF had ~150px on a
-   *     laptop window and pushed Send below the fold.
+   *   · TWO COLUMNS (side menu showing): thread on the left, compose on the
+   *     right and wider. With a document attached, the compose column switches
+   *     between the Message (the whole box) and the Attachment — it belongs to
+   *     the email being written, not to the thread (Mark, 2026-11-05:
+   *     "conceptually, the compose box and the attachment should be
+   *     together"). It opens on the Message. Not the body alone: under To, Cc
+   *     and Subject the PDF had ~150px on a laptop window and pushed Send
+   *     below the fold.
    *   · ONE COLUMN: the box, with the same switch, then the thread.
-   *
-   * Zero until the first measurement, which is one column; the observer
-   * reports before the first paint, so that is never seen.
    */
-  const sectionRef = useRef<HTMLElement>(null);
-  const [width, setWidth] = useState(0);
-  useLayoutEffect(() => {
-    const el = sectionRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(() => setWidth(el.clientWidth));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-  const columns = width >= 760;
+  const columns = useViewportAtLeast(1024);
   /** Message and Attachment share the compose column: two columns or one. */
   const switching = composing && !!doc;
   /** The switch's choice belongs to ONE attachment: a new one opens on itself. */
@@ -763,7 +747,7 @@ export function OrderEmails({
     busy === "check" || busy === "attach" || sentNote || (waiting.length === 0 && replyButton);
 
   return (
-    <section ref={sectionRef} className="space-y-4">
+    <section className="space-y-4">
       {statusRow ? (
         <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted">
           {busy === "check" ? <span>Checking for email…</span> : null}
