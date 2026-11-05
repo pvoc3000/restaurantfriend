@@ -191,6 +191,7 @@ export function OrderEmails({
   const historyRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLObjectElement>(null);
+  const switchRef = useRef<HTMLDivElement>(null);
   /**
    * EVERY COLUMN ENDS AT THE FOOT OF THE WINDOW, measured honestly (Mark,
    * 2026-10-29: "the scroll view … grows but is always too small. It hasn't
@@ -225,6 +226,14 @@ export function OrderEmails({
       const top = (el: HTMLElement) => el.getBoundingClientRect().top + window.scrollY;
 
       const history = historyRef.current;
+      // UNDER THE SWITCH, THE THREAD STARTS WHERE THE BOX DOES (Mark,
+      // 2026-11-05), so the two panes' tops line up. Set before the height,
+      // which is measured from the thread's top.
+      const tabs = switchRef.current;
+      if (history) {
+        const drop = tabs && columns ? `${tabs.offsetHeight}px` : "";
+        if (history.style.marginTop !== drop) history.style.marginTop = drop;
+      }
       write(history, "maxHeight", history && hasHistory ? Math.max(320, foot - top(history)) : null);
 
       // A hidden body (the Attachment is showing) has no top to measure from.
@@ -256,7 +265,7 @@ export function OrderEmails({
       observer.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [hasHistory, composing, columns, doc, threeUp, pane]);
+  }, [hasHistory, composing, columns, doc, threeUp, pane, switching]);
   const newestId = thread[thread.length - 1]?.id;
   // A new message arrives at the top, so that is where the pane goes back to.
   useLayoutEffect(() => {
@@ -757,12 +766,11 @@ export function OrderEmails({
         className={`grid items-start gap-4 ${
           threeUp
             ? "grid-cols-3"
-            : switching && columns
-              ? // The box holds the PDF now, so it takes the wider column.
+            : composing && columns
+              ? // THE BOX IS THE WIDER COLUMN, whether Reply or Send… opened it
+                // (Mark, 2026-11-05: "I prefer the wider compose box").
                 "grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
-              : composing && columns
-                ? "grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
-                : ""
+              : ""
         }`}
       >
         {/* Thread · compose · preview, left to right. In one column the
@@ -782,15 +790,17 @@ export function OrderEmails({
         {canWrite && composing ? (
           <div className={columns ? "" : "order-first"}>
             {switching ? (
-              <TabPicker
-                ariaLabel="Show the message or the attachment"
-                options={[
-                  { key: "message", label: "Message" },
-                  { key: "attachment", label: "Attachment" },
-                ]}
-                value={pane}
-                onChange={(next) => doc && setPaneChoice({ url: doc.url, pane: next })}
-              />
+              <div ref={switchRef}>
+                <TabPicker
+                  ariaLabel="Show the message or the attachment"
+                  options={[
+                    { key: "message", label: "Message" },
+                    { key: "attachment", label: "Attachment" },
+                  ]}
+                  value={pane}
+                  onChange={(next) => doc && setPaneChoice({ url: doc.url, pane: next })}
+                />
+              </div>
             ) : null}
             {showAttachment ? preview : null}
             {/* The box stays MOUNTED behind the Attachment, so the caret, the
