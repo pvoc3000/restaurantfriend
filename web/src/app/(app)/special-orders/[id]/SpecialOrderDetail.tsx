@@ -1107,7 +1107,7 @@ export async function SpecialOrderDetail({
                         <>
                           <Cell table="special_orders" id={id} column="status" kind="pick"
                                 options={STATUS_OPTIONS} value={status} canWrite={canWrite}
-                                ariaLabel="Status" />
+                                nullable={false} ariaLabel="Status" />
                           {/* The catch-up: the dates have run ahead of the
                               status, and here is the one tap that squares
                               them. Absent when there is nothing to say. */}
@@ -1127,7 +1127,7 @@ export async function SpecialOrderDetail({
                            that reads stage dates, and this record has none. */
                         <Cell table="special_orders" id={id} column="status" kind="pick"
                               options={STANDING_STATUS_OPTIONS} value={status} canWrite={canWrite}
-                              ariaLabel="What its days start as" />
+                              nullable={false} ariaLabel="What its days start as" />
                       ) : (
                         /* A TEMPLATE STILL HAS NONE, and the database still
                            enforces it: 112 widened decision 3's biconditional
@@ -1699,6 +1699,10 @@ function Cell({
   options?: { value: string; label: string; hint?: string }[];
   allowNew?: boolean;
   clearable?: boolean;
+  /** False where the column may be null for some rows but not this one — the
+   *  status of an order or standing order (051/112's check constraint). Without
+   *  it the picker offers a None row the database refuses. */
+  nullable?: boolean;
   multiline?: boolean;
   /** A note's height in lines; 8 is twice the usual (`InlineValue`'s `rows`). */
   rows?: number;
