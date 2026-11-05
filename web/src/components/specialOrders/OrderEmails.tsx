@@ -157,10 +157,14 @@ export function OrderEmails({
    *
    *   · WIDE (≥ 1500px): thread · compose · preview, three columns.
    *   · TWO COLUMNS (≥ 880px): thread on the left, compose on the right. With
-   *     a document attached, the left pane SWITCHES between Conversation and
-   *     Attachment, opening on Attachment because you just attached it. The
-   *     box stays where it was, so attaching moves nothing you are typing in.
-   *   · ONE COLUMN: the box, then the same switch and its pane under it.
+   *     a document attached, the compose column switches between the Message
+   *     (the whole box) and the Attachment — it belongs to the email being
+   *     written, not to the thread (Mark, 2026-11-05: "conceptually, the
+   *     compose box and the attachment should be together"). It opens on
+   *     Attachment, because you just attached it, and takes the wider column.
+   *     Not the body alone: under To, Cc and Subject the PDF had ~150px on a
+   *     laptop window and pushed Send below the fold.
+   *   · ONE COLUMN: the box, with the same switch, then the thread.
    *
    * Zero until the first measurement, which is one column; the observer
    * reports before the first paint, so that is never seen.
@@ -176,11 +180,12 @@ export function OrderEmails({
   }, []);
   const columns = width >= 880;
   const threeUp = composing && !!doc && width >= 1500;
-  /** Conversation and Attachment share one pane: two columns or one. */
+  /** Message and Attachment share the compose column: two columns or one. */
   const switching = composing && !!doc && !threeUp;
   /** The switch's choice belongs to ONE attachment: a new one opens on itself. */
   const [paneChoice, setPaneChoice] = useState<{ url: string; pane: EmailPane } | null>(null);
   const pane: EmailPane = doc && paneChoice?.url === doc.url ? paneChoice.pane : "attachment";
+  const showAttachment = switching && pane === "attachment";
 
   const gridRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
@@ -222,7 +227,8 @@ export function OrderEmails({
       const history = historyRef.current;
       write(history, "maxHeight", history && hasHistory ? Math.max(320, foot - top(history)) : null);
 
-      const message = bodyRef.current;
+      // A hidden body (the Attachment is showing) has no top to measure from.
+      const message = bodyRef.current?.offsetParent ? bodyRef.current : null;
       const box = boxRef.current;
       write(
         message,
@@ -749,46 +755,52 @@ export function OrderEmails({
       <div
         ref={gridRef}
         className={`grid items-start gap-4 ${
-          threeUp ? "grid-cols-3" : composing && columns ? "grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : ""
+          threeUp
+            ? "grid-cols-3"
+            : switching && columns
+              ? // The box holds the PDF now, so it takes the wider column.
+                "grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+              : composing && columns
+                ? "grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
+                : ""
         }`}
       >
-        {/* Thread (or the switch) · compose · preview, left to right. In one
-            column the compose box comes first. */}
-        <div className="min-w-0">
-          {switching ? (
-            <TabPicker
-              ariaLabel="Show the conversation or the attachment"
-              options={[
-                { key: "conversation", label: "Conversation" },
-                { key: "attachment", label: "Attachment" },
-              ]}
-              value={pane}
-              onChange={(next) => doc && setPaneChoice({ url: doc.url, pane: next })}
-            />
-          ) : null}
-          {/* KEYED, both: they are the same element type in the same place, so
-              React would otherwise reuse one node for both — and the history's
-              measured max-height would stay on the PDF's frame and clip it. */}
-          {switching && pane === "attachment" ? (
-            <div key="attachment">{preview}</div>
+        {/* Thread · compose · preview, left to right. In one column the
+            compose box comes first. */}
+        <div ref={historyRef} className="overflow-y-auto overflow-x-hidden border border-ink">
+          {thread.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-muted">No email about this order has come in or gone out.</p>
           ) : (
-            <div key="conversation" ref={historyRef} className="overflow-y-auto overflow-x-hidden border border-ink">
-              {thread.length === 0 ? (
-                <p className="px-3 py-3 text-sm text-muted">No email about this order has come in or gone out.</p>
-              ) : (
-                <ol className="space-y-4 bg-neutral-100 p-4">
-                  {[...thread].reverse().map((m) => (
-                    <Message key={m.id} message={m} when={when(m.sent_at)} onOpenFile={openFile} />
-                  ))}
-                </ol>
-              )}
-            </div>
+            <ol className="space-y-4 bg-neutral-100 p-4">
+              {[...thread].reverse().map((m) => (
+                <Message key={m.id} message={m} when={when(m.sent_at)} onOpenFile={openFile} />
+              ))}
+            </ol>
           )}
         </div>
 
         {canWrite && composing ? (
-          <div className={`space-y-4 ${columns ? "" : "order-first"}`}>
-            <div ref={boxRef} className="space-y-2 border-2 border-ink bg-white p-3 shadow-[4px_4px_0_0_#000]">
+          <div className={columns ? "" : "order-first"}>
+            {switching ? (
+              <TabPicker
+                ariaLabel="Show the message or the attachment"
+                options={[
+                  { key: "message", label: "Message" },
+                  { key: "attachment", label: "Attachment" },
+                ]}
+                value={pane}
+                onChange={(next) => doc && setPaneChoice({ url: doc.url, pane: next })}
+              />
+            ) : null}
+            {showAttachment ? preview : null}
+            {/* The box stays MOUNTED behind the Attachment, so the caret, the
+                scroll and every field are where you left them. */}
+            <div
+              ref={boxRef}
+              className={`space-y-2 border-2 border-ink bg-white p-3 shadow-[4px_4px_0_0_#000] ${
+                showAttachment ? "hidden" : ""
+              }`}
+            >
               <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
                 <label className="contents">
                   <span className="text-xs uppercase tracking-[0.12em] text-subtle">To</span>
@@ -888,7 +900,7 @@ export function OrderEmails({
   );
 }
 
-type EmailPane = "conversation" | "attachment";
+type EmailPane = "message" | "attachment";
 
 /** One attached file, with its ✕. */
 function FileChip({ name, onRemove, disabled }: { name: string; onRemove: () => void; disabled: boolean }) {
