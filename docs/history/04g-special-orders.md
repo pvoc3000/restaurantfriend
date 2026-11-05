@@ -6453,3 +6453,26 @@ the date filter hid the order. Of the options offered, Mark chose "option 1":
 Not done, still a gap: a NEW email (no thread, no SO number) from a past
 customer matches only orders dated from three days ago on (`matchOrder` step
 3), so it stays in Gmail. An unmatched-mail list was option 5.
+
+## 2026-11-05 — Standing order days can start at Quote (migration 223, APPLIED)
+
+Mark: "I need a status option to precede Invoice for standing orders when they
+are instantiated. When the order is created, it hasn't been invoiced yet." He
+chose the existing **Quote** rung rather than a new status, "but also make sure
+that even though the status is Quote they are also included in the 'not
+invoiced' balance."
+
+- `STANDING_STATUS_OPTIONS` offers Quote · Invoice · Order. New standing orders
+  still default to Invoice (`createSpecialOrder`). The materializer copies the
+  status, and sending the invoice moves lead/quote → invoice (141/143/145).
+- **A standing-order day at Quote is OWED**, unlike any other quote: its terms
+  were agreed when the standing order was set up. The test is
+  `status in ('invoice','order') or (status = 'quote' and standing_order_id is
+  not null)`, in `countsAsOwed` and in 223's `customer_balances` and
+  `customer_uninvoiced_orders`; the two must agree. The customer record and the
+  Start widget now select `standing_order_id` so the app half can apply it.
+- Separately, both Status pickers pass `nullable={false}`: `InlineValue`
+  defaults to nullable, so they offered a None row that 051/112's
+  `special_orders_status_iff_order` refused.
+- 223 was dry-run on the hosted DB first (live functions confirmed as 218's and
+  144's), then applied in one transaction by CLI.
