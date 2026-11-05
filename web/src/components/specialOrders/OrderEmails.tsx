@@ -160,8 +160,8 @@ export function OrderEmails({
    *     a document attached, the compose column switches between the Message
    *     (the whole box) and the Attachment — it belongs to the email being
    *     written, not to the thread (Mark, 2026-11-05: "conceptually, the
-   *     compose box and the attachment should be together"). It opens on
-   *     Attachment, because you just attached it, and takes the wider column.
+   *     compose box and the attachment should be together"). It opens on the
+   *     Message, and the compose side is the wider column.
    *     Not the body alone: under To, Cc and Subject the PDF had ~150px on a
    *     laptop window and pushed Send below the fold.
    *   · ONE COLUMN: the box, with the same switch, then the thread.
@@ -184,7 +184,9 @@ export function OrderEmails({
   const switching = composing && !!doc && !threeUp;
   /** The switch's choice belongs to ONE attachment: a new one opens on itself. */
   const [paneChoice, setPaneChoice] = useState<{ url: string; pane: EmailPane } | null>(null);
-  const pane: EmailPane = doc && paneChoice?.url === doc.url ? paneChoice.pane : "attachment";
+  // Opens on the MESSAGE (Mark, 2026-11-05: "make the compose box the default
+  // view, not the attachment view").
+  const pane: EmailPane = doc && paneChoice?.url === doc.url ? paneChoice.pane : "message";
   const showAttachment = switching && pane === "attachment";
 
   const gridRef = useRef<HTMLDivElement>(null);
@@ -192,6 +194,7 @@ export function OrderEmails({
   const boxRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLObjectElement>(null);
   const switchRef = useRef<HTMLDivElement>(null);
+  const bandRef = useRef<HTMLDivElement>(null);
   /**
    * EVERY COLUMN ENDS AT THE FOOT OF THE WINDOW, measured honestly (Mark,
    * 2026-10-29: "the scroll view … grows but is always too small. It hasn't
@@ -222,16 +225,37 @@ export function OrderEmails({
       if (Math.abs(parseFloat(el.style[prop] || "0") - whole) > 1) el.style[prop] = `${whole}px`;
     };
     const measure = () => {
+      // THE SWITCH SITS IN THE WAITING BAND (Mark, 2026-11-05: "move the email
+      // thread view and the compose box up, so the tabpicker is partially
+      // inside the area with the 'waiting for reply' text"). The grid rises
+      // until the tabs' bottom meets the band's, so the box hangs from the band.
+      // The tabs are at the left of the compose column and the band's buttons
+      // at its right, so they never meet. Done first: everything below is
+      // measured from where the grid ends up.
+      const band = bandRef.current;
+      const tabs = switchRef.current;
+      const lifted = band && tabs && columns;
+      const current = parseFloat(grid.style.marginTop || "0");
+      const lift = lifted
+        ? Math.round(current - (tabs.getBoundingClientRect().bottom - band.getBoundingClientRect().bottom))
+        : 0;
+      const wanted = lift ? `${lift}px` : "";
+      // The lifted grid and the compose column are transparent boxes lying
+      // over the band, and would take No Reply Needed's clicks: the grid and
+      // the column wear pointer-events-none, and each real pane -auto.
+      if (grid.style.marginTop !== wanted) grid.style.marginTop = wanted;
       const foot = window.innerHeight - spaceBelow(grid);
       const top = (el: HTMLElement) => el.getBoundingClientRect().top + window.scrollY;
 
       const history = historyRef.current;
-      // UNDER THE SWITCH, THE THREAD STARTS WHERE THE BOX DOES (Mark,
-      // 2026-11-05), so the two panes' tops line up. Set before the height,
-      // which is measured from the thread's top.
-      const tabs = switchRef.current;
+      // UNDER THE SWITCH THE THREAD DROPS BY THE SWITCH'S HEIGHT, so its top
+      // lines up with the box (Mark, 2026-11-05). Lifted into the band, it
+      // drops by the band's usual gap too: the space between the band and the
+      // thread is the same whether the box is open or not (Mark, same day).
+      // Set before the height, which is measured from the thread's top.
       if (history) {
-        const drop = tabs && columns ? `${tabs.offsetHeight}px` : "";
+        const gap = lifted ? parseFloat(getComputedStyle(band).marginBottom) || 0 : 0;
+        const drop = tabs && columns ? `${tabs.offsetHeight + gap}px` : "";
         if (history.style.marginTop !== drop) history.style.marginTop = drop;
       }
       write(history, "maxHeight", history && hasHistory ? Math.max(320, foot - top(history)) : null);
@@ -265,7 +289,7 @@ export function OrderEmails({
       observer.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [hasHistory, composing, columns, doc, threeUp, pane, switching]);
+  }, [hasHistory, composing, columns, doc, threeUp, pane, switching, waiting.length]);
   const newestId = thread[thread.length - 1]?.id;
   // A new message arrives at the top, so that is where the pane goes back to.
   useLayoutEffect(() => {
@@ -746,7 +770,10 @@ export function OrderEmails({
       ) : null}
 
       {waiting.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-mark-fill px-3 py-2 text-[14px] text-ink">
+        <div
+          ref={bandRef}
+          className="flex flex-wrap items-center justify-between gap-3 bg-mark-fill px-3 py-2 text-[14px] text-ink"
+        >
           <span>
             <strong>Waiting for a reply</strong> · {waitingFor(waiting[0].sent_at, nowMs)}
           </span>
@@ -763,7 +790,7 @@ export function OrderEmails({
 
       <div
         ref={gridRef}
-        className={`grid items-start gap-4 ${
+        className={`pointer-events-none grid items-start gap-4 ${
           threeUp
             ? "grid-cols-3"
             : composing && columns
@@ -775,7 +802,7 @@ export function OrderEmails({
       >
         {/* Thread · compose · preview, left to right. In one column the
             compose box comes first. */}
-        <div ref={historyRef} className="overflow-y-auto overflow-x-hidden border border-ink">
+        <div ref={historyRef} className="pointer-events-auto overflow-y-auto overflow-x-hidden border border-ink">
           {thread.length === 0 ? (
             <p className="px-3 py-3 text-sm text-muted">No email about this order has come in or gone out.</p>
           ) : (
@@ -790,7 +817,9 @@ export function OrderEmails({
         {canWrite && composing ? (
           <div className={columns ? "" : "order-first"}>
             {switching ? (
-              <div ref={switchRef}>
+              // ONLY AS WIDE AS THE TABS: lifted into the band, a full-width strip
+              // would lie over No Reply Needed and take its clicks.
+              <div ref={switchRef} className="pointer-events-auto w-fit">
                 <TabPicker
                   ariaLabel="Show the message or the attachment"
                   options={[
@@ -802,12 +831,12 @@ export function OrderEmails({
                 />
               </div>
             ) : null}
-            {showAttachment ? preview : null}
+            {showAttachment ? <div className="pointer-events-auto">{preview}</div> : null}
             {/* The box stays MOUNTED behind the Attachment, so the caret, the
                 scroll and every field are where you left them. */}
             <div
               ref={boxRef}
-              className={`space-y-2 border-2 border-ink bg-white p-3 shadow-[4px_4px_0_0_#000] ${
+              className={`pointer-events-auto space-y-2 border-2 border-ink bg-white p-3 shadow-[4px_4px_0_0_#000] ${
                 showAttachment ? "hidden" : ""
               }`}
             >
@@ -899,7 +928,7 @@ export function OrderEmails({
           </div>
         ) : null}
 
-        {canWrite && composing && threeUp ? preview : null}
+        {canWrite && composing && threeUp ? <div className="pointer-events-auto">{preview}</div> : null}
       </div>
 
       {error && !composing ? <p className="text-[13px] text-accent">{error}</p> : null}
