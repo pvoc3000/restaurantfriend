@@ -2,7 +2,7 @@
 
 import { AlertMark } from "@/components/ui/AlertMark";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 /**
  * The app's one-of-N chooser (Mark, 2026-08-01: the order guide's filter tabs
@@ -13,8 +13,9 @@ import type { ReactNode } from "react";
  *
  * **SINCE 2026-09-12 THEY ARE CLASSIC MAC TABS** (Mark): the selected tab is
  * WHITE, full height and open at the bottom (no bottom border), the rest
- * 8px shorter and bottom-aligned — BLACK with grey type and a white edge since
- * 2026-09-28 (Mark), grey (#c0c0c0) with black type before that. What follows about a black selected cell is
+ * 8px shorter and bottom-aligned — GREY (#c0c0c0) with black type, ROUNDED at
+ * the top and 4px apart since 2026-11-05 (Mark); black with grey type and a
+ * white edge from 2026-09-28 to then, grey before. What follows about a black selected cell is
  * history; the rule that there is no per-caller colour still holds.
  *
  * This RETIRES the underline-marker tab dialect (border-b-2 on the active
@@ -123,58 +124,62 @@ export function TabPicker<K extends string>({
         // and with nowrap a flex cell can't shrink below its own label, so the
         // shares come out as-equal-as-the-words-allow instead.
         //
-        // Each tab is its OWN box now, the neighbours overlapping by one pixel
-        // (`-ml-px`) so a shared edge is one rule, not two. The selected tab
-        // sits above its neighbours (`z-10`) so its full-height border is the
-        // one you see. Hover is the Mac look's 2px edge, drawn inset so
-        // nothing grows — never a fill, since grey already means unselected.
+        // Each tab is its OWN box, with ROUNDED TOP CORNERS and a 4px gap to
+        // its neighbour (Mark, 2026-11-05: "more of a classic mac look …
+        // rounded corners … spaced a little further apart"). The gap carries
+        // the row's rule (the spacer below), so the tabs still stand on one
+        // line. The selected tab sits above (`z-10`). Hover is the Mac look's
+        // inset edge, so nothing grows — never a fill, since grey already
+        // means unselected.
         //
-        // AN UNSELECTED TAB IS BLACK WITH GREY TYPE (#c0c0c0, 12.6:1) AND A WHITE EDGE since
-        // 2026-09-28 (Mark), and its hover edge is white to match. Its BOTTOM
-        // edge stays black: that is the stretch of the rule under the row
-        // that the tabs carry, and a white one would break it at every tab.
-        const cls = `relative inline-flex ${on ? `${tall} z-10 border-ink border-b-0 bg-white text-ink` : `${short} border-white border-b-ink bg-ink text-[#c0c0c0] hover:shadow-[inset_0_0_0_1px_#fff]`} items-center gap-2 whitespace-nowrap border ${cell} font-semibold uppercase tracking-[0.06em] no-underline ${
+        // AN UNSELECTED TAB IS GREY WITH BLACK TYPE (#c0c0c0, the Mac look's
+        // grey) — again, since 2026-11-05 (Mark: "the inactive tabs being
+        // grey instead of black fill"). It was this until 2026-09-28, then
+        // black with grey type and a white edge until now.
+        const cls = `relative inline-flex rounded-t-[6px] ${on ? `${tall} z-10 border-ink border-b-0 bg-white text-ink` : `${short} border-ink bg-[#c0c0c0] text-ink hover:shadow-[inset_0_0_0_1px_#000]`} items-center gap-2 whitespace-nowrap border ${cell} font-semibold uppercase tracking-[0.06em] no-underline ${
           // Equal shares, centred — a stretched bar whose cells were sized by
           // their labels would put "Never ordered" three times the width of
           // "2+ years" and read as a mistake.
           stretch ? "flex-1 justify-center" : ""
-        } ${i > 0 ? "-ml-px" : ""}`;
+        }`;
         const count =
           o.count !== undefined ? (
-            // Dimmed on the white selected tab only: on an unselected tab's black the
-            // grey type is already the quiet one (Mark, 2026-09-28).
-            <span className={`font-normal tabular-nums ${on ? "opacity-55" : ""}`}>{o.count}</span>
+            // Dimmed on every tab, now that every tab has black type.
+            <span className="font-normal tabular-nums opacity-55">{o.count}</span>
           ) : null;
 
-        return o.href ? (
-          <Link
-            key={o.key}
-            href={o.href}
-            title={o.title}
-            aria-current={on ? "page" : undefined}
-            className={cls}
-          >
-            {o.label}
-            {count}
-            {o.alert ? <AlertMark label={o.alert} /> : null}
-          </Link>
-        ) : (
-          <button
-            key={o.key}
-            type="button"
-            title={o.title}
-            aria-pressed={on}
-            onClick={() => onChange?.(o.key)}
-            className={cls}
-          >
-            {o.label}
-            {count}
-            {o.alert ? <AlertMark label={o.alert} /> : null}
-          </button>
+        // THE GAP BETWEEN TABS carries the row's rule, so the line under the
+        // row is unbroken except beneath the selected tab.
+        const gap = i > 0 ? <span aria-hidden className="w-1 shrink-0 self-end border-b border-ink" /> : null;
+
+        return (
+          <Fragment key={o.key}>
+            {gap}
+            {o.href ? (
+              <Link href={o.href} title={o.title} aria-current={on ? "page" : undefined} className={cls}>
+                {o.label}
+                {count}
+                {o.alert ? <AlertMark label={o.alert} /> : null}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                title={o.title}
+                aria-pressed={on}
+                onClick={() => onChange?.(o.key)}
+                className={cls}
+              >
+                {o.label}
+                {count}
+                {o.alert ? <AlertMark label={o.alert} /> : null}
+              </button>
+            )}
+          </Fragment>
         );
       })}
-      {/* THE RULE: the lead-in above starts it, the grey tabs' own bottom borders carry it under the tabs,
-          the selected tab leaves the gap, and this runs it on to the edge. A
+      {/* THE RULE: the lead-in above starts it, the grey tabs' own bottom
+          borders and the gaps between them carry it under the tabs, the
+          selected tab leaves the gap, and this runs it on to the edge. A
           stretched bar has no leftover width, so it needs none. */}
       {stretch ? null : <span aria-hidden className="min-w-0 flex-1 border-b border-ink" />}
     </span>
