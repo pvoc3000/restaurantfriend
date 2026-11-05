@@ -31,10 +31,10 @@ import { TabPicker } from "@/components/ui/TabPicker";
  * a bordered box beside a bordered table beside a bordered filter row was three
  * boxes deep before anybody had read a word.
  *
- * Weight carries the state and colour supports it: bold black for where you
- * are, `text-muted` (neutral-600 — the darkest of the three greys, not a
- * disabled grey) for everywhere else. That is the same pairing `AppNav` uses,
- * minus the yellow it needs to survive a black band.
+ * Weight, a ▶ and an inset carry the state and colour supports it: bold black
+ * for where you are, `text-subtle` (neutral-500, the middle of the three greys,
+ * still not a disabled grey) for everywhere else — one step lighter than the
+ * `text-muted` it was until Mark asked for "slightly lighter" (2026-11-05).
  */
 export type SectionNavItem<K extends string = string> = {
   key: K;
@@ -132,10 +132,23 @@ export function SectionNav<K extends string>({
         const className = `inline-flex items-center gap-2 whitespace-nowrap ${
           size === "lg" ? "py-2.5 text-[12px]" : "py-1 text-[12px]"
         } uppercase tracking-[0.06em] no-underline transition-colors ${
-          on ? "font-bold text-ink" : "font-semibold text-muted hover:text-ink"
+          on ? "font-bold text-ink" : "font-semibold text-subtle hover:text-ink"
         }`;
         const body = (
           <>
+            {/* THE CURRENT SECTION GETS A ▸ (Mark, 2026-11-05: "how can we make
+                the active tab stand out more"), the mark a classic Mac menu
+                puts beside the chosen item. It stands on the SAME LEFT EDGE as
+                the other labels, and the current label steps in to make room
+                for it (Mark: "aligned with the other tab options, making the
+                selected tab text inset a little"). */}
+            {on ? (
+              // ▶ with U+FE0E, so Apple platforms draw the glyph, not an emoji
+              // (the ♥/★ rule); ▸ rendered as little more than a dot.
+              <span aria-hidden className="-mr-0.5 text-[9px] font-normal">
+                {"\u25B6\uFE0E"}
+              </span>
+            ) : null}
             {item.label}
             {item.count !== undefined && (
               <span className="font-normal tabular-nums opacity-55">{item.count}</span>
