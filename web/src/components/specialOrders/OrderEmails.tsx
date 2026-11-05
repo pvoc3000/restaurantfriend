@@ -9,7 +9,8 @@ import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { FORM_FIELD_DRESS } from "@/components/ui/fieldMetrics";
 import { MenuButton } from "@/components/ui/MenuButton";
 import { TextInput } from "@/components/ui/TextInput";
-import { spaceBelow, useViewportAtLeast } from "@/lib/tableHead";
+import { spaceBelow } from "@/lib/tableHead";
+import { TabPicker } from "@/components/ui/TabPicker";
 import {
   answering,
   CHECK_ORDER_MAIL_EVENT,
@@ -145,14 +146,41 @@ export function OrderEmails({
 
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const sideBySide = useViewportAtLeast(1024);
   /**
-   * THREE COLUMNS WHILE A DOCUMENT IS ATTACHED (Mark, 2026-11-04: "putting it
-   * to the right of the compose box, splitting the horizontal space equally
-   * between the email thread, the compose box, and the pdf preview"). Below
-   * the breakpoint the preview stays under the box, as before.
+   * THE LAYOUT FOLLOWS THE TAB'S OWN WIDTH, not the window's (Mark,
+   * 2026-11-05: "the three column layout is too small for some users. I need a
+   * solution that works for different screen sizes"). Three columns from
+   * 1024px left each pane ~400px on a laptop — too narrow to read a letter-size
+   * PDF (~600px), and cramped for the box and the thread. Measured off the
+   * section, so a window that is not full screen, or split, still gets the
+   * layout that fits it. No pane is ever narrower than ~500px:
+   *
+   *   · WIDE (≥ 1500px): thread · compose · preview, three columns.
+   *   · TWO COLUMNS (≥ 880px): thread on the left, compose on the right. With
+   *     a document attached, the left pane SWITCHES between Conversation and
+   *     Attachment, opening on Attachment because you just attached it. The
+   *     box stays where it was, so attaching moves nothing you are typing in.
+   *   · ONE COLUMN: the box, then the same switch and its pane under it.
+   *
+   * Zero until the first measurement, which is one column; the observer
+   * reports before the first paint, so that is never seen.
    */
-  const threeUp = composing && !!doc && sideBySide;
+  const sectionRef = useRef<HTMLElement>(null);
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setWidth(el.clientWidth));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const columns = width >= 880;
+  const threeUp = composing && !!doc && width >= 1500;
+  /** Conversation and Attachment share one pane: two columns or one. */
+  const switching = composing && !!doc && !threeUp;
+  /** The switch's choice belongs to ONE attachment: a new one opens on itself. */
+  const [paneChoice, setPaneChoice] = useState<{ url: string; pane: EmailPane } | null>(null);
+  const pane: EmailPane = doc && paneChoice?.url === doc.url ? paneChoice.pane : "attachment";
 
   const gridRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
@@ -199,7 +227,7 @@ export function OrderEmails({
       write(
         message,
         "maxHeight",
-        message && box && composing && sideBySide && (!doc || threeUp)
+        message && box && composing && columns
           ? Math.max(160, foot - top(message) - (box.getBoundingClientRect().bottom - message.getBoundingClientRect().bottom))
           : null
       );
@@ -209,8 +237,8 @@ export function OrderEmails({
       write(
         preview,
         "height",
-        preview && frame && threeUp
-          ? Math.max(480, foot - top(preview) - (frame.getBoundingClientRect().bottom - preview.getBoundingClientRect().bottom))
+        preview && frame && columns
+          ? Math.max(320, foot - top(preview) - (frame.getBoundingClientRect().bottom - preview.getBoundingClientRect().bottom))
           : null
       );
     };
@@ -222,7 +250,7 @@ export function OrderEmails({
       observer.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [hasHistory, composing, sideBySide, doc, threeUp]);
+  }, [hasHistory, composing, columns, doc, threeUp, pane]);
   const newestId = thread[thread.length - 1]?.id;
   // A new message arrives at the top, so that is where the pane goes back to.
   useLayoutEffect(() => {
@@ -657,8 +685,8 @@ export function OrderEmails({
     { label: "Other…", onSelect: () => fileRef.current?.click(), disabled: working },
   ];
 
-  /** THE DOCUMENT AS IT WILL GO — beside the box on a wide window, under it
-   *  on a narrow one, and only while there is a document. */
+  /** THE DOCUMENT AS IT WILL GO — its own column on a wide tab, the switch's
+   *  Attachment pane otherwise, and only while there is a document. */
   const preview = doc ? (
     <div className="border border-ink">
       <div className="flex items-center gap-3 border-b border-ink px-3 py-2 text-[13px]">
@@ -672,7 +700,7 @@ export function OrderEmails({
         data={doc.url}
         type="application/pdf"
         aria-label={`Preview of ${doc.filename}`}
-        className={`block w-full ${threeUp ? "" : "h-[80vh]"}`}
+        className={`block w-full ${columns ? "" : "h-[80vh]"}`}
       >
         <div className="flex h-40 items-center justify-center p-4 text-center text-xs text-subtle">
           This browser can’t show the PDF here — open it in a new tab.
@@ -689,7 +717,7 @@ export function OrderEmails({
     busy === "check" || busy === "attach" || sentNote || (waiting.length === 0 && replyButton);
 
   return (
-    <section className="space-y-4">
+    <section ref={sectionRef} className="space-y-4">
       {statusRow ? (
         <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted">
           {busy === "check" ? <span>Checking for email…</span> : null}
@@ -721,25 +749,45 @@ export function OrderEmails({
       <div
         ref={gridRef}
         className={`grid items-start gap-4 ${
-          threeUp ? "lg:grid-cols-3" : composing ? "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : ""
+          threeUp ? "grid-cols-3" : composing && columns ? "grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : ""
         }`}
       >
-        {/* Thread · compose · preview, left to right. On a narrow window the
-            compose box comes first and the preview sits under it. */}
-        <div ref={historyRef} className="overflow-y-auto overflow-x-hidden border border-ink">
-          {thread.length === 0 ? (
-            <p className="px-3 py-3 text-sm text-muted">No email about this order has come in or gone out.</p>
+        {/* Thread (or the switch) · compose · preview, left to right. In one
+            column the compose box comes first. */}
+        <div className="min-w-0">
+          {switching ? (
+            <TabPicker
+              ariaLabel="Show the conversation or the attachment"
+              options={[
+                { key: "conversation", label: "Conversation" },
+                { key: "attachment", label: "Attachment" },
+              ]}
+              value={pane}
+              onChange={(next) => doc && setPaneChoice({ url: doc.url, pane: next })}
+            />
+          ) : null}
+          {/* KEYED, both: they are the same element type in the same place, so
+              React would otherwise reuse one node for both — and the history's
+              measured max-height would stay on the PDF's frame and clip it. */}
+          {switching && pane === "attachment" ? (
+            <div key="attachment">{preview}</div>
           ) : (
-            <ol className="space-y-4 bg-neutral-100 p-4">
-              {[...thread].reverse().map((m) => (
-                <Message key={m.id} message={m} when={when(m.sent_at)} onOpenFile={openFile} />
-              ))}
-            </ol>
+            <div key="conversation" ref={historyRef} className="overflow-y-auto overflow-x-hidden border border-ink">
+              {thread.length === 0 ? (
+                <p className="px-3 py-3 text-sm text-muted">No email about this order has come in or gone out.</p>
+              ) : (
+                <ol className="space-y-4 bg-neutral-100 p-4">
+                  {[...thread].reverse().map((m) => (
+                    <Message key={m.id} message={m} when={when(m.sent_at)} onOpenFile={openFile} />
+                  ))}
+                </ol>
+              )}
+            </div>
           )}
         </div>
 
         {canWrite && composing ? (
-          <div className="order-first space-y-4 lg:order-none">
+          <div className={`space-y-4 ${columns ? "" : "order-first"}`}>
             <div ref={boxRef} className="space-y-2 border-2 border-ink bg-white p-3 shadow-[4px_4px_0_0_#000]">
               <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
                 <label className="contents">
@@ -826,8 +874,6 @@ export function OrderEmails({
               </div>
               {error ? <p className="text-[13px] text-accent">{error}</p> : null}
             </div>
-
-            {threeUp ? null : preview}
           </div>
         ) : null}
 
@@ -841,6 +887,8 @@ export function OrderEmails({
     </section>
   );
 }
+
+type EmailPane = "conversation" | "attachment";
 
 /** One attached file, with its ✕. */
 function FileChip({ name, onRemove, disabled }: { name: string; onRemove: () => void; disabled: boolean }) {
