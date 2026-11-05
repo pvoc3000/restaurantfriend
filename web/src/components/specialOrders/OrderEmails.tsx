@@ -153,10 +153,17 @@ export function OrderEmails({
    * 1024px left each pane ~400px on a laptop — too narrow to read a letter-size
    * PDF (~600px), and cramped for the box and the thread. Measured off the
    * section, so a window that is not full screen, or split, still gets the
-   * layout that fits it. No pane is ever narrower than ~500px:
+   * layout that fits it.
    *
-   *   · WIDE (≥ 1500px): thread · compose · preview, three columns.
-   *   · TWO COLUMNS (≥ 880px): thread on the left, compose on the right. With
+   * TWO LAYOUTS, AND ONLY TWO (Mark, 2026-11-05: "we go through more layout
+   * varieties than we should … just 2 layouts"). The three-column layout is
+   * gone. And the breakpoint sits BELOW the dip the record's side menu makes:
+   * up to a 1023px window the tab is the whole width (991px there), and at
+   * 1024 the menu appears and takes it to 784. A breakpoint of 880 went two
+   * columns, back to one, then two again as a window widened; 760 is under
+   * the dip, so widening only ever goes one way.
+   *
+   *   · TWO COLUMNS (≥ 760px): thread on the left, compose on the right. With
    *     a document attached, the compose column switches between the Message
    *     (the whole box) and the Attachment — it belongs to the email being
    *     written, not to the thread (Mark, 2026-11-05: "conceptually, the
@@ -178,10 +185,9 @@ export function OrderEmails({
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const columns = width >= 880;
-  const threeUp = composing && !!doc && width >= 1500;
+  const columns = width >= 760;
   /** Message and Attachment share the compose column: two columns or one. */
-  const switching = composing && !!doc && !threeUp;
+  const switching = composing && !!doc;
   /** The switch's choice belongs to ONE attachment: a new one opens on itself. */
   const [paneChoice, setPaneChoice] = useState<{ url: string; pane: EmailPane } | null>(null);
   // Opens on the MESSAGE (Mark, 2026-11-05: "make the compose box the default
@@ -290,7 +296,7 @@ export function OrderEmails({
       observer.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [hasHistory, composing, columns, doc, threeUp, pane, switching, waiting.length]);
+  }, [hasHistory, composing, columns, doc, pane, switching, waiting.length]);
   const newestId = thread[thread.length - 1]?.id;
   // A new message arrives at the top, so that is where the pane goes back to.
   useLayoutEffect(() => {
@@ -725,8 +731,8 @@ export function OrderEmails({
     { label: "Other…", onSelect: () => fileRef.current?.click(), disabled: working },
   ];
 
-  /** THE DOCUMENT AS IT WILL GO — its own column on a wide tab, the switch's
-   *  Attachment pane otherwise, and only while there is a document. */
+  /** THE DOCUMENT AS IT WILL GO — the switch's Attachment pane, and only while
+   *  there is a document. */
   const preview = doc ? (
     <div className="border border-ink">
       <div className="flex items-center gap-3 border-b border-ink px-3 py-2 text-[13px]">
@@ -792,17 +798,14 @@ export function OrderEmails({
       <div
         ref={gridRef}
         className={`pointer-events-none grid items-start gap-4 ${
-          threeUp
-            ? "grid-cols-3"
-            : composing && columns
-              ? // THE BOX IS THE WIDER COLUMN, whether Reply or Send… opened it
-                // (Mark, 2026-11-05: "I prefer the wider compose box").
-                "grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
-              : ""
+          composing && columns
+            ? // THE BOX IS THE WIDER COLUMN, whether Reply or Send… opened it
+              // (Mark, 2026-11-05: "I prefer the wider compose box").
+              "grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+            : ""
         }`}
       >
-        {/* Thread · compose · preview, left to right. In one column the
-            compose box comes first. */}
+        {/* Thread, then compose. In one column the compose box comes first. */}
         <div ref={historyRef} className="pointer-events-auto overflow-y-auto overflow-x-hidden border border-ink">
           {thread.length === 0 ? (
             <p className="px-3 py-3 text-sm text-muted">No email about this order has come in or gone out.</p>
@@ -929,7 +932,6 @@ export function OrderEmails({
           </div>
         ) : null}
 
-        {canWrite && composing && threeUp ? <div className="pointer-events-auto">{preview}</div> : null}
       </div>
 
       {error && !composing ? <p className="text-[13px] text-accent">{error}</p> : null}
