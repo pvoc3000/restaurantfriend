@@ -236,8 +236,12 @@ export function OrderEmails({
       const tabs = switchRef.current;
       const lifted = band && tabs && columns;
       const current = parseFloat(grid.style.marginTop || "0");
+      // The band's usual gap stays under it: the box and the thread both start
+      // that far below the band, as they do with the box closed (Mark,
+      // 2026-11-05), so the tabs reach up into the band from there.
+      const gap = lifted ? parseFloat(getComputedStyle(band).marginBottom) || 0 : 0;
       const lift = lifted
-        ? Math.round(current - (tabs.getBoundingClientRect().bottom - band.getBoundingClientRect().bottom))
+        ? Math.round(current - (tabs.getBoundingClientRect().bottom - band.getBoundingClientRect().bottom - gap))
         : 0;
       const wanted = lift ? `${lift}px` : "";
       // The lifted grid and the compose column are transparent boxes lying
@@ -249,13 +253,10 @@ export function OrderEmails({
 
       const history = historyRef.current;
       // UNDER THE SWITCH THE THREAD DROPS BY THE SWITCH'S HEIGHT, so its top
-      // lines up with the box (Mark, 2026-11-05). Lifted into the band, it
-      // drops by the band's usual gap too: the space between the band and the
-      // thread is the same whether the box is open or not (Mark, same day).
-      // Set before the height, which is measured from the thread's top.
+      // lines up with the box (Mark, 2026-11-05). Set before the height, which
+      // is measured from the thread's top.
       if (history) {
-        const gap = lifted ? parseFloat(getComputedStyle(band).marginBottom) || 0 : 0;
-        const drop = tabs && columns ? `${tabs.offsetHeight + gap}px` : "";
+        const drop = tabs && columns ? `${tabs.offsetHeight}px` : "";
         if (history.style.marginTop !== drop) history.style.marginTop = drop;
       }
       write(history, "maxHeight", history && hasHistory ? Math.max(320, foot - top(history)) : null);
