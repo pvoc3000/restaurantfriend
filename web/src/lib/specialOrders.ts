@@ -274,20 +274,32 @@ export const KIND_CHIP_LABEL: Partial<Record<SpecialOrderKind, string>> = {
 /**
  * WHAT A STANDING ORDER'S DAYS START AS (migration 112, 2026-09-20).
  *
- * Two rungs, not five. A standing order is a PROTOTYPE, and its status is the
- * one its days inherit — so the only answers that mean anything are the two a
- * materialized day can sensibly arrive at: **Invoice**, for an account that
- * pays before the donuts are made (Cafe Knotted), and **Order**, for one billed
- * in arrears whose days should reach the kitchen without waiting.
+ * Three rungs, not five. A standing order is a PROTOTYPE, and its status is
+ * the one its days inherit — so the only answers that mean anything are the
+ * ones a materialized day can sensibly arrive at: **Quote**, for a day made
+ * before anybody has invoiced it (Mark, 2026-11-05: "When the order is
+ * created, it hasn't been invoiced yet") — sending the invoice moves it to
+ * Invoice; **Invoice**, for an account that pays before the donuts are made
+ * (Cafe Knotted); and **Order**, for one billed in arrears whose days should
+ * reach the kitchen without waiting.
  *
- * `lead` and `quote` would describe a conversation this arrangement finished
- * long ago. `cancelled` would be a standing order configured to manufacture
- * cancelled days, which is what `paused` is for and says better. The database
- * does not forbid those three here — the widened constraint only says a
- * standing order HAS a status — so this list is the guard, which is why the
- * record's picker reads it rather than `STATUS_OPTIONS`.
+ * A standing-order day at Quote is OWED, unlike any other quote — the
+ * arrangement was agreed when the standing order was set up, so it is not a
+ * price offered (`countsAsOwed`, migration 223).
+ *
+ * `lead` would describe a conversation this arrangement finished long ago.
+ * `cancelled` would be a standing order configured to manufacture cancelled
+ * days, which is what `paused` is for and says better. The database does not
+ * forbid those here — the widened constraint only says a standing order HAS a
+ * status — so this list is the guard, which is why the record's picker reads it
+ * rather than `STATUS_OPTIONS`.
  */
 export const STANDING_STATUS_OPTIONS: PickOption[] = [
+  {
+    value: "quote",
+    label: STATUS_LABEL.quote,
+    hint: "days arrive not yet invoiced — sending the invoice moves them on",
+  },
   {
     value: "invoice",
     label: STATUS_LABEL.invoice,
@@ -575,15 +587,23 @@ export function isSettled(order: MoneyOrder, totals: OrderTotals): boolean {
  * shape, never a bill. `ignore_balance` is decision 13's weekly-statement
  * escape hatch. The two customer screens both ask this, so they cannot
  * disagree about one customer's money again.
+ *
+ * ONE QUOTE IS OWED: a day a standing order made (Mark, 2026-11-05). Its
+ * terms were agreed when the standing order was set up, so Quote there only
+ * means "not invoiced yet". Migration 223 states the same test in SQL
+ * (`customer_balances`, `customer_uninvoiced_orders`); the two must agree.
  */
 export function countsAsOwed(order: {
   kind: string;
   status: string | null;
+  standing_order_id?: string | null;
   ignore_balance?: boolean | null;
 }): boolean {
   return (
     order.kind === "order" &&
-    (order.status === "invoice" || order.status === "order") &&
+    (order.status === "invoice" ||
+      order.status === "order" ||
+      (order.status === "quote" && Boolean(order.standing_order_id))) &&
     !order.ignore_balance
   );
 }
@@ -767,6 +787,8 @@ export type AttentionOrder = MoneyOrder & {
    *  a caller that has not been taught to select it gets the behaviour that
    *  was there before 116, which is the safe half — a flag that stays put. */
   flag_source?: string | null;
+  /** A standing order's day at Quote is owed (`countsAsOwed`, 223). */
+  standing_order_id?: string | null;
 };
 
 /**

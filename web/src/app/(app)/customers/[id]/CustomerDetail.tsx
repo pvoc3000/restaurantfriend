@@ -86,7 +86,7 @@ export async function CustomerDetail({
     supabase
       .from("special_orders")
       .select(
-        `id, number, kind, status, title, event_date, ignore_balance,
+        `id, number, kind, status, title, event_date, ignore_balance, standing_order_id,
          tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate`
       )
       .eq("customer_id", id)
@@ -140,6 +140,7 @@ export async function CustomerDetail({
     title: o.title as string | null,
     event_date: o.event_date as string | null,
     ignore_balance: Boolean(o.ignore_balance),
+    standing_order_id: o.standing_order_id as string | null,
     totals: orderTotals(o as never, lines.get(o.id as string) ?? [], payments.get(o.id as string) ?? [], readSettings(session.orgSettings).rush),
   }));
 

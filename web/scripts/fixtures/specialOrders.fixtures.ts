@@ -761,6 +761,16 @@ test("countsAsOwed: only a BILLED order is money owed, never a lead or a quote",
   no(countsAsOwed(o("order", "order", true)));
 });
 
+test("countsAsOwed: a standing order's day at Quote IS owed (223)", () => {
+  const day = (status: string, ignore_balance = false) =>
+    ({ kind: "order", status, standing_order_id: "s1", ignore_balance });
+  ok(countsAsOwed(day("quote")), "agreed when the standing order was set up");
+  no(countsAsOwed(day("lead")));
+  no(countsAsOwed(day("cancelled")));
+  no(countsAsOwed(day("quote", true)));
+  no(countsAsOwed({ kind: "standing_order", status: "quote", standing_order_id: null }), "the prototype is never a bill");
+});
+
 test("the kind filter tells a standing order from the days it makes", () => {
   const day = { kind: "order", standing_order_id: "s1" };
   const oneOff = { kind: "order", standing_order_id: null };
