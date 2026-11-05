@@ -66,6 +66,8 @@ export function TabPicker<K extends string>({
   onChange,
   size = "md",
   stretch = false,
+  placement = "top",
+  heavy = false,
   ariaLabel,
   className = "",
 }: {
@@ -74,6 +76,22 @@ export function TabPicker<K extends string>({
   /** Omit only when every option carries an href. */
   onChange?: (key: K) => void;
   size?: "md" | "sm";
+  /**
+   * Which side of its panel the tabs hang from. "bottom" turns the control
+   * upside down — rounded at the bottom, the rule along the TOP, the selected
+   * tab open upward into the panel above (Mark, 2026-11-05, for the email
+   * compose box: tabs "on the bottom … instead of the top"). Everything else,
+   * the colours and the sizes, is the same control.
+   */
+  placement?: "top" | "bottom";
+  /**
+   * Tabs that belong to a WINDOW wear its frame: a 2px rule and a hard shadow,
+   * like the email compose box they hang from (Mark, 2026-11-05: "the tab
+   * border doesn't match the box border. and should they cast a shadow like the
+   * box?") — at half the box's offset, 2px. The gap between tabs doubles to 8px
+   * so a tab's shadow doesn't fill it.
+   */
+  heavy?: boolean;
   /**
    * Fill the container's width, dividing it evenly between the cells, instead
    * of sizing to the labels. For a bar that has to line up with the controls
@@ -96,6 +114,18 @@ export function TabPicker<K extends string>({
   // inactive tabs"), and the selected tab has NO BOTTOM BORDER — it opens onto
   // whatever sits below it, the way a Mac tab joins its panel.
   const short = size === "sm" ? "h-6" : "h-7";
+  const below = placement === "bottom";
+  /** The row's rule: under the tabs, or over them when they hang below. */
+  const rule = `${below ? (heavy ? "border-t-2" : "border-t") : heavy ? "border-b-2" : "border-b"} border-ink`;
+  const edge = heavy ? "border-2" : "border";
+  // HALF the window's 4px offset (Mark, 2026-11-05: "can the drop shadow for
+  // the tabs have less of an offset than the box? 1/2 of whatever the box
+  // offset is") — not physics, but it keeps the tabs from looking as heavy as
+  // the window they hang from.
+  const drop = heavy ? "shadow-[2px_2px_0_0_#000]" : "";
+  const hoverEdge = heavy
+    ? "hover:shadow-[2px_2px_0_0_#000,inset_0_0_0_1px_#000]"
+    : "hover:shadow-[inset_0_0_0_1px_#000]";
 
   return (
     <span
@@ -107,7 +137,7 @@ export function TabPicker<K extends string>({
       // In a flex row `flex-1` takes only the leftover space, so nothing beside
       // it is pushed onto another line; in a block parent a `flex` box already
       // fills the width. An `ml-auto` sibling still wins the space first.
-      className={`flex ${tall} ${stretch ? "w-full" : "min-w-0 flex-1"} items-end ${className}`}
+      className={`flex ${tall} ${stretch ? "w-full" : "min-w-0 flex-1"} ${below ? "items-start" : "items-end"} ${className}`}
     >
       {/* THE LEAD-IN (Mark, 2026-10-16): a short stretch of the rule BEFORE
           the first tab, so the row reads as tabs standing on a line rather
@@ -115,7 +145,7 @@ export function TabPicker<K extends string>({
           says where the line comes from, and anything longer pushes the first
           tab away from the left edge every filter row shares. Left off a
           stretched bar for the same reason the trailing rule is. */}
-      {stretch ? null : <span aria-hidden className="w-3 shrink-0 border-b border-ink" />}
+      {stretch ? null : <span aria-hidden className={`w-3 shrink-0 ${rule}`} />}
       {options.map((o, i) => {
         const on = o.key === value;
         // whitespace-nowrap: a cell label is a name, never a paragraph. It
@@ -136,7 +166,7 @@ export function TabPicker<K extends string>({
         // grey) — again, since 2026-11-05 (Mark: "the inactive tabs being
         // grey instead of black fill"). It was this until 2026-09-28, then
         // black with grey type and a white edge until now.
-        const cls = `relative inline-flex rounded-t-[6px] ${on ? `${tall} z-10 border-ink border-b-0 bg-white text-ink` : `${short} border-ink bg-[#c0c0c0] text-ink hover:shadow-[inset_0_0_0_1px_#000]`} items-center gap-2 whitespace-nowrap border ${cell} font-semibold uppercase tracking-[0.06em] no-underline ${
+        const cls = `relative inline-flex ${below ? "rounded-b-[6px]" : "rounded-t-[6px]"} ${on ? `${tall} z-10 border-ink ${below ? "border-t-0" : "border-b-0"} bg-white text-ink ${drop}` : `${short} border-ink bg-[#c0c0c0] text-ink ${drop} ${hoverEdge}`} items-center gap-2 whitespace-nowrap ${edge} ${cell} font-semibold uppercase tracking-[0.06em] no-underline ${
           // Equal shares, centred — a stretched bar whose cells were sized by
           // their labels would put "Never ordered" three times the width of
           // "2+ years" and read as a mistake.
@@ -150,7 +180,7 @@ export function TabPicker<K extends string>({
 
         // THE GAP BETWEEN TABS carries the row's rule, so the line under the
         // row is unbroken except beneath the selected tab.
-        const gap = i > 0 ? <span aria-hidden className="w-1 shrink-0 self-end border-b border-ink" /> : null;
+        const gap = i > 0 ? <span aria-hidden className={`${heavy ? "w-2" : "w-1"} shrink-0 ${below ? "self-start" : "self-end"} ${rule}`} /> : null;
 
         return (
           <Fragment key={o.key}>
@@ -181,7 +211,7 @@ export function TabPicker<K extends string>({
           borders and the gaps between them carry it under the tabs, the
           selected tab leaves the gap, and this runs it on to the edge. A
           stretched bar has no leftover width, so it needs none. */}
-      {stretch ? null : <span aria-hidden className="min-w-0 flex-1 border-b border-ink" />}
+      {stretch ? null : <span aria-hidden className={`min-w-0 flex-1 ${rule}`} />}
     </span>
   );
 }
