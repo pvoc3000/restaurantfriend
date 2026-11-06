@@ -85,11 +85,11 @@ export function TabPicker<K extends string>({
    */
   placement?: "top" | "bottom";
   /**
-   * Tabs that belong to a WINDOW wear its frame: a 2px rule and a hard shadow,
-   * like the email compose box they hang from (Mark, 2026-11-05: "the tab
-   * border doesn't match the box border. and should they cast a shadow like the
-   * box?") — at half the box's offset, 2px. The gap between tabs doubles to 8px
-   * so a tab's shadow doesn't fill it.
+   * Tabs that belong to a WINDOW wear its 2px frame, like the email compose box
+   * they hang from (Mark, 2026-11-05: "the tab border doesn't match the box
+   * border"). NO shadow: they carried one at half the box's offset for a day,
+   * and Mark took it off ("remove the drop shadow on the bottom tabs … Keep the
+   * 2px borders though").
    */
   heavy?: boolean;
   /**
@@ -118,14 +118,7 @@ export function TabPicker<K extends string>({
   /** The row's rule: under the tabs, or over them when they hang below. */
   const rule = `${below ? (heavy ? "border-t-2" : "border-t") : heavy ? "border-b-2" : "border-b"} border-ink`;
   const edge = heavy ? "border-2" : "border";
-  // HALF the window's 4px offset (Mark, 2026-11-05: "can the drop shadow for
-  // the tabs have less of an offset than the box? 1/2 of whatever the box
-  // offset is") — not physics, but it keeps the tabs from looking as heavy as
-  // the window they hang from.
-  const drop = heavy ? "shadow-[2px_2px_0_0_#000]" : "";
-  const hoverEdge = heavy
-    ? "hover:shadow-[2px_2px_0_0_#000,inset_0_0_0_1px_#000]"
-    : "hover:shadow-[inset_0_0_0_1px_#000]";
+  const hoverEdge = "hover:shadow-[inset_0_0_0_1px_#000]";
 
   return (
     <span
@@ -166,7 +159,7 @@ export function TabPicker<K extends string>({
         // grey) — again, since 2026-11-05 (Mark: "the inactive tabs being
         // grey instead of black fill"). It was this until 2026-09-28, then
         // black with grey type and a white edge until now.
-        const cls = `relative inline-flex ${below ? "rounded-b-[6px]" : "rounded-t-[6px]"} ${on ? `${tall} z-10 border-ink ${below ? "border-t-0" : "border-b-0"} bg-white text-ink ${drop}` : `${short} border-ink bg-[#c0c0c0] text-ink ${drop} ${hoverEdge}`} items-center gap-2 whitespace-nowrap ${edge} ${cell} font-semibold uppercase tracking-[0.06em] no-underline ${
+        const cls = `relative inline-flex ${below ? "rounded-b-[6px]" : "rounded-t-[6px]"} ${on ? `${tall} z-10 border-ink ${below ? "border-t-0" : "border-b-0"} bg-white text-ink` : `${short} border-ink bg-[#c0c0c0] text-ink ${hoverEdge}`} items-center gap-2 whitespace-nowrap ${edge} ${cell} font-semibold uppercase tracking-[0.06em] no-underline ${
           // Equal shares, centred — a stretched bar whose cells were sized by
           // their labels would put "Never ordered" three times the width of
           // "2+ years" and read as a mistake.
@@ -180,7 +173,7 @@ export function TabPicker<K extends string>({
 
         // THE GAP BETWEEN TABS carries the row's rule, so the line under the
         // row is unbroken except beneath the selected tab.
-        const gap = i > 0 ? <span aria-hidden className={`${heavy ? "w-2" : "w-1"} shrink-0 ${below ? "self-start" : "self-end"} ${rule}`} /> : null;
+        const gap = i > 0 ? <span aria-hidden className={`w-1 shrink-0 ${below ? "self-start" : "self-end"} ${rule}`} /> : null;
 
         return (
           <Fragment key={o.key}>
