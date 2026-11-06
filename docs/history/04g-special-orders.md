@@ -6476,3 +6476,40 @@ invoiced' balance."
   `special_orders_status_iff_order` refused.
 - 223 was dry-run on the hosted DB first (live functions confirmed as 218's and
   144's), then applied in one transaction by CLI.
+
+## 2026-11-05 — The first person to change an order takes it (migration 224, APPLIED)
+
+Mark: "the 'taken by' field is pretty much not getting used when it should be.
+Can we automatically assign it to the first person to interact with the order?
+Not the first person to view it, but the first person to modify it in some
+way. Unless the field is already assigned to someone."
+
+Measured first (orders since 2026-09-01): 27 of 28 web inquiries and 24 of 51
+other orders had no taker. Standing order days copy their template's taker, and
+an order made in the app has named its maker since 2026-09-21.
+
+- **Triggers, not app code**, so every route counts. `special_orders` claims
+  BEFORE UPDATE, so 054's log records "Taken by set to …" with the edit. Items,
+  attachments, messages, payment applications, invoice lines, credit memos and
+  memo lines claim their order AFTER a write. The child trigger is told which
+  column names the order.
+- **Not a claim:**
+  - Viewing, including note read receipts. The events log isn't watched.
+  - `auth.uid()` null: `order-mail`, the morning run, `qbo-webhook`, the
+    inquiry form.
+  - A row this transaction made or already changed (`xmin =
+    pg_current_xact_id()::xid`). The standing-order top-up runs as whoever has
+    the Orders list open.
+  - Templates and standing orders (`kind <> 'order'`).
+  - Already taken, by the employee link or by FileMaker's text `taken_by`.
+- `order_taker_for_me(org)` is a definer, because `employees` is owner/admin
+  only and a supervisor's edit must still claim. Execute is revoked from
+  anon/authenticated.
+- **Known edge:** scheduling or printing production for an untouched order is a
+  write, so it claims. Accepted, since inquiries get answered long before
+  production.
+- Dry-run on the hosted DB first (six checks: order edit claims, item edit
+  claims, an untouched control stays empty, the same-transaction guard holds,
+  an already-taken order is unchanged, history is logged). Then applied in one
+  transaction by CLI. Verified live: 8 triggers, 3 functions, none executable
+  by anon.
