@@ -424,7 +424,18 @@ there).
 Fees` (740), then `sync-square-sales` v28 (verify_jwt on) and `sales-nightly`
 v11 (`--no-verify-jwt`) were deployed. Probed: the sync answers its
 `locations` mode, and the nightly refuses a caller without its secret (401).
-**Not yet**: October re-posted. **The order was**: map *Third-party app fees* to `Merchant
+**Re-posted 2026-11-07** (Mark: "Re-sync and post"): the 74 posted shop-days
+10-01 → 11-06 were backed up, re-synced from Square, and planned against the
+old breakdowns. All 74 old stored hashes matched the old build (so the re-sync
+changed nothing else), 54 entries differed ONLY by the courier amount moving
+from Square Fees to Third Party Fees, 20 days had no courier charge and were
+skipped, and all 70 deposits were unchanged and not sent. DF01-2026-10-04 went
+first and read back as $91.32 + $84.89 = the old $176.21; the other 53
+followed, every one `updated`, no warnings, no `post_error`. Read back from
+QuickBooks: 74 entries, all balanced; Third Party Fees October DF01 $832.20,
+DF02 $578.27, November 1–6 DF01 $79.43, DF02 $46.91; Square Fees + Third Party
+Fees for October equals the measured fee totals (DF01 $3,411.72, DF02
+$1,887.16). **The order was**: map *Third-party app fees* to `Merchant
 Services:Third Party Fees` on the grid FIRST (or every day with a courier
 charge refuses), then deploy both functions. **Catch-up**: Sync from Square
 10-01 → today and Post — every posted day's entry changes (its hash moves) and
