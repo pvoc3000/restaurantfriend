@@ -25,6 +25,10 @@
  *     = Σ tenders + discounts
  *
  * with fees inside the card tender (card net of fee + fee = card gross).
+ *
+ * The courier charge on a Square Online delivery (DoorDash Drive) is one of
+ * those fees, and since 2026-11-06 it posts to its own role rather than to
+ * Square's: see `app_fee` below.
  */
 
 import { DOC_NUMBER_MAX, type QboRefValue } from "./quickbooks.ts";
@@ -41,7 +45,13 @@ export type BreakdownKind =
   | "tip"
   | "gift_card_sale"
   | "tender"
-  | "fee";
+  | "fee"
+  /** The PART of the day's fee lines that is a third-party app's charge —
+   *  the DoorDash Drive courier fee on a Square Online delivery (the Fees
+   *  cube's APP_FEE, the payout's THIRD_PARTY_FEE). It is inside the fee
+   *  lines, not beside them, so a breakdown pulled before 2026-11-06 simply
+   *  has none and posts every fee to Square's role, as it always did. */
+  | "app_fee";
 
 export type BreakdownLine = {
   kind: BreakdownKind;
@@ -88,6 +98,7 @@ export type SalesRole =
   | "cash"
   | "other_tender"
   | "fees"
+  | "third_party_fees"
   | "bank";
 
 /** QuickBooks' own `Classification` words — income accounts are `Revenue`
@@ -116,6 +127,7 @@ export const SALES_ROLES: {
   { key: "cash", label: "Cash takings", hint: "cash payments net of cash refunds (debit)", classification: "Asset" },
   { key: "other_tender", label: "Unmapped tenders", hint: "where a tender with no mapping posts — Uber Eats, DoorDash, Afterpay (debit)", classification: "Asset" },
   { key: "fees", label: "Square fees", hint: "processing fees, posted daily (debit)", classification: "Expense" },
+  { key: "third_party_fees", label: "Third-party app fees", hint: "what an app charges through Square — the courier fee on Square Online deliveries (debit)", classification: "Expense" },
   { key: "bank", label: "Bank account for payouts", hint: "where a Square payout lands — the Deposit is made into this account (105)", classification: "Asset" },
 ];
 
@@ -357,7 +369,9 @@ function money(cents: number): string {
  *     SQUARE_GIFT_CARD, which have fixed homes;
  *   · a category or service charge in net return is a DEBIT of the magnitude,
  *     never a negative credit;
- *   · CARD's debit is net of its fee; every fee debits the fees role;
+ *   · CARD's debit is net of its fee; every fee debits the fees role,
+ *     except the part a third-party app charged (`app_fee`), which debits
+ *     the third-party fees role;
  *   · a role with no account, needed by a non-zero line → refused BY NAME;
  *   · debits ≠ credits → refused naming both sides — no plug, ever;
  *   · nothing to post → refused;
@@ -425,6 +439,7 @@ export function buildJournalEntry(input: BuildInput): JournalBuild {
   let discountCents = 0;
   let tipCents = 0;
   let feesCents = 0;
+  let appFeeCents = 0;
   let sawCard = false;
 
   for (const l of breakdown.lines) {
@@ -484,6 +499,9 @@ export function buildJournalEntry(input: BuildInput): JournalBuild {
       case "fee":
         feesCents += l.cents;
         break;
+      case "app_fee":
+        appFeeCents += l.cents;
+        break;
     }
   }
   // Every fee, one line — and a day with fees and no card payment at all
@@ -492,7 +510,14 @@ export function buildJournalEntry(input: BuildInput): JournalBuild {
   if (!sawCard && feesTotal !== 0) {
     push("Debit", -feesTotal, need("card"), "Square fees taken from the payout", { kind: "tender", key: "CARD" });
   }
-  push("Debit", feesCents, feesCents ? need("fees") : null, "Square fees", { kind: "fee", key: "fees" });
+  // The courier charge comes OUT of the fees, never on top of them: the card
+  // line above is already net of it (it is inside the fee lines), so moving
+  // it to its own account changes which expense it lands in and nothing else.
+  // Shogo booked it to Third Party Fees; from 2026-10-01 to 11-06 this posted
+  // it inside Square fees. A day pulled before then has no `app_fee` line.
+  const squareFeesCents = feesCents - appFeeCents;
+  push("Debit", squareFeesCents, squareFeesCents ? need("fees") : null, "Square fees", { kind: "fee", key: "fees" });
+  push("Debit", appFeeCents, appFeeCents ? need("third_party_fees") : null, "Third-party app fees", { kind: "app_fee", key: "third_party_fees" });
 
   for (const role of missingRoles) {
     refusals.push(`No account is set for “${SALES_ROLE_LABEL[role]}” — Settings → Integrations → Square Sales Mapping.`);
@@ -641,8 +666,8 @@ function signed(posting: "Debit" | "Credit", cents: number): number {
 /**
  * Per account, what we would post against what Shogo posted for the same
  * shop-day. Keyed by ACCOUNT NAME, since that is what both sides carry and
- * what a reader recognises; a name Shogo used that we did not (Refunds,
- * Third Party Fees) shows up as ours = 0.
+ * what a reader recognises; a name Shogo used that we did not (Refunds)
+ * shows up as ours = 0.
  */
 export function diffAgainstShogo(
   ours: readonly JournalLine[],

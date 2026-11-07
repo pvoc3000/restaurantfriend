@@ -274,7 +274,10 @@ What a payout carries, measured on the real account (2026-09-17):
 
 A payout's **entries** (`/v2/payouts/{id}/payout-entries`, paged by cursor at
 100) are per charge: `CHARGE` (gross, fee, net), `REFUND`, `THIRD_PARTY_FEE`
-(the DoorDash Drive courier charge — the breakdown's `APP_FEE`) and
+(the DoorDash Drive courier charge — the Fees cube's `APP_FEE`, and inside
+`PaymentMethods.fee_amount`; the breakdown carries it as its `app_fee` line,
+`fee_amount − processing_fee_amount − tax_on_fee_amount`, measured to the cent
+for October 2026) and
 `GIFT_CARD_LOAD_FEE` (63¢ per gift card loaded, whatever tender bought it).
 The sync does not store them; the function's owner-only `get` mode reads them
 when a payout needs explaining.

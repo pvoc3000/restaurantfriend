@@ -330,6 +330,98 @@ test("fees on a day with no card payment at all come off a card line that flips 
   eq(b.debits, b.credits);
 });
 
+// --- the courier charge: third-party app fees (2026-11-06) ------------------
+//
+// The real DF01 2026-10-04, as stored, plus the `app_fee` line the sync now
+// pulls beside it: $84.89 of DoorDash Drive courier charges, the Fees cube's
+// APP_FEE and the payout's THIRD_PARTY_FEE for that day, to the cent. The
+// entry posted that day (QuickBooks #DF01-2026-10-04) read "Square fees
+// $176.21" and "Card takings, net of fees $2,685.71" — the courier charge was
+// inside the first, which is the misfiling this split corrects.
+
+function realOct4(appFeeCents: number | null): SalesBreakdown {
+  const lines: SalesBreakdown["lines"] = [
+    { key: "discounts", kind: "discount", name: "Discounts and comps", cents: 9235 },
+    { key: "sales_tax", kind: "tax", name: "Sales tax", cents: 18715 },
+    { key: "tips", kind: "tip", name: "Tips", cents: 27172 },
+    { key: "Ice Cream", kind: "category", name: "Ice Cream", cents: 20550 },
+    { key: "Uncategorized", kind: "category", name: "Uncategorized", cents: 1950 },
+    { key: "Signatures", kind: "category", name: "Signatures", cents: 277385 },
+    { key: "Coffee & Tea", kind: "category", name: "Coffee & Tea", cents: 14340 },
+    { key: "Beverages", kind: "category", name: "Beverages", cents: 5595 },
+    { key: "Courier Tip", kind: "service_charge", name: "Courier Tip", cents: 2218 },
+    { key: "Service Charge", kind: "service_charge", name: "Service Charge", cents: 1200 },
+    { key: "Delivery", kind: "service_charge", name: "Delivery", cents: 6271 },
+    { key: "CARD", kind: "tender", name: "CARD", cents: 286192 },
+    { key: "CARD", kind: "fee", name: "CARD fees", cents: 15811 },
+    { key: "CASH", kind: "tender", name: "CASH", cents: 10360 },
+    { key: "OTHER:DOORDASH", kind: "tender", name: "DOORDASH", cents: 44889 },
+    { key: "OTHER:UBEREATS", kind: "tender", name: "UBEREATS", cents: 18265 },
+    { key: "SQUARE_GIFT_CARD", kind: "tender", name: "SQUARE_GIFT_CARD", cents: 6455 },
+    // A delivery paid by gift card: its courier charge rides this fee line.
+    { key: "SQUARE_GIFT_CARD", kind: "fee", name: "SQUARE_GIFT_CARD fees", cents: 1810 },
+  ];
+  if (appFeeCents !== null) lines.push({ kind: "app_fee", key: "APP_FEE", name: "Third-party app fees", cents: appFeeCents });
+  return {
+    v: 1,
+    pulled_at: "2026-10-29T18:33:46.076Z",
+    lines,
+    totals: { top_line_cents: 329509, net_sales_cents: 320274, total_collected_cents: 366161, itemized_returns_cents: 0, refunds_by_amount_cents: 0 },
+  };
+}
+const OCT4_MAPS: SalesMapping[] = [
+  ...ROLES,
+  role("third_party_fees", "TP", "Merchant Services:Third Party Fees"),
+  cat("Signatures", "SIG", "Signatures"),
+  cat("Ice Cream", "ICE", "Ice Cream"),
+  cat("Coffee & Tea", "COF", "Coffee & Tea"),
+  cat("Beverages", "BEV", "Beverages"),
+  tender("OTHER:UBEREATS", "UE", "Undeposited Square Funds"),
+  tender("OTHER:DOORDASH", "DD", "Undeposited Square Funds"),
+];
+const oct4 = (appFeeCents: number | null, mappings = OCT4_MAPS) =>
+  buildJournalEntry(input({ breakdown: realOct4(appFeeCents), mappings, businessDate: "2026-10-04", netSalesCents: 320274, tipsCents: 27172 }));
+
+test("the courier charge posts to Third Party Fees, out of Square fees — the card line does not move", () => {
+  const b = oct4(8489);
+  if (!b.ok) throw new Error(b.refusals.join(" | "));
+  const card = b.lines.find((l) => l.source.kind === "tender" && l.source.key === "CARD")!;
+  const sq = b.lines.find((l) => l.source.kind === "fee")!;
+  const tp = b.lines.find((l) => l.source.kind === "app_fee")!;
+  eq([card.posting, card.cents, card.account.ref], ["Debit", 268571, "C"], "card net of EVERY fee, as posted: $2,685.71");
+  eq([sq.posting, sq.cents, sq.account.ref, sq.description], ["Debit", 17621 - 8489, "F", "Square fees"]);
+  eq([tp.posting, tp.cents, tp.account.ref, tp.description], ["Debit", 8489, "TP", "Third-party app fees"]);
+  eq(sq.cents + tp.cents, 17621, "together they are exactly the old Square fees line");
+  eq(b.debits, b.credits);
+});
+
+test("a breakdown pulled before the split (no app_fee line) posts exactly what it always did", () => {
+  const b = oct4(null);
+  if (!b.ok) throw new Error(b.refusals.join(" | "));
+  eq(b.lines.filter((l) => l.source.kind === "app_fee").length, 0);
+  eq(b.lines.find((l) => l.source.kind === "fee")!.cents, 17621);
+  // …and so does it without the new role mapped: the role is only needed by a courier charge.
+  ok(oct4(null, OCT4_MAPS.filter((m) => m.square_key !== "third_party_fees")).ok, "an old day builds with the role unmapped");
+});
+
+test("a courier charge with the third-party role unmapped is refused BY NAME, never folded into Square fees", () => {
+  const b = oct4(8489, OCT4_MAPS.filter((m) => m.square_key !== "third_party_fees"));
+  if (b.ok) throw new Error("expected a refusal");
+  ok(b.refusals.some((r) => r.includes("Third-party app fees")), b.refusals.join(" | "));
+});
+
+test("splitting the courier charge out changes the entry's hash, so a posted day is offered as an update", () => {
+  const before = oct4(null);
+  const after = oct4(8489);
+  if (!before.ok || !after.ok) throw new Error("expected builds");
+  no(before.hash === after.hash);
+});
+
+test("Third-party app fees is a role on the grid, an expense", () => {
+  const r = SALES_ROLES.find((x) => x.key === "third_party_fees");
+  eq([r?.label, r?.classification], ["Third-party app fees", "Expense"]);
+});
+
 // --- create versus update -----------------------------------------------------
 
 test("a day already in QuickBooks builds an UPDATE with Id, SyncToken and sparse:false", () => {

@@ -362,7 +362,8 @@ type BreakdownKind =
   | "tip"
   | "gift_card_sale"
   | "tender"
-  | "fee";
+  | "fee"
+  | "app_fee";
 
 type BreakdownLine = { kind: BreakdownKind; key: string; name: string; cents: number };
 
@@ -587,7 +588,10 @@ async function loadBreakdown(
   const payRows: Record<string, unknown>[] = [];
   for (const [a, b] of chunkDays(from, addDays(to, TENDER_REACH_DAYS), TENDER_CHUNK_DAYS)) {
     payRows.push(...await runAll({
-      measures: ["PaymentMethods.total_amount", "PaymentMethods.fee_amount"],
+      measures: [
+        "PaymentMethods.total_amount", "PaymentMethods.fee_amount",
+        "PaymentMethods.processing_fee_amount", "PaymentMethods.tax_on_fee_amount",
+      ],
       dimensions: [
         "PaymentMethods.location_id", "PaymentMethods.order_id", "PaymentMethods.payment_method",
         "PaymentMethods.payment_external_source", "PaymentMethods.type", "PaymentMethods.status",
@@ -635,6 +639,24 @@ async function loadBreakdown(
       const f = d.lines.find((l) => l.kind === "fee" && l.key === key);
       if (f) f.cents += -fee;
       else d.lines.push({ kind: "fee", key, name: `${name} fees`, cents: -fee });
+    }
+    // THE PART OF THAT FEE THAT IS NOT SQUARE'S (2026-11-06). `fee_amount`
+    // carries every fee taken from the payment, and on a Square Online
+    // delivery that includes the DoorDash Drive courier charge — the Fees
+    // cube's `APP_FEE`, the payout's `THIRD_PARTY_FEE`. What is left after
+    // Square's processing fee and its tax is exactly that charge: October
+    // 2026, both shops, to the cent against the Fees cube (DF01 $832.20, DF02
+    // $578.27), with gift-card load and "additional" fees inside processing.
+    // It is a PART of the fee line above, not beside it — the fee lines still
+    // carry every fee, so a builder that does not know this line posts what
+    // it always did, and the card line stays net of everything either way.
+    const processing = cents(d, pickField(row, "PaymentMethods.processing_fee_amount"), `${name} processing fee`, loc, date) ?? 0;
+    const feeTax = cents(d, pickField(row, "PaymentMethods.tax_on_fee_amount"), `${name} tax on fee`, loc, date) ?? 0;
+    const appFee = fee - processing - feeTax;
+    if (appFee !== 0) {
+      const a = d.lines.find((l) => l.kind === "app_fee");
+      if (a) a.cents += -appFee;
+      else d.lines.push({ kind: "app_fee", key: "APP_FEE", name: "Third-party app fees", cents: -appFee });
     }
   }
   for (const [status, n] of skippedStatus) {

@@ -35,7 +35,7 @@ beside the run is harmless, because an unchanged day is skipped.
 
    | Kind | Rows | Where it comes from |
    | --- | --- | --- |
-   | Role | eleven fixed slots — unmapped categories, discounts, service charges, tax, tips, gift cards, card, cash, unmapped tenders, fees, **the bank account for payouts** | always listed |
+   | Role | twelve fixed slots — unmapped categories, discounts, service charges, tax, tips, gift cards, card, cash, unmapped tenders, Square fees, **third-party app fees**, **the bank account for payouts** | always listed |
    | Category | one per Square item category | written by **Sync from Square** the first time it sees the name |
    | Tender | one per payment method — `CARD`, `CASH`, `SQUARE_GIFT_CARD`, `OTHER:UBEREATS`, `OTHER:DOORDASH`, `AFTERPAY`, … | written by the sync likewise |
 
@@ -53,8 +53,10 @@ beside the run is harmless, because an unchanged day is skipped.
    Orders, Specials, Uncategorized Income, Wholesale Income (categories);
    `Franchise Tax Board Payable:Sales Tax Payable` (tax); Square Tips; Square
    Gift Cards; Undeposited Square Funds (card and marketplace tenders);
-   Undeposited Cash; `Merchant Services:Square Fees`; **Chase ACH (\*1509)**
-   for the bank the payouts land in.
+   Undeposited Cash; `Merchant Services:Square Fees`;
+   `Merchant Services:Third Party Fees` (third-party app fees — the DoorDash
+   Drive courier charge, where Shogo put it); **Chase ACH (\*1509)** for the
+   bank the payouts land in.
 
 4. **Migration 105 is applied** (the `square_payouts` table and its two
    functions), or the Sales screen says so under its Square deposits table
@@ -240,6 +242,15 @@ gift card bought with *cash* included — so the drawer holds the full cash and
 the payout is short by the fee. Keyed per tender, the card line was short of
 the payout by that fee on every such day; netted here it agrees to cents.
 
+**The courier charge is a fee too, but not Square's** (2026-11-06). A Square
+Online delivery sent by DoorDash Drive has its courier charge taken from the
+payment, and Square counts it in the payment's fee. The sync pulls the part
+of each fee that is not Square's processing fee or its tax as an `app_fee`
+line, and the entry debits it to the **Third-party app fees** role instead of
+Square Fees. It still comes off the card line like every other fee, so the
+card line and the deposits do not move. A day pulled before then has no such
+line and posts its courier charge inside Square Fees, as October did.
+
 ### What is deliberately not posted
 
 - **Cash over/short, pay-ins and pay-outs.** Shogo sent them all to
@@ -320,6 +331,7 @@ Expected differences, from the first real day compared:
 | `pulled again` in the QuickBooks column | The breakdown moved since the post. Post again to update the entry |
 | `failed` in the QuickBooks column | QuickBooks refused the last post; the reason is on hover, and the entry it already had (if any) is unchanged |
 | `No account is set for “Bank account for payouts”` | The `bank` role row in the grid is empty — pick Chase ACH |
+| `No account is set for “Third-party app fees”` | The day has a courier charge and the role is empty — pick `Merchant Services:Third Party Fees` |
 | `Square reports this payout as FAILED` | No money moved; nothing to deposit |
 | `This payout is negative` | Square took money back — a withdrawal to record by hand |
 | `changed since posted` under Square deposits | The payout's amount or arrival date moved after the post. Post again to update the deposit |

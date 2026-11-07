@@ -363,3 +363,73 @@ packages like Gmail does: a random divider per message, quoted-printable text
 bodies, the subject in as few encoded words as fit (two, where it was six
 folded lines), and its own Date header. Every function that imports the module
 has to be redeployed for it to take effect.
+
+### 2026-11-06 — The courier charge posts to Third Party Fees again
+
+Mark, after reconciling the delivery-app statements for 2026: `Merchant
+Services:Third Party Fees` held 265 Shogo lines described `THIRD_PARTY_FEE`,
+Jan–Sep, about $450–$1,000 per shop per month — and none for October. The
+suspicion was that the courier charge had gone unbooked since the cutover.
+**It had not. It was misfiled.** Measured read-only (an owner session minted
+and signed out, `sync-square-sales`' `get` and `query` modes, `qbo-sync`'s
+`query`):
+
+- `PaymentMethods.fee_amount`, which the sync has always pulled as each
+  tender's fee, INCLUDES the DoorDash Drive courier charge on a Square Online
+  delivery. What is left after `processing_fee_amount` and `tax_on_fee_amount`
+  is exactly the Fees cube's `APP_FEE` and the payout entries'
+  `THIRD_PARTY_FEE`: October, DF01 $832.20 (45 charges, $18.10 of it on a
+  gift-card-paid order), DF02 $578.27 (33), to the cent. Gift-card load fees
+  and Square's `ADDITIONAL_FEE` sit inside processing.
+- October's stored fee lines reconcile to the cent against the Fees cube by
+  type (DF01 $3,411.72 = capture 2,556.51 + app 832.20 + load 8.27 +
+  additional 14.74; DF02 $1,887.16 = 1,289.60 + 578.27 + 19.29).
+- Payout entries bucketed by reporting day agree with the day's card takings
+  net of fees to within cents only WITH the courier entries counted — so
+  Undeposited Square Funds was never short; the card line was already net of
+  the charge.
+- `DF01-2026-10-04` in QuickBooks: "Square fees" $176.21 to `Merchant
+  Services:Square Fees`, of which $84.89 was that day's courier charge.
+
+So from 10-01 the total expense was right and the account was wrong:
+$1,410.47 in October and $101.63 for Nov 1–5 (DF01 $54.72, DF02 $46.91) sit in
+Square Fees that Shogo would have put in Third Party Fees.
+
+**The fix (Mark: "Yes, build it").** `sync-square-sales` adds
+`processing_fee_amount` and `tax_on_fee_amount` to the PaymentMethods pull it
+already makes — same rows, so the courier charge follows the same
+order-day rule as the fee it is part of — and records the remainder as one
+`app_fee` line (key `APP_FEE`). **It is a PART of the fee lines, not beside
+them**: the fee lines still carry every fee, so a builder that has never
+heard of `app_fee` (an old browser tab, an undeployed `sales-nightly`) posts
+exactly what it did before, and no deploy order can leave a charge
+unexpensed. `buildJournalEntry` debits Square fees *minus* the app fee to the
+`fees` role and the app fee to a new role, **`third_party_fees` ("Third-party
+app fees", Expense)**; the card line is unchanged. The role is required only
+by a day that has a courier charge, and refused BY NAME when empty, like every
+role — never folded into Square fees. `diffAgainstShogo`'s comment no longer
+lists Third Party Fees as a Shogo-only account. No migration: role rows are
+written by the grid, and `post_daily_sales` checks accounts against the grid
+whatever the role.
+**Verified**: 2,552 fixtures (five new, pinned on the real DF01 10-04; removing
+the subtraction turns two red); tsc, lint, `deno check` of
+`sync-square-sales` and `sales-nightly` with the regenerated copy. **Dry-built
+every October–November shop-day (72) through the compiled builder** with the
+app fee computed from live PaymentMethods rows and the role stood in at 740:
+0 refusals, Square fees never negative, monthly totals equal to the Fees cube
+to the cent. Six days differ from the payout's own dating, in three adjacent
+pairs that cancel (a charge dated by its sale here, by Square's effective time
+there).
+**Not yet**: deployed (`sync-square-sales`, `sales-nightly`), the role mapped,
+or October re-posted. **To go live**: map *Third-party app fees* to `Merchant
+Services:Third Party Fees` on the grid FIRST (or every day with a courier
+charge refuses), then deploy both functions. **Catch-up**: Sync from Square
+10-01 → today and Post — every posted day's entry changes (its hash moves) and
+is updated in place, moving the courier part out of Square Fees; the
+deposits do not change. The alternative is one reclass entry per shop.
+
+**Side finding, not fixed:** three payout entries of type `OTHER`, positive and
+in no Reporting cube, so never booked — DF02 2026-09-22 +$62.52 (Shogo era),
+DF01 2026-10-08 +$42.88, DF02 2026-10-27 +$56.81. Each leaves Undeposited
+Square Funds over-cleared by its amount. Unidentified; perhaps courier-fee
+credits. Square's dashboard should name them.
