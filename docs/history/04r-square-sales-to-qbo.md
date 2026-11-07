@@ -420,8 +420,11 @@ app fee computed from live PaymentMethods rows and the role stood in at 740:
 to the cent. Six days differ from the payout's own dating, in three adjacent
 pairs that cancel (a charge dated by its sale here, by Square's effective time
 there).
-**Not yet**: deployed (`sync-square-sales`, `sales-nightly`), the role mapped,
-or October re-posted. **To go live**: map *Third-party app fees* to `Merchant
+**Live 2026-11-07**: Mark mapped the role to `Merchant Services:Third Party
+Fees` (740), then `sync-square-sales` v28 (verify_jwt on) and `sales-nightly`
+v11 (`--no-verify-jwt`) were deployed. Probed: the sync answers its
+`locations` mode, and the nightly refuses a caller without its secret (401).
+**Not yet**: October re-posted. **The order was**: map *Third-party app fees* to `Merchant
 Services:Third Party Fees` on the grid FIRST (or every day with a courier
 charge refuses), then deploy both functions. **Catch-up**: Sync from Square
 10-01 → today and Post — every posted day's entry changes (its hash moves) and
