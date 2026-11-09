@@ -130,10 +130,11 @@ function moneyWithCommas(value: number): string {
  * module returns, so a letter donut's cut list grows a Letter group and every
  * other line's does not.
  *
- * A `Misc*` LINE IS MONEY, NOT PRODUCTION. It counts toward every figure on the
- * totals card and is excluded from the kitchen document and the production
- * schedule. The row says so in words rather than by a colour, because "this
- * will not be made" is a claim worth reading.
+ * A `Misc*` LINE IS NOT PRODUCTION. It counts toward every figure on the
+ * totals card, prints in the kitchen order's MISC band (2026-11-09) and is
+ * excluded from the production schedule and so from the tray guides. The row
+ * says so in words rather than by a colour, because "this will not be made" is
+ * a claim worth reading.
  */
 export function OrderLines({
   orderId,
@@ -879,7 +880,7 @@ export function OrderLines({
                     {!production ? (
                       <span className="mt-1 block text-[12px]">
                         <span className="bg-mark-fill px-1">
-                          Money only — this never reaches the kitchen
+                          On the kitchen order, not the tray guides
                         </span>
                       </span>
                     ) : !row.production_item_id ? (

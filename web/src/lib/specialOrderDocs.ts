@@ -235,12 +235,20 @@ export function taxonomyLine(line: DocumentLine): string {
  * The kitchen document groups by SIZE CLASS — REGULAR, MINI, GIANT — which is
  * how the kitchen works: a tray holds one size.
  *
- * Two rules a rewrite would get wrong:
+ * Three rules a rewrite would get wrong:
  *
- * **`Misc` lines never reach the kitchen** (decision 5). A Delivery Fee is
- * money, not a donut, and printing one on a production sheet asks somebody to
- * make it. `isProductionLine` is the one test, and an UNTYPED line counts as
- * production — 569 real lines carry no type and they are ordinary donuts.
+ * **`Misc` lines PRINT, in their own `MISC` band after the donuts** (Mark,
+ * 2026-11-09, reversing decision 5 for this sheet only). The kitchen order is
+ * the list of everything that goes out the door: a Catering Platter, a 96 oz
+ * coffee traveler, napkins and utensils are packed by the same people, and a
+ * sheet that hid them left nobody knowing they were part of the order. They
+ * stay OFF the production schedule and so off the tray guides —
+ * `scheduleDraft` still skips them with `isProductionLine`, because a tray
+ * guide is what to MAKE. Their own band, whatever their size, because a size
+ * band is a tray and none of these goes on one.
+ *
+ * **An UNTYPED line is a donut**, not Misc — 569 real lines carry no type and
+ * they are ordinary donuts (`isProductionLine`'s fallback direction).
  *
  * **A line with no size still prints**, under its own heading rather than
  * being dropped. A donut nobody classified is still a donut somebody ordered;
@@ -250,8 +258,12 @@ export function sizeClassGroups(
   lines: DocumentLine[]
 ): { label: string; lines: DocumentLine[] }[] {
   const groups = new Map<string, DocumentLine[]>();
+  const misc: DocumentLine[] = [];
   for (const line of lines) {
-    if (!isProductionLine(line)) continue;
+    if (!isProductionLine(line)) {
+      misc.push(line);
+      continue;
+    }
     const label = (line.item_size ?? "").trim().toUpperCase() || "UNSPECIFIED";
     const list = groups.get(label) ?? [];
     list.push(line);
@@ -261,11 +273,13 @@ export function sizeClassGroups(
   // that order. FileMaker prints the sizes in the order they first appear on
   // the order rather than alphabetically, and the person who typed the order
   // typed it in the order they want it made.
-  return [...groups.entries()].map(([label, list]) => ({ label, lines: list }));
+  const out = [...groups.entries()].map(([label, list]) => ({ label, lines: list }));
+  if (misc.length) out.push({ label: "MISC", lines: misc });
+  return out;
 }
 
-/** `29 items / 29 donuts` — the kitchen sheet's own count, production lines
- *  only, so a delivery fee never inflates it. */
+/** `29 items / 29 donuts` — production lines only, so a platter or a coffee
+ *  traveler on the kitchen sheet never counts as a donut. */
 export function productionCount(lines: DocumentLine[]): { lines: number; qty: number } {
   const production = lines.filter(isProductionLine);
   return {

@@ -8,9 +8,10 @@
 //   · `usDate` written as `new Date(iso).toLocaleDateString()` prints the day
 //     BEFORE for everyone west of Greenwich — a wedding misdated on the quote
 //     the customer signs, and invisible to whoever wrote it in London;
-//   · `sizeClassGroups` written without `isProductionLine` puts "Delivery Fee"
-//     on the production sheet as something to make, and written to DROP lines
-//     with no size loses a real donut off it silently;
+//   · `sizeClassGroups` written without `isProductionLine` puts a Catering
+//     Platter in a donut size band as if it went on a tray, written to DROP
+//     Misc lines hides it from whoever packs the order, and written to DROP
+//     lines with no size loses a real donut off it silently;
 //   · `fillTemplate` written to blank unknown placeholders swallows a typo in
 //     a template into a hole in a sentence a customer reads;
 //   · `quoteStateMessage` collapsed to one "this link is not valid" tells a
@@ -197,23 +198,28 @@ test("taxonomyLine is donut · type · cut · size · finish, FileMaker's order"
   );
 });
 
-test("a Misc line NEVER reaches the kitchen, and an untyped one always does", () => {
+test("a Misc line prints in its own MISC band after the donuts, and an untyped one is a donut", () => {
   const groups = sizeClassGroups([
+    // FIRST, so a band built in insertion order would put it on top.
+    line({ id: "p", name: "Catering Platter", item_type: "Misc", item_size: null }),
     line({ id: "a" }),
     // Given the SAME size as the donuts, so this case is about the TYPE and
-    // nothing else — with a null size it would also be caught by the
-    // no-size rule below, which would hide a broken Misc guard.
-    line({ id: "b", name: "Delivery Fee", item_type: "Misc", item_size: "Regular" }),
-    // 569 real lines carry no type at all and they are ordinary donuts. If this
-    // is treated as money the kitchen never hears about it.
+    // nothing else — it must not join the REGULAR tray.
+    line({ id: "b", name: "Stumptown Coffee - 96oz", item_type: "Misc- Coffee", item_size: "Regular" }),
+    // 569 real lines carry no type at all and they are ordinary donuts.
     line({ id: "c", name: "Mystery donut", item_type: null }),
   ]);
-  eq(groups.length, 1, "one size class");
-  eq(groups[0].label, "REGULAR");
   eq(
-    groups[0].lines.map((l) => l.id),
-    ["a", "c"]
+    groups.map((g) => g.label),
+    ["REGULAR", "MISC"],
+    "the donuts' band, then MISC last"
   );
+  eq(groups[0].lines.map((l) => l.id), ["a", "c"]);
+  eq(groups[1].lines.map((l) => l.id), ["p", "b"], "in the order's own sequence");
+});
+
+test("an order with no Misc lines has no MISC band", () => {
+  eq(sizeClassGroups([line({ id: "a" })]).map((g) => g.label), ["REGULAR"]);
 });
 
 test("a line with NO size still prints, under its own heading", () => {
@@ -238,7 +244,7 @@ test("size classes come out in the order they first appear, not alphabetically",
   eq(groups[0].lines.length, 2, "the second Regular joins the first group");
 });
 
-test("productionCount excludes the money lines the kitchen never sees", () => {
+test("productionCount counts donuts only, never a Misc line", () => {
   const count = productionCount([
     line({ id: "a", qty: 12 }),
     line({ id: "b", qty: 1, item_type: "Misc- Delivery" }),

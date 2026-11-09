@@ -6513,3 +6513,34 @@ an order made in the app has named its maker since 2026-09-21.
   an already-taken order is unchanged, history is logged). Then applied in one
   transaction by CLI. Verified live: 8 triggers, 3 functions, none executable
   by anon.
+
+## The kitchen order prints Misc lines (2026-11-09)
+
+Mark: "the kitchen order page needs to display misc. special order items, not
+hide them. Otherwise staff has no way to know if an order is supposed to
+include a catering platter or a 96oz coffee carrier. These items should still
+NOT appear on the tray guides."
+
+This reverses decision 5 (**`Misc*` lines never reach the kitchen**) for the
+kitchen order ONLY. Decision 5 treated every Misc line as money, like a Delivery
+Fee. But measured on orders since 2026-06-01, most of them are things that go
+out with the order: Catering Platter (26), Stumptown Coffee 96 oz, Menu Card,
+Napkins, Utensils, coffee travelers, clamshell boxes. The real money lines were
+"Delivery Fee" (20, last 2026-09-20, before 165 made delivery an order charge)
+and one "Cart deposit". Those print too when an old order is reprinted, which
+is accepted: they are history, and staff can read a fee.
+
+- `sizeClassGroups` (lib/specialOrderDocs) puts every Misc line in a `MISC`
+  band, last, in the order's own sequence. It gets its own band whatever its
+  size, because a size band stands for a tray.
+- `isProductionLine` is unchanged and still drives `scheduleDraft`. A Misc line
+  never becomes a `production_schedule_items` row, so it never reaches the tray
+  guides or the packet's schedule pages. The packet's kitchen-order pages are
+  the same `kitchenOrderPages`, so they show the band.
+- `productionCount` still counts donuts only. The sheet's "Items" count
+  includes the Misc lines.
+- The Items tab's note on a Misc row now reads "On the kitchen order, not the
+  tray guides". It used to say "Money only — this never reaches the kitchen".
+- Fixtures: the old "never reaches the kitchen" case now asserts the MISC band:
+  it comes last, it is not merged into a same-size donut band, and it keeps the
+  order's sequence. Breaking the rule turned one case red.

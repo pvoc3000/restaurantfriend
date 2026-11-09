@@ -540,8 +540,10 @@ function WriteBox({ label, value }: { label: string; value?: string | number | n
 
 /**
  * The production sheet in the app's language (Mark, 2026-09-25). NO MONEY, as
- * on the original — a decorator is being told what to make — and `Misc` lines
- * never reach it (`sizeClassGroups`).
+ * on the original — a decorator is being told what to make. `Misc` lines (a
+ * catering platter, a coffee traveler) print in their own band after the
+ * donuts, so whoever packs the order knows they go with it; they stay off the
+ * tray guides (`sizeClassGroups`).
  *
  * What the record KNOWS prints as fields; what the kitchen WRITES is a box
  * (completed by, received, and the tracking number and box count when the

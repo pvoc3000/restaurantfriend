@@ -9,7 +9,7 @@
 //
 // Each sample is shaped to SHOW the layout's optional blocks at once: the
 // order has a discount, delivery, a rush fee, tax, a Misc line (which the
-// kitchen sheet must drop), a line with no size (which it must keep), a
+// kitchen sheet prints in its MISC band), a line with no size (which it must keep), a
 // payment, and notes on every document. A layout change that breaks one of
 // those shows up here first.
 
@@ -65,7 +65,7 @@ const SAMPLE_LINES: DocumentLine[] = [
   line(6, "Mini Jelly", 36, 1.75, { item_donut: "Jelly", item_type: "Raised", item_finish: "Powdered", item_size: "Mini" }),
   line(7, "Giant Birthday Donut", 1, 45, { item_donut: "Birthday", item_type: "Raised", item_finish: "Sprinkles", item_size: "Giant" }, "“Happy 40th, Dana!” in white script"),
   line(8, "Vegan Cinnamon Sugar", 12, 3.5, { item_donut: "Cinnamon Sugar", item_type: "Vegan" }, "No size recorded — should still print on the kitchen sheet"),
-  line(9, "Window Box Upgrade", 12, 2, { item_type: "Misc" }, "Misc — kept off the kitchen sheet", false),
+  line(9, "Window Box Upgrade", 12, 2, { item_type: "Misc" }, "Misc — printed in the kitchen sheet's MISC band", false),
 ];
 
 const SAMPLE_MONEY: MoneyOrder = {
