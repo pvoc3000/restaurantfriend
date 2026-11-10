@@ -27,7 +27,12 @@ import {
   type OrderMessage,
 } from "@/lib/orderEmail";
 import { ccWithContacts, DOCUMENT_LABEL, type DocumentKind } from "@/lib/specialOrderDocs";
-import { bindQuoteSnapshot, quoteSnapshot, sendSpecialOrderEmail } from "@/lib/specialOrderSend";
+import {
+  bindQuoteSnapshot,
+  deliveryEstimateGoAhead,
+  quoteSnapshot,
+  sendSpecialOrderEmail,
+} from "@/lib/specialOrderSend";
 import { afterDocumentSent, type Consequence, type WorkflowOrder } from "@/lib/orderWorkflow";
 import { fileForMail, prepareDocument, type PreparedDocument } from "./orderDocumentDraft";
 import { WorkflowOffer } from "./WorkflowOffer";
@@ -45,6 +50,9 @@ export type OrderEmailDocuments = {
   today: string;
   /** What the order still lacks for its receipt; attaching one asks first. */
   receiptGaps: string[];
+  /** The website's delivery estimate while the fee is still it
+   *  (`unconfirmedDeliveryEstimate`); sending a quote asks first. */
+  deliveryEstimate: number | null;
 };
 
 /** The Email tab's own files ceiling — `order-mail`'s MAX_ATTACHMENT_BYTES. */
@@ -623,7 +631,14 @@ export function OrderEmails({
       if (e) throw new Error(e.message);
     });
 
-  const send = () =>
+  const send = async () => {
+    if (doc?.kind === "quote" && !(await deliveryEstimateGoAhead(documents?.deliveryEstimate, "Send"))) {
+      return;
+    }
+    return sendNow();
+  };
+
+  const sendNow = () =>
     run("send", async () => {
       const supabase = createClient();
       const mailFiles = await Promise.all(files.map(fileForMail));

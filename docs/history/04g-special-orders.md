@@ -6566,3 +6566,18 @@ one is typed on the chosen row), note, Tax and Hide — except a bare letter not
 (`"A"`), which is dropped for a plain donut and rewritten for a letter one.
 Typechecked and linted; NOT yet exercised in a browser (the pane was on the
 shared-device PIN lock).
+
+### The website's delivery estimate asks before a quote goes out (2026-11-10, migration 225)
+
+Mark: if the delivery fee is still the guess the inquiry form made, warn before
+sending the quote. `submit-inquiry` now also writes `delivery_charge_estimate`
+(225, backfilled from the "Delivery estimated on the website: … $X" log lines).
+`unconfirmedDeliveryEstimate` (`lib/specialOrders`) is the estimate while
+`delivery_charge` still equals it, else null — so editing the fee to anything
+silences it with no flag to keep in step. `deliveryEstimateGoAhead`
+(`lib/specialOrderSend`) asks at the Email tab's Send with a quote attached and
+at Download ▸ Quote (a printed quote is a sent one), "Send Anyway" /
+"Download Anyway". Send ▸ Quote itself only opens the compose box, so it does
+not ask. Status: 225 written, NOT applied; `submit-inquiry` changed, NOT
+deployed (needs --no-verify-jwt); the order screen selects the new column, so
+the web change must not reach production before 225 does.

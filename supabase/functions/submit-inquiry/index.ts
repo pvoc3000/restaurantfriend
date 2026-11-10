@@ -194,7 +194,13 @@ async function estimateDelivery(
     if (result.state === "ok") {
       await admin
         .from("special_orders")
-        .update({ delivery_distance: result.miles, delivery_charge: result.fee })
+        // The estimate is kept beside the fee it seeds (225), so the app can
+        // tell a fee nobody has checked from one somebody set.
+        .update({
+          delivery_distance: result.miles,
+          delivery_charge: result.fee,
+          delivery_charge_estimate: result.fee,
+        })
         .eq("id", orderId)
         .is("delivery_charge", null);
       await admin.from("special_order_events").insert({

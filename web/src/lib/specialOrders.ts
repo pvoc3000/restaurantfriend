@@ -608,6 +608,25 @@ export function countsAsOwed(order: {
   );
 }
 
+/**
+ * THE WEBSITE'S DELIVERY ESTIMATE, IF THE FEE IS STILL IT (225, Mark,
+ * 2026-11-10). `submit-inquiry` seeds `delivery_charge` with a guess from the
+ * distance and keeps the guess in `delivery_charge_estimate`; while the two
+ * are equal nobody has set the fee, and sending or printing the quote asks
+ * first (`deliveryEstimateGoAhead`). Any other value — including clearing it —
+ * counts as somebody having decided. Null when there is nothing to ask about.
+ */
+export function unconfirmedDeliveryEstimate(order: {
+  delivery_charge: number | string | null;
+  delivery_charge_estimate?: number | string | null;
+}): number | null {
+  if (order.delivery_charge == null || order.delivery_charge_estimate == null) return null;
+  const fee = Number(order.delivery_charge);
+  const estimate = Number(order.delivery_charge_estimate);
+  if (!Number.isFinite(fee) || !Number.isFinite(estimate)) return null;
+  return Math.abs(fee - estimate) < 0.005 ? estimate : null;
+}
+
 export function money(value: number): string {
   return `${value < 0 ? "-" : ""}$${Math.abs(value).toFixed(2)}`;
 }

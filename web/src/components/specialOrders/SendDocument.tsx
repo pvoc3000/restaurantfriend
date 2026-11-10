@@ -25,6 +25,7 @@ import { sendIntent, type InvoiceCandidate } from "@/lib/customerInvoices";
 import { withFrom } from "@/lib/breadcrumbs";
 import { renderOrderDocument } from "./renderOrderDocument";
 import { confirmDialog } from "@/lib/confirm";
+import { deliveryEstimateGoAhead } from "@/lib/specialOrderSend";
 
 /**
  * PRODUCE AND SEND — decision 11's four documents, as one control on the
@@ -84,6 +85,7 @@ export function SendDocument({
   children,
   invoice = null,
   receiptGaps = [],
+  deliveryEstimate = null,
 }: {
   /**
    * Render the three verbs as rows of an `ui/ActionMenu` instead of three
@@ -105,6 +107,10 @@ export function SendDocument({
    * never asks, because previewing commits to nothing.
    */
   receiptGaps?: string[];
+  /** The website's delivery estimate while the fee is still it
+   *  (`unconfirmedDeliveryEstimate`). Download ▸ Quote asks first; Send ▸
+   *  Quote asks at the Email tab's Send, where the quote actually goes. */
+  deliveryEstimate?: number | null;
   /**
    * SEND ▸ INVOICE GOES THROUGH A CUSTOMER INVOICE (Mark, 2026-09-23, for
    * every order: "the user chooses send invoice, the create invoice dialogue
@@ -224,6 +230,7 @@ export function SendDocument({
 
   const download = async (k: DocumentKind) => {
     if (!(await receiptGoAhead(k, "Download"))) return;
+    if (k === "quote" && !(await deliveryEstimateGoAhead(deliveryEstimate, "Download"))) return;
     return run("download", async () => {
       const { blob, name, ofInvoice } = await renderFile(k);
       downloadBlob(blob, name);

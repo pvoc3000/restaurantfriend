@@ -31,6 +31,7 @@ import {
   customerContactName,
   isWholesaleOrder,
   missingTaxRate,
+  unconfirmedDeliveryEstimate,
 } from "@/lib/specialOrders";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
@@ -110,7 +111,7 @@ const ORDER_COLUMNS = `
   delivery_address, delivery_distance, delivery_cost, delivery_company,
   delivery_company_phone, delivery_company_email, delivery_tracking,
   delivery_boxes, delivery_weight_lbs,
-  tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee, rush_rate,
+  tax_rate, discount_amount, discount_rate, delivery_charge, delivery_charge_estimate, rush_fee, rush_rate,
   ignore_balance, square_item, taken_by, taken_by_employee_id,
   notes_general, inquiry_note, notes_quote, notes_production, notes_invoice, notes_receipt,
   standing_days, starts_on, ends_on, paused, standing_order_id,
@@ -749,6 +750,9 @@ export async function SpecialOrderDetail({
 
   /** What the order still lacks for its receipt — Send ▸ Receipt and the
    *  Email tab's Attach ▸ Receipt both ask first when it is not empty. */
+  const deliveryEstimate = unconfirmedDeliveryEstimate(
+    row as { delivery_charge: number | string | null; delivery_charge_estimate: number | string | null }
+  );
   const orderReceiptGaps = receiptGaps({
     status,
     fulfillment: (row.fulfillment as string | null) ?? null,
@@ -961,6 +965,7 @@ export async function SpecialOrderDetail({
                       orgSettings: session.orgSettings,
                       today,
                       receiptGaps: orderReceiptGaps,
+                      deliveryEstimate,
                       invoice: {
                         liveInvoiceId: liveInvoice?.id ?? null,
                         liveInvoiceLabel: liveInvoice?.label ?? null,
@@ -1598,6 +1603,7 @@ export async function SpecialOrderDetail({
                         orgSettings: session.orgSettings,
                         today,
                         receiptGaps: orderReceiptGaps,
+                      deliveryEstimate,
                       }
                     : null
                 }

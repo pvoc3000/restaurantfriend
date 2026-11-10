@@ -8,6 +8,8 @@
  * from any screen.
  */
 
+import { confirmDialog } from "./confirm";
+import { money } from "./specialOrders";
 import { customerLines } from "./specialOrderDocs";
 import type { LineGrouping } from "./specialOrderLines";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -418,4 +420,24 @@ export function quoteStateMessage(state: QuoteTokenState["state"]): {
     case "open":
       return { title: "", body: "" };
   }
+}
+
+/**
+ * A QUOTE GOING OUT WITH THE WEBSITE'S DELIVERY GUESS ASKS FIRST (225, Mark,
+ * 2026-11-10: "warn the user that the delivery fee was an estimate and ask if
+ * they want to send the quote anyway"). `estimate` is
+ * `unconfirmedDeliveryEstimate` — null when the fee has been set by hand, and
+ * then this resolves true without asking. Asked by the Email tab's Send and by
+ * Download ▸ Quote, the two routes that stamp a quote as sent.
+ */
+export function deliveryEstimateGoAhead(
+  estimate: number | null | undefined,
+  verb: "Send" | "Download"
+): Promise<boolean> {
+  if (estimate == null) return Promise.resolve(true);
+  return confirmDialog({
+    title: `${verb} the quote with an estimated delivery fee?`,
+    body: `The delivery fee is ${money(estimate)}, the estimate the website made from the address when the customer filled in the inquiry. Nobody has changed it since.`,
+    confirmLabel: `${verb} Anyway`,
+  });
 }
