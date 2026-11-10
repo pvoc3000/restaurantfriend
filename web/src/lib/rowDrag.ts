@@ -124,14 +124,31 @@ export function edgeScrollStep(
   return 0;
 }
 
-/** The nearest ancestor that actually scrolls vertically — null for the window. */
+/**
+ * The nearest ancestor that actually scrolls vertically — null for the window.
+ *
+ * MORE THAN A SCROLLBAR'S WORTH OF OVERFLOW, not merely some (2026-11-10). A
+ * table's `overflow-x-auto` wrapper computes `overflow-y: auto` too (CSS turns
+ * a `visible` beside a non-visible into `auto`), and when it shows a horizontal
+ * scrollbar its `clientHeight` loses the bar's ~15px while `scrollHeight` does
+ * not — so it passed for a vertical scroller and the drag scrolled IT, a few
+ * pixels and then nothing, while the page that needed to move stood still.
+ * That was a special order's lines on a narrow window.
+ */
+const SCROLLBAR_ALLOWANCE = 20;
 function scrollParent(el: Element | null): HTMLElement | null {
   for (let n = el?.parentElement ?? null; n; n = n.parentElement) {
     const oy = getComputedStyle(n).overflowY;
-    if ((oy === "auto" || oy === "scroll") && n.scrollHeight > n.clientHeight) return n;
+    if ((oy === "auto" || oy === "scroll") && n.scrollHeight - n.clientHeight > SCROLLBAR_ALLOWANCE) {
+      return n;
+    }
   }
   return null;
 }
+
+/** Marks a band pinned over the bottom of the window (`ui/StickyFooter`), so
+ *  a drag's bottom edge is the band's top rather than the window's floor. */
+export const STICKY_FOOTER_ATTRIBUTE = "data-rf-sticky-footer";
 
 // ---------------------------------------------------------------------------
 // The drag itself.
@@ -183,22 +200,52 @@ export function useRowDrag({
     // THE BOX THAT SCROLLS, and where it stood at pointer-down. Rows are still
     // measured once; a scroll during the drag is added back as an offset, so
     // the slots stay where they were measured and the pointer is read against
-    // them in CONTENT coordinates.
+    // them in CONTENT coordinates. The offset counts the window AS WELL as the
+    // box, because a box at the end of its travel hands the scroll on to the
+    // page (see `tick`), and either one moves the rows.
     const scroller = scrollParent(body.querySelector(`[${rowAttribute}]`));
-    const readScroll = () => (scroller ? scroller.scrollTop : window.scrollY);
+    const readScroll = () => (scroller ? scroller.scrollTop : 0) + window.scrollY;
     const startScroll = readScroll();
-    // The window's top edge is under the masthead, which publishes its height.
-    const edges = () => {
-      if (scroller) {
-        const r = scroller.getBoundingClientRect();
-        return { top: Math.max(r.top, 0), bottom: Math.min(r.bottom, window.innerHeight) };
-      }
-      const head =
-        parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--rf-header-h")) || 0;
-      return { top: head, bottom: window.innerHeight };
-    };
 
     const table = body.closest("table") ?? body.querySelector("table") ?? body;
+    const thead = table.querySelector(":scope > thead");
+
+    /**
+     * THE EDGES ARE WHERE THE ROWS STOP BEING VISIBLE, not where the window
+     * does (2026-11-10, Mark: "dragging beyond the bounds of the scroll view or
+     * near the bounds … actually scrolled the view"). Read every frame, because
+     * the sticky parts move as the page scrolls under them:
+     *
+     *   * TOP — the masthead (`--rf-header-h`), the scrolling box's own top, and
+     *     the table's column labels, which stick under the masthead and cover
+     *     the rows passing beneath. Measured against the window alone, the zone
+     *     sat UNDER the labels and you had to drag over them, past where any
+     *     row is, before anything moved.
+     *   * BOTTOM — the window's floor, the box's own bottom, and a band pinned
+     *     over the bottom (`ui/StickyFooter`, which marks itself with
+     *     `STICKY_FOOTER_ATTRIBUTE`). A special order's Add item footer is
+     *     ~70px of rows you cannot see, and the zone used to be inside it.
+     *
+     * Held anywhere past an edge — over the labels, the masthead, the footer or
+     * off the window altogether — is full speed (`edgeScrollStep`).
+     */
+    const edges = () => {
+      let top =
+        parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--rf-header-h")) || 0;
+      let bottom = window.innerHeight;
+      if (scroller) {
+        const r = scroller.getBoundingClientRect();
+        top = Math.max(top, r.top);
+        bottom = Math.min(bottom, r.bottom);
+      }
+      if (thead) top = Math.max(top, thead.getBoundingClientRect().bottom);
+      document.querySelectorAll(`[${STICKY_FOOTER_ATTRIBUTE}]`).forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.height > 0 && r.top > top) bottom = Math.min(bottom, r.top);
+      });
+      return { top, bottom };
+    };
+
     const tableRect = table.getBoundingClientRect();
     const tableLeft = Math.max(tableRect.left, 0);
     const tableWidth = Math.max(Math.min(tableRect.right, window.innerWidth) - tableLeft, 0);
@@ -299,8 +346,11 @@ export function useRowDrag({
       const { top, bottom } = edges();
       const step = edgeScrollStep(lastY, top, bottom);
       if (step !== 0) {
+        // The box first; once it can travel no further that way, the page —
+        // a pane at its end inside a taller page still gets you there.
+        const before = scroller ? scroller.scrollTop : null;
         if (scroller) scroller.scrollTop += step;
-        else window.scrollBy(0, step);
+        if (!scroller || scroller.scrollTop === before) window.scrollBy(0, step);
         place();
       }
       frame = requestAnimationFrame(tick);

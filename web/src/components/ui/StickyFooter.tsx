@@ -101,6 +101,9 @@ export function StickyFooter({
       <div ref={spacerRef} className={spacerClassName} aria-hidden />
       <div
         ref={footerRef}
+        // A row drag's bottom edge (`lib/rowDrag`'s STICKY_FOOTER_ATTRIBUTE):
+        // rows under this band are out of sight, so auto-scroll starts above it.
+        data-rf-sticky-footer=""
         // Full-bleed and opaque, but with NO border of its own — it carries the
         // page's own gutters as padding so its card lines up with the content
         // above, and the white is what stops rows showing through when the page
