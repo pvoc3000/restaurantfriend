@@ -1443,3 +1443,20 @@ taking the source's vendor, shop and order date, and a refused call leaving no
 new order behind. `tsc` and eslint clean. 199 APPLIED 2026-10-12 (function present,
 invoker, executable by authenticated and not anon). NOT checked in a browser:
 the pane was signed out, so the first real split is the first end-to-end run.
+
+
+## Moved from CLAUDE.md on 2026-11-10 (verbatim)
+
+From CLAUDE.md's "Open threads" section:
+
+CLOSED 2026-08-04, all three by Mark ("these are all fine") — kept as answers,
+not as questions:
+- **Should-order counts.** The brief's figures (Mon 229 / Wed 118 at DF01) never
+  reproduced; the model over live data gives Mon 394 / Wed 222. The MODEL is
+  right and the brief's totals were wrong. Judge the guide by the per-vendor
+  breakdown against the real Monday POs.
+- **`rep_email` carrying `info@donutfriend.com`** on Restaurant Depot's rows is
+  not a mis-mapping to chase.
+- **"Last ordered" on the vendor screen** means "this item, at this location,
+  from any vendor" — the Inventory semantics — and that is the intended reading.
+  It does NOT need a per-vendor-item view.

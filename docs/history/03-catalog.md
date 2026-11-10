@@ -198,3 +198,55 @@
    Purpose Flour 50 → 45 → 50, with the derived Unit price moving $0.22 → $0.24
    → $0.22 per lb, which is what proves the write reached the database rather
    than the cell.
+
+
+## Moved from CLAUDE.md on 2026-11-10 (verbatim)
+
+Resolved entries from CLAUDE.md's "Open threads" section:
+
+- ~~**"Default vendor item" may be the wrong concept."**~~ **RESOLVED
+  2026-07-23 — retired (migration 012).** It stopped having any reader when 008
+  killed the null-plan-row indirection, leaving a closed loop: the only writer
+  was the cleanup queue's own "assign default" editor and the only readers were
+  the checks complaining about it. Measured over 665 active item-locations at
+  DF01+DF02, `no_default` flagged 146 of which 130 (89%) already had a healthy
+  favorite, and `default_inactive` flagged 193 of which 124 (64%) did. Both
+  checks and that editor are gone; `lib/cleanup.ts` now asks about FAVORITES —
+  `no_package_content` and `no_price` evaluate each ACTIVE favorite (the sources
+  the guide actually emits) and `no_par` is unchanged. Those two counts went UP
+  (46→105, 55→59) because they had been inspecting the wrong vendor item and
+  missing real gaps. Also dropped with the column: the "Default vendor item" and
+  "Price" columns on the Inventory list and item detail, and their sort keys —
+  there is no single vendor item that speaks for an item-location any more.
+- **Duplicate/delete INVENTORY items — built 2026-09-04**
+  (`catalog/InventoryItemActions.tsx`, a ⋯ at the end of every `/items` row,
+  purchaser+). **Duplicate copies EVERYTHING** (Mark's word): the master, every
+  per-location row (section, par, per-weekday pars, order days, note), every
+  vendor item pointing at it with its per-location price overrides, and the
+  favorites re-pointed at the COPIED vendor items — so the copy is orderable on
+  day one. Named "… copy" (`duplicateTitle`) and the screen lands on it.
+  Client-side, parent-first; vendor items inserted ONE AT A TIME so old→new is
+  certain. Verified against the live DB by script: 2 location rows
+  byte-identical, 11 of 11 favorites, counts restored after cleanup.
+  **Delete counts first**: item-locations cascade (taking favorites and guide
+  counts), reminders cascade, and `vendor_items` / production elements /
+  purchase requests are `set null` — the vendor items survive UNLINKED and off
+  every guide, which the dialog says. Stocked anywhere → Deactivate is the
+  default. Every write `.select()`s its row count.
+- ~~**Delete/duplicate vendor items.**~~ **RESOLVED 2026-07-31 — built**
+  (`catalog/VendorItemActions.tsx`, on `VendorItemsTable` and the vendor-item
+  screen, purchaser+). A `⋯` menu as agreed, not a right-click — no touch
+  equivalent, and iPad Safari is the ordering stopgap.
+  **Duplicate** copies every field except `id`, the timestamps and `legacy_id`
+  (the FileMaker row's identity; two rows claiming it would corrupt any future
+  reconciliation against the export), and deliberately carries over **neither
+  favorites nor per-location price overrides** — a duplicate is a new SKU, the
+  pack-size-variant case it exists for, not a second favorite.
+  **Delete counts the damage first** and reports it: `price_history`,
+  `vendor_item_location_prices`, `order_guide_entries` and — since 008 —
+  `order_guide_plan_days` all CASCADE, so a delete silently takes the price audit
+  trail, the overrides and **the favorites** with it; `purchase_order_items` is
+  `on delete set null`, so history survives but loses the anchor "last ordered"
+  and price reconciliation need. Anything ever ordered defaults to
+  **Deactivate**, with Delete still reachable beside the real counts. It's a
+  `ui/Dialog`, not `window.confirm`, precisely because it needs three answers.

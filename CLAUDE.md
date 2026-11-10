@@ -7,6 +7,15 @@ The owner/developer is Mark: fluent in SwiftUI (built "Empty Basket"), new to
 web/TS/SQL — explain non-obvious choices briefly; prefer boring, conventional
 solutions over clever ones.
 
+**THE CODE IS CLAUDE'S** (Mark, 2026-11-10). Claude, and only Claude, writes,
+updates and extends this codebase. Mark directs the product, decides and
+reviews, but does not edit the code. Treat it as your own: nobody else will
+come behind you, so a TODO, a half-swept rename, a dead file, a stale comment
+or a convention followed in one place and not another is yours to finish or
+fix, not someone else's to notice. Keep it consistent and legible to the next
+session, which is also you. Ownership is of the CODE, not the decisions —
+product, data and anything outward-facing still go to Mark first.
+
 **Read `docs/purchasing-spec.md` before designing or changing any purchasing
 feature.** `docs/master-plan.md` has the overall roadmap.
 
@@ -64,7 +73,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 4d. 🚧 Bills (vendor bills, approval, financials lock, filing on close) — `docs/history/04d-invoices.md` (named Invoices until 2026-09-20; see Table naming)
 4e. ✅ Employee events (`employee_events`, `/events`) — `docs/history/04e-employee-events.md`
 4f. 🚧 Production (elements, recipes, items, price grid, plans, schedules, batch logs, costing; 203 Rescued — Too Good To Go boxes are not sold, APPLIED 2026-10-14; 204 sold-out time, APPLIED 2026-10-14; 211 staff generate batch logs, APPLIED 2026-10-28; 221 the baker's % counts from a chosen Base line, APPLIED 2026-11-03; 222 ingredient dividers and spacers, FileMaker's 824 restored, APPLIED 2026-11-03) — `docs/history/04f-production.md`
-4g. 🚧 Special orders (quotes, documents, /q approval, /inquiry, standing orders, scheduling, /pay link via Square, customer invoices — 124–130 applied; build-your-order on /inquiry, 132–133 applied and deployed 2026-09-24, v1 form tagged `inquiry-v1`; **textbook A/R rebuild, 5 phases, 2026-09-27 — 140 payments ledger APPLIED + deployed; 141 invoices own their lines APPLIED + deployed; 142 picker fix APPLIED; 143 revise + credit APPLIED + deployed; 144 who owes us (balances, statement, aging) APPLIED; 145 clean-up APPLIED + deployed — the rebuild is complete; 146 invoices number from `customer_invoices.first_number` (10000) APPLIED; 147 order numbers STORE the `special_orders.number_prefix` ("SO-"), invoices print "INV-", `{employee_name}` on invoice emails, test invoices deleted — APPLIED; go-live 2026-10-01; 148 Cancel Order calls off the money (held → credit, off drafts, revise and void skip cancelled orders) APPLIED 2026-09-28; 149 QuickBooks Payments refunds recorded APPLIED 2026-09-28, with `qbo-sync` `refund_payment` deployed; 167 one email conversation per order APPLIED + deployed 2026-10-02; 168 switching to pickup removes the delivery charge, after asking — APPLIED 2026-10-02; 169 an unread inquiry note flags the Notes tab — APPLIED 2026-10-02; 170 the delivery window is the ready and event times (window columns dropped, ready time follows event time) — APPLIED 2026-10-02; 171 492 FileMaker orders discounted twice, dollar amount cleared — APPLIED 2026-10-02; 172 standing orders top up again (170 had dropped two columns the materializer still copied) — APPLIED 2026-10-03; 174 no invoice for taxable items with no tax rate, and a delivery inquiry always gets its price shop's rate — APPLIED 2026-10-06; 176 an order an earlier invoice bills goes on a new one as WHAT WAS ADDED (quantity not yet billed, no "Less invoice"), so it can go through QuickBooks — APPLIED 2026-10-06; 177 an order stores its Items tab Group by (`line_grouping`), and the quote, invoice, receipt and `/q` band their items by it — APPLIED 2026-10-07; 178 a standing order's days take its `line_grouping` (copies already did) — APPLIED 2026-10-07; 179 `special_order_items.hide_from_customer`, a line left off the quote, invoice and receipt but not the kitchen order — APPLIED 2026-10-07; 180 a hidden line must have no cost (check constraint) — APPLIED 2026-10-08; 200 an inquiry's time is inside the shop's opening hours (pickup 30 min inside both ends, delivery from 2 h after opening) — APPLIED 2026-10-13; 201 an inquiry's date is tomorrow at the earliest — APPLIED 2026-10-13; 206 the customer's words in their own `inquiry_note`, General says "See inquiry notes.", the Notes "!" per person — APPLIED 2026-10-17; 210 an order's emails really are one conversation (Gmail's own Message-ID read back, its threadId stored, the shop notices inside it) — APPLIED + deployed 2026-10-21; 214 the order's Email tab (the mailbox mirrored by `order-mail`, a message WAITING until answered, shown in the Orders list's To-do) APPLIED + `order-mail` DEPLOYED (--no-verify-jwt) 2026-10-29, token re-minted with `gmail.readonly`; 215 its 5-minute cron APPLIED 2026-10-29 (secrets set by Mark), first run 23:30 UTC clean; 216 an emailed reply clears 'Respond to Email/Call' (unless the customer wrote again) APPLIED 2026-10-29; 217 the delivery record (a short recorded on the order, an invoice bills what was delivered), 218 customer credit memos (credit or refund, QuickBooks CreditMemo / itemized RefundReceipt, credit never read back as cash), 219 APPLIED 2026-11-01; 220 every refund on an invoiced order is a credit memo — Refund… opens the memo dialog with delivery, rush, another amount and All, and the morning run books a Square memo refund as what it gave back — APPLIED and deployed 2026-11-01; 223 a standing order's days can start at Quote and a standing day at Quote still counts as owed (not invoiced) — APPLIED 2026-11-05; 224 the first signed-in person to change an untaken order (or its items, emails, payments, invoice lines, memos) becomes its Taken by — viewing does not — APPLIED 2026-11-05**) — `docs/history/04g-special-orders.md`
+4g. 🚧 Special orders (quotes, documents, /q approval, /inquiry, standing orders, scheduling, /pay via Square, customer invoices and A/R on the textbook model, credit memos, the order's email conversation — migrations 124–224 APPLIED, go-live 2026-10-01; the per-migration status is in the history file) — `docs/history/04g-special-orders.md`
 4h. ✅ Supervisor shift report (runner, email, reopen; Donut batches on opening/mid, migration 153) — `docs/history/04h-shift-report.md`
 4i. ✅ Which shops a member may work at (migration 073) — `docs/history/04i-location-access.md`
 4j. ✅ Password reset (migration 074 + `request-password-reset`) — `docs/history/04j-password-reset.md`
@@ -577,64 +586,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   and California employment paperwork, not org configuration. If a second org
   ever needs a different set, that's the moment it moves — and design rule 2
   will be why.
-- ~~**"Default vendor item" may be the wrong concept."**~~ **RESOLVED
-  2026-07-23 — retired (migration 012).** It stopped having any reader when 008
-  killed the null-plan-row indirection, leaving a closed loop: the only writer
-  was the cleanup queue's own "assign default" editor and the only readers were
-  the checks complaining about it. Measured over 665 active item-locations at
-  DF01+DF02, `no_default` flagged 146 of which 130 (89%) already had a healthy
-  favorite, and `default_inactive` flagged 193 of which 124 (64%) did. Both
-  checks and that editor are gone; `lib/cleanup.ts` now asks about FAVORITES —
-  `no_package_content` and `no_price` evaluate each ACTIVE favorite (the sources
-  the guide actually emits) and `no_par` is unchanged. Those two counts went UP
-  (46→105, 55→59) because they had been inspecting the wrong vendor item and
-  missing real gaps. Also dropped with the column: the "Default vendor item" and
-  "Price" columns on the Inventory list and item detail, and their sort keys —
-  there is no single vendor item that speaks for an item-location any more.
-- **Duplicate/delete INVENTORY items — built 2026-09-04**
-  (`catalog/InventoryItemActions.tsx`, a ⋯ at the end of every `/items` row,
-  purchaser+). **Duplicate copies EVERYTHING** (Mark's word): the master, every
-  per-location row (section, par, per-weekday pars, order days, note), every
-  vendor item pointing at it with its per-location price overrides, and the
-  favorites re-pointed at the COPIED vendor items — so the copy is orderable on
-  day one. Named "… copy" (`duplicateTitle`) and the screen lands on it.
-  Client-side, parent-first; vendor items inserted ONE AT A TIME so old→new is
-  certain. Verified against the live DB by script: 2 location rows
-  byte-identical, 11 of 11 favorites, counts restored after cleanup.
-  **Delete counts first**: item-locations cascade (taking favorites and guide
-  counts), reminders cascade, and `vendor_items` / production elements /
-  purchase requests are `set null` — the vendor items survive UNLINKED and off
-  every guide, which the dialog says. Stocked anywhere → Deactivate is the
-  default. Every write `.select()`s its row count.
-- ~~**Delete/duplicate vendor items.**~~ **RESOLVED 2026-07-31 — built**
-  (`catalog/VendorItemActions.tsx`, on `VendorItemsTable` and the vendor-item
-  screen, purchaser+). A `⋯` menu as agreed, not a right-click — no touch
-  equivalent, and iPad Safari is the ordering stopgap.
-  **Duplicate** copies every field except `id`, the timestamps and `legacy_id`
-  (the FileMaker row's identity; two rows claiming it would corrupt any future
-  reconciliation against the export), and deliberately carries over **neither
-  favorites nor per-location price overrides** — a duplicate is a new SKU, the
-  pack-size-variant case it exists for, not a second favorite.
-  **Delete counts the damage first** and reports it: `price_history`,
-  `vendor_item_location_prices`, `order_guide_entries` and — since 008 —
-  `order_guide_plan_days` all CASCADE, so a delete silently takes the price audit
-  trail, the overrides and **the favorites** with it; `purchase_order_items` is
-  `on delete set null`, so history survives but loses the anchor "last ordered"
-  and price reconciliation need. Anything ever ordered defaults to
-  **Deactivate**, with Delete still reachable beside the real counts. It's a
-  `ui/Dialog`, not `window.confirm`, precisely because it needs three answers.
-
-CLOSED 2026-08-04, all three by Mark ("these are all fine") — kept as answers,
-not as questions:
-- **Should-order counts.** The brief's figures (Mon 229 / Wed 118 at DF01) never
-  reproduced; the model over live data gives Mon 394 / Wed 222. The MODEL is
-  right and the brief's totals were wrong. Judge the guide by the per-vendor
-  breakdown against the real Monday POs.
-- **`rep_email` carrying `info@donutfriend.com`** on Restaurant Depot's rows is
-  not a mis-mapping to chase.
-- **"Last ordered" on the vendor screen** means "this item, at this location,
-  from any vendor" — the Inventory semantics — and that is the intended reading.
-  It does NOT need a per-vendor-item view.
+- **Resolved and closed threads moved to their module history** (2026-11-10):
+  "Default vendor item" retired, duplicate/delete inventory items, duplicate/
+  delete vendor items → `docs/history/03-catalog.md`; the three answers closed
+  2026-08-04 (should-order counts, `rep_email`, "Last ordered") →
+  `docs/history/04-order-guide-and-pos.md`.
 
 ## What NOT to build (deliberately killed or deferred)
 
