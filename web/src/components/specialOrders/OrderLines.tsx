@@ -18,7 +18,7 @@ import { STICKY_HEAD_ROW, useOverflowOnlyWhenNeeded } from "@/lib/tableHead";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
-import { AddOrderLine, type MenuItem } from "./AddOrderLine";
+import { AddOrderLine, ReplaceOrderLine, type MenuItem } from "./AddOrderLine";
 import { isProductionLine, lineTotal, money } from "@/lib/specialOrders";
 import {
   cutLetter,
@@ -178,6 +178,8 @@ export function OrderLines({
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [optimistic, setOptimistic] = useState<{ order: string[]; basedOn: string } | null>(null);
+  /** The line whose Replace item panel is open. */
+  const [replacing, setReplacing] = useState<OrderLineRow | null>(null);
 
   const serverOrder = rows.map((r) => r.id).join("|");
   const ordered =
@@ -813,6 +815,12 @@ export function OrderLines({
                             onSelect: () => duplicate(row),
                           },
                           {
+                            label: "Replace item",
+                            hint: "Another menu item in this line's place",
+                            disabled: pending,
+                            onSelect: () => setReplacing(row),
+                          },
+                          {
                             label: "Remove line",
                             hint: "Takes it off the order; the catalog is untouched",
                             danger: true,
@@ -920,6 +928,18 @@ export function OrderLines({
           </tbody>
         </table>
       </div>
+
+      {replacing ? (
+        <ReplaceOrderLine
+          key={replacing.id}
+          orderId={orderId}
+          orgId={orgId}
+          existing={ordered}
+          menu={menu}
+          row={replacing}
+          onClose={() => setReplacing(null)}
+        />
+      ) : null}
 
       {/* The same footer `DataTable` puts under every list, and it appears the
           same way — only once a width has actually been dragged. */}

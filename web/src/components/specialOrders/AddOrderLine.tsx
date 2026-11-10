@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
@@ -90,6 +90,142 @@ export function AddOrderLine({
   const supabase = createClient();
 
   const [open, setOpen] = useState(false);
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const nextSort = existing.reduce((a, l) => Math.max(a, l.sort ?? 0), 0) + 1;
+
+  function addBlank() {
+    setError(null);
+    start(async () => {
+      const { data, error: e } = await supabase
+        .from("special_order_items")
+        .insert({
+          org_id: orgId,
+          order_id: orderId,
+          sort: nextSort,
+          name: "New item",
+          qty: 1,
+          unit_price: 0,
+          taxable: true,
+        })
+        .select("id");
+      if (e) setError(e.message);
+      else if (!data?.length) setError("Nothing was added — the database refused it silently.");
+      else router.refresh();
+    });
+  }
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className={BUTTON_CLASS} onClick={() => setOpen(true)}>
+          Add item
+        </button>
+        {/* SMALL, between Add item and Clear items (Mark, 2026-09-22) — it
+            was an underlined "Add a line by hand" after both. */}
+        <button type="button" className={SMALL_BUTTON_CLASS} onClick={addBlank} disabled={pending}>
+          Add Line
+        </button>
+        {beside}
+        {error && !open ? <p className="w-full text-[13px] text-accent">{error}</p> : null}
+      </div>
+
+      {open ? (
+        <OrderLinePanel
+          orderId={orderId}
+          orgId={orgId}
+          existing={existing}
+          menu={menu}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * REPLACE ITEM (Mark, 2026-11-10) — the row ⋯ menu's command. The same panel
+ * as Add item, but choosing a donut MARKS it rather than adding it, and Done
+ * writes it over the line.
+ *
+ * AN UPDATE OF THE SAME ROW, never a delete and an insert: the line keeps its
+ * id and so its `sort` (the position the user asked to keep), its delivery
+ * record (217) and its place in any invoice it was copied to. What changes is
+ * everything the menu item supplies — `production_item_id`, the name and the
+ * five taxonomy fields, and the price, snapshotted from the grid exactly as an
+ * add snapshots it. What stays is what the line itself owns: the quantity
+ * (unless one is typed on the chosen row), the note, Tax and Hide.
+ *
+ * The one exception is a LETTER NOTE. A letter line carries its character as
+ * `"A"` in the note (see `insert` below); replacing a letter donut with a plain
+ * one drops that note, or the kitchen would read a letter onto a donut that has
+ * none, and replacing with a letter donut writes the new one.
+ */
+export function ReplaceOrderLine({
+  orderId,
+  orgId,
+  existing,
+  menu,
+  row,
+  onClose,
+}: {
+  orderId: string;
+  orgId: string;
+  existing: OrderLineRow[];
+  menu: MenuItem[];
+  row: OrderLineRow;
+  onClose: () => void;
+}) {
+  return (
+    <OrderLinePanel
+      orderId={orderId}
+      orgId={orgId}
+      existing={existing}
+      menu={menu}
+      replacing={row}
+      onClose={onClose}
+    />
+  );
+}
+
+/** A note that is only a letter in quotes — `"A"`, how an added letter line
+ *  carries its character. */
+function isLetterNote(notes: string | null): boolean {
+  return /^"[^"]*"$/.test((notes ?? "").trim());
+}
+
+/**
+ * The panel itself, for both commands. Its search, filters and typed amounts
+ * last for as long as it is open, and start empty the next time.
+ */
+function OrderLinePanel({
+  orderId,
+  orgId,
+  existing,
+  menu,
+  replacing,
+  onClose,
+}: {
+  orderId: string;
+  orgId: string;
+  existing: OrderLineRow[];
+  menu: MenuItem[];
+  /** The line being replaced; absent when adding. */
+  replacing?: OrderLineRow;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+
+  // The menu is rendered with the page, so an item created or renamed since
+  // this order was opened is not in it (Mark, 2026-09-16: a just-duplicated
+  // donut would not come up). Refreshing on open re-reads it; the panel shows
+  // the list it has meanwhile.
+  useEffect(() => {
+    router.refresh();
+  }, [router]);
+
   const [search, setSearch] = useState("");
   // TYPE · SIZE · CUT beside the search (Mark, 2026-09-16). "" is All. Kept
   // for as long as the panel is open, like the search.
@@ -105,6 +241,8 @@ export function AddOrderLine({
    *  "Which letter?" box. Blank still asks. Several, comma-separated, add a
    *  line each (2026-09-22) — `parseLetters`. */
   const [rowLetter, setRowLetter] = useState<Record<string, string>>({});
+  /** Replace only: the donut marked to go over the line, and its letter. */
+  const [chosen, setChosen] = useState<{ item: MenuItem; letter: string | null } | null>(null);
 
   const items = menu;
 
@@ -170,7 +308,8 @@ export function AddOrderLine({
     // "empty should be blank"), and a box cleared after an add ("") used to
     // read as 0 and do nothing at all.
     const typed = (qty[item.id] ?? "").trim();
-    const amount = typed === "" ? 1 : Number(typed);
+    // Replacing, a blank box keeps the line's own quantity.
+    const amount = typed === "" ? (replacing ? Number(replacing.qty ?? 1) : 1) : Number(typed);
     if (!Number.isFinite(amount) || amount <= 0) return;
     // A LETTER DONUT ASKS WHICH LETTER FIRST (Mark, 2026-09-16) — only a bare
     // `Letter` cut; nothing is written until the character is chosen, so
@@ -178,14 +317,28 @@ export function AddOrderLine({
     if (needsLetterChoice(item.subtype)) {
       const typedLetters = parseLetters(rowLetter[item.id] ?? "");
       if (typedLetters.length > 0) {
-        insert(item, amount, typedLetters);
+        place(item, amount, typedLetters);
         return;
       }
       setOtherLetter("");
       setAsking({ item, amount });
       return;
     }
-    insert(item, amount, [null]);
+    place(item, amount, [null]);
+  }
+
+  /** Adding writes the lines now; replacing only marks the choice for Done. */
+  function place(item: MenuItem, amount: number, characters: (string | null)[]) {
+    if (!replacing) {
+      insert(item, amount, characters);
+      return;
+    }
+    if (characters.length > 1) {
+      setError("A replacement is one line — give it one letter.");
+      return;
+    }
+    setError(null);
+    setChosen({ item, letter: characters[0] });
   }
 
   function chooseLetter(typed: string) {
@@ -193,7 +346,7 @@ export function AddOrderLine({
     if (!asking || letters.length === 0) return;
     const { item, amount } = asking;
     setAsking(null);
-    insert(item, amount, letters);
+    place(item, amount, letters);
   }
 
   /** One line per character, in the order given — `[null]` is one line with
@@ -247,53 +400,49 @@ export function AddOrderLine({
     });
   }
 
-  function addBlank() {
+  /** Done, when replacing: write the chosen donut over the line. */
+  function replace() {
+    if (!replacing || !chosen) return;
+    const { item, letter } = chosen;
+    const typed = (qty[item.id] ?? "").trim();
+    const amount = typed === "" ? Number(replacing.qty ?? 1) : Number(typed);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("The quantity has to be a number above zero.");
+      return;
+    }
     setError(null);
     start(async () => {
       const { data, error: e } = await supabase
         .from("special_order_items")
-        .insert({
-          org_id: orgId,
-          order_id: orderId,
-          sort: nextSort,
-          name: "New item",
-          qty: 1,
-          unit_price: 0,
-          taxable: true,
+        .update({
+          production_item_id: item.id,
+          name: addedLineName(item, letter),
+          item_donut: item.name,
+          item_type: item.item_type,
+          item_cut: letter ? letterCut(letter) : item.subtype,
+          item_finish: item.finish,
+          item_size: item.size,
+          qty: amount,
+          unit_price: item.price ?? 0,
+          notes: letter ? `"${letter}"` : isLetterNote(replacing.notes) ? null : replacing.notes,
         })
+        .eq("id", replacing.id)
         .select("id");
-      if (e) setError(e.message);
-      else if (!data?.length) setError("Nothing was added — the database refused it silently.");
-      else router.refresh();
+      if (e) {
+        setError(e.message);
+        return;
+      }
+      if (!data?.length) {
+        setError("Nothing was replaced — the database refused it and said nothing.");
+        return;
+      }
+      router.refresh();
+      onClose();
     });
   }
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          className={BUTTON_CLASS}
-          onClick={() => {
-            setOpen(true);
-            // The menu is rendered with the page, so an item created or renamed
-            // since this order was opened is not in it (Mark, 2026-09-16: a
-            // just-duplicated donut would not come up). Refreshing on open
-            // re-reads it; the panel shows the list it has meanwhile.
-            router.refresh();
-          }}
-        >
-          Add item
-        </button>
-        {/* SMALL, between Add item and Clear items (Mark, 2026-09-22) — it
-            was an underlined "Add a line by hand" after both. */}
-        <button type="button" className={SMALL_BUTTON_CLASS} onClick={addBlank} disabled={pending}>
-          Add Line
-        </button>
-        {beside}
-        {error && !open ? <p className="w-full text-[13px] text-accent">{error}</p> : null}
-      </div>
-
       {/* A PANEL OVERLAY (Mark, 2026-09-13), where it opened inline under the
           lines and pushed the page down. `ui/Dialog` pins the search in its
           toolbar and Done in its footer, and scrolls only the list — the
@@ -302,10 +451,14 @@ export function AddOrderLine({
           footer (`fixed`, z-30), and a `ui/Dialog` rendered inside it would be
           capped at that layer — under the masthead. On the body it is z-60 as
           everywhere else. */}
-      {open ? createPortal(
+      {createPortal(
         <Dialog
-          title="Add items to this order"
-          onClose={() => setOpen(false)}
+          title={
+            replacing
+              ? `Replace ${replacing.qty != null ? `${replacing.qty} × ` : ""}${replacing.name}`
+              : "Add items to this order"
+          }
+          onClose={onClose}
           width="max-w-3xl"
           // No top padding: the column labels pin to the top of this scroller,
           // and a sticky cell stops at the padding edge — with it, rows would
@@ -347,11 +500,28 @@ export function AddOrderLine({
             </div>
           }
           footer={
-            // BLACK — the panel-commit exception (Mark, 2026-08-19): the one
-            // way out of a panel whose outcome is lines added.
-            <button type="button" onClick={() => setOpen(false)} className={DIALOG_COMMIT_CLASS}>
-              Done
-            </button>
+            replacing ? (
+              // Replacing, Done is the commit and needs a choice to commit.
+              <div className="flex items-center justify-end gap-3">
+                <button type="button" onClick={onClose} className={DIALOG_CANCEL_CLASS}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={replace}
+                  disabled={!chosen || pending}
+                  className={DIALOG_COMMIT_CLASS}
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              // BLACK — the panel-commit exception (Mark, 2026-08-19): the one
+              // way out of a panel whose outcome is lines added.
+              <button type="button" onClick={onClose} className={DIALOG_COMMIT_CLASS}>
+                Done
+              </button>
+            )
           }
         >
           {items.length === 0 ? (
@@ -377,8 +547,12 @@ export function AddOrderLine({
                 <tbody>
                   {shown.map((item) => {
                     const already = onOrder.get(item.id);
+                    const isChosen = chosen?.item.id === item.id;
                     return (
-                      <tr key={item.id} className="border-b border-hairline last:border-0 hover:bg-neutral-50">
+                      <tr
+                        key={item.id}
+                        className={`border-b border-hairline last:border-0 ${isChosen ? "bg-mark-fill" : "hover:bg-neutral-50"}`}
+                      >
                         <td className="py-2 pr-3">
                           <span className="block">{item.name}</span>
                           <span className="block text-[12px] text-subtle">
@@ -434,9 +608,10 @@ export function AddOrderLine({
                             type="button"
                             onClick={() => add(item)}
                             disabled={pending}
+                            aria-pressed={replacing ? isChosen : undefined}
                             className={`${BUTTON_CLASS} w-full px-2`}
                           >
-                            Add
+                            {replacing ? (isChosen ? "Chosen" : "Choose") : "Add"}
                           </button>
                         </td>
                       </tr>
@@ -457,10 +632,15 @@ export function AddOrderLine({
             </div>
           )}
 
+          {replacing && chosen ? (
+            <p className="pt-3 text-[13px]">
+              Replacing with {addedLineName(chosen.item, chosen.letter)}
+            </p>
+          ) : null}
           {error ? <p className="pt-3 text-[13px] text-accent">{error}</p> : null}
         </Dialog>,
         document.body
-      ) : null}
+      )}
 
       {/* WHICH LETTER — a sibling of the panel, not nested inside it, so it
           paints over it and takes Escape alone (`ui/Dialog`'s stack). One tap
@@ -483,7 +663,7 @@ export function AddOrderLine({
                 disabled={otherLetter.trim() === ""}
                 className={DIALOG_COMMIT_CLASS}
               >
-                Add
+                {replacing ? "Choose" : "Add"}
               </button>
             </div>
           }
