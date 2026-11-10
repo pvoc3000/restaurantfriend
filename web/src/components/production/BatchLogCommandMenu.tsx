@@ -6,13 +6,17 @@ import { readSelectedBatch, serverSelectedBatch, subscribeSelectedBatch } from "
 import { BatchActions } from "./BatchActions";
 import { BatchLogActions } from "./BatchLogActions";
 import { NewBatch } from "./NewBatch";
+import { previewBatchLogRow, useBatchLogPreview } from "./PreviewBatchLog";
 
 /**
  * THE BATCH LOG'S COMMANDS, AS ONE "ACTIONS" MENU, THE SAME ON BOTH SHELLS
  * (Mark, 2026-09-12: "make them match, one menu on both"):
  *
- *   Add Batch… · Duplicate Batch · Delete Batch… · — · Mark Complete (or Reopen
- *   Log) · Delete Log…
+ *   Preview Batch Log… · — · Add Batch… · Duplicate Batch · Delete Batch… · — ·
+ *   Mark Complete (or Reopen Log) · Delete Log…
+ *
+ * Preview Batch Log… (Mark, 2026-11-09) is the one READ, so it leads and it is
+ * the whole menu for anybody who may not write — `PreviewBatchLog`.
  *
  * The desk puts it in the title row; the tablet, which has no title row, in the
  * crumb row. That placement is the only difference left — the tablet's footer,
@@ -38,6 +42,7 @@ export function BatchLogCommandMenu({
   outstanding,
   editable,
   removable = false,
+  today,
 }: {
   orgId: string;
   logId: string;
@@ -50,11 +55,18 @@ export function BatchLogCommandMenu({
   editable: boolean;
   /** Purchaser+ — 044's delete policy, which Delete Batch… answers to. */
   removable?: boolean;
+  /** The org's calendar day, for the printed sheet's masthead. */
+  today: string;
 }) {
   const selected = useSyncExternalStore(subscribeSelectedBatch, readSelectedBatch, serverSelectedBatch);
+  const previewer = useBatchLogPreview(today);
+  const previewRow = previewBatchLogRow(previewer, logId);
+  const ariaLabel = `Actions for the ${kitchenCode} ${logDate} batch log`;
 
-  // Every command here writes, so below `canLogBatch` there is no menu.
-  if (!editable) return null;
+  // Every other command writes, so below `canLogBatch` the menu is Preview alone.
+  if (!editable) {
+    return <ActionMenu ariaLabel={ariaLabel} minWidth={200} items={[previewRow]} />;
+  }
 
   const menu = (addRow: ActionMenuItem, deleteBatchRows: ActionMenuItem[]) => (
     <BatchLogActions
@@ -68,10 +80,11 @@ export function BatchLogCommandMenu({
     >
       {(logRows) => (
         <ActionMenu
-          ariaLabel={`Actions for the ${kitchenCode} ${logDate} batch log`}
+          ariaLabel={ariaLabel}
           minWidth={200}
           items={[
-            addRow,
+            previewRow,
+            { ...addRow, separatorBefore: true },
             // With nothing selected the batch commands stay in the menu, dead,
             // so it keeps its shape as you click around the list.
             ...(deleteBatchRows.length

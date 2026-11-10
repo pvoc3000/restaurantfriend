@@ -2166,3 +2166,39 @@ is on lines only. `AddStepDialog` is the old Actions dialog, placed by the
 same `sortBelow`; Actions keeps Add Procedure… only for a version with no
 steps. `DeleteRecipeRow`, the × both tables used, had no callers left and is
 gone.
+
+## 2026-11-09 — Preview Batch Log… (a write-in sheet)
+
+Mark: staff print a batch log, walk the kitchen with it, and write On hand and
+Made in by hand. **Preview Batch Log…** is now the first row of the log's
+Actions menu (both shells) and the only row of a new ⋯ at the far right of each
+`/batch-logs` row (`PreviewBatchLog`, `ui/RowMenu`). For anybody below
+`canLogBatch` the log's Actions menu is Preview alone — today that is nobody,
+since every role may log batches.
+
+- **The sheet** (`pdf/BatchLogSheetPdf`, appDocument parts): masthead, KITCHEN
+  over BATCH LOG with the log's date where a record's number sits, the schedule
+  and batch count as the caption, the log's note under it; then Element · Par ·
+  On hand □ · Made □, US Letter portrait. A batch's label tails its element
+  ("Chocolate Glaze — Dark"); an unset par prints BLANK, not an em dash, since a
+  dash in a column somebody copies figures from reads as a value.
+- **Order: the screen's DEFAULTS, not the reader's remembered ones** —
+  `lib/batchLogSheet.batchSheetGroups`: black bands by element type, untyped
+  last as "No type", element name, then the schedule's sort and the label. The
+  list's ⋯ has no batch table to read a grouping from, and two routes to one
+  document should print the same page. Every batch on the log prints, whatever
+  its status.
+- **Fetched at the click** (`fetchBatchSheet`) on both routes, the tab opened
+  before any await (`ProcessPo`'s Preview PDF). The masthead's date is the org's
+  day from the server page (`guideToday`), not a UTC `toISOString()`.
+- **It stamps nothing.** `production_batch_logs.printed_at` is still written by
+  no app path (only FileMaker history carries it), so every app log keeps its
+  yellow "not printed". A preview is not proof of paper; whether a print command
+  should stamp it is Mark's call.
+- `/forms` has a **Batch log** row (`sampleBatchSheet`); fixtures
+  `batchLogSheet.fixtures.ts` (ordering, name, par, file name — checked red by
+  letting an untyped batch sort first). Rendered in Node over the sample, a
+  64-line log (3 pages, each band kept with its first row; the column heads do
+  not repeat after page 1) and DF02's real 2026-11-09 Donut log (9 batches), and
+  looked at with `sips`. NOT clicked through in a browser: the pane was at the
+  shared-device PIN lock.

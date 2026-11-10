@@ -20,6 +20,7 @@ import type { CustomerInvoiceDoc } from "@/components/specialOrders/pdf/SpecialO
 import type { TagPrint } from "@/components/tags/pdf/TagSheetPdf";
 import type { OrgDocData, PoDocData } from "@/lib/poProcessing";
 import type { PacketData, PacketSchedule } from "@/lib/productionPacket";
+import { batchSheetGroups, type BatchSheetData, type BatchSheetLine } from "@/lib/batchLogSheet";
 import type { ScheduleLine } from "@/lib/productionSchedule";
 import type { DocumentLine, OrderDocData } from "@/lib/specialOrderDocs";
 import { buildStatement, type StatementDocument } from "@/lib/customerStatement";
@@ -524,6 +525,41 @@ export function samplePacket(orgName: string): PacketData {
         weekly: [element("e6", "Maple Glaze Base", "AM", 1, "gal", 1)],
       },
     ],
+  };
+}
+
+/** A Donut-schedule log: three types, a second labelled batch of one glaze,
+ *  an untyped element banding last, and one batch with no par. */
+export function sampleBatchSheet(orgName: string): BatchSheetData {
+  const line = (
+    id: string,
+    element_name: string,
+    element_type: string | null,
+    par_count: number | null,
+    par_size: number | null,
+    par_unit: string | null,
+    batch_label: string | null = null,
+    sort: number | null = null
+  ): BatchSheetLine => ({ id, element_name, element_type, batch_label, sort, par_count, par_size, par_unit });
+  return {
+    orgName,
+    kitchenCode: "DF01",
+    logDate: "2026-09-26",
+    schedule: "Donut",
+    note: "Fryer oil changed Friday — check the fritters.",
+    printedOn: "2026-09-25",
+    groups: batchSheetGroups([
+      line("b1", "Raised Dough", "Donut", 2, 35, "lb", null, 1),
+      line("b2", "Cake Batter", "Donut", null, 30, "lb", null, 2),
+      line("b3", "Old Fashioned Batter", "Donut", null, 18, "lb", null, 3),
+      line("b4", "Vanilla Glaze", "Glaze", 4, 3, "gal"),
+      line("b5", "Chocolate Glaze", "Glaze", 2, 3, "gal", "Dark", 10),
+      line("b6", "Chocolate Glaze", "Glaze", 1, 3, "gal", "Milk", 11),
+      line("b7", "Maple Glaze", "Glaze", 6, 1, "qt"),
+      line("b8", "Raspberry Jam", "Filling", 4, 22, "qt"),
+      line("b9", "Bavarian Cream", "Filling", null, null, null),
+      line("b10", "Sprinkles, rainbow", null, 10, null, "bags"),
+    ]),
   };
 }
 

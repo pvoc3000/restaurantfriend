@@ -25,6 +25,7 @@ import {
 import { SCHEDULE_CLASSES, scheduleLabel } from "@/lib/production";
 import { PAUSED } from "@/components/ui/FilterMenus";
 import { hrefWithSearch, useSearchLoadsAllDates } from "@/lib/searchWindow";
+import { BatchLogRowMenu } from "@/components/production/PreviewBatchLog";
 
 export type BatchLogRow = {
   id: string;
@@ -323,6 +324,23 @@ export function BatchLogsIndex({
       hideWhenCompact: true,
       render: (r) =>
         r.note ? <span>{r.note}</span> : <span className="text-faint">—</span>,
+    },
+    // THE ROW'S OWN COMMANDS, all the way right (Mark, 2026-11-09): Preview
+    // Batch Log… today. Unlabelled, so it stays out of the Columns menu and
+    // holds its slot through a drag — a control column, not a field, as on
+    // `/elements`. Offered to everybody: previewing writes nothing.
+    {
+      key: "actions",
+      label: "",
+      width: 60,
+      align: "right",
+      render: (r) => (
+        <BatchLogRowMenu
+          logId={r.id}
+          name={`${r.kitchenCode} ${batchDate(r.log_date)}`}
+          printedOn={today}
+        />
+      ),
     },
   ];
 

@@ -12,6 +12,7 @@ import { ControlField } from "@/components/ui/ControlField";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { batchDate } from "@/lib/productionBatches";
 import { dateInTimeZone, serverTimeZone } from "@/lib/today";
+import { guideToday } from "@/lib/orderGuide";
 import { scheduleLabel } from "@/lib/production";
 import { type BatchRow } from "@/components/production/BatchItemsTable";
 import { BatchLogItems } from "@/components/production/BatchLogItems";
@@ -264,6 +265,9 @@ export async function BatchLogRecord({
     ? memberById.get(log.generated_by as string) ?? null
     : null;
 
+  // The org's day, for the printed sheet — `guideToday`, as `/batch-logs` reads it.
+  const today = guideToday(session.orgSettings.timezone ?? serverTimeZone()).date;
+
   const trail = parseTrail(rawParams, { href: "/batch-logs", label: "Batch Logs" });
 
   // THE TABLET KEEPS THE CRUMB, THE LIST AND THE PANE, AND LOSES THE REST
@@ -299,6 +303,7 @@ export async function BatchLogRecord({
               outstanding={rows.length - done}
               editable={editable}
               removable={removable}
+              today={today}
             />
           </div>
         ) : (
@@ -338,6 +343,7 @@ export async function BatchLogRecord({
             outstanding={rows.length - done}
             editable={editable}
             removable={removable}
+            today={today}
           />
         </div>
       </header>

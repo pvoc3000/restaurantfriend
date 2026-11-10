@@ -15,6 +15,7 @@ import "./taxRates.fixtures";
 import "./threadSubject.fixtures";
 import "./orderEmail.fixtures";
 import "./batchLogFilters.fixtures";
+import "./batchLogSheet.fixtures";
 import "./breakRules.fixtures";
 import "./timesheetIssues.fixtures";
 import "./checklists.fixtures";

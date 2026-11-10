@@ -170,6 +170,10 @@ async function buildElement(
         />
       );
     }
+    case "batch-log": {
+      const { BatchLogSheetPdf } = await import("@/components/production/pdf/BatchLogSheetPdf");
+      return <BatchLogSheetPdf data={s.sampleBatchSheet(orgName)} />;
+    }
     case "recipe": {
       const { RecipePdf } = await import("@/components/production/pdf/RecipePdf");
       return <RecipePdf data={s.sampleRecipe(orgName)} />;

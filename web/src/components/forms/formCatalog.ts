@@ -32,6 +32,7 @@ export const FORM_GROUPS = [
     label: "Production",
     forms: [
       { key: "production-packet", label: "Production packet" },
+      { key: "batch-log", label: "Batch log" },
       { key: "recipe", label: "Recipe" },
     ],
   },
