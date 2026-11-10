@@ -6578,6 +6578,6 @@ silences it with no flag to keep in step. `deliveryEstimateGoAhead`
 (`lib/specialOrderSend`) asks at the Email tab's Send with a quote attached and
 at Download ▸ Quote (a printed quote is a sent one), "Send Anyway" /
 "Download Anyway". Send ▸ Quote itself only opens the compose box, so it does
-not ask. Status: 225 written, NOT applied; `submit-inquiry` changed, NOT
-deployed (needs --no-verify-jwt); the order screen selects the new column, so
-the web change must not reach production before 225 does.
+not ask. Status: 225 APPLIED 2026-11-10 (11 orders backfilled); `submit-inquiry`
+v26 DEPLOYED (--no-verify-jwt) 2026-11-10; the order screen selects the new
+column, which is why 225 had to land before the push.
