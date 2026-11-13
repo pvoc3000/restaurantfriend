@@ -9,6 +9,9 @@ import { BatchPhoto } from "@/components/production/BatchPhoto";
 import { BatchVersionCell } from "@/components/production/BatchVersionCell";
 import { UNIT_PICK_OPTIONS } from "@/lib/units";
 
+/** An edit to one batch's column, reported the moment it is made. */
+export type BatchEdit = (id: string, column: string, value: string | number | null) => void;
+
 /** Everything the editable pane needs about one batch. */
 export type BatchFieldsRow = {
   id: string;
@@ -72,6 +75,7 @@ export function BatchFields({
   editable,
   fill = false,
   scaleLabels = [],
+  onEdit,
 }: {
   row: BatchFieldsRow;
   orgId: string;
@@ -92,7 +96,12 @@ export function BatchFields({
   /** The batch sizes the batch's recipe version has — the Scale picker's
    *  options. `allowNew` on top, since a size typed by hand is a real answer. */
   scaleLabels?: string[];
+  /** Each edit as it STARTS (and its undo if it fails), so the list above the
+   *  pane can show it without waiting for the server — see `BatchLogItems`. */
+  onEdit?: BatchEdit;
 }) {
+  const pend = (column: string) =>
+    onEdit ? (v: string | number | null) => onEdit(row.id, column, v) : undefined;
   return (
     // TWO BY TWO (Mark, 2026-09-09): what the batch IS on the left — status,
     // number, order, who made it, which recipe — and the four AMOUNTS on the
@@ -121,7 +130,7 @@ export function BatchFields({
             // Uppercase on the CONTROL — a wrapper's `text-transform` never
             // reaches a button (the reset sets it to none).
             <InlineValue
-              boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="status" kind="pick"
+              boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="status" onPending={pend("status")} kind="pick"
               nullable={false} options={BATCH_STATUS_OPTIONS}
               value={row.status} className="uppercase" ariaLabel="Batch status"
             />
@@ -137,7 +146,7 @@ export function BatchFields({
         <Field label="Order">
           {editable ? (
             <InlineValue
-              boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="batch_label"
+              boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="batch_label" onPending={pend("batch_label")}
               value={row.batch_label} ariaLabel="Which batch of the day"
             />
           ) : (
@@ -148,7 +157,7 @@ export function BatchFields({
         <Field label="Prepared by">
           {editable ? (
             <InlineValue
-              boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="operator_employee_id" kind="pick"
+              boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="operator_employee_id" onPending={pend("operator_employee_id")} kind="pick"
               options={operators} value={row.operator_employee_id}
               ariaLabel="Who made this batch"
             />
@@ -182,7 +191,7 @@ export function BatchFields({
           <Field label="Scale">
             {editable ? (
               <InlineValue
-                boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="scale_label" kind="pick"
+                boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="scale_label" onPending={pend("scale_label")} kind="pick"
                 allowNew options={scaleLabels.map((l) => ({ value: l, label: l }))}
                 value={row.scale_label} ariaLabel="Which batch size was made"
               />
@@ -206,10 +215,10 @@ export function BatchFields({
           </span>
         </Field>
         <Field label="On hand before">
-          <Triple row={row} prefix="on_hand" editable={editable} />
+          <Triple row={row} prefix="on_hand" editable={editable} pend={pend} />
         </Field>
         <Field label="Made">
-          <Triple row={row} prefix="yield" editable={editable} />
+          <Triple row={row} prefix="yield" editable={editable} pend={pend} />
         </Field>
       </dl>
 
@@ -220,7 +229,7 @@ export function BatchFields({
           <dd className="mt-0.5">
             {editable ? (
               <InlineValue
-                boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="notes" multiline
+                boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="notes" onPending={pend("notes")} multiline
                 value={row.notes} ariaLabel="Notes on this batch"
               />
             ) : (
@@ -255,10 +264,12 @@ function Triple({
   row,
   prefix,
   editable,
+  pend,
 }: {
   row: BatchFieldsRow;
   prefix: "on_hand" | "yield";
   editable: boolean;
+  pend: (column: string) => ((v: string | number | null) => void) | undefined;
 }) {
   const count = prefix === "on_hand" ? row.on_hand_count : row.yield_count;
   const size = prefix === "on_hand" ? row.on_hand_size : row.yield_size;
@@ -283,7 +294,7 @@ function Triple({
       <span className="block w-14 shrink-0">
         <InlineValue
           boxed={BOXED_FIELDS}
-          table="production_batches" id={row.id} column={`${prefix}_count`} kind="number"
+          table="production_batches" id={row.id} column={`${prefix}_count`} onPending={pend(`${prefix}_count`)} kind="number"
           value={count} ariaLabel={`${what} count`}
         />
       </span>
@@ -291,7 +302,7 @@ function Triple({
       <span className="block w-16 shrink-0">
         <InlineValue
           boxed={BOXED_FIELDS}
-          table="production_batches" id={row.id} column={`${prefix}_size`} kind="number"
+          table="production_batches" id={row.id} column={`${prefix}_size`} onPending={pend(`${prefix}_size`)} kind="number"
           value={size} ariaLabel={`${what} size`}
         />
       </span>
@@ -302,7 +313,7 @@ function Triple({
       <span className="block w-24 shrink-0">
         <InlineValue
           boxed={BOXED_FIELDS}
-          table="production_batches" id={row.id} column={`${prefix}_unit`}
+          table="production_batches" id={row.id} column={`${prefix}_unit`} onPending={pend(`${prefix}_unit`)}
           kind="pick" options={UNIT_PICK_OPTIONS} allowNew
           value={unit} ariaLabel={`${what} unit`}
         />

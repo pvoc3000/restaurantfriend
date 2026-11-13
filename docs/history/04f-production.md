@@ -2202,3 +2202,26 @@ since every role may log batches.
   not repeat after page 1) and DF02's real 2026-11-09 Donut log (9 batches), and
   looked at with `sips`. NOT clicked through in a browser: the pane was at the
   shared-device PIN lock.
+
+### 2026-11-13 — the batch log's Info pane went stuck between batches, and was slow
+
+Mark: edit a field on one batch, pick another row, and the same field showed the
+value just typed and would not take a new one until you went back. **The pane
+was not keyed by the batch**, so React reused every `InlineValue` across rows.
+A cell holds the value it just wrote (`pending`) until the server's copy
+CHANGES — and on the next batch the server's copy was usually the same as the
+last batch's old one (both empty), so nothing changed and the stale value
+stayed. Typing that same value again then compared equal and wrote nothing.
+Fixed by `key={selected.id}` on `BatchFields` and `BatchRecipe` — the
+conventions rule about keying client state seeded from server data, applied
+where it had been missed. The scan for other in-page selection panes over
+inline fields found no other; full-page detail routes remount per `[id]`.
+
+**Slow:** every edit waited on `router.refresh()`, which re-runs the whole page,
+before the LIST showed it. `InlineValue` gained `onPending` (the value as a
+write starts, the old one back on failure); `BatchLogItems` lays those over
+both the rows and the pane until the server agrees, so the list, its grouping
+and the Made column move on the keystroke. The photo signing and the recipe
+versions read now run side by side, one round trip fewer per refresh. A
+"Set" button that batches edits was raised and NOT built — to discuss.
+Not verified with a real write in the browser (that would write live data).

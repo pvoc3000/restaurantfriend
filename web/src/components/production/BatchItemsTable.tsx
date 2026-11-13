@@ -10,6 +10,7 @@ import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { useRememberedView } from "@/lib/viewMemory";
 import { InlineValue } from "@/components/catalog/InlineValue";
+import type { BatchEdit } from "@/components/production/BatchFields";
 import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import {
   BATCH_STATUSES,
@@ -132,6 +133,7 @@ export function BatchItemsTable({
   fill,
   touch = false,
   filterExtra,
+  onEdit,
 }: {
   rows: BatchRow[];
   /** Supervisor and up — 044's `production_batches` write policies. */
@@ -150,6 +152,9 @@ export function BatchItemsTable({
   /** A control after Group by — the batch log's Note (Mark, 2026-09-12).
    *  A flexible pen, so a boxed field's `w-full` has a width to fill. */
   filterExtra?: React.ReactNode;
+  /** Each edit as it starts — so the pane below follows the list's own Note
+   *  and Status cells without waiting for the server. See `BatchLogItems`. */
+  onEdit?: BatchEdit;
 }) {
   // REMEMBERED WHILE YOU WALK RECORDS (Mark, 2026-08-09: "when navigating using
   // the buttons in the upper right hand corner of the detail screen, I'd like
@@ -459,6 +464,7 @@ export function BatchItemsTable({
             table="production_batches"
             id={r.id}
             column="notes"
+            onPending={onEdit ? (v) => onEdit(r.id, "notes", v) : undefined}
             value={r.notes}
             ariaLabel={`Note, ${r.element_name}`}
           />
@@ -481,6 +487,7 @@ export function BatchItemsTable({
             table="production_batches"
             id={r.id}
             column="status"
+            onPending={onEdit ? (v) => onEdit(r.id, "status", v) : undefined}
             kind="pick"
             nullable={false}
             options={BATCH_STATUS_OPTIONS}

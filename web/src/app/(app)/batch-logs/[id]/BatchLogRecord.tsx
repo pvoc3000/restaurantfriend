@@ -127,28 +127,31 @@ export async function BatchLogRecord({
   const photoPaths = (batches ?? [])
     .map((b) => b.photo_path as string | null)
     .filter((p): p is string => p !== null);
-  const signedByPath = new Map<string, string>();
-  if (photoPaths.length > 0) {
-    const { data: signed } = await supabase.storage
-      .from(BATCH_PHOTO_BUCKET)
-      .createSignedUrls(photoPaths, BATCH_PHOTO_TTL_SECONDS);
-    for (const s of signed ?? []) {
-      if (s.path && s.signedUrl) signedByPath.set(s.path, s.signedUrl);
-    }
-  }
-
   // The element's own recipe versions, for the pane's picker. One query for the
-  // whole log rather than one per batch.
+  // whole log rather than one per batch. It and the photo signing both need only
+  // the batches, so they run side by side — every edit in the pane re-runs this
+  // page through `router.refresh()`, and this was a round trip of its own.
   const elementIds = [
     ...new Set((batches ?? []).map((b) => b.element_id as string).filter(Boolean)),
   ];
-  const { data: versionRows } = elementIds.length
-    ? await supabase
-        .from("production_recipe_versions")
-        .select("id, version_label, is_master, scale_labels, production_recipes!inner(element_id)")
-        .in("production_recipes.element_id", elementIds)
-        .order("version_sort", { nullsFirst: false })
-    : { data: [] };
+  const [{ data: signed }, { data: versionRows }] = await Promise.all([
+    photoPaths.length > 0
+      ? supabase.storage
+          .from(BATCH_PHOTO_BUCKET)
+          .createSignedUrls(photoPaths, BATCH_PHOTO_TTL_SECONDS)
+      : Promise.resolve({ data: [] as { path: string | null; signedUrl: string }[] }),
+    elementIds.length
+      ? supabase
+          .from("production_recipe_versions")
+          .select("id, version_label, is_master, scale_labels, production_recipes!inner(element_id)")
+          .in("production_recipes.element_id", elementIds)
+          .order("version_sort", { nullsFirst: false })
+      : Promise.resolve({ data: [] }),
+  ]);
+  const signedByPath = new Map<string, string>();
+  for (const s of signed ?? []) {
+    if (s.path && s.signedUrl) signedByPath.set(s.path, s.signedUrl);
+  }
 
   const versionsByElement: Record<string, { value: string; label: string; hint?: string }[]> = {};
   // Each version's BATCH SIZES — its scale column labels — so the pane's

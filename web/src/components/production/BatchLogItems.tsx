@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { setSelectedBatch } from "@/lib/selectedBatch";
 import { useRememberedView } from "@/lib/viewMemory";
 import { useScrollMemory } from "@/lib/scrollMemory";
@@ -10,7 +10,11 @@ import { SectionNav } from "@/components/ui/SectionNav";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { clampSplit, setSplit, useSplit } from "@/lib/paneSplit";
 import { BatchItemsTable, type BatchRow } from "@/components/production/BatchItemsTable";
-import { BatchFields, type BatchFieldsRow } from "@/components/production/BatchFields";
+import {
+  BatchFields,
+  type BatchEdit,
+  type BatchFieldsRow,
+} from "@/components/production/BatchFields";
 import { BatchHistory } from "@/components/production/BatchHistory";
 import { BatchRecipe } from "@/components/production/BatchRecipe";
 
@@ -95,8 +99,8 @@ const FRAME_FLOOR = 40 + 4 * 36 + 8 + 260;
  * screen leaves the table about six rows, which is worse than scrolling.
  */
 export function BatchLogItems({
-  rows,
-  fields,
+  rows: serverRows,
+  fields: serverFields,
   orgId,
   operators,
   versionsByElement,
@@ -125,6 +129,62 @@ export function BatchLogItems({
   // tab you were on — see `lib/viewMemory`. A batch that is not in this log
   // falls through to the first row below, so the key need not name the log.
   const [picked, setPicked] = useRememberedView<string | null>("batch-log.picked", null);
+
+  /**
+   * EDITS NOT YET BACK FROM THE SERVER, laid over both the list and the pane
+   * (Mark, 2026-11-13: "editing values is slow here").
+   *
+   * Every field writes on its own and then `router.refresh()` re-runs the whole
+   * page — the log, its batches, the operators, every photo's signed URL and
+   * every recipe version — before the list above showed what the pane below
+   * had just been told. Each cell now reports its value the moment it starts
+   * writing (and the old one if the write fails), so the list, its grouping
+   * and its "Made" column move on the keystroke.
+   *
+   * An entry is dropped once the server's copy AGREES with it, not merely when
+   * a new copy arrives: a refresh started by the first of two quick edits
+   * lands while the second is still in flight, and dropping everything then
+   * would flick the second back for a moment.
+   */
+  const [edits, setEdits] = useState<Record<string, Record<string, string | number | null>>>({});
+  const [seenFields, setSeenFields] = useState(serverFields);
+  if (seenFields !== serverFields) {
+    setSeenFields(serverFields);
+    const kept: typeof edits = {};
+    for (const [batchId, cols] of Object.entries(edits)) {
+      const server = serverFields[batchId] as Record<string, unknown> | undefined;
+      if (!server) continue;
+      const left = Object.fromEntries(
+        Object.entries(cols).filter(([col, v]) => !sameValue(server[col], v))
+      );
+      if (Object.keys(left).length > 0) kept[batchId] = left;
+    }
+    setEdits(kept);
+  }
+  const onEdit: BatchEdit = (batchId, column, value) =>
+    setEdits((prev) => ({ ...prev, [batchId]: { ...prev[batchId], [column]: value } }));
+
+  const fields = useMemo(() => {
+    const out: Record<string, BatchFieldsRow> = {};
+    for (const [batchId, f] of Object.entries(serverFields)) {
+      out[batchId] = edits[batchId] ? ({ ...f, ...edits[batchId] } as BatchFieldsRow) : f;
+    }
+    return out;
+  }, [serverFields, edits]);
+  const rows = useMemo(() => {
+    const operatorName = new Map(operators.map((o) => [o.value, o.label]));
+    return serverRows.map((r) => {
+      const e = edits[r.id];
+      if (!e) return r;
+      const next = { ...r, ...(e as Partial<BatchRow>) };
+      if ("operator_employee_id" in e) {
+        next.operatorName = e.operator_employee_id
+          ? operatorName.get(String(e.operator_employee_id)) ?? null
+          : null;
+      }
+      return next;
+    });
+  }, [serverRows, edits, operators]);
   const [storedPane, setPane] = useRememberedView<string>("batch-log.pane", "info");
   const pane: Pane = PANE_SECTIONS.some((t) => t.key === storedPane) ? (storedPane as Pane) : "info";
   /**
@@ -226,6 +286,7 @@ export function BatchLogItems({
           editable={editable}
           selectedId={selectedId}
           onSelect={setPicked}
+          onEdit={onEdit}
           fill={wide}
           touch={touch}
           filterExtra={filterExtra}
@@ -343,6 +404,14 @@ export function BatchLogItems({
                 className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto pr-1"
               >
                 <BatchFields
+                  // KEYED BY THE BATCH (Mark, 2026-11-13). Unkeyed, picking
+                  // another row reused every cell, and a cell still holding the
+                  // value it had just written for the LAST batch kept showing it
+                  // here whenever this batch's own value happened to match the
+                  // last one's old value — most often both empty. Worse, typing
+                  // that same value then looked like no change and wrote nothing.
+                  key={selected.id}
+                  onEdit={onEdit}
                   row={selected}
                   orgId={orgId}
                   operators={operators}
@@ -398,6 +467,7 @@ export function BatchLogItems({
               // hands over a definite height and gets out of the way.
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                 <BatchRecipe
+                  key={selected.id}
                   versionId={selected.recipe_version_id ?? selected.masterVersionId ?? null}
                   elementName={selected.element_name}
                   show={pane}
@@ -417,4 +487,13 @@ export function BatchLogItems({
     </div>
     </>
   );
+}
+
+/** The server's copy against an edit: numerics come back from PostgREST as
+ *  strings often enough that `5` and `"5"` must count as the same answer. */
+function sameValue(server: unknown, edit: string | number | null): boolean {
+  if (server === null || server === undefined) return edit === null;
+  if (edit === null) return false;
+  if (typeof edit === "number" || typeof server === "number") return Number(server) === Number(edit);
+  return String(server) === edit;
 }

@@ -310,6 +310,7 @@ export function InlineValue({
   arrayWidth,
   match,
   onWrite,
+  onPending,
   activateTable,
   scale,
   multiline = false,
@@ -442,6 +443,13 @@ export function InlineValue({
    * gives a sentence, where a zero-row update gives silence.
    */
   onWrite?: (next: string | number | null) => Promise<{ error: string | null }>;
+  /**
+   * Told the value the moment a write STARTS, and told the old value back if
+   * it fails — so a screen showing the same fact elsewhere (the batch log's
+   * list above its pane) can change on the keystroke rather than after
+   * `router.refresh()` has re-run the whole route (Mark, 2026-11-13).
+   */
+  onPending?: (next: string | number | null) => void;
   /**
    * kind="pick" only — passed straight to `PickList`. The table an `inactive`
    * option lives in, so choosing a retired one offers to revive it first rather
@@ -596,9 +604,11 @@ export function InlineValue({
   async function write(next: string | number | null, reopen: boolean) {
     if (next === value || (next === null && value === null)) return;
 
+    const before = value;
     setSaving(true);
     setError(null);
     setPending({ v: next });
+    onPending?.(next);
 
     // A caller-supplied write replaces the statement and nothing else. It is
     // checked FIRST so none of the row-identity machinery below applies: a
@@ -610,6 +620,7 @@ export function InlineValue({
       setSaving(false);
       if (error) {
         setPending(null);
+        onPending?.(before);
         setError(error);
         if (reopen) setEditing(true);
         return;
@@ -624,6 +635,7 @@ export function InlineValue({
     if (!where) {
       setSaving(false);
       setPending(null);
+      onPending?.(before);
       setError("this field has no row to write to");
       return;
     }
@@ -653,6 +665,7 @@ export function InlineValue({
     setSaving(false);
     if (error || !data || data.length === 0) {
       setPending(null);
+      onPending?.(before);
       setError(error?.message ?? "not saved");
       if (reopen) setEditing(true);
       return;
