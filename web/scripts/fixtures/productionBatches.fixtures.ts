@@ -40,8 +40,9 @@ test("describeAmount reproduces FileMaker's own '2x 22qt'", () => {
   eq(describeAmount(2, 22, "qt"), "2 × 22 qt");
 });
 
-test("a count of 1 is dropped — '1 × 22 qt' is 22 qt said twice", () => {
-  eq(describeAmount(1, 22, "qt"), "22 qt");
+test("a count of 1 is shown, so it differs from no count at all", () => {
+  eq(describeAmount(1, 22, "qt"), "1 × 22 qt");
+  eq(describeAmount(1, 1.5, "gal"), "1 × 1.5 gal");
   eq(describeAmount(null, 22, "qt"), "22 qt");
 });
 

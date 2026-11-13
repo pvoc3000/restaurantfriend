@@ -126,7 +126,10 @@ export function batchMadeNothing(batch: {
  * three columns rather than the free text 036 had to parse: a count and a size
  * are different facts and only the pair can be multiplied.
  *
- * A count of 1 is dropped, because "1 × 22 qt" is 22 qt said twice.
+ * A count of 1 is SHOWN (Mark, 2026-11-13). It used to be dropped as "22 qt
+ * said twice", which made a batch counted as one container read exactly like
+ * one where nobody entered a count — and only the second is missing a fact.
+ * A null count still reads as the bare size.
  */
 export function describeAmount(
   count: number | null,
@@ -138,7 +141,7 @@ export function describeAmount(
     // No size: the count IS the amount ("8 ea", "10 BAGS").
     return count === null ? "—" : `${trim(count)}${u}`;
   }
-  if (count === null || count === 1) return `${trim(size)}${u}`;
+  if (count === null) return `${trim(size)}${u}`;
   return `${trim(count)} × ${trim(size)}${u}`;
 }
 
