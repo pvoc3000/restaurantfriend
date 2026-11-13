@@ -242,21 +242,23 @@ export function needsLetterChoice(subtype: string | null | undefined): boolean {
  * The letters typed into a letter box, one per line to add (Mark, 2026-09-22:
  * "H, A, P" adds an H, an A and a P).
  *
- * COMMAS SEPARATE, AND NOTHING ELSE DOES — Mark chose consistency over
- * convenience. `HAPPY` without commas is ONE character, exactly as it was
- * before this existed, so the rare two-letter cuts (`OP`, `AB`) mean the same
- * thing typed alone or in a list, and `<3` never splits into `<` and `3`. No
- * character in the set is a comma, so the separator costs nothing.
+ * COMMAS AND SPACES SEPARATE (spaces since 2026-11-12, Mark: "let spaces split
+ * too", after `S T R I K E R S` added one line). A run of characters with no
+ * separator is still ONE character, exactly as before this existed, so the
+ * rare two-letter cuts (`OP`, `AB`) mean the same thing typed alone or in a
+ * list, and `<3` never splits into `<` and `3` — which is why `STRIKERS` typed
+ * solid is still one line. No character in the set holds a comma or a space,
+ * so the separators cost nothing.
  *
  * In the order typed, repeats kept: the lines are the word's sequence, and a
- * second P is a second line rather than a P of quantity two. Each is trimmed
- * and upper-cased; blanks (`H,,A`, a trailing comma) are dropped, so an empty
- * list means nothing was typed.
+ * second P is a second line rather than a P of quantity two. Each is
+ * upper-cased; blanks (`H,,A`, `H, A`, a trailing comma) are dropped, so an
+ * empty list means nothing was typed.
  */
 export function parseLetters(raw: string): string[] {
   return raw
-    .split(",")
-    .map((c) => c.trim().toUpperCase())
+    .split(/[\s,]+/)
+    .map((c) => c.toUpperCase())
     .filter((c) => c !== "");
 }
 

@@ -238,8 +238,8 @@ function OrderLinePanel({
   const [asking, setAsking] = useState<{ item: MenuItem; amount: number } | null>(null);
   const [otherLetter, setOtherLetter] = useState("");
   /** A letter typed on the row itself (Mark, 2026-09-16), which skips the
-   *  "Which letter?" box. Blank still asks. Several, comma-separated, add a
-   *  line each (2026-09-22) — `parseLetters`. */
+   *  "Which letter?" box. Blank still asks. Several, separated by commas or
+   *  spaces, add a line each (2026-09-22; spaces 2026-11-12) — `parseLetters`. */
   const [rowLetter, setRowLetter] = useState<Record<string, string>>({});
   /** Replace only: the donut marked to go over the line, and its letter. */
   const [chosen, setChosen] = useState<{ item: MenuItem; letter: string | null } | null>(null);
@@ -645,7 +645,7 @@ function OrderLinePanel({
       {/* WHICH LETTER — a sibling of the panel, not nested inside it, so it
           paints over it and takes Escape alone (`ui/Dialog`'s stack). One tap
           on a character adds the line; the box is for the rare ones ("OP"),
-          and takes a comma-separated list like the row's own box. */}
+          and takes a list split by commas or spaces like the row's own box. */}
       {asking ? createPortal(
         <Dialog
           title="Which letter?"

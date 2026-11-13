@@ -222,14 +222,21 @@ test("parseLetters: commas separate, in the order typed, repeats kept", () => {
   eq(parseLetters("h,a"), ["H", "A"]);
 });
 
-test("parseLetters: nothing but a comma separates", () => {
-  eq(parseLetters("HAPPY"), ["HAPPY"], "no commas is one character, as before");
+test("parseLetters: spaces separate too (2026-11-12)", () => {
+  eq(parseLetters("S T R I K E R S"), ["S", "T", "R", "I", "K", "E", "R", "S"]);
+  eq(parseLetters("  H   A\tP "), ["H", "A", "P"], "runs of spaces are one separator");
+  eq(parseLetters("H, A ,P"), ["H", "A", "P"], "a comma and spaces together are one separator");
+});
+
+test("parseLetters: characters run together stay one", () => {
+  eq(parseLetters("HAPPY"), ["HAPPY"], "no separator is one character, as before");
   eq(parseLetters("OP"), ["OP"]);
-  eq(parseLetters("H A"), ["H A"], "a space is not a separator");
+  eq(parseLetters("OP A"), ["OP", "A"]);
 });
 
 test("parseLetters: the heart and the punctuation survive whole", () => {
   eq(parseLetters("<3, !, -, &"), ["<3", "!", "-", "&"]);
+  eq(parseLetters("<3 A"), ["<3", "A"]);
 });
 
 test("parseLetters: blanks are dropped, and nothing typed is an empty list", () => {

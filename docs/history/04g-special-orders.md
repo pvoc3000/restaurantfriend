@@ -3986,6 +3986,12 @@
    refusal adds none of the word rather than half. The row box lost its
    3-character cap and widened to `w-40`. Fixtures cover the space-is-not-a-
    separator rule and were checked by splitting on whitespace too (one red).
+   **SPACES SEPARATE TOO SINCE 2026-11-12** (Mark: "let spaces split too",
+   after typing `S T R I K E R S` on SO-10220 and getting one line). Split on
+   any run of commas and whitespace. A run of characters with no separator is
+   still ONE character, so `STRIKERS` solid is one line and `OP`, `AB` and
+   `<3` keep their meaning; no character in the set holds a space either.
+   The space-is-not-a-separator fixture became its opposite.
 
    **AND SHOW IS A RANGEPICKER — 2026-09-20** (Mark: "convert the show picklist
    to a rangepicker"). With the two non-time options gone to Status, what was
