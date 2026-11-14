@@ -233,3 +233,10 @@ Same day, Mark: "let's add seconds to the countdown". The word is now "18:42",
 minutes and seconds, read every second (the dial no longer rounds to 5-second
 steps), and the bar's words are `tabular-nums` so the cell doesn't twitch as
 the digits change.
+
+**2026-11-13 — no record book in the tablet bar on a batch log** (Mark: "the
+nav buttons aren't useful on the batch log detail page unless the datatable is
+completely hidden"; the divider clamps at 20–80%, so it never is). The book had
+also come and gone with the in-memory found set — present from the list, gone
+after a lock's reload — which is what moved Stay unlocked. The desk keeps its
+book in the title row.

@@ -289,9 +289,13 @@ export async function BatchLogRecord({
         touch ? (
           // THE TABLET'S ACTIONS MENU, where the footer's two commands went
           // (Mark, 2026-09-12). The crumb row, because the tablet has no title
-          // row; `RecordNav` publishes to the bar there and renders nothing.
+          // row.
+          // NO RECORD BOOK IN THE TABLET BAR (Mark, 2026-11-13: "the nav
+          // buttons aren't useful on the batch log detail page unless the
+          // datatable is completely hidden", and the divider never hides it).
+          // It also appeared only when the found set had survived — never
+          // after an idle lock's reload — so Stay unlocked hopped sideways.
           <div className="flex items-center gap-3">
-            <RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />
             {/* The bar's Stay unlocked switch — only where there is an idle
                 lock to extend. Renders nothing here. */}
             {session.registeredDevice ? <StayUnlocked userId={session.userId} /> : null}
