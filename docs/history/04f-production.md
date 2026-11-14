@@ -2233,3 +2233,14 @@ number sorts by itself, "Caramel" or "x2" by null, i.e. last) — 040's rule.
 Before this the Info pane wrote the label alone, so a relabelled batch kept
 sorting by its old number. The optimistic overlay carries `sort` too, so the row
 moves on the keystroke.
+
+**2026-11-14 — the batch LOG's note on the tablet** (Mark: "there's room to the
+right of the 'group by' picklist for a small 'add note' button … If a batch note
+exists it could be displayed below the filter row"). The desk keeps its boxed
+field beside Group by. The tablet gets `components/production/BatchLogNote`:
+an Add note / Edit note button after Group by that opens a dialog with a text
+box, and, when a note exists, the note on its own line under the filter row
+(`basis-full` inside the row's flex-wrap, via a new `filterTail` slot on
+`BatchItemsTable`, unwrapped where `filterExtra` is wrapped). Saved notes show
+at once and roll back, with the dialog reopened, if the write fails. Read-only
+users see the note and no button.

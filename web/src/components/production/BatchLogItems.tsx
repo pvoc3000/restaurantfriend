@@ -109,6 +109,7 @@ export function BatchLogItems({
   editable,
   touch = false,
   filterExtra,
+  filterTail,
 }: {
   rows: BatchRow[];
   /** The same batches, carrying what the PANE needs. Keyed by id. */
@@ -124,6 +125,8 @@ export function BatchLogItems({
   touch?: boolean;
   /** Handed to the table's filter row, after Group by. */
   filterExtra?: ReactNode;
+  /** Straight into the filter row's flex-wrap, unwrapped — the tablet's log note. */
+  filterTail?: ReactNode;
 }) {
   // REMEMBERED (Mark, 2026-10-06), so an idle lock gives back the batch and the
   // tab you were on — see `lib/viewMemory`. A batch that is not in this log
@@ -292,6 +295,7 @@ export function BatchLogItems({
           fill={wide}
           touch={touch}
           filterExtra={filterExtra}
+          filterTail={filterTail}
         />
       </div>
 

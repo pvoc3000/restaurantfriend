@@ -134,6 +134,7 @@ export function BatchItemsTable({
   fill,
   touch = false,
   filterExtra,
+  filterTail,
   onEdit,
 }: {
   rows: BatchRow[];
@@ -153,6 +154,12 @@ export function BatchItemsTable({
   /** A control after Group by — the batch log's Note (Mark, 2026-09-12).
    *  A flexible pen, so a boxed field's `w-full` has a width to fill. */
   filterExtra?: React.ReactNode;
+  /**
+   * Items placed STRAIGHT into the filter row's flex-wrap, with no wrapper —
+   * the tablet's log note (`BatchLogNote`), whose button sits after Group by
+   * and whose note claims the next line with `basis-full` (Mark, 2026-11-14).
+   */
+  filterTail?: React.ReactNode;
   /** Each edit as it starts — so the pane below follows the list's own Note
    *  and Status cells without waiting for the server. See `BatchLogItems`. */
   onEdit?: BatchEdit;
@@ -630,6 +637,7 @@ export function BatchItemsTable({
               />
             </ControlField>
           {filterExtra ? <div className="min-w-[13rem] max-w-md flex-1">{filterExtra}</div> : null}
+          {filterTail}
         </div>
       }
     />

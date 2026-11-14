@@ -20,6 +20,7 @@ import { StayUnlocked } from "@/components/production/StayUnlocked";
 import { type BatchFieldsRow } from "@/components/production/BatchFields";
 import { BATCH_PHOTO_BUCKET, BATCH_PHOTO_TTL_SECONDS } from "@/lib/batchPhotos";
 import { BatchLogCommandMenu } from "@/components/production/BatchLogCommandMenu";
+import { BatchLogNote } from "@/components/production/BatchLogNote";
 
 /**
  * One batch log — the MASTER record, and its batches.
@@ -403,8 +404,20 @@ export async function BatchLogRecord({
           locationId={log.location_id as string}
           editable={editable}
           touch={touch}
-          // THE LOG'S NOTE, beside Group by (Mark, 2026-09-12). Desk only, as
-          // the strip it came from was — the tablet shell has neither.
+          // THE LOG'S NOTE, beside Group by (Mark, 2026-09-12) — a boxed field
+          // on the desk. The tablet's row has no width for one: it gets an Add
+          // note button there and the note on a line of its own underneath
+          // (Mark, 2026-11-14), `filterTail`.
+          filterTail={
+            touch ? (
+              <BatchLogNote
+                key={id}
+                logId={id}
+                note={(log.note ?? null) as string | null}
+                editable={editable}
+              />
+            ) : undefined
+          }
           filterExtra={
             touch ? undefined : (
               <ControlField label="Note">
