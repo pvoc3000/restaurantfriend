@@ -19,6 +19,7 @@ import {
   batchStatusTone,
   describeAmount,
   amountTotal,
+  batchOrdinal,
 } from "@/lib/productionBatches";
 import { PAUSED } from "@/components/ui/FilterMenus";
 
@@ -348,8 +349,29 @@ export function BatchItemsTable({
       // integer alone: 040 measured "Blueberry", "Caramel" and "x2" among the
       // real values, so what sorts and what prints are two different things.
       sortValue: (r) => r.sort ?? Number.MAX_SAFE_INTEGER,
+      // EDITABLE HERE (Mark, 2026-11-14), as it is in the Info pane. The label
+      // and the `sort` it implies are written in ONE statement (`alsoUpdate`),
+      // so the row moves to its new place and the two can't disagree.
       render: (r) =>
-        r.batch_label ? (
+        editable ? (
+          <InlineValue
+            table="production_batches"
+            id={r.id}
+            column="batch_label"
+            alsoUpdate={(v) => ({ sort: batchOrdinal(v) })}
+            onPending={
+              onEdit
+                ? (v) => {
+                    onEdit(r.id, "batch_label", v);
+                    onEdit(r.id, "sort", batchOrdinal(v));
+                  }
+                : undefined
+            }
+            value={r.batch_label}
+            className="tabular-nums"
+            ariaLabel={`Order, ${r.element_name}`}
+          />
+        ) : r.batch_label ? (
           <span className="tabular-nums opacity-70">{r.batch_label}</span>
         ) : (
           <span className="opacity-45">—</span>

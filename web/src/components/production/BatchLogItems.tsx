@@ -152,8 +152,10 @@ export function BatchLogItems({
     setSeenFields(serverFields);
     const kept: typeof edits = {};
     for (const [batchId, cols] of Object.entries(edits)) {
-      const server = serverFields[batchId] as Record<string, unknown> | undefined;
-      if (!server) continue;
+      const fieldsRow = serverFields[batchId] as Record<string, unknown> | undefined;
+      if (!fieldsRow) continue;
+      // `sort` is on the table's row, not the pane's.
+      const server = { ...serverRows.find((r) => r.id === batchId), ...fieldsRow } as Record<string, unknown>;
       const left = Object.fromEntries(
         Object.entries(cols).filter(([col, v]) => !sameValue(server[col], v))
       );

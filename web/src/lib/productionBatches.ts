@@ -224,6 +224,18 @@ export function batchDate(iso: string): string {
   return `${day} ${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 }
 
+/**
+ * The number a batch's ORDER label sorts by — "3" → 3, and null for a label
+ * that is not a whole number ("Caramel", "x2"), which then sorts after the
+ * numbered ones. 040's rule for `sort` beside `batch_label`, applied whenever
+ * the label is edited (Mark, 2026-11-14: the order is editable in the table),
+ * so the row moves to where its new label says.
+ */
+export function batchOrdinal(label: string | number | null): number | null {
+  const t = label === null ? "" : String(label).trim();
+  return /^\d{1,9}$/.test(t) ? Number(t) : null;
+}
+
 /** Drops a trailing ".000" without rounding anything a scale could show. */
 function trim(n: number): string {
   return String(Number(n.toFixed(3)));

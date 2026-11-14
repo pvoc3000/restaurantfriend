@@ -4,7 +4,7 @@ import { InlineValue } from "@/components/catalog/InlineValue";
 import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import type { PickOption } from "@/components/ui/PickList";
-import { BATCH_STATUS_LABEL, BATCH_STATUS_OPTIONS, describeAmount } from "@/lib/productionBatches";
+import { BATCH_STATUS_LABEL, BATCH_STATUS_OPTIONS, batchOrdinal, describeAmount } from "@/lib/productionBatches";
 import { BatchPhoto } from "@/components/production/BatchPhoto";
 import { BatchVersionCell } from "@/components/production/BatchVersionCell";
 import { UNIT_PICK_OPTIONS } from "@/lib/units";
@@ -146,7 +146,18 @@ export function BatchFields({
         <Field label="Order">
           {editable ? (
             <InlineValue
-              boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="batch_label" onPending={pend("batch_label")}
+              boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="batch_label"
+              // The label and the `sort` it implies, in one statement — the
+              // table orders by `sort` (2026-11-14).
+              alsoUpdate={(v) => ({ sort: batchOrdinal(v) })}
+              onPending={
+                onEdit
+                  ? (v) => {
+                      onEdit(row.id, "batch_label", v);
+                      onEdit(row.id, "sort", batchOrdinal(v));
+                    }
+                  : undefined
+              }
               value={row.batch_label} ariaLabel="Which batch of the day"
             />
           ) : (

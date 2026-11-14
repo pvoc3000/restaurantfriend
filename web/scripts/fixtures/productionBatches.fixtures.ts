@@ -14,6 +14,7 @@ import {
   batchMadeNothing,
   batchStatusTone,
   describeAmount,
+  batchOrdinal,
   isBatchOutstanding,
   yieldAgainstPar,
 } from "../../src/lib/productionBatches";
@@ -50,6 +51,17 @@ test("a count of 0 is just 0 — the size means nothing without an amount", () =
   eq(describeAmount(0, 1.5, "gal"), "0");
   eq(describeAmount(0, 0, "qt"), "0");
   eq(describeAmount(0, null, "ea"), "0");
+});
+
+test("an Order label sorts by its number, and a word sorts last", () => {
+  eq(batchOrdinal("3"), 3);
+  eq(batchOrdinal(" 12 "), 12);
+  eq(batchOrdinal(2), 2);
+  eq(batchOrdinal("Caramel"), null);
+  eq(batchOrdinal("x2"), null);
+  eq(batchOrdinal("1.5"), null);
+  eq(batchOrdinal(""), null);
+  eq(batchOrdinal(null), null);
 });
 
 test("no size means the count IS the amount", () => {

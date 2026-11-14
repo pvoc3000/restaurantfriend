@@ -2225,3 +2225,11 @@ and the Made column move on the keystroke. The photo signing and the recipe
 versions read now run side by side, one round trip fewer per refresh. A
 "Set" button that batches edits was raised and NOT built — to discuss.
 Not verified with a real write in the browser (that would write live data).
+
+**2026-11-14 — the Order column is editable in the batch log's table** (Mark).
+An `InlineValue` on `batch_label`, as in the Info pane. Editing the label now
+also writes `sort` in the same statement (`alsoUpdate`, `batchOrdinal`: a whole
+number sorts by itself, "Caramel" or "x2" by null, i.e. last) — 040's rule.
+Before this the Info pane wrote the label alone, so a relabelled batch kept
+sorting by its old number. The optimistic overlay carries `sort` too, so the row
+moves on the keystroke.
