@@ -219,3 +219,12 @@ have to click it once … any activity can reset the timer back to 20, but not
 [the] state of the button itself." `IdleLock`'s `endExtension` listener is
 gone; a touch restarts the twenty minutes like any activity. The switch now
 ends only at the lock, on leaving the batch log, or when it is tapped off.
+
+**2026-11-13 — Stay unlocked shows a countdown dial, not an end time** (Mark:
+stating the time it will end "is a little hard to comprehend… like a countdown
+clock instead"). When on, the switch's lock icon becomes a disc that drains
+clockwise from twelve o'clock over the twenty minutes, over the minutes left
+("18 min", rounded up so it never reads "0 min"). A touch fills it back up. The
+bar learned an optional `dial` (1 → 0) on `BarAction`, drawn by `BarLabel` in the
+icon's own box; it is read every 5 seconds and rounded to that step, so the bar
+redraws only when the dial moves.

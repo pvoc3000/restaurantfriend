@@ -26,6 +26,12 @@ export type BarAction = {
   word: string;
   /** A `BarLabel` icon path. */
   icon: string;
+  /**
+   * A COUNTDOWN in place of the icon: the share of the time left, 1 → 0, drawn
+   * as a disc that drains clockwise like a kitchen timer. First caller: Stay
+   * unlocked (Mark, 2026-11-13: an end time "is a little hard to comprehend").
+   */
+  dial?: number;
   onClick: () => void;
   disabled?: boolean;
   /**
@@ -60,7 +66,7 @@ function drawn(a: BarAction[] | null): string {
     : a
         .map(
           (x) =>
-            `${x.key}|${x.word}|${x.icon}|${x.disabled ? 1 : 0}|${x.pressed ?? ""}|${x.title ?? ""}|${x.side ?? "trailing"}`
+            `${x.key}|${x.word}|${x.icon}|${x.dial ?? ""}|${x.disabled ? 1 : 0}|${x.pressed ?? ""}|${x.title ?? ""}|${x.side ?? "trailing"}`
         )
         .join("\n");
 }

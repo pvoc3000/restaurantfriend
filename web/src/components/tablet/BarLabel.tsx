@@ -8,14 +8,42 @@
  * A bare glyph cannot say which of two things the first cell is, and the
  * runners already made that argument at length — the word stays.
  */
-export function BarLabel({ icon, word }: { icon: string; word: string }) {
+export function BarLabel({ icon, word, dial }: { icon: string; word: string; dial?: number }) {
   return (
     <span className="flex flex-col items-center gap-0.5">
       <svg width="28" height="28" viewBox="0 -960 960 960" aria-hidden="true">
-        <path fill="currentColor" d={icon} />
+        {dial === undefined ? <path fill="currentColor" d={icon} /> : <Dial left={dial} />}
       </svg>
       <span className="text-center text-[12px] font-bold uppercase leading-none tracking-[0.08em]">{word}</span>
     </span>
+  );
+}
+
+/**
+ * A countdown: a ring with the time LEFT filled in, starting at twelve o'clock
+ * and draining clockwise as it runs out — a kitchen timer, read at a glance
+ * from across the bench. `left` is 1 (full) → 0 (empty). Drawn in the icon's
+ * own `0 -960 960 960` box so it sits exactly where an icon would.
+ */
+function Dial({ left }: { left: number }) {
+  const share = Math.min(1, Math.max(0, left));
+  const r = 330;
+  const cx = 480;
+  const cy = -480;
+  // The wedge runs from where the hand has reached round to twelve o'clock.
+  const start = (1 - share) * 2 * Math.PI;
+  const x = cx + r * Math.sin(start);
+  const y = cy - r * Math.cos(start);
+  const large = share > 0.5 ? 1 : 0;
+  return (
+    <>
+      <circle cx={cx} cy={cy} r={400} fill="none" stroke="currentColor" strokeWidth={70} />
+      {share >= 0.999 ? (
+        <circle cx={cx} cy={cy} r={r} fill="currentColor" />
+      ) : share > 0.001 ? (
+        <path fill="currentColor" d={`M${cx} ${cy}L${x} ${y}A${r} ${r} 0 ${large} 1 ${cx} ${cy - r}Z`} />
+      ) : null}
+    </>
   );
 }
 

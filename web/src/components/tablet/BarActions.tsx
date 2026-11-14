@@ -36,7 +36,7 @@ export function BarActions({ side }: { side: "leading" | "trailing" }) {
           // is refreshed in place on every publish.
           onClick={() => action.onClick()}
         >
-          <BarLabel icon={action.icon} word={action.word} />
+          <BarLabel icon={action.icon} word={action.word} dial={action.dial} />
         </button>
       ))}
     </div>

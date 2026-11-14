@@ -23,11 +23,9 @@ function subscribe(onChange: () => void) {
   };
 }
 
-/** "10:42" — the iPad's own clock, since that is the one on the wall of it. */
-function clock(ms: number): string {
-  const at = new Date(ms);
-  const hour = at.getHours() % 12 || 12;
-  return `${hour}:${String(at.getMinutes()).padStart(2, "0")}`;
+/** "18 min" — rounded UP, so it reads "1 min" right to the end, never "0 min". */
+function minutesLeft(ms: number): string {
+  return `${Math.max(1, Math.ceil(ms / 60000))} min`;
 }
 
 /**
@@ -41,10 +39,12 @@ function clock(ms: number): string {
  * what "leaving the batch log" means; `pagehide` covers a hard navigation,
  * where no unmount runs.
  *
- * ON, the cell inverts and reads "Until 10:42": when it will lock if nobody
- * touches it, so the baker can see it took and a passer-by can see why the iPad
- * is open. A touch moves that time later and leaves the switch on; only the
- * lock, leaving, or tapping the switch itself turns it off.
+ * ON, the cell inverts and its icon becomes a COUNTDOWN DIAL over "18 min":
+ * a disc that drains clockwise as the twenty minutes run out, so the baker can
+ * see it took and a passer-by can see why the iPad is open (Mark, 2026-11-13 —
+ * it read "Until 10:42" before, and an end time is arithmetic to read). A touch
+ * fills it back up and leaves the switch on; only the lock, leaving, or tapping
+ * the switch itself turns it off.
  *
  * IT ALSO ASKS THE SCREEN TO STAY AWAKE (`navigator.wakeLock`, Safari 16.4+).
  * Without that the iPad's own Auto-Lock darkens it in a few minutes and the
@@ -57,15 +57,17 @@ export function StayUnlocked({ userId }: { userId: string }) {
     () => extendedFor(readExtendedUser(), userId),
     () => false
   );
-  // When it locks if nothing is touched. State, not arithmetic in render: a
-  // scroll moves it, and the clock is not something a render may read.
-  const [until, setUntil] = useState<number | null>(null);
+  // How long until it locks if nothing is touched. State, not arithmetic in
+  // render: a touch moves it, and the clock is not something a render may read.
+  // Read every 5 seconds — the dial's 1/240th of a turn, too small to see jump.
+  const [left, setLeft] = useState(EXTEND_MS);
 
   useEffect(() => {
     if (!on) return;
     const read = () => {
       const last = Number(readActivity());
-      setUntil((Number.isFinite(last) && last > 0 ? last : Date.now()) + EXTEND_MS);
+      const from = Number.isFinite(last) && last > 0 ? last : Date.now();
+      setLeft(Math.max(0, from + EXTEND_MS - Date.now()));
     };
     const timer = window.setInterval(read, 5000);
     return () => window.clearInterval(timer);
@@ -101,23 +103,25 @@ export function StayUnlocked({ userId }: { userId: string }) {
     publishBarActions([
       {
         key: EXTEND_ACTION_KEY,
-        word: on ? `Until ${clock(until ?? Date.now() + EXTEND_MS)}` : "Stay 20 min",
+        word: on ? minutesLeft(left) : "Stay 20 min",
         icon: ICON_LOCK_OPEN,
+        // Rounded to the 5-second read, so the bar redraws only when it moves.
+        dial: on ? Math.round((left / EXTEND_MS) * 240) / 240 : undefined,
         pressed: on,
         title: on
-          ? "This iPad stays unlocked until then; any touch moves it later. Tap to turn off."
+          ? "Minutes until this iPad locks; any touch starts them over. Tap to turn off."
           : "Keep this iPad unlocked for 20 minutes without a touch",
         onClick: () => {
           if (on) {
             recordExtendedUser("");
             return;
           }
-          setUntil(Date.now() + EXTEND_MS);
+          setLeft(EXTEND_MS);
           recordExtendedUser(userId);
         },
       },
     ]);
-  }, [on, until, userId]);
+  }, [on, left, userId]);
 
   // Leaving the batch log gives the seat back and turns the switch off.
   useEffect(() => {
