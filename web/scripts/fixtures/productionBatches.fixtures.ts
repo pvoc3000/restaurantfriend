@@ -46,6 +46,12 @@ test("a count of 1 is shown, so it differs from no count at all", () => {
   eq(describeAmount(null, 22, "qt"), "22 qt");
 });
 
+test("a count of 0 is just 0 — the size means nothing without an amount", () => {
+  eq(describeAmount(0, 1.5, "gal"), "0");
+  eq(describeAmount(0, 0, "qt"), "0");
+  eq(describeAmount(0, null, "ea"), "0");
+});
+
 test("no size means the count IS the amount", () => {
   // FMP's real free text includes "8 ea." and "10 BAGS" — a count and a unit
   // with nothing to multiply.

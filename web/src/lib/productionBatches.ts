@@ -120,7 +120,7 @@ export function batchMadeNothing(batch: {
 /* -- amounts -------------------------------------------------------------- */
 
 /**
- * "2 × 22 qt", "22 qt", "2", or an em dash.
+ * "2 × 22 qt", "22 qt", "2", "0", or an em dash.
  *
  * FileMaker's own `Batch_Yield_full_c` reads "2x 22qt", which is why these are
  * three columns rather than the free text 036 had to parse: a count and a size
@@ -130,12 +130,17 @@ export function batchMadeNothing(batch: {
  * said twice", which made a batch counted as one container read exactly like
  * one where nobody entered a count — and only the second is missing a fact.
  * A null count still reads as the bare size.
+ *
+ * A count of 0 reads "0" and nothing else (Mark, 2026-11-14): "0 × 1.5 gal"
+ * names a container there are none of, and the size isn't meaningful without
+ * an amount. FileMaker's history holds thousands of these.
  */
 export function describeAmount(
   count: number | null,
   size: number | null,
   unit: string | null
 ): string {
+  if (count === 0) return "0";
   const u = unit?.trim() ? ` ${unit.trim()}` : "";
   if (size === null) {
     // No size: the count IS the amount ("8 ea", "10 BAGS").
