@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { SMALL_BUTTON_CLASS } from "@/components/ui/buttons";
 import { FORM_TEXTAREA } from "@/components/ui/fieldMetrics";
 import { createClient } from "@/lib/supabase/client";
 
@@ -78,7 +78,7 @@ export function BatchLogNote({
   return (
     <>
       {editable ? (
-        <button type="button" className={BUTTON_CLASS} onClick={start}>
+        <button type="button" className={SMALL_BUTTON_CLASS} onClick={start}>
           {note ? "Edit note" : "Add note"}
         </button>
       ) : null}
