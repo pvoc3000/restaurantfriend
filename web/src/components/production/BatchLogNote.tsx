@@ -84,12 +84,7 @@ export function BatchLogNote({
       ) : null}
 
       {note ? (
-        <p className="basis-full whitespace-pre-wrap text-sm">
-          <span className="mr-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-            Note
-          </span>
-          {note}
-        </p>
+        <p className="basis-full whitespace-pre-wrap text-sm">{note}</p>
       ) : null}
 
       {open ? (
