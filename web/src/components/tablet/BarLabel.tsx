@@ -13,7 +13,7 @@ export function BarLabel({ icon, word, fill }: { icon: string; word: string; fil
     <span className="flex flex-col items-center gap-0.5">
       <svg width="28" height="28" viewBox="0 -960 960 960" aria-hidden="true">
         <path fill="currentColor" d={icon} />
-        {fill === undefined || icon !== ICON_LOCK_OPEN ? null : <LockFill share={fill} />}
+        {fill === undefined || icon !== ICON_LOCK_OPEN ? null : <RedRising icon={icon} share={fill} />}
       </svg>
       <span className="text-center text-[12px] font-bold uppercase tabular-nums leading-none tracking-[0.08em]">{word}</span>
     </span>
@@ -21,17 +21,33 @@ export function BarLabel({ icon, word, fill }: { icon: string; word: string; fil
 }
 
 /**
- * The open lock's body FILLING FROM THE BOTTOM, 0 (empty) → 1 (full): Stay
- * unlocked's countdown, where full is the moment the iPad locks (Mark,
- * 2026-11-14, replacing a pie dial: "keep the lock glyph … fill it from the
- * bottom up as time progresses"). The rectangle is the body's inside (overlapping the outline by 6, so no hairline shows) in
- * `ICON_LOCK_OPEN`'s own box (x 252–708, y −551 to −175), so it sits inside
- * the outline; the keyhole is covered as the ink passes it.
+ * Stay unlocked's countdown: the glyph turns RED FROM THE BOTTOM UP, 0 (all
+ * white) → 1 (all red), where all red is the moment the iPad locks (Mark,
+ * 2026-11-14: "at the half way point it's 1/2 red and 1/2 white … make the
+ * transition smooth"). An end time came first, then a pie dial, then ink
+ * filling the lock's body.
+ *
+ * The icon drawn a second time in red inside a NESTED <svg> whose viewport is
+ * the bottom share of the glyph: a nested svg clips to its own box, and with a
+ * viewBox equal to that box it maps coordinates one to one — a clip with no
+ * `id`, so two bars on a page can't collide. The share is of the GLYPH's
+ * height (y −946 to −49 in `ICON_LOCK_OPEN`), not the 960 box, so half the
+ * time is half the lock. Read every second, the edge moves 0.02px a tick at
+ * 28px — continuous to the eye.
  */
-function LockFill({ share }: { share: number }) {
+const LOCK_TOP = -946;
+const LOCK_BOTTOM = -49;
+
+function RedRising({ icon, share }: { icon: string; share: number }) {
   const s = Math.min(1, Math.max(0, share));
-  const h = 376 * s;
-  return h < 1 ? null : <rect x={246} y={-169 - h} width={468} height={h + 6} fill="currentColor" />;
+  const h = (LOCK_BOTTOM - LOCK_TOP) * s;
+  if (h <= 0) return null;
+  const y = LOCK_BOTTOM - h;
+  return (
+    <svg x={0} y={y} width={960} height={h} viewBox={`0 ${y} 960 ${h}`} overflow="hidden">
+      <path fill="var(--color-accent)" d={icon} />
+    </svg>
+  );
 }
 
 /** Material Symbols Outlined, wght 700 — the same weight the runners' footers use. */

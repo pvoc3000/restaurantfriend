@@ -25,7 +25,11 @@ export function BarActions({ side }: { side: "leading" | "trailing" }) {
         <button
           key={action.key}
           type="button"
-          className={action.pressed ? BAR_CELL_PRESSED : BAR_CELL}
+          // A switch that shows a countdown (`fill`) stays BLACK while on: its
+          // white glyph reddening from the bottom says it is on, and an
+          // inverted cell would leave a white glyph nothing to show against
+          // (Mark, 2026-11-14). `aria-pressed` still says so.
+          className={action.pressed && action.fill === undefined ? BAR_CELL_PRESSED : BAR_CELL}
           aria-pressed={action.pressed}
           // Named, so `IdleLock` can tell the Stay unlocked switch's own tap
           // from one that should turn it off.

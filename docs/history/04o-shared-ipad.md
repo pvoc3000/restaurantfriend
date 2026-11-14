@@ -246,3 +246,12 @@ on the stay button, but when engaged … fill it from the bottom up as time
 progresses"). `BarAction.dial` became `fill` (time GONE, 0 → 1); `BarLabel`
 draws a rectangle inside the open lock's body rising from the bottom, full at
 the moment it locks. The 18:42 countdown stays under it.
+
+**2026-11-14 — the lock reddens from the bottom instead of filling** (Mark: "it
+starts fully white … at the half way point it's 1/2 red and 1/2 white … make
+the transition smooth"). `BarLabel` draws the lock again in `--color-accent`
+inside a nested `<svg>` whose viewport is the bottom share of the GLYPH's height
+(not the 960 box), so half the time is half the lock; no clip `id` needed. A
+pressed action with a `fill` keeps the black cell (`BarActions`) so the white
+glyph shows; `aria-pressed` still marks it on. Read every second, the edge
+moves ~0.02px a tick.

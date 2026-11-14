@@ -40,12 +40,13 @@ function timeLeft(ms: number): string {
  * what "leaving the batch log" means; `pagehide` covers a hard navigation,
  * where no unmount runs.
  *
- * ON, the cell inverts, reads "18:42" (minutes and seconds left), and its
- * lock FILLS FROM THE BOTTOM as the twenty minutes run out — full is when it
- * locks (Mark, 2026-11-14; an end time "Until 10:42" came first, then a pie
- * dial). The baker can see it took and a passer-by can see why the iPad is
- * open. A touch empties it again and leaves the switch on; only the lock,
- * leaving, or tapping the switch itself turns it off.
+ * ON, it reads "18:42" (minutes and seconds left) and its white lock turns RED
+ * FROM THE BOTTOM UP as the twenty minutes run out — all red is when it locks
+ * (Mark, 2026-11-14; an end time "Until 10:42" came first, then a pie dial,
+ * then ink filling the lock's body). The cell stays black rather than
+ * inverting, so the white glyph has something to show against. A touch turns
+ * it white again and leaves the switch on; only the lock, leaving, or tapping
+ * the switch itself turns it off.
  *
  * IT ALSO ASKS THE SCREEN TO STAY AWAKE (`navigator.wakeLock`, Safari 16.4+).
  * Without that the iPad's own Auto-Lock darkens it in a few minutes and the
