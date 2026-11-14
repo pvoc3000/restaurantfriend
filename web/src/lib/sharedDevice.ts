@@ -61,11 +61,13 @@ export function idleExpired(lastActivityMs: number, nowMs: number, limitMs = IDL
  * right there. A switch in the batch log's tablet bar gives THEM twenty, and it
  * is built to be used sparingly:
  *   · it is a deliberate tap, off by default, and only on the batch log;
- *   · any tap or key press turns it off again (`IdleLock`), so it never
- *     outlives the absence it was switched on for — SCROLLING does not, or
- *     nudging the recipe to the next step would cancel it unnoticed;
+ *   · it stays on until twenty idle minutes lock the iPad, it is tapped off,
+ *     or the batch log is left. A tap or key press used to turn it off too, so
+ *     picking the next batch cancelled it (Mark, 2026-11-13: "You should only
+ *     have to click it once … any activity can reset the timer back to 20, but
+ *     not [the] state of the button itself");
  *   · leaving the batch log turns it off, and so does any lock.
- * The twenty minutes are idle time like the five: a scroll restarts them.
+ * The twenty minutes are idle time like the five: any touch restarts them.
  *
  * `EXTEND_KEY` holds the user it was switched on for, in localStorage because
  * the idle clock is the DEVICE's — a background tab must honour it too, or it
@@ -73,7 +75,7 @@ export function idleExpired(lastActivityMs: number, nowMs: number, limitMs = IDL
  */
 export const EXTEND_MS = 20 * 60_000;
 export const EXTEND_KEY = "rf.device.extend";
-/** The bar command's key, which `IdleLock` must not treat as a cancelling tap. */
+/** The bar command's key. */
 export const EXTEND_ACTION_KEY = "stay-unlocked";
 /** Fired on `window` in the tab that changed it; other tabs get `storage`. */
 export const EXTEND_EVENT = "rf:extend";

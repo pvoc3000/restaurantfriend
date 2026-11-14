@@ -209,3 +209,13 @@ the server already locked refuses the action. `clearSessionCookies` takes
 anything with `delete`. Probed on the dev server with one-off owner sessions,
 results in `docs/shared-device-brief.md`. NOT walked on an iPad: the heartbeat
 from a real page, and Stay unlocked across a long read.
+
+### 2026-11-13 — Stay unlocked no longer ends at the first tap
+
+Mark: the switch turned itself off every time a new batch was picked on the
+batch log. That was the 2026-10-06 rule — any tap or key press ended it, so it
+could never outlive the absence it was switched on for. Mark: "You should only
+have to click it once … any activity can reset the timer back to 20, but not
+[the] state of the button itself." `IdleLock`'s `endExtension` listener is
+gone; a touch restarts the twenty minutes like any activity. The switch now
+ends only at the lock, on leaving the batch log, or when it is tapped off.

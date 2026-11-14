@@ -43,7 +43,8 @@ function clock(ms: number): string {
  *
  * ON, the cell inverts and reads "Until 10:42": when it will lock if nobody
  * touches it, so the baker can see it took and a passer-by can see why the iPad
- * is open. `IdleLock` does the turning off; this only reflects it.
+ * is open. A touch moves that time later and leaves the switch on; only the
+ * lock, leaving, or tapping the switch itself turns it off.
  *
  * IT ALSO ASKS THE SCREEN TO STAY AWAKE (`navigator.wakeLock`, Safari 16.4+).
  * Without that the iPad's own Auto-Lock darkens it in a few minutes and the
@@ -104,7 +105,7 @@ export function StayUnlocked({ userId }: { userId: string }) {
         icon: ICON_LOCK_OPEN,
         pressed: on,
         title: on
-          ? "This iPad stays unlocked until then. Any tap turns this off."
+          ? "This iPad stays unlocked until then; any touch moves it later. Tap to turn off."
           : "Keep this iPad unlocked for 20 minutes without a touch",
         onClick: () => {
           if (on) {

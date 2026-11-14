@@ -6,7 +6,6 @@ import { snapshotScrollMemory } from "@/lib/scrollMemory";
 import { snapshotViewMemory } from "@/lib/viewMemory";
 import { lockDevice } from "@/app/deviceActions";
 import {
-  EXTEND_ACTION_KEY,
   EXTEND_EVENT,
   EXTEND_KEY,
   TOUCH_EVERY_MS,
@@ -76,10 +75,9 @@ import {
  *
  * FIVE MINUTES, OR TWENTY (Mark, 2026-10-06): the batch log's Stay unlocked
  * switch — see `EXTEND_MS` in `lib/sharedDevice` for the rules. This component
- * reads the limit on every check and is what turns the switch OFF: on any tap
- * or key press, and on the lock itself. A tap is `pointerup`, which a touch
- * scroll never fires (the browser sends `pointercancel`), and which iOS does
- * deliver on plain text where it withholds `click`.
+ * reads the limit on every check and turns the switch OFF on the lock itself.
+ * A tap no longer does (Mark, 2026-11-13): it restarts the twenty minutes, like
+ * any activity, and leaves the switch on.
  *
  * A PAGE LOAD IS NOT A TOUCH (2026-10-13). The wake check needs a page that
  * survived the sleep, and Safari often loads a fresh one instead. So the mount
@@ -195,16 +193,6 @@ export function IdleLock({ userId }: { userId: string }) {
       if (idleExpired(active, Date.now(), limit)) lock();
     };
 
-    /** Stay unlocked ends at the first tap or key — except the switch's own. */
-    const endExtension = (e: Event) => {
-      if (!extendedFor(readExtendedUser(), userId)) return;
-      const target = e.target instanceof Element ? e.target : null;
-      if (target?.closest(`[data-bar-action="${EXTEND_ACTION_KEY}"]`)) return;
-      recordExtendedUser("");
-    };
-    window.addEventListener("pointerup", endExtension, { passive: true, capture: true });
-    window.addEventListener("keydown", endExtension, { passive: true, capture: true });
-
     const events: (keyof WindowEventMap)[] = ["pointerdown", "keydown", "touchstart", "scroll"];
     for (const e of events) window.addEventListener(e, touch, { passive: true, capture: true });
     const onVisible = () => {
@@ -228,8 +216,6 @@ export function IdleLock({ userId }: { userId: string }) {
     const timer = window.setInterval(check, 1000);
 
     return () => {
-      window.removeEventListener("pointerup", endExtension, { capture: true });
-      window.removeEventListener("keydown", endExtension, { capture: true });
       for (const e of events) window.removeEventListener(e, touch, { capture: true });
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", check);
