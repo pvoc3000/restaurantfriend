@@ -23,9 +23,10 @@ function subscribe(onChange: () => void) {
   };
 }
 
-/** "18 min" — rounded UP, so it reads "1 min" right to the end, never "0 min". */
-function minutesLeft(ms: number): string {
-  return `${Math.max(1, Math.ceil(ms / 60000))} min`;
+/** "18:42" — minutes and seconds left, rounded UP so it never reads "0:00". */
+function timeLeft(ms: number): string {
+  const total = Math.max(1, Math.ceil(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
 /**
@@ -39,7 +40,7 @@ function minutesLeft(ms: number): string {
  * what "leaving the batch log" means; `pagehide` covers a hard navigation,
  * where no unmount runs.
  *
- * ON, the cell inverts and its icon becomes a COUNTDOWN DIAL over "18 min":
+ * ON, the cell inverts and its icon becomes a COUNTDOWN DIAL over "18:42" (minutes and seconds left):
  * a disc that drains clockwise as the twenty minutes run out, so the baker can
  * see it took and a passer-by can see why the iPad is open (Mark, 2026-11-13 —
  * it read "Until 10:42" before, and an end time is arithmetic to read). A touch
@@ -59,7 +60,7 @@ export function StayUnlocked({ userId }: { userId: string }) {
   );
   // How long until it locks if nothing is touched. State, not arithmetic in
   // render: a touch moves it, and the clock is not something a render may read.
-  // Read every 5 seconds — the dial's 1/240th of a turn, too small to see jump.
+  // Read every second, for the seconds in the word (Mark, 2026-11-13).
   const [left, setLeft] = useState(EXTEND_MS);
 
   useEffect(() => {
@@ -69,7 +70,7 @@ export function StayUnlocked({ userId }: { userId: string }) {
       const from = Number.isFinite(last) && last > 0 ? last : Date.now();
       setLeft(Math.max(0, from + EXTEND_MS - Date.now()));
     };
-    const timer = window.setInterval(read, 5000);
+    const timer = window.setInterval(read, 1000);
     return () => window.clearInterval(timer);
   }, [on]);
 
@@ -103,13 +104,12 @@ export function StayUnlocked({ userId }: { userId: string }) {
     publishBarActions([
       {
         key: EXTEND_ACTION_KEY,
-        word: on ? minutesLeft(left) : "Stay 20 min",
+        word: on ? timeLeft(left) : "Stay 20 min",
         icon: ICON_LOCK_OPEN,
-        // Rounded to the 5-second read, so the bar redraws only when it moves.
-        dial: on ? Math.round((left / EXTEND_MS) * 240) / 240 : undefined,
+        dial: on ? left / EXTEND_MS : undefined,
         pressed: on,
         title: on
-          ? "Minutes until this iPad locks; any touch starts them over. Tap to turn off."
+          ? "Time until this iPad locks; any touch starts them over. Tap to turn off."
           : "Keep this iPad unlocked for 20 minutes without a touch",
         onClick: () => {
           if (on) {

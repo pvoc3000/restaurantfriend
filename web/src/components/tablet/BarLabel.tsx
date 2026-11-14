@@ -14,7 +14,7 @@ export function BarLabel({ icon, word, dial }: { icon: string; word: string; dia
       <svg width="28" height="28" viewBox="0 -960 960 960" aria-hidden="true">
         {dial === undefined ? <path fill="currentColor" d={icon} /> : <Dial left={dial} />}
       </svg>
-      <span className="text-center text-[12px] font-bold uppercase leading-none tracking-[0.08em]">{word}</span>
+      <span className="text-center text-[12px] font-bold uppercase tabular-nums leading-none tracking-[0.08em]">{word}</span>
     </span>
   );
 }

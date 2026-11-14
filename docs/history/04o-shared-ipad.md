@@ -228,3 +228,8 @@ clockwise from twelve o'clock over the twenty minutes, over the minutes left
 bar learned an optional `dial` (1 → 0) on `BarAction`, drawn by `BarLabel` in the
 icon's own box; it is read every 5 seconds and rounded to that step, so the bar
 redraws only when the dial moves.
+
+Same day, Mark: "let's add seconds to the countdown". The word is now "18:42",
+minutes and seconds, read every second (the dial no longer rounds to 5-second
+steps), and the bar's words are `tabular-nums` so the cell doesn't twitch as
+the digits change.
