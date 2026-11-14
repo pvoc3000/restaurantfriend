@@ -255,3 +255,5 @@ inside a nested `<svg>` whose viewport is the bottom share of the GLYPH's height
 pressed action with a `fill` keeps the black cell (`BarActions`) so the white
 glyph shows; `aria-pressed` still marks it on. Read every second, the edge
 moves ~0.02px a tick.
+
+Same day: yellow (`--color-mark`) instead of red (Mark: "maybe yellow is a better choice of color"). An ink only because the bar is black.

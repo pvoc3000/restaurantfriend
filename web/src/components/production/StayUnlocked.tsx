@@ -40,8 +40,8 @@ function timeLeft(ms: number): string {
  * what "leaving the batch log" means; `pagehide` covers a hard navigation,
  * where no unmount runs.
  *
- * ON, it reads "18:42" (minutes and seconds left) and its white lock turns RED
- * FROM THE BOTTOM UP as the twenty minutes run out — all red is when it locks
+ * ON, it reads "18:42" (minutes and seconds left) and its white lock turns YELLOW
+ * FROM THE BOTTOM UP as the twenty minutes run out — all yellow is when it locks
  * (Mark, 2026-11-14; an end time "Until 10:42" came first, then a pie dial,
  * then ink filling the lock's body). The cell stays black rather than
  * inverting, so the white glyph has something to show against. A touch turns

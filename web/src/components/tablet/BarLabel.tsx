@@ -21,13 +21,15 @@ export function BarLabel({ icon, word, fill }: { icon: string; word: string; fil
 }
 
 /**
- * Stay unlocked's countdown: the glyph turns RED FROM THE BOTTOM UP, 0 (all
- * white) → 1 (all red), where all red is the moment the iPad locks (Mark,
+ * Stay unlocked's countdown: the glyph turns YELLOW FROM THE BOTTOM UP, 0 (all
+ * white) → 1 (all yellow), where all yellow is the moment the iPad locks (Mark,
  * 2026-11-14: "at the half way point it's 1/2 red and 1/2 white … make the
- * transition smooth"). An end time came first, then a pie dial, then ink
+ * transition smooth"), in yellow rather than the first try's red ("maybe
+ * yellow is a better choice") — `--color-mark`, an INK here only because the
+ * bar is black; the yellow-is-never-ink rule is about light grounds. An end time came first, then a pie dial, then ink
  * filling the lock's body.
  *
- * The icon drawn a second time in red inside a NESTED <svg> whose viewport is
+ * The icon drawn a second time in yellow inside a NESTED <svg> whose viewport is
  * the bottom share of the glyph: a nested svg clips to its own box, and with a
  * viewBox equal to that box it maps coordinates one to one — a clip with no
  * `id`, so two bars on a page can't collide. The share is of the GLYPH's
@@ -45,7 +47,7 @@ function RedRising({ icon, share }: { icon: string; share: number }) {
   const y = LOCK_BOTTOM - h;
   return (
     <svg x={0} y={y} width={960} height={h} viewBox={`0 ${y} 960 ${h}`} overflow="hidden">
-      <path fill="var(--color-accent)" d={icon} />
+      <path fill="var(--color-mark)" d={icon} />
     </svg>
   );
 }

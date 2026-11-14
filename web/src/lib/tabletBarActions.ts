@@ -28,7 +28,7 @@ export type BarAction = {
   icon: string;
   /**
    * A COUNTDOWN in the icon: the share of the time GONE, 0 → 1, drawn as the
-   * glyph turning red from the bottom up (`BarLabel`; the open lock only, whose
+   * glyph turning yellow from the bottom up (`BarLabel`; the open lock only, whose
    * height it knows). A pressed action with a fill keeps the black cell. First
    * caller: Stay unlocked (Mark, 2026-11-13/14).
    */
