@@ -8,11 +8,12 @@
  * A bare glyph cannot say which of two things the first cell is, and the
  * runners already made that argument at length — the word stays.
  */
-export function BarLabel({ icon, word, dial }: { icon: string; word: string; dial?: number }) {
+export function BarLabel({ icon, word, fill }: { icon: string; word: string; fill?: number }) {
   return (
     <span className="flex flex-col items-center gap-0.5">
       <svg width="28" height="28" viewBox="0 -960 960 960" aria-hidden="true">
-        {dial === undefined ? <path fill="currentColor" d={icon} /> : <Dial left={dial} />}
+        <path fill="currentColor" d={icon} />
+        {fill === undefined || icon !== ICON_LOCK_OPEN ? null : <LockFill share={fill} />}
       </svg>
       <span className="text-center text-[12px] font-bold uppercase tabular-nums leading-none tracking-[0.08em]">{word}</span>
     </span>
@@ -20,31 +21,17 @@ export function BarLabel({ icon, word, dial }: { icon: string; word: string; dia
 }
 
 /**
- * A countdown: a ring with the time LEFT filled in, starting at twelve o'clock
- * and draining clockwise as it runs out — a kitchen timer, read at a glance
- * from across the bench. `left` is 1 (full) → 0 (empty). Drawn in the icon's
- * own `0 -960 960 960` box so it sits exactly where an icon would.
+ * The open lock's body FILLING FROM THE BOTTOM, 0 (empty) → 1 (full): Stay
+ * unlocked's countdown, where full is the moment the iPad locks (Mark,
+ * 2026-11-14, replacing a pie dial: "keep the lock glyph … fill it from the
+ * bottom up as time progresses"). The rectangle is the body's inside (overlapping the outline by 6, so no hairline shows) in
+ * `ICON_LOCK_OPEN`'s own box (x 252–708, y −551 to −175), so it sits inside
+ * the outline; the keyhole is covered as the ink passes it.
  */
-function Dial({ left }: { left: number }) {
-  const share = Math.min(1, Math.max(0, left));
-  const r = 330;
-  const cx = 480;
-  const cy = -480;
-  // The wedge runs from where the hand has reached round to twelve o'clock.
-  const start = (1 - share) * 2 * Math.PI;
-  const x = cx + r * Math.sin(start);
-  const y = cy - r * Math.cos(start);
-  const large = share > 0.5 ? 1 : 0;
-  return (
-    <>
-      <circle cx={cx} cy={cy} r={400} fill="none" stroke="currentColor" strokeWidth={70} />
-      {share >= 0.999 ? (
-        <circle cx={cx} cy={cy} r={r} fill="currentColor" />
-      ) : share > 0.001 ? (
-        <path fill="currentColor" d={`M${cx} ${cy}L${x} ${y}A${r} ${r} 0 ${large} 1 ${cx} ${cy - r}Z`} />
-      ) : null}
-    </>
-  );
+function LockFill({ share }: { share: number }) {
+  const s = Math.min(1, Math.max(0, share));
+  const h = 376 * s;
+  return h < 1 ? null : <rect x={246} y={-169 - h} width={468} height={h + 6} fill="currentColor" />;
 }
 
 /** Material Symbols Outlined, wght 700 — the same weight the runners' footers use. */

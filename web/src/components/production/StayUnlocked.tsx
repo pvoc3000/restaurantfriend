@@ -40,12 +40,12 @@ function timeLeft(ms: number): string {
  * what "leaving the batch log" means; `pagehide` covers a hard navigation,
  * where no unmount runs.
  *
- * ON, the cell inverts and its icon becomes a COUNTDOWN DIAL over "18:42" (minutes and seconds left):
- * a disc that drains clockwise as the twenty minutes run out, so the baker can
- * see it took and a passer-by can see why the iPad is open (Mark, 2026-11-13 —
- * it read "Until 10:42" before, and an end time is arithmetic to read). A touch
- * fills it back up and leaves the switch on; only the lock, leaving, or tapping
- * the switch itself turns it off.
+ * ON, the cell inverts, reads "18:42" (minutes and seconds left), and its
+ * lock FILLS FROM THE BOTTOM as the twenty minutes run out — full is when it
+ * locks (Mark, 2026-11-14; an end time "Until 10:42" came first, then a pie
+ * dial). The baker can see it took and a passer-by can see why the iPad is
+ * open. A touch empties it again and leaves the switch on; only the lock,
+ * leaving, or tapping the switch itself turns it off.
  *
  * IT ALSO ASKS THE SCREEN TO STAY AWAKE (`navigator.wakeLock`, Safari 16.4+).
  * Without that the iPad's own Auto-Lock darkens it in a few minutes and the
@@ -106,7 +106,7 @@ export function StayUnlocked({ userId }: { userId: string }) {
         key: EXTEND_ACTION_KEY,
         word: on ? timeLeft(left) : "Stay 20 min",
         icon: ICON_LOCK_OPEN,
-        dial: on ? left / EXTEND_MS : undefined,
+        fill: on ? 1 - left / EXTEND_MS : undefined,
         pressed: on,
         title: on
           ? "Time until this iPad locks; any touch starts them over. Tap to turn off."

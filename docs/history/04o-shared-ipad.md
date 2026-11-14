@@ -240,3 +240,9 @@ completely hidden"; the divider clamps at 20–80%, so it never is). The book ha
 also come and gone with the in-memory found set — present from the list, gone
 after a lock's reload — which is what moved Stay unlocked. The desk keeps its
 book in the title row.
+
+**2026-11-14 — the lock fills instead of a dial** (Mark: "keep the lock glyph
+on the stay button, but when engaged … fill it from the bottom up as time
+progresses"). `BarAction.dial` became `fill` (time GONE, 0 → 1); `BarLabel`
+draws a rectangle inside the open lock's body rising from the bottom, full at
+the moment it locks. The 18:42 countdown stays under it.
