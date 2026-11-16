@@ -4,6 +4,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { ActionMenuItem } from "@/components/ui/ActionMenu";
+import { Dialog } from "@/components/ui/Dialog";
+import { ProgressBand } from "@/components/ui/ProgressBand";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { ATTACHMENT_BUCKET } from "@/lib/attachments";
 import { money } from "@/lib/purchaseOrders";
@@ -73,6 +75,13 @@ export function BillBatchActions({
   const supabase = createClient();
   const router = useRouter();
   const [busy, setBusy] = useState<"approve" | "delete" | "push" | null>(null);
+  /**
+   * WHERE A PUSH HAS GOT TO (Mark, 2026-11-16: "I just pushed 4 bills to QBO,
+   * and it was dead silent until the operation finished"). The menu row's
+   * "Pushing…" was the only sign, and the menu closes the moment you choose it.
+   * Null when nothing is being pushed.
+   */
+  const [pushProgress, setPushProgress] = useState<{ label: string; note?: string } | null>(null);
   /** Whether QuickBooks is connected at all — the record's rule: a screen is
    *  not the place to advertise a feature nobody has set up, so the row is
    *  absent until this says yes. One cheap RPC per list load. */
@@ -264,6 +273,7 @@ export function BillBatchActions({
     if (!ok) return;
 
     setBusy("push");
+    setPushProgress({ label: "Reading the bills…" });
     const ids = pushable.map((i) => i.id);
     const { data: rows, error: rowsError } = await supabase
       .from("vendor_bills")
@@ -273,6 +283,7 @@ export function BillBatchActions({
       .in("id", ids);
     if (rowsError || !rows) {
       setBusy(null);
+      setPushProgress(null);
       onReport(rowsError?.message ?? "The bills could not be read.", "error");
       return;
     }
@@ -282,6 +293,7 @@ export function BillBatchActions({
     const unlinked = pushable.filter((i) => !i.qbo_linked).map((i) => i.id);
     let candidates: QboCandidate[] = [];
     if (unlinked.length > 0) {
+      setPushProgress({ label: "Checking QuickBooks for duplicates…" });
       const { data, message } = await invokeQbo(supabase, {
         mode: "find_bills",
         bill_ids: unlinked,
@@ -290,6 +302,7 @@ export function BillBatchActions({
         // The record falls through on a failed lookup; a BATCH must not, or a
         // bad connection would put every Bill.com-synced bill in twice.
         setBusy(null);
+        setPushProgress(null);
         onReport(`QuickBooks could not be checked for duplicates, so nothing was sent: ${message}`, "error");
         return;
       }
@@ -300,9 +313,13 @@ export function BillBatchActions({
     let updated = 0;
     const notes: string[] = [];
     const failed: string[] = [];
-    for (const listRow of pushable) {
+    for (const [index, listRow] of pushable.entries()) {
       const inv = rows.find((r) => r.id === listRow.id);
       const name = listRow.invoice_number ?? "no number";
+      setPushProgress({
+        label: `Pushing bill ${index + 1} of ${pushable.length}…`,
+        note: listRow.invoice_number ? `Bill ${listRow.invoice_number}` : undefined,
+      });
       if (!inv) {
         failed.push(`${name}: could not be read`);
         continue;
@@ -385,6 +402,7 @@ export function BillBatchActions({
       for (const w of result.warnings) notes.push(`${name}: ${w}`);
     }
     setBusy(null);
+    setPushProgress(null);
 
     const done = [sent ? `Sent ${sent}` : null, updated ? `updated ${updated}` : null]
       .filter(Boolean)
@@ -439,5 +457,19 @@ export function BillBatchActions({
       : []),
   ];
 
-  return <>{children(items)}</>;
+  return (
+    <>
+      {children(items)}
+      {/* A DIALOG, where `ProgressBand` alone would be the rule (ui-parts): a
+          batch push works through the SELECTION, so nothing behind it should
+          be touchable until it is done — re-ticking, Approve or Delete mid-run
+          would act on bills that are half sent. It cannot be closed while it
+          runs (`busy`), and the report it ends in is the list's usual one. */}
+      {pushProgress && (
+        <Dialog title="Push to QuickBooks" onClose={() => {}} busy width="max-w-md">
+          <ProgressBand label={pushProgress.label} note={pushProgress.note} />
+        </Dialog>
+      )}
+    </>
+  );
 }
