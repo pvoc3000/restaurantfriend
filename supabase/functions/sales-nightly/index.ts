@@ -53,12 +53,16 @@ import {
   type SquarePayout,
 } from "../_shared/generated/salesPosting.ts";
 import {
+  additionalCents,
   addDays,
   emptyTally,
   problem,
   renderSummaryEmail,
   runWindow,
   sameDayLastYear,
+  type AdditionalCategories,
+  type AdditionalKind,
+  type AdditionalSale,
   type DepositLine,
   type RunProblem,
   type RunSummary,
@@ -91,12 +95,20 @@ type Settings = {
   enabled: boolean;
   /** The member the run signs in as — a purchaser or above. */
   botUserId: string | null;
+  /** The Square categories kept out of daily sales (Mark, 2026-11-18). */
+  additional: AdditionalCategories;
 };
 
 function readSettings(settings: Record<string, unknown>): Settings {
   const s = (settings.sales_automation ?? {}) as Record<string, unknown>;
   const bot = typeof s.bot_user_id === "string" && s.bot_user_id.trim() ? s.bot_user_id.trim() : null;
-  return { enabled: s.enabled === true, botUserId: bot };
+  const pick = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+  const additional: AdditionalCategories = {};
+  const so = pick(s.special_orders_category);
+  const ws = pick(s.wholesale_category);
+  if (so) additional.special_orders = so;
+  if (ws) additional.wholesale = ws;
+  return { enabled: s.enabled === true, botUserId: bot, additional };
 }
 
 /**
@@ -463,19 +475,38 @@ async function runForOrg(
     const lastYearDates = weekDates.map(sameDayLastYear);
     const { data: compareRows, error: cmpErr } = await admin
       .from("daily_sales")
-      .select("location_id, business_date, net_sales_cents")
+      .select("location_id, business_date, net_sales_cents, breakdown")
       .eq("org_id", org.id)
       .in("business_date", [...weekDates, ...lastYearDates]);
     if (cmpErr) throw new Error(cmpErr.message);
+    // `net` is DAILY sales: net sales less the special and wholesale order
+    // categories, where the day's breakdown says what they were. A day with
+    // no breakdown (last year, until August 2027) stays whole.
+    const splitting = Object.keys(settings.additional).length > 0;
     const net = new Map<string, number>();
+    const extra = new Map<string, Record<AdditionalKind, number>>();
+    const unsplit = new Set<string>();
     for (const r of (compareRows ?? []) as Record<string, unknown>[]) {
-      net.set(`${r.location_id}|${r.business_date}`, Number(r.net_sales_cents));
+      const key = `${r.location_id}|${r.business_date}`;
+      const parts = splitting ? additionalCents(r.breakdown, settings.additional) : null;
+      if (splitting && !parts) unsplit.add(key);
+      if (parts) extra.set(key, parts);
+      net.set(key, Number(r.net_sales_cents) - (parts ? parts.special_orders + parts.wholesale : 0));
     }
     const shopDays: ShopDay[] = shopsWithSquare.map((s) => ({
       shop: s.code,
       netCents: net.get(`${s.id}|${yesterday}`) ?? null,
       lastYearCents: net.get(`${s.id}|${lastYear}`) ?? null,
     }));
+    const additional: AdditionalSale[] | undefined = splitting
+      ? (Object.keys(settings.additional) as AdditionalKind[]).map((kind) => {
+          const shops = shopsWithSquare
+            .map((s) => ({ shop: s.code, cents: extra.get(`${s.id}|${yesterday}`)?.[kind] ?? 0 }))
+            .filter((x) => x.cents !== 0);
+          return { kind, cents: shops.reduce((a, x) => a + x.cents, 0), shops };
+        })
+      : undefined;
+    const lastYearUnsplit = shopsWithSquare.some((s) => unsplit.has(`${s.id}|${lastYear}`));
     const dayTotal = (date: string): number | null => {
       let sum: number | null = null;
       for (const shop of shopsWithSquare) {
@@ -514,6 +545,8 @@ async function runForOrg(
       businessDate: yesterday,
       lastYearDate: lastYear,
       shops: shopDays,
+      additional,
+      lastYearUnsplit,
       week,
       deposits: depositLines,
       entries,

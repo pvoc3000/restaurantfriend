@@ -340,6 +340,7 @@ export default async function SettingsPage({
                     editable={editable}
                     members={runMembers}
                     lastRun={lastRun}
+                    categories={salesMappings.filter((m) => m.kind === "category").map((m) => m.square_key)}
                     timeZone={(settings.timezone as string | undefined) ?? serverTimeZone()}
                   />
                 </div>

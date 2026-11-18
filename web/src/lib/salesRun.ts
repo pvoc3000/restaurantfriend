@@ -45,6 +45,10 @@ export type SalesRun = {
 export type SalesRunSettings = {
   enabled: boolean;
   botUserId: string | null;
+  /** The Square categories the email keeps out of DAILY sales and lists as
+   *  Additional Sales (Mark, 2026-11-18). Read by `sales-nightly`. */
+  specialOrdersCategory: string | null;
+  wholesaleCategory: string | null;
 };
 
 export function readSalesRunSettings(settings: Record<string, unknown> | null | undefined): SalesRunSettings {
@@ -52,6 +56,9 @@ export function readSalesRunSettings(settings: Record<string, unknown> | null | 
   return {
     enabled: s.enabled === true,
     botUserId: typeof s.bot_user_id === "string" && s.bot_user_id ? s.bot_user_id : null,
+    specialOrdersCategory:
+      typeof s.special_orders_category === "string" && s.special_orders_category ? s.special_orders_category : null,
+    wholesaleCategory: typeof s.wholesale_category === "string" && s.wholesale_category ? s.wholesale_category : null,
   };
 }
 

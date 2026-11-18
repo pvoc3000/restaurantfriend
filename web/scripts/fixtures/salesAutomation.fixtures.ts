@@ -4,6 +4,7 @@
 
 import { eq, no, ok, test } from "./harness";
 import {
+  additionalCents,
   addDays,
   emailSubject,
   emptyTally,
@@ -122,7 +123,7 @@ function sampleRun(over: Partial<RunForEmail> = {}): RunForEmail {
 }
 
 test("email: a clean morning leads with the total and its change on last year", () => {
-  eq(emailSubject(sampleRun()), "Sales for Wed, Oct 28: $3,412.50 (+5.0%) · all posted");
+  eq(emailSubject(sampleRun()), "Daily Sales for Wed, Oct 28: $3,412.50 (+5.0%) · all posted");
   const { html, text } = renderSummaryEmail(sampleRun());
   ok(text.includes("Total"), "a total row with two shops");
   ok(text.includes("$168.45 (+8.6%)"), "DF01's change in dollars and percent");
@@ -140,9 +141,9 @@ test("email: issues come first, each with its fix and link, and the subject coun
       problem("qbo_connection", "QuickBooks is not connected."),
     ],
   });
-  eq(emailSubject(run), "Sales for Wed, Oct 28: $3,412.50 (+5.0%) · 2 issues need you");
+  eq(emailSubject(run), "Daily Sales for Wed, Oct 28: $3,412.50 (+5.0%) · 2 issues need you");
   const { text, html } = renderSummaryEmail(run);
-  ok(text.indexOf("NEEDS YOU") < text.indexOf("SALES FOR"), "issues lead");
+  ok(text.indexOf("NEEDS YOU") < text.indexOf("DAILY SALES BY SHOP"), "issues lead");
   ok(text.includes("DF01 · Wed, Oct 28: “Pumpkin Spice”"), "names the shop and day");
   ok(html.includes("integration=square"), "links to the grid");
   ok(html.includes("&ldquo;") || html.includes("“Pumpkin"), "text is escaped, not dropped");
@@ -209,7 +210,7 @@ test("email: the week's chart leads, labels yesterday only, and the text carries
     { date: "2026-10-28", netCents: 3_412_50, lastYearCents: 3_251_10 },
   ];
   const { html, text } = renderSummaryEmail(run);
-  ok(html.indexOf("The last 7 days") < html.indexOf("By shop"), "the chart sits above the tables");
+  ok(html.indexOf("the last 7 days") < html.indexOf("Daily sales by shop"), "the chart sits above the tables");
   ok(html.includes(">$3,413<"), "yesterday's bar carries its value");
   no(html.includes(">$3,100<"), "the other days do not");
   ok(html.includes("width:14px;height:130px;background:#c0c0c0"), "last year's $5,000 sets the scale: 132px, less its 1px outline top and bottom");
@@ -218,4 +219,54 @@ test("email: the week's chart leads, labels yesterday only, and the text carries
   ok(/Sat, Oct 24\s+—/.test(text), "a missing day is a dash");
   ok(html.includes("background:#ffe98a") === false, "no yellow without a problem");
   ok(html.includes("Restaurant Friend"), "the wordmark");
+});
+
+// ---- Daily sales vs special and wholesale orders (Mark, 2026-11-18) ----
+
+test("split: a day's breakdown gives each chosen category's cents; no breakdown is unknown, not zero", () => {
+  const breakdown = {
+    v: 1,
+    lines: [
+      { kind: "category", key: "Signatures", cents: 1_200_00 },
+      { kind: "category", key: "Special Orders", cents: 3_787_61 },
+      { kind: "category", key: "Wholesale", cents: 75 },
+      { kind: "service_charge", key: "Special Orders", cents: 999 },
+      { kind: "discount", key: "Staff", cents: 10_00 },
+    ],
+  };
+  const cats = { special_orders: "Special Orders", wholesale: "Wholesale" };
+  eq(additionalCents(breakdown, cats), { special_orders: 3_787_61, wholesale: 75 }, "only category lines count");
+  eq(additionalCents(breakdown, { special_orders: "Special Orders" }), { special_orders: 3_787_61, wholesale: 0 }, "an unchosen kind is zero");
+  eq(additionalCents(null, cats), null, "a day before 104 cannot be split");
+  eq(additionalCents({ v: 1 }, cats), null, "nor one with no lines");
+});
+
+test("email: Additional Sales lists special and wholesale orders apart from the daily figures", () => {
+  const run = sampleRun();
+  run.summary!.additional = [
+    { kind: "special_orders", cents: 4_101_74, shops: [{ shop: "DF01", cents: 314_13 }, { shop: "DF02", cents: 3_787_61 }] },
+    { kind: "wholesale", cents: 0, shops: [] },
+  ];
+  const { html, text } = renderSummaryEmail(run);
+  eq(emailSubject(run), "Daily Sales for Wed, Oct 28: $3,412.50 (+5.0%) · all posted", "the subject is daily sales only");
+  ok(html.includes("Daily net sales"), "the headline is named daily");
+  ok(html.indexOf("Daily sales by shop") < html.indexOf("Additional sales"), "after the shops");
+  ok(html.indexOf("Additional sales") < html.indexOf("Square deposits"), "before the deposits");
+  ok(html.includes("Special Orders") && html.includes("Wholesale Orders"));
+  ok(html.includes("DF01 $314.13 · DF02 $3,787.61"), "each shop's share");
+  ok(/Special Orders\s+\$4,101\.74\s+DF01 \$314\.13 · DF02 \$3,787\.61/.test(text), text);
+  ok(/Wholesale Orders\s+—/.test(text), "none is a dash");
+  no(text.includes("still include"), "no note when last year was split");
+  run.summary!.lastYearUnsplit = true;
+  ok(renderSummaryEmail(run).text.includes("still include special and wholesale"), "says when last year could not be split");
+  ok(renderSummaryEmail(run).html.includes("still include special and wholesale"));
+});
+
+test("email: with no category chosen there is no Additional Sales section and no note", () => {
+  const run = sampleRun({});
+  run.summary!.lastYearUnsplit = true;
+  const { html, text } = renderSummaryEmail(run);
+  no(html.includes("Additional sales"));
+  no(text.includes("ADDITIONAL SALES"));
+  no(text.includes("still include"), "nothing was split, so nothing to explain");
 });

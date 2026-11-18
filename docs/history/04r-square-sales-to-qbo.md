@@ -447,3 +447,41 @@ in no Reporting cube, so never booked — DF02 2026-09-22 +$62.52 (Shogo era),
 DF01 2026-10-08 +$42.88, DF02 2026-10-27 +$56.81. Each leaves Undeposited
 Square Funds over-cleared by its amount. Unidentified; perhaps courier-fee
 credits. Square's dashboard should name them.
+
+## Daily sales vs special and wholesale orders (2026-11-18)
+
+Mark: "we need to differentiate regular, in shop sales and special orders &
+wholesale orders. Otherwise a big special order makes it appear like a shop was
+very busy when it wasn't." The case was DF02 on 2026-11-17: $5,469.22 net, of
+which $3,787.61 was one Special Orders sale.
+
+**What changed in the morning email** (`_shared/salesAutomation.ts`):
+the subject reads "Daily Sales for …", the headline "Daily net sales", the
+shop band "Daily sales by shop", the chart "Daily sales · the last 7 days" —
+and every one of those figures is net sales LESS the special and wholesale
+order categories. They are listed instead in a new **Additional Sales** band
+(Special Orders, Wholesale Orders, each with its per-shop split), between the
+shops and the deposits.
+
+**Where the split comes from:** the day's `breakdown` (104), whose category
+lines already separate them — a pay-link payment is sold as the Special Orders
+or Wholesale item (125, 126), and a hand-sent Square invoice uses the same
+items. WHICH Square category is which is a setting, chosen on the Morning
+Sales Run panel from the categories the sync has seen:
+`orgs.settings.sales_automation.special_orders_category` and
+`wholesale_category`. Unset, nothing is split and there is no Additional Sales
+band (rule 2: no Square name in code). Measured over Aug 1–Nov 17: Special
+Orders $7,500 DF01 / $7,095 DF02; Wholesale $0.75 on one day — wholesale is
+mostly QuickBooks-collected (131) and never reaches Square, so it is in
+neither figure.
+
+**Two approximations, both deliberate.** A category line is gross net of
+returns; a discount stays in the daily figure, because the breakdown does not
+say which category a discount came from. And **last year cannot be split**:
+breakdowns start 2026-08-01, so until August 2027 the comparison is this
+year's daily sales against last year's EVERYTHING, and the email says so under
+the shop table. Backfilling last year's breakdowns from Square would fix it
+early; not done.
+
+The preview was rendered from Nov 17's real figures with the compiled module
+(the fixtures build) and headless Chrome; three fixture cases cover the split.

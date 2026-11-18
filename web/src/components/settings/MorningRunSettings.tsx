@@ -19,13 +19,18 @@ export type RunMember = { user_id: string; display_name: string | null; role: st
  * THE MORNING SALES RUN'S SETTINGS (Mark, 2026-10-29) — `sales-nightly`, which
  * syncs from Square, posts to QuickBooks and emails the summary at 7 AM.
  *
- * Two choices and nothing else:
+ * Three choices and nothing else:
  *   · whether it runs — `orgs.settings.sales_automation.enabled`, off until
  *     somebody turns it on;
  *   · which member it signs in as — `bot_user_id`. The run does what the Sales
  *     screen does, AS a member, so every permission check applies to it
  *     unchanged and its posts carry that member's name. A member of its own,
  *     made for the purpose, keeps "who posted this" honest.
+ *   · which Square categories are special and wholesale orders —
+ *     `special_orders_category`, `wholesale_category` (Mark, 2026-11-18). The
+ *     email's DAILY sales leave them out, so one big order does not make a
+ *     shop look busy, and lists them under Additional Sales. Chosen from the
+ *     categories the sync has seen (the Sales Mapping's rows), never typed.
  *
  * WHO GETS THE EMAIL IS NOT A SETTING: the owner and managers, by role — the
  * shift report's rule, so there is no list to forget a leaver on. Stated here
@@ -38,6 +43,7 @@ export function MorningRunSettings({
   members,
   lastRun,
   timeZone,
+  categories,
 }: {
   orgId: string;
   settings: Settings;
@@ -47,6 +53,8 @@ export function MorningRunSettings({
   /** The latest run of any kind, test runs included. */
   lastRun: SalesRun | null;
   timeZone: string;
+  /** Every Square category the sync has seen, by its key. */
+  categories: string[];
 }) {
   const router = useRouter();
   const current = readSalesRunSettings(settings);
@@ -111,6 +119,14 @@ export function MorningRunSettings({
       hint: ROLE_LABEL[m.role as keyof typeof ROLE_LABEL] ?? m.role,
     }));
   const bot = members.find((m) => m.user_id === current.botUserId);
+  const categoryOptions = categories
+    .slice()
+    .sort((a, b) => a.localeCompare(b))
+    .map((c) => ({ value: c, label: c }));
+  const categoryRows: { label: string; path: string; value: string | null }[] = [
+    { label: "Special Orders", path: "special_orders_category", value: current.specialOrdersCategory },
+    { label: "Wholesale", path: "wholesale_category", value: current.wholesaleCategory },
+  ];
 
   const when = lastRun
     ? new Intl.DateTimeFormat("en-US", {
@@ -181,6 +197,33 @@ export function MorningRunSettings({
             )}
           </dd>
         </div>
+
+        {categoryRows.map((c) => (
+          <div key={c.path} className={row}>
+            <dt className={term}>{c.label}</dt>
+            <dd>
+              {editable ? (
+                <InlineValue
+                  table="orgs"
+                  id={orgId}
+                  column={c.path}
+                  jsonColumn="settings"
+                  jsonPath={["sales_automation", c.path]}
+                  jsonDocument={settings}
+                  value={c.value}
+                  kind="pick"
+                  clearable
+                  options={categoryOptions}
+                  boxed
+                  placeholder="Choose a Square category"
+                  ariaLabel={`The Square category of ${c.label.toLowerCase()} sales`}
+                />
+              ) : (
+                <span className="text-sm">{c.value ?? "—"}</span>
+              )}
+            </dd>
+          </div>
+        ))}
 
         <div className={row}>
           <dt className={term}>Emails</dt>

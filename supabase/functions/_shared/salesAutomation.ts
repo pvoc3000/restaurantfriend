@@ -231,11 +231,76 @@ export type WeekDay = {
   lastYearCents: number | null;
 };
 
+/**
+ * DAILY SALES ARE THE SHOP'S OWN TRADE; SPECIAL AND WHOLESALE ORDERS ARE
+ * "ADDITIONAL" (Mark, 2026-11-18: "a big special order makes it appear like a
+ * shop was very busy when it wasn't"). DF02 on 2026-11-17 was the case: $5,469
+ * net, $3,788 of it one Special Orders sale.
+ *
+ * Square reports both by CATEGORY in the day's breakdown (104) — a pay-link
+ * payment is sold as the Special Orders or the Wholesale item (125, 126), and
+ * a hand-sent Square invoice uses the same items. Which Square category is
+ * which is a SETTING (`sales_automation.special_orders_category`,
+ * `wholesale_category`), chosen from the categories the sync has seen, so no
+ * Square name is written here. Unset, nothing is split.
+ *
+ * A category's cents are its gross sales net of returns; a discount on the
+ * order stays in the daily figure, because the breakdown does not say which
+ * category a discount was taken from. Wholesale collected by QuickBooks (131)
+ * never reaches Square and so is in neither figure.
+ */
+export type AdditionalKind = "special_orders" | "wholesale";
+
+export const ADDITIONAL_LABEL: Record<AdditionalKind, string> = {
+  special_orders: "Special Orders",
+  wholesale: "Wholesale Orders",
+};
+
+/** The Square category chosen for each kind; a kind with none is left out. */
+export type AdditionalCategories = Partial<Record<AdditionalKind, string>>;
+
+export type AdditionalSale = {
+  kind: AdditionalKind;
+  /** Every shop together, yesterday. */
+  cents: number;
+  /** The shops that had any, by code. */
+  shops: { shop: string; cents: number }[];
+};
+
+/**
+ * What one day's breakdown holds in each chosen category, or null when the
+ * day has no breakdown (every day before August 2026), so the caller can tell
+ * "none" from "unknown".
+ */
+export function additionalCents(
+  breakdown: unknown,
+  categories: AdditionalCategories
+): Record<AdditionalKind, number> | null {
+  const lines = (breakdown as { lines?: unknown } | null)?.lines;
+  if (!Array.isArray(lines)) return null;
+  const out: Record<AdditionalKind, number> = { special_orders: 0, wholesale: 0 };
+  for (const kind of Object.keys(out) as AdditionalKind[]) {
+    const key = categories[kind];
+    if (!key) continue;
+    for (const ln of lines as { kind?: unknown; key?: unknown; cents?: unknown }[]) {
+      if (ln.kind === "category" && ln.key === key) out[kind] += Number(ln.cents) || 0;
+    }
+  }
+  return out;
+}
+
 export type RunSummary = {
   /** Yesterday — the day the sales block is about. */
   businessDate: string;
   lastYearDate: string;
+  /** Each shop's DAILY sales — net sales less the additional categories. */
   shops: ShopDay[];
+  /** Yesterday's special and wholesale orders, one entry per chosen
+   *  category. Absent when none is chosen, and on runs from before the split. */
+  additional?: AdditionalSale[];
+  /** True when a last-year figure could not be split — its day has no
+   *  breakdown — so it still counts special and wholesale orders. */
+  lastYearUnsplit?: boolean;
   /** The window's days, oldest first, for the chart at the top. Absent on
    *  runs recorded before the chart existed. */
   week?: WeekDay[];
@@ -306,7 +371,7 @@ export function emailSubject(run: RunForEmail): string {
   const t = totals(run.summary.shops);
   const pct = percentChange(t.netCents, t.lastYearCents);
   const figure = t.netCents === null ? "" : `: ${formatCents(t.netCents)}${pct ? ` (${pct})` : ""}`;
-  return `${dry}Sales for ${shortDate(run.summary.businessDate)}${figure} · ${tail}`;
+  return `${dry}Daily Sales for ${shortDate(run.summary.businessDate)}${figure} · ${tail}`;
 }
 
 function esc(s: string): string {
@@ -407,7 +472,7 @@ function band(title: string): string {
 }
 
 /**
- * THE WEEK, AT THE TOP. Seven days of every shop together, each beside the
+ * THE WEEK, AT THE TOP. Seven days of every shop's daily sales together, each beside the
  * same weekday a year earlier — the comparison the email exists for, seen
  * before it is read. Black bars are this week; last year is the Mac grey with
  * a black outline, because grey alone is under 3:1 on white. One value label,
@@ -452,7 +517,7 @@ function weekChart(week: readonly WeekDay[], businessDate: string): string {
   return (
     `<tr><td style="padding:24px 0 0 0">` +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
-    `<td style="${LABEL}">The last 7 days · all shops</td>` +
+    `<td style="${LABEL}">Daily sales · the last 7 days · all shops</td>` +
     `</tr><tr>` +
     `<td style="padding-top:6px;font-family:${FONT};font-size:11px;color:${C.secondary}">` +
     `<span style="white-space:nowrap">${key(true)}&nbsp; This week</span> &nbsp;&nbsp; ` +
@@ -477,6 +542,10 @@ function changeChip(now: number | null, before: number | null): string {
   );
 }
 
+/** Under the shop table when last year's day had no breakdown to split. */
+const UNSPLIT_NOTE =
+  "Last year's figures still include special and wholesale orders: Square's category split only goes back to August 2026.";
+
 function renderHtml(run: RunForEmail): string {
   const s = run.summary;
   const rows: string[] = [];
@@ -495,7 +564,7 @@ function renderHtml(run: RunForEmail): string {
   if (s) {
     const t = totals(s.shops);
     rows.push(
-      `<tr><td style="${LABEL}">Net sales · ${esc(shortDate(s.businessDate))}</td></tr>` +
+      `<tr><td style="${LABEL}">Daily net sales · ${esc(shortDate(s.businessDate))}</td></tr>` +
         `<tr><td style="padding:6px 0 0 0;font-family:${FONT};font-size:48px;line-height:52px;font-weight:700;letter-spacing:-0.02em;color:${C.ink};${NUM}">${t.netCents === null ? "—" : formatCents(t.netCents)}</td></tr>` +
         `<tr><td style="padding:10px 0 0 0">${changeChip(t.netCents, t.lastYearCents)}` +
         `<span style="font-family:${FONT};font-size:13px;color:${C.secondary}">&nbsp; vs ${esc(longDate(s.lastYearDate))}${t.lastYearCents !== null ? ` · ${formatCents(t.lastYearCents)}` : ""}</span></td></tr>`
@@ -530,7 +599,7 @@ function renderHtml(run: RunForEmail): string {
 
   if (s) {
     // By shop.
-    rows.push(band(`By shop · ${shortDate(s.businessDate)}`));
+    rows.push(band(`Daily sales by shop · ${shortDate(s.businessDate)}`));
     const shopRows = s.shops.length > 1 ? [...s.shops, totals(s.shops)] : s.shops;
     const body = shopRows
       .map((r) => {
@@ -559,6 +628,36 @@ function renderHtml(run: RunForEmail): string {
         `<td style="${head}text-align:right">${esc(longDate(s.lastYearDate))}</td><td style="${head}text-align:right;padding-right:0">Change</td></tr>` +
         `${body}</table></td></tr>`
     );
+    if (s.additional && s.lastYearUnsplit) {
+      rows.push(
+        `<tr><td style="padding:10px 0 0 0;font-family:${FONT};font-size:12px;line-height:18px;color:${C.secondary}">${esc(UNSPLIT_NOTE)}</td></tr>`
+      );
+    }
+
+    // Special and wholesale orders, kept out of the figures above.
+    if (s.additional && s.additional.length) {
+      rows.push(band(`Additional sales · ${shortDate(s.businessDate)}`));
+      const body = s.additional
+        .map((a) => {
+          const detail =
+            a.shops.length > 0
+              ? `<tr><td colspan="2" style="padding:0 0 10px 0;font-family:${FONT};font-size:12px;color:${C.secondary};${NUM}">` +
+                a.shops.map((x) => `${esc(x.shop)} ${formatCents(x.cents)}`).join(" · ") +
+                `</td></tr>`
+              : "";
+          return (
+            `<tr><td style="${cell}${detail ? "padding-bottom:2px;" : ""}font-weight:700;color:${C.ink};${CAPS}">${esc(ADDITIONAL_LABEL[a.kind])}</td>` +
+            `<td style="${numCell}${detail ? "padding-bottom:2px;" : ""}padding-right:0">${a.cents === 0 ? `<span style="color:${C.faint}">—</span>` : formatCents(a.cents)}</td></tr>` +
+            detail
+          );
+        })
+        .join("");
+      rows.push(
+        `<tr><td style="padding:14px 0 0 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">` +
+          `<tr><td style="${head}">Kind</td><td style="${head}text-align:right;padding-right:0">Sales</td></tr>` +
+          `${body}</table></td></tr>`
+      );
+    }
 
     // Deposits.
     rows.push(band("Square deposits"));
@@ -659,7 +758,7 @@ export function renderSummaryEmail(run: RunForEmail): { subject: string; html: s
 
   const s = run.summary;
   if (s) {
-    text.push(`SALES FOR ${shortDate(s.businessDate).toUpperCase()} (vs ${longDate(s.lastYearDate)})`);
+    text.push(`DAILY SALES BY SHOP · ${shortDate(s.businessDate).toUpperCase()} (vs ${longDate(s.lastYearDate)})`);
     const rows = s.shops.length > 1 ? [...s.shops, totals(s.shops)] : s.shops;
     for (const r of rows) {
       const pct = percentChange(r.netCents, r.lastYearCents);
@@ -669,10 +768,20 @@ export function renderSummaryEmail(run: RunForEmail): { subject: string; html: s
       const change = pct ? `${diff} (${pct})` : "—";
       text.push(`  ${r.shop.padEnd(6)} ${now.padStart(12)}   last year ${before.padStart(12)}   ${change}`);
     }
+    if (s.additional && s.lastYearUnsplit) text.push(`  ${UNSPLIT_NOTE}`);
     text.push("");
 
+    if (s.additional && s.additional.length) {
+      text.push(`ADDITIONAL SALES · ${shortDate(s.businessDate).toUpperCase()}`);
+      for (const a of s.additional) {
+        const shops = a.shops.map((x) => `${x.shop} ${formatCents(x.cents)}`).join(" · ");
+        text.push(`  ${ADDITIONAL_LABEL[a.kind].padEnd(18)} ${(a.cents === 0 ? "—" : formatCents(a.cents)).padStart(12)}${shops ? `   ${shops}` : ""}`);
+      }
+      text.push("");
+    }
+
     if (s.week && s.week.length) {
-      text.push("THE LAST 7 DAYS, ALL SHOPS (vs the same day last year)");
+      text.push("DAILY SALES, THE LAST 7 DAYS, ALL SHOPS (vs the same day last year)");
       for (const d of s.week) {
         const now = d.netCents === null ? "—" : formatCents(d.netCents);
         const before = d.lastYearCents === null ? "—" : formatCents(d.lastYearCents);
