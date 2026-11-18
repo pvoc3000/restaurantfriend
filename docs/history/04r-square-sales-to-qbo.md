@@ -485,3 +485,29 @@ early; not done.
 
 The preview was rendered from Nov 17's real figures with the compiled module
 (the fixtures build) and headless Chrome; three fixture cases cover the split.
+
+**Same day, second pass** (Mark): "make each location its own line" under
+Special Orders and Wholesale, "even though there aren't any currently". Each
+kind is now a small table in the shop table's shape: a line per shop in the
+email (a dash where it had none), and a Total under two or more. The run
+passes every shop, zeroes included, so the list reads the same every morning.
+**Set and deployed 2026-11-18:** `special_orders_category = "Special Orders"`,
+`wholesale_category = "Wholesale"` written to `orgs.settings.sales_automation`
+(enabled and bot member untouched, read back); `sales-nightly` v12 deployed
+`--no-verify-jwt`, listed afterwards still false, and an unauthenticated POST
+answers its own 401.
+
+**Backfilling last year from the Sales screen — what it would do** (asked the
+same day, not run). Sync from Square takes any range and loops it by month;
+a real sync pulls the breakdown for every day it lands. For a 2025 day it
+rewrites net sales with Square's own figure (skipped where the row is
+`manual`), writes the breakdown, adds any category or tender it has not seen
+to the Sales Mapping grid as an unmapped row, and does NOT touch tips: 104's
+`record_daily_sales` writes tip pools only where
+`day_in_open_pay_period` is true. The range that matters is 2025-11-12 →
+2026-07-31 (364 days before the first day with a breakdown onward).
+**THE HAZARD:** a day with a breakdown and no `posted_at` is offered by
+Post to QuickBooks… for whatever range the screen shows, and nothing knows
+that Shogo booked it. That is ALREADY true of 2026-08-01 → 09-15 (breakdowns,
+never posted by the app; the first app-posted day is 09-16), and a backfill
+would extend it to a year. A "posting starts on" guard would close both.

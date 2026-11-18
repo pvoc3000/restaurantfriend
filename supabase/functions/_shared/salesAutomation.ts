@@ -263,7 +263,8 @@ export type AdditionalSale = {
   kind: AdditionalKind;
   /** Every shop together, yesterday. */
   cents: number;
-  /** The shops that had any, by code. */
+  /** Every shop in the email, by code — a shop with none is a line of 0, so
+   *  the list reads the same every morning (Mark, 2026-11-18). */
   shops: { shop: string; cents: number }[];
 };
 
@@ -637,26 +638,26 @@ function renderHtml(run: RunForEmail): string {
     // Special and wholesale orders, kept out of the figures above.
     if (s.additional && s.additional.length) {
       rows.push(band(`Additional sales · ${shortDate(s.businessDate)}`));
-      const body = s.additional
-        .map((a) => {
-          const detail =
-            a.shops.length > 0
-              ? `<tr><td colspan="2" style="padding:0 0 10px 0;font-family:${FONT};font-size:12px;color:${C.secondary};${NUM}">` +
-                a.shops.map((x) => `${esc(x.shop)} ${formatCents(x.cents)}`).join(" · ") +
-                `</td></tr>`
-              : "";
-          return (
-            `<tr><td style="${cell}${detail ? "padding-bottom:2px;" : ""}font-weight:700;color:${C.ink};${CAPS}">${esc(ADDITIONAL_LABEL[a.kind])}</td>` +
-            `<td style="${numCell}${detail ? "padding-bottom:2px;" : ""}padding-right:0">${a.cents === 0 ? `<span style="color:${C.faint}">—</span>` : formatCents(a.cents)}</td></tr>` +
-            detail
-          );
-        })
-        .join("");
-      rows.push(
-        `<tr><td style="padding:14px 0 0 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">` +
-          `<tr><td style="${head}">Kind</td><td style="${head}text-align:right;padding-right:0">Sales</td></tr>` +
-          `${body}</table></td></tr>`
-      );
+      // Each kind is a small table of its own, in the shop table's shape:
+      // a line per shop (a dash where it had none), and a total under two.
+      const money = (c: number) => (c === 0 ? `<span style="color:${C.faint}">—</span>` : formatCents(c));
+      for (const a of s.additional) {
+        const lines = a.shops.length > 1 ? [...a.shops, { shop: "Total", cents: a.cents }] : a.shops;
+        const body = lines
+          .map((x) => {
+            const top = x.shop === "Total" ? `border-top:2px solid ${C.ink};font-weight:700;color:${C.ink};` : "";
+            return (
+              `<tr><td style="${cell}${top}font-weight:700;color:${C.ink};${CAPS}">${esc(x.shop)}</td>` +
+              `<td style="${numCell}${top}padding-right:0">${money(x.cents)}</td></tr>`
+            );
+          })
+          .join("");
+        rows.push(
+          `<tr><td style="padding:14px 0 0 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">` +
+            `<tr><td style="${head}">${esc(ADDITIONAL_LABEL[a.kind])}</td><td style="${head}text-align:right;padding-right:0">Sales</td></tr>` +
+            `${body}</table></td></tr>`
+        );
+      }
     }
 
     // Deposits.
@@ -774,8 +775,9 @@ export function renderSummaryEmail(run: RunForEmail): { subject: string; html: s
     if (s.additional && s.additional.length) {
       text.push(`ADDITIONAL SALES · ${shortDate(s.businessDate).toUpperCase()}`);
       for (const a of s.additional) {
-        const shops = a.shops.map((x) => `${x.shop} ${formatCents(x.cents)}`).join(" · ");
-        text.push(`  ${ADDITIONAL_LABEL[a.kind].padEnd(18)} ${(a.cents === 0 ? "—" : formatCents(a.cents)).padStart(12)}${shops ? `   ${shops}` : ""}`);
+        text.push(`  ${ADDITIONAL_LABEL[a.kind]}`);
+        const lines = a.shops.length > 1 ? [...a.shops, { shop: "Total", cents: a.cents }] : a.shops;
+        for (const x of lines) text.push(`    ${x.shop.padEnd(6)} ${(x.cents === 0 ? "—" : formatCents(x.cents)).padStart(12)}`);
       }
       text.push("");
     }

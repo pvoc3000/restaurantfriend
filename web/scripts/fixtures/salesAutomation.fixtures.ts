@@ -245,7 +245,7 @@ test("email: Additional Sales lists special and wholesale orders apart from the 
   const run = sampleRun();
   run.summary!.additional = [
     { kind: "special_orders", cents: 4_101_74, shops: [{ shop: "DF01", cents: 314_13 }, { shop: "DF02", cents: 3_787_61 }] },
-    { kind: "wholesale", cents: 0, shops: [] },
+    { kind: "wholesale", cents: 0, shops: [{ shop: "DF01", cents: 0 }, { shop: "DF02", cents: 0 }] },
   ];
   const { html, text } = renderSummaryEmail(run);
   eq(emailSubject(run), "Daily Sales for Wed, Oct 28: $3,412.50 (+5.0%) · all posted", "the subject is daily sales only");
@@ -253,9 +253,9 @@ test("email: Additional Sales lists special and wholesale orders apart from the 
   ok(html.indexOf("Daily sales by shop") < html.indexOf("Additional sales"), "after the shops");
   ok(html.indexOf("Additional sales") < html.indexOf("Square deposits"), "before the deposits");
   ok(html.includes("Special Orders") && html.includes("Wholesale Orders"));
-  ok(html.includes("DF01 $314.13 · DF02 $3,787.61"), "each shop's share");
-  ok(/Special Orders\s+\$4,101\.74\s+DF01 \$314\.13 · DF02 \$3,787\.61/.test(text), text);
-  ok(/Wholesale Orders\s+—/.test(text), "none is a dash");
+  ok(/Special Orders\n\s+DF01\s+\$314\.13\n\s+DF02\s+\$3,787\.61\n\s+Total\s+\$4,101\.74/.test(text), "a line per shop, then the total: " + text);
+  ok(/Wholesale Orders\n\s+DF01\s+—\n\s+DF02\s+—/.test(text), "a shop with none is still a line, as a dash");
+  ok(html.includes(">$314.13<") && html.includes(">$3,787.61<"), "each shop's share is its own cell");
   no(text.includes("still include"), "no note when last year was split");
   run.summary!.lastYearUnsplit = true;
   ok(renderSummaryEmail(run).text.includes("still include special and wholesale"), "says when last year could not be split");

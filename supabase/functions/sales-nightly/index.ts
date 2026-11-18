@@ -501,8 +501,7 @@ async function runForOrg(
     const additional: AdditionalSale[] | undefined = splitting
       ? (Object.keys(settings.additional) as AdditionalKind[]).map((kind) => {
           const shops = shopsWithSquare
-            .map((s) => ({ shop: s.code, cents: extra.get(`${s.id}|${yesterday}`)?.[kind] ?? 0 }))
-            .filter((x) => x.cents !== 0);
+            .map((s) => ({ shop: s.code, cents: extra.get(`${s.id}|${yesterday}`)?.[kind] ?? 0 }));
           return { kind, cents: shops.reduce((a, x) => a + x.cents, 0), shops };
         })
       : undefined;
