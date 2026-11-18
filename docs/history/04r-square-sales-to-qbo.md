@@ -546,3 +546,11 @@ it was), listed afterwards with both settings held, both ACTIVE, and both
 401 to a caller with no credentials. The refusal itself was NOT probed live:
 a probe that found the check broken would have posted a Shogo-era day. The signed-in
 screens were not seen in a browser (the pane is at the shared-device lock).
+
+**Last year backfilled 2026-11-18** (by Mark, Sync from Square… for
+2025-11-12 → 2026-07-31). Read back: 546 of 546 shop-days in the range now
+carry a breakdown; nothing before either posting start has `posted_at`; no
+category is left unmapped; Special Orders + Wholesale over the range come to
+$44,929. The morning email now splits both sides of the year-ago comparison,
+so its "last year still includes" note no longer appears. Mark: "test email
+looks good".
