@@ -540,7 +540,9 @@ because the two cut over a fortnight apart.
   reason on hover) instead of "not posted" or "no breakdown".
 
 Fixtures: three cases, checked by breaking the comparison (all three red).
-**NOT YET DEPLOYED:** `qbo-sync` and `sales-nightly` carry the server half;
-the deploy was stopped by the permission check and waits on Mark. Until it
-lands, the browser half guards Post to QuickBooks… on its own. The signed-in
+**DEPLOYED 2026-11-18** (Mark: "Yes, deploy both"): `qbo-sync` v61
+(verify_jwt true, as it was) and `sales-nightly` v13 (`--no-verify-jwt`, as
+it was), listed afterwards with both settings held, both ACTIVE, and both
+401 to a caller with no credentials. The refusal itself was NOT probed live:
+a probe that found the check broken would have posted a Shogo-era day. The signed-in
 screens were not seen in a browser (the pane is at the shared-device lock).
