@@ -62,6 +62,15 @@ import {
   revokeToken,
 } from "../_shared/qbo.ts";
 import { notifyInvoicePaid } from "../_shared/shopNotify.ts";
+import { beforePostingStart, readPostingStart, type PostingStart } from "../_shared/generated/salesPosting.ts";
+
+/** Where the org's sales posting starts (`lib/salesPosting`). Checked here as
+ *  well as in the builder, so no caller can post a day or a deposit that
+ *  Shogo already booked. Read through the caller's client, like the rest. */
+async function postingStartFor(supabase: SupabaseClient, orgId: string): Promise<PostingStart> {
+  const { data } = await supabase.from("orgs").select("settings").eq("id", orgId).maybeSingle();
+  return readPostingStart((data?.settings as Record<string, unknown> | null) ?? null);
+}
 
 /**
  * One file to put on the QuickBooks document that was just written.
@@ -1558,6 +1567,12 @@ Deno.serve(async (req) => {
         });
       }
       if (!day) return json(404, { error: "No such sales day" });
+      const early = beforePostingStart(
+        String(day.business_date),
+        (await postingStartFor(supabase, day.org_id as string)).entriesFrom,
+        "day"
+      );
+      if (early) return json(400, { error: early });
 
       const [{ data: shop }, { data: maps, error: mapErr }] = await Promise.all([
         supabase
@@ -1968,6 +1983,12 @@ Deno.serve(async (req) => {
       if (Number(payout.amount_cents) <= 0) {
         return json(400, { error: "A zero or negative payout is not a deposit." });
       }
+      const earlyDeposit = beforePostingStart(
+        String(payout.arrival_date),
+        (await postingStartFor(supabase, payout.org_id as string)).depositsFrom,
+        "deposit"
+      );
+      if (earlyDeposit) return json(400, { error: earlyDeposit });
 
       const [{ data: shop }, { data: maps, error: mapErr }] = await Promise.all([
         supabase

@@ -30,7 +30,14 @@ import { InlineValue } from "@/components/catalog/InlineValue";
 import { createClient } from "@/lib/supabase/client";
 import type { RawSearchParams } from "@/lib/filterMenus";
 import Link from "next/link";
-import { postingLabel, postingState, payoutPostingLabel, payoutPostingState } from "@/lib/salesPosting";
+import {
+  beforePostingStart,
+  postingLabel,
+  postingState,
+  payoutPostingLabel,
+  payoutPostingState,
+  type PostingStart,
+} from "@/lib/salesPosting";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import type { ActionPayout } from "./SalesActions";
 
@@ -71,7 +78,7 @@ export function SalesScreen({
   canEdit: boolean;
   /** The QuickBooks posting's standing facts (migration 104). `ready` is
    *  false until that migration is applied, and then the column stays off. */
-  posting: { ready: boolean; connected: boolean; unmappedNames: number; depositsReady: boolean };
+  posting: { ready: boolean; connected: boolean; unmappedNames: number; depositsReady: boolean; start: PostingStart };
   /** The whole window, EVERY shop — the filter is applied here. */
   days: SalesDay[];
   /** The range's payouts, every shop (105); the shop filter applies here too. */
@@ -236,6 +243,14 @@ export function SalesScreen({
       render: (r) => {
         const state = payoutPostingState(r);
         const label = payoutPostingLabel(state, r.external_ref);
+        const early = beforePostingStart(r.arrival_date, posting.start.depositsFrom, "deposit");
+        if (state === "unposted" && early) {
+          return (
+            <span className="text-faint" title={early}>
+              before posting starts
+            </span>
+          );
+        }
         if (state === "failed") {
           return (
             <span className="bg-mark-fill px-1 text-[11px] text-accent" title={r.post_error ?? undefined}>
@@ -436,6 +451,17 @@ export function SalesScreen({
           post_error: r.postError ?? null,
         });
         const label = postingLabel(state, r.externalRef ?? null);
+        // A day before posting starts was booked elsewhere and never will be
+        // here — a different sentence from "not posted yet", and it wins
+        // over "no breakdown", which would invite a sync that changes nothing.
+        const early = beforePostingStart(r.business_date, posting.start.entriesFrom, "day");
+        if (state === "unposted" && early) {
+          return (
+            <span className="text-faint" title={early}>
+              before posting starts
+            </span>
+          );
+        }
         // A day never pulled with a breakdown cannot be posted, and that is a
         // different sentence from "not posted yet".
         if (state === "unposted" && !r.breakdownPulledAt) {

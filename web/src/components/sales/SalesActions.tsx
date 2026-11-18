@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import type { DateRange } from "@/lib/sales";
-import type { SquarePayout } from "@/lib/salesPosting";
+import { beforePostingStart, type PostingStart, type SquarePayout } from "@/lib/salesPosting";
 import { SyncFromSquare } from "./SyncFromSquare";
 import { PostToQuickBooksDialog } from "./PostToQuickBooksDialog";
 import { CompareWithShogoDialog } from "./CompareWithShogoDialog";
@@ -41,6 +41,7 @@ export function SalesActions({
   days,
   payouts,
   shopCodes,
+  postingStart,
 }: {
   today: string;
   orgId: string;
@@ -52,10 +53,19 @@ export function SalesActions({
   /** Empty until migration 105 is applied; the deposit half then stays off. */
   payouts: ActionPayout[];
   shopCodes: string[];
+  /** Nothing before these dates is offered: it was booked before this app. */
+  postingStart: PostingStart;
 }) {
   const [open, setOpen] = useState<"post" | "compare" | null>(null);
-  const postable = days.filter((d) => d.hasBreakdown);
-  const depositable = payouts.filter((p) => (p.status === "SENT" || p.status === "PAID") && p.amount_cents > 0);
+  const postable = days.filter(
+    (d) => d.hasBreakdown && !beforePostingStart(d.business_date, postingStart.entriesFrom, "day")
+  );
+  const depositable = payouts.filter(
+    (p) =>
+      (p.status === "SENT" || p.status === "PAID") &&
+      p.amount_cents > 0 &&
+      !beforePostingStart(p.arrival_date, postingStart.depositsFrom, "deposit")
+  );
   const postLabel =
     `Post to QuickBooks… (${postable.length} day${postable.length === 1 ? "" : "s"}` +
     (depositable.length ? `, ${depositable.length} deposit${depositable.length === 1 ? "" : "s"}` : "") +

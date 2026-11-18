@@ -12,6 +12,7 @@ import { AccountingSettings, type AccountingStatus } from "@/components/settings
 import { LaborAccountsSettings, type LaborAccountRow } from "@/components/settings/LaborAccountsSettings";
 import { SalesMappingsTable, type SalesMappingRow } from "@/components/settings/SalesMappingsTable";
 import { MorningRunSettings, type RunMember } from "@/components/settings/MorningRunSettings";
+import { SalesPostingStart } from "@/components/settings/SalesPostingStart";
 import type { SalesRun } from "@/lib/salesRun";
 import { SharedDevices, type RegisteredDevice } from "@/components/settings/SharedDevices";
 import { thisDeviceId } from "@/app/deviceActions";
@@ -334,6 +335,7 @@ export default async function SettingsPage({
                       connected={accounting?.status === "connected"}
                     />
                   )}
+                  <SalesPostingStart orgId={orgId} settings={settings} editable={editable} />
                   <MorningRunSettings
                     orgId={orgId}
                     settings={settings}

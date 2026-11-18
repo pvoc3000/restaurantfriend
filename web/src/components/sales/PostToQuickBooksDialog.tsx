@@ -98,6 +98,7 @@ export function PostToQuickBooksDialog({
             tipsCents: r.tipsCents,
             existing: r.external_ref,
             orgName: ctx.orgName,
+            entriesFrom: ctx.postingStart.entriesFrom,
           });
           if (!build.ok) return { day, read: r, build, action: "refused" as const };
           // Unchanged means the entry it would send is the one QuickBooks
@@ -129,7 +130,13 @@ export function PostToQuickBooksDialog({
             const r = depById.get(payout.id) ?? null;
             const shop = ctx.shops.get(payout.location_id);
             if (!r || !shop) return { payout, read: r, build: null, action: "refused" as const };
-            const build = buildDeposit({ payout: r, mappings: ctx.mappings, shop, orgName: ctx.orgName });
+            const build = buildDeposit({
+              payout: r,
+              mappings: ctx.mappings,
+              shop,
+              orgName: ctx.orgName,
+              depositsFrom: ctx.postingStart.depositsFrom,
+            });
             if (!build.ok) return { payout, read: r, build, action: "refused" as const };
             const stored = r.external_ref?.qbo;
             const unchanged =

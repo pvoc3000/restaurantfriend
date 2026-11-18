@@ -179,8 +179,53 @@ export type SalesPostingRef = {
   };
 };
 
+// ---------------------------------------------------------------------------
+// Where this app's posting starts
+// ---------------------------------------------------------------------------
+
+/**
+ * BEFORE THESE DATES SOMEBODY ELSE BOOKED THE MONEY, so this app never posts
+ * them (Mark, 2026-11-18). Shogo booked every shop-day's sales until the
+ * cutover — the first entry this app posted is DF02-2026-09-16 — and the
+ * deposits until a fortnight later (the first app-posted deposit arrived
+ * 2026-10-01). A day or payout before its date posts nothing, and the
+ * refusal says why.
+ *
+ * Why it had to exist: a day with a breakdown and no `posted_at` is offered
+ * by Post to QuickBooks… for whatever range the Sales screen shows, and
+ * nothing else knew that Shogo had booked it. Aug 1 – Sep 15, 2026 were
+ * already that, and backfilling last year's breakdowns (so the morning email
+ * can split last year's special orders out) would have made a year of it.
+ *
+ * `orgs.settings.sales_posting.entries_from` and `deposits_from`, ISO dates,
+ * set on Settings → Integrations → Square. Unset means no limit. The builder
+ * refuses, and `qbo-sync` checks again, so neither the browser nor the
+ * morning run can post past it. Compare with Shogo builds old days ON PURPOSE
+ * and passes no date.
+ */
+export type PostingStart = { entriesFrom: string | null; depositsFrom: string | null };
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function readPostingStart(settings: Record<string, unknown> | null | undefined): PostingStart {
+  const s = ((settings ?? {}).sales_posting ?? {}) as Record<string, unknown>;
+  const date = (v: unknown) => (typeof v === "string" && ISO_DATE.test(v) ? v : null);
+  return { entriesFrom: date(s.entries_from), depositsFrom: date(s.deposits_from) };
+}
+
+/** The refusal for a date before its start, or null when it may post. */
+export function beforePostingStart(date: string, from: string | null | undefined, what: "day" | "deposit"): string | null {
+  if (!from || date >= from) return null;
+  return what === "day"
+    ? `Sales before ${from} were booked before this app posted them, so it never posts this day (Settings → Integrations → Square).`
+    : `Deposits arriving before ${from} were booked before this app posted them, so it never posts this one (Settings → Integrations → Square).`;
+}
+
 export type BuildInput = {
   breakdown: SalesBreakdown | null;
+  /** The first business date this app posts, from `readPostingStart`. A day
+   *  before it is refused. Omitted (Compare with Shogo) means no limit. */
+  entriesFrom?: string | null;
   /** `orgs.name`, which closes the memo (Mark, 2026-09-24). Not hashed. */
   orgName?: string;
   mappings: readonly SalesMapping[];
@@ -378,6 +423,9 @@ export function buildJournalEntry(input: BuildInput): JournalBuild {
   const { breakdown, mappings, shop, businessDate, existing } = input;
   const refusals: string[] = [];
   const warnings: string[] = [];
+
+  const early = beforePostingStart(businessDate, input.entriesFrom, "day");
+  if (early) return { ok: false, refusals: [early] };
 
   if (!breakdown) {
     return { ok: false, refusals: ["No breakdown has been pulled for this day — sync from Square again."] };
@@ -830,10 +878,15 @@ export function buildDeposit(input: {
   orgName?: string;
   mappings: readonly SalesMapping[];
   shop: PostingShop;
+  /** The first arrival date this app posts, from `readPostingStart`. */
+  depositsFrom?: string | null;
 }): DepositBuild {
   const { payout, mappings, shop } = input;
   const refusals: string[] = [];
   const warnings: string[] = [];
+
+  const early = beforePostingStart(payout.arrival_date, input.depositsFrom, "deposit");
+  if (early) return { ok: false, refusals: [early] };
 
   if (payout.status !== "SENT" && payout.status !== "PAID") {
     refusals.push(`Square reports this payout as ${payout.status}, so no money reached the bank.`);

@@ -12,6 +12,7 @@ import type {
   SalesPostingRef,
   SquarePayout,
 } from "@/lib/salesPosting";
+import { readPostingStart, type PostingStart } from "@/lib/salesPosting";
 
 /**
  * POSTING A SHOP-DAY TO QUICKBOOKS, the client half — `qboBillPush.ts`'s shape.
@@ -33,6 +34,8 @@ export type PostingContext = {
   mappings: SalesMapping[];
   /** `orgs.name`, which closes each memo. */
   orgName: string;
+  /** Where this app's posting starts — nothing before it is posted. */
+  postingStart: PostingStart;
   /** A missing column, which means migration 104 is not applied. */
   schemaError: string | null;
 };
@@ -49,7 +52,7 @@ export async function readPostingContext(
     supabase
       .from("accounting_sales_mappings")
       .select("kind, square_key, square_name, account_ref, account_name"),
-    supabase.from("orgs").select("name").eq("id", orgId).maybeSingle(),
+    supabase.from("orgs").select("name, settings").eq("id", orgId).maybeSingle(),
   ]);
   const row = Array.isArray(conn.data) ? (conn.data[0] as { status?: string } | undefined) : undefined;
   const shops = new Map<string, PostingShop & { id: string }>();
@@ -59,6 +62,7 @@ export async function readPostingContext(
     shops,
     mappings: ((maps.data ?? []) as SalesMapping[]),
     orgName: (org.data?.name as string | undefined) ?? "",
+    postingStart: readPostingStart(org.data?.settings as Record<string, unknown> | null | undefined),
     schemaError: locs.error?.message ?? maps.error?.message ?? null,
   };
 }

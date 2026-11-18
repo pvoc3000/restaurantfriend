@@ -25,6 +25,8 @@ import {
   payoutPostingState,
   payoutPostingLabel,
   matchDeposits,
+  readPostingStart,
+  beforePostingStart,
   type SquarePayout,
   type FlatDeposit,
   type SalesBreakdown,
@@ -668,4 +670,36 @@ test("matchDeposits pairs a payout with deposits of its amount near its date, ou
 test("the bank role is on the grid, and it is an asset", () => {
   const bank = SALES_ROLES.find((r) => r.key === "bank")!;
   eq(bank.classification, "Asset");
+});
+
+// ---- Where posting starts (Mark, 2026-11-18): Shogo booked what came before ----
+
+test("posting start: read from orgs.settings.sales_posting, a non-date is no limit", () => {
+  eq(readPostingStart({ sales_posting: { entries_from: "2026-09-16", deposits_from: "2026-10-01" } }), {
+    entriesFrom: "2026-09-16",
+    depositsFrom: "2026-10-01",
+  });
+  eq(readPostingStart({}), { entriesFrom: null, depositsFrom: null }, "unset");
+  eq(readPostingStart(null), { entriesFrom: null, depositsFrom: null });
+  eq(readPostingStart({ sales_posting: { entries_from: "Sep 16", deposits_from: 20261001 } }), { entriesFrom: null, depositsFrom: null }, "only an ISO date counts");
+  eq(beforePostingStart("2026-09-16", "2026-09-16", "day"), null, "the start date itself posts");
+  ok(beforePostingStart("2026-09-15", "2026-09-16", "day")!.includes("Sales before 2026-09-16"));
+  ok(beforePostingStart("2026-09-30", "2026-10-01", "deposit")!.includes("Deposits arriving before 2026-10-01"));
+  eq(beforePostingStart("2025-11-18", null, "day"), null, "no start, no limit");
+});
+
+test("posting start: a day before it is refused BEFORE anything else, so the refusal is the reason", () => {
+  const r = refused({ businessDate: "2026-09-15", entriesFrom: "2026-09-16", breakdown: null });
+  eq(r.length, 1, "one refusal, not also 'no breakdown'");
+  ok(r[0].includes("never posts this day"), r[0]);
+  ok(built({ businessDate: "2026-09-16", entriesFrom: "2026-09-16" }).body, "the start date builds");
+  ok(built({ businessDate: "2026-09-10" }).body, "no start given (Compare with Shogo) builds an old day");
+});
+
+test("posting start: a deposit arriving before it is refused; on or after it builds", () => {
+  const early = buildDeposit({ payout: payout({ arrival_date: "2026-09-30" }), mappings: BANKED, shop: DF01, depositsFrom: "2026-10-01" });
+  no(early.ok, "refused");
+  if (!early.ok) eq(early.refusals.length, 1);
+  ok(buildDeposit({ payout: payout({ arrival_date: "2026-10-01" }), mappings: BANKED, shop: DF01, depositsFrom: "2026-10-01" }).ok);
+  ok(buildDeposit({ payout: payout(), mappings: BANKED, shop: DF01 }).ok, "no start, no limit");
 });

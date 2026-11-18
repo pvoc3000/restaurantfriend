@@ -511,3 +511,36 @@ Post to QuickBooks… for whatever range the screen shows, and nothing knows
 that Shogo booked it. That is ALREADY true of 2026-08-01 → 09-15 (breakdowns,
 never posted by the app; the first app-posted day is 09-16), and a backfill
 would extend it to a year. A "posting starts on" guard would close both.
+
+## Posting starts — nothing Shogo booked is ever posted again (2026-11-18)
+
+Mark: "Yes, add the guard", after the backfill question above showed that a
+day with a breakdown and no `posted_at` is offered by Post to QuickBooks…
+whatever its date.
+
+**The setting:** `orgs.settings.sales_posting.entries_from` and
+`deposits_from`, ISO dates, on Settings → Integrations → Square under
+**Posting Starts** (`components/settings/SalesPostingStart.tsx`). Unset means
+no limit. **Set 2026-11-18 to 2026-09-16 and 2026-10-01**, the measured
+cutovers: the first app-posted journal entry is DF02-2026-09-16 and the first
+app-posted deposit arrived 2026-10-01 (all 28 payouts arriving 09-16 → 09-30
+were never posted by the app, so they were booked elsewhere). TWO dates
+because the two cut over a fortnight apart.
+
+**Enforced three times, by one rule** (`readPostingStart`,
+`beforePostingStart` in `lib/salesPosting`, copied to `_shared/generated`):
+- `buildJournalEntry` / `buildDeposit` refuse a date before the start FIRST,
+  as the only refusal, so the receipt gives the reason rather than "no
+  breakdown". The post dialog and `sales-nightly` pass the dates; Compare with
+  Shogo deliberately passes none, since building old days is its job.
+- `qbo-sync`'s `post_daily_sales` and `post_square_payout` read the org's
+  settings and refuse with the same sentence, so no caller can post past it.
+- The Sales screen leaves such days and payouts out of Post to QuickBooks…'s
+  count, and its QuickBooks column says **before posting starts** (with the
+  reason on hover) instead of "not posted" or "no breakdown".
+
+Fixtures: three cases, checked by breaking the comparison (all three red).
+**NOT YET DEPLOYED:** `qbo-sync` and `sales-nightly` carry the server half;
+the deploy was stopped by the permission check and waits on Mark. Until it
+lands, the browser half guards Post to QuickBooks… on its own. The signed-in
+screens were not seen in a browser (the pane is at the shared-device lock).

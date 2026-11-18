@@ -43,6 +43,7 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import {
   buildDeposit,
   buildJournalEntry,
+  readPostingStart,
   type DepositBuild,
   type JournalBuild,
   type PayoutPostingRef,
@@ -227,6 +228,8 @@ async function runForOrg(
   opts: { trigger: "cron" | "manual"; dryRun: boolean; startedBy: string | null }
 ): Promise<RunResult> {
   const settings = readSettings(org.settings ?? {});
+  // Nothing before these dates is posted: Shogo booked it (salesPosting).
+  const postingStart = readPostingStart(org.settings ?? {});
   const zone = (org.settings?.timezone as string) || "America/Los_Angeles";
   const window = runWindow(Date.now(), zone);
 
@@ -325,6 +328,7 @@ async function runForOrg(
         tipsCents: Number(r.tips_cents),
         existing: (r.external_ref as SalesPostingRef | null) ?? null,
         orgName: org.name,
+        entriesFrom: postingStart.entriesFrom,
       });
       const label = { shop: shop.code, date: r.business_date as string };
       if (!build.ok) {
@@ -365,7 +369,13 @@ async function runForOrg(
     for (const p of payouts) {
       const shop = ctx.shops.get(p.location_id);
       if (!shop) continue;
-      const build = buildDeposit({ payout: p, mappings: ctx.mappings, shop, orgName: org.name });
+      const build = buildDeposit({
+        payout: p,
+        mappings: ctx.mappings,
+        shop,
+        orgName: org.name,
+        depositsFrom: postingStart.depositsFrom,
+      });
       const label = { shop: shop.code, date: p.arrival_date };
       if (!build.ok) {
         deposits.push({ label, build, action: "refused", id: p.id });

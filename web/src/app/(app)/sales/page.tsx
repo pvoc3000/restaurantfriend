@@ -22,7 +22,7 @@ import { SalesActions, type ActionPayout } from "@/components/sales/SalesActions
 import { SalesScreen } from "@/components/sales/SalesScreen";
 import { MorningRunBanner } from "@/components/sales/MorningRunBanner";
 import { morningRunNow, readSalesRunSettings, type SalesRun } from "@/lib/salesRun";
-import type { PayoutPostingRef, SalesPostingRef } from "@/lib/salesPosting";
+import { readPostingStart, type PayoutPostingRef, type SalesPostingRef } from "@/lib/salesPosting";
 
 /**
  * DAILY NET SALES AND TIPS, per shop.
@@ -117,6 +117,8 @@ export default async function SalesPage({
   };
   let { rows: salesRows, error } = await sweep(POSTING);
   let postingSchema = true;
+  // Nothing before these dates is ever posted (lib/salesPosting).
+  const postingStart = readPostingStart(session.orgSettings as Record<string, unknown>);
   if (error && /breakdown|external_ref|posted_at|post_error/.test(error.message)) {
     postingSchema = false;
     ({ rows: salesRows, error } = await sweep(BASE));
@@ -327,6 +329,7 @@ export default async function SalesPage({
               days={rangeDays}
               payouts={payouts}
               shopCodes={shops.map((s) => s.code)}
+              postingStart={postingStart}
             />
           ) : null
         }
@@ -342,7 +345,7 @@ export default async function SalesPage({
 
       <SalesScreen
         canEdit={canPost}
-        posting={{ ready: postingSchema, connected: qboConnected, unmappedNames, depositsReady }}
+        posting={{ ready: postingSchema, connected: qboConnected, unmappedNames, depositsReady, start: postingStart }}
         days={days}
         payouts={payouts}
         range={resolved.range}
