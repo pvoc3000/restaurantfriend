@@ -5,6 +5,7 @@ import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { openWindowNow, showBlob } from "@/lib/poProcessing";
 import { formatTagPrice, type TagSize } from "@/lib/displayTags";
 import type { TagRow } from "./TagsList";
+import type { TagPrint } from "./pdf/TagSheetPdf";
 
 /**
  * One size of sheet from the selected tags — 2x3.5 8-up, 2x8 and 2x10 3-up.
@@ -12,7 +13,13 @@ import type { TagRow } from "./TagsList";
  * A tag prints only when it has THAT background and a price: a label with no
  * art would be a black brick, and one with no price would print the stale
  * figure baked into the art, which is the thing the overlay exists to stop.
- * The button says how many of the selection qualify and, at zero, why not.
+ * UNDER HIDE PRICE the price is not needed — the box covers the art's figure
+ * and says nothing — so only the background is. The button says how many of
+ * the selection qualify and, at zero, why not.
+ *
+ * Replace Description sets the record's Description over the art's own; a
+ * tag whose Description is blank keeps the art's, rather than printing an
+ * empty box where the words were.
  *
  * THE WINDOW OPENS SYNCHRONOUSLY, before any `await` (`PrintChecklist`'s note).
  * The backgrounds reach the renderer as the signed URLs the page was served
@@ -24,22 +31,27 @@ export function PrintTags({
   tags,
   locationCode,
   today,
+  hidePrice,
+  replaceDescription,
 }: {
   size: TagSize;
   tags: TagRow[];
   locationCode: string;
   today: string;
+  hidePrice: boolean;
+  replaceDescription: boolean;
 }) {
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
 
-  const printable = tags.flatMap((t) => {
+  const printable: TagPrint[] = tags.flatMap((t) => {
     const url = t.images[size]?.url;
-    const price = formatTagPrice(t.price);
-    return url && price ? [{ url, price, title: t.title }] : [];
+    const price = hidePrice ? null : formatTagPrice(t.price);
+    if (!url || (!hidePrice && !price)) return [];
+    return [{ url, price, description: replaceDescription ? t.description : null, title: t.title }];
   });
   const withoutArt = tags.filter((t) => !t.images[size]?.url).length;
-  const withoutPrice = tags.filter((t) => t.images[size]?.url && t.price === null).length;
+  const withoutPrice = hidePrice ? 0 : tags.filter((t) => t.images[size]?.url && t.price === null).length;
 
   const why =
     printable.length > 0

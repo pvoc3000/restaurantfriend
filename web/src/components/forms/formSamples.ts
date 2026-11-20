@@ -616,13 +616,19 @@ export function sampleChecklist(orgName: string): ChecklistPdfData {
 /* -------------------------------------------------------------------------- */
 
 /** Tag art is an uploaded image; the sample uses the app's own icon, which
- *  the renderer fetches from this origin. */
+ *  the renderer fetches from this origin. One tag shows Hide Price (an empty
+ *  box) and two Replace Description, one short and one that has to shrink. */
 export function sampleTags(origin: string): TagPrint[] {
   const url = `${origin}/icon-512.png`;
   return [
-    { url, price: "$3.25", title: "Glazed" },
-    { url, price: "$3.75", title: "Chocolate Sprinkle" },
-    { url, price: "$4.50", title: "Maple Bacon" },
-    { url, price: "$4.25", title: "Apple Fritter" },
+    { url, price: "$3.25", description: null, title: "Glazed" },
+    { url, price: "$3.75", description: "A vanilla cake donut with chocolate glaze and rainbow sprinkles", title: "Chocolate Sprinkle" },
+    { url, price: null, description: null, title: "Maple Bacon" },
+    {
+      url,
+      price: "$4.25",
+      description: "A raised donut with your choice of Chocolate, Strawberry, or Vanilla glaze, rainbow sprinkles, and a candy rainbow.",
+      title: "Apple Fritter",
+    },
   ];
 }

@@ -124,6 +124,7 @@ export default async function TagsPage({
     return {
       id: t.id,
       title: t.title,
+      description: t.description?.trim() || null,
       item_id: t.production_item_id,
       item_name: item ? (item.name as string) : null,
       item_label: item ? itemLabel(item as Parameters<typeof itemLabel>[0]) : null,

@@ -121,6 +121,114 @@ export function priceBoxFor(size: TagSize): Box {
   return scaleBox(PRICE_ZONE[size], imageBoxFor(size));
 }
 
+/**
+ * THE DESCRIPTION, LIKE THE PRICE, IS BAKED INTO THE ART — and Replace
+ * Description covers it with a black box and sets the record's Description in
+ * it (Mark, 2026-11-20). Measured over the same 151 raster files (2026-11-20):
+ *
+ *   2x3.5   title ends ≤ 0.487, description 0.503–0.740, price from 0.807
+ *   2x8     title ends ≤ 0.357, description 0.463–0.697, price from 0.775
+ *
+ * so the box runs from just under the lowest title to the top of the price
+ * box, the art's full width — the backgrounds are black, so covering more
+ * than the glyphs is invisible. TWO 2x3.5 FILES START HIGHER: Fudgegazi and
+ * Paramoreo have a one-line title and their description from 0.443, so a
+ * sliver of the old first line stays above the box on those two.
+ */
+export const DESCRIPTION_ZONE: Record<TagSize, Box> = {
+  "2x3.5": { x: 0, y: 0.492, w: 1, h: 0.278 },
+  "2x8": { x: 0, y: 0.4, w: 1, h: 0.34 },
+  "2x10": { x: 0, y: 0.4, w: 1, h: 0.34 },
+};
+
+/** Side margin inside the box, as a fraction of the art's width. */
+const DESCRIPTION_INSET = 0.03;
+
+/**
+ * The art's own style: the 2x3.5 sets its description in CAPITALS, regular
+ * weight, ~11.6 pt on a 12 pt pitch; the 2x8 in sentence case, bold, 18 pt on
+ * one line and smaller when it wraps (both read off the files by width). The
+ * text starts at `max` and steps down by half a point until it fits.
+ */
+export const DESCRIPTION_STYLE: Record<
+  TagSize,
+  { font: "Helvetica" | "Helvetica-Bold"; max: number; min: number; lineHeight: number; capitals: boolean }
+> = {
+  "2x3.5": { font: "Helvetica", max: 12, min: 6, lineHeight: 1.05, capitals: true },
+  "2x8": { font: "Helvetica-Bold", max: 18, min: 8, lineHeight: 1.1, capitals: false },
+  "2x10": { font: "Helvetica-Bold", max: 18, min: 8, lineHeight: 1.1, capitals: false },
+};
+
+/** The description overlay's box on the label, in points. */
+export function descriptionBoxFor(size: TagSize): Box {
+  return scaleBox(DESCRIPTION_ZONE[size], imageBoxFor(size));
+}
+
+/**
+ * Advance widths of ASCII 32–126 per 1000 em, read from @react-pdf/pdfkit's
+ * own AFM data for the two bundled faces — so the wrap computed here is the
+ * wrap the renderer would make. Anything outside ASCII counts as a digit.
+ */
+const AFM_WIDTHS: Record<"Helvetica" | "Helvetica-Bold", number[]> = {
+  Helvetica: [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584],
+  "Helvetica-Bold": [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584],
+};
+
+export function textWidth(text: string, font: "Helvetica" | "Helvetica-Bold", fontSize: number): number {
+  const table = AFM_WIDTHS[font];
+  let units = 0;
+  for (const ch of text) {
+    const code = ch.charCodeAt(0);
+    units += code >= 32 && code < 127 ? table[code - 32] : 556;
+  }
+  return (units * fontSize) / 1000;
+}
+
+/** Greedy word wrap. A word wider than the line gets a line of its own. */
+export function wrapWords(text: string, font: "Helvetica" | "Helvetica-Bold", fontSize: number, width: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && textWidth(next, font, fontSize) > width) {
+      lines.push(line);
+      line = word;
+    } else line = next;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+export type FittedDescription = { lines: string[]; fontSize: number; lineHeight: number; font: "Helvetica" | "Helvetica-Bold" };
+
+/**
+ * The description, broken into lines at the largest size that fits the box —
+ * the lines are returned rather than left to the renderer so the PDF and the
+ * preview break in the same places. Measured against 97% of the width, so a
+ * rounding difference in the renderer can never re-wrap a line. At `min` it
+ * stops shrinking and returns what it has, overflow and all: a description
+ * that long wants editing, not 4 pt type.
+ */
+export function fitDescription(raw: string, size: TagSize): FittedDescription | null {
+  const style = DESCRIPTION_STYLE[size];
+  const text = (style.capitals ? raw.toUpperCase() : raw).replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  const box = descriptionBoxFor(size);
+  const width = (box.w - 2 * DESCRIPTION_INSET * imageBoxFor(size).w) * 0.97;
+  let fontSize = style.max;
+  for (;;) {
+    const lines = wrapWords(text, style.font, fontSize, width);
+    const fits = lines.length * fontSize * style.lineHeight <= box.h;
+    if (fits || fontSize - 0.5 < style.min) return { lines, fontSize, lineHeight: style.lineHeight, font: style.font };
+    fontSize -= 0.5;
+  }
+}
+
+/** The inner side margin of the description box, in points. */
+export function descriptionInset(size: TagSize): number {
+  return DESCRIPTION_INSET * imageBoxFor(size).w;
+}
+
 /** The top-left of the i-th label on a sheet (i within one sheet). */
 export function labelOrigin(size: TagSize, index: number): { x: number; y: number } {
   const layout = SHEET_LAYOUT[size];

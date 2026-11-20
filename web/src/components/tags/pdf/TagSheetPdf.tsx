@@ -3,7 +3,9 @@
 // the renderer is heavy and nothing on a normal page load needs it.
 //
 // Each label is the stored background with a black box over the price baked
-// into it and the CURRENT price set in that box — the geometry is
+// into it and the CURRENT price set in that box — or nothing in it, under
+// Hide Price — and, under Replace Description, a second box over the baked-in
+// description with the record's Description set in it — the geometry is
 // `lib/displayTags`', shared with the on-screen preview, so the two can only
 // ever disagree by font metrics. Labels are packed edge to edge on a letter
 // sheet (8-up for 2x3.5, 3-up for 2x8 and 2x10, the last in landscape) with
@@ -16,6 +18,9 @@ import {
   PRICE_FONT,
   PRICE_FONT_SIZE,
   SHEET_LAYOUT,
+  descriptionBoxFor,
+  descriptionInset,
+  fitDescription,
   imageBoxFor,
   labelOrigin,
   priceBoxFor,
@@ -46,8 +51,10 @@ function pdfText(raw: string): string {
 export type TagPrint = {
   /** A signed URL the renderer fetches while building — valid because the page that minted it is the page you pressed Print on. */
   url: string;
-  /** "$4.95" */
-  price: string;
+  /** "$4.95" — or null under Hide Price: the box still covers the art's own figure, empty. */
+  price: string | null;
+  /** The record's Description under Replace Description; null leaves the art's own. */
+  description: string | null;
   title: string;
 };
 
@@ -88,6 +95,8 @@ function Label({ size, tag, index }: { size: TagSize; tag: TagPrint; index: numb
   const label = LABEL_POINTS[size];
   const art = imageBoxFor(size);
   const box = priceBoxFor(size);
+  const descBox = descriptionBoxFor(size);
+  const fitted = tag.description ? fitDescription(pdfText(tag.description), size) : null;
   return (
     <View
       style={{
@@ -105,6 +114,38 @@ function Label({ size, tag, index }: { size: TagSize; tag: TagPrint; index: numb
     >
       {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf's Image is a PDF primitive, not an <img>; it takes no alt. */}
       <Image src={tag.url} style={{ position: "absolute", left: art.x, top: art.y, width: art.w, height: art.h }} />
+      {fitted ? (
+        <View
+          style={{
+            position: "absolute",
+            left: descBox.x,
+            top: descBox.y,
+            width: descBox.w,
+            height: descBox.h,
+            paddingHorizontal: descriptionInset(size),
+            backgroundColor: "#000",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          {/* A Text per line: `fitDescription` chose the breaks, so the
+              renderer is never asked to make its own. */}
+          {fitted.lines.map((line, i) => (
+            <Text
+              key={i}
+              style={{
+                fontFamily: fitted.font,
+                fontSize: fitted.fontSize,
+                lineHeight: fitted.lineHeight,
+                color: "#fff",
+                textAlign: "center",
+              }}
+            >
+              {line}
+            </Text>
+          ))}
+        </View>
+      ) : null}
       <View
         style={{
           position: "absolute",
@@ -118,7 +159,7 @@ function Label({ size, tag, index }: { size: TagSize; tag: TagPrint; index: numb
         }}
       >
         <Text style={{ fontFamily: PRICE_FONT, fontSize: PRICE_FONT_SIZE[size], color: "#fff" }}>
-          {pdfText(tag.price)}
+          {tag.price ? pdfText(tag.price) : ""}
         </Text>
       </View>
     </View>

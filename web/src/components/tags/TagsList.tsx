@@ -40,6 +40,9 @@ import { PrintTags } from "./PrintTags";
 export type TagRow = {
   id: string;
   title: string;
+  /** The record's Description, trimmed; null when blank. Printed over the
+   *  art's own only when Replace description is ticked. */
+  description: string | null;
   item_id: string | null;
   item_name: string | null;
   /** `name · size · type · cut`, for the tooltip — the name alone is ambiguous. */
@@ -111,6 +114,10 @@ export function TagsList({
     window.history.replaceState(null, "", listHref(day, today, tier, next));
   }
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  // Print options — both off by default, and neither is remembered: a sheet
+  // printed without prices should be a choice made for THAT sheet.
+  const [hidePrice, setHidePrice] = useState(false);
+  const [replaceDescription, setReplaceDescription] = useState(false);
   // Item first (Mark, 2026-09-06): the tags are read against the case, which
   // is arranged by donut, and a tag's own title is the donut's stage name.
   const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "item", dir: "asc" });
@@ -363,8 +370,23 @@ export function TagsList({
           <span className="font-medium">
             {checked.size} {checked.size === 1 ? "tag" : "tags"} selected
           </span>
+          {/* The options sit before the buttons they change. */}
+          <Checkbox checked={hidePrice} onChange={setHidePrice}>
+            Hide Price
+          </Checkbox>
+          <Checkbox checked={replaceDescription} onChange={setReplaceDescription}>
+            Replace Description
+          </Checkbox>
           {TAG_SIZES.map((s) => (
-            <PrintTags key={s} size={s} tags={selected} locationCode={locationCode} today={today} />
+            <PrintTags
+              key={s}
+              size={s}
+              tags={selected}
+              locationCode={locationCode}
+              today={today}
+              hidePrice={hidePrice}
+              replaceDescription={replaceDescription}
+            />
           ))}
           {editable && (
             <button type="button" className={DANGER_BUTTON_CLASS} disabled={busy} onClick={() => void remove(selected)}>

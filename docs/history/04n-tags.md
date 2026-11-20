@@ -88,3 +88,31 @@
    signed URL still answers 200 for a while, which is the storage CDN's cache
    and not a failed delete) and deleted, back to 86 / 249. **1641 fixtures.**
 
+
+   **HIDE PRICE AND REPLACE DESCRIPTION (Mark, 2026-11-20)** — two checkboxes
+   in the selection bar, before the Print buttons, both off by default and
+   neither remembered. **Hide Price** keeps the black box over the art's
+   baked-in price and sets nothing in it, so a tag with NO price can print
+   under it (only the background is required then). **Replace Description**
+   covers the art's baked-in description with a second black box and sets the
+   record's Description in it; a tag whose Description is blank keeps the
+   art's own words rather than printing an empty box. 31 of 84 tags had a
+   Description that day, the longest 115 characters (Pride Donuts).
+   The zone was MEASURED like the price (white-pixel row bands over the same
+   151 raster files): 2x3.5 title ends ≤ 0.487, description 0.503–0.740,
+   price from 0.807; 2x8 title ends ≤ 0.357, description 0.463–0.697, price
+   from 0.775. `DESCRIPTION_ZONE` runs from just under the lowest title to the
+   top of the price box, full art width. **Two 2x3.5 files start higher** —
+   Fudgegazi and Paramoreo have a one-line title and their description from
+   0.443, so a sliver of the old first line shows above the box on those two.
+   Type matches the art, read off it by width: 2x3.5 CAPITALS in Helvetica at
+   12 pt, 2x8/2x10 sentence case in Helvetica-Bold at 18 pt, each stepping down
+   by half a point until it fits (`fitDescription`). The LINES are broken in
+   `lib/displayTags` from the AFM widths of the two bundled faces (copied out
+   of `@react-pdf/pdfkit`) and the PDF draws one `Text` per line, so the
+   renderer never makes its own breaks. The record's preview (`TagPreview`)
+   does not show either option — they live on the list's print bar only.
+   Verified: fixtures (both new cases checked red by breaking the zone and the
+   fitter); real sheets rendered in Node over the Caramel Assault and Dag Nutty
+   art at all three sizes. The bar itself was NOT checked in a browser — the
+   test pane sat on `/lock`.
