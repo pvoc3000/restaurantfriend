@@ -554,7 +554,7 @@ export function daySourceIndex(
  * independently.
  */
 export function expansionKey(sectionKey: string, inventoryItemId: string): string {
-  return `${sectionKey} ${inventoryItemId}`;
+  return `${sectionKey}\u0000${inventoryItemId}`;
 }
 
 /** The lines an item's triangle would reveal — its day-relevant sources that

@@ -644,8 +644,10 @@ export function OrderGuide({
 
   // What the two jumps have to aim at, so each button can say when there's
   // nowhere to go. Counted off the same data the list renders from.
-  const untouchedCount = visibleRows.filter(
-    (row) => (entries.get(row.vendor_item_id)?.qty_to_order ?? null) === null
+  // Next favorite aims at the Skipped set — favorites still untouched — not
+  // at every empty box, or under All it would stop on every other source.
+  const favoritesLeft = visibleRows.filter((row) =>
+    matchesGuideFilter(row, entries.get(row.vendor_item_id), "skipped", weekday, ignoreDays)
   ).length;
   const sectionCount = sections.filter((section) => section.showHeader).length;
 
@@ -837,12 +839,12 @@ export function OrderGuide({
         key: "favorite",
         word: "Favorite",
         icon: ICON_DOUBLE_CHEVRON_RIGHT,
-        onClick: () => scrollToNext("tr[data-untouched]"),
-        disabled: untouchedCount === 0,
+        onClick: () => scrollToNext("tr[data-next-favorite]"),
+        disabled: favoritesLeft === 0,
         title:
-          untouchedCount === 0
-            ? "Every line in this view has an order quantity or an explicit zero"
-            : "Scroll to the next line with an empty order box — " + untouchedCount + " left",
+          favoritesLeft === 0
+            ? "Every favorite in this view has an order quantity or an explicit zero"
+            : "Scroll to the next favorite with an empty order box — " + favoritesLeft + " left",
       },
       {
         key: "section",

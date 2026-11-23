@@ -5,6 +5,7 @@ import Link from "next/link";
 import { withFrom, type Crumb } from "@/lib/breadcrumbs";
 import {
   deliveryLabel,
+  matchesGuideFilter,
   notGreenReason,
   qtyClass,
   qtyState,
@@ -169,12 +170,15 @@ export const GuideLine = memo(function GuideLine({
   // Only orderable lines reach the guide — the page filters on the view's
   // active cascade — so there's no blocked state to render here.
   return (
-    // data-untouched marks the lines "Next favorite" walks (OrderGuide's
-    // scrollToNext): an order box with nothing in it. Absent once the line
-    // carries a quantity OR an explicit zero — a zero is a decision, and the
-    // burn-down shouldn't send you back to it. The attribute rather than a ref
-    // registry because the DOM already holds the one thing the jump needs,
-    // which is where each row sits.
+    // data-next-favorite marks the lines "Next favorite" walks (OrderGuide's
+    // scrollToNext): a FAVORITE whose order box has nothing in it — exactly
+    // the Skipped filter's test. It must name the favorite condition itself:
+    // until 2026-11-23 it marked every empty box, which under Favorites is the
+    // same set but under All sent the jump to every non-favorite source too.
+    // Absent once the line carries a quantity OR an explicit zero — a zero is
+    // a decision, and the burn-down shouldn't send you back to it. The
+    // attribute rather than a ref registry because the DOM already holds the
+    // one thing the jump needs, which is where each row sits.
     <tr
       // NO RULE UNDER A LINE (Mark, 2026-08-27: "we don't really need the
       // dividers between vendor item lines"). It is the design system's own
@@ -185,7 +189,11 @@ export const GuideLine = memo(function GuideLine({
       // which is a far louder break than a hairline. What it did do was draw a
       // line under every row of a long walk.
       data-guide-line=""
-      data-untouched={qty === null ? "" : undefined}
+      data-next-favorite={
+        matchesGuideFilter(row, entry, "skipped", weekday, ignoreDays)
+          ? ""
+          : undefined
+      }
     >
       {/* Vendor over brand, the way the printed guide reads. Generous row
           padding on purpose — the walk is read standing up. */}
