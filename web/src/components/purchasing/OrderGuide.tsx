@@ -1260,9 +1260,9 @@ export function OrderGuide({
             variant="field"
             value={filter}
             onPick={(next) => {
-              // Above the rule, the two shortcuts: a filter and a grouping in
+              // Below the rule, the two shortcuts: a filter and a grouping in
               // one pick, and back to the top of the walk, since a new view
-              // starts there (Mark, 2026-11-23). Below it, the filter alone.
+              // starts there (Mark, 2026-11-23). Above it, the filter alone.
               const shortcut = GUIDE_VIEW_SHORTCUTS.find((v) => v.value === next);
               if (shortcut) {
                 setFilter(shortcut.filter);
@@ -1274,16 +1274,16 @@ export function OrderGuide({
               }
             }}
             options={[
-              ...GUIDE_VIEW_SHORTCUTS.map((v) => ({
-                value: v.value,
-                label: v.label,
-                command: true,
-              })),
-              ...GUIDE_FILTERS.map((f, i) => ({
+              ...GUIDE_FILTERS.map((f) => ({
                 value: f,
                 label: GUIDE_FILTER_LABEL[f],
                 hint: String(filterCounts[f]),
+              })),
+              ...GUIDE_VIEW_SHORTCUTS.map((v, i) => ({
+                value: v.value,
+                label: v.label,
                 separatorBefore: i === 0,
+                command: true,
               })),
             ]}
             fit
