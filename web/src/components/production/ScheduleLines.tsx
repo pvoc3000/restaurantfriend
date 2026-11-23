@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
@@ -15,7 +15,7 @@ import { RowMenu } from "@/components/ui/RowMenu";
 import { Steppers } from "@/components/ui/Steppers";
 import { useLatestWrite } from "@/lib/latestWrite";
 import { stepPar } from "@/lib/productionPlans";
-import { countTotals, planDeviation, type ScheduleLine } from "@/lib/productionSchedule";
+import { countTotals, planDeviation, planParTotal, type ScheduleLine } from "@/lib/productionSchedule";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { formatTypedTime } from "@/lib/timeInput";
 
@@ -808,8 +808,28 @@ export function ScheduleLines({
         columnChooser
         group={group}
         // THE NIGHT'S GRAND TOTALS (Mark, 2026-09-19) — `lineTotals`, the
-        // same sums each group's subtotal shows.
-        totals={(shown) => ({ item: "Total", ...lineTotals(shown) })}
+        // same sums each group's subtotal shows. The par total wears the line
+        // marks' "plan N" once any par differs from the plan (Mark,
+        // 2026-11-23), so the night's change reads off one row. Grand total
+        // only, as asked; group subtotals stay plain.
+        totals={(shown) => {
+          const cells: Record<string, ReactNode> = { item: "Total", ...lineTotals(shown) };
+          const planned = planParTotal(shown);
+          if (planned !== null) {
+            cells.par = (
+              <span className="flex items-center justify-end gap-1">
+                <span
+                  className="bg-mark-fill px-1 text-[11px] font-normal"
+                  title={`The plan's pars come to ${planned.toLocaleString()}`}
+                >
+                  plan {planned.toLocaleString()}
+                </span>
+                {cells.par}
+              </span>
+            );
+          }
+          return cells;
+        }}
         empty={
           needle ? (
             <p className="text-sm text-muted">No item on this schedule matches “{search.trim()}”.</p>

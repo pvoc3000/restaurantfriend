@@ -657,6 +657,23 @@ export function planDeviation(line: {
   return { kind: "changed", planned: Number(line.planned_par) };
 }
 
+/**
+ * What the plan's pars came to, for the footer's "plan N" beside the par total
+ * (Mark, 2026-11-23: "when pars in a production schedule differ from their
+ * plan … add the plan par total to the footer"). The line-level mark, summed.
+ *
+ * NULL WHEN NOTHING DIFFERS, by `planDeviation` — the same test the line marks
+ * and the record's badge use, so the footer is tagged exactly when a line is.
+ * A line ADDED by hand counts 0: the plan never carried it. A line deleted from
+ * the schedule is not here to count, so it drops out of both totals.
+ */
+export function planParTotal(
+  lines: { par: number; planned_par: number | null; par_source: string }[]
+): number | null {
+  if (!lines.some((l) => planDeviation(l) !== null)) return null;
+  return lines.reduce((n, l) => n + (l.planned_par === null ? 0 : Number(l.planned_par)), 0);
+}
+
 /* ==========================================================================
  * ORDERING THE SCHEDULES LIST
  * ========================================================================== */

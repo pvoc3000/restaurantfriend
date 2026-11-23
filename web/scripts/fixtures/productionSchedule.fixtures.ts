@@ -16,7 +16,9 @@ import {
   type ScheduleLine,
   type ItemDemandSource,
   planDeviation,
-  countTotals,} from "../../src/lib/productionSchedule";
+  planParTotal,
+  countTotals,
+} from "../../src/lib/productionSchedule";
 import type { CostElement } from "../../src/lib/productionCost";
 import { test, eq } from "./harness";
 
@@ -381,6 +383,26 @@ test("a line the plan never carried reads as ADDED, not as changed", () => {
   eq(planDeviation(devLine({ par_source: "manual", par: 12, planned_par: null })), {
     kind: "added",
   });
+});
+
+test("the footer's plan total is absent while every line matches the plan", () => {
+  eq(planParTotal([devLine(), devLine({ par_source: "manual" })]), null);
+});
+
+test("the footer's plan total sums what the plan said, once a line differs", () => {
+  // DF01's 11/25: pars rebalanced and raised, the plan still at its own figures.
+  eq(
+    planParTotal([
+      devLine({ par_source: "manual", par: 36, planned_par: 24 }),
+      devLine({ par_source: "manual", par: 6, planned_par: 18 }),
+      devLine(),
+    ]),
+    66
+  );
+});
+
+test("a line added by hand counts nothing toward the plan total", () => {
+  eq(planParTotal([devLine(), devLine({ par_source: "manual", par: 12, planned_par: null })]), 24);
 });
 
 /* -- countTotals: sold is made − left − rescued (203) ----------------------- */
