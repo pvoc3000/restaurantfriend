@@ -35,6 +35,14 @@ export type PickOption = {
    */
   separatorBefore?: boolean;
   /**
+   * A row that DOES something rather than a value the control can hold — the
+   * order guide's Show shortcuts, which set a filter and a grouping at once
+   * (2026-11-23). It is never the face, so `fit` does not size the trigger
+   * against it: a long command would otherwise widen a closed control that can
+   * only ever show one of the short values.
+   */
+  command?: boolean;
+  /**
    * Retired, but still worth knowing about (Mark, 2026-08-15: "sometimes I'd
    * like to be able to at least know an item exists").
    *
@@ -407,7 +415,10 @@ export function PickList({
    * has never heard of should TRUNCATE rather than widen the control for good.
    */
   const sizerLabels = fit
-    ? [...options.map((o) => o.label), ...(clearOption ? [clearOption.label] : [])]
+    ? [
+        ...options.filter((o) => !o.command).map((o) => o.label),
+        ...(clearOption ? [clearOption.label] : []),
+      ]
     : [];
 
   // Headers computed up front rather than tracked with a running variable

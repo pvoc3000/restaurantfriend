@@ -33,6 +33,7 @@ import {
   GUIDE_FILTERS,
   GUIDE_FILTER_LABEL,
   GUIDE_GROUPINGS,
+  GUIDE_VIEW_SHORTCUTS,
   GUIDE_VIEW_COOKIE,
   WEEKDAY_LABELS,
   guideHref,
@@ -1258,12 +1259,31 @@ export function OrderGuide({
             ariaLabel="Guide filter"
             variant="field"
             value={filter}
-            onPick={(next) => changeFilter(next as GuideFilter)}
-            options={GUIDE_FILTERS.map((f) => ({
-              value: f,
-              label: GUIDE_FILTER_LABEL[f],
-              hint: String(filterCounts[f]),
-            }))}
+            onPick={(next) => {
+              // Below the rule, the two shortcuts: a filter and a grouping in
+              // one pick (Mark, 2026-11-23). Above it, the filter alone.
+              const shortcut = GUIDE_VIEW_SHORTCUTS.find((v) => v.value === next);
+              if (shortcut) {
+                setFilter(shortcut.filter);
+                setGrouping(shortcut.grouping);
+                setExpanded(new Set());
+              } else {
+                changeFilter(next as GuideFilter);
+              }
+            }}
+            options={[
+              ...GUIDE_FILTERS.map((f) => ({
+                value: f,
+                label: GUIDE_FILTER_LABEL[f],
+                hint: String(filterCounts[f]),
+              })),
+              ...GUIDE_VIEW_SHORTCUTS.map((v, i) => ({
+                value: v.value,
+                label: v.label,
+                separatorBefore: i === 0,
+                command: true,
+              })),
+            ]}
             fit
           />
         </ControlField>

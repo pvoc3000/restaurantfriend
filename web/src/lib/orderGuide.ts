@@ -325,6 +325,32 @@ export const GROUPING_LABEL: Record<GuideGrouping, string> = {
 export const GUIDE_GROUPINGS: GuideGrouping[] = ["section", "item", "vendor"];
 
 /**
+ * The two ways a walk is actually done, one pick each from the Show list
+ * (Mark, 2026-11-23): walk the shop for today's favorites, then read the
+ * baskets vendor by vendor. Each sets the filter AND the grouping; the list's
+ * face then shows the filter, as it would had you set the two by hand.
+ */
+export const GUIDE_VIEW_SHORTCUTS: {
+  value: string;
+  label: string;
+  filter: GuideFilter;
+  grouping: GuideGrouping;
+}[] = [
+  {
+    value: "shortcut:favorites-by-section",
+    label: "Favorites by Shop Section",
+    filter: "favorites",
+    grouping: "section",
+  },
+  {
+    value: "shortcut:will-order-by-vendor",
+    label: "Will Order by Vendor",
+    filter: "will_order",
+    grouping: "vendor",
+  },
+];
+
+/**
  * How you left the guide: the filter, the grouping, whether the day gates were
  * lifted, and the search. Kept in a SESSION cookie rather than the URL (the
  * convention for list filters) because the nav link is a bare `/order-guide`
