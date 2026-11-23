@@ -705,15 +705,56 @@ export function OrderGuide({
    * record rather than a gap (Mark, 2026-07-25). Lines that weren't today's
    * work stay untouched, and entered quantities are never overwritten —
    * zeroing is for what you walked past, not what you chose.
+   *
+   * THEN IT MOVES ON TO THE NEXT SECTION (Mark, 2026-11-23: "This would avoid
+   * having to tap 'zero section' then 'next section' repeatedly"). Zeroing is
+   * the last thing you do in a section, so the band that follows the one you
+   * pressed comes up under the chrome — the one after THIS band in the walk,
+   * not whichever is next below the scroll, which is what Next section asks.
+   * It moves on even when there was nothing left to zero, because the press
+   * still means "done here". The last section stays put rather than wrapping
+   * to the top: there is nothing after it to walk. Nothing moves on a failed
+   * write, so the error is seen where it happened.
    */
   const [zeroing, setZeroing] = useState<string | null>(null);
-  async function zeroSection(sectionKey: string, lines: GuideRow[]) {
+  const pendingSection = useRef<string | null>(null);
+  // Bumped to run the scroll effect below once the zeroed lines have rendered.
+  const [sectionTick, setSectionTick] = useState(0);
+
+  function moveOnFrom(band: Element | null) {
+    let el = band?.nextElementSibling ?? null;
+    while (el && !el.matches("tr[data-guide-section]")) el = el.nextElementSibling;
+    const key = el?.getAttribute("data-guide-section");
+    if (!key) return;
+    // After the render: under Skipped, the lines just zeroed leave the view
+    // and the next band rises, so its position is only known afterwards.
+    pendingSection.current = key;
+    setSectionTick((n) => n + 1);
+  }
+  useEffect(() => {
+    const key = pendingSection.current;
+    if (!key) return;
+    pendingSection.current = null;
+    const band = document.querySelector<HTMLElement>(
+      `tr[data-guide-section="${CSS.escape(key)}"]`
+    );
+    if (!band) return;
+    window.scrollTo({
+      top: Math.max(0, window.scrollY + band.getBoundingClientRect().top - chromeOffset()),
+      behavior: "auto",
+    });
+  }, [sectionTick]);
+
+  async function zeroSection(sectionKey: string, lines: GuideRow[], band: Element | null) {
     const untouched = lines.filter(
       (row) =>
         row.should_order &&
         (entries.get(row.vendor_item_id)?.qty_to_order ?? null) === null
     );
-    if (untouched.length === 0) return;
+    if (untouched.length === 0) {
+      moveOnFrom(band);
+      return;
+    }
 
     setZeroing(sectionKey);
     setError(null);
@@ -744,6 +785,7 @@ export function OrderGuide({
       }
       return next;
     });
+    moveOnFrom(band);
   }
 
   /**
@@ -1419,7 +1461,7 @@ export function OrderGuide({
                         <td colSpan={7} className="h-16" />
                       </tr>
                     )}
-                    <tr className="bg-ink" data-guide-section="">
+                    <tr className="bg-ink" data-guide-section={section.key}>
                       {/* colSpan stays 8 even where two columns are hidden
                           below 1180px — the browser clamps a colSpan to the
                           real column count, so the band still spans the row. */}
@@ -1466,9 +1508,13 @@ export function OrderGuide({
                           <button
                             type="button"
                             disabled={zeroing !== null}
-                            onClick={() => {
+                            onClick={(event) => {
                               const lines = section.items.flatMap((i) => i.lines);
-                              void zeroSection(section.key, lines);
+                              void zeroSection(
+                                section.key,
+                                lines,
+                                event.currentTarget.closest("tr")
+                              );
                             }}
                             className="ml-auto h-9 border border-white/40 px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-white hover:text-ink disabled:opacity-35"
                           >
