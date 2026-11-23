@@ -532,7 +532,31 @@ export function OrderGuide({
     );
   }
 
-  function scrollToNext(selector: string) {
+  /**
+   * NEXT FAVORITE LANDS ON THE ITEM, NOT THE LINE (Mark, 2026-11-23: "so the
+   * user can see the inventory item of the order guide item … I have to scroll
+   * up to see what inventory item the order guide item is part of";
+   * "particularly important when viewing all"). A line says who sells it and
+   * what the vendor calls it; WHAT IT IS — the item, and so the par you are
+   * ordering against — is its header, which a line-under-the-chrome jump put
+   * just out of sight. Under All an item carries every orderable source, so
+   * the favorite can sit several lines below its header.
+   *
+   * So the jump aims at the line's item header — its name a little under the
+   * chrome, the header's 48px `pt-12` gap mostly scrolled away — and falls back
+   * to the line itself only when the line would not fit on screen below its
+   * header (an item with more sources than the window holds), because the line
+   * you have to act on matters more than its label.
+   */
+  function itemAnchor(line: HTMLElement): HTMLElement | null {
+    let el = line.previousElementSibling;
+    while (el && !(el instanceof HTMLElement && el.matches("tr[data-guide-item]"))) {
+      el = el.previousElementSibling;
+    }
+    return el as HTMLElement | null;
+  }
+
+  function scrollToNext(selector: string, toItem = false) {
     const offset = chromeOffset();
 
     const targets = Array.from(document.querySelectorAll<HTMLElement>(selector));
@@ -549,14 +573,28 @@ export function OrderGuide({
       0,
       document.documentElement.scrollHeight - window.innerHeight
     );
-    const scrollFor = (el: HTMLElement) =>
-      Math.min(
-        maxScroll,
-        Math.max(0, window.scrollY + el.getBoundingClientRect().top - offset)
-      );
+    const landing = (top: number) =>
+      Math.min(maxScroll, Math.max(0, window.scrollY + top - offset));
+    // What a press would scroll to for this target: the line, or — for Next
+    // favorite — its item header, when the line still fits beneath it.
+    const scrollFor = (el: HTMLElement) => {
+      const line = el.getBoundingClientRect();
+      if (!toItem) return landing(line.top);
+      const header = itemAnchor(el);
+      if (!header) return landing(line.top);
+      const cell = header.firstElementChild;
+      const gap = cell ? parseFloat(getComputedStyle(cell).paddingTop) || 0 : 0;
+      const top = header.getBoundingClientRect().top + Math.max(0, gap - 12);
+      const fits = line.bottom - top <= window.innerHeight - offset - 16;
+      return landing(fits ? top : line.top);
+    };
 
     // Nothing further down means you're at the end, so wrap: on a burn-down the
     // answer to "no more after here" is the first one still outstanding.
+    // Two favorites under one item that both fit share a landing, so the second
+    // never "moves" you and the press goes on to the next item — it is already
+    // on screen under the header you are looking at. Every press either scrolls
+    // further down or wraps, so the walk cannot get stuck.
     const next = targets.find((el) => scrollFor(el) > window.scrollY + 2) ?? targets[0];
 
     // INSTANT, not smooth. Two reasons, one measured and one from the design
@@ -839,7 +877,7 @@ export function OrderGuide({
         key: "favorite",
         word: "Favorite",
         icon: ICON_DOUBLE_CHEVRON_RIGHT,
-        onClick: () => scrollToNext("tr[data-next-favorite]"),
+        onClick: () => scrollToNext("tr[data-next-favorite]", true),
         disabled: favoritesLeft === 0,
         title:
           favoritesLeft === 0
