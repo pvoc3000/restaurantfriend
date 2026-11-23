@@ -10,6 +10,7 @@ import { PACKAGE_DESC_OPTIONS, UNIT_PICK_OPTIONS } from "@/lib/units";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
+import { confirmRelink } from "./confirmRelink";
 import type { PickOption } from "@/components/ui/PickList";
 import { OpenRecordLink } from "@/components/ui/OpenRecordLink";
 
@@ -232,6 +233,9 @@ export function VendorItemFields({
                 options={itemOptions}
                 clearLabel="Not linked"
                 activateTable="inventory_items"
+                confirmChange={(next, before) =>
+                  confirmRelink(vi, before as string | null, next as string | null, itemOptions)
+                }
               />
               {vi.inventory_items && (
                 <OpenRecordLink

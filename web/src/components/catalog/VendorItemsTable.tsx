@@ -7,6 +7,7 @@ import { withFrom, type Crumb } from "@/lib/breadcrumbs";
 import type { StaleBucket } from "@/lib/lastOrdered";
 import { PACKAGE_DESC_OPTIONS } from "@/lib/units";
 import { InlineValue } from "./InlineValue";
+import { confirmRelink } from "./confirmRelink";
 import type { PickOption } from "@/components/ui/PickList";
 import { OpenRecordLink } from "@/components/ui/OpenRecordLink";
 import { ActiveToggle } from "./ActiveToggle";
@@ -270,6 +271,9 @@ export function VendorItemsTable({
                       options={itemOptions}
                       clearLabel="Not linked"
                       activateTable="inventory_items"
+                      confirmChange={(next, before) =>
+                        confirmRelink(vi, before as string | null, next as string | null, itemOptions)
+                      }
                     />
                   </span>
                   {vi.inventory_items && (

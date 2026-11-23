@@ -312,6 +312,7 @@ export function InlineValue({
   onWrite,
   onPending,
   activateTable,
+  confirmChange,
   scale,
   multiline = false,
   rows = 4,
@@ -456,6 +457,16 @@ export function InlineValue({
    * than quietly writing it into this column. See `PickList.activateTable`.
    */
   activateTable?: string;
+  /**
+   * Asked before a write, with the new value and the old; resolve false and
+   * nothing is written — the cell keeps its value. For the few changes that
+   * move more than they look like (a vendor item's inventory item:
+   * `catalog/confirmRelink`). Absent, every write commits as before.
+   */
+  confirmChange?: (
+    next: string | number | null,
+    before: string | number | null
+  ) => Promise<boolean>;
   /**
    * A column STORED in one unit and read in another.
    *
@@ -603,6 +614,10 @@ export function InlineValue({
    */
   async function write(next: string | number | null, reopen: boolean) {
     if (next === value || (next === null && value === null)) return;
+    if (confirmChange && !(await confirmChange(next, value))) {
+      if (reopen) setEditing(true);
+      return;
+    }
 
     const before = value;
     setSaving(true);
@@ -681,8 +696,8 @@ export function InlineValue({
       ? evaluateNumeric(draft)
       : null;
 
-  // A chosen value writes on the spot: there's no draft to abandon and nothing
-  // to confirm, which is the same call BaseUnitEditor made ("picking a unit IS
+  // A chosen value writes on the spot (unless the caller passed
+  // `confirmChange`): there's no draft to abandon, which is the same call BaseUnitEditor made ("picking a unit IS
   // the edit") and the reason the control can live in a table cell at all.
   if (readOnly) {
     const label =
