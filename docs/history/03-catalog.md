@@ -250,3 +250,32 @@ Resolved entries from CLAUDE.md's "Open threads" section:
   and price reconciliation need. Anything ever ordered defaults to
   **Deactivate**, with Delete still reachable beside the real counts. It's a
   `ui/Dialog`, not `window.confirm`, precisely because it needs three answers.
+
+## Relinking a vendor item asks first (2026-11-23)
+
+Unified Paper's Biodegradable Fork (FMP vendor item 1366, linked to
+`Utensil, Fork, Natural` in the export) was found on `Activated Charcoal` —
+the first row of the Inventory item picklist after "Not linked" — edited
+2026-11-09 17:58 UTC with no price change beside it, so almost certainly a
+stray pick. Nothing records who changes `vendor_items.inventory_item_id`. Mark
+relinked it himself.
+
+Mark: "we should confirm changes to a vendor item inventory item with a
+dialogue box before committing. It's pretty important." Built as
+`components/catalog/confirmRelink.ts`, through a new `InlineValue`
+`confirmChange` hook, on the vendor item record and the vendor items table.
+Moving to another item or to Not linked asks; linking an unlinked one does
+not.
+
+**A RELINK STRANDS FAVORITES.** `order_guide_plan_days` is keyed by the OLD
+item's item-location AND the vendor item, and `v_order_guide` joins on both,
+so after a relink the rows match nothing and stop applying, silently. The
+dialog counts them. A sweep of all 9,844 favorites found 14 stranded, all one
+vendor item — Chefs Warehouse "Original Oatmilk Beverage size" (12 × 11 oz),
+moved 2026-07-29 from `Milk, Oat` to `Milk, Soy, single serving`, every day
+at DF01 and DF02. Deleted with Mark's OK 2026-11-23 (they did nothing). The
+same sweep against the FMP export found only those two vendor items whose
+link differs from FileMaker's.
+
+Seen in passing, not changed: DF02 DTLA's vendor item "Soy Milk" sits under
+`Milk, Oat`.
