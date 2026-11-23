@@ -674,6 +674,17 @@ export function planParTotal(
   return lines.reduce((n, l) => n + (l.planned_par === null ? 0 : Number(l.planned_par)), 0);
 }
 
+/**
+ * The footer's change from the plan, signed: "+186", "−24" (a real minus,
+ * U+2212, not a hyphen), and "±0" when lines differ but the night still sums
+ * to the plan — a rebalance, which is worth saying rather than hiding.
+ */
+export function formatParDelta(delta: number): string {
+  if (delta === 0) return "±0";
+  const n = Math.abs(delta).toLocaleString();
+  return delta > 0 ? `+${n}` : `−${n}`;
+}
+
 /* ==========================================================================
  * ORDERING THE SCHEDULES LIST
  * ========================================================================== */

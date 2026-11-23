@@ -17,6 +17,7 @@ import {
   type ItemDemandSource,
   planDeviation,
   planParTotal,
+  formatParDelta,
   countTotals,
 } from "../../src/lib/productionSchedule";
 import type { CostElement } from "../../src/lib/productionCost";
@@ -422,4 +423,11 @@ test("countTotals: a night before Rescued existed reads exactly as it did", () =
   const t = countTotals([line({ par: 24, made: 24, leftover: 3 })]);
   eq(t.rescued, null);
   eq(t.sold, 21);
+});
+
+test("the footer's delta is signed, with a real minus and ±0 for a rebalance", () => {
+  eq(formatParDelta(186), "+186");
+  eq(formatParDelta(-24), "−24");
+  eq(formatParDelta(0), "±0");
+  eq(formatParDelta(1200), "+1,200");
 });

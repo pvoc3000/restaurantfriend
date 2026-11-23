@@ -15,7 +15,13 @@ import { RowMenu } from "@/components/ui/RowMenu";
 import { Steppers } from "@/components/ui/Steppers";
 import { useLatestWrite } from "@/lib/latestWrite";
 import { stepPar } from "@/lib/productionPlans";
-import { countTotals, planDeviation, planParTotal, type ScheduleLine } from "@/lib/productionSchedule";
+import {
+  countTotals,
+  formatParDelta,
+  planDeviation,
+  planParTotal,
+  type ScheduleLine,
+} from "@/lib/productionSchedule";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { formatTypedTime } from "@/lib/timeInput";
 
@@ -808,21 +814,25 @@ export function ScheduleLines({
         columnChooser
         group={group}
         // THE NIGHT'S GRAND TOTALS (Mark, 2026-09-19) — `lineTotals`, the
-        // same sums each group's subtotal shows. The par total wears the line
-        // marks' "plan N" once any par differs from the plan (Mark,
-        // 2026-11-23), so the night's change reads off one row. Grand total
-        // only, as asked; group subtotals stay plain.
+        // same sums each group's subtotal shows. Once any par differs from the
+        // plan, the par total wears the DELTA from the plan's total to its
+        // left, in the line marks' yellow fill (Mark, 2026-11-23: "Place the
+        // delta between the plan and the schedule to the left of the schedule
+        // total"). On ONE line: nowrap, because the first cut ("plan 572")
+        // wrapped onto a second line inside the column. Grand total only;
+        // group subtotals stay plain.
         totals={(shown) => {
           const cells: Record<string, ReactNode> = { item: "Total", ...lineTotals(shown) };
           const planned = planParTotal(shown);
           if (planned !== null) {
+            const delta = countTotals(shown).par - planned;
             cells.par = (
-              <span className="flex items-center justify-end gap-1">
+              <span className="inline-flex items-center justify-end gap-1 whitespace-nowrap">
                 <span
                   className="bg-mark-fill px-1 text-[11px] font-normal"
                   title={`The plan's pars come to ${planned.toLocaleString()}`}
                 >
-                  plan {planned.toLocaleString()}
+                  {formatParDelta(delta)}
                 </span>
                 {cells.par}
               </span>
