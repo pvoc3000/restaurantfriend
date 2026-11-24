@@ -10,7 +10,7 @@
  * Measured 2026-07-29: `smooth` silently did nothing in at least one Chromium
  * build, and a walk button that looks dead is the worst outcome. And the
  * browser's own curve and duration are its choice, not ours — this one is
- * ease-in-out and short on purpose, so the eye can follow the page moving
+ * an S-curve and short on purpose, so the eye can follow the page moving
  * without waiting on it.
  *
  * PRESSING AGAIN DOES NOT QUEUE. A new glide starts from wherever the page is
@@ -42,9 +42,15 @@ export function glideDestination(): number {
   return destination ?? window.scrollY;
 }
 
-/** Fast at the middle, gentle at both ends. */
-function easeInOutCubic(t: number) {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+/**
+ * The S-curve: slow away, a rush through the middle, slow into the landing.
+ * QUINTIC, not cubic (Mark, 2026-11-23: longer at the start and the end, the
+ * fastest part about the same). A quintic's peak speed is 5/3 of a cubic's
+ * over the same time, so the duration below is 5/3 as long — the middle moves
+ * exactly as fast as it did, and the extra time all goes to the two ends.
+ */
+function easeInOutQuint(t: number) {
+  return t < 0.5 ? 16 * t ** 5 : 1 - Math.pow(-2 * t + 2, 5) / 2;
 }
 
 export function glideScrollTo(top: number) {
@@ -61,9 +67,10 @@ export function glideScrollTo(top: number) {
     return;
   }
 
-  // Longer trips take a little longer, never much: about a quarter second for a
-  // row or two, half a second at most for a whole screenful and beyond.
-  const duration = Math.min(500, 240 + Math.sqrt(Math.abs(distance)) * 6);
+  // Longer trips take a little longer, never much: about 0.4 s for a row or
+  // two, 0.83 s at most for a whole screenful and beyond. (The cubic's 240–500
+  // ms, times 5/3 — see easeInOutQuint.)
+  const duration = Math.min(500, 240 + Math.sqrt(Math.abs(distance)) * 6) * (5 / 3);
   const start = performance.now();
   destination = to;
 
@@ -79,7 +86,7 @@ export function glideScrollTo(top: number) {
     const t = Math.min(1, (now - start) / duration);
     // "instant", not "auto": auto defers to any CSS scroll-behavior, which
     // would turn every frame into a smooth scroll of its own.
-    window.scrollTo({ top: from + distance * easeInOutCubic(t), behavior: "instant" });
+    window.scrollTo({ top: from + distance * easeInOutQuint(t), behavior: "instant" });
     if (t < 1) frame = requestAnimationFrame(step);
     else stop();
   };
