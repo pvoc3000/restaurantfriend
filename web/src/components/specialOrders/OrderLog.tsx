@@ -1,12 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
-import { SectionHeading } from "@/components/ui/SectionHeading";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
-import { TextInput } from "@/components/ui/TextInput";
+import { EventLog } from "@/components/ui/EventLog";
 
 export type OrderEventRow = {
   id: string;
@@ -30,6 +27,9 @@ export type OrderEventRow = {
  * There is no delete: an entry removed is a thing that happened with no trace,
  * and migration 051 declines to write a delete policy at all. A wrong entry is
  * corrected in place.
+ *
+ * The list and the add control are `ui/EventLog`, shared with the task record;
+ * this keeps only the insert, which is the order's own.
  */
 export function OrderLog({
   orderId,
@@ -49,102 +49,40 @@ export function OrderLog({
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [message, setMessage] = useState("");
 
-  function add() {
-    const text = message.trim();
-    if (!text) return;
-    setError(null);
-    start(async () => {
-      const { data, error: e } = await supabase
-        .from("special_order_events")
-        .insert({
-          org_id: orgId,
-          order_id: orderId,
-          message: text,
-          author: authorName,
-          // `manual` rather than `app`: this one was typed by a person, where
-          // `app` means the app wrote it because something happened. Telling
-          // them apart is what lets a future screen show only the acts.
-          source: "manual",
-        })
-        .select("id");
-      if (e) {
-        setError(e.message);
-        return;
-      }
-      if (!data?.length) {
-        setError("Nothing was written — the database refused it and said nothing.");
-        return;
-      }
-      setMessage("");
-      setAdding(false);
-      router.refresh();
-    });
+  async function add(text: string): Promise<string | null> {
+    const { data, error } = await supabase
+      .from("special_order_events")
+      .insert({
+        org_id: orgId,
+        order_id: orderId,
+        message: text,
+        author: authorName,
+        // `manual` rather than `app`: this one was typed by a person, where
+        // `app` means the app wrote it because something happened. Telling
+        // them apart is what lets a future screen show only the acts.
+        source: "manual",
+      })
+      .select("id");
+    if (error) return error.message;
+    if (!data?.length) return "Nothing was written — the database refused it and said nothing.";
+    router.refresh();
+    return null;
   }
 
   return (
-    <section className="space-y-3">
-      <SectionHeading count={total}>History</SectionHeading>
-
-      {canWrite ? (
-        adding ? (
-          <div className="flex flex-wrap items-end gap-3">
-            <TextInput
-              value={message}
-              onValueChange={setMessage}
-              aria-label="What happened"
-              className="w-full max-w-[42rem]"
-              autoFocus
-            />
-            <button type="button" className={BUTTON_CLASS} onClick={add} disabled={pending || !message.trim()}>
-              {pending ? "Adding…" : "Add entry"}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setAdding(false); setMessage(""); }}
-              className="text-[13px] text-muted underline underline-offset-2 hover:text-ink"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <button type="button" className={BUTTON_CLASS} onClick={() => setAdding(true)}>
-            Add entry
-          </button>
-        )
-      ) : null}
-
-      {error ? <p className="text-[13px] text-accent">{error}</p> : null}
-
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted">Nothing has been recorded on this order.</p>
-      ) : (
-        <ul className="max-w-[70ch] space-y-2 text-[14px]">
-          {rows.map((e) => (
-            <li key={e.id} className="border-b border-hairline pb-2 last:border-0">
-              <span className="block whitespace-pre-wrap">{e.message}</span>
-              <span className="block text-[12px] text-subtle">
-                {e.happened_at.slice(0, 10)}
-                {e.author ? ` · ${e.author}` : ""}
-                {e.source === "filemaker" ? " · FileMaker" : ""}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* Names the cap only when there IS one — "showing 200 of 200" is a
-          sentence nobody needs, and one that appears on every record teaches
-          you to stop reading it. */}
-      {total > rows.length ? (
-        <p className="text-[12px] text-muted">
-          Showing the most recent {rows.length} of {total}.
-        </p>
-      ) : null}
-    </section>
+    <EventLog
+      rows={rows.map((e) => ({
+        id: e.id,
+        when: e.happened_at.slice(0, 10),
+        author: e.author,
+        message: e.message,
+        tag: e.source === "filemaker" ? "FileMaker" : null,
+      }))}
+      total={total}
+      canWrite={canWrite}
+      onAdd={add}
+      empty="Nothing has been recorded on this order."
+    />
   );
 }

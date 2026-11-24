@@ -78,6 +78,7 @@ import { PO_STATUS_CLASS, PO_STATUS_LABEL, PO_STATUS_ORDER } from "@/lib/purchas
 import { INVOICE_STATUS_ORDER } from "@/lib/customerInvoices";
 import { InvoiceStatusChip } from "@/components/customerInvoices/InvoiceStatusChip";
 import { usePublishRecordSet } from "@/lib/recordSet";
+import { EventLog, type EventLogRow } from "@/components/ui/EventLog";
 
 /**
  * EVERY SHARED CONTROL, ON ONE PAGE, WORKING (Mark, 2026-09-10). Fake data, and
@@ -1542,12 +1543,36 @@ function PanelsBlock() {
 
 /* ---- documents --------------------------------------------------------- */
 
+const LOG_SAMPLE: EventLogRow[] = [
+  { id: "3", when: "Nov 23, 2026, 2:14 PM", author: "Traci", message: "Plumber coming Thursday morning." },
+  { id: "2", when: "Nov 22, 2026, 9:02 AM", author: "Mark", message: "Priority changed from Normal to High; Vendor set to Joe’s Plumbing", quiet: true },
+  { id: "1", when: "Nov 21, 2026, 6:40 PM", author: "Karina", message: "Raised on a checklist", quiet: true },
+];
+
 function DocumentsBlock() {
   const [dropped, setDropped] = useState<string[]>([]);
   const [rejected, setRejected] = useState<string[]>([]);
+  const [log, setLog] = useState<EventLogRow[]>(LOG_SAMPLE);
 
   return (
     <Block id="documents" title="Documents">
+      <Specimen name="EventLog (a record's history — app entries quiet, typed notes ink)" wide>
+        <EventLog
+          rows={log}
+          total={log.length}
+          canWrite
+          addLabel="Add note"
+          inputLabel="Note"
+          empty="Nothing has been recorded yet."
+          onAdd={async (text) => {
+            setLog((rows) => [
+              { id: String(rows.length + 1), when: "Just now", author: "You", message: text },
+              ...rows,
+            ]);
+            return null;
+          }}
+        />
+      </Specimen>
       <Grid>
         <Specimen name="FileDropZone (PNG, JPEG, PDF)">
           <FileDropZone
