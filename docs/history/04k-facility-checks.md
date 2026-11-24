@@ -1054,3 +1054,12 @@ and a note signed as another user were refused; update and delete on notes
 touched 0 rows; staff read 0; anon cannot call the writer; a backdated,
 misnamed note was re-stamped), then APPLIED 2026-11-23 via the CLI (2
 policies, 2 triggers, 35 entries). Typecheck, lint, 2,580 fixtures.
+Walked in the browser pane on DF02 with a throwaway request (created, then
+deleted with its history via the CLI — back to 21 tasks): the long
+description shows in full; priority, vendor and In Progress each wrote one
+entry; a note saved with Enter, signed Mark; Done through the dialog put
+"— Replaced the capacitor" on the status line; Open cleared done_at,
+done_by and the note; Make it a task landed on `/tasks/[id]`; next/previous
+walked the list's 3 open requests. The carry-forward box first rendered with
+no words (`Checkbox`'s `label` is the accessible name only — the visible one
+is `children`); it now reads like the create dialog's.

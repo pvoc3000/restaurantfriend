@@ -446,8 +446,9 @@ export function TaskRecord({
                 setCarry(next);
                 writeCarry(next);
               }}
-              label="Carry it forward"
-            />
+            >
+              Put it on every checklist until it is done
+            </Checkbox>
           </dd>
         </dl>
 
