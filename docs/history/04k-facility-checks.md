@@ -1002,3 +1002,55 @@ All · Done · Remaining · Issues `TabPicker`.
 
 Verified: typecheck and lint. NOT seen in a browser: the test pane was signed
 out.
+
+## 2026-11-23 — A task's record, and its history (migration 226)
+
+Mark, on `/maintenance-requests`: "I cannot view the maintenance description
+completely in the list view … I would also like to be able to track and update
+progress for requests, change status, make notes, etc." Scoped with him first;
+his answers are the design.
+
+- **`/maintenance-requests/[id]` and `/tasks/[id]`** — one record for both
+  kinds (`components/tasks/TaskDetail` server, `TaskRecord` client), as
+  `TasksPage` is one loader for both lists. A row whose `kind` no longer
+  matches the route redirects to the other one, so "Make it a task" on the
+  record lands you on `/tasks/[id]`. One scroll (Mark chose it over tabs):
+  title, a line with kind · shop · who flagged it when · age; Details with
+  Status, the full Description (multiline), Priority, About, Where, Shift,
+  Assigned, Due, **Vendor** (the 075 column, on screen for the first time) and
+  Carry it forward; then History. Read at the TASK's shop, not the working
+  one — a record screen.
+- **Statuses unchanged** (Mark: keep Open / In Progress / Done / Canceled).
+  Open ↔ In Progress writes at once; Done and Canceled open `ResolveTask`,
+  which gained a `mode`: done takes an optional "What was done", cancel still
+  demands a reason. The list's ⋯ "Mark done…" goes through the same dialog,
+  so there is one path to Done.
+- **The list**: the title is now a link to the record and no longer
+  inline-editable; the description under it is read-only; every other cell is
+  unchanged. The sort moved from `DataTable` to the screen so the list can
+  publish its found set and the record's book walks it.
+- **226 — `location_task_events`**, 054's shape. A trigger writes one entry
+  per statement for: created ("Raised on a checklist" when it was), status
+  (with the resolution note appended), priority, assignee, due date,
+  description ("Description edited", never the old text), vendor and kind.
+  People add notes. **Notes are permanent** (Mark's call): select + insert
+  policies only. The insert policy demands `source = 'manual'` and
+  `author_id = auth.uid()`, and a BEFORE INSERT trigger stamps the note's
+  `author` and `happened_at` itself — without it the name was free text and
+  the time had only a default, so a note could be signed as somebody else or
+  backdated. Backfilled: 21 tasks → 35 entries (a Created each, a closing
+  entry for the 14 closed).
+- **`ui/EventLog`** — the special order log's list and Add control, pulled out
+  so both records share it; `OrderLog` is now a wrapper keeping its insert.
+  App-written rows render muted so typed notes stand out.
+- Links that used `?open=` now open the record: the equipment record's Jobs,
+  an inspection's tasks, and a checklist's "see the task". `?open=` still
+  works on the lists.
+- `taskLoaders.ts` holds the assignee and photo reads both screens share.
+
+Verified: 226 dry-run on the hosted DB in a transaction that raised before
+commit (each watched change wrote one sentence; a forged `source='app'` note
+and a note signed as another user were refused; update and delete on notes
+touched 0 rows; staff read 0; anon cannot call the writer; a backdated,
+misnamed note was re-stamped), then APPLIED 2026-11-23 via the CLI (2
+policies, 2 triggers, 35 entries). Typecheck, lint, 2,580 fixtures.

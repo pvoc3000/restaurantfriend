@@ -10,11 +10,17 @@ import { InlineValue } from "@/components/catalog/InlineValue";
 import { READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { BOXED_FIELD, BOXED_FIELDS } from "@/components/ui/fieldMetrics";
-import { parseTrail } from "@/lib/breadcrumbs";
+import { parseTrail, withFrom } from "@/lib/breadcrumbs";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { expiryState } from "@/lib/employeeDocuments";
 import { assessReading } from "@/lib/checklists";
-import { TASK_STATUS_LABEL, isTaskOpen, type TaskStatus } from "@/lib/facilityTasks";
+import {
+  TASK_STATUS_LABEL,
+  isTaskOpen,
+  taskDetailPath,
+  type TaskKind,
+  type TaskStatus,
+} from "@/lib/facilityTasks";
 
 const CRUMB = { href: "/equipment", label: "Equipment" };
 
@@ -341,11 +347,10 @@ export default async function EquipmentRecordPage({
                 </span>
                 <span className="min-w-0 flex-1">
                   <Link
-                    href={
-                      t.kind === "maintenance"
-                        ? `/maintenance-requests?open=${t.id}`
-                        : `/tasks?open=${t.id}`
-                    }
+                    href={withFrom(taskDetailPath(t.kind as TaskKind, t.id as string), {
+                      href: `/equipment/${id}`,
+                      label: unit.name as string,
+                    })}
                     className="hover:underline"
                   >
                     {t.title as string}

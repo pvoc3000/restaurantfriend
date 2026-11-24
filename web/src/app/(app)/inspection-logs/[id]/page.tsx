@@ -276,7 +276,7 @@ export default async function InspectionPage({
               return (
                 <li key={t.id as string} className="flex items-center gap-4 py-2 text-sm">
                   <Link
-                    href={`/tasks?open=${t.id}`}
+                    href={`/tasks/${t.id}`}
                     className={`min-w-0 flex-1 truncate underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900 ${open ? "text-ink" : "text-muted"}`}
                   >
                     {t.title as string}

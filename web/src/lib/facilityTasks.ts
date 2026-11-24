@@ -26,6 +26,18 @@ export const TASK_KIND_LABEL: Record<TaskKind, string> = {
   maintenance: "Maintenance",
 };
 
+/** Each kind's list screen — where its records live and what the crumb says. */
+export const TASK_LIST: Record<TaskKind, { href: string; label: string }> = {
+  task: { href: "/tasks", label: "Tasks" },
+  maintenance: { href: "/maintenance-requests", label: "Maintenance Requests" },
+};
+
+/** A task's record, under its own kind's list: `/tasks/…` or
+ *  `/maintenance-requests/…`. The record redirects if the kind has changed. */
+export function taskDetailPath(kind: TaskKind, id: string): string {
+  return `${TASK_LIST[kind].href}/${id}`;
+}
+
 export type TaskStatus = "open" | "in_progress" | "done" | "cancelled";
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {

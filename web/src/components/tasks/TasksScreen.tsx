@@ -3,6 +3,10 @@
 import { sectionPickOptions } from "@/lib/locations";
 import { TASK_PRIORITY_OPTIONS } from "@/lib/facilityTasks";
 import { useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { withFrom } from "@/lib/breadcrumbs";
+import { usePublishRecordSet } from "@/lib/recordSet";
+import { sortRows, type SortDir } from "@/lib/tableSort";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -19,8 +23,10 @@ import { TaskPhotos, type TaskPhoto } from "./TaskPhotos";
 import { SHIFT_SLOT_LABEL, SHIFT_SLOT_OPTIONS } from "@/lib/employeeEvents";
 import {
   TASK_PRIORITY_LABEL,
+  TASK_LIST,
   TASK_STATUS_LABEL,
   isTaskOpen,
+  taskDetailPath,
   staleTaskBanner,
   taskAgeLabel,
   taskTone,
@@ -102,7 +108,13 @@ export function TasksScreen({
   const [search, setSearch] = useState("");
   const [tier, setTier] = useState<"open" | "done" | "all">("open");
   const [failed, setFailed] = useState<string | null>(null);
-  const [resolving, setResolving] = useState<TaskRow | null>(null);
+  const [resolving, setResolving] = useState<{ row: TaskRow; mode: "done" | "cancel" } | null>(
+    null,
+  );
+  // THE SORT IS THE SCREEN'S, not the table's, so the record book on the
+  // detail page can walk the rows in the order they are on screen
+  // (`lib/recordSet` — the credit memo list's shape).
+  const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "age", dir: "asc" });
   // THE ID, NOT THE ROW. `router.refresh()` re-renders the server component and
   // hands down fresh `rows`, but a captured row object is a snapshot taken when
   // the dialog opened — so a photo you had just added did not appear until you
@@ -137,26 +149,6 @@ export function TasksScreen({
   }, [searched, tier, searching]);
 
   const banner = staleTaskBanner(rows, today);
-
-  async function markDone(row: TaskRow) {
-    setFailed(null);
-    await optimistic(row.id, { status: "done" }, async () => {
-      // `getSession`, not `getUser`: this only fills a column, and `getUser` is
-      // a round trip to Supabase Auth. RLS still checks the real token.
-      const uid = (await supabase.auth.getSession()).data.session?.user.id ?? null;
-      const { data, error } = await supabase
-        .from("location_tasks")
-        .update({ status: "done", done_at: new Date().toISOString(), done_by: uid })
-        .eq("id", row.id)
-        .select("id");
-      if (error || !data || data.length === 0) {
-        setFailed(error?.message ?? "That change was not saved.");
-        return false;
-      }
-      router.refresh();
-      return true;
-    });
-  }
 
   async function reopen(row: TaskRow) {
     setFailed(null);
@@ -195,6 +187,10 @@ export function TasksScreen({
     });
   }
 
+  function detailHref(id: string): string {
+    return withFrom(taskDetailPath(kind, id), TASK_LIST[kind]);
+  }
+
   const columns: DataColumn<TaskRow>[] = [
     {
       key: "title",
@@ -202,20 +198,13 @@ export function TasksScreen({
       width: 330,
       pinned: true,
       sortValue: (r) => r.title,
+      // THE TITLE OPENS THE RECORD (Mark, 2026-11-23), where it — and the
+      // description, in full — are edited. Every other cell stays inline.
       render: (r) => (
         <span className="block">
-          {editable ? (
-            <InlineValue
-              table="location_tasks"
-              id={r.id}
-              column="title"
-              value={r.title}
-              nullable={false}
-              ariaLabel="Task"
-            />
-          ) : (
-            <span className={READ_ONLY_VALUE}>{r.title}</span>
-          )}
+          <Link href={detailHref(r.id)} className="font-semibold hover:underline">
+            {r.title}
+          </Link>
           {r.details && (
             <span className="block text-[13px] text-muted">{r.details}</span>
           )}
@@ -426,7 +415,7 @@ export function TasksScreen({
               },
               ...(isTaskOpen(r)
                 ? [
-                    { label: "Mark done", onSelect: () => void markDone(r) },
+                    { label: "Mark done…", onSelect: () => setResolving({ row: r, mode: "done" }) },
                     {
                       label: kind === "task" ? "Make it maintenance" : "Make it a task",
                       hint:
@@ -440,7 +429,7 @@ export function TasksScreen({
                       label: "Cancel…",
                       hint: "needs a reason",
                       danger: true,
-                      onSelect: () => setResolving(r),
+                      onSelect: () => setResolving({ row: r, mode: "cancel" }),
                     },
                   ]
                 : [{ label: "Reopen", onSelect: () => void reopen(r) }]),
@@ -449,6 +438,12 @@ export function TasksScreen({
         ) : null,
     },
   ];
+
+  const sorted = sortRows(shown, columns, sort);
+  usePublishRecordSet(
+    TASK_LIST[kind].href,
+    sorted.map((r) => ({ id: r.id, href: detailHref(r.id) })),
+  );
 
   return (
     <div className="space-y-4">
@@ -509,7 +504,9 @@ export function TasksScreen({
       </div>
 
       <DataTable
-        rows={shown}
+        rows={sorted}
+        sort={sort}
+        onSortChange={setSort}
         columns={columns}
         rowKey={(r) => r.id}
         compactBelow={1280}
@@ -537,7 +534,8 @@ export function TasksScreen({
 
       {resolving && (
         <ResolveTask
-          task={resolving}
+          task={resolving.row}
+          mode={resolving.mode}
           onClose={() => setResolving(null)}
           onDone={() => {
             setResolving(null);

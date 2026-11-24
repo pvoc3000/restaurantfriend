@@ -81,7 +81,7 @@ export function RaiseTaskFromIssue({
     return (
       <span className="text-[13px] text-muted">
         Pinned —{" "}
-        <Link href={`/tasks?open=${taskId}`} className="underline">
+        <Link href={`/tasks/${taskId}`} className="underline">
           see the task
         </Link>
       </span>
