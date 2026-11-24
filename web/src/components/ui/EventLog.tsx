@@ -43,6 +43,9 @@ export function EventLog({
   addLabel = "Add entry",
   inputLabel = "What happened",
   empty,
+  addRowClassName = "max-w-[70ch]",
+  adding: addingProp,
+  onAddingChange,
 }: {
   title?: string;
   rows: EventLogRow[];
@@ -53,10 +56,26 @@ export function EventLog({
   addLabel?: string;
   inputLabel?: string;
   empty: string;
+  /**
+   * The open Add row's WIDTH. The field fills it and the Add button ends it,
+   * so a record can line that button up with the right edge of its own fields
+   * (the task record passes its `dl`'s width). Defaults to the list's.
+   */
+  addRowClassName?: string;
+  /**
+   * CONTROLLED: the record's own Actions menu opens the Add row (the task
+   * record, Mark 2026-11-23), so the log draws no Add button of its own.
+   * Omit both and the log keeps its own button and state, as on the order.
+   */
+  adding?: boolean;
+  onAddingChange?: (adding: boolean) => void;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [ownAdding, setOwnAdding] = useState(false);
+  const controlled = onAddingChange !== undefined;
+  const adding = controlled ? (addingProp ?? false) : ownAdding;
+  const setAdding = controlled ? onAddingChange : setOwnAdding;
   const [message, setMessage] = useState("");
 
   function add() {
@@ -80,12 +99,14 @@ export function EventLog({
 
       {canWrite ? (
         adding ? (
-          <div className="flex flex-wrap items-end gap-3">
+          // Cancel BEFORE the commit, so the commit is the row's last thing and
+          // its right edge is the row's.
+          <div className={`flex w-full items-center gap-3 ${addRowClassName}`}>
             <TextInput
               value={message}
               onValueChange={setMessage}
               aria-label={inputLabel}
-              className="w-full max-w-[42rem]"
+              fullWidth
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -94,18 +115,23 @@ export function EventLog({
                 }
               }}
             />
-            <button type="button" className={BUTTON_CLASS} onClick={add} disabled={pending || !message.trim()}>
-              {pending ? "Adding…" : addLabel}
-            </button>
             <button
               type="button"
               onClick={() => { setAdding(false); setMessage(""); }}
-              className="text-[13px] text-muted underline underline-offset-2 hover:text-ink"
+              className="shrink-0 text-[13px] text-muted underline underline-offset-2 hover:text-ink"
             >
               Cancel
             </button>
+            <button
+              type="button"
+              className={`shrink-0 ${BUTTON_CLASS}`}
+              onClick={add}
+              disabled={pending || !message.trim()}
+            >
+              {pending ? "Adding…" : addLabel}
+            </button>
           </div>
-        ) : (
+        ) : controlled ? null : (
           <button type="button" className={BUTTON_CLASS} onClick={() => setAdding(true)}>
             {addLabel}
           </button>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { HeightGrip, useFieldHeight } from "@/components/ui/HeightGrip";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { evaluateNumeric, looksLikeExpression } from "@/lib/calc";
@@ -240,6 +241,7 @@ function Sizer({
   boxed = false,
   multiline = false,
   rows = 4,
+  minHeight = null,
 }: {
   text: string;
   align?: "left" | "right";
@@ -250,6 +252,9 @@ function Sizer({
   /** …and so does a note's `min-h`, for exactly the same reason. */
   multiline?: boolean;
   rows?: number;
+  /** A height the reader dragged to (`ui/HeightGrip`) — worn here too, so
+   *  the editor opens at the size the resting box had. */
+  minHeight?: number | null;
 }) {
   return (
     <span
@@ -275,6 +280,7 @@ function Sizer({
       } ${restLook(boxed, multiline, align, rows)} ${
         align === "right" ? "text-right tabular-nums" : "text-left"
       }`}
+      style={minHeight ? { minHeight } : undefined}
     >
       {/* A space, never "", or an empty cell collapses to no height at all. */}
       {text === "" ? " " : text}
@@ -316,6 +322,7 @@ export function InlineValue({
   scale,
   multiline = false,
   rows = 4,
+  resizable = false,
   boxed = false,
   readOnly = false,
   disabled = false,
@@ -495,6 +502,10 @@ export function InlineValue({
   /** How tall a multiline editor opens — and, boxed, how tall it rests, so the
    *  two never differ. 4 is a paragraph; 8 is a page of violations. */
   rows?: number;
+  /** A multiline field the reader can drag TALLER (never wider) by a grip in
+   *  its corner, at rest and while editing — `ui/HeightGrip`. The height is
+   *  remembered per field (`table.column`) in this browser. */
+  resizable?: boolean;
   /** Wear a bounding box at rest instead of the dotted underline — see
    *  `INLINE_REST_BOXED`. For a stack of multiline notes, where the quiet cue
    *  leaves the fields indistinguishable from each other. */
@@ -525,6 +536,11 @@ export function InlineValue({
   const supabase = createClient();
   const calcField = useCalcField();
   const [editing, setEditing] = useState(false);
+  const growBox = useRef<HTMLSpanElement>(null);
+  const grows = resizable && multiline;
+  const [grownHeight, setGrownHeight] = useFieldHeight(
+    grows ? `rf.fieldHeight.${table}.${jsonColumn ?? column}` : null,
+  );
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -833,8 +849,15 @@ export function InlineValue({
             Where the parent is shrink-to-fit, a percentage cannot resolve, so
             it falls back to the sizer's content width, which is the resting
             button's width. One rule, both cases. */}
-        <span className="relative block w-full">
-          <Sizer text={draft} align={align} boxed={boxed} multiline rows={rows} />
+        <span ref={growBox} className="relative block w-full">
+          <Sizer
+            text={draft}
+            align={align}
+            boxed={boxed}
+            multiline
+            rows={rows}
+            minHeight={grows ? grownHeight : null}
+          />
         <textarea
           autoFocus
           rows={rows}
@@ -855,8 +878,9 @@ export function InlineValue({
               setEditing(false);
             }
           }}
-          className={`resize-y ${INLINE_EDITING}`}
+          className={`${grows ? "resize-none" : "resize-y"} ${INLINE_EDITING}`}
         />
+        {grows && <HeightGrip target={growBox} onHeight={setGrownHeight} />}
         </span>
         {error && <span className="text-xs text-accent">{error}</span>}
       </span>
@@ -925,7 +949,7 @@ export function InlineValue({
     );
   }
 
-  return (
+  const resting = (
     <button
       type="button"
       onClick={open}
@@ -943,6 +967,7 @@ export function InlineValue({
       } ${multiline ? "whitespace-pre-wrap" : ""} ${
         shown === null || shown === "" ? emptyClassName : ""
       } ${className}`}
+      style={grows && grownHeight ? { minHeight: grownHeight } : undefined}
     >
       {/* A NON-BREAKING SPACE when there is nothing to show and no placeholder
           to show instead. A caller that passes `placeholder=""` — the recipe
@@ -961,5 +986,13 @@ export function InlineValue({
           ? format(shown)
           : String(shown)}
     </button>
+  );
+
+  if (!grows) return resting;
+  return (
+    <span ref={growBox} className="relative block w-full">
+      {resting}
+      {!disabled && <HeightGrip target={growBox} onHeight={setGrownHeight} />}
+    </span>
   );
 }

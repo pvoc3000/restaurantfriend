@@ -25,7 +25,7 @@ import { InlineValue } from "@/components/catalog/InlineValue";
 import { PickList } from "@/components/ui/PickList";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { ActionMenu } from "@/components/ui/ActionMenu";
 import { EventLog, type EventLogRow } from "@/components/ui/EventLog";
 import { BOXED_FIELD, BOXED_FIELDS, READ_ONLY_VALUE } from "@/components/ui/fieldMetrics";
 import { ResolveTask } from "./ResolveTask";
@@ -60,6 +60,11 @@ const STATUS_OPTIONS = (["open", "in_progress", "done", "cancelled"] as const).m
 }));
 
 const LABEL = "text-[11px] font-semibold uppercase tracking-[0.08em] text-muted";
+
+/** The Details block's width — and, when the history sits BELOW it (a narrow
+ *  screen), the open Add note row's, so its button ends where the fields
+ *  above end (Mark, 2026-11-23). In two columns the fields fill their own. */
+const DETAIL_WIDTH = "max-w-[min(42rem,max(24rem,50%))] lg:max-w-[42rem]";
 
 /**
  * A task's record — a maintenance request's, or a crew task's (Mark,
@@ -106,6 +111,7 @@ export function TaskRecord({
   const [failed, setFailed] = useState<string | null>(null);
   const [resolving, setResolving] = useState<"done" | "cancel" | null>(null);
   const [showPhotos, setShowPhotos] = useState(false);
+  const [addingNote, setAddingNote] = useState(false);
 
   // The status shown is LOCAL, so a tap shows at once (lib/latestWrite); the
   // server's value re-seeds it on the refresh, since the record is keyed.
@@ -358,43 +364,73 @@ export function TaskRecord({
         trailing={<RecordNav listKey={listKey} id={task.id} />}
       />
 
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          {editable ? (
-            <InlineValue
-              table="location_tasks"
-              id={task.id}
-              column="title"
-              value={task.title}
-              nullable={false}
-              ariaLabel={task.kind === "maintenance" ? "What needs doing" : "Task"}
-              className="uppercase"
-            />
-          ) : (
-            task.title
-          )}
-        </h1>
-        <p className="text-sm text-muted">
-          {TASK_KIND_LABEL[task.kind]}
-          {task.locationCode && ` · ${task.locationCode}`}
-          {` · ${task.flagged}`}
-          {task.from_walk && " · raised on a checklist"}
-          {ageLabel && (
-            <>
-              {" · "}
-              <span className={tone === "loud" ? "bg-accent px-1 text-white" : "bg-mark-fill px-1 text-ink"}>
-                {ageLabel}
-              </span>
-            </>
-          )}
-        </p>
+      {/* THE TITLE ROW CARRIES THE ONE ACTIONS MENU, level with the name at
+          the right margin — every record screen's shape (Mark, 2026-11-23). */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            {editable ? (
+              <InlineValue
+                table="location_tasks"
+                id={task.id}
+                column="title"
+                value={task.title}
+                nullable={false}
+                ariaLabel={task.kind === "maintenance" ? "What needs doing" : "Task"}
+                className="uppercase"
+              />
+            ) : (
+              task.title
+            )}
+          </h1>
+          <p className="text-sm text-muted">
+            {TASK_KIND_LABEL[task.kind]}
+            {task.locationCode && ` · ${task.locationCode}`}
+            {` · ${task.flagged}`}
+            {task.from_walk && " · raised on a checklist"}
+            {ageLabel && (
+              <>
+                {" · "}
+                <span className={tone === "loud" ? "bg-accent px-1 text-white" : "bg-mark-fill px-1 text-ink"}>
+                  {ageLabel}
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+        {editable && (
+          <ActionMenu
+            ariaLabel={`Actions for ${task.title}`}
+            items={[
+              { label: "Add Note…", onSelect: () => setAddingNote(true) },
+              {
+                label: photos.length === 0 ? "Photos…" : `Photos (${photos.length})…`,
+                onSelect: () => setShowPhotos(true),
+              },
+              ...(isTaskOpen({ status })
+                ? [
+                    {
+                      label: task.kind === "task" ? "Make It Maintenance" : "Make It a Task",
+                      onSelect: () => void moveKind(),
+                      separatorBefore: true,
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        )}
       </div>
 
-      <section className="space-y-4">
+      {/* TWO COLUMNS ON A WIDE SCREEN (Mark, 2026-11-23: "move the history area
+          to the second column"): the fields and the history side by side, so
+          reading what happened never scrolls the fields away. Narrow, the
+          history follows the fields, as before. */}
+      <div className="grid items-start gap-12 lg:grid-cols-2">
+      <section className="min-w-0 space-y-4">
         <SectionHeading>Details</SectionHeading>
         {failed && <p className="text-sm text-accent">{failed}</p>}
 
-        <dl className="grid max-w-[min(42rem,max(24rem,50%))] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+        <dl className={`grid ${DETAIL_WIDTH} grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm`}>
           <dt className={LABEL}>Status</dt>
           <dd>
             {editable ? (
@@ -421,6 +457,7 @@ export function TaskRecord({
                 column="details"
                 value={task.details}
                 multiline
+                resizable
                 boxed={BOXED_FIELDS}
                 ariaLabel="Description"
               />
@@ -451,19 +488,6 @@ export function TaskRecord({
             </Checkbox>
           </dd>
         </dl>
-
-        {editable && (
-          <div className="flex flex-wrap gap-3">
-            <button type="button" className={BUTTON_CLASS} onClick={() => setShowPhotos(true)}>
-              {photos.length === 0 ? "Photos…" : `Photos (${photos.length})…`}
-            </button>
-            {isTaskOpen({ status }) && (
-              <button type="button" className={BUTTON_CLASS} onClick={() => void moveKind()}>
-                {task.kind === "task" ? "Make it maintenance" : "Make it a task"}
-              </button>
-            )}
-          </div>
-        )}
       </section>
 
       <EventLog
@@ -474,7 +498,13 @@ export function TaskRecord({
         addLabel="Add note"
         inputLabel="Note"
         empty="Nothing has been recorded yet."
+        // Narrow: the fields' width, so Add note ends under them. Wide: the
+        // history column's own list width.
+        addRowClassName="max-w-[min(42rem,max(24rem,50%))] lg:max-w-[70ch]"
+        adding={addingNote}
+        onAddingChange={setAddingNote}
       />
+      </div>
 
       {showPhotos && (
         <TaskPhotos

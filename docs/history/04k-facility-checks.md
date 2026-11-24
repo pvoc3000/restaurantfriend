@@ -1063,3 +1063,34 @@ done_by and the note; Make it a task landed on `/tasks/[id]`; next/previous
 walked the list's 3 open requests. The carry-forward box first rendered with
 no words (`Checkbox`'s `label` is the accessible name only — the visible one
 is `children`); it now reads like the create dialog's.
+
+## 2026-11-23 — The task record: a taller description, History beside Details, an Actions menu
+
+Mark, the same day, after walking it:
+
+- **"add a resize drag handle to the descriptions cell … only … downward,
+  not wider"** — `InlineValue resizable` and the new `ui/HeightGrip`: a grip
+  in the box's corner sets a `min-height` worn at rest AND by the editor's
+  sizer, so it opens at the size you dragged it to; remembered per field in
+  localStorage, double-click resets. The textarea's own `resize-y` was there
+  already and did nothing useful: it exists only while editing, and the
+  textarea is laid over a hidden sizer, so it grew over the fields below.
+- **"move the history area to the second column"** — at `lg` and up, Details
+  and History sit side by side (`grid lg:grid-cols-2`); narrower, History
+  follows Details as before.
+- **The Add note row** fills its column (`TextInput fullWidth`, which is what
+  makes a field fill a flex row — `w-full` on its class does not) with Cancel
+  before the commit, so Add note ends at the column's right edge: under the
+  fields when stacked, at the History list's edge in two columns.
+- **"move 'make it a task' and 'add note' to an 'Actions' menu in the upper
+  right"** — `ui/ActionMenu` level with the title, the customer record's
+  shape: Add Note… · Photos… · Make It a Task / Make It Maintenance. Photos
+  moved too, or it would have been a lone button left behind. `EventLog`
+  became controllable (`adding`/`onAddingChange`) so the menu opens its row;
+  the special order's log is unchanged.
+
+Verified in the browser pane at 800 and 1440 wide: the grip took the box from
+86 to 207px with its width unchanged (by dispatched pointer events — the
+pane's drag tool does not send them) and the editor opened at 207; two
+columns at 1440; the note field 472px with Add note ending at the row's edge;
+Add Note… opened the field focused. Nothing was saved to the record.
