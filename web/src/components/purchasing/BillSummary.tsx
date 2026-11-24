@@ -102,6 +102,8 @@ export function BillSummary({
   const notOnInvoice = match.matches.length - matched;
   const total = extraction.invoice_total;
   const short = total !== null && receivedTotal < Number(total) - 0.005;
+  const difference = total === null ? 0 : Number(total) - receivedTotal;
+  const off = Math.abs(difference) >= 0.005;
 
   /** The invoice naming an order that isn't this one. Nothing here is an ERROR
    *  — the vendor keys our number by hand, and on 2026-08-17 a week of ordering
@@ -237,6 +239,15 @@ export function BillSummary({
               title="What you've recorded as received, at the order's prices"
             >
               Received {money(receivedTotal)}
+            </span>
+            {/* Billed − received, signed, so the band answers "by how much?"
+                as well as "does it add up?". A real minus sign, not `money`'s
+                "$-", and a cent's rounding reads as even. */}
+            <span
+              className={`text-[12px] uppercase tracking-[0.12em] ${off ? "text-accent" : "text-subtle"}`}
+              title="Billed minus received"
+            >
+              Difference {off ? `${difference > 0 ? "+" : "−"}${money(Math.abs(difference))}` : money(0)}
             </span>
           </span>
         )}
