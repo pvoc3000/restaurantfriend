@@ -55,6 +55,7 @@ import { ICON_DOUBLE_CHEVRON_RIGHT, ICON_REFRESH } from "@/components/tablet/Bar
 import { BackToTop } from "@/components/ui/BackToTop";
 import { usePublishedHeight } from "@/lib/tableHead";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { glideDestination, glideScrollTo } from "@/lib/glideScroll";
 
 /**
  * TRIAL, 2026-08-10 (Mark): the item header's par is hidden — "distracting…
@@ -596,16 +597,17 @@ export function OrderGuide({
     // never "moves" you and the press goes on to the next item — it is already
     // on screen under the header you are looking at. Every press either scrolls
     // further down or wraps, so the walk cannot get stuck.
-    const next = targets.find((el) => scrollFor(el) > window.scrollY + 2) ?? targets[0];
+    // "Below here" means below where a glide still in flight is heading, so a
+    // second press mid-glide goes on to the one after rather than re-finding it.
+    const from = glideDestination();
+    const next = targets.find((el) => scrollFor(el) > from + 2) ?? targets[0];
 
-    // INSTANT, not smooth. Two reasons, one measured and one from the design
-    // system. Measured: `behavior: "smooth"` silently does nothing in at least
-    // one Chromium build — scrollTo and scrollIntoView both no-op while "auto"
-    // works — and a walk button that appears dead is the worst outcome here.
-    // And the system's rule is near-zero motion; you pressed "next", so the
-    // jump is the answer, not an animation of the answer. It also means
-    // press-press-press keeps up with you instead of queueing 300ms each.
-    window.scrollTo({ top: scrollFor(next), behavior: "auto" });
+    // A GLIDE, not a jump (Mark, 2026-11-23: "fast, but … an obvious scroll and
+    // not a snap"). It was instant until then, on the design system's
+    // near-zero-motion rule; a snap left you unsure which way the page had
+    // gone. Hand-driven, not `behavior: "smooth"`, which silently did nothing
+    // in one Chromium build — see lib/glideScroll.
+    glideScrollTo(scrollFor(next));
   }
 
   /**
@@ -740,10 +742,8 @@ export function OrderGuide({
       `tr[data-guide-section="${CSS.escape(key)}"]`
     );
     if (!band) return;
-    window.scrollTo({
-      top: Math.max(0, window.scrollY + band.getBoundingClientRect().top - chromeOffset()),
-      behavior: "auto",
-    });
+    // The same glide as Next section, which this press stands in for.
+    glideScrollTo(window.scrollY + band.getBoundingClientRect().top - chromeOffset());
   }, [sectionTick]);
 
   async function zeroSection(sectionKey: string, lines: GuideRow[], band: Element | null) {
