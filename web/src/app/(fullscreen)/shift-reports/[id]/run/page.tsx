@@ -778,6 +778,7 @@ export default async function RunShiftReportPage({
     },
     taskSpecialOrdersDone: report.task_special_orders_done as boolean,
     taskSchedulesDone: report.task_schedules_done as boolean,
+    nextProductionDate: nextDay,
     netSalesCents,
     countedLines: premadeRows.filter((r) => r.made !== null || r.leftover !== null).length,
     rescuedLines: premadeRows.filter((r) => r.rescued !== null).length,
@@ -1104,6 +1105,7 @@ export default async function RunShiftReportPage({
       premadePages={premadePages}
       openAtPage={Number.isFinite(openAt) ? openAt : null}
       blockers={blockers}
+      nextProductionDate={nextDay}
       readOnlyNote={
         !isSent && !editable ? { authorName, viewerName } : null
       }

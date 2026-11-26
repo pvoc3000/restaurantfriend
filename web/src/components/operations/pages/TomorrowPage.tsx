@@ -9,6 +9,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { GenerateSchedules } from "@/components/production/GenerateSchedules";
 import { PrintPacket } from "@/components/production/PrintPacket";
 import { sellingShopsForKitchen } from "@/lib/productionPlans";
+import { dayAndDate } from "@/lib/blackoutDates";
 
 /**
  * One special order tomorrow — what the packet needs to print it and NAME it.
@@ -152,7 +153,7 @@ export function TomorrowPage({
 
       <section className="space-y-4">
         <SectionHeading count={schedules.length}>
-          Production schedules for {nextProductionDate}
+          Production schedules for {dayAndDate(nextProductionDate)}
         </SectionHeading>
         {schedules.length === 0 ? (
           <p className="text-sm text-muted">None.</p>
@@ -185,7 +186,7 @@ export function TomorrowPage({
         {productionOff ? (
           <p className="text-[16px]">
             <span className="bg-mark-fill px-1">
-              No production at {kitchenCode} on {nextProductionDate}
+              No production at {kitchenCode} on {dayAndDate(nextProductionDate)}
             </span>{" "}
             <span className="text-muted">— {productionOff}, on the calendar.</span>
           </p>
@@ -259,7 +260,7 @@ export function TomorrowPage({
           disabled={!editable}
           onChange={(next) => flag("task_schedules_done", next)}
         >
-          Tomorrow&rsquo;s production logs are printed
+          Production logs for {dayAndDate(nextProductionDate)} are printed
         </Checkbox>
       </section>
     </div>

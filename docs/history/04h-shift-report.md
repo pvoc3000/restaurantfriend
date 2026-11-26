@@ -917,3 +917,30 @@ the report stays disabled until one is picked, and the duplicate/resume check
 waits for it too. It is the only insert into `shift_reports`, so the tablet's
 tile goes through the same dialog. The guide's step now says to pick the shift.
 Typechecked and linted; not seen in a browser (the pane was on `/lock`).
+
+**THE NEXT PRODUCTION DAY IS THE NEXT DAY THE SHOP IS OPEN (Mark, 2026-11-26:
+"when closing on a Wednesday, and the shop is closed Thursday and Friday, the
+supervisor needs to print out Saturday's production schedules").** The create
+dialog defaulted `next_production_date` to today + 1. It now defaults to
+`blackoutDates.nextOpenDay(date, …)`: the first day after the report's date
+whose weekday is in `locations.open_days` (empty = every day) and which no
+`shop_closed` calendar entry covers at this shop. `no_production` alone does
+NOT skip a day — the question is "when are we open", and a no-production day
+the shop trades on still shows its "No production at …" line on the page. Gives
+up after 14 days and answers date + 1. The default FOLLOWS the Date field (a
+closer after midnight sets yesterday) until somebody picks a day by hand.
+`/shift-reports` fetches calendar entries 15 days ahead for it; the
+missing-night sweep still reads only the past days of the same set.
+Measured on the hosted DB that day: DF01 and DF02 open every weekday, and
+Thanksgiving (Nov 26–27) is a `shop_closed` every-shop entry — exactly Mark's
+case. Reports already created keep their stored date; page 1 corrects one.
+**THE PAGES NAME THE DAY** (Mark, same message: "the shift report pages need to
+display the proper dates as well"). The production page's title is now
+`pageTitle("tomorrow", date)` → "Production for Saturday, Nov 28" (fallback
+"Next production day"), and so are its heading, the no-production line, the
+"Production logs for … are printed" checkbox and the two submit caveats, which
+reach the email. Special orders and schedules were already fetched by
+`next_production_date`, so they follow it. The page KEY stays `tomorrow`.
+Fixtures: `nextOpenDay` (closure, weekly pattern, no-production, limit),
+`dayAndDate`, the dated caveats and title. Typechecked, linted; not seen in a
+browser (the pane was on `/lock`).

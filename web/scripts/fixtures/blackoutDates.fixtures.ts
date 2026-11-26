@@ -14,12 +14,14 @@ import {
   blackoutSentence,
   closedDates,
   coveringEntry,
+  dayAndDate,
   entryAppliesTo,
   entryCoversDate,
   entryDates,
   entryShops,
   entryTitle,
   isBlackout,
+  nextOpenDay,
   type CalendarEntry,
 } from "../../src/lib/blackoutDates";
 
@@ -195,4 +197,45 @@ test("blackoutSentence names the shops only when the entry is not for all", () =
     ),
     "No production on Mar 2 — Floor refinishing (DF01)",
   );
+});
+
+/* -- nextOpenDay ---------------------------------------------------------- */
+
+const EVERY_DAY = [1, 2, 3, 4, 5, 6, 7];
+
+test("nextOpenDay is the day after when nothing is closed", () => {
+  eq(nextOpenDay("2026-11-24", { openDays: EVERY_DAY, closed: new Set() }), "2026-11-25");
+});
+
+test("nextOpenDay steps over a calendar closure — Wednesday's closer prints Saturday", () => {
+  // Thanksgiving 2026 as it is on the live calendar: Thu 26 and Fri 27 shut.
+  const entries = [entry({ shop_closed: true, starts_on: "2026-11-26", ends_on: "2026-11-27" })];
+  const closed = closedDates(entries, DF01, { from: "2026-11-25", to: "2026-12-10" });
+  eq(nextOpenDay("2026-11-25", { openDays: EVERY_DAY, closed }), "2026-11-28");
+});
+
+test("nextOpenDay ignores a no-production entry — only shop_closed closes the shop", () => {
+  const entries = [entry({ no_production: true, starts_on: "2026-11-26", ends_on: "2026-11-26" })];
+  const closed = closedDates(entries, DF01, { from: "2026-11-25", to: "2026-12-10" });
+  eq(nextOpenDay("2026-11-25", { openDays: EVERY_DAY, closed }), "2026-11-26");
+});
+
+test("nextOpenDay steps over the weekly closed days too", () => {
+  // DF04's pattern: Wednesday to Sunday. Closing Sunday Nov 29 → Wednesday Dec 2.
+  eq(nextOpenDay("2026-11-29", { openDays: [3, 4, 5, 6, 7], closed: new Set() }), "2026-12-02");
+});
+
+test("nextOpenDay treats no weekly pattern as open every day", () => {
+  eq(nextOpenDay("2026-11-29", { openDays: [], closed: new Set() }), "2026-11-30");
+});
+
+test("nextOpenDay gives up on a closure longer than its limit and says the day after", () => {
+  const entries = [entry({ shop_closed: true, starts_on: "2026-01-01", ends_on: "2026-12-31" })];
+  const closed = closedDates(entries, DF01, { from: "2026-06-01", to: "2026-07-01" });
+  eq(nextOpenDay("2026-06-01", { openDays: EVERY_DAY, closed }), "2026-06-02");
+});
+
+test("dayAndDate names the weekday", () => {
+  eq(dayAndDate("2026-11-28"), "Saturday, Nov 28");
+  eq(dayAndDate("2026-11-30"), "Monday, Nov 30");
 });

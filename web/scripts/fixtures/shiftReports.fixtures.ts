@@ -5,6 +5,7 @@ import {
   donutsToRecord,
   showsDonutBatch,
   pageBanner,
+  pageTitle,
   submitReadiness,
   submitBlockers,
   premadeGroups,
@@ -185,6 +186,27 @@ test("printing is the exception — paper can come out of a printer tomorrow", (
     "Tomorrow's production logs have not been printed.",
   ]);
   eq(submitBlockers(unprinted), []);
+});
+
+test("the printing caveats name the next production day when the report has one", () => {
+  // After a closure it is not tomorrow (2026-11-26): closing Wednesday Nov 25
+  // before Thanksgiving, the paper is Saturday's.
+  const unprinted = {
+    ...READY,
+    taskSpecialOrdersDone: false,
+    taskSchedulesDone: false,
+    nextProductionDate: "2026-11-28",
+  };
+  eq(submitReadiness(unprinted), [
+    "Special orders for Saturday, Nov 28 have not been printed.",
+    "Production logs for Saturday, Nov 28 have not been printed.",
+  ]);
+});
+
+test("the production page's title names its day", () => {
+  eq(pageTitle("tomorrow", "2026-11-28"), "Production for Saturday, Nov 28");
+  eq(pageTitle("tomorrow", null), "Next production day");
+  eq(pageTitle("sales", "2026-11-28"), "Sales");
 });
 
 test("a shift that is not asked for a page is not blocked on it", () => {

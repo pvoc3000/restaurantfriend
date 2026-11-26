@@ -12,6 +12,7 @@
 // Every date is an ISO `YYYY-MM-DD` string and is compared as a string, the
 // same discipline as `lib/dateRange`.
 
+import { isoWeekdayOf } from "./dateRange";
 import { daysAfter } from "./today";
 
 export type BlackoutEffect = "special_orders" | "standing_orders" | "production" | "closed";
@@ -171,6 +172,33 @@ export function closedDates(
   return closed;
 }
 
+/**
+ * The first day AFTER `after` on which the shop is open: its weekday is one of
+ * `openDays` (017's weekly pattern; EMPTY means no pattern, so every weekday)
+ * and the calendar has not closed it (`closed`, from `closedDates`).
+ *
+ * What a closing report's "next production day" defaults to (Mark,
+ * 2026-11-26): closing on a Wednesday before a shop shut Thursday and Friday,
+ * the supervisor prints Saturday's schedules, not Thursday's.
+ *
+ * Gives up after `limit` days and answers the day after, because a shop shut
+ * for longer than that is a mistake on the calendar, and a date the person can
+ * see and correct beats one that is a fortnight away.
+ */
+export function nextOpenDay(
+  after: string,
+  shop: { openDays: readonly number[]; closed: ReadonlySet<string> },
+  limit = 14,
+): string {
+  for (let i = 1; i <= limit; i += 1) {
+    const day = daysAfter(after, i);
+    if (shop.openDays.length > 0 && !shop.openDays.includes(isoWeekdayOf(day))) continue;
+    if (shop.closed.has(day)) continue;
+    return day;
+  }
+  return daysAfter(after, 1);
+}
+
 /* -- wording ------------------------------------------------------------- */
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -178,6 +206,16 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 /** "Dec 25" — no year, for a sentence about a date that is on screen already. */
 export function monthDay(iso: string): string {
   return `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}`;
+}
+
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/**
+ * "Saturday, Nov 28" — a day the reader has to act on, named rather than
+ * called "tomorrow", because after a closure it is not tomorrow.
+ */
+export function dayAndDate(iso: string): string {
+  return `${WEEKDAYS[isoWeekdayOf(iso) - 1]}, ${monthDay(iso)}`;
 }
 
 const MONTHS_LONG = [

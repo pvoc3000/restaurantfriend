@@ -1,7 +1,7 @@
 "use client";
 
 import { SHIFT_SLOT_OPTIONS } from "@/lib/employeeEvents";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -10,7 +10,7 @@ import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { PickList } from "@/components/ui/PickList";
 import { DateField } from "@/components/ui/DateField";
 import { SHIFT_SLOT_LABEL, type ShiftSlot } from "@/lib/shiftReports";
-import { daysBefore } from "@/lib/today";
+import { nextOpenDay } from "@/lib/blackoutDates";
 
 const SHIFT_OPTIONS = SHIFT_SLOT_OPTIONS;
 
@@ -50,6 +50,8 @@ export function NewShiftReport({
   today,
   myEmployeeId,
   myName,
+  openDays,
+  closedDates,
   existing,
 }: {
   orgId: string;
@@ -69,6 +71,13 @@ export function NewShiftReport({
    * this was until the email arrived — DF02's opening report that day.
    */
   myName: string;
+  /** This shop's weekly pattern (`locations.open_days`, 017); empty means every day. */
+  openDays: number[];
+  /**
+   * The days the calendar closes this shop, from the day before today through
+   * a few weeks ahead — what `nextOpenDay` steps over.
+   */
+  closedDates: string[];
   existing: {
     id: string;
     /** Started by the signed-in member — the one who may reopen it once sent (106). */
@@ -86,7 +95,19 @@ export function NewShiftReport({
   // pressed Start without looking filed an opening report as a closing one —
   // with the closing pages. A field starts empty; Start waits for a pick.
   const [shift, setShift] = useState<ShiftSlot | null>(null);
-  const [nextDay, setNextDay] = useState<string | null>(daysBefore(today, -1));
+  // THE NEXT DAY THE SHOP IS OPEN, not the day after (Mark, 2026-11-26):
+  // closing on a Wednesday before a Thursday and Friday shut, the supervisor
+  // prints Saturday's schedules. It FOLLOWS the Date field — a closer finishing
+  // after midnight sets yesterday's date, and the production day moves with it
+  // — until somebody picks a day by hand, which then stays theirs.
+  const closed = useMemo(() => new Set(closedDates), [closedDates]);
+  const [pickedNextDay, setPickedNextDay] = useState<string | null | undefined>(undefined);
+  const nextDay =
+    pickedNextDay !== undefined
+      ? pickedNextDay
+      : date === null
+        ? null
+        : nextOpenDay(date, { openDays, closed });
   const [failed, setFailed] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -319,13 +340,13 @@ export function NewShiftReport({
               </span>
               <DateField
                 value={nextDay}
-                onChange={setNextDay}
+                onChange={setPickedNextDay}
                 variant="field"
                 boxed
                 ariaLabel="The next day production happens"
               />
               <span className="block text-xs text-muted italic">
-                typically tomorrow, but could be any date in the future.
+                the next day the shop is open.
               </span>
             </label>
           </div>

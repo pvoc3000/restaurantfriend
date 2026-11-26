@@ -184,6 +184,10 @@ export default function ShiftReportGuide() {
             <strong>Date</strong> and <strong>Next production day</strong>, then tap{" "}
             <Ui go>Start the report</Ui>.
             <p>
+              <strong>Next production day</strong> fills itself with the next day the shop is open,
+              so closing before a holiday gives the day you reopen, not tomorrow.
+            </p>
+            <p>
               <strong>Supervisor</strong> should be your name. If it is somebody else’s, the
               iPad is still signed in as them: tap <Ui>Cancel</Ui>, then <Ui>Switch user</Ui>.
             </p>
@@ -372,8 +376,11 @@ export default function ShiftReportGuide() {
             </ul>
           </Page>
 
-          <Page name="Tomorrow’s production" closingOnly>
-            <p>Get tomorrow’s kitchen paper printed.</p>
+          <Page name="Production for …" closingOnly>
+            <p>
+              Get the kitchen paper printed for the next production day — the page’s title names
+              it, for example “Production for Saturday, Nov 28”.
+            </p>
             <ul>
               <li>
                 If there’s no schedule yet, tap <Ui>Generate schedules</Ui>. Special orders that

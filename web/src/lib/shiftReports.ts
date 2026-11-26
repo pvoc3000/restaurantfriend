@@ -10,6 +10,7 @@
 import type { ShiftSlot } from "./employeeEvents";
 import { formatTypedTime } from "./timeInput";
 import { SHIFT_SLOT_LABEL } from "./employeeEvents";
+import { dayAndDate } from "./blackoutDates";
 import {
   CHECKLIST_KIND_LABEL,
   outstandingCount,
@@ -55,7 +56,9 @@ export const PAGE_TITLE: Record<ShiftReportPage, string> = {
   elements: "Donut batches",
   checklist: "Checklist",
   report: "Report",
-  tomorrow: "Tomorrow's production",
+  // The fallback only: `pageTitle` names the DAY when the report has one
+  // (2026-11-26) — after a closure the next production day is not tomorrow.
+  tomorrow: "Next production day",
   submit: "Submit",
 };
 
@@ -168,13 +171,25 @@ export function showsDonutBatch(
   return batch.recorded || asked.includes(batch.elementId);
 }
 
-export function pageTitle(page: ShiftReportPage): string {
+/**
+ * A page's title. The production page names its day — "Production for
+ * Saturday, Nov 28" — given the report's `next_production_date`.
+ */
+export function pageTitle(page: ShiftReportPage, nextProductionDate?: string | null): string {
+  if (page === "tomorrow" && nextProductionDate) {
+    return `Production for ${dayAndDate(nextProductionDate)}`;
+  }
   return PAGE_TITLE[page];
 }
 
 /** The black band's own words. `total` is `pagesForShift(...).length`. */
-export function pageBanner(page: ShiftReportPage, index: number, total: number): string {
-  return `Shift report — page ${index + 1} of ${total} — ${pageTitle(page)}`;
+export function pageBanner(
+  page: ShiftReportPage,
+  index: number,
+  total: number,
+  nextProductionDate?: string | null
+): string {
+  return `Shift report — page ${index + 1} of ${total} — ${pageTitle(page, nextProductionDate)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +228,12 @@ export type ReadinessInput = {
   };
   taskSpecialOrdersDone: boolean;
   taskSchedulesDone: boolean;
+  /**
+   * The report's `next_production_date`, so the two printing caveats name the
+   * day rather than saying "tomorrow" (2026-11-26). Absent or null keeps the
+   * old word.
+   */
+  nextProductionDate?: string | null;
   /** Null when Square has not reported the day yet, which is the normal case. */
   netSalesCents: number | null;
   countedLines: number;
@@ -250,11 +271,20 @@ export function submitReadiness(input: ReadinessInput): string[] {
   // of a printer can come out of it at six tomorrow morning. Late, and a real
   // problem, and not a fact that has evaporated.
   if (pages.includes("tomorrow")) {
+    const day = input.nextProductionDate ? dayAndDate(input.nextProductionDate) : null;
     if (!input.taskSpecialOrdersDone) {
-      caveats.push("Tomorrow's special orders have not been printed.");
+      caveats.push(
+        day
+          ? `Special orders for ${day} have not been printed.`
+          : "Tomorrow's special orders have not been printed."
+      );
     }
     if (!input.taskSchedulesDone) {
-      caveats.push("Tomorrow's production logs have not been printed.");
+      caveats.push(
+        day
+          ? `Production logs for ${day} have not been printed.`
+          : "Tomorrow's production logs have not been printed."
+      );
     }
   }
 

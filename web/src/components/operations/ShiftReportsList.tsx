@@ -357,6 +357,8 @@ export function ShiftReportsList({
             today={today}
             myEmployeeId={myEmployeeId}
             myName={myName}
+            openDays={openDays}
+            closedDates={closedDates}
             existing={rows.map((r) => ({
               id: r.id,
               mine: r.mine,

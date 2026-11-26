@@ -183,7 +183,7 @@ export function InfoPage({
       </div>
 
       <label className="block space-y-2">
-        <FieldLabel hint="typically tomorrow, but could be any date in the future.">
+        <FieldLabel hint="the next day the shop is open.">
           Next production day
         </FieldLabel>
         <DateField

@@ -3,7 +3,7 @@ import { fetchEntries } from "@/lib/calendarQueries";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canEnterCounts } from "@/lib/roles";
-import { todayInTimeZone, serverTimeZone, daysBefore } from "@/lib/today";
+import { todayInTimeZone, serverTimeZone, daysAfter, daysBefore } from "@/lib/today";
 import {
   ShiftReportsList,
   type ShiftReportRow,
@@ -17,6 +17,10 @@ import { searchTerm } from "@/lib/searchQuery";
 /** The missing-night sweep's own window — `ShiftReportsList`'s `GAP_DAYS`.
  *  Fetched apart from the list, which may be showing last March. */
 const GAP_DAYS = 7;
+
+/** How far ahead the create dialog looks for the shop's next open day —
+ *  `nextOpenDay`'s own limit, and the reach of the calendar fetch for it. */
+const AHEAD_DAYS = 14;
 
 
 /**
@@ -125,8 +129,10 @@ export default async function ShiftReportsPage({
     // was not open that weekday.
     supabase.from("locations").select("open_days").eq("id", active.id).maybeSingle(),
     // The calendar's exceptions to that weekly pattern (migration 181): a shop
-    // closed for Christmas owes no closing report.
-    fetchEntries(supabase, { from: daysBefore(today, GAP_DAYS), to: today }),
+    // closed for Christmas owes no closing report — and, looking AHEAD, gets
+    // no production day either: the create dialog defaults to the next day the
+    // shop is open (2026-11-26).
+    fetchEntries(supabase, { from: daysBefore(today, GAP_DAYS), to: daysAfter(today, AHEAD_DAYS + 1) }),
   ]);
 
   if (error) {
@@ -176,7 +182,12 @@ export default async function ShiftReportsPage({
       locationCode={active.code}
       openDays={(shop?.open_days as number[] | null) ?? []}
       closedDates={[
-        ...closedDates(calendarEntries, active.id, { from: daysBefore(today, GAP_DAYS), to: today }),
+        // The missing-night sweep reads only the past days of this; the create
+        // dialog reads the days ahead.
+        ...closedDates(calendarEntries, active.id, {
+          from: daysBefore(today, GAP_DAYS),
+          to: daysAfter(today, AHEAD_DAYS + 1),
+        }),
       ]}
       myEmployeeId={(myEmployeeId as string | null) ?? null}
       myName={

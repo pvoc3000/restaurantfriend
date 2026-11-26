@@ -81,6 +81,7 @@ export function ShiftReportRunner({
   readOnlyNote,
   checklistRun,
   squareSales,
+  nextProductionDate,
 }: {
   reportId: string;
   shift: ShiftSlot;
@@ -143,6 +144,8 @@ export function ShiftReportRunner({
    * settled and stored — there is nothing fresher to ask for then.
    */
   squareSales: { locationId: string; reportDate: string } | null;
+  /** The report's `next_production_date`, which the production page's title names. */
+  nextProductionDate: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -152,7 +155,7 @@ export function ShiftReportRunner({
   const order = pagesForReport(shift, pages.elements !== undefined).flatMap((p) =>
     p === "premades" && premadePages && premadePages.length > 0
       ? premadePages.map((s, i) => ({ key: `premades-${i}`, title: s.title, body: s.body }))
-      : [{ key: p as string, title: pageTitle(p), body: pages[p] }]
+      : [{ key: p as string, title: pageTitle(p, nextProductionDate), body: pages[p] }]
   );
   const [index, setIndex] = useState(() =>
     openAtPage === null ? 0 : Math.min(Math.max(openAtPage - 1, 0), order.length - 1)
