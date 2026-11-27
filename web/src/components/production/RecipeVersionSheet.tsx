@@ -781,8 +781,9 @@ export function RecipeVersionSheet({
             )
           : null}
 
-        {/* No add row here: Add Ingredient… in the record's Actions menu opens
-            a dialog (Mark, 2026-09-12). */}
+        {/* No add row here: each row's ⋯ adds an ingredient, divider or spacer
+            BELOW it (2026-11-03). Only a version with no lines keeps Add
+            Ingredient… in the record's Actions menu (`RecipeCommandMenu`). */}
       </section>
       ) : null}
 
