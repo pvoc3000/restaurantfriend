@@ -2273,3 +2273,11 @@ it is the same line of code. SO-10223 and SO-10231 got their entry by hand,
 dated to the 21:51 print. **Seen, not fixed:** `schedule_special_order`'s
 "Production scheduled…" entry inserts `author_id` but no `author`, so History
 shows it unattributed. That needs a migration.
+
+**227 APPLIED 2026-11-27 — a History line with a user gets their name.** A
+BEFORE INSERT trigger on `special_order_events`
+(`trg_special_order_event_author`) fills `author` from `org_members` whenever an
+insert names `author_id` and no `author`. The migration also backfilled the 160
+lines `schedule_special_order` / `unschedule_special_order` had written that
+way since 2026-08-28. Verified after applying: trigger present, 0 unnamed lines,
+not executable by `anon`, and both 11-28 orders' scheduling lines read "Mark".
