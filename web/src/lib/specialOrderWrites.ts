@@ -439,3 +439,43 @@ export async function duplicateSpecialOrder(
   }
   return { id: data };
 }
+
+/**
+ * Write lines into orders' History (`special_order_events`) from the app.
+ *
+ * FOR AN ACT WITH NO WATCHED COLUMN BEHIND IT. 054's trigger deliberately
+ * leaves the stage dates out, on the ground that the act which sets one writes
+ * its own line. Printing did not (Mark, 2026-11-27: "the history field/log
+ * should be updated as well"), so an order printed by Download or inside a
+ * production packet got a date and no entry.
+ *
+ * THE AUTHOR IS RESOLVED HERE, from the signed-in user's own membership, so a
+ * caller that has no display name in hand (the packet dialog sits under three
+ * screens) needs no prop for it. `getSession` reads the local session and costs
+ * no round trip; the one query is the member's name.
+ *
+ * Best effort and SILENT on failure, which is the stamp's own rule: the paper
+ * exists, and failing a print after the fact because a log line did not land
+ * would report the wrong thing.
+ */
+export async function logOrderEvents(
+  supabase: SupabaseClient,
+  rows: readonly { org_id: string; order_id: string; message: string }[]
+): Promise<void> {
+  if (rows.length === 0) return;
+  const { data: auth } = await supabase.auth.getSession();
+  const userId = auth.session?.user.id ?? null;
+  let author: string | null = null;
+  if (userId) {
+    const { data: m } = await supabase
+      .from("org_members")
+      .select("display_name")
+      .eq("user_id", userId)
+      .eq("org_id", rows[0].org_id)
+      .maybeSingle();
+    author = (m?.display_name as string | null) ?? auth.session?.user.email ?? null;
+  }
+  await supabase.from("special_order_events").insert(
+    rows.map((r) => ({ ...r, author, author_id: userId, source: "app" }))
+  );
+}

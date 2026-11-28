@@ -15,7 +15,8 @@ import {
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { PACKET_PARTS, type PacketPart } from "@/components/production/pdf/ProductionPacketPdfs";
-import { fetchOrderDocData } from "@/lib/specialOrderDocs";
+import { DOCUMENT_LABEL, fetchOrderDocData } from "@/lib/specialOrderDocs";
+import { logOrderEvents } from "@/lib/specialOrderWrites";
 
 /**
  * Print the night's packet — production brief decision 7.
@@ -63,6 +64,24 @@ const SAVEABLE = new Set<PacketPart>(["premade", "baker", "fryer", "decorator"])
 
 /** A special order the packet prints, with what the dialog names it by. */
 export type PacketOrder = { id: string; number: string | null; title: string | null };
+
+/**
+ * `2026-11-28` → `Sat Nov 28`, the wording `schedule_special_order`'s own
+ * History line uses (`to_char(p_date, 'FMDy FMMon FMDD')`), so the two entries
+ * an order's night writes read alike. UTC throughout: a wall-clock date, not
+ * an instant.
+ */
+function shortDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).replace(",", "");
+}
 
 export function PrintPacket({
   scheduleIds,
@@ -169,19 +188,33 @@ export function PrintPacket({
    * would be re-stamped from a stale null — moving a date the record had
    * already, correctly, claimed. It is also the rule the per-order button has
    * always followed: a second copy next week is not a second print.
+   *
+   * EACH ORDER IT STAMPS GETS A HISTORY LINE, and only those: the rows the
+   * update returns are exactly the orders that moved, so the entry and the
+   * date agree one for one. `describe` words it from the order's schedule.
    */
   async function stampOrdersPrinted(
     column: "id" | "production_schedule_id",
     ids: string[],
-    day: string
+    day: string,
+    describe: (scheduleId: string | null) => string
   ): Promise<string | null> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("special_orders")
       .update({ order_printed_at: day })
       .in(column, ids)
       .is("order_printed_at", null)
-      .select("id");
-    return error ? error.message : null;
+      .select("id, org_id, production_schedule_id");
+    if (error) return error.message;
+    await logOrderEvents(
+      supabase,
+      (data ?? []).map((o) => ({
+        org_id: o.org_id as string,
+        order_id: o.id as string,
+        message: describe((o.production_schedule_id ?? null) as string | null),
+      }))
+    );
+    return null;
   }
 
   function print() {
@@ -291,10 +324,22 @@ export function PrintPacket({
         const orderSchedules = packet.schedules
           .filter((s) => s.source === "special_order")
           .map((s) => s.id);
+        const byId = new Map(packet.schedules.map((s) => [s.id, s]));
         const stamps: Promise<string | null>[] = [];
-        if (wantOrders) stamps.push(stampOrdersPrinted("id", orderIds, packet.printedOn));
+        if (wantOrders) {
+          stamps.push(
+            stampOrdersPrinted("id", orderIds, packet.printedOn, () => `${DOCUMENT_LABEL.order} printed`)
+          );
+        }
         if (orderSchedules.length > 0) {
-          stamps.push(stampOrdersPrinted("production_schedule_id", orderSchedules, packet.printedOn));
+          stamps.push(
+            stampOrdersPrinted("production_schedule_id", orderSchedules, packet.printedOn, (id) => {
+              const s = id ? byId.get(id) : undefined;
+              return s
+                ? `Order printed with the ${s.kitchenCode} production schedule for ${shortDay(s.date)}`
+                : "Order printed with its production schedule";
+            })
+          );
         }
         const stampErr = (await Promise.all(stamps)).find((m) => m !== null);
         if (stampErr) setFailed(stampErr);

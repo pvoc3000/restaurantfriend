@@ -24,6 +24,7 @@ import { CreateInvoiceDialog } from "@/components/customerInvoices/CreateInvoice
 import { sendIntent, type InvoiceCandidate } from "@/lib/customerInvoices";
 import { withFrom } from "@/lib/breadcrumbs";
 import { renderOrderDocument } from "./renderOrderDocument";
+import { logOrderEvents } from "@/lib/specialOrderWrites";
 import { confirmDialog } from "@/lib/confirm";
 import { deliveryEstimateGoAhead } from "@/lib/specialOrderSend";
 
@@ -247,7 +248,19 @@ export function SendDocument({
         // Silent on refusal, deliberately: the document IS downloaded and is
         // on somebody's disk. Failing the download after the fact because a
         // bookkeeping write did not land would be reporting the wrong thing.
-        if (data?.length) router.refresh();
+        //
+        // The History line goes with the stamp, never without it, so a second
+        // copy is not a second "printed" (see `logOrderEvents`).
+        if (data?.length) {
+          await logOrderEvents(supabase, [
+            {
+              org_id: orgId,
+              order_id: orderId,
+              message: `${DOCUMENT_LABEL[k]} ${k === "order" ? "printed" : "downloaded"}`,
+            },
+          ]);
+          router.refresh();
+        }
       }
       propose(k);
     });

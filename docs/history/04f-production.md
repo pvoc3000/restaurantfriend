@@ -2259,3 +2259,17 @@ org's day as `printedOn`. Before, they fell back to `fetchPacketData`'s UTC
 date, which is tomorrow after 4 pm Pacific. **Order scheduled was NOT
 missing:** `schedule_special_order` stamped both orders 2026-11-27 at
 generation. Not verified with a real print (that writes live data).
+**Later the same day — the print writes a History line too** (Mark: "the
+history field/log should be updated as well"). No print had EVER logged:
+054's trigger leaves the stage dates out because "the act writes its own
+line", and neither printing act did. `lib/specialOrderWrites.logOrderEvents`
+writes the line and resolves the author from the signed-in member. It is
+called only for the orders a stamp actually moved (the update's returned rows),
+so a reprint adds nothing. The wording: "Order printed with the DF02 production
+schedule for Sat Nov 28" from a packet's schedule, "Kitchen Order printed" from
+the packet's Special Orders part and from the order's Download. A downloaded
+quote or receipt now writes "Quote downloaded" / "Receipt downloaded", because
+it is the same line of code. SO-10223 and SO-10231 got their entry by hand,
+dated to the 21:51 print. **Seen, not fixed:** `schedule_special_order`'s
+"Production scheduled…" entry inserts `author_id` but no `author`, so History
+shows it unattributed. That needs a migration.
