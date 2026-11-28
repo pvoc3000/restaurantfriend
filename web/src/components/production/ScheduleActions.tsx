@@ -36,6 +36,7 @@ export function ScheduleActions({
   lineCount,
   editable,
   stampable,
+  printedOn,
   orgId,
   addable,
 }: {
@@ -54,6 +55,8 @@ export function ScheduleActions({
   editable: boolean;
   /** Passed to `PrintPacket` — may this reader stamp the night printed (044). */
   stampable: boolean;
+  /** The org's calendar day, for the print stamps — `PrintPacket.printedOn`. */
+  printedOn: string;
   orgId: string;
   /** The menu `AddScheduleItems` offers. */
   addable: AddableItem[];
@@ -254,7 +257,7 @@ export function ScheduleActions({
   };
 
   const withPrint = (addRow: ActionMenuItem | null) => (
-    <PrintPacket scheduleIds={[scheduleId]} stampable={stampable} label="Print…">
+    <PrintPacket scheduleIds={[scheduleId]} stampable={stampable} printedOn={printedOn} label="Print…">
       {(printRow) => menu(addRow, printRow)}
     </PrintPacket>
   );

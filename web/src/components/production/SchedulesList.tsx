@@ -570,6 +570,7 @@ export function SchedulesList({
       <PrintPacket
         scheduleIds={[...checked]}
         stampable={stampable}
+        printedOn={today}
         onPrinted={() => setChecked(new Set())}
       >
         {(printRow) => menu(generateRow, printRow)}

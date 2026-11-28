@@ -2244,3 +2244,18 @@ box, and, when a note exists, the note on its own line under the filter row
 `BatchItemsTable`, unwrapped where `filterExtra` is wrapped). Saved notes show
 at once and roll back, with the dialog reopened, if the write fails. Read-only
 users see the note and no button.
+
+**2026-11-27 — printing an order's production schedule stamps the order
+printed** (Mark: "the app only records these events when they are initiated
+from a specific place"). DF02's 11-28 night was generated with SO-10223 and
+SO-10231, then printed from `/schedules`. The edge log shows three
+`mark_schedule_printed` calls and no `special_orders` write: `/schedules` and a
+schedule's record pass no `specialOrders`, so the packet's only order stamp,
+the one behind the Special Orders part, never ran. `PrintPacket` now also
+stamps `order_printed_at` (only where it is empty) on every order whose
+`production_schedule_id` is a `special_order` schedule in the printed packet,
+whichever parts were ticked. `/schedules` and the schedule record now pass the
+org's day as `printedOn`. Before, they fell back to `fetchPacketData`'s UTC
+date, which is tomorrow after 4 pm Pacific. **Order scheduled was NOT
+missing:** `schedule_special_order` stamped both orders 2026-11-27 at
+generation. Not verified with a real print (that writes live data).

@@ -13,7 +13,7 @@ import { ScheduleLocationCell } from "@/components/production/ScheduleLocationCe
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { packetDate, planDeviation, plansInForce } from "@/lib/productionSchedule";
 import { meansNoAllergy } from "@/lib/specialOrders";
-import { dateInTimeZone, serverTimeZone } from "@/lib/today";
+import { dateInTimeZone, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import {
   ScheduleLines,
   type ScheduleLineRow,
@@ -365,6 +365,7 @@ export async function ScheduleDetail({
           lineCount={rows.length}
           editable={editable}
           stampable={countable}
+          printedOn={todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone())}
           orgId={session.membership.org_id}
           addable={addable}
         />

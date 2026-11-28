@@ -156,6 +156,34 @@ export function PrintPacket({
     setParts((prev) => (prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]));
   }
 
+  /**
+   * Stamp `order_printed_at` on the orders matching `column in ids`.
+   *
+   * `printedOn` is the day the ACT happened — every other stage date in this
+   * module records that, never the day the thing is FOR. Falls back to the
+   * packet's own date for a caller supplying none.
+   *
+   * THE "ONLY WHERE EMPTY" TEST IS POSTGRES', not a filter over what the page
+   * happened to be holding. The screen's copy of `order_printed_at` is as old
+   * as its last render, so a sheet printed from the row above a minute ago
+   * would be re-stamped from a stale null — moving a date the record had
+   * already, correctly, claimed. It is also the rule the per-order button has
+   * always followed: a second copy next week is not a second print.
+   */
+  async function stampOrdersPrinted(
+    column: "id" | "production_schedule_id",
+    ids: string[],
+    day: string
+  ): Promise<string | null> {
+    const { error } = await supabase
+      .from("special_orders")
+      .update({ order_printed_at: day })
+      .in(column, ids)
+      .is("order_printed_at", null)
+      .select("id");
+    return error ? error.message : null;
+  }
+
   function print() {
     setFailed(null);
     try {
@@ -241,24 +269,35 @@ export function PrintPacket({
         // ONLY WHERE IT IS EMPTY, which is the rule the per-order button has
         // always followed: a second copy next week is not a second print, and
         // overwriting would move the date the record already claims.
-        if (wantOrders) {
-          const { error: stampErr } = await supabase
-            .from("special_orders")
-            // `printedOn` is the day the ACT happened — every other stage date
-            // in this module records that, never the day the thing is FOR.
-            // Falls back to the packet's own date for a caller supplying none.
-            .update({ order_printed_at: packet.printedOn })
-            .in("id", orderIds)
-            // THE "ONLY WHERE EMPTY" TEST IS POSTGRES', not a filter over what
-            // the page happened to be holding. The screen's copy of
-            // `order_printed_at` is as old as its last render, so a sheet
-            // printed from the row above a minute ago would be re-stamped from
-            // a stale null — moving a date the record had already, correctly,
-            // claimed.
-            .is("order_printed_at", null)
-            .select("id");
-          if (stampErr) setFailed(stampErr.message);
+        //
+        // TWO WAYS A SHEET FOR AN ORDER COMES OUT, and both stamp it (Mark,
+        // 2026-11-27: "the app only records these events when they are
+        // initiated from a specific place"). One is the kitchen order sheet,
+        // the Special Orders part, offered only where the caller hands over
+        // `specialOrders`. The other is the order's own PRODUCTION SCHEDULE,
+        // which `/schedules` and a schedule's record print with the night and
+        // which is titled after the order. Before this, only the first one
+        // stamped: DF02's 11-28 packet printed both orders' schedules from
+        // `/schedules` and left both orders reading unprinted.
+        //
+        // Read from the schedules ACTUALLY IN THE PACKET (the expanded set,
+        // for the reason the schedule stamp above uses it), through the
+        // order's `production_schedule_id`, the one link between the two.
+        //
+        // WHATEVER PARTS WERE TICKED, the schedule stamp's own rule: the two
+        // stamps answer one question (is there paper in the kitchen for this),
+        // and a schedule reading printed over an order reading unprinted is
+        // the disagreement this exists to end.
+        const orderSchedules = packet.schedules
+          .filter((s) => s.source === "special_order")
+          .map((s) => s.id);
+        const stamps: Promise<string | null>[] = [];
+        if (wantOrders) stamps.push(stampOrdersPrinted("id", orderIds, packet.printedOn));
+        if (orderSchedules.length > 0) {
+          stamps.push(stampOrdersPrinted("production_schedule_id", orderSchedules, packet.printedOn));
         }
+        const stampErr = (await Promise.all(stamps)).find((m) => m !== null);
+        if (stampErr) setFailed(stampErr);
         setOpen(false);
         onPrinted?.();
         router.refresh();
